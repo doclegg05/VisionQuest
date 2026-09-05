@@ -1,0 +1,26 @@
+[
+  {
+    "id": "bench_class_1",
+    "code": "bench-spokes-beckley",
+    "name": "Bench SPOKES Beckley",
+    "region": "Raleigh County, WV",
+    "instructorId": "bench_instr_1",
+    "localJobPriority": "prefer_local"
+  },
+  {
+    "id": "bench_class_2",
+    "code": "bench-spokes-charleston",
+    "name": "Bench SPOKES Charleston",
+    "region": "Kanawha County, WV",
+    "instructorId": "bench_instr_2",
+    "localJobPriority": "prefer_local"
+  },
+  {
+    "id": "bench_class_3",
+    "code": "bench-spokes-huntington",
+    "name": "Bench SPOKES Huntington",
+    "region": "Cabell County, WV",
+    "instructorId": "bench_instr_3",
+    "localJobPriority": "prefer_local"
+  }
+]

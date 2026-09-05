@@ -1,0 +1,2892 @@
+[
+  {
+    "studentId": "bench_stu_01",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "25801",
+    "county": "Raleigh",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": "2026-09-20",
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_02",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "25301",
+    "county": "Kanawha",
+    "maxCommuteMinutes": 22,
+    "payFloorHourly": null,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": "2026-09-18",
+    "shiftLimits": {
+      "maxHoursPerWeek": 29
+    },
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_03",
+    "availabilityShape": "weekdayEvenings",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "25701",
+    "county": "Cabell",
+    "maxCommuteMinutes": 32,
+    "payFloorHourly": 11,
+    "childcareHours": null,
+    "earliestStart": "2026-10-02",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_04",
+    "availabilityShape": "weekendsOnly",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "ride",
+    "homeZip": "26501",
+    "county": "Monongalia",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 12,
+    "childcareHours": null,
+    "earliestStart": "2026-09-06",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_05",
+    "availabilityShape": "anytime",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "bus",
+    "homeZip": "26101",
+    "county": "Wood",
+    "maxCommuteMinutes": 15,
+    "payFloorHourly": 13,
+    "childcareHours": null,
+    "earliestStart": "2026-09-17",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_06",
+    "availabilityShape": "morningsAndWeekends",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "bus",
+    "homeZip": "26003",
+    "county": "Ohio",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 14,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_07",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "walk",
+    "homeZip": "25401",
+    "county": "Berkeley",
+    "maxCommuteMinutes": 31,
+    "payFloorHourly": 15,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_08",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "none",
+    "homeZip": "26554",
+    "county": "Marion",
+    "maxCommuteMinutes": 24,
+    "payFloorHourly": 16,
+    "childcareHours": null,
+    "earliestStart": "2026-09-11",
+    "shiftLimits": {
+      "maxHoursPerWeek": 33
+    },
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_09",
+    "availabilityShape": "weekdayEvenings",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": null,
+    "homeZip": "26301",
+    "county": "Harrison",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 18,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_10",
+    "availabilityShape": "weekendsOnly",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "24901",
+    "county": "Greenbrier",
+    "maxCommuteMinutes": 30,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": "2026-09-16",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_11",
+    "availabilityShape": "anytime",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "25901",
+    "county": "Fayette",
+    "maxCommuteMinutes": 24,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": "2026-10-07",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_12",
+    "availabilityShape": "morningsAndWeekends",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "24740",
+    "county": "Mercer",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 11,
+    "childcareHours": null,
+    "earliestStart": "2026-09-17",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_13",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "ride",
+    "homeZip": "26651",
+    "county": "Nicholas",
+    "maxCommuteMinutes": 45,
+    "payFloorHourly": 12,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": {
+      "maxHoursPerWeek": 28
+    },
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_14",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "bus",
+    "homeZip": "25271",
+    "county": "Jackson",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 13,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_15",
+    "availabilityShape": "weekdayEvenings",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "bus",
+    "homeZip": "26201",
+    "county": "Upshur",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 14,
+    "childcareHours": null,
+    "earliestStart": "2026-09-15",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_16",
+    "availabilityShape": "weekendsOnly",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "walk",
+    "homeZip": "26241",
+    "county": "Randolph",
+    "maxCommuteMinutes": 36,
+    "payFloorHourly": 15,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": "2026-09-08",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_17",
+    "availabilityShape": "anytime",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "none",
+    "homeZip": "25801",
+    "county": "Raleigh",
+    "maxCommuteMinutes": 22,
+    "payFloorHourly": 16,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_18",
+    "availabilityShape": "morningsAndWeekends",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": null,
+    "homeZip": "25301",
+    "county": "Kanawha",
+    "maxCommuteMinutes": 18,
+    "payFloorHourly": 18,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": {
+      "maxHoursPerWeek": 27
+    },
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_19",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "25701",
+    "county": "Cabell",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": "2026-09-30",
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_20",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "26501",
+    "county": "Monongalia",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_21",
+    "availabilityShape": "weekdayEvenings",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "26101",
+    "county": "Wood",
+    "maxCommuteMinutes": 20,
+    "payFloorHourly": 11,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_22",
+    "availabilityShape": "weekendsOnly",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "ride",
+    "homeZip": "26003",
+    "county": "Ohio",
+    "maxCommuteMinutes": 30,
+    "payFloorHourly": 12,
+    "childcareHours": null,
+    "earliestStart": "2026-09-12",
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_23",
+    "availabilityShape": "anytime",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "bus",
+    "homeZip": "25401",
+    "county": "Berkeley",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 13,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_24",
+    "availabilityShape": "morningsAndWeekends",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "bus",
+    "homeZip": "26554",
+    "county": "Marion",
+    "maxCommuteMinutes": 36,
+    "payFloorHourly": 14,
+    "childcareHours": null,
+    "earliestStart": "2026-09-04",
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_25",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "walk",
+    "homeZip": "26301",
+    "county": "Harrison",
+    "maxCommuteMinutes": 35,
+    "payFloorHourly": 15,
+    "childcareHours": null,
+    "earliestStart": "2026-10-06",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_26",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "none",
+    "homeZip": "24901",
+    "county": "Greenbrier",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 16,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_27",
+    "availabilityShape": "weekdayEvenings",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": null,
+    "homeZip": "25901",
+    "county": "Fayette",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 18,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": null,
+    "shiftLimits": {
+      "maxHoursPerWeek": 25
+    },
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_28",
+    "availabilityShape": "weekendsOnly",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "24740",
+    "county": "Mercer",
+    "maxCommuteMinutes": 27,
+    "payFloorHourly": null,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_29",
+    "availabilityShape": "anytime",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "26651",
+    "county": "Nicholas",
+    "maxCommuteMinutes": 28,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": "2026-09-22",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_30",
+    "availabilityShape": "morningsAndWeekends",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "25271",
+    "county": "Jackson",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 11,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": {
+      "maxHoursPerWeek": 27
+    },
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_31",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "ride",
+    "homeZip": "26201",
+    "county": "Upshur",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 12,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_32",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "bus",
+    "homeZip": "26241",
+    "county": "Randolph",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 13,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_33",
+    "availabilityShape": "weekdayEvenings",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "bus",
+    "homeZip": "25801",
+    "county": "Raleigh",
+    "maxCommuteMinutes": 42,
+    "payFloorHourly": 14,
+    "childcareHours": null,
+    "earliestStart": "2026-09-15",
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_34",
+    "availabilityShape": "weekendsOnly",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "walk",
+    "homeZip": "25301",
+    "county": "Kanawha",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 15,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": {
+      "maxHoursPerWeek": 35
+    },
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_35",
+    "availabilityShape": "anytime",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "none",
+    "homeZip": "25701",
+    "county": "Cabell",
+    "maxCommuteMinutes": 26,
+    "payFloorHourly": 16,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_36",
+    "availabilityShape": "morningsAndWeekends",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": null,
+    "homeZip": "26501",
+    "county": "Monongalia",
+    "maxCommuteMinutes": 16,
+    "payFloorHourly": 18,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": {
+      "maxHoursPerWeek": 26
+    },
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_37",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "26101",
+    "county": "Wood",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_38",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "26003",
+    "county": "Ohio",
+    "maxCommuteMinutes": 24,
+    "payFloorHourly": null,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": "2026-09-23",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_39",
+    "availabilityShape": "weekdayEvenings",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "car",
+    "homeZip": "25401",
+    "county": "Berkeley",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 11,
+    "childcareHours": null,
+    "earliestStart": "2026-10-03",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_40",
+    "availabilityShape": "weekendsOnly",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "ride",
+    "homeZip": "26554",
+    "county": "Marion",
+    "maxCommuteMinutes": 33,
+    "payFloorHourly": 12,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": {
+      "maxHoursPerWeek": 23
+    },
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_41",
+    "availabilityShape": "anytime",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "bus",
+    "homeZip": "26301",
+    "county": "Harrison",
+    "maxCommuteMinutes": 39,
+    "payFloorHourly": 13,
+    "childcareHours": null,
+    "earliestStart": "2026-10-10",
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_42",
+    "availabilityShape": "morningsAndWeekends",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "bus",
+    "homeZip": "24901",
+    "county": "Greenbrier",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 14,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": "2026-10-05",
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_43",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "walk",
+    "homeZip": "25901",
+    "county": "Fayette",
+    "maxCommuteMinutes": 42,
+    "payFloorHourly": 15,
+    "childcareHours": {
+      "note": "Kids are at school 8 to 3 on weekdays."
+    },
+    "earliestStart": "2026-10-05",
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_44",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "none",
+    "homeZip": "24740",
+    "county": "Mercer",
+    "maxCommuteMinutes": 40,
+    "payFloorHourly": 16,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_45",
+    "availabilityShape": "weekdayEvenings",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": true,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": null,
+    "homeZip": "26651",
+    "county": "Nicholas",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 18,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_46",
+    "availabilityShape": "weekendsOnly",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "25271",
+    "county": "Jackson",
+    "maxCommuteMinutes": 21,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_47",
+    "availabilityShape": "anytime",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "26201",
+    "county": "Upshur",
+    "maxCommuteMinutes": 43,
+    "payFloorHourly": null,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": {
+      "maxHoursPerWeek": 32
+    },
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_48",
+    "availabilityShape": "morningsAndWeekends",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      },
+      "sunday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": true,
+        "overnight": true
+      }
+    },
+    "transport": "car",
+    "homeZip": "26241",
+    "county": "Randolph",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 11,
+    "childcareHours": null,
+    "earliestStart": "2026-09-07",
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  },
+  {
+    "studentId": "bench_stu_49",
+    "availabilityShape": "none",
+    "availability": {
+      "monday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "ride",
+    "homeZip": "25801",
+    "county": "Raleigh",
+    "maxCommuteMinutes": null,
+    "payFloorHourly": 12,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "student"
+  },
+  {
+    "studentId": "bench_stu_50",
+    "availabilityShape": "weekdayDays",
+    "availability": {
+      "monday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "tuesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "wednesday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "thursday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "friday": {
+        "morning": true,
+        "afternoon": true,
+        "evening": false,
+        "overnight": false
+      },
+      "saturday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      },
+      "sunday": {
+        "morning": false,
+        "afternoon": false,
+        "evening": false,
+        "overnight": false
+      }
+    },
+    "transport": "bus",
+    "homeZip": "25301",
+    "county": "Kanawha",
+    "maxCommuteMinutes": 18,
+    "payFloorHourly": 13,
+    "childcareHours": null,
+    "earliestStart": null,
+    "shiftLimits": null,
+    "updatedVia": "sage"
+  }
+]

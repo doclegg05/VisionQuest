@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "epoch": "2026-09-01T12:00:00.000Z",
+  "idPrefix": "bench_",
+  "generator": "scripts/bench/generate-cohort.mjs",
+  "note": "Entirely synthetic. No real person, employer, phone number or address."
+}

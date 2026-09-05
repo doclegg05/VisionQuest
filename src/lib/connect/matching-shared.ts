@@ -145,6 +145,11 @@ export interface FitResult {
   reasons: string[];
 }
 
+export interface LeadFit {
+  lead: MatchLead;
+  fit: FitResult;
+}
+
 // ---------------------------------------------------------------------------
 // "Has the student actually told us anything?"
 // ---------------------------------------------------------------------------
@@ -454,4 +459,37 @@ export function fit(
     blockReasons: [],
     reasons: buildReasons(student, lead, overlap),
   };
+}
+
+// ---------------------------------------------------------------------------
+// rankLeadFits
+// ---------------------------------------------------------------------------
+
+/**
+ * Score a list of leads for one student, drop the hard-blocked ones, and put
+ * the rest in the order a student sees them.
+ *
+ * This is the whole of the student-facing ranking, and it is here — pure, with
+ * no Prisma — for two reasons. `rankLeadsForStudent` in ./matching.ts is a
+ * database query with three joins and a `Promise.all`, so the ordering rule
+ * used to be four lines at the bottom of it, reachable only by standing up a
+ * database. And the `matching-quality` benchmark has to measure the ORDER, not
+ * just the scores: precision@3 is a statement about which three leads come out
+ * on top, so a benchmark that re-implemented the sort would be grading its own
+ * copy and would keep passing after the real one changed.
+ *
+ * The tie-break on `lead.id` is not cosmetic. Leads that score identically are
+ * common (the shared sub-scorers are coarse), and without a deterministic
+ * second key the top three would depend on the order Postgres returned rows —
+ * which would make precision@3 flap between runs on unchanged code.
+ */
+export function rankLeadFits(
+  student: MatchStudent,
+  leads: readonly MatchLead[],
+  priority: LocalJobPriority = "prefer_local",
+): LeadFit[] {
+  return leads
+    .map((lead) => ({ lead, fit: fit(student, lead, priority) }))
+    .filter((entry) => entry.fit.hardBlocks.length === 0)
+    .sort((a, b) => b.fit.score - a.fit.score || a.lead.id.localeCompare(b.lead.id));
 }

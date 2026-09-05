@@ -1,0 +1,1343 @@
+[
+  {
+    "id": "bench_stu_01",
+    "login": "bench-student-01",
+    "displayName": "Alma Ashgrove",
+    "firstName": "Alma",
+    "lastName": "Ashgrove",
+    "email": "bench-student-01@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-01",
+    "topClusters": [
+      "Construction",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "REC",
+    "resumeSkills": [
+      "cash handling",
+      "cleaning",
+      "patient care",
+      "hand tools",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [
+      "osha-10",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 147
+  },
+  {
+    "id": "bench_stu_02",
+    "login": "bench-student-02",
+    "displayName": "Bryce Bellweather",
+    "firstName": "Bryce",
+    "lastName": "Bellweather",
+    "email": "bench-student-02@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-02",
+    "topClusters": [
+      "Construction",
+      "Digital Technology",
+      "Healthcare & Human Services"
+    ],
+    "hollandCode": "IAS",
+    "resumeSkills": [
+      "cash handling",
+      "scheduling",
+      "phone support",
+      "loading"
+    ],
+    "verifiedCertIds": [
+      "cna"
+    ],
+    "enrolledDaysAgo": 173
+  },
+  {
+    "id": "bench_stu_03",
+    "login": "bench-student-03",
+    "displayName": "Corah Cardwell",
+    "firstName": "Corah",
+    "lastName": "Cardwell",
+    "email": "bench-student-03@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-03",
+    "topClusters": [
+      "Construction",
+      "Digital Technology",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "RCE",
+    "resumeSkills": [
+      "customer service",
+      "hand tools",
+      "loading"
+    ],
+    "verifiedCertIds": [
+      "servsafe-food-handler",
+      "cpr-first-aid",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 150
+  },
+  {
+    "id": "bench_stu_04",
+    "login": "bench-student-04",
+    "displayName": "Dalen Denbrook",
+    "firstName": "Dalen",
+    "lastName": "Denbrook",
+    "email": "bench-student-04@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-04",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "ECS",
+    "resumeSkills": [
+      "loading",
+      "filing"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 273
+  },
+  {
+    "id": "bench_stu_05",
+    "login": "bench-student-05",
+    "displayName": "Efren Everly",
+    "firstName": "Efren",
+    "lastName": "Everly",
+    "email": "bench-student-05@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-05",
+    "topClusters": [
+      "Digital Technology",
+      "Hospitality, Events, & Tourism",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "RIE",
+    "resumeSkills": [
+      "inventory",
+      "data entry",
+      "patient care",
+      "hand tools",
+      "loading"
+    ],
+    "verifiedCertIds": [
+      "servsafe-food-handler",
+      "osha-10"
+    ],
+    "enrolledDaysAgo": 216
+  },
+  {
+    "id": "bench_stu_06",
+    "login": "bench-student-06",
+    "displayName": "Fallon Fenmore",
+    "firstName": "Fallon",
+    "lastName": "Fenmore",
+    "email": "bench-student-06@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-06",
+    "topClusters": [
+      "Healthcare & Human Services",
+      "Hospitality, Events, & Tourism",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "REC",
+    "resumeSkills": [
+      "phone support",
+      "quality checks"
+    ],
+    "verifiedCertIds": [
+      "osha-10",
+      "cpr-first-aid",
+      "cna"
+    ],
+    "enrolledDaysAgo": 221
+  },
+  {
+    "id": "bench_stu_07",
+    "login": "bench-student-07",
+    "displayName": "Garnet Galewood",
+    "firstName": "Garnet",
+    "lastName": "Galewood",
+    "email": "bench-student-07@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-07",
+    "topClusters": [
+      "Digital Technology",
+      "Healthcare & Human Services",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "CRE",
+    "resumeSkills": [
+      "cash handling",
+      "food prep",
+      "scheduling",
+      "phone support",
+      "shipping and receiving"
+    ],
+    "verifiedCertIds": [
+      "cna"
+    ],
+    "enrolledDaysAgo": 284
+  },
+  {
+    "id": "bench_stu_08",
+    "login": "bench-student-08",
+    "displayName": "Halle Hartsell",
+    "firstName": "Halle",
+    "lastName": "Hartsell",
+    "email": "bench-student-08@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-08",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Digital Technology",
+      "Healthcare & Human Services"
+    ],
+    "hollandCode": "ECS",
+    "resumeSkills": [
+      "food prep",
+      "cleaning",
+      "patient care",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [
+      "ready-to-work"
+    ],
+    "enrolledDaysAgo": 157
+  },
+  {
+    "id": "bench_stu_09",
+    "login": "bench-student-09",
+    "displayName": "Ilene Inglewright",
+    "firstName": "Ilene",
+    "lastName": "Inglewright",
+    "email": "bench-student-09@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-09",
+    "topClusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "ISE",
+    "resumeSkills": [
+      "forklift",
+      "scheduling",
+      "patient care",
+      "filing"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 192
+  },
+  {
+    "id": "bench_stu_10",
+    "login": "bench-student-10",
+    "displayName": "Jarrah Jarrowby",
+    "firstName": "Jarrah",
+    "lastName": "Jarrowby",
+    "email": "bench-student-10@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-10",
+    "topClusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "ASE",
+    "resumeSkills": [
+      "cash handling",
+      "inventory"
+    ],
+    "verifiedCertIds": [
+      "cna",
+      "flagger",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 297
+  },
+  {
+    "id": "bench_stu_11",
+    "login": "bench-student-11",
+    "displayName": "Kessa Kindler",
+    "firstName": "Kessa",
+    "lastName": "Kindler",
+    "email": "bench-student-11@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-11",
+    "topClusters": [
+      "Digital Technology",
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "RSE",
+    "resumeSkills": [
+      "scheduling",
+      "cleaning",
+      "hand tools",
+      "quality checks",
+      "loading"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 235
+  },
+  {
+    "id": "bench_stu_12",
+    "login": "bench-student-12",
+    "displayName": "Loman Lindsell",
+    "firstName": "Loman",
+    "lastName": "Lindsell",
+    "email": "bench-student-12@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-12",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "IRC",
+    "resumeSkills": [
+      "cash handling",
+      "food prep",
+      "scheduling",
+      "hand tools",
+      "quality checks"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 236
+  },
+  {
+    "id": "bench_stu_13",
+    "login": "bench-student-13",
+    "displayName": "Maribel Marchbank",
+    "firstName": "Maribel",
+    "lastName": "Marchbank",
+    "email": "bench-student-13@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-13",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Digital Technology"
+    ],
+    "hollandCode": "RIE",
+    "resumeSkills": [
+      "forklift",
+      "food prep",
+      "data entry",
+      "patient care",
+      "quality checks"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 167
+  },
+  {
+    "id": "bench_stu_14",
+    "login": "bench-student-14",
+    "displayName": "Norwood Northway",
+    "firstName": "Norwood",
+    "lastName": "Northway",
+    "email": "bench-student-14@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-14",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Digital Technology",
+      "Hospitality, Events, & Tourism"
+    ],
+    "hollandCode": "ISE",
+    "resumeSkills": [
+      "customer service",
+      "scheduling",
+      "data entry",
+      "loading"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 247
+  },
+  {
+    "id": "bench_stu_15",
+    "login": "bench-student-15",
+    "displayName": "Ottilie Oakhaven",
+    "firstName": "Ottilie",
+    "lastName": "Oakhaven",
+    "email": "bench-student-15@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-15",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Digital Technology",
+      "Hospitality, Events, & Tourism"
+    ],
+    "hollandCode": "REC",
+    "resumeSkills": [
+      "customer service",
+      "data entry",
+      "filing"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 245
+  },
+  {
+    "id": "bench_stu_16",
+    "login": "bench-student-16",
+    "displayName": "Prewitt Pinderly",
+    "firstName": "Prewitt",
+    "lastName": "Pinderly",
+    "email": "bench-student-16@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-16",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "REC",
+    "resumeSkills": [
+      "hand tools",
+      "quality checks",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 245
+  },
+  {
+    "id": "bench_stu_17",
+    "login": "bench-student-17",
+    "displayName": "Quilla Quarry",
+    "firstName": "Quilla",
+    "lastName": "Quarry",
+    "email": "bench-student-17@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-17",
+    "topClusters": [
+      "Construction",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "RIA",
+    "resumeSkills": [
+      "patient care",
+      "quality checks",
+      "loading"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 238
+  },
+  {
+    "id": "bench_stu_18",
+    "login": "bench-student-18",
+    "displayName": "Rennick Ridgelow",
+    "firstName": "Rennick",
+    "lastName": "Ridgelow",
+    "email": "bench-student-18@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-18",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Hospitality, Events, & Tourism",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "IRC",
+    "resumeSkills": [
+      "forklift",
+      "phone support",
+      "cleaning",
+      "shipping and receiving",
+      "loading"
+    ],
+    "verifiedCertIds": [
+      "forklift-operator"
+    ],
+    "enrolledDaysAgo": 298
+  },
+  {
+    "id": "bench_stu_19",
+    "login": "bench-student-19",
+    "displayName": "Sable Stonebrook",
+    "firstName": "Sable",
+    "lastName": "Stonebrook",
+    "email": "bench-student-19@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-19",
+    "topClusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "ASE",
+    "resumeSkills": [
+      "data entry",
+      "phone support",
+      "patient care",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [
+      "osha-10",
+      "cna",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 146
+  },
+  {
+    "id": "bench_stu_20",
+    "login": "bench-student-20",
+    "displayName": "Tavish Thackery",
+    "firstName": "Tavish",
+    "lastName": "Thackery",
+    "email": "bench-student-20@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-20",
+    "topClusters": [
+      "Digital Technology",
+      "Healthcare & Human Services",
+      "Hospitality, Events, & Tourism"
+    ],
+    "hollandCode": "RIE",
+    "resumeSkills": [
+      "customer service",
+      "cash handling",
+      "scheduling",
+      "cleaning",
+      "shipping and receiving"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 288
+  },
+  {
+    "id": "bench_stu_21",
+    "login": "bench-student-21",
+    "displayName": "Ulmer Underhill",
+    "firstName": "Ulmer",
+    "lastName": "Underhill",
+    "email": "bench-student-21@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-21",
+    "topClusters": [
+      "Digital Technology",
+      "Healthcare & Human Services",
+      "Hospitality, Events, & Tourism"
+    ],
+    "hollandCode": "REC",
+    "resumeSkills": [
+      "inventory",
+      "phone support",
+      "patient care",
+      "loading",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [
+      "cpr-first-aid",
+      "cna"
+    ],
+    "enrolledDaysAgo": 173
+  },
+  {
+    "id": "bench_stu_22",
+    "login": "bench-student-22",
+    "displayName": "Verity Vellacourt",
+    "firstName": "Verity",
+    "lastName": "Vellacourt",
+    "email": "bench-student-22@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-22",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "RSE",
+    "resumeSkills": [
+      "cash handling",
+      "forklift",
+      "cleaning",
+      "shipping and receiving",
+      "filing"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 293
+  },
+  {
+    "id": "bench_stu_23",
+    "login": "bench-student-23",
+    "displayName": "Wrenna Westmoor",
+    "firstName": "Wrenna",
+    "lastName": "Westmoor",
+    "email": "bench-student-23@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-23",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Digital Technology"
+    ],
+    "hollandCode": "RCE",
+    "resumeSkills": [
+      "phone support",
+      "patient care",
+      "filing",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [
+      "ready-to-work",
+      "servsafe-food-handler"
+    ],
+    "enrolledDaysAgo": 242
+  },
+  {
+    "id": "bench_stu_24",
+    "login": "bench-student-24",
+    "displayName": "Xavia Yardley",
+    "firstName": "Xavia",
+    "lastName": "Yardley",
+    "email": "bench-student-24@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-24",
+    "topClusters": [
+      "Digital Technology",
+      "Hospitality, Events, & Tourism",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "ISE",
+    "resumeSkills": [
+      "customer service",
+      "scheduling",
+      "phone support",
+      "cleaning",
+      "hand tools"
+    ],
+    "verifiedCertIds": [
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 214
+  },
+  {
+    "id": "bench_stu_25",
+    "login": "bench-student-25",
+    "displayName": "Yolen Ambry",
+    "firstName": "Yolen",
+    "lastName": "Ambry",
+    "email": "bench-student-25@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-25",
+    "topClusters": [
+      "Construction",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "ASE",
+    "resumeSkills": [
+      "customer service",
+      "cash handling",
+      "shipping and receiving",
+      "patient care",
+      "loading"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 199
+  },
+  {
+    "id": "bench_stu_26",
+    "login": "bench-student-26",
+    "displayName": "Zephra Brightwell",
+    "firstName": "Zephra",
+    "lastName": "Brightwell",
+    "email": "bench-student-26@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-26",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "ECS",
+    "resumeSkills": [
+      "inventory",
+      "scheduling",
+      "cleaning",
+      "hand tools",
+      "loading"
+    ],
+    "verifiedCertIds": [
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 264
+  },
+  {
+    "id": "bench_stu_27",
+    "login": "bench-student-27",
+    "displayName": "Arlo Coalfield",
+    "firstName": "Arlo",
+    "lastName": "Coalfield",
+    "email": "bench-student-27@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-27",
+    "topClusters": [
+      "Digital Technology",
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "IAS",
+    "resumeSkills": [
+      "inventory",
+      "data entry",
+      "quality checks"
+    ],
+    "verifiedCertIds": [
+      "forklift-operator",
+      "flagger",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 285
+  },
+  {
+    "id": "bench_stu_28",
+    "login": "bench-student-28",
+    "displayName": "Brannon Dunmore",
+    "firstName": "Brannon",
+    "lastName": "Dunmore",
+    "email": "bench-student-28@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-28",
+    "topClusters": [
+      "Healthcare & Human Services",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "ECS",
+    "resumeSkills": [
+      "inventory",
+      "food prep",
+      "phone support",
+      "filing"
+    ],
+    "verifiedCertIds": [
+      "osha-10",
+      "cna"
+    ],
+    "enrolledDaysAgo": 260
+  },
+  {
+    "id": "bench_stu_29",
+    "login": "bench-student-29",
+    "displayName": "Cressa Elderbush",
+    "firstName": "Cressa",
+    "lastName": "Elderbush",
+    "email": "bench-student-29@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-29",
+    "topClusters": [
+      "Digital Technology",
+      "Healthcare & Human Services",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "IAS",
+    "resumeSkills": [
+      "food prep",
+      "scheduling"
+    ],
+    "verifiedCertIds": [
+      "cpr-first-aid",
+      "flagger",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 140
+  },
+  {
+    "id": "bench_stu_30",
+    "login": "bench-student-30",
+    "displayName": "Dovie Foxglove",
+    "firstName": "Dovie",
+    "lastName": "Foxglove",
+    "email": "bench-student-30@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-30",
+    "topClusters": [
+      "Healthcare & Human Services",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "IAS",
+    "resumeSkills": [
+      "inventory",
+      "food prep",
+      "cleaning",
+      "shipping and receiving"
+    ],
+    "verifiedCertIds": [
+      "servsafe-food-handler",
+      "flagger",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 220
+  },
+  {
+    "id": "bench_stu_31",
+    "login": "bench-student-31",
+    "displayName": "Emrys Grimsby",
+    "firstName": "Emrys",
+    "lastName": "Grimsby",
+    "email": "bench-student-31@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-31",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Healthcare & Human Services"
+    ],
+    "hollandCode": "SEA",
+    "resumeSkills": [
+      "inventory",
+      "phone support"
+    ],
+    "verifiedCertIds": [
+      "ready-to-work",
+      "servsafe-food-handler",
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 215
+  },
+  {
+    "id": "bench_stu_32",
+    "login": "bench-student-32",
+    "displayName": "Farrow Havenhurst",
+    "firstName": "Farrow",
+    "lastName": "Havenhurst",
+    "email": "bench-student-32@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-32",
+    "topClusters": [
+      "Construction",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "RSE",
+    "resumeSkills": [
+      "scheduling",
+      "shipping and receiving",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [
+      "ready-to-work",
+      "osha-10",
+      "cna"
+    ],
+    "enrolledDaysAgo": 290
+  },
+  {
+    "id": "bench_stu_33",
+    "login": "bench-student-33",
+    "displayName": "Gwenda Ironwood",
+    "firstName": "Gwenda",
+    "lastName": "Ironwood",
+    "email": "bench-student-33@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-33",
+    "topClusters": [
+      "Digital Technology",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "SEC",
+    "resumeSkills": [
+      "cleaning",
+      "quality checks"
+    ],
+    "verifiedCertIds": [
+      "osha-10",
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 239
+  },
+  {
+    "id": "bench_stu_34",
+    "login": "bench-student-34",
+    "displayName": "Hollis Junewell",
+    "firstName": "Hollis",
+    "lastName": "Junewell",
+    "email": "bench-student-34@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-34",
+    "topClusters": [
+      "Digital Technology",
+      "Hospitality, Events, & Tourism",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "REC",
+    "resumeSkills": [
+      "customer service",
+      "data entry",
+      "phone support"
+    ],
+    "verifiedCertIds": [
+      "ready-to-work",
+      "servsafe-food-handler",
+      "osha-10"
+    ],
+    "enrolledDaysAgo": 149
+  },
+  {
+    "id": "bench_stu_35",
+    "login": "bench-student-35",
+    "displayName": "Isla Kellerman",
+    "firstName": "Isla",
+    "lastName": "Kellerman",
+    "email": "bench-student-35@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-35",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Digital Technology",
+      "Hospitality, Events, & Tourism"
+    ],
+    "hollandCode": "RIA",
+    "resumeSkills": [
+      "inventory",
+      "forklift"
+    ],
+    "verifiedCertIds": [
+      "ready-to-work",
+      "osha-10",
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 289
+  },
+  {
+    "id": "bench_stu_36",
+    "login": "bench-student-36",
+    "displayName": "Jessup Lowecroft",
+    "firstName": "Jessup",
+    "lastName": "Lowecroft",
+    "email": "bench-student-36@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-36",
+    "topClusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "RIE",
+    "resumeSkills": [
+      "customer service",
+      "inventory",
+      "food prep",
+      "scheduling",
+      "phone support"
+    ],
+    "verifiedCertIds": [
+      "servsafe-food-handler",
+      "flagger"
+    ],
+    "enrolledDaysAgo": 262
+  },
+  {
+    "id": "bench_stu_37",
+    "login": "bench-student-37",
+    "displayName": "Kettle Merrowfield",
+    "firstName": "Kettle",
+    "lastName": "Merrowfield",
+    "email": "bench-student-37@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-37",
+    "topClusters": [
+      "Healthcare & Human Services",
+      "Marketing & Sales",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "IRC",
+    "resumeSkills": [
+      "phone support",
+      "filing"
+    ],
+    "verifiedCertIds": [
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 252
+  },
+  {
+    "id": "bench_stu_38",
+    "login": "bench-student-38",
+    "displayName": "Lissette Nettleship",
+    "firstName": "Lissette",
+    "lastName": "Nettleship",
+    "email": "bench-student-38@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-38",
+    "topClusters": [
+      "Digital Technology",
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "CRE",
+    "resumeSkills": [
+      "forklift",
+      "shipping and receiving",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 258
+  },
+  {
+    "id": "bench_stu_39",
+    "login": "bench-student-39",
+    "displayName": "Marrow Ottersby",
+    "firstName": "Marrow",
+    "lastName": "Ottersby",
+    "email": "bench-student-39@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-39",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Digital Technology"
+    ],
+    "hollandCode": "ECS",
+    "resumeSkills": [
+      "scheduling",
+      "phone support",
+      "shipping and receiving",
+      "patient care"
+    ],
+    "verifiedCertIds": [
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 260
+  },
+  {
+    "id": "bench_stu_40",
+    "login": "bench-student-40",
+    "displayName": "Nyla Pemberlow",
+    "firstName": "Nyla",
+    "lastName": "Pemberlow",
+    "email": "bench-student-40@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-40",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Digital Technology",
+      "Healthcare & Human Services"
+    ],
+    "hollandCode": "ISE",
+    "resumeSkills": [
+      "phone support",
+      "shipping and receiving",
+      "loading"
+    ],
+    "verifiedCertIds": [
+      "forklift-operator",
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 153
+  },
+  {
+    "id": "bench_stu_41",
+    "login": "bench-student-41",
+    "displayName": "Ozias Quillon",
+    "firstName": "Ozias",
+    "lastName": "Quillon",
+    "email": "bench-student-41@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-41",
+    "topClusters": [
+      "Digital Technology",
+      "Healthcare & Human Services",
+      "Hospitality, Events, & Tourism"
+    ],
+    "hollandCode": "SEA",
+    "resumeSkills": [
+      "forklift",
+      "food prep",
+      "data entry",
+      "filing",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 191
+  },
+  {
+    "id": "bench_stu_42",
+    "login": "bench-student-42",
+    "displayName": "Petra Rushmoor",
+    "firstName": "Petra",
+    "lastName": "Rushmoor",
+    "email": "bench-student-42@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-42",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "RIE",
+    "resumeSkills": [
+      "data entry",
+      "shipping and receiving",
+      "hand tools"
+    ],
+    "verifiedCertIds": [
+      "forklift-operator"
+    ],
+    "enrolledDaysAgo": 281
+  },
+  {
+    "id": "bench_stu_43",
+    "login": "bench-student-43",
+    "displayName": "Quenby Saltmarsh",
+    "firstName": "Quenby",
+    "lastName": "Saltmarsh",
+    "email": "bench-student-43@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-43",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "RIE",
+    "resumeSkills": [
+      "food prep",
+      "patient care",
+      "filing"
+    ],
+    "verifiedCertIds": [
+      "osha-10",
+      "cpr-first-aid",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 227
+  },
+  {
+    "id": "bench_stu_44",
+    "login": "bench-student-44",
+    "displayName": "Rowan Trueblood",
+    "firstName": "Rowan",
+    "lastName": "Trueblood",
+    "email": "bench-student-44@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-44",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services",
+      "Hospitality, Events, & Tourism"
+    ],
+    "hollandCode": "REC",
+    "resumeSkills": [
+      "forklift",
+      "patient care"
+    ],
+    "verifiedCertIds": [
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 266
+  },
+  {
+    "id": "bench_stu_45",
+    "login": "bench-student-45",
+    "displayName": "Selby Ulverton",
+    "firstName": "Selby",
+    "lastName": "Ulverton",
+    "email": "bench-student-45@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-45",
+    "topClusters": [
+      "Construction",
+      "Digital Technology",
+      "Marketing & Sales"
+    ],
+    "hollandCode": "REC",
+    "resumeSkills": [
+      "customer service",
+      "inventory",
+      "cleaning",
+      "shipping and receiving",
+      "loading"
+    ],
+    "verifiedCertIds": [
+      "forklift-operator",
+      "osha-10",
+      "cpr-first-aid"
+    ],
+    "enrolledDaysAgo": 182
+  },
+  {
+    "id": "bench_stu_46",
+    "login": "bench-student-46",
+    "displayName": "Truett Verrell",
+    "firstName": "Truett",
+    "lastName": "Verrell",
+    "email": "bench-student-46@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-46",
+    "topClusters": [
+      "Construction",
+      "Digital Technology",
+      "Healthcare & Human Services"
+    ],
+    "hollandCode": "RCE",
+    "resumeSkills": [
+      "customer service",
+      "data entry",
+      "shipping and receiving",
+      "hand tools"
+    ],
+    "verifiedCertIds": [
+      "flagger",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 298
+  },
+  {
+    "id": "bench_stu_47",
+    "login": "bench-student-47",
+    "displayName": "Ursa Winnowby",
+    "firstName": "Ursa",
+    "lastName": "Winnowby",
+    "email": "bench-student-47@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-47",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Healthcare & Human Services"
+    ],
+    "hollandCode": "SEA",
+    "resumeSkills": [
+      "cash handling",
+      "filing"
+    ],
+    "verifiedCertIds": [
+      "servsafe-food-handler",
+      "osha-10",
+      "nccer-core"
+    ],
+    "enrolledDaysAgo": 169
+  },
+  {
+    "id": "bench_stu_48",
+    "login": "bench-student-48",
+    "displayName": "Vantry Yarborough",
+    "firstName": "Vantry",
+    "lastName": "Yarborough",
+    "email": "bench-student-48@test.local",
+    "classId": "bench_class_3",
+    "classRegion": "Cabell County, WV",
+    "spokesId": "bench-student-48",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "hollandCode": "RSE",
+    "resumeSkills": [
+      "cash handling",
+      "data entry",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 240
+  },
+  {
+    "id": "bench_stu_49",
+    "login": "bench-student-49",
+    "displayName": "Whitlock Applewhite",
+    "firstName": "Whitlock",
+    "lastName": "Applewhite",
+    "email": "bench-student-49@test.local",
+    "classId": "bench_class_1",
+    "classRegion": "Raleigh County, WV",
+    "spokesId": "bench-student-49",
+    "topClusters": [
+      "Construction",
+      "Digital Technology",
+      "Healthcare & Human Services"
+    ],
+    "hollandCode": "CSE",
+    "resumeSkills": [
+      "inventory",
+      "shipping and receiving"
+    ],
+    "verifiedCertIds": [],
+    "enrolledDaysAgo": 129
+  },
+  {
+    "id": "bench_stu_50",
+    "login": "bench-student-50",
+    "displayName": "Yarrow Bracknell",
+    "firstName": "Yarrow",
+    "lastName": "Bracknell",
+    "email": "bench-student-50@test.local",
+    "classId": "bench_class_2",
+    "classRegion": "Kanawha County, WV",
+    "spokesId": "bench-student-50",
+    "topClusters": [
+      "Advanced Manufacturing",
+      "Construction",
+      "Hospitality, Events, & Tourism"
+    ],
+    "hollandCode": "ISE",
+    "resumeSkills": [
+      "customer service",
+      "food prep",
+      "data entry",
+      "spreadsheets"
+    ],
+    "verifiedCertIds": [
+      "forklift-operator",
+      "servsafe-food-handler",
+      "flagger"
+    ],
+    "enrolledDaysAgo": 249
+  }
+]

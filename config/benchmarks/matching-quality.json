@@ -1,0 +1,25 @@
+{
+  "suite": "matching-quality",
+  "title": "Fit ranking quality",
+  "area": "connect",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/matching-quality.mjs",
+  "fixture": "config/benchmarks/fixtures/matching-labels.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "precision_at_3",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 0.8,
+      "tolerance": 0.03
+    },
+    {
+      "id": "ndcg_at_5",
+      "unit": "ratio",
+      "direction": "higher",
+      "tolerance": 0.03
+    }
+  ],
+  "notes": "In-process over the synthetic cohort — no database. Calls the real ranker (rankLeadFits in src/lib/connect/matching-shared.ts), which is also what rankLeadsForStudent calls, so the benchmark cannot drift from the ranking students get. Labels are an INDEPENDENT judgement rule, not the score: see scripts/bench/generate-matching-labels.mjs. Owner step: one SPOKES instructor audits 200 of the 2,000 pairs (design §9 decision 2) before this floor is treated as authoritative."
+}

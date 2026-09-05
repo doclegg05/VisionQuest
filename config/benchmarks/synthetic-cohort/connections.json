@@ -1,0 +1,1901 @@
+[
+  {
+    "id": "bench_conn_01",
+    "key": "proposed-a",
+    "studentId": "bench_stu_01",
+    "jobLeadId": "bench_lead_01",
+    "employerId": "bench_emp_01",
+    "employerName": "Ridgeline Metal Works",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "proposed",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-18T12:00:00.000Z",
+    "sentAt": null,
+    "sentById": null,
+    "employerViewedAt": null,
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_01_ev_01",
+        "connectionId": "bench_conn_01",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": null
+  },
+  {
+    "id": "bench_conn_02",
+    "key": "proposed-b",
+    "studentId": "bench_stu_02",
+    "jobLeadId": "bench_lead_04",
+    "employerId": "bench_emp_04",
+    "employerName": "Kanawha Valley Grocers",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "proposed",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-18T12:00:00.000Z",
+    "sentAt": null,
+    "sentById": null,
+    "employerViewedAt": null,
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_02_ev_01",
+        "connectionId": "bench_conn_02",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": null
+  },
+  {
+    "id": "bench_conn_03",
+    "key": "approved",
+    "studentId": "bench_stu_03",
+    "jobLeadId": "bench_lead_07",
+    "employerId": "bench_emp_07",
+    "employerName": "Tygart Freight Lines",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "student_approved",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-14T12:00:00.000Z",
+    "sentAt": null,
+    "sentById": null,
+    "employerViewedAt": null,
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_03_ev_01",
+        "connectionId": "bench_conn_03",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_03_ev_02",
+        "connectionId": "bench_conn_03",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_03",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Corah came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [
+        "bench_cert_03_servsafe-food-handler",
+        "bench_cert_03_cpr-first-aid",
+        "bench_cert_03_nccer-core"
+      ],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Corah C.",
+      "certifications": [
+        "servsafe-food-handler",
+        "cpr-first-aid",
+        "nccer-core"
+      ],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-21",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_04",
+    "key": "rolled-back-send",
+    "studentId": "bench_stu_04",
+    "jobLeadId": "bench_lead_10",
+    "employerId": "bench_emp_10",
+    "employerName": "Mountain State Data Services",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "student_approved",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-10T12:00:00.000Z",
+    "sentAt": null,
+    "sentById": null,
+    "employerViewedAt": null,
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": true,
+    "events": [
+      {
+        "id": "bench_conn_04_ev_01",
+        "connectionId": "bench_conn_04",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_04_ev_02",
+        "connectionId": "bench_conn_04",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_04_ev_03",
+        "connectionId": "bench_conn_04",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_04",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Dalen came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Dalen D.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-12",
+      "subsidyLine": null
+    }
+  },
+  {
+    "id": "bench_conn_05",
+    "key": "sent-a",
+    "studentId": "bench_stu_05",
+    "jobLeadId": "bench_lead_13",
+    "employerId": "bench_emp_01",
+    "employerName": "Ridgeline Metal Works",
+    "classId": "bench_class_2",
+    "className": "Bench SPOKES Charleston",
+    "proposedById": "bench_instr_2",
+    "proposedVia": "teacher",
+    "status": "sent",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-10T12:00:00.000Z",
+    "sentAt": "2026-08-18T12:00:00.000Z",
+    "sentById": "bench_instr_2",
+    "employerViewedAt": null,
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_05_ev_01",
+        "connectionId": "bench_conn_05",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_05_ev_02",
+        "connectionId": "bench_conn_05",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_05_ev_03",
+        "connectionId": "bench_conn_05",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_05",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Efren came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [
+        "bench_cert_05_servsafe-food-handler",
+        "bench_cert_05_osha-10"
+      ],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Efren E.",
+      "certifications": [
+        "servsafe-food-handler",
+        "osha-10"
+      ],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-09",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_06",
+    "key": "sent-b",
+    "studentId": "bench_stu_06",
+    "jobLeadId": "bench_lead_16",
+    "employerId": "bench_emp_04",
+    "employerName": "Kanawha Valley Grocers",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "sent",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-10T12:00:00.000Z",
+    "sentAt": "2026-08-18T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": null,
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_06_ev_01",
+        "connectionId": "bench_conn_06",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_06_ev_02",
+        "connectionId": "bench_conn_06",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_06_ev_03",
+        "connectionId": "bench_conn_06",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_06",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Fallon came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [
+        "bench_cert_06_osha-10",
+        "bench_cert_06_cpr-first-aid",
+        "bench_cert_06_cna"
+      ],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Fallon F.",
+      "certifications": [
+        "osha-10",
+        "cpr-first-aid",
+        "cna"
+      ],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-21",
+      "subsidyLine": null
+    }
+  },
+  {
+    "id": "bench_conn_07",
+    "key": "viewed",
+    "studentId": "bench_stu_07",
+    "jobLeadId": "bench_lead_19",
+    "employerId": "bench_emp_07",
+    "employerName": "Tygart Freight Lines",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "viewed",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-06T12:00:00.000Z",
+    "sentAt": "2026-08-14T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-08-18T12:00:00.000Z",
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_07_ev_01",
+        "connectionId": "bench_conn_07",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_07_ev_02",
+        "connectionId": "bench_conn_07",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_07_ev_03",
+        "connectionId": "bench_conn_07",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_07_ev_04",
+        "connectionId": "bench_conn_07",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_07",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Garnet came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [
+        "bench_cert_07_cna"
+      ],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Garnet G.",
+      "certifications": [
+        "cna"
+      ],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-20",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_08",
+    "key": "interested-a",
+    "studentId": "bench_stu_08",
+    "jobLeadId": "bench_lead_22",
+    "employerId": "bench_emp_10",
+    "employerName": "Mountain State Data Services",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "interested",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-02T12:00:00.000Z",
+    "sentAt": "2026-08-10T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-08-14T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-18T12:00:00.000Z",
+    "employerResponse": "interested",
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_08_ev_01",
+        "connectionId": "bench_conn_08",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_08_ev_02",
+        "connectionId": "bench_conn_08",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_08_ev_03",
+        "connectionId": "bench_conn_08",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_08_ev_04",
+        "connectionId": "bench_conn_08",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_08_ev_05",
+        "connectionId": "bench_conn_08",
+        "fromStatus": "viewed",
+        "toStatus": "interested",
+        "actorType": "employer",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_08",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Halle came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [
+        "bench_cert_08_ready-to-work"
+      ],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Halle H.",
+      "certifications": [
+        "ready-to-work"
+      ],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-13",
+      "subsidyLine": null
+    }
+  },
+  {
+    "id": "bench_conn_09",
+    "key": "interested-b",
+    "studentId": "bench_stu_09",
+    "jobLeadId": "bench_lead_25",
+    "employerId": "bench_emp_01",
+    "employerName": "Ridgeline Metal Works",
+    "classId": "bench_class_3",
+    "className": "Bench SPOKES Huntington",
+    "proposedById": "bench_instr_3",
+    "proposedVia": "teacher",
+    "status": "interested",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-06T12:00:00.000Z",
+    "sentAt": "2026-08-14T12:00:00.000Z",
+    "sentById": "bench_instr_3",
+    "employerViewedAt": null,
+    "employerRespondedAt": "2026-08-18T12:00:00.000Z",
+    "employerResponse": "interested",
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_09_ev_01",
+        "connectionId": "bench_conn_09",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_09_ev_02",
+        "connectionId": "bench_conn_09",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_09_ev_03",
+        "connectionId": "bench_conn_09",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_09_ev_04",
+        "connectionId": "bench_conn_09",
+        "fromStatus": "sent",
+        "toStatus": "interested",
+        "actorType": "employer",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_09",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Ilene came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Ilene I.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-13",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_10",
+    "key": "not-now",
+    "studentId": "bench_stu_10",
+    "jobLeadId": "bench_lead_28",
+    "employerId": "bench_emp_04",
+    "employerName": "Kanawha Valley Grocers",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "not_now",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-02T12:00:00.000Z",
+    "sentAt": "2026-08-10T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-08-14T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-18T12:00:00.000Z",
+    "employerResponse": "not_now",
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_10_ev_01",
+        "connectionId": "bench_conn_10",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_10_ev_02",
+        "connectionId": "bench_conn_10",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_10_ev_03",
+        "connectionId": "bench_conn_10",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_10_ev_04",
+        "connectionId": "bench_conn_10",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_10_ev_05",
+        "connectionId": "bench_conn_10",
+        "fromStatus": "viewed",
+        "toStatus": "not_now",
+        "actorType": "employer",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_10",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Jarrah came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [
+        "bench_cert_10_cna",
+        "bench_cert_10_flagger",
+        "bench_cert_10_nccer-core"
+      ],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Jarrah J.",
+      "certifications": [
+        "cna",
+        "flagger",
+        "nccer-core"
+      ],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-19",
+      "subsidyLine": null
+    }
+  },
+  {
+    "id": "bench_conn_11",
+    "key": "interview",
+    "studentId": "bench_stu_11",
+    "jobLeadId": "bench_lead_31",
+    "employerId": "bench_emp_07",
+    "employerName": "Tygart Freight Lines",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "interview_scheduled",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-07-29T12:00:00.000Z",
+    "sentAt": "2026-08-06T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-08-10T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-14T12:00:00.000Z",
+    "employerResponse": "interested",
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_11_ev_01",
+        "connectionId": "bench_conn_11",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-07-29T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_11_ev_02",
+        "connectionId": "bench_conn_11",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_11_ev_03",
+        "connectionId": "bench_conn_11",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_11_ev_04",
+        "connectionId": "bench_conn_11",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_11_ev_05",
+        "connectionId": "bench_conn_11",
+        "fromStatus": "viewed",
+        "toStatus": "interested",
+        "actorType": "employer",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_11_ev_06",
+        "connectionId": "bench_conn_11",
+        "fromStatus": "interested",
+        "toStatus": "interview_scheduled",
+        "actorType": "employer",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_11",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Kessa came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Kessa K.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-16",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_12",
+    "key": "offered",
+    "studentId": "bench_stu_12",
+    "jobLeadId": "bench_lead_34",
+    "employerId": "bench_emp_10",
+    "employerName": "Mountain State Data Services",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "offered",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-07-25T12:00:00.000Z",
+    "sentAt": "2026-08-02T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-08-06T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-10T12:00:00.000Z",
+    "employerResponse": "interested",
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_12_ev_01",
+        "connectionId": "bench_conn_12",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-07-25T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_12_ev_02",
+        "connectionId": "bench_conn_12",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-07-29T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_12_ev_03",
+        "connectionId": "bench_conn_12",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_12_ev_04",
+        "connectionId": "bench_conn_12",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_12_ev_05",
+        "connectionId": "bench_conn_12",
+        "fromStatus": "viewed",
+        "toStatus": "interested",
+        "actorType": "employer",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_12_ev_06",
+        "connectionId": "bench_conn_12",
+        "fromStatus": "interested",
+        "toStatus": "interview_scheduled",
+        "actorType": "employer",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_12_ev_07",
+        "connectionId": "bench_conn_12",
+        "fromStatus": "interview_scheduled",
+        "toStatus": "offered",
+        "actorType": "teacher",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_12",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Loman came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Loman L.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-14",
+      "subsidyLine": null
+    }
+  },
+  {
+    "id": "bench_conn_13",
+    "key": "withdrawn",
+    "studentId": "bench_stu_13",
+    "jobLeadId": "bench_lead_01",
+    "employerId": "bench_emp_01",
+    "employerName": "Ridgeline Metal Works",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "withdrawn",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-06T12:00:00.000Z",
+    "sentAt": "2026-08-14T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": null,
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": null,
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_13_ev_01",
+        "connectionId": "bench_conn_13",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_13_ev_02",
+        "connectionId": "bench_conn_13",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_13_ev_03",
+        "connectionId": "bench_conn_13",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_13_ev_04",
+        "connectionId": "bench_conn_13",
+        "fromStatus": "sent",
+        "toStatus": "withdrawn",
+        "actorType": "student",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_13",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Maribel came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Maribel M.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-10",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_14",
+    "key": "closed",
+    "studentId": "bench_stu_14",
+    "jobLeadId": "bench_lead_04",
+    "employerId": "bench_emp_04",
+    "employerName": "Kanawha Valley Grocers",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "closed",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-02T12:00:00.000Z",
+    "sentAt": "2026-08-10T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-08-14T12:00:00.000Z",
+    "employerRespondedAt": null,
+    "employerResponse": null,
+    "hiredAt": null,
+    "startDate": null,
+    "hourlyWage": null,
+    "closedReason": "Student took a different job.",
+    "isPlacement": false,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_14_ev_01",
+        "connectionId": "bench_conn_14",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_14_ev_02",
+        "connectionId": "bench_conn_14",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_14_ev_03",
+        "connectionId": "bench_conn_14",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_14_ev_04",
+        "connectionId": "bench_conn_14",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_14_ev_05",
+        "connectionId": "bench_conn_14",
+        "fromStatus": "viewed",
+        "toStatus": "closed",
+        "actorType": "teacher",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_14",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Norwood came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Norwood N.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-12",
+      "subsidyLine": null
+    }
+  },
+  {
+    "id": "bench_conn_15",
+    "key": "hired-skip",
+    "studentId": "bench_stu_15",
+    "jobLeadId": "bench_lead_07",
+    "employerId": "bench_emp_07",
+    "employerName": "Tygart Freight Lines",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "hired",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-02T12:00:00.000Z",
+    "sentAt": "2026-08-10T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-08-14T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-18T12:00:00.000Z",
+    "employerResponse": "hired",
+    "hiredAt": "2026-08-18T12:00:00.000Z",
+    "startDate": "2026-08-29",
+    "hourlyWage": 16,
+    "closedReason": null,
+    "isPlacement": true,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_15_ev_01",
+        "connectionId": "bench_conn_15",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_15_ev_02",
+        "connectionId": "bench_conn_15",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_15_ev_03",
+        "connectionId": "bench_conn_15",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_15_ev_04",
+        "connectionId": "bench_conn_15",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_15_ev_05",
+        "connectionId": "bench_conn_15",
+        "fromStatus": "viewed",
+        "toStatus": "hired",
+        "actorType": "employer",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_15",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Ottilie came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Ottilie O.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-08",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_16",
+    "key": "hired-direct",
+    "studentId": "bench_stu_16",
+    "jobLeadId": "bench_lead_10",
+    "employerId": "bench_emp_10",
+    "employerName": "Mountain State Data Services",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "hired",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-08-06T12:00:00.000Z",
+    "sentAt": "2026-08-14T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": null,
+    "employerRespondedAt": "2026-08-18T12:00:00.000Z",
+    "employerResponse": "hired",
+    "hiredAt": "2026-08-18T12:00:00.000Z",
+    "startDate": "2026-08-29",
+    "hourlyWage": 17,
+    "closedReason": null,
+    "isPlacement": true,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_16_ev_01",
+        "connectionId": "bench_conn_16",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_16_ev_02",
+        "connectionId": "bench_conn_16",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_16_ev_03",
+        "connectionId": "bench_conn_16",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_16_ev_04",
+        "connectionId": "bench_conn_16",
+        "fromStatus": "sent",
+        "toStatus": "hired",
+        "actorType": "employer",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_16",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Prewitt came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Prewitt P.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-21",
+      "subsidyLine": null
+    }
+  },
+  {
+    "id": "bench_conn_17",
+    "key": "started",
+    "studentId": "bench_stu_17",
+    "jobLeadId": "bench_lead_13",
+    "employerId": "bench_emp_01",
+    "employerName": "Ridgeline Metal Works",
+    "classId": "bench_class_2",
+    "className": "Bench SPOKES Charleston",
+    "proposedById": "bench_instr_2",
+    "proposedVia": "teacher",
+    "status": "started",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-07-21T12:00:00.000Z",
+    "sentAt": "2026-07-29T12:00:00.000Z",
+    "sentById": "bench_instr_2",
+    "employerViewedAt": "2026-08-02T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-14T12:00:00.000Z",
+    "employerResponse": "hired",
+    "hiredAt": "2026-08-14T12:00:00.000Z",
+    "startDate": "2026-08-29",
+    "hourlyWage": 18,
+    "closedReason": null,
+    "isPlacement": true,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_17_ev_01",
+        "connectionId": "bench_conn_17",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-07-21T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_17_ev_02",
+        "connectionId": "bench_conn_17",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-07-25T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_17_ev_03",
+        "connectionId": "bench_conn_17",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-07-29T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_17_ev_04",
+        "connectionId": "bench_conn_17",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_17_ev_05",
+        "connectionId": "bench_conn_17",
+        "fromStatus": "viewed",
+        "toStatus": "interested",
+        "actorType": "employer",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_17_ev_06",
+        "connectionId": "bench_conn_17",
+        "fromStatus": "interested",
+        "toStatus": "offered",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_17_ev_07",
+        "connectionId": "bench_conn_17",
+        "fromStatus": "offered",
+        "toStatus": "hired",
+        "actorType": "employer",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_17_ev_08",
+        "connectionId": "bench_conn_17",
+        "fromStatus": "hired",
+        "toStatus": "started",
+        "actorType": "teacher",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_17",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Quilla came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Quilla Q.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-11",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_18",
+    "key": "retained-30",
+    "studentId": "bench_stu_18",
+    "jobLeadId": "bench_lead_16",
+    "employerId": "bench_emp_04",
+    "employerName": "Kanawha Valley Grocers",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "retained_30",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-07-13T12:00:00.000Z",
+    "sentAt": "2026-07-21T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-07-25T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-10T12:00:00.000Z",
+    "employerResponse": "hired",
+    "hiredAt": "2026-08-10T12:00:00.000Z",
+    "startDate": "2026-08-29",
+    "hourlyWage": 19,
+    "closedReason": null,
+    "isPlacement": true,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_18_ev_01",
+        "connectionId": "bench_conn_18",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-07-13T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_02",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-07-17T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_03",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-07-21T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_04",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-07-25T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_05",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "viewed",
+        "toStatus": "interested",
+        "actorType": "employer",
+        "at": "2026-07-29T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_06",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "interested",
+        "toStatus": "interview_scheduled",
+        "actorType": "employer",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_07",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "interview_scheduled",
+        "toStatus": "offered",
+        "actorType": "teacher",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_08",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "offered",
+        "toStatus": "hired",
+        "actorType": "employer",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_09",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "hired",
+        "toStatus": "started",
+        "actorType": "teacher",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_18_ev_10",
+        "connectionId": "bench_conn_18",
+        "fromStatus": "started",
+        "toStatus": "retained_30",
+        "actorType": "system",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_18",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Rennick came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [
+        "bench_cert_18_forklift-operator"
+      ],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Rennick R.",
+      "certifications": [
+        "forklift-operator"
+      ],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-21",
+      "subsidyLine": null
+    }
+  },
+  {
+    "id": "bench_conn_19",
+    "key": "retained-60",
+    "studentId": "bench_stu_19",
+    "jobLeadId": "bench_lead_19",
+    "employerId": "bench_emp_07",
+    "employerName": "Tygart Freight Lines",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "retained_60",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-07-13T12:00:00.000Z",
+    "sentAt": "2026-07-21T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-07-25T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-06T12:00:00.000Z",
+    "employerResponse": "hired",
+    "hiredAt": "2026-08-06T12:00:00.000Z",
+    "startDate": "2026-08-29",
+    "hourlyWage": 14,
+    "closedReason": null,
+    "isPlacement": true,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_19_ev_01",
+        "connectionId": "bench_conn_19",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-07-13T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_02",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-07-17T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_03",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-07-21T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_04",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-07-25T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_05",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "viewed",
+        "toStatus": "interested",
+        "actorType": "employer",
+        "at": "2026-07-29T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_06",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "interested",
+        "toStatus": "offered",
+        "actorType": "teacher",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_07",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "offered",
+        "toStatus": "hired",
+        "actorType": "employer",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_08",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "hired",
+        "toStatus": "started",
+        "actorType": "teacher",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_09",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "started",
+        "toStatus": "retained_30",
+        "actorType": "system",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_19_ev_10",
+        "connectionId": "bench_conn_19",
+        "fromStatus": "retained_30",
+        "toStatus": "retained_60",
+        "actorType": "system",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_19",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Sable came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [
+        "bench_cert_19_osha-10",
+        "bench_cert_19_cna",
+        "bench_cert_19_nccer-core"
+      ],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement",
+        "subsidy_line"
+      ],
+      "candidateName": "Sable S.",
+      "certifications": [
+        "osha-10",
+        "cna",
+        "nccer-core"
+      ],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-16",
+      "subsidyLine": "Ask us about money for hiring."
+    }
+  },
+  {
+    "id": "bench_conn_20",
+    "key": "retained-90",
+    "studentId": "bench_stu_20",
+    "jobLeadId": "bench_lead_22",
+    "employerId": "bench_emp_10",
+    "employerName": "Mountain State Data Services",
+    "classId": "bench_class_1",
+    "className": "Bench SPOKES Beckley",
+    "proposedById": "bench_instr_1",
+    "proposedVia": "teacher",
+    "status": "retained_90",
+    "statusChangedAt": "2026-08-18T12:00:00.000Z",
+    "createdAt": "2026-07-05T12:00:00.000Z",
+    "sentAt": "2026-07-13T12:00:00.000Z",
+    "sentById": "bench_instr_1",
+    "employerViewedAt": "2026-07-17T12:00:00.000Z",
+    "employerRespondedAt": "2026-08-02T12:00:00.000Z",
+    "employerResponse": "hired",
+    "hiredAt": "2026-08-02T12:00:00.000Z",
+    "startDate": "2026-08-29",
+    "hourlyWage": 15,
+    "closedReason": null,
+    "isPlacement": true,
+    "rolledBackSend": false,
+    "events": [
+      {
+        "id": "bench_conn_20_ev_01",
+        "connectionId": "bench_conn_20",
+        "fromStatus": null,
+        "toStatus": "proposed",
+        "actorType": "teacher",
+        "at": "2026-07-05T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_02",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "proposed",
+        "toStatus": "student_approved",
+        "actorType": "student",
+        "at": "2026-07-09T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_03",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "student_approved",
+        "toStatus": "sent",
+        "actorType": "teacher",
+        "at": "2026-07-13T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_04",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "sent",
+        "toStatus": "viewed",
+        "actorType": "employer",
+        "at": "2026-07-17T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_05",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "viewed",
+        "toStatus": "interested",
+        "actorType": "employer",
+        "at": "2026-07-21T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_06",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "interested",
+        "toStatus": "interview_scheduled",
+        "actorType": "employer",
+        "at": "2026-07-25T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_07",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "interview_scheduled",
+        "toStatus": "offered",
+        "actorType": "teacher",
+        "at": "2026-07-29T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_08",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "offered",
+        "toStatus": "hired",
+        "actorType": "employer",
+        "at": "2026-08-02T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_09",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "hired",
+        "toStatus": "started",
+        "actorType": "teacher",
+        "at": "2026-08-06T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_10",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "started",
+        "toStatus": "retained_30",
+        "actorType": "system",
+        "at": "2026-08-10T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_11",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "retained_30",
+        "toStatus": "retained_60",
+        "actorType": "system",
+        "at": "2026-08-14T12:00:00.000Z",
+        "note": null
+      },
+      {
+        "id": "bench_conn_20_ev_12",
+        "connectionId": "bench_conn_20",
+        "fromStatus": "retained_60",
+        "toStatus": "retained_90",
+        "actorType": "system",
+        "at": "2026-08-18T12:00:00.000Z",
+        "note": null
+      }
+    ],
+    "packet": {
+      "resumeVersionId": "bench_resume_20",
+      "coverLetterId": null,
+      "resumeFileUploadId": null,
+      "endorsement": "Tavish came to every class on time and finished the work. They ask good questions.",
+      "includedCertIds": [],
+      "includedFields": [
+        "candidate_name",
+        "resume",
+        "verified_certifications",
+        "availability",
+        "earliest_start",
+        "endorsement"
+      ],
+      "candidateName": "Tavish T.",
+      "certifications": [],
+      "availabilitySummary": "Weekdays, mornings and afternoons",
+      "earliestStart": "2026-09-12",
+      "subsidyLine": null
+    }
+  }
+]

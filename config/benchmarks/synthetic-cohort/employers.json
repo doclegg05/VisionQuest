@@ -1,0 +1,247 @@
+[
+  {
+    "id": "bench_emp_01",
+    "name": "Ridgeline Metal Works",
+    "nameKey": "ridgeline metal works",
+    "legalName": "Ridgeline Metal Works LLC",
+    "sector": "Manufacturing",
+    "clusters": [
+      "Agriculture"
+    ],
+    "county": "Raleigh",
+    "city": "Beckley",
+    "zip": "25801",
+    "website": "https://ridgeline-metal-works.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": true,
+    "lastHiredAt": "2025-10-07T12:00:00.000Z",
+    "subsidyFlags": {
+      "eip": "known",
+      "wotc": "unknown"
+    },
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_02",
+    "name": "New River Care Home",
+    "nameKey": "new river care home",
+    "legalName": "New River Care Home LLC",
+    "sector": "Health care",
+    "clusters": [
+      "Arts, Entertainment, & Design",
+      "Marketing & Sales"
+    ],
+    "county": "Kanawha",
+    "city": "Charleston",
+    "zip": "25301",
+    "website": "https://new-river-care-home.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": false,
+    "lastHiredAt": null,
+    "subsidyFlags": {},
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_03",
+    "name": "Blackwater Logistics",
+    "nameKey": "blackwater logistics",
+    "legalName": "Blackwater Logistics LLC",
+    "sector": "Warehousing",
+    "clusters": [
+      "Advanced Manufacturing",
+      "Management & Entrepreneurship"
+    ],
+    "county": "Cabell",
+    "city": "Huntington",
+    "zip": "25701",
+    "website": "https://blackwater-logistics.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": false,
+    "lastHiredAt": null,
+    "subsidyFlags": {},
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_04",
+    "name": "Kanawha Valley Grocers",
+    "nameKey": "kanawha valley grocers",
+    "legalName": "Kanawha Valley Grocers LLC",
+    "sector": "Retail grocery",
+    "clusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism"
+    ],
+    "county": "Monongalia",
+    "city": "Morgantown",
+    "zip": "26501",
+    "website": "https://kanawha-valley-grocers.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": true,
+    "lastHiredAt": "2026-07-24T12:00:00.000Z",
+    "subsidyFlags": {},
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_05",
+    "name": "Coalfield Machine & Tool",
+    "nameKey": "coalfield machine & tool",
+    "legalName": "Coalfield Machine & Tool LLC",
+    "sector": "Machining",
+    "clusters": [
+      "Healthcare & Human Services"
+    ],
+    "county": "Wood",
+    "city": "Parkersburg",
+    "zip": "26101",
+    "website": "https://coalfield-machine-tool.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": false,
+    "lastHiredAt": null,
+    "subsidyFlags": {
+      "eip": "known",
+      "wotc": "unknown"
+    },
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_06",
+    "name": "Greenbrier Family Dental",
+    "nameKey": "greenbrier family dental",
+    "legalName": "Greenbrier Family Dental LLC",
+    "sector": "Dental care",
+    "clusters": [
+      "Construction",
+      "Energy & Natural Resources"
+    ],
+    "county": "Ohio",
+    "city": "Wheeling",
+    "zip": "26003",
+    "website": "https://greenbrier-family-dental.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": false,
+    "lastHiredAt": null,
+    "subsidyFlags": {},
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_07",
+    "name": "Tygart Freight Lines",
+    "nameKey": "tygart freight lines",
+    "legalName": "Tygart Freight Lines LLC",
+    "sector": "Trucking",
+    "clusters": [
+      "Advanced Manufacturing",
+      "Agriculture"
+    ],
+    "county": "Berkeley",
+    "city": "Martinsburg",
+    "zip": "25401",
+    "website": "https://tygart-freight-lines.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": true,
+    "lastHiredAt": "2026-02-24T12:00:00.000Z",
+    "subsidyFlags": {},
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_08",
+    "name": "Appalachian Print & Sign",
+    "nameKey": "appalachian print & sign",
+    "legalName": "Appalachian Print & Sign LLC",
+    "sector": "Printing",
+    "clusters": [
+      "Construction"
+    ],
+    "county": "Marion",
+    "city": "Fairmont",
+    "zip": "26554",
+    "website": "https://appalachian-print-sign.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": false,
+    "lastHiredAt": null,
+    "subsidyFlags": {},
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_09",
+    "name": "Cheat River Hospitality",
+    "nameKey": "cheat river hospitality",
+    "legalName": "Cheat River Hospitality LLC",
+    "sector": "Hospitality",
+    "clusters": [
+      "Financial Services",
+      "Supply Chain & Transportation"
+    ],
+    "county": "Harrison",
+    "city": "Clarksburg",
+    "zip": "26301",
+    "website": "https://cheat-river-hospitality.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": false,
+    "lastHiredAt": null,
+    "subsidyFlags": {
+      "eip": "known",
+      "wotc": "unknown"
+    },
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_10",
+    "name": "Mountain State Data Services",
+    "nameKey": "mountain state data services",
+    "legalName": "Mountain State Data Services LLC",
+    "sector": "Information services",
+    "clusters": [
+      "Education",
+      "Management & Entrepreneurship"
+    ],
+    "county": "Greenbrier",
+    "city": "Lewisburg",
+    "zip": "24901",
+    "website": "https://mountain-state-data-services.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": true,
+    "lastHiredAt": "2025-09-20T12:00:00.000Z",
+    "subsidyFlags": {},
+    "status": "active"
+  },
+  {
+    "id": "bench_emp_11",
+    "name": "Elk Fork Building Supply",
+    "nameKey": "elk fork building supply",
+    "legalName": "Elk Fork Building Supply LLC",
+    "sector": "Building supply",
+    "clusters": [
+      "Construction",
+      "Financial Services"
+    ],
+    "county": "Fayette",
+    "city": "Oak Hill",
+    "zip": "25901",
+    "website": "https://elk-fork-building-supply.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": false,
+    "lastHiredAt": null,
+    "subsidyFlags": {},
+    "status": "do_not_contact"
+  },
+  {
+    "id": "bench_emp_12",
+    "name": "Seneca Home Health",
+    "nameKey": "seneca home health",
+    "legalName": "Seneca Home Health LLC",
+    "sector": "Home health",
+    "clusters": [
+      "Supply Chain & Transportation"
+    ],
+    "county": "Mercer",
+    "city": "Princeton",
+    "zip": "24740",
+    "website": "https://seneca-home-health.example.invalid",
+    "notes": null,
+    "hiredSpokesGradBefore": false,
+    "lastHiredAt": null,
+    "subsidyFlags": {},
+    "status": "paused"
+  }
+]

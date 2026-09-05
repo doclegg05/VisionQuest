@@ -1,0 +1,194 @@
+[
+  {
+    "id": "bench_listing_01",
+    "classId": "bench_class_1",
+    "sourceId": "bench-listing-source-01",
+    "title": "Delivery Driver Helper",
+    "company": "Blackwater Logistics",
+    "location": "Beckley, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 12,
+    "salaryMax": 16,
+    "clusters": [
+      "Digital Technology"
+    ],
+    "source": "jsearch",
+    "postedAt": "2026-08-26T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_02",
+    "classId": "bench_class_2",
+    "sourceId": "bench-listing-source-02",
+    "title": "Grocery Stocker",
+    "company": "Kanawha Valley Grocers",
+    "location": "Charleston, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 13,
+    "salaryMax": 17,
+    "clusters": [
+      "Education"
+    ],
+    "source": "usajobs",
+    "postedAt": "2026-07-27T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_03",
+    "classId": "bench_class_3",
+    "sourceId": "bench-listing-source-03",
+    "title": "Dental Office Assistant",
+    "company": "Coalfield Machine & Tool",
+    "location": "Huntington, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 14,
+    "salaryMax": 18,
+    "clusters": [
+      "Energy & Natural Resources"
+    ],
+    "source": "usajobs",
+    "postedAt": "2026-08-09T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_04",
+    "classId": "bench_class_1",
+    "sourceId": "bench-listing-source-04",
+    "title": "Print Finisher",
+    "company": "Greenbrier Family Dental",
+    "location": "Morgantown, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 15,
+    "salaryMax": 19,
+    "clusters": [
+      "Financial Services"
+    ],
+    "source": "adzuna",
+    "postedAt": "2026-08-11T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_05",
+    "classId": "bench_class_2",
+    "sourceId": "bench-listing-source-05",
+    "title": "Housekeeping Attendant",
+    "company": "Tygart Freight Lines",
+    "location": "Parkersburg, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 16,
+    "salaryMax": 20,
+    "clusters": [
+      "Healthcare & Human Services"
+    ],
+    "source": "usajobs",
+    "postedAt": "2026-08-25T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_06",
+    "classId": "bench_class_3",
+    "sourceId": "bench-listing-source-06",
+    "title": "Data Entry Clerk",
+    "company": "Appalachian Print & Sign",
+    "location": "Wheeling, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 17,
+    "salaryMax": 21,
+    "clusters": [
+      "Hospitality, Events, & Tourism"
+    ],
+    "source": "adzuna",
+    "postedAt": "2026-08-29T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_07",
+    "classId": "bench_class_1",
+    "sourceId": "bench-listing-source-07",
+    "title": "Building Supply Cashier",
+    "company": "Cheat River Hospitality",
+    "location": "Martinsburg, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 18,
+    "salaryMax": 22,
+    "clusters": [
+      "Management & Entrepreneurship"
+    ],
+    "source": "jsearch",
+    "postedAt": "2026-08-21T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_08",
+    "classId": "bench_class_2",
+    "sourceId": "bench-listing-source-08",
+    "title": "Home Health Aide",
+    "company": "Mountain State Data Services",
+    "location": "Fairmont, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 19,
+    "salaryMax": 23,
+    "clusters": [
+      "Marketing & Sales"
+    ],
+    "source": "jsearch",
+    "postedAt": "2026-08-23T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_09",
+    "classId": "bench_class_3",
+    "sourceId": "bench-listing-source-09",
+    "title": "Shipping Clerk",
+    "company": "Elk Fork Building Supply",
+    "location": "Clarksburg, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 20,
+    "salaryMax": 24,
+    "clusters": [
+      "Public Service & Safety"
+    ],
+    "source": "usajobs",
+    "postedAt": "2026-08-01T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_10",
+    "classId": "bench_class_1",
+    "sourceId": "bench-listing-source-10",
+    "title": "Line Cook",
+    "company": "Seneca Home Health",
+    "location": "Lewisburg, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 21,
+    "salaryMax": 25,
+    "clusters": [
+      "Supply Chain & Transportation"
+    ],
+    "source": "adzuna",
+    "postedAt": "2026-08-24T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_11",
+    "classId": "bench_class_2",
+    "sourceId": "bench-listing-source-11",
+    "title": "Maintenance Helper",
+    "company": "Ridgeline Metal Works",
+    "location": "Oak Hill, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 22,
+    "salaryMax": 26,
+    "clusters": [
+      "Advanced Manufacturing"
+    ],
+    "source": "jsearch",
+    "postedAt": "2026-08-27T12:00:00.000Z"
+  },
+  {
+    "id": "bench_listing_12",
+    "classId": "bench_class_3",
+    "sourceId": "bench-listing-source-12",
+    "title": "Quality Inspector",
+    "company": "New River Care Home",
+    "location": "Princeton, WV",
+    "description": "Entry level. Training provided. Apply in person or online.",
+    "salaryMin": 23,
+    "salaryMax": 27,
+    "clusters": [
+      "Agriculture"
+    ],
+    "source": "jsearch",
+    "postedAt": "2026-08-07T12:00:00.000Z"
+  }
+]

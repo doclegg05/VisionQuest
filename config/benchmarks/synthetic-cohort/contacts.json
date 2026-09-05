@@ -1,0 +1,134 @@
+[
+  {
+    "id": "bench_contact_01",
+    "employerId": "bench_emp_01",
+    "name": "Dalen Lindsell",
+    "role": "Plant Supervisor",
+    "email": "dalen.lindsell@ridgelinemetalworks.invalid",
+    "phone": "(304) 555-0100",
+    "preferredChannel": "email",
+    "contactConsentAt": "2025-08-19T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_02",
+    "employerId": "bench_emp_02",
+    "name": "Kessa Quarry",
+    "role": "Owner",
+    "email": "kessa.quarry@newrivercarehome.invalid",
+    "phone": "(304) 555-0101",
+    "preferredChannel": "email",
+    "contactConsentAt": "2025-11-07T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_03",
+    "employerId": "bench_emp_03",
+    "name": "Rennick Vellacourt",
+    "role": "Plant Supervisor",
+    "email": "rennick.vellacourt@blackwaterlogistics.invalid",
+    "phone": "(304) 555-0102",
+    "preferredChannel": "email",
+    "contactConsentAt": "2025-12-23T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_04",
+    "employerId": "bench_emp_04",
+    "name": "Yolen Coalfield",
+    "role": "Owner",
+    "email": "yolen.coalfield@kanawhavalleygrocers.invalid",
+    "phone": "(304) 555-0103",
+    "preferredChannel": "email",
+    "contactConsentAt": "2025-10-16T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_05",
+    "employerId": "bench_emp_05",
+    "name": "Farrow Havenhurst",
+    "role": "Owner",
+    "email": "farrow.havenhurst@coalfieldmachine&tool.invalid",
+    "phone": "(304) 555-0104",
+    "preferredChannel": "email",
+    "contactConsentAt": "2026-03-17T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_06",
+    "employerId": "bench_emp_06",
+    "name": "Marrow Merrowfield",
+    "role": "Hiring Manager",
+    "email": "marrow.merrowfield@greenbrierfamilydental.invalid",
+    "phone": "(304) 555-0105",
+    "preferredChannel": "email",
+    "contactConsentAt": "2025-08-08T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_07",
+    "employerId": "bench_emp_07",
+    "name": "Truett Rushmoor",
+    "role": "Plant Supervisor",
+    "email": "truett.rushmoor@tygartfreightlines.invalid",
+    "phone": "(304) 555-0106",
+    "preferredChannel": "email",
+    "contactConsentAt": "2026-05-22T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_08",
+    "employerId": "bench_emp_08",
+    "name": "Corah Winnowby",
+    "role": "Office Manager",
+    "email": "corah.winnowby@appalachianprint&sign.invalid",
+    "phone": "(304) 555-0107",
+    "preferredChannel": "email",
+    "contactConsentAt": "2026-04-08T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_09",
+    "employerId": "bench_emp_09",
+    "name": "Jarrah Bellweather",
+    "role": "Plant Supervisor",
+    "email": "jarrah.bellweather@cheatriverhospitality.invalid",
+    "phone": "(304) 555-0108",
+    "preferredChannel": "email",
+    "contactConsentAt": "2026-04-30T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_10",
+    "employerId": "bench_emp_10",
+    "name": "Quilla Galewood",
+    "role": "Office Manager",
+    "email": "quilla.galewood@mountainstatedataservices.invalid",
+    "phone": "(304) 555-0109",
+    "preferredChannel": "email",
+    "contactConsentAt": "2025-08-08T12:00:00.000Z",
+    "doNotContactAt": null
+  },
+  {
+    "id": "bench_contact_11",
+    "employerId": "bench_emp_11",
+    "name": "Xavia Lindsell",
+    "role": "Plant Supervisor",
+    "email": "xavia.lindsell@elkforkbuildingsupply.invalid",
+    "phone": "(304) 555-0110",
+    "preferredChannel": "email",
+    "contactConsentAt": "2025-09-10T12:00:00.000Z",
+    "doNotContactAt": "2026-08-12T12:00:00.000Z"
+  },
+  {
+    "id": "bench_contact_12",
+    "employerId": "bench_emp_12",
+    "name": "Emrys Quarry",
+    "role": "Owner",
+    "email": "emrys.quarry@senecahomehealth.invalid",
+    "phone": "(304) 555-0111",
+    "preferredChannel": "email",
+    "contactConsentAt": "2026-06-05T12:00:00.000Z",
+    "doNotContactAt": null
+  }
+]
