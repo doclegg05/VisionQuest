@@ -174,7 +174,14 @@ export async function runDailyBriefing(
     { userId: studentId, role: "student", studentId },
     () => assembleStudentContextBundle(studentId, { viewer: "sage" }),
   );
-  const sanitizedBundle = sanitizeForPrompt(JSON.stringify(bundle)).slice(0, 4000);
+  // Cap BEFORE sanitizing, not after. The bundle is unbounded — it grows with
+  // the student's goals, alerts and activity — and sanitizeForPrompt runs a
+  // fixpoint loop whose pass budget scales with input length, so sanitizing the
+  // whole thing to then throw all but 4000 characters away does work that
+  // grows with data nobody reads. Every other caller caps first. Slicing first
+  // cannot smuggle anything past the sanitizer: it only ever removes trailing
+  // input, and the sanitizer runs on exactly the text that reaches the prompt.
+  const sanitizedBundle = sanitizeForPrompt(JSON.stringify(bundle).slice(0, 4000));
 
   const baseProvider = await resolveAiProvider({
     studentId,

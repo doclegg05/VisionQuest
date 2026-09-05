@@ -229,18 +229,54 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // 91 of 91. A student naming who knows about their own overdose is exactly
   // the message this entry exists for.
   //
-  // The shape below is the one the od'd entry below already uses and got right:
-  // anchor on the first-person pronoun and refuse third-person words INSIDE the
-  // bounded gap that follows it, so a pronoun in an outer clause is irrelevant
-  // and only the verb's own subject is examined. The subjectless alternative
-  // applies the same refusal to the sentence's leading words, which is what
-  // keeps "she has taken too many pills", "my brother swallowed all the pills",
-  // "the patient had taken all the medication" and "they swallowed a bunch of
-  // pills" silent. Both directions are pinned.
+  // The second attempt anchored on the first-person pronoun and refused
+  // third-person words INSIDE the gap that follows it. That recovered the
+  // eleven rows above, and cost a different 880: it accepted a subject only
+  // after ".", "!" or "?", and only across a two-word gap. Both bounds are
+  // wrong about how a frightened student writes. They write one breath and a
+  // comma — "im scared, took all my pills", "i need help - took too many
+  // pills", "help me: took all my pills" — and they write narrative, in the
+  // order it happened — "i came home last night and took all my pills". A
+  // 2,000-row generated sweep put the loss at 880 messages with nothing gained;
+  // 13 of 14 hand-written realistic disclosures went silent. The gate stayed
+  // green throughout because this file had no must-detect row with a
+  // subjectless verb after "," ";" ":" "-" and none with a gap wider than two
+  // words. It does now — every shape below is pinned, so the same narrowing
+  // cannot pass silently again.
+  //
+  // So the sentence boundary accepts any clause separator, and the gaps are
+  // wide enough for narrative. What keeps the third-person rows silent is no
+  // longer gap width, it is WHERE a competing subject can stand: immediately
+  // before the verb. The two lookbehinds refuse a third-person word in either
+  // of those two positions, which is what keeps "i heard she took all my
+  // pills" and "i think my brother swallowed all the pills" silent while the
+  // gap is six words wide. Refusing those words anywhere in the gap instead —
+  // the second attempt's rule — cannot be recovered by any gap width, because
+  // "i locked THE door and took too many pills" and "i sat in THE car and
+  // swallowed all my meds" put a determiner inside a prepositional phrase, not
+  // a subject; both are pinned. The subjectless branch keeps the whole-gap
+  // refusal, where it is correct because nothing legitimate precedes the
+  // subject: "she has taken too many pills", "my brother swallowed all the
+  // pills", "the patient had taken all the medication" and "they swallowed a
+  // bunch of pills" stay silent on it.
+  //
+  // "you" is deliberately absent from the refusal list. Adding it would silence
+  // "i told you i took all my pills" and "i already told you i swallowed all my
+  // meds" — a student disclosing to their coach, in the register they actually
+  // use — and would buy only "you took all the pills" and "i think you took too
+  // many pills", each of which costs one instructor dismissal. Measured, not
+  // assumed, and both disclosure rows are pinned so the trade cannot be made
+  // silently. Known and accepted limits, unchanged from before this entry was
+  // bounded at all: a proper-name third person ("i think dave took all the
+  // pills") alerts, because no name list can be complete, and a third-person
+  // subject in the clause BEFORE a separator ("she was upset, took all the
+  // pills") alerts, because the subjectless branch by construction only reads
+  // the words after the separator. Both are recall-first: an instructor
+  // dismisses a card, and no disclosure is lost.
   {
     category: "self_harm",
     pattern:
-      /(?:\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+){0,2}\s+|(?:^|[.!?]\s+)(?:(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+\s+){0,2})(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
+      /(?:\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+\w+){0,6}\s+|(?:^|[-\n.!?;:,\u2014]\s*)(?:(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+\s+){0,4})(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s)(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s\w+\s)(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
   },
   // S1: "od'd" as a completed act. The only od entry required an intent verb
   // ("gonna od"), so the past tense — the higher-risk disclosure of the two —

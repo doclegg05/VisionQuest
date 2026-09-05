@@ -77,7 +77,9 @@ import { REPO_ROOT } from "./crisis-corpus.mjs";
 // Dynamic import: a static named import of a TypeScript module from an .mjs
 // file fails at instantiate time under tsx (the named exports are not visible
 // to the ESM linker). Every other TS import in this file uses the same form.
-const { AMBIGUOUS_SPACE_RE, INVISIBLE_CHAR_RE } = await import("@/lib/sage/invisible-chars");
+const { AMBIGUOUS_SPACE_RE, INVISIBLE_CHAR_RE, HIDEABLE_IN_MARKER_SOURCE } = await import(
+  "@/lib/sage/invisible-chars"
+);
 
 const HARNESS = path.join(REPO_ROOT, "scripts", "bench", "harness", "posting-injection.ts");
 
@@ -114,8 +116,10 @@ const DELIMITER_SHAPED = /\[\s*[A-Za-z0-9_]+_(START|END)\s*\]/i;
  * ordinary prose is never joined into an accidental match — makes a
  * post-normalization survivor visible again.
  */
-const HIDEABLE_INSIDE_A_MARKER =
-  /[\s\p{Default_Ignorable_Code_Point}\p{Cf}\p{Cc}]/gu;
+// Derived from the shared module rather than spelled out again: this scorer is
+// what proves the sanitizer works, so a class it does not track would make it
+// report CLEAN for a posting the sanitizer no longer handles.
+const HIDEABLE_INSIDE_A_MARKER = new RegExp(HIDEABLE_IN_MARKER_SOURCE, "gu");
 
 function collapseBracketedTokens(text) {
   return text.replace(/\[[^[\]]*\]/g, (token) => token.replace(HIDEABLE_INSIDE_A_MARKER, ""));

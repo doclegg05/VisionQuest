@@ -352,6 +352,67 @@ export const INFORMAL_MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["their fault i swallowed all my meds", "plural possessive"],
   ["your fault i took too many pills", "second-person possessive"],
 
+  // A SUBJECTLESS CLAUSE AFTER A COMMA, SEMICOLON, COLON OR DASH. Fixing the
+  // row above by anchoring on the first-person pronoun made the sentence-
+  // boundary alternation accept only ".", "!" and "?", so the register a
+  // frightened student actually writes in — one breath, one comma, then the
+  // disclosure — went silent. A 2,000-row generated sweep put the loss at 880
+  // messages. Every row here alerted before that narrowing and must keep
+  // alerting; none of them was representable in this file at the time, which is
+  // exactly why the gate stayed green while recall collapsed.
+  ["im scared, took all my pills", "comma splice, no subject"],
+  ["i messed up, took all my pills", "comma splice after a first-person clause"],
+  ["please dont tell anyone, took too many pills", "comma splice, imperative lead"],
+  ["im sorry, swallowed all my meds", "comma splice + swallowed"],
+  ["cant do this anymore, took a bunch of pills", "comma splice, no pronoun at all"],
+  ["so tired of everything, took all my medication", "comma splice, longer lead"],
+  ["i need help - took too many pills", "dash separator"],
+  ["help me: took all my pills", "colon separator"],
+  ["im done; took all my pills", "semicolon separator"],
+  ["im scared, just took all my pills", "comma splice with a leading adverb"],
+  ["cant sleep, already swallowed all my meds", "comma splice, adverb + swallowed"],
+  ["nobody cares - took a lot of pills", "dash separator, third-person-free lead"],
+  // Three and four leading words after the separator. Without these the
+  // subjectless gap bound is invisible to this file — a knockout that narrowed
+  // it back to two words silenced NOTHING, which is precisely how the previous
+  // narrowing passed every gate while costing 880 messages. Each of these goes
+  // silent at a two-word bound and matches on the subjectless branch alone.
+  ["cant do this, so honestly just took all my pills", "three leading words"],
+  ["nobody cares, so last night just swallowed all my meds", "three leading words + swallowed"],
+  ["please dont tell anyone, but last night just took all my pills", "four leading words"],
+  ["cant keep going, and last night finally took too many pills", "four leading words, different quantity"],
+
+  // A FIRST-PERSON FRAME WITH MORE THAN TWO WORDS BEFORE THE VERB. The same
+  // narrowing capped the gap after "i" at two words, which silenced every
+  // narrative disclosure — the shape a student uses when they tell you what
+  // they did in the order they did it.
+  ["i got home and took all my pills", "three-word gap"],
+  ["i went ahead and took all my pills", "three-word gap, different verb phrase"],
+  ["i came home last night and took all my pills", "five-word gap"],
+  ["i gave up and took all my pills", "three-word gap"],
+  ["i waited until everyone was asleep and took all my pills", "long narrative gap"],
+  ["i locked myself in and swallowed all my meds", "long gap + swallowed"],
+  ["i finally gave up tonight and took too many pills", "long gap, adverbs"],
+
+  // A DETERMINER OR POSSESSIVE INSIDE A PREPOSITIONAL PHRASE IS NOT A SUBJECT.
+  // These are the reason the third-person refusal on this entry is anchored to
+  // the two word positions immediately before the verb rather than applied to
+  // the whole gap: widening the gap while refusing "the" anywhere inside it
+  // silenced both of these, and no gap width alone can recover them.
+  ["i locked the door and took too many pills", "'the' in a prepositional object"],
+  ["i sat in the car and swallowed all my meds", "'the' in a prepositional object"],
+  ["i went to my room and took all my pills", "'my' in a prepositional object"],
+  ["i put her to bed and took all my pills", "'her' as an object, not a subject"],
+
+  // "you" IS DELIBERATELY ABSENT FROM THE THIRD-PERSON REFUSAL LIST, and these
+  // two rows are why. Adding it would silence a student telling their coach
+  // what they did — measured, not assumed: both of these go silent the moment
+  // "you" joins the list, while the only things it buys are "you took all the
+  // pills" and "i think you took too many pills", which cost an instructor one
+  // dismissal each. Recall-first: keep the pronoun out and keep these alerting.
+  ["i told you i took all my pills", "second person as an indirect object"],
+  ["i already told you i swallowed all my meds", "second person, adverb lead"],
+
   // S1: the od abbreviation as a PAST ACT. The only od entry required an intent
   // verb ("gonna od"), so a completed one was silent.
   ["ive od'd on pills before", "od'd past act"],

@@ -94,8 +94,9 @@
  * "\t" — both are Cc, and both are prompt structure — so the union can be
  * asked for as a whole rather than picked apart. Requires the `u` flag.
  */
-export const INVISIBLE_CHAR_SOURCE =
-  "(?![\\n\\t])[\\p{Default_Ignorable_Code_Point}\\p{Cf}\\p{Cc}]";
+const INVISIBLE_CLASS_BODY = "\\p{Default_Ignorable_Code_Point}\\p{Cf}\\p{Cc}";
+
+export const INVISIBLE_CHAR_SOURCE = `(?![\\n\\t])[${INVISIBLE_CLASS_BODY}]`;
 
 /**
  * Character class BODY for whitespace that is not a plain ASCII space and is
@@ -111,6 +112,22 @@ export const AMBIGUOUS_SPACE_CLASS =
   "\\u202F" + // narrow no-break space
   "\\u205F" + // medium mathematical space
   "\\u3000"; // ideographic space
+
+/**
+ * Everything that can hide INSIDE a bracketed marker without a reader seeing
+ * it: the invisible union above, the ambiguous spaces above, and ordinary
+ * whitespace. The `\n`/`\t` exemption is deliberately NOT applied here — this
+ * class exists to collapse a token down to what it would read as, and a
+ * marker split by a newline is exactly the forgery being looked for.
+ *
+ * Exported because the benchmark scorer needs the same set. It carried its own
+ * copy until 2026-09-05, which is a live hazard rather than duplication for its
+ * own sake: the scorer is what proves the sanitizer works, so a widening here
+ * that the copy did not track would leave the scorer under-covering and
+ * reporting CLEAN for a posting the sanitizer no longer handles. One source,
+ * and the detector can only ever be at least as wide as the defence.
+ */
+export const HIDEABLE_IN_MARKER_SOURCE = `[\\s${INVISIBLE_CLASS_BODY}${AMBIGUOUS_SPACE_CLASS}]`;
 
 /** Non-global, so `.test()`/`.exec()` carry no `lastIndex` state for callers. */
 export const INVISIBLE_CHAR_RE = new RegExp(INVISIBLE_CHAR_SOURCE, "u");
