@@ -29,6 +29,7 @@ Read when deciding what to build, cut, simplify, or automate.
 | Frontend redesign implementation | [docs/superpowers/plans/2026-03-30-frontend-redesign.md](./docs/superpowers/plans/2026-03-30-frontend-redesign.md) |
 | Job board implementation | [docs/superpowers/plans/2026-03-31-job-board.md](./docs/superpowers/plans/2026-03-31-job-board.md) |
 | Match & Connect (student↔employer brokering) — **PROPOSED** | [docs/superpowers/specs/2026-09-05-match-and-connect-design.md](./docs/superpowers/specs/2026-09-05-match-and-connect-design.md) · plan: [docs/superpowers/plans/2026-09-05-match-and-connect.md](./docs/superpowers/plans/2026-09-05-match-and-connect.md) |
+| Benchmark suite (numeric quality, safety, performance floors) — **PROPOSED** | [docs/superpowers/specs/2026-09-05-benchmark-suite-design.md](./docs/superpowers/specs/2026-09-05-benchmark-suite-design.md) |
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
 | Developer setup & scripts | [README.md](./README.md) |
 | SPOKES content reference | [content/_INDEX.md](./content/_INDEX.md) |
