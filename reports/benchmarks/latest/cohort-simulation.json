@@ -1,0 +1,123 @@
+{
+  "suite": "cohort-simulation",
+  "tier": "nightly",
+  "startedAt": "2026-09-05T17:01:33.687Z",
+  "durationMs": 124,
+  "commit": "b579cdb",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.7,
+    "node": "v22.22.2",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "illegal_transitions",
+      "value": 0,
+      "unit": "count",
+      "direction": "lower",
+      "n": 1680,
+      "floor": 0,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "examples": []
+      }
+    },
+    {
+      "id": "retention_checkpoint_mismatches",
+      "value": 0,
+      "unit": "count",
+      "direction": "lower",
+      "n": 60,
+      "floor": 0,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "examples": [],
+        "reaskWindowDays": 7
+      }
+    },
+    {
+      "id": "retention_checkpoints_raised",
+      "value": 33,
+      "unit": "count",
+      "reason": "The count itself, so a reader sees how much of the retention chain a twelve-week cohort actually reaches. The GATE is retention_checkpoint_mismatches: a raised count that moved because the fixture's probabilities were retuned is not a regression, while a checkpoint that came due and was never asked always is. Flooring the raw count would fail the run for a lucky draw.",
+      "direction": "higher",
+      "n": 20,
+      "floor": null,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "info",
+      "details": {
+        "alertsRaised": 5,
+        "textsSent": 50,
+        "textsRefused": 0
+      }
+    },
+    {
+      "id": "students_stuck_over_30_days",
+      "value": 4,
+      "unit": "count",
+      "reason": "Tracked, not floored: a stalled connection is usually the world, not a defect — employers do not answer. The number is here so a jump is visible and so the funnel's shape can be read beside the Connect report's, and details.byStatus names where they are stalled. A floor waits on a real pilot cohort saying what normal looks like.",
+      "direction": "lower",
+      "n": 20,
+      "floor": null,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "info",
+      "details": {
+        "byStatus": {
+          "started": 2,
+          "retained_30": 2
+        },
+        "thresholdDays": 30
+      }
+    },
+    {
+      "id": "simulated_weeks",
+      "value": 12,
+      "unit": "count",
+      "reason": "Provenance, not a score: it says how long the run covered, so a result whose numbers dropped because somebody shortened the simulation is not read as an improvement.",
+      "direction": "higher",
+      "n": 20,
+      "floor": null,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "info",
+      "details": {
+        "epoch": "2026-09-01T12:00:00.000Z",
+        "finalStatuses": {
+          "started": 2,
+          "retained_60": 5,
+          "closed": 9,
+          "retained_30": 4
+        },
+        "transitionTable": {
+          "proposed": 3,
+          "student_approved": 3,
+          "sent": 6,
+          "viewed": 5,
+          "interested": 6,
+          "interview_scheduled": 5,
+          "offered": 4,
+          "hired": 3,
+          "started": 3,
+          "retained_30": 3,
+          "retained_60": 3,
+          "retained_90": 0,
+          "not_now": 0,
+          "withdrawn": 0,
+          "closed": 0
+        },
+        "studentTableSize": 8
+      }
+    }
+  ],
+  "status": "pass"
+}

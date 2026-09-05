@@ -55,7 +55,7 @@ export async function run(ctx) {
     transitionConnection,
   } = await import("../../../src/lib/connect/pipeline.ts");
   const { createWalkingConnectionClient } = await import(
-    "../../../src/lib/connect/pipeline-fake-client.ts"
+    "../../../src/lib/connect/__fixtures__/pipeline-fake-client.ts"
   );
   const {
     RETENTION_DAYS,
