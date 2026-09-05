@@ -189,7 +189,7 @@ export async function recordInterested(input: InterestedInput) {
     data: {
       employerRespondedAt: new Date(),
       employerResponse: "interested",
-      interviewAppointment: { connect: { id: appointmentId } },
+      interviewAppointmentId: appointmentId,
     },
     client: prismaAdmin,
   });
@@ -338,7 +338,7 @@ export async function recordHired(input: HiredInput) {
       hiredAt: new Date(),
       startDate,
       hourlyWage: input.hourlyWage,
-      application: { connect: { id: applicationId } },
+      applicationId,
       // The link has done its job. Clearing the token is what makes a replay
       // after a hire resolve to the neutral page rather than the packet.
       employerTokenHash: null,

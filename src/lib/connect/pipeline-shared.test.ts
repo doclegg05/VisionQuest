@@ -24,8 +24,8 @@ import {
 const LEGAL: Record<ConnectionStatus, ConnectionStatus[]> = {
   proposed: ["student_approved", "withdrawn", "closed"],
   student_approved: ["sent", "withdrawn", "closed"],
-  sent: ["viewed", "interested", "not_now", "withdrawn", "closed"],
-  viewed: ["interested", "not_now", "withdrawn", "closed"],
+  sent: ["viewed", "interested", "not_now", "hired", "withdrawn", "closed"],
+  viewed: ["interested", "not_now", "hired", "withdrawn", "closed"],
   interested: ["interview_scheduled", "offered", "hired", "not_now", "withdrawn", "closed"],
   interview_scheduled: ["offered", "hired", "not_now", "withdrawn", "closed"],
   offered: ["hired", "not_now", "withdrawn", "closed"],

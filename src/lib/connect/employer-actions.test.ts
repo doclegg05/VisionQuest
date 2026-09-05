@@ -236,7 +236,7 @@ describe("recordHired — the outcome capture", () => {
     assert.equal(transition.actorType, "employer");
     assert.equal(transition.data.hourlyWage, 16.5);
     assert.equal(transition.data.startDate.toISOString().slice(0, 10), "2026-09-15");
-    assert.ok(transition.data.application.connect.id);
+    assert.ok(transition.data.applicationId, "the Application is linked by its scalar FK");
     // The token is cleared, which is what makes a replay after a hire resolve
     // to the neutral page rather than the packet.
     assert.equal(transition.data.employerTokenHash, null);

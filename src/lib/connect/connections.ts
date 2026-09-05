@@ -15,22 +15,26 @@
 // =============================================================================
 
 import { logAuditEvent } from "@/lib/audit";
-import { prisma } from "@/lib/db";
+import { prisma, prismaAdmin } from "@/lib/db";
 import { sendEmail, isEmailDeliveryConfigured } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { redactContactInfo } from "@/lib/log-redaction";
 import { studentLogKey } from "@/lib/log-keys";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, refundRateLimit } from "@/lib/rate-limit";
 import { sendNotification } from "@/lib/notifications";
 import { sanitizeForPrompt } from "@/lib/sage/system-prompts";
 
 import { grantConsent, hasActiveConsent } from "@/lib/consent";
 
+import { ENROLLED_STATUSES } from "./classes";
 import { buildEmployerEmail } from "./employer-email";
 import { mintEmployerToken } from "./employer-link-shared";
 import { assemblePacket, packetAsJson, renderPacketPdf } from "./packet";
 import { parsePacket, type Packet } from "./packet-shared";
 import {
+  POST_HIRE_STATUSES,
+  STUDENT_VISIBLE_CONNECTION_STATUSES,
+  TERMINAL_CONNECTION_STATUSES,
   isTerminalConnectionStatus,
   isConnectionStatus,
   transitionConnection,
@@ -48,6 +52,38 @@ export class ConnectionError extends Error {
     this.name = "ConnectionError";
     this.status = status;
   }
+}
+
+/**
+ * Has this student explicitly turned employer introductions OFF?
+ *
+ * A revoked-and-not-re-granted record is a decision, not an absence: without
+ * this check, approving a new proposal would call `grantConsent` and silently
+ * put back the standing permission they went into Settings to remove.
+ * NEVER having been asked is different, and is not a refusal.
+ */
+async function hasRevokedEmployerReferral(studentId: string): Promise<boolean> {
+  const [active, revoked] = await Promise.all([
+    prisma.consentRecord.findFirst({
+      where: { studentId, scope: "employer_referral", revokedAt: null },
+      select: { id: true },
+    }),
+    prisma.consentRecord.findFirst({
+      where: { studentId, scope: "employer_referral", revokedAt: { not: null } },
+      select: { id: true },
+    }),
+  ]);
+  return !active && Boolean(revoked);
+}
+
+/** The student's current class, for the funnel dimension on a new connection. */
+async function activeClassIdFor(studentId: string): Promise<string | null> {
+  const enrollment = await prisma.studentClassEnrollment.findFirst({
+    where: { studentId, status: { in: [...ENROLLED_STATUSES] } },
+    orderBy: { createdAt: "desc" },
+    select: { classId: true },
+  });
+  return enrollment?.classId ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +119,19 @@ export interface ProposeInput {
  * A proposal is not an approval and sends nothing — that is why a student may
  * create one for themselves (`propose_connection`) under the RLS insert
  * policy's bounded student branch.
+ *
+ * ORDER MATTERS, in two ways that both burned the first cut:
+ *
+ *   1. The packet is assembled BEFORE the row exists and written IN the INSERT.
+ *      Assembling afterwards meant a follow-up UPDATE that left `status` at
+ *      "proposed" — which the student UPDATE policy's WITH CHECK rejects
+ *      (it admits only student_approved|withdrawn), so under Sage's
+ *      student-context call the packet write raised 42501 and left a dead row
+ *      holding the permanent (studentId, jobLeadId) key forever. Widening that
+ *      policy was the wrong fix: it would let a student rewrite their own
+ *      proposed row's columns.
+ *   2. The same reordering means a throwing assembler leaves NO row at all,
+ *      rather than an un-approvable proposal squatting on the unique key.
  */
 export async function proposeConnection(input: ProposeInput) {
   // `employerName` rather than the Employer relation, deliberately: this runs
@@ -97,7 +146,14 @@ export async function proposeConnection(input: ProposeInput) {
   // here without a second query.
   const lead = await prisma.jobLead.findUnique({
     where: { id: input.jobLeadId },
-    select: { id: true, employerId: true, status: true, title: true, employerName: true },
+    select: {
+      id: true,
+      employerId: true,
+      status: true,
+      title: true,
+      employerName: true,
+      classId: true,
+    },
   });
   if (!lead) throw new ConnectionError("That job wasn't found.", 404);
   if (lead.status !== "open") throw new ConnectionError("That job is not open right now.");
@@ -113,37 +169,56 @@ export async function proposeConnection(input: ProposeInput) {
     throw new ConnectionError("There is already a connection for this student and job.");
   }
 
-  const connection = await prisma.connection.create({
-    data: {
-      studentId: input.studentId,
-      jobLeadId: input.jobLeadId,
-      employerId: lead.employerId,
-      proposedById: input.proposedById,
-      proposedVia: input.proposedVia,
-      status: "proposed",
-    },
-    select: { id: true },
-  });
+  // A student who turned employer introductions OFF in Settings has said no to
+  // the whole idea; asking again on a card would be asking them to re-answer a
+  // question they already answered. Refused with a teacher-facing reason.
+  if (await hasRevokedEmployerReferral(input.studentId)) {
+    throw new ConnectionError(
+      "This student turned off employer introductions in Settings.",
+      403,
+    );
+  }
 
-  // Assembled after the row exists because assemblePacket reads through it.
-  const packet = await assemblePacket(connection.id, {
-    endorsement: input.endorsement,
-    subsidyFlags: input.subsidyFlags,
-  });
-  await prisma.connection.update({
-    where: { id: connection.id },
-    data: { packet: packetAsJson(packet) },
-  });
+  const packet = await assemblePacket(
+    { studentId: input.studentId, jobLeadId: input.jobLeadId },
+    { endorsement: input.endorsement, subsidyFlags: input.subsidyFlags },
+  );
 
-  await prisma.connectionEvent.create({
-    data: {
-      connectionId: connection.id,
-      fromStatus: null,
-      toStatus: "proposed",
-      actorType: input.proposedVia === "sage" ? "student" : input.proposedVia,
-      actorId: input.proposedById,
-      note: `Proposed for "${lead.title}" at ${lead.employerName}.`,
-    },
+  // The class this student was in at propose time, for the Phase 6 funnel.
+  // The lead's own class first (it is the narrower fact); otherwise their
+  // active enrollment. Null when neither exists — a dimension, not a gate.
+  const classId = lead.classId ?? (await activeClassIdFor(input.studentId));
+
+  const connection = await prisma.$transaction(async (tx) => {
+    const created = await tx.connection.create({
+      data: {
+        studentId: input.studentId,
+        jobLeadId: input.jobLeadId,
+        employerId: lead.employerId,
+        classId,
+        proposedById: input.proposedById,
+        proposedVia: input.proposedVia,
+        status: "proposed",
+        // Written IN the insert. See the ORDER MATTERS note above: a follow-up
+        // UPDATE that left status "proposed" is rejected by the student RLS
+        // policy's WITH CHECK.
+        packet: packetAsJson(packet),
+      },
+      select: { id: true },
+    });
+
+    await tx.connectionEvent.create({
+      data: {
+        connectionId: created.id,
+        fromStatus: null,
+        toStatus: "proposed",
+        actorType: input.proposedVia === "sage" ? "student" : input.proposedVia,
+        actorId: input.proposedById,
+        note: `Proposed for "${lead.title}" at ${lead.employerName}.`,
+      },
+    });
+
+    return created;
   });
 
   await logAuditEvent({
@@ -275,9 +350,11 @@ export async function approveConnection(connectionId: string, studentId: string)
     actorType: "student",
     actorId: studentId,
     note: "The student approved what would be shared.",
+    // Scalar FK, not a relation connect: transitionConnection writes through
+    // `updateMany`, which takes scalars only (see TransitionInput.data).
     data: {
       packet: packetAsJson(frozen),
-      ...(consent ? { consentRecord: { connect: { id: consent.id } } } : {}),
+      ...(consent ? { consentRecordId: consent.id } : {}),
     },
   });
 
@@ -324,13 +401,23 @@ export interface SendResult {
  * result is treated as a refusal. Over-contacting a local employer costs the
  * program a relationship it cannot rebuild; a delayed packet costs a day.
  */
-async function assertEmployerSendAllowed(employerId: string, now: Date): Promise<void> {
-  const recentSends = await prisma.outboundMessage.count({
+async function assertEmployerSendAllowed(employerId: string, now: Date): Promise<number> {
+  // `prismaAdmin`, and on the DENORMALISED `employerId` column.
+  //
+  // Two separate reasons, both of which silently raised the real limit:
+  //   - counting through the `connection` relation compiles to an EXISTS
+  //     against Connection, which `connection_read` scopes to the CALLER's own
+  //     students — so each instructor saw only their own sends and two of them
+  //     could put six packets in front of one employer in a week;
+  //   - the column also survives `connectionId` going NULL on SetNull.
+  // This is a program-wide policy question, so it needs a program-wide count;
+  // nothing about a student is read here, only how many messages went out.
+  const recentSends = await prismaAdmin.outboundMessage.count({
     where: {
       channel: "email",
       toKind: "employer_contact",
       sentAt: { gte: new Date(now.getTime() - EMPLOYER_SEND_WINDOW_MS) },
-      connection: { employerId },
+      employerId,
     },
   });
   if (recentSends >= EMPLOYER_SEND_LIMIT) {
@@ -341,7 +428,7 @@ async function assertEmployerSendAllowed(employerId: string, now: Date): Promise
   }
 
   const limit = await rateLimit(
-    `connect-send:${employerId}`,
+    employerSendKey(employerId),
     EMPLOYER_SEND_LIMIT,
     EMPLOYER_SEND_WINDOW_MS,
   );
@@ -350,6 +437,65 @@ async function assertEmployerSendAllowed(employerId: string, now: Date): Promise
       "We can't send to this employer right now. Try again shortly.",
       429,
     );
+  }
+  // Returned so a failed email can refund THIS window's unit; a refund against
+  // a window that has since rolled over is a no-op by design.
+  return limit.resetTime;
+}
+
+function employerSendKey(employerId: string): string {
+  return `connect-send:${employerId}`;
+}
+
+/**
+ * Undo a send claim whose email never left.
+ *
+ * Deliberately NOT a `transitionConnection` call: `sent -> student_approved`
+ * is not a move anybody made, and adding it to the transitions table would
+ * make "un-send" a legal operation for every other caller too. This is the
+ * narrow undo of a claim, guarded on the exact token hash it wrote, so an
+ * employer action or a student withdrawal that already moved the row wins.
+ */
+async function rollBackFailedSend(
+  connectionId: string,
+  tokenHash: string,
+  actorId: string,
+): Promise<void> {
+  try {
+    const rolled = await prisma.connection.updateMany({
+      where: { id: connectionId, status: "sent", employerTokenHash: tokenHash },
+      data: {
+        status: "student_approved",
+        statusChangedAt: new Date(),
+        sentAt: null,
+        sentById: null,
+        employerTokenHash: null,
+        tokenExpiresAt: null,
+        tokenContactId: null,
+      },
+    });
+    if (rolled.count === 0) return;
+
+    await prisma.connectionEvent.create({
+      data: {
+        connectionId,
+        fromStatus: "sent",
+        toStatus: "student_approved",
+        actorType: "system",
+        actorId,
+        note: "The email did not go through, so nothing was sent.",
+      },
+    });
+  } catch (error) {
+    // The send already failed; a failed rollback must not replace that error
+    // with a different one. The connection is left at "sent" with a token
+    // nobody received, which the instructor sees as "sent, no view" — visible,
+    // and recoverable by closing it.
+    logger.error("Send rollback failed", {
+      actorId,
+      alert: "connect_send_rollback_failed",
+      error: String(error),
+    });
   }
 }
 
@@ -442,7 +588,7 @@ export async function sendConnection(
   const packet = parsePacket(connection.packet);
   if (!packet) throw new ConnectionError("That connection has nothing to send yet.");
 
-  await assertEmployerSendAllowed(connection.employerId, now);
+  const sendLimitResetAt = await assertEmployerSendAllowed(connection.employerId, now);
 
   const { token, tokenHash, expiresAt } = mintEmployerToken(now);
   const email = buildEmployerEmail({
@@ -460,6 +606,31 @@ export async function sendConnection(
     throw new ConnectionError("Email is not set up, so nothing was sent.", 503);
   }
 
+  // CLAIM FIRST, then email.
+  //
+  // The first cut emailed and then transitioned, which fails in the worst
+  // possible direction: the employer holds a live link whose token hash was
+  // never stored, so the page they open resolves to nothing, and the
+  // connection still reads "student_approved" so an instructor sends again.
+  // Claiming first means the token that exists in the world is the token the
+  // database knows about. The claim is guarded by `expectedFrom`, so two
+  // instructors racing Send cannot both win it.
+  await transitionConnection({
+    connectionId,
+    to: "sent",
+    expectedFrom: "student_approved",
+    actorType: options.senderRole === "admin" ? "admin" : "teacher",
+    actorId: options.senderId,
+    note: `Sent to ${contact.name}.`,
+    data: {
+      sentAt: now,
+      sentById: options.senderId,
+      employerTokenHash: tokenHash,
+      tokenExpiresAt: expiresAt,
+      tokenContactId: contact.id,
+    },
+  });
+
   try {
     await sendEmail({ to: contact.email, subject: email.subject, text: email.text });
   } catch (error) {
@@ -470,24 +641,24 @@ export async function sendConnection(
       student: studentLogKey(connection.studentId),
       error: redactContactInfo(String(error)),
     });
+
+    // Roll the claim back so the instructor can try again, and clear the token
+    // in the same statement: nothing was delivered, so nothing may resolve.
+    // Guarded on the hash we just wrote, so a concurrent employer action (or a
+    // student withdrawal) that has already moved the row is left alone.
+    //
+    // `sent -> student_approved` is not a legal transition and must not become
+    // one — a rollback is not a state change anyone made, it is the undo of a
+    // claim. So it is a direct updateMany with its own event, deliberately
+    // NOT routed through transitionConnection.
+    await rollBackFailedSend(connectionId, tokenHash, options.senderId);
+
+    // Give the employer's weekly allowance back: nothing reached them, so this
+    // attempt must not count against the three they may receive.
+    await refundRateLimit(employerSendKey(connection.employerId), sendLimitResetAt);
+
     throw new ConnectionError("That email didn't go through. Nothing was sent.", 502);
   }
-
-  await transitionConnection({
-    connectionId,
-    to: "sent",
-    expectedFrom: "student_approved",
-    actorType: options.senderRole === "admin" ? "admin" : "teacher",
-    actorId: options.senderId,
-    note: `Sent to ${contact.name}.`,
-    data: {
-      sentAt: now,
-      sentBy: { connect: { id: options.senderId } },
-      employerTokenHash: tokenHash,
-      tokenExpiresAt: expiresAt,
-      tokenContactId: contact.id,
-    },
-  });
 
   await prisma.outboundMessage.create({
     data: {
@@ -504,6 +675,9 @@ export async function sendConnection(
       // version of the thing the token design exists to prevent.
       body: email.text.replace(token, "[link]"),
       connectionId,
+      // Denormalised so the per-employer limit can count without joining
+      // Connection, whose RLS scopes the count to the caller's own students.
+      employerId: connection.employerId,
       status: "sent",
     },
   });
@@ -634,7 +808,13 @@ export async function withdrawConnectionsForConsentRevocation(
   const open = await prisma.connection.findMany({
     where: {
       studentId,
-      status: { notIn: ["not_now", "retained_90", "withdrawn", "closed"] },
+      // Terminal statuses have nothing to withdraw. POST-HIRE statuses are
+      // excluded for a different and stronger reason: a student who turns the
+      // setting off did not un-get the job. Rewriting `hired`/`started`/
+      // `retained_*` to "withdrawn" would falsify the placement in the grant
+      // KPI report, the DoHS export and their own record. Revoking stops
+      // future sharing; it does not edit history.
+      status: { notIn: [...TERMINAL_CONNECTION_STATUSES, ...POST_HIRE_STATUSES] },
     },
     select: { id: true, status: true },
   });

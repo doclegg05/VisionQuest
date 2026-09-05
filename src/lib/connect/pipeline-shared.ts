@@ -62,6 +62,27 @@ export function isTerminalConnectionStatus(status: ConnectionStatus): boolean {
   return (TERMINAL_CONNECTION_STATUSES as readonly string[]).includes(status);
 }
 
+/**
+ * The job already happened.
+ *
+ * Consent revocation withdraws live introductions, but it must NOT rewrite
+ * these: a student who turns the setting off in October did not un-get the job
+ * they started in September, and marking a real placement "withdrawn" would
+ * corrupt the grant KPI report and the DoHS export as well as the student's own
+ * record. Revoking stops future sharing; it does not edit history.
+ */
+export const POST_HIRE_STATUSES = [
+  "hired",
+  "started",
+  "retained_30",
+  "retained_60",
+  "retained_90",
+] as const;
+
+export function isPostHireStatus(status: ConnectionStatus): boolean {
+  return (POST_HIRE_STATUSES as readonly string[]).includes(status);
+}
+
 /** Student-facing wording, grade 6. Used by the approval card and /memory. */
 export const CONNECTION_STATUS_LABELS: Record<ConnectionStatus, string> = {
   proposed: "Waiting for you to say OK",
@@ -84,7 +105,7 @@ export const CONNECTION_STATUS_LABELS: Record<ConnectionStatus, string> = {
 /**
  * Every legal move.
  *
- * Two shapes are deliberate rather than incidental:
+ * Three shapes are deliberate rather than incidental:
  *
  *   - `sent` may go straight to `interested` or `not_now` without passing
  *     through `viewed`. The employer page records the view before it renders
@@ -92,14 +113,23 @@ export const CONNECTION_STATUS_LABELS: Record<ConnectionStatus, string> = {
  *     one write fails, an employer who taps a button must not be told "no".
  *     Losing a view timestamp is a reporting gap; losing the employer's answer
  *     is the whole product.
+ *   - `sent` and `viewed` may go straight to `hired`. Employers talk to people:
+ *     one who rings the instructor, meets the candidate at the shop and hires
+ *     them, then comes back to the link, must be able to say so. Refusing that
+ *     would not prevent the hire, only the record of it.
  *   - `hired` does NOT accept another employer response. A token replay after
  *     a hire is refused here, not only by the link's active-status filter.
+ *
+ * `interested` is a RESTING state, not a passing one (design spec §4): an
+ * employer who says yes but picks no slot stops there, and the instructor
+ * follows up. That is why `recordInterested` writes it as its own transition
+ * before booking, rather than jumping to `interview_scheduled`.
  */
 export const ALLOWED_TRANSITIONS: Record<ConnectionStatus, readonly ConnectionStatus[]> = {
   proposed: ["student_approved", "withdrawn", "closed"],
   student_approved: ["sent", "withdrawn", "closed"],
-  sent: ["viewed", "interested", "not_now", "withdrawn", "closed"],
-  viewed: ["interested", "not_now", "withdrawn", "closed"],
+  sent: ["viewed", "interested", "not_now", "hired", "withdrawn", "closed"],
+  viewed: ["interested", "not_now", "hired", "withdrawn", "closed"],
   interested: ["interview_scheduled", "offered", "hired", "not_now", "withdrawn", "closed"],
   interview_scheduled: ["offered", "hired", "not_now", "withdrawn", "closed"],
   offered: ["hired", "not_now", "withdrawn", "closed"],
@@ -206,3 +236,84 @@ export function assertStudentTransition(
 /** The employer's three answers, in the order the response page shows them. */
 export const EMPLOYER_RESPONSES = ["interested", "not_now", "hired"] as const;
 export type EmployerResponse = (typeof EMPLOYER_RESPONSES)[number];
+
+/**
+ * The statuses a student sees on their own Career page as a live connection.
+ *
+ * Everything after they approved and before it ended. `proposed` is excluded
+ * because that is the approval card's job, and the terminal statuses are
+ * excluded because there is nothing left to do about them.
+ *
+ * This set exists because of a real gap: the approval card promised "You can
+ * take it back any time" while nothing between approval and send showed the
+ * connection at all, so there was no screen on which to take it back.
+ */
+export const STUDENT_VISIBLE_CONNECTION_STATUSES = CONNECTION_STATUSES.filter(
+  (status) => status !== "proposed" && !isTerminalConnectionStatus(status),
+);
+
+/**
+ * What the student is told about a connection, in their own words.
+ *
+ * Every phrase names the actor the student is waiting on, because "where is
+ * this up to" is the only question this line has to answer. `employerName` is
+ * interpolated where the EMPLOYER acted; a missing name degrades to "the
+ * employer" rather than leaving a gap or printing "undefined".
+ */
+export function connectionStatusPhrase(
+  status: ConnectionStatus,
+  employerName: string,
+): string {
+  const employer = employerName.trim() || "the employer";
+  switch (status) {
+    case "proposed":
+      return "Waiting for you to say OK";
+    case "student_approved":
+      return "Waiting for your teacher to send it";
+    case "sent":
+      return `Sent to ${employer}`;
+    case "viewed":
+      return `${employer} opened it`;
+    case "interested":
+      return `${employer} wants to meet you`;
+    case "not_now":
+      return `${employer} said not right now`;
+    case "interview_scheduled":
+      return "Your meeting is set";
+    case "offered":
+      return `${employer} offered you the job`;
+    case "hired":
+      return `You got the job at ${employer}`;
+    case "started":
+      return "You started work";
+    case "retained_30":
+      return "Still working after 30 days";
+    case "retained_60":
+      return "Still working after 60 days";
+    case "retained_90":
+      return "Still working after 90 days";
+    case "withdrawn":
+      return "You took this back";
+    case "closed":
+      return "Your teacher closed this";
+  }
+}
+
+/**
+ * What the student is told after they take one back.
+ *
+ * Split on whether the packet had actually gone: before it is sent, the honest
+ * message is that nothing left the program; after, it is that the employer was
+ * told. Telling a student "we told your teacher not to send this" about a
+ * packet an employer has already read would be a lie they might act on.
+ */
+export function withdrawConfirmation(
+  status: ConnectionStatus,
+  employerName: string,
+): string {
+  const employer = employerName.trim() || "the employer";
+  if (status === "proposed" || status === "student_approved") {
+    return "Done. We told your teacher not to send this.";
+  }
+  return `Done. We told ${employer} you changed your mind.`;
+}
