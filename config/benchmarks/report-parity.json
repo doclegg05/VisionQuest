@@ -1,0 +1,23 @@
+{
+  "suite": "report-parity",
+  "title": "Three reports, one placement count",
+  "area": "connect",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/report-parity.mjs",
+  "fixture": "config/benchmarks/fixtures/report-parity.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "parity_violations",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    { "id": "grant_kpi_placements", "unit": "count", "direction": "higher", "tolerance": 0 },
+    { "id": "dohs_export_placed_rows", "unit": "count", "direction": "higher", "tolerance": 0 },
+    { "id": "funnel_hired_or_beyond", "unit": "count", "direction": "higher", "tolerance": 0 }
+  ],
+  "notes": "In-process over the synthetic cohort — no database. Runs the three real computations (computeGrantKpis, buildDohsExportRows, computeFunnel) over one population and asserts they agree on how many people got a job. Each count is also reported on its own so a failure says WHICH report moved. The three self-directed applications in the cohort are deliberately non-qualifying, so the funnel's comparison line is non-zero while the three placement counts still agree — a fixture where they qualified would make the reports legitimately disagree and turn this into a test of the fixture."
+}

@@ -332,7 +332,7 @@ async function main(): Promise<void> {
     }
 
     // ── Student career data ──────────────────────────────────────────────
-    for (const student of cohort.students) {
+    for (const [index, student] of cohort.students.entries()) {
       await prisma.careerDiscovery.upsert({
         where: { studentId: student.id as string },
         update: {
@@ -352,8 +352,26 @@ async function main(): Promise<void> {
       // The résumé is stored as a JSON STRING in a Text column, which is what
       // `parseStoredResumeData` expects — writing an object here would produce
       // "[object Object]" and a silently empty skills list.
+      //
+      // The contact block is POPULATED on purpose. A real student's résumé
+      // carries their phone, email and town, and `renderPacketPdf` strips
+      // exactly that before the employer sees the document. Seeding a blank
+      // contact block would make `packet-privacy` pass because there was
+      // nothing to leak, which is the least useful way for a privacy benchmark
+      // to be green. These values are the same fictional ones the rest of the
+      // cohort uses: a reserved 555 number, an undeliverable domain, a real
+      // WV town.
+      const profile = cohort.workProfiles.find((row) => row.studentId === student.id);
       const resume = JSON.stringify({
-        contact: { email: "", phone: "", location: "", website: "", linkedin: "" },
+        contact: {
+          email: student.email as string,
+          phone: `(304) 555-01${String(index % 100).padStart(2, "0")}`,
+          location: `${(profile?.county as string) ?? "Raleigh"} County, WV ${
+            (profile?.homeZip as string) ?? "25801"
+          }`,
+          website: "",
+          linkedin: "",
+        },
         summary: `${student.firstName as string} is finishing SPOKES and looking for work.`,
         skills: student.resumeSkills as string[],
         experience: [],

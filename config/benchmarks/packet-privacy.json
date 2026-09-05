@@ -1,0 +1,26 @@
+{
+  "suite": "packet-privacy",
+  "title": "Packet privacy across every employer-facing surface",
+  "area": "connect",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/packet-privacy.mjs",
+  "fixture": "config/benchmarks/fixtures/packet-privacy.json",
+  "requires": ["postgres", "cohort"],
+  "metrics": [
+    {
+      "id": "forbidden_fields_found",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "surfaces_scanned",
+      "unit": "count",
+      "direction": "higher",
+      "tolerance": 0
+    }
+  ],
+  "notes": "Assembles a packet for every cohort connection through the real assemblePacket against a seeded database, then scans the three things that actually leave the program — the employer response page (rendered), the employer email, and the résumé content the PDF carries — against the same denylist packet-shared.test.ts and workforce-batch.test.ts pin, plus phone/email/ZIP patterns. Résumé tailoring is not mocked: the scorer seeds a ResumeVersion for each (student, lead) pair, which is the reuse branch assemblePacket already takes, so no AI call happens and no module has to be stubbed. Reports `skipped` without a database rather than failing."
+}
