@@ -52,6 +52,31 @@ export const PACKET_FIELD_LABELS: Record<PacketFieldKey, string> = {
   subsidy_line: "A note about money the employer may get for hiring",
 };
 
+/**
+ * The same fields, in the EMPLOYER's second person.
+ *
+ * The labels above are written to the student — "Your résumé", "The cards you
+ * earned" — and the employer page was printing them verbatim under "This is
+ * everything that was shared", so an employer read a list addressed to
+ * somebody else. Worse, it reads as though the page is telling the EMPLOYER
+ * what their own résumé and cards are.
+ *
+ * Two maps rather than one neutral wording, because neither audience should
+ * get the compromise: the student's list is the consent screen and has to be
+ * unambiguously about them, and the employer's is a summary of what they were
+ * given. The keys are shared, so a new field cannot be added to one and
+ * forgotten in the other — the Record type requires both.
+ */
+export const EMPLOYER_FIELD_LABELS: Record<PacketFieldKey, string> = {
+  candidate_name: "Their first name and last initial",
+  resume: "A résumé written for this job",
+  verified_certifications: "Cards a teacher checked",
+  availability: "The days and times they can work",
+  earliest_start: "The soonest day they can start",
+  endorsement: "A note from their teacher",
+  subsidy_line: "A note about money you may get for hiring",
+};
+
 export interface PacketFieldDescriptor {
   key: PacketFieldKey;
   label: string;

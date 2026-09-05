@@ -235,6 +235,50 @@ function furthestFunnelIndex(events: readonly FunnelEventRow[]): number {
 }
 
 /**
+ * The stage a connection actually reached, discounting a send that was rolled
+ * back.
+ *
+ * `sendConnection` CLAIMS the transition to "sent" before it emails, so the
+ * token that exists in the world is always one the database knows about. When
+ * the email then fails, `rollBackFailedSend` puts the row back to
+ * "student_approved" and nulls `sentAt` — but the "sent" ConnectionEvent stays,
+ * because the event log is append-only and that claim genuinely happened.
+ *
+ * Reading the event history alone therefore counts a packet that never left
+ * the building as "sent". On a report whose whole job is "how far did each
+ * introduction get", that is the one number nobody would question and nobody
+ * could reproduce: a misconfigured mail server would show a healthy send rate
+ * and a mysterious zero response rate.
+ *
+ * `sentAt` is the discriminator because `rollBackFailedSend` is the only thing
+ * that ever nulls it, and `sendConnection` always writes it alongside the
+ * claim. So "an event at or past `sent`, with no `sentAt`" means exactly one
+ * thing. A later successful re-send writes a new `sentAt`, and the connection
+ * counts from then on — which is why this checks the column rather than
+ * subtracting the rollback event.
+ */
+export function funnelStageIndexForConnection(
+  events: readonly FunnelEventRow[],
+  sentAt: Date | string | null | undefined,
+): number {
+  const reached = furthestFunnelIndex(events);
+  const sentIndex = funnelStageIndex("sent");
+  if (reached < sentIndex || sentAt) return reached;
+
+  // The claim was undone. Fall back to the furthest stage strictly BELOW
+  // "sent" that the events support — in practice "student_approved", which is
+  // where the row was put back.
+  return furthestFunnelStageIndex(
+    events
+      .map((event) => event.toStatus)
+      .filter((status) => {
+        const index = funnelStageIndex(status);
+        return index >= 0 && index < sentIndex;
+      }),
+  );
+}
+
+/**
  * The employer's first substantive answer, in the order the employer page
  * shows the buttons: a view isn't an answer, so it is deliberately absent —
  * "viewed" only tells us the packet was opened, not that anyone responded.
@@ -335,8 +379,11 @@ export function computeFunnel(
     const connectionEvents = eventsByConnection.get(connection.id) ?? [];
 
     // --- stages: every connection contributes to exactly one, its furthest
-    // funnel-order stage, regardless of whether it later exited. ---
-    const stage = FUNNEL_STAGE_ORDER[furthestFunnelIndex(connectionEvents)];
+    // funnel-order stage, regardless of whether it later exited — except a
+    // send that was claimed and then rolled back, which never reached the
+    // employer and must not be counted as if it had. ---
+    const stage =
+      FUNNEL_STAGE_ORDER[funnelStageIndexForConnection(connectionEvents, connection.sentAt)];
     stageCounts.set(stage, (stageCounts.get(stage) ?? 0) + 1);
 
     // --- exits: an independent overlay, keyed off the CURRENT status. ---

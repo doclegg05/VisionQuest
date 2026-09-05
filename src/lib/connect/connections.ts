@@ -37,6 +37,7 @@ import {
   POST_HIRE_STATUSES,
   STUDENT_VISIBLE_CONNECTION_STATUSES,
   TERMINAL_CONNECTION_STATUSES,
+  isPostHireStatus,
   isTerminalConnectionStatus,
   isConnectionStatus,
   transitionConnection,
@@ -487,6 +488,21 @@ export async function approveConnection(connectionId: string, studentId: string)
   const packet = parsePacket(connection.packet);
   if (!packet) throw new ConnectionError("That connection has nothing to send yet.");
 
+  // The same guard `proposeConnection` has, and for a sharper reason.
+  //
+  // A student can revoke `employer_referral` in Settings AFTER a proposal was
+  // raised — the card is still sitting on their dashboard. Approving it calls
+  // `grantConsent` below, which would silently put the standing permission
+  // back: one tap on a card they had already decided against would re-enable
+  // employer sharing program-wide, not just for this connection. Revocation
+  // has to survive a stale card.
+  if (await hasRevokedEmployerReferral(studentId)) {
+    throw new ConnectionError(
+      "You turned off employer introductions. Turn them back on in Settings first.",
+      403,
+    );
+  }
+
   await grantConsent(studentId, "employer_referral", studentId);
   const consent = await prisma.consentRecord.findFirst({
     where: { studentId, scope: "employer_referral", revokedAt: null },
@@ -494,7 +510,26 @@ export async function approveConnection(connectionId: string, studentId: string)
   });
 
   const resumeFileUploadId = await renderPacketPdf(studentId, packet);
-  const frozen: Packet = { ...packet, resumeFileUploadId };
+  // If the PDF did not render, the résumé is NOT in the packet — so it comes
+  // out of the approved field list too.
+  //
+  // The employer page gates its résumé block on `hasPacketPdf`, i.e. on this
+  // id existing. Leaving "resume" in `includedFields` would leave the packet
+  // saying one thing and the page doing another: the console's review list and
+  // the student's own /memory disclosure record would both promise a document
+  // the employer never received. The list is the record of what was shared, so
+  // it has to shrink when what was shared does.
+  //
+  // Dropped rather than retried: the student has already tapped, and holding
+  // their approval open on a second render attempt would either block the
+  // request or send later than they agreed to.
+  const frozen: Packet = {
+    ...packet,
+    resumeFileUploadId,
+    includedFields: resumeFileUploadId
+      ? packet.includedFields
+      : packet.includedFields.filter((field) => field !== "resume"),
+  };
 
   await transitionConnection({
     connectionId,
@@ -613,7 +648,7 @@ async function rollBackFailedSend(
   connectionId: string,
   tokenHash: string,
   actorId: string,
-): Promise<void> {
+): Promise<{ rolledBack: boolean }> {
   try {
     const rolled = await prisma.connection.updateMany({
       where: { id: connectionId, status: "sent", employerTokenHash: tokenHash },
@@ -627,7 +662,12 @@ async function rollBackFailedSend(
         tokenContactId: null,
       },
     });
-    if (rolled.count === 0) return;
+    // Zero rows means the guard did its job: something else moved the row
+    // between the claim and this undo — an employer opening the link (the
+    // email DID arrive, the send only looked failed to us), or a student
+    // withdrawing. Either way the connection is no longer ours to put back,
+    // and the instructor needs a different sentence.
+    if (rolled.count === 0) return { rolledBack: false };
 
     await prisma.connectionEvent.create({
       data: {
@@ -639,6 +679,7 @@ async function rollBackFailedSend(
         note: "The email did not go through, so nothing was sent.",
       },
     });
+    return { rolledBack: true };
   } catch (error) {
     // The send already failed; a failed rollback must not replace that error
     // with a different one. The connection is left at "sent" with a token
@@ -649,6 +690,7 @@ async function rollBackFailedSend(
       alert: "connect_send_rollback_failed",
       error: String(error),
     });
+    return { rolledBack: false };
   }
 }
 
@@ -663,6 +705,27 @@ export interface SendOptions {
   now?: Date;
 }
 
+/**
+ * Send the approved packet to the employer's contact.
+ *
+ * THE RECIPIENT IS NOT A PARAMETER, and that is a decision rather than an
+ * omission. It is always `jobLead.contact` — the contact recorded on the lead,
+ * re-checked here against the lead's own `employerId` so an employer merge or
+ * a hand-edited row cannot end with one company's hiring manager receiving a
+ * packet about another company's job.
+ *
+ * Letting the caller name an address would make this function a way to send
+ * one student's résumé, certifications and teacher endorsement to any email
+ * an instructor could type, with the student's approval attached to it. The
+ * student approved a packet going to a named employer for a named job; the
+ * lead is where that name lives. Changing the recipient means editing the
+ * lead's contact, which is an auditable staff action with its own checks
+ * (`assertContactBelongsTo`), not a field on a send request.
+ *
+ * The same reasoning covers the `doNotContactAt` refusal below: a contact who
+ * asked not to be emailed is a property of the contact record, so it cannot be
+ * routed around by addressing the message somewhere else.
+ */
 export async function sendConnection(
   connectionId: string,
   options: SendOptions,
@@ -741,6 +804,21 @@ export async function sendConnection(
   const packet = parsePacket(connection.packet);
   if (!packet) throw new ConnectionError("That connection has nothing to send yet.");
 
+  // BEFORE the limiter, not after.
+  //
+  // `assertEmployerSendAllowed` increments an atomic counter — that is what
+  // makes it safe against two instructors clicking Send at the same moment —
+  // so reaching it and then failing on unconfigured email burns one of the
+  // three packets this employer may receive in seven days. The refund path
+  // below only covers a send that got as far as trying; a misconfigured
+  // deployment would quietly spend the weekly allowance three times and then
+  // refuse real sends for a week, with nothing in the pipeline to show why.
+  //
+  // Checking a static config value costs nothing and cannot race.
+  if (!isEmailDeliveryConfigured()) {
+    throw new ConnectionError("Email is not set up, so nothing was sent.", 503);
+  }
+
   const sendLimitResetAt = await assertEmployerSendAllowed(connection.employerId, now);
 
   const { token, tokenHash, expiresAt } = mintEmployerToken(now);
@@ -754,10 +832,6 @@ export async function sendConnection(
     programName: options.programName,
     responseUrl: `${options.baseUrl.replace(/\/$/, "")}/connect/${token}`,
   });
-
-  if (!isEmailDeliveryConfigured()) {
-    throw new ConnectionError("Email is not set up, so nothing was sent.", 503);
-  }
 
   // CLAIM FIRST, then email.
   //
@@ -804,13 +878,32 @@ export async function sendConnection(
     // one — a rollback is not a state change anyone made, it is the undo of a
     // claim. So it is a direct updateMany with its own event, deliberately
     // NOT routed through transitionConnection.
-    await rollBackFailedSend(connectionId, tokenHash, options.senderId);
+    const { rolledBack } = await rollBackFailedSend(
+      connectionId,
+      tokenHash,
+      options.senderId,
+    );
 
     // Give the employer's weekly allowance back: nothing reached them, so this
     // attempt must not count against the three they may receive.
     await refundRateLimit(employerSendKey(connection.employerId), sendLimitResetAt);
 
-    throw new ConnectionError("That email didn't go through. Nothing was sent.", 502);
+    // Two different failures wearing one error message, until now.
+    //
+    // The usual case is that nothing left: the row is back at
+    // `student_approved` and the instructor can simply try again. But the
+    // rollback is guarded on the token hash, so a zero-row result means
+    // something else moved the connection first — most often the employer
+    // OPENING the link, which means the mail did arrive and only our side of
+    // the send failed. Telling that instructor "nothing was sent" invites them
+    // to send the same packet again, to an employer who already has it, and
+    // burns a second slot of the three-per-week allowance.
+    throw new ConnectionError(
+      rolledBack
+        ? "That email didn't go through. Nothing was sent — you can try again."
+        : "That email may have gone through. Check Connect before sending again.",
+      502,
+    );
   }
 
   await prisma.outboundMessage.create({
@@ -871,6 +964,24 @@ export async function withdrawConnection(connectionId: string, studentId: string
   }
   if (isTerminalConnectionStatus(connection.status)) {
     throw new ConnectionError("That connection is already closed.");
+  }
+  // A hire is not a thing to take back on your own.
+  //
+  // `Connection.applicationId` points at an accepted, instructor-verified
+  // Application; the placement bridge has already raised its queue item and
+  // the row feeds the grant KPI report and the DoHS export. Rewriting it to
+  // "withdrawn" would leave the Application accepted and the connection
+  // withdrawn — two records of the same event disagreeing, with the funnel
+  // counting the person as both placed and not.
+  //
+  // STUDENT_ALLOWED_TRANSITIONS says the same thing and would refuse this
+  // anyway, but a bare "that move is not allowed" is the wrong sentence for
+  // somebody who believes the hire is wrong. This one points them at the
+  // person who can actually fix both records.
+  if (isPostHireStatus(connection.status)) {
+    throw new ConnectionError(
+      "This one is past the job offer. Tell your teacher if something is wrong and they will fix it with you.",
+    );
   }
 
   await transitionConnection({

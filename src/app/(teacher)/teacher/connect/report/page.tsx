@@ -147,7 +147,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
         <>
           <section aria-labelledby="funnel-heading" className="theme-card rounded-xl p-5">
             <h2 id="funnel-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-              The funnel
+              How far each introduction got
             </h2>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[420px] text-sm">

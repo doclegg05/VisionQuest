@@ -9,7 +9,7 @@ import {
   resolveEmployerLink,
 } from "@/lib/connect/employer-link";
 import { CONNECT_CONFIG_KEY } from "@/lib/connect/flags-shared";
-import { SUBSIDY_FALLBACK_LINE, packetFieldList } from "@/lib/connect/packet-shared";
+import { EMPLOYER_FIELD_LABELS, SUBSIDY_FALLBACK_LINE } from "@/lib/connect/packet-shared";
 import { getPlainConfigValue } from "@/lib/system-config";
 
 /**
@@ -80,7 +80,11 @@ export default async function EmployerConnectPage({
       }))
     : [];
 
-  const fields = packetFieldList(view.packet);
+  // The EMPLOYER's wording, not the student's. `packetFieldList` renders the
+  // consent-screen labels ("Your résumé", "The cards you earned"), which read
+  // as if this page were addressing the candidate — or worse, telling the
+  // employer about their own résumé.
+  const fields = view.packet.includedFields.map((key) => EMPLOYER_FIELD_LABELS[key]);
   // Gate every block on the APPROVED FIELD LIST, not on whether the value
   // happens to be present. A packet whose `includedFields` omits a key but
   // whose value column still carries something — a student who approved a
@@ -171,17 +175,27 @@ export default async function EmployerConnectPage({
           </div>
         </section>
 
-        <section className="surface-section p-6">
-          <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Money for hiring</h2>
-          <p className="mt-2 text-base text-[var(--ink-strong)]">
-            {included.has("subsidy_line")
-              ? (view.packet.subsidyLine ?? SUBSIDY_FALLBACK_LINE)
-              : SUBSIDY_FALLBACK_LINE}
-          </p>
-          <p className="mt-2 text-sm text-[var(--ink-muted)]">
-            Rules change. Check with the local WV Works office before you count on any of it.
-          </p>
-        </section>
+        {/* Gated on the field like every other block.
+
+            It used to print the fallback line even when `subsidy_line` was
+            NOT in the approved list — harmless-looking, because the fallback
+            says nothing about the student, but it broke the one rule this
+            page has: what renders is what the student approved, and nothing
+            else. A block that ignores `includedFields` "because its content
+            is generic" is the precedent that lets the next one ignore it too.
+            The student's own card applies the same rule, so the two surfaces
+            agree by construction rather than by coincidence. */}
+        {included.has("subsidy_line") && (
+          <section className="surface-section p-6">
+            <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Money for hiring</h2>
+            <p className="mt-2 text-base text-[var(--ink-strong)]">
+              {view.packet.subsidyLine ?? SUBSIDY_FALLBACK_LINE}
+            </p>
+            <p className="mt-2 text-sm text-[var(--ink-muted)]">
+              Rules change. Check with the local WV Works office before you count on any of it.
+            </p>
+          </section>
+        )}
 
         <EmployerResponseActions token={token} slots={slots} />
 

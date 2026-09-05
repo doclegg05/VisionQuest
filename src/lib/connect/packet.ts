@@ -408,7 +408,20 @@ export async function renderPacketPdf(
       select: { id: true },
     });
     return upload.id;
-  } catch {
+  } catch (error) {
+    // Never silent. A null here is not cosmetic: the employer page keys its
+    // "Download the résumé" block on `hasPacketPdf`, so a failed render is the
+    // difference between an employer reading the candidate's work history and
+    // reading a name. The approval card is told the same thing, so the student
+    // is not asked to approve a résumé that will not arrive.
+    //
+    // Correlation key, not the id — this is a path that logs BECAUSE nothing
+    // reached storage, so a line nobody can follow helps nobody, and a raw
+    // student id in a log is PII (src/lib/log-keys.ts).
+    logger.warn("Packet PDF render failed", {
+      student: studentLogKey(studentId),
+      error: String(error),
+    });
     return null;
   }
 }

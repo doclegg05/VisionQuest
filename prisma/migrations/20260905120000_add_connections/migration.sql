@@ -138,6 +138,13 @@ CREATE INDEX "CoverLetter_jobLeadId_idx" ON "visionquest"."CoverLetter"("jobLead
 CREATE UNIQUE INDEX "CoverLetter_studentId_jobLeadId_version_key" ON "visionquest"."CoverLetter"("studentId", "jobLeadId", "version");
 
 -- CreateIndex
+-- `Opportunity.sourceJobLeadId` deliberately carries NO foreign key: it is the
+-- interim mirror the hire path writes so a Connection-sourced placement is
+-- visible to the existing Application/Opportunity views, and D5 may delete the
+-- mirror entirely. Referential integrity is transitive in the meantime — the
+-- only writer sets it from a Connection whose own `jobLeadId` FK is RESTRICT,
+-- so the lead it names cannot be deleted while that connection exists. If D5
+-- keeps the mirror, this column earns a real FK.
 CREATE UNIQUE INDEX "Opportunity_sourceJobLeadId_key" ON "visionquest"."Opportunity"("sourceJobLeadId");
 
 -- AddForeignKey
@@ -275,6 +282,21 @@ CREATE POLICY "connection_insert" ON "visionquest"."Connection"
 -- transitions the design allows them are enforced by the database and not only
 -- by assertStudentTransition() in the app.
 --
+-- The student's USING clause also excludes every POST-HIRE status, and that
+-- placement is forced rather than chosen: WITH CHECK cannot see the OLD row,
+-- so "withdrawn is fine unless you were hired" is not expressible there. USING
+-- is evaluated against the old row, so refusing to match a hired row at all is
+-- the only way to say it in SQL.
+--
+-- Why it needs saying: `Connection.applicationId` points at an accepted,
+-- instructor-VERIFIED Application, and the row feeds the placement bridge, the
+-- grant KPI report and the DoHS export. A student tapping "take this back" on
+-- a job they actually got would rewrite a verified placement to 'withdrawn'
+-- while the Application stayed accepted — two records of one event
+-- disagreeing, with the funnel counting the person as both placed and not. A
+-- hire recorded in error is a conversation with the instructor, who can close
+-- the connection and unverify the Application together.
+--
 -- WHAT THIS POLICY DOES NOT DO, stated plainly because the opposite is easy to
 -- assume: RLS is row-level, never column-level. A student whose UPDATE lands
 -- on a permitted row and leaves a permitted status behind may change ANY other
@@ -300,6 +322,7 @@ CREATE POLICY "connection_update" ON "visionquest"."Connection"
     OR (
       current_setting('app.current_role', true) = 'student'
       AND "studentId" = current_setting('app.current_user_id', true)
+      AND "status" NOT IN ('hired', 'started', 'retained_30', 'retained_60', 'retained_90')
     )
   )
   WITH CHECK (
@@ -315,6 +338,16 @@ CREATE POLICY "connection_update" ON "visionquest"."Connection"
     )
   );
 
+-- ON THE RESTRICT FKs ABOVE, one ordering hazard worth writing down: a
+-- self-proposed connection (proposedById = studentId, the Sage path) points at
+-- the same Student row twice — once Cascade, once Restrict. Postgres applies
+-- the Restrict check regardless of the other constraint's action, so a hard
+-- `Student.delete` on such a student fails rather than cascading. Offboarding
+-- does not hit this (it deactivates and exports; it never deletes the row), so
+-- there is nothing to fix today — but anyone introducing a real delete has to
+-- clear Connections first, and so does any test fixture that tears students
+-- down (see scripts/seed-e2e-users.ts).
+--
 -- No DELETE policy AND no DELETE privilege: a connection is a disclosure
 -- record. It is closed or withdrawn, never removed. The two guards do
 -- different jobs -- the missing policy makes a delete match zero rows, the
@@ -439,13 +472,23 @@ CREATE POLICY "outbound_message_insert" ON "visionquest"."OutboundMessage"
 -- the record of what left the program. It is written once, when the message is
 -- sent, and never corrected afterwards.
 --
--- NOTE FOR THE SMS NUDGE PATH (Phase 5): src/lib/nudges/replies.ts claims a
--- reply with `prismaAdmin.outboundMessage.updateMany`. These REVOKEs name
--- vq_app, so they do not touch that client while ADMIN_DATABASE_URL points at
--- its own role. They DO bite if that variable is unset, because prismaAdmin
--- then silently falls back to DATABASE_URL — i.e. to vq_app (finding F63). In
--- that configuration the reply claim fails loudly with 42501 instead of
--- quietly running without RLS, which is the better of the two failures but is
--- worth knowing before reading the stack trace.
+-- TWO prismaAdmin CONSUMERS depend on this table, and both are F63 exposures:
+--
+--   1. `assertEmployerSendAllowed` (src/lib/connect/connections.ts) counts a
+--      true rolling seven days of rows for one employer through prismaAdmin,
+--      on the denormalised `employerId`. It has to bypass RLS: under the
+--      instructor's own context the count would be scoped to THEIR students,
+--      so an employer already contacted three times by another class would
+--      read as zero and the weekly cap would silently triple.
+--   2. `src/lib/nudges/replies.ts` (Phase 5) claims an inbound SMS reply with
+--      `prismaAdmin.outboundMessage.updateMany`.
+--
+-- These REVOKEs name vq_app, so neither is touched while ADMIN_DATABASE_URL
+-- points at its own role. They DO bite if that variable is unset, because
+-- prismaAdmin then silently falls back to DATABASE_URL — i.e. to vq_app
+-- (finding F63). In that configuration (2) fails loudly with 42501 instead of
+-- quietly running without RLS, which is the better of the two failures; (1)
+-- keeps working but under-counts, which is the worse one, and is the reason
+-- F63 wants a boot probe rather than a comment.
 GRANT SELECT, INSERT ON "visionquest"."OutboundMessage" TO vq_app;
 REVOKE UPDATE, DELETE ON "visionquest"."OutboundMessage" FROM vq_app;

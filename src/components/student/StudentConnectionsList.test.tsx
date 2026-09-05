@@ -18,6 +18,7 @@ import { renderToString } from "react-dom/server";
 import {
   STUDENT_VISIBLE_CONNECTION_STATUSES,
   connectionStatusPhrase,
+  isPostHireStatus,
   withdrawConfirmation,
 } from "@/lib/connect/pipeline-shared";
 
@@ -52,11 +53,12 @@ describe("StudentConnectionsList", () => {
     );
   });
 
-  it("gives every student-visible status a row and a way out", () => {
+  it("gives every PRE-HIRE status a row and a way out", () => {
     // Not just the one status the fixture happens to use. Any status a student
     // can be shown must render with the control, or the promise fails exactly
     // in the state nobody wrote a case for.
     for (const status of STUDENT_VISIBLE_CONNECTION_STATUSES) {
+      if (isPostHireStatus(status)) continue;
       const html = renderToString(
         <StudentConnectionsList
           connections={[
@@ -78,6 +80,39 @@ describe("StudentConnectionsList", () => {
     }
   });
 
+  it("shows a POST-HIRE row but NOT the take-back button", () => {
+    // The security fix. "Take this back" on a job the student actually got
+    // would rewrite a verified placement — the row names an accepted,
+    // instructor-verified Application that the grant KPI report and the DoHS
+    // export both read. The row stays, because a student must be able to see
+    // the job they got; the one-tap undo goes, and the copy points at the
+    // person who can fix both records.
+    for (const status of ["hired", "started", "retained_30", "retained_60"] as const) {
+      const html = renderToString(
+        <StudentConnectionsList
+          connections={[
+            connection({
+              status,
+              statusPhrase: connectionStatusPhrase(status, "Mountain Metal"),
+            }),
+          ]}
+        />,
+      );
+      assert.ok(
+        html.includes(connectionStatusPhrase(status, "Mountain Metal")),
+        `a "${status}" introduction disappeared from the student's list`,
+      );
+      assert.ok(
+        !html.includes("Take this back"),
+        `a student could withdraw a "${status}" connection from the UI`,
+      );
+      assert.ok(
+        html.includes("Tell your teacher"),
+        `a "${status}" row offers no way to raise a problem`,
+      );
+    }
+  });
+
   it("renders nothing at all when there are no live introductions", () => {
     // An empty "Your job introductions" heading is a section a student has to
     // read and dismiss to learn nothing.
@@ -94,11 +129,23 @@ describe("StudentConnectionsList", () => {
     assert.match(withdrawConfirmation("student_approved", "Mountain Metal"), /your teacher/i);
 
     for (const sent of ["sent", "viewed", "interested", "interview_scheduled"] as const) {
+      const message = withdrawConfirmation(sent, "Mountain Metal");
       assert.match(
-        withdrawConfirmation(sent, "Mountain Metal"),
+        message,
         /Mountain Metal/,
         `a "${sent}" withdrawal did not name the employer who already had the packet`,
       );
+      // And it must not claim a message this program never sends. The old
+      // wording — "We told Mountain Metal you changed your mind" — described
+      // an email nobody writes, to a student deciding whether they still need
+      // to make a phone call themselves. What actually happens is the link
+      // stops working and the instructor is notified.
+      assert.ok(
+        !/told .*you changed your mind/i.test(message),
+        `a "${sent}" withdrawal promises the employer was told`,
+      );
+      assert.match(message, /turned off the link/i);
+      assert.match(message, /teacher will follow up/i);
     }
   });
 

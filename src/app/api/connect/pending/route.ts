@@ -6,7 +6,6 @@ import {
   listPendingForStudent,
 } from "@/lib/connect/connections";
 import { isConnectEnabledForStudent } from "@/lib/connect/flags";
-import { packetFieldList } from "@/lib/connect/packet-shared";
 import { connectionStatusPhrase } from "@/lib/connect/pipeline-shared";
 
 /**
@@ -46,7 +45,11 @@ export const GET = withAuth(async (session) => {
         jobTitle: row.jobTitle,
         location: row.location,
         employerName: row.employerName,
-        fields: row.packet ? packetFieldList(row.packet) : [],
+        // KEYS, not labels. The card renders the label for each key from the
+        // same PACKET_FIELD_LABELS map the employer page uses, so a copy edit
+        // to one string can no longer silently drop a row from the consent
+        // list while the employer still receives the value.
+        fields: row.packet?.includedFields ?? [],
         endorsement: row.packet?.endorsement ?? "",
         candidateName: row.packet?.candidateName ?? "",
         certifications: row.packet?.certifications ?? [],

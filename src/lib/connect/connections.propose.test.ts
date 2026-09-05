@@ -339,6 +339,47 @@ describe("approveConnection", () => {
     assert.equal(scope, "employer_referral");
   });
 
+  it("refuses to approve when the student has REVOKED employer introductions", async () => {
+    // A student can turn introductions off in Settings AFTER a proposal was
+    // raised — the card is still on their dashboard. Approving calls
+    // `grantConsent`, so without this guard one tap on a stale card would
+    // silently put the standing permission back: not just for this connection,
+    // but program-wide. Revocation has to survive a card that predates it.
+    activeConsent = null;
+    revokedConsent = { id: "consent0" };
+
+    await assert.rejects(() => approveConnection("conn1", "stu1"), /turned off/i);
+
+    assert.equal(grantConsent.mock.callCount(), 0, "a revoked consent was re-granted");
+    assert.equal(transitionConnection.mock.callCount(), 0);
+    assert.equal(
+      renderPacketPdf.mock.callCount(),
+      0,
+      "a revoked student's résumé was rendered anyway",
+    );
+  });
+
+  it("drops the résumé from the approved list when its PDF did not render", async () => {
+    // The employer page gates its résumé block on the rendered file existing,
+    // so leaving "resume" in `includedFields` would leave the packet saying
+    // one thing and the page doing another — and the /memory disclosure record
+    // would promise the employer received a document they never got. The list
+    // IS the record of what was shared, so it shrinks when what was shared
+    // does.
+    renderPacketPdf.mock.mockImplementation(async () => null);
+
+    const frozen = await approveConnection("conn1", "stu1");
+
+    assert.equal(frozen.resumeFileUploadId, null);
+    assert.ok(
+      !frozen.includedFields.includes("resume"),
+      "the packet still promises a résumé the employer will not receive",
+    );
+    // Everything else the student agreed to is untouched.
+    assert.ok(frozen.includedFields.includes("candidate_name"));
+    assert.ok(frozen.includedFields.includes("subsidy_line"));
+  });
+
   it("refuses a connection that is not waiting for the student's OK", async () => {
     connectionFindFirst.mock.mockImplementation(async () => ({
       ...PROPOSED_ROW,

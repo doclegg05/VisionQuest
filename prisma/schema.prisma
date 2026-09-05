@@ -897,6 +897,13 @@ model Opportunity {
   /// concurrent hires from one lead would both miss. INTERIM until owner
   /// decision D5 retires Opportunity in favour of JobLead — this column is
   /// also the list of rows to migrate when it does.
+  ///
+  /// NO foreign key, deliberately. Integrity is transitive until D5: the only
+  /// writer sets this from a Connection whose own `jobLeadId` FK is RESTRICT,
+  /// so the lead named here cannot be deleted while that connection exists.
+  /// Declaring a real relation would tie a table D5 may retire to one it may
+  /// keep, and would have to be dropped again to do it. If D5 keeps the
+  /// mirror, this column earns its FK then.
   sourceJobLeadId String? @unique
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1218,6 +1225,14 @@ model Connection {
   /// deliberately deletes it after the export bundle is written.
   jobLead             JobLead           @relation(fields: [jobLeadId], references: [id], onDelete: Restrict)
   employer            Employer          @relation(fields: [employerId], references: [id], onDelete: Restrict)
+  /// ORDERING HAZARD, recorded because it only bites a path that does not
+  /// exist yet: a SELF-PROPOSED connection (the Sage path sets proposedById =
+  /// studentId) points at one Student row through both a Cascade and a
+  /// Restrict. Postgres enforces the Restrict regardless of the Cascade, so a
+  /// hard `Student.delete` on such a student FAILS rather than cascading.
+  /// Offboarding never deletes the row, so nothing is broken today — but any
+  /// future hard delete, and any fixture teardown, must clear Connections
+  /// first (see scripts/seed-e2e-users.ts).
   proposedBy          Student           @relation("ProposedConnections", fields: [proposedById], references: [id], onDelete: Restrict)
   sentBy              Student?          @relation("SentConnections", fields: [sentById], references: [id], onDelete: SetNull)
   consentRecord       ConsentRecord?    @relation(fields: [consentRecordId], references: [id], onDelete: SetNull)

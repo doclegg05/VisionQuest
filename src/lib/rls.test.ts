@@ -1930,6 +1930,59 @@ if (!SHOULD_RUN) {
         });
       });
 
+      it("a student CANNOT withdraw a connection once it is a hire", async () => {
+        // The security fix, at the layer that has to hold even if the app
+        // forgets. `Connection.applicationId` names an accepted,
+        // instructor-verified Application, and the row feeds the placement
+        // bridge, the grant KPI report and the DoHS export — so "take this
+        // back" on a job the student actually got would leave two records of
+        // one event disagreeing, with the funnel counting them as both placed
+        // and not.
+        //
+        // Expressed in USING rather than WITH CHECK because WITH CHECK cannot
+        // see the OLD row: "withdrawn is fine unless you WERE hired" is only
+        // sayable by refusing to match a hired row at all. That also changes
+        // the failure shape — the row is never matched, so this is a silent
+        // count 0 rather than a 42501, and the read-back is what proves it.
+        for (const status of ["hired", "started", "retained_60"] as const) {
+          await db.connection.update({ where: { id: connectionA }, data: { status } });
+
+          const updated = await asRole("student", fixtures.studentA, (tx) =>
+            tx.connection.updateMany({
+              where: { id: connectionA },
+              data: { status: "withdrawn" },
+            }),
+          );
+          assert.equal(
+            updated.count,
+            0,
+            `a student withdrew a "${status}" connection`,
+          );
+
+          const after = await db.connection.findUnique({
+            where: { id: connectionA },
+            select: { status: true },
+          });
+          assert.equal(
+            after?.status,
+            status,
+            `a verified placement was rewritten from "${status}"`,
+          );
+        }
+
+        // Staff keep their route: a hire recorded in error is fixable by the
+        // person who can also unverify the Application.
+        const closed = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.connection.updateMany({ where: { id: connectionA }, data: { status: "closed" } }),
+        );
+        assert.equal(closed.count, 1, "an instructor could not close a bad hire");
+
+        await db.connection.update({
+          where: { id: connectionA },
+          data: { status: "proposed" },
+        });
+      });
+
       it("a student may insert their OWN proposal, and only in 'proposed'", async () => {
         // The bounded student branch that makes propose_connection possible
         // without an admin bypass. Uses studentB, who has no row on this lead.
@@ -2224,6 +2277,67 @@ if (!SHOULD_RUN) {
         assert.equal(revoked.count, 1, "a student can always revoke their own consent");
 
         await db.notificationPreference.deleteMany({ where: { id: own } });
+      });
+
+      it("refuses a ResumeVersion or CoverLetter that names NO opening", async () => {
+        // The CHECK constraints, exercised as the table OWNER — this is not an
+        // RLS property, it is a shape the database must refuse for every
+        // writer, including one that never reads tailor-application.ts.
+        //
+        // A row with neither key is the quiet half of the bug: it is invisible
+        // to every packet and every application view, so the tailoring looks
+        // like it simply did not happen, which is exactly how the original
+        // P2003 failure hid.
+        //
+        // SCOPE NOTE: the BOTH-keys half of the same constraint is not
+        // exercised here, because reaching it needs a real `JobListing`, which
+        // needs a JobClassConfig and a scrape batch this suite does not build
+        // — and with a fabricated id the FK fires first, so the assertion
+        // would pass for the wrong reason. `assertExactlyOneOpening` covers it
+        // at the unit level (tailor-application.columns.test.ts), and the
+        // constraint text below is the same predicate for both halves.
+        await assert.rejects(
+          () =>
+            db.resumeVersion.create({
+              data: {
+                studentId: fixtures.studentA,
+                version: 1,
+                content: {},
+                jobListingId: null,
+                jobLeadId: null,
+              },
+            }),
+          /violates check constraint/i,
+          "a ResumeVersion belonging to no opening was accepted",
+        );
+
+        await assert.rejects(
+          () =>
+            db.coverLetter.create({
+              data: {
+                studentId: fixtures.studentA,
+                version: 1,
+                content: "x",
+                jobListingId: null,
+                jobLeadId: null,
+              },
+            }),
+          /violates check constraint/i,
+          "a CoverLetter belonging to no opening was accepted",
+        );
+
+        // And the valid shape still inserts, so the constraint is not simply
+        // refusing everything.
+        const ok = await db.resumeVersion.create({
+          data: {
+            studentId: fixtures.studentA,
+            version: 99,
+            content: {},
+            jobLeadId: leadId,
+          },
+          select: { id: true },
+        });
+        await db.resumeVersion.delete({ where: { id: ok.id } });
       });
 
       it("returns zero rows for all three tables with no RLS context", async () => {

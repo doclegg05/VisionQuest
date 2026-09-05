@@ -32,6 +32,18 @@ interface CallSite {
   observable: readonly ConnectionStatus[];
   /** Transitions this file performs that are not from `observable`. */
   ignore?: readonly ConnectionStatus[];
+  /**
+   * Per-TARGET narrowing, for a file whose transitions are each guarded to one
+   * source status rather than sharing a set.
+   *
+   * `connections.ts` is the case this exists for: `approveConnection` passes
+   * `expectedFrom: "proposed"` and `sendConnection` passes
+   * `expectedFrom: "student_approved"`, so the flat cross-product would demand
+   * edges the code can never attempt (sent -> sent), and either fail for a
+   * reason that is not a bug or be silenced with a blanket ignore. Narrowing
+   * per target keeps every remaining pair a real claim about the code.
+   */
+  observableFor?: Partial<Record<ConnectionStatus, readonly ConnectionStatus[]>>;
 }
 
 const CALL_SITES: CallSite[] = [
@@ -50,6 +62,38 @@ const CALL_SITES: CallSite[] = [
     // "interview_scheduled" follows the "interested" this same file just
     // wrote, not a status the link resolver produced.
     ignore: ["interview_scheduled"],
+  },
+  {
+    // The staff and student side. Each of these transitions is guarded by an
+    // explicit `expectedFrom` or a status check, so in practice the row is
+    // narrower than this list — but the point of the scanner is to hold every
+    // transition legal from every status the file could plausibly meet, so the
+    // list is the whole non-terminal set rather than the one status each
+    // function expects. A move that is illegal from any of them is a bug
+    // waiting for the day the guard is loosened.
+    file: "src/lib/connect/connections.ts",
+    // Withdraw and close are the broad ones: a student may take back, and an
+    // instructor may close, anything that has not ended. Post-hire statuses
+    // are excluded from BOTH lists deliberately — `withdrawConnection` refuses
+    // them (a hire is not a thing to take back on your own) and
+    // STUDENT_ALLOWED_TRANSITIONS has no post-hire entries, so demanding those
+    // edges here would ask the table to legalise exactly what the security fix
+    // removed.
+    observable: [
+      "proposed",
+      "student_approved",
+      "sent",
+      "viewed",
+      "interested",
+      "interview_scheduled",
+      "offered",
+    ],
+    observableFor: {
+      // approveConnection: expectedFrom "proposed".
+      student_approved: ["proposed"],
+      // sendConnection: expectedFrom "student_approved".
+      sent: ["student_approved"],
+    },
   },
 ];
 
@@ -71,7 +115,7 @@ describe("every call site's transitions are legal from every status it can see",
 
     for (const to of targets) {
       if (site.ignore?.includes(to)) continue;
-      for (const from of site.observable) {
+      for (const from of site.observableFor?.[to] ?? site.observable) {
         it(`${site.file}: ${from} -> ${to} is in the table`, () => {
           assert.ok(
             canTransition(from, to),

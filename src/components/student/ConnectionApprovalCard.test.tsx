@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToString } from "react-dom/server";
 
+import { PACKET_FIELD_LABELS } from "@/lib/connect/packet-shared";
 import { assessReadability, PLAIN_LANGUAGE_MAX_GRADE } from "@/lib/sage/readability";
 
 import { ConnectionApprovalCard, type PendingConnection } from "./ConnectionApprovalCard";
@@ -20,13 +21,16 @@ function connection(overrides: Partial<PendingConnection> = {}): PendingConnecti
     jobTitle: "Production Associate",
     employerName: "Mountain Metal",
     location: "Beckley, WV",
+    // Packet field KEYS. The card renders each label from
+    // PACKET_FIELD_LABELS, so a copy edit cannot silently drop a row from the
+    // consent list while the employer still receives the value.
     fields: [
-      "Your first name and the first letter of your last name",
-      "Your résumé, written for this job",
-      "The cards you earned that a teacher checked",
-      "The days and times you can work",
-      "The soonest day you can start",
-      "What your teacher wrote about your work",
+      "candidate_name",
+      "resume",
+      "verified_certifications",
+      "availability",
+      "earliest_start",
+      "endorsement",
     ],
     endorsement: "Dana came to every class and earned the forklift card.",
     candidateName: "Dana R.",
@@ -42,8 +46,9 @@ function connection(overrides: Partial<PendingConnection> = {}): PendingConnecti
 describe("ConnectionApprovalCard", () => {
   it("shows the exact field list ON the screen with the button, not behind a link", () => {
     const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
-    for (const field of connection().fields) {
-      assert.ok(html.includes(field), `the card hid "${field}" from the student`);
+    for (const key of connection().fields) {
+      const label = PACKET_FIELD_LABELS[key];
+      assert.ok(html.includes(label), `the card hid "${label}" from the student`);
     }
     assert.ok(html.includes("OK, send it"));
     // Informed consent means the list and the decision are in one place.
