@@ -3954,6 +3954,131 @@
       "bucket": "hard_negative",
       "source": "pinned-test",
       "reviewed": false
+    },
+    {
+      "text": "me tragué todas las pastillas",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test",
+      "category": "self_harm",
+      "reviewed": false
+    },
+    {
+      "text": "me trague todas las pastillas",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "pinned-test",
+      "category": "self_harm",
+      "reviewed": false
+    },
+    {
+      "text": "me estoy haciendo daño",
+      "label": "detect",
+      "family": "selfharm_cutting",
+      "bucket": "must_detect",
+      "source": "pinned-test",
+      "category": "self_harm",
+      "reviewed": false
+    },
+    {
+      "text": "me estoy haciendo dano otra vez",
+      "label": "detect",
+      "family": "selfharm_cutting",
+      "bucket": "must_detect",
+      "source": "pinned-test",
+      "category": "self_harm",
+      "reviewed": false
+    },
+    {
+      "text": "me estoy lastimando",
+      "label": "detect",
+      "family": "selfharm_cutting",
+      "bucket": "must_detect",
+      "source": "pinned-test",
+      "category": "self_harm",
+      "reviewed": false
+    },
+    {
+      "text": "se tragó todas las pastillas",
+      "label": "silent",
+      "family": "medication_adherence",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "mi hermano se tragó las pastillas",
+      "label": "silent",
+      "family": "medication_adherence",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "me tragué un hueso de pollo sin querer",
+      "label": "silent",
+      "family": "medication_adherence",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "le estoy haciendo daño a mi relación",
+      "label": "silent",
+      "family": "selfharm_cutting",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "está haciendo daño a la comunidad",
+      "label": "silent",
+      "family": "selfharm_cutting",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "la escuela está a kms de mi casa",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "queda a kms del centro",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "camino unos kms todos los días",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "recorrí varios kms",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
+    },
+    {
+      "text": "son diez kms",
+      "label": "silent",
+      "family": "distance_kms",
+      "bucket": "hard_negative",
+      "source": "pinned-test",
+      "reviewed": false
     }
   ]
 }

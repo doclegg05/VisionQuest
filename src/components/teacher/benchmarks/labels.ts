@@ -58,6 +58,8 @@ export const AREA_LABEL: Record<string, string> = {
   "data-integrity": "Data we can trust",
   ops: "Running the service",
   meta: "The tests themselves",
+  nudges: "Text-message check-ins",
+  connect: "Matching students with employers",
   other: "Everything else",
 };
 

@@ -1,0 +1,50 @@
+{
+  "suite": "cohort-simulation",
+  "title": "Twelve weeks of the placement funnel, simulated",
+  "area": "journeys",
+  "tier": "nightly",
+  "scorer": "scripts/bench/suites/cohort-simulation.mjs",
+  "fixture": "config/benchmarks/fixtures/cohort-simulation.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "illegal_transitions",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    },
+    {
+      "id": "retention_checkpoint_mismatches",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    },
+    {
+      "id": "retention_checkpoints_raised",
+      "unit": "count",
+      "direction": "higher",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "The count itself, so a reader sees how much of the retention chain a twelve-week cohort actually reaches. The GATE is retention_checkpoint_mismatches: a raised count that moved because the fixture's probabilities were retuned is not a regression, while a checkpoint that came due and was never asked always is. Flooring the raw count would fail the run for a lucky draw."
+    },
+    {
+      "id": "students_stuck_over_30_days",
+      "unit": "count",
+      "direction": "lower",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "Tracked, not floored: a stalled connection is usually the world, not a defect — employers do not answer. The number is here so a jump is visible and so the funnel's shape can be read beside the Connect report's, and details.byStatus names where they are stalled. A floor waits on a real pilot cohort saying what normal looks like."
+    },
+    {
+      "id": "simulated_weeks",
+      "unit": "count",
+      "direction": "higher",
+      "tolerance": 0,
+      "floor": null,
+      "reason": "Provenance, not a score: it says how long the run covered, so a result whose numbers dropped because somebody shortened the simulation is not read as an improvement."
+    }
+  ],
+  "notes": "Drives the cohort's 20 connections day by day from meta.epoch through the real transitionConnection (with the pipeline-fake-client the unit tests use), the real nudge selectors in src/lib/nudges/schedule-shared.ts, and the real send policy in sms-policy-shared.ts. Nothing about the rules is restated in the scorer — it supplies a clock and a world that answers. `retention_checkpoint_mismatches` is COVERAGE, not a second copy of selectRetentionChecks: a connection that sat in a retention-eligible status across its checkpoint and a whole re-ask window on top, and was never asked, is the shape of the bug the retention chain already had (an unanswered day-30 text froze days 60 and 90 forever). Nightly rather than gate because it is the slowest of the in-process suites and its value is the trend, not a per-PR verdict."
+}

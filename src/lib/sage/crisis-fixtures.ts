@@ -136,6 +136,14 @@ export const ES_SHOULD_MATCH: PinnedCrisisCase[] = [
   // disclosure with the clitic on the finite verb — was not, the same
   // clitic-climbing gap the sobredosis entry closed.
   { text: "me corté las venas", category: "self_harm" },
+  // W3 parity: "swallowed" and the progressive of the self-harm family had
+  // English forms and no Spanish counterpart, which the sage-ai.md rule treats
+  // as a gap needing either a fix or an explicit note. Fixed.
+  { text: "me tragué todas las pastillas", category: "self_harm" },
+  { text: "me trague todas las pastillas", category: "self_harm" },
+  { text: "me estoy haciendo daño", category: "self_harm" },
+  { text: "me estoy haciendo dano otra vez", category: "self_harm" },
+  { text: "me estoy lastimando", category: "self_harm" },
   // Clitic climbing — Spanish allows the pronoun to raise onto the finite verb
   // ("me quiero dar" == "quiero darme"), and every other Spanish pair in the
   // detector handles both directions ("me quiero morir" / "quiero morirme").
@@ -189,6 +197,14 @@ export const ES_SHOULD_NOT_MATCH: string[] = [
   "me corté con el cuchillo cocinando",
   "me corté afeitándome",
   "me corte el dedo picando cebolla",
+  // W3 guards for the two new Spanish entries: third person and an accidental
+  // swallow must stay silent, and "haciendo daño" aimed at anything other than
+  // oneself is ordinary talk.
+  "se tragó todas las pastillas",
+  "mi hermano se tragó las pastillas",
+  "me tragué un hueso de pollo sin querer",
+  "le estoy haciendo daño a mi relación",
+  "está haciendo daño a la comunidad",
   "no hay que abusar del café",
   // "tengo miedo de mi ..." is bounded to partner nouns.
   "tengo miedo de mi examen final",
@@ -312,6 +328,15 @@ export const INFORMAL_MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["ive taken too many pills", "taken, past participle"],
   ["i have taken all my pills tonight", "have taken"],
   ["i swallowed all my medication", "swallowed"],
+  // A subjectless past act is a real student message and must keep alerting —
+  // it is why this entry is guarded by refusing third-person subjects rather
+  // than by requiring a first-person one.
+  ["took all my pills last night", "no subject at all"],
+
+  // S1: the od abbreviation as a PAST ACT. The only od entry required an intent
+  // verb ("gonna od"), so a completed one was silent.
+  ["ive od'd on pills before", "od'd past act"],
+  ["i od'd last night", "od'd, no object"],
 
   // "die my hair" is exempted as the dye homophone, but the exemption must end
   // at a word boundary — "my hairbrush" is a different word, so the disclosure
@@ -368,6 +393,16 @@ export const INFORMAL_MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> 
   ["ive heard he overdosed on heroin", "hearsay about someone else"],
   ["id say she overdosed on pills", "speculation about someone else"],
   ["i think my cousin overdosed on something", "possessive inside the gap"],
+  // W2: the took|taken|swallowed widening had no subject bound at all, so a
+  // student describing SOMEONE ELSE's overdose raised a CRITICAL alert on
+  // themselves. Same class as the overdose-frame gap above, found the same way
+  // — by running it, not by reading it.
+  ["she has taken too many pills", "third-person subject before the verb"],
+  ["my brother swallowed all the pills", "possessive subject before the verb"],
+  ["the patient had taken all the medication", "determiner subject before the verb"],
+  ["they swallowed a bunch of pills", "plural third-person subject"],
+  ["he od'd on pills", "third person + od'd"],
+  ["my brother od'd last year", "possessive subject + od'd"],
 
   // "kms" is also kilometres. The pattern is unanchored, so it fired on
   // distances — and, because it carries no lang tag, a Spanish speaker writing
@@ -386,19 +421,35 @@ export const INFORMAL_MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> 
   ["la oficina está a unos kms de aquí", "Spanish distance frame, accented"],
   ["el centro está a pocos kms de distancia", "a pocos … de distancia"],
   // These ISOLATE the "kms de …" lookahead: no quantity word precedes them, so
-  // the quantity lookbehind cannot be what keeps them silent. The first pass at
-  // this guard ended its lookahead with \b, which JS cannot assert after "í",
-  // so the lookahead was dead code and the two rows above were passing on the
-  // lookbehind alone — a fixture passing for the wrong reason. Delete the
-  // lookahead and these three go red; delete the lookbehind and they do not.
+  // the quantity lookbehind cannot be what keeps them silent. Delete the
+  // lookahead and every row in this group goes red; delete the lookbehind and
+  // none of them does. Verified that way rather than asserted — an earlier
+  // version of this comment claimed three isolating rows and one of them
+  // ("la escuela está a DOS kms de mi casa") carried a quantity word, so it
+  // passed on the lookbehind and proved nothing about the lookahead. That is
+  // the same "passes for the wrong reason" failure the lookahead itself had.
   ["queda a kms de aquí", "de aquí with no quantity word"],
   ["eso está a kms de aquí, más o menos", "de aquí followed by a comma"],
-  ["la escuela está a dos kms de mi casa", "de + possessive destination"],
+  ["la escuela está a kms de mi casa", "de + possessive destination, no quantity word"],
+  ["queda a kms del centro", "del centro, no quantity word"],
+  // DOUBLE-COVERED: these carry a quantity word AND a distance suffix, so
+  // either guard alone keeps them silent. Verified, not assumed — they prove
+  // real sentences stay quiet, and nothing about which guard does it.
+  ["la escuela está a dos kms de mi casa", "quantity word and 'de' both apply"],
   ["queda a varios kms de aquí", "varios — quantity word the first list omitted"],
-  ["el trabajo está a diez kms del centro", "del centro"],
+  ["el trabajo está a diez kms del centro", "quantity word and 'del' both apply"],
+  ["the office is a few kms down the road", "English quantity word and 'down' both apply"],
+  // These ISOLATE the quantity LOOKBEHIND: no distance suffix follows, so the
+  // lookahead cannot be what keeps them silent. The Spanish three are W5 — a
+  // bare quantity word with no preceding "a", which was alerting and, because
+  // this entry carries no lang tag, serving the ENGLISH 988 block.
+  ["camino unos kms todos los días", "bare quantity word, no preceding 'a'"],
+  ["recorrí varios kms", "bare varios"],
+  ["son diez kms", "bare number word"],
+  ["a few kms to the bus stop", "English quantity word, no direction word after"],
+  ["some kms later", "bare English quantity word"],
   // English parity for the same frame: "a few kms" with a direction word the
   // away/from list did not carry.
-  ["the office is a few kms down the road", "a few kms down the road"],
 
   // Relationship talk is what students bring to a coach; "end things with X" is
   // the dominant benign sense of the phrase and the single highest-frequency
