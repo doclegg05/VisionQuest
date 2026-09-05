@@ -240,7 +240,7 @@ one and is not.
 
 ### What is baselined today, and what is deliberately not
 
-The initial baseline (29 metric rows across 13 suites) was measured on the
+The initial baseline (**48 metric rows across 17 suites**) was measured on the
 build container with:
 
 ```bash
@@ -249,12 +249,13 @@ npm run bench -- \
   --suite=explain-faithfulness-check --suite=form-ranking --suite=posting-injection \
   --suite=readability-by-surface --suite=sms-readability --suite=scheduled-layer-drift \
   --suite=pii-log-grep --suite=orientation-readiness --suite=rls-coverage \
-  --suite=migration-drift \
+  --suite=migration-drift --suite=nudge-consent --suite=nudge-quiet-hours \
+  --suite=nudge-attribution --suite=report-parity \
   --update-baseline \
   --reason="initial: deterministic in-process suites, measured on the build container at <HEAD>; timing and DB/browser suites deferred to the first nightly CI run"
 ```
 
-Those thirteen share one property: they are **deterministic and
+Those seventeen share one property: they are **deterministic and
 hardware-independent** — gate tier, `requires: []`, in-process, no database, no
 browser, no model, and no `ms`/`seconds` metric. A number measured on one
 machine is the same number on another, so a baseline taken here is meaningful
@@ -277,9 +278,22 @@ wall-clock number, not only to model runs. The baseline row records its host
 precisely so a number measured somewhere else is visibly a different number
 rather than a silent regression.
 
-Four gate suites meet the deterministic criteria but were left out of this
-first pass and can be added the same way whenever someone wants them pinned:
-`nudge-consent`, `nudge-quiet-hours`, `nudge-attribution`, `report-parity`.
+**One suite needed work before it could be trusted at a baseline:
+`form-ranking`.** `searchForms()` ranks hybrid when an embedding index is
+reachable and keyword-only when it is not — a decision made by the
+environment, not by the code under test — and the baseline was measured
+keyword-only. A CI database that later gained form embeddings would have moved
+`top1` for a reason that is not a regression. The mode is now a declared input,
+`FORM_RANKING_MODE=keyword` (default) or `hybrid`, and the floored
+`off_mode_cases` metric counts every case that ran under a different one, so
+the change fails the gate and names the offenders instead of quietly reporting
+a different number. Switching to hybrid is legitimate — set the variable,
+re-measure, re-baseline with a reason.
+
+That question is worth asking of any suite before pinning it: *does this
+number depend on anything the environment decides?* If it does, make the
+choice an input and floor the drift, rather than hoping the environment stays
+still.
 
 ---
 
