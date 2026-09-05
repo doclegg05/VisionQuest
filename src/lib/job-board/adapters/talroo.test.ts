@@ -115,6 +115,59 @@ describe("talroo adapter", () => {
     assert.deepEqual(await talrooAdapter.fetchJobs("WV", 25), []);
   });
 
+  it(
+    "skips one malformed item and still returns the rest, logging exactly one {source, index} warning",
+    async (t: TestContext) => {
+      const warnMock = t.mock.method(logger, "warn", () => {});
+      // A getter that throws on access simulates a genuinely corrupt row
+      // without going through real JSON serialization (JSON.stringify
+      // would itself throw on a throwing getter), by returning a
+      // Response-shaped object whose `.json()` resolves directly to the raw
+      // values — fetchJson only ever calls `.ok` and `.json()` on what
+      // fetch() returns. For consistency with jsearch/usajobs/adzuna (added
+      // for the same reason as this test), even though mapTalrooJob's own
+      // required-field checks already return null for most malformed shapes.
+      const malformed = {
+        get title() {
+          throw new Error("corrupt row");
+        },
+        id: "bad",
+        url: "https://click.talroo.com/track/bad",
+      };
+      const good = {
+        id: "good",
+        title: "Warehouse Associate",
+        company: "Mountain Metal",
+        city: "Beckley",
+        state: "WV",
+        description: "Pick, pack, and ship orders.",
+        url: "https://click.talroo.com/track/good",
+      };
+      // fetchJobs loops over every SPOKES query keyword, making one request
+      // per keyword — return the malformed+good pair only on the first call
+      // and nothing thereafter, so the batch under test is exactly one
+      // malformed item and one good item (matching the other three
+      // adapters' single-request shape).
+      let callCount = 0;
+      globalThis.fetch = (async () => {
+        callCount += 1;
+        return {
+          ok: true,
+          json: async () => (callCount === 1 ? { jobs: [malformed, good] } : { jobs: [] }),
+        };
+      }) as unknown as typeof fetch;
+
+      const jobs = await talrooAdapter.fetchJobs("Beckley, WV", 25);
+
+      assert.equal(jobs.length, 1);
+      assert.equal(jobs[0].sourceId, "talroo:good");
+      assert.equal(warnMock.mock.calls.length, 1);
+      const [message, context] = warnMock.mock.calls[0].arguments;
+      assert.equal(message, "Job source item failed to normalize");
+      assert.deepEqual(context, { source: "talroo", index: 0 });
+    },
+  );
+
   it("returns [] when fetch throws", async () => {
     globalThis.fetch = async () => {
       throw new Error("connection reset");

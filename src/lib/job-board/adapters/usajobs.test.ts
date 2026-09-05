@@ -1,6 +1,7 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { usajobsAdapter } from "./usajobs";
+import { logger } from "@/lib/logger";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_ABORT_TIMEOUT = AbortSignal.timeout;
@@ -90,6 +91,41 @@ describe("usajobs adapter", () => {
 
     assert.ok(capturedSignal instanceof AbortSignal, "expected fetch to receive an AbortSignal");
   });
+
+  it(
+    "skips one malformed item (MatchedObjectDescriptor undefined) and still returns the rest, logging exactly one {source, index} warning",
+    async (t: TestContext) => {
+      const warnMock = t.mock.method(logger, "warn", () => {});
+      globalThis.fetch = async () =>
+        mockSearchResponse([
+          // The reviewer's own example: a real USAJobs row with the
+          // descriptor missing. This round-trips through real JSON fine
+          // (the property is simply absent); the throw happens when
+          // normalization reads `desc.PositionTitle` off `undefined`.
+          { MatchedObjectId: "bad" },
+          {
+            MatchedObjectId: "good",
+            MatchedObjectDescriptor: {
+              PositionTitle: "Office Assistant",
+              OrganizationName: "Dept of Something",
+              PositionLocationDisplay: "Beckley, WV",
+              PositionRemuneration: [],
+              QualificationSummary: "General office support.",
+              PositionURI: "https://usajobs.gov/job/good",
+            },
+          },
+        ]);
+
+      const jobs = await usajobsAdapter.fetchJobs("WV", 25);
+
+      assert.equal(jobs.length, 1);
+      assert.equal(jobs[0].sourceId, "usajobs:good");
+      assert.equal(warnMock.mock.calls.length, 1);
+      const [message, context] = warnMock.mock.calls[0].arguments;
+      assert.equal(message, "Job source item failed to normalize");
+      assert.deepEqual(context, { source: "usajobs", index: 0 });
+    },
+  );
 
   it(
     "VQ-R-019: returns [] rather than hanging forever when the request's own timeout fires",

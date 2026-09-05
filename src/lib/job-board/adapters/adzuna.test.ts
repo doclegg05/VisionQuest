@@ -83,6 +83,48 @@ describe("adzuna adapter", () => {
   });
 
   it(
+    "skips one malformed item and still returns the rest, logging exactly one {source, index} warning",
+    async (t: TestContext) => {
+      const warnMock = t.mock.method(logger, "warn", () => {});
+      // As in jsearch.test.ts: a getter that throws on access simulates a
+      // genuinely corrupt row without going through real JSON serialization
+      // (JSON.stringify would itself throw on a throwing getter), by
+      // returning a Response-shaped object whose `.json()` resolves
+      // directly to the raw values — fetchJson only ever calls `.ok` and
+      // `.json()` on what fetch() returns.
+      const malformed = {
+        get title() {
+          throw new Error("corrupt row");
+        },
+        id: "bad",
+      };
+      const good = {
+        id: "good",
+        title: "Line Cook",
+        company: { display_name: "Diner Co" },
+        location: { display_name: "Beckley, WV" },
+        salary_min: null,
+        salary_max: null,
+        description: "Prep and cook menu items.",
+        redirect_url: "https://example.com/adzuna/good",
+      };
+      globalThis.fetch = (async () => ({
+        ok: true,
+        json: async () => ({ results: [malformed, good] }),
+      })) as unknown as typeof fetch;
+
+      const jobs = await adzunaAdapter.fetchJobs("Beckley, WV", 25);
+
+      assert.equal(jobs.length, 1);
+      assert.equal(jobs[0].sourceId, "adzuna:good");
+      assert.equal(warnMock.mock.calls.length, 1);
+      const [message, context] = warnMock.mock.calls[0].arguments;
+      assert.equal(message, "Job source item failed to normalize");
+      assert.deepEqual(context, { source: "adzuna", index: 0 });
+    },
+  );
+
+  it(
     "VQ-R-019: returns [] rather than hanging forever when the request's own timeout fires",
     { timeout: 2000 },
     async () => {

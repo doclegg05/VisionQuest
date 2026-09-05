@@ -1,7 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { inferJobWorkMode } from "../work-mode";
-import { fetchJson } from "./shared";
+import { fetchJson, mapEachJob } from "./shared";
 
 /**
  * USAJobs adapter — official federal government job listings API.
@@ -66,7 +66,10 @@ export const usajobsAdapter: JobSourceAdapter = {
     });
     const items: USAJobsSearchItem[] = json?.SearchResult?.SearchResultItems ?? [];
 
-    return items.map((item) => {
+    // mapEachJob isolates one malformed row (e.g. a missing
+    // MatchedObjectDescriptor throwing on property access) from the rest of
+    // the batch — see its doc comment in ./shared.
+    return mapEachJob(items, "usajobs", (item) => {
       const desc = item.MatchedObjectDescriptor;
       const pay = desc.PositionRemuneration?.[0];
       const salaryText = pay
