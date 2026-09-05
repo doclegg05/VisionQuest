@@ -119,6 +119,23 @@ export const ES_SHOULD_MATCH: PinnedCrisisCase[] = [
   { text: "me tome un monton de pastillas", category: "self_harm" },
   { text: "me tomé todos los medicamentos", category: "self_harm" },
   { text: "quiero darme una sobredosis", category: "self_harm" },
+  // self_harm — the cutting register (es). PARITY with the English
+  // hurt/harm/cutting fix: English covers the past and ongoing act
+  // ("i hurt myself yesterday", "i been hurting myself"), Spanish covered only
+  // the fixed phrase "cortarme las venas" and the "hacerme daño" family, so a
+  // student writing the most ordinary Spanish form of the same disclosure was
+  // silent. Discriminated by BODY PART rather than by the verb alone, because
+  // the same verb is how you describe a kitchen accident — see the guard rows
+  // in ES_SHOULD_NOT_MATCH, which carry the verb and stay silent.
+  { text: "me corte los brazos otra vez", category: "self_harm" },
+  { text: "me corté los brazos otra vez", category: "self_harm" },
+  { text: "me hice cortes donde nadie ve", category: "self_harm" },
+  { text: "me corté las muñecas anoche", category: "self_harm" },
+  { text: "quiero cortarme los brazos", category: "self_harm" },
+  // "cortarme las venas" was already covered; "me corté las venas" — the same
+  // disclosure with the clitic on the finite verb — was not, the same
+  // clitic-climbing gap the sobredosis entry closed.
+  { text: "me corté las venas", category: "self_harm" },
   // Clitic climbing — Spanish allows the pronoun to raise onto the finite verb
   // ("me quiero dar" == "quiero darme"), and every other Spanish pair in the
   // detector handles both directions ("me quiero morir" / "quiero morirme").
@@ -161,8 +178,17 @@ export const ES_SHOULD_NOT_MATCH: string[] = [
   // "matar el tiempo" (kill time): the harm_others patterns require a person
   // object (clitic or personal "a"), mirroring the English object list.
   "voy a matar el tiempo antes de la clase",
-  // Haircut, not self-injury — the pattern requires "cortarme las venas".
+  // Haircut, not self-injury — the cutting pattern requires a body part from
+  // the self-injury list, and hair is not on it.
   "voy a cortarme el pelo este fin de semana",
+  // KITCHEN-KNIFE PARITY. These carry the same verb as the disclosures above
+  // and must stay silent, so the pattern cannot be passing on the verb alone.
+  // Note this is deliberately STRICTER than the English side, where
+  // "i cut myself chopping onions" does alert — that is a pre-existing,
+  // recorded English false positive, not a standard to copy into Spanish.
+  "me corté con el cuchillo cocinando",
+  "me corté afeitándome",
+  "me corte el dedo picando cebolla",
   "no hay que abusar del café",
   // "tengo miedo de mi ..." is bounded to partner nouns.
   "tengo miedo de mi examen final",
@@ -261,12 +287,31 @@ export const INFORMAL_MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i been hurting myself so i can feel something", "hurting — past progressive"],
   ["i been harming myself for a while now", "harming — progressive"],
 
+  // FIGURATIVE USES OF THE SAME PHRASE, pinned as ALERTING so the accepted cost
+  // of the progressive-form widening is on the record rather than discovered
+  // later. This is the same recall-first trade the file already makes for
+  // "i want to die laughing"; a coach dismissing "hurting myself financially"
+  // is cheap, and no wording rule reliably separates the two. The reflexive is
+  // what carries the risk — "hurting YOURSELF" stays silent, pinned below.
+  ["i'm hurting myself financially", "figurative — accepted false positive"],
+  ["harming myself by procrastinating", "figurative — accepted false positive"],
+  ["i keep hurting myself by staying up so late", "figurative — accepted false positive"],
+
   // First-person overdose frame WITHOUT the apostrophe. This population texts
   // "im"/"ive"/"id", and the frame accepted only the punctuated forms, so
   // "im overdosing on these pills right now" — a disclosure in progress —
   // passed silently while "i'm overdosing on these pills" alerted.
   ["im overdosing on these pills right now", "im, no apostrophe"],
   ["ive overdosed on my meds before", "ive, no apostrophe"],
+  ["id overdose on my meds if i could", "id, no apostrophe"],
+
+  // Past participle in the pills means family. The sibling past-act entry
+  // spelled only "took", so "ive taken too many pills" — the same disclosure
+  // in the same register as the pinned "i took all my pills" — was silent.
+  // "swallowed" is the same one-word class and was silent for the same reason.
+  ["ive taken too many pills", "taken, past participle"],
+  ["i have taken all my pills tonight", "have taken"],
+  ["i swallowed all my medication", "swallowed"],
 
   // "die my hair" is exempted as the dye homophone, but the exemption must end
   // at a word boundary — "my hairbrush" is a different word, so the disclosure
@@ -300,6 +345,11 @@ export const INFORMAL_MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> 
   ["i need to take all my meds before bed", "need to — obligation, not intent"],
   ["i have to take all my medication with food", "have to — obligation, not intent"],
   ["i wanna work in healthcare", "wanna + career"],
+  // The reflexive is the whole signal. Second person is advice a student gives
+  // or receives, not a disclosure, and must not alert — it is also the most
+  // common way these exact words appear in a coaching conversation.
+  ["you're only hurting yourself", "second person, not reflexive"],
+  ["stop hurting yourself over this", "second person, imperative"],
   ["that overdose documentary was sad", "overdose in third person"],
   // Third-person overdose disclosure — someone else's, usually grief, and the
   // most common way this noun shows up in coaching conversation. The module
@@ -307,6 +357,17 @@ export const INFORMAL_MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> 
   // object was actually guarded, so "overdosed on X" fired on both of these.
   ["my brother overdosed on fentanyl last year", "brother's overdose, not the student's"],
   ["my mom overdosed on pills when i was little", "trailing 'i' must not supply the frame"],
+  // The two-word gap in the first-person frame is wide enough for a
+  // third-person SUBJECT to slip into it: "i" + "worried he" + "overdosed on"
+  // matched, so a student expressing concern about someone else raised a
+  // CRITICAL alert on themselves and named their instructors. The gap now
+  // refuses third-person pronouns and possessives — the frame is about the
+  // student, so nothing inside it may name anybody else.
+  ["im worried he overdosed on pills", "third-person subject inside the gap"],
+  ["im scared she overdosed on something", "third-person subject, she"],
+  ["ive heard he overdosed on heroin", "hearsay about someone else"],
+  ["id say she overdosed on pills", "speculation about someone else"],
+  ["i think my cousin overdosed on something", "possessive inside the gap"],
 
   // "kms" is also kilometres. The pattern is unanchored, so it fired on
   // distances — and, because it carries no lang tag, a Spanish speaker writing
@@ -324,6 +385,20 @@ export const INFORMAL_MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> 
   ["la oficina esta a unos kms de aqui", "Spanish distance frame, unaccented"],
   ["la oficina está a unos kms de aquí", "Spanish distance frame, accented"],
   ["el centro está a pocos kms de distancia", "a pocos … de distancia"],
+  // These ISOLATE the "kms de …" lookahead: no quantity word precedes them, so
+  // the quantity lookbehind cannot be what keeps them silent. The first pass at
+  // this guard ended its lookahead with \b, which JS cannot assert after "í",
+  // so the lookahead was dead code and the two rows above were passing on the
+  // lookbehind alone — a fixture passing for the wrong reason. Delete the
+  // lookahead and these three go red; delete the lookbehind and they do not.
+  ["queda a kms de aquí", "de aquí with no quantity word"],
+  ["eso está a kms de aquí, más o menos", "de aquí followed by a comma"],
+  ["la escuela está a dos kms de mi casa", "de + possessive destination"],
+  ["queda a varios kms de aquí", "varios — quantity word the first list omitted"],
+  ["el trabajo está a diez kms del centro", "del centro"],
+  // English parity for the same frame: "a few kms" with a direction word the
+  // away/from list did not carry.
+  ["the office is a few kms down the road", "a few kms down the road"],
 
   // Relationship talk is what students bring to a coach; "end things with X" is
   // the dominant benign sense of the phrase and the single highest-frequency

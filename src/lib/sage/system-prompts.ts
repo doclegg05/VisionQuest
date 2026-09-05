@@ -15,6 +15,7 @@ import {
 import { buildPlatformKnowledge, type PlatformRole } from "./platform-map";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import type { PromptTier } from "@/lib/ai";
+import { stripInvisibleChars } from "./invisible-chars";
 
 // Prompt-revision attribution tag. Defined in its own dependency-free module
 // (see ./prompt-revision) so logging code can import it without pulling in
@@ -104,50 +105,20 @@ const DELIMITER_SHAPED = /\[\s*[A-Za-z0-9_]+_(START|END)\s*\]/gi;
 /** A forged marker cannot need more nesting than this to be worth defeating. */
 const MAX_SANITIZE_PASSES = 10;
 
-/**
- * Characters that are invisible to a reader but not to a tokenizer, or that
- * reverse what a reader sees. Modelled on `sanitizeSmsValue`
- * (src/lib/nudges/sms-policy-shared.ts), which has stripped exactly these
- * classes since it shipped; this is the same defence at the prompt boundary.
- *
- *   - C0/C1 controls, EXCEPT "\n" and "\t". Those two are prompt structure —
- *     the grounding fence and every rendered context block are built out of
- *     newlines — so they are the one exemption. Everything else in the range,
- *     NUL and ESC included, goes.
- *   - bidi overrides and isolates (U+202A-202E, U+2066-2069), which can
- *     visually reverse text a student reads.
- *   - zero-width characters (U+200B-200D, U+2060, U+FEFF), which hide content
- *     from a reviewer but not from the model.
- *
- * The posting-injection benchmark measured 19 leaks of these characters into
- * the explain_job prompt, the search_jobs result and the explanation shown to
- * the student. The worst was "[GROUNDING<ZWSP>_DATA_END]": a zero-width space
- * is not in [A-Za-z0-9_], so the token was not delimiter-shaped to either
- * sweep below, while remaining a plausible fence marker to a tokenizer.
- */
-const INVISIBLE_CHARS =
-  /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u200B-\u200D\u2060\u202A-\u202E\u2066-\u2069\uFEFF]/g;
-
 export function sanitizeForPrompt(value: string): string {
-  // Invisible characters go FIRST, and are DELETED rather than replaced with a
-  // space the way sanitizeSmsValue does it. Order and substitution are both
-  // load-bearing:
+  // Invisible characters go FIRST, and the two classes get different remedies
+  // (deleted vs normalized to a space) for reasons spelled out in
+  // ./invisible-chars.ts. Running them first is load-bearing: the delimiter
+  // sweeps below only recognise a marker in its canonical shape, so stripping
+  // the hidden character rejoins "[GROUNDING<ZWSP>_DATA_END]" into
+  // "[GROUNDING_DATA_END]", which they then remove. Run afterwards, the same
+  // input survives both passes.
   //
-  //   - first, because the delimiter sweeps below only recognise a marker in
-  //     its canonical shape; stripping the hidden character rejoins
-  //     "[GROUNDING<ZWSP>_DATA_END]" into "[GROUNDING_DATA_END]", which they
-  //     then remove. Run afterwards, the same input survives both passes.
-  //   - deleted, because DELIMITER_SHAPED allows whitespace only at the token's
-  //     edges, so substituting a space would leave "[GROUNDING _DATA_END]" —
-  //     still a plausible fence marker to a tokenizer, and now immune to the
-  //     sweep. (sanitizeSmsValue substitutes for a different reason: an SMS is
-  //     length-budgeted prose where two words must not fuse. A fused word in a
-  //     prompt is cosmetic; a surviving marker is not.)
-  //
-  // One pre-pass is enough, unlike the marker loop: removing a delimiter only
-  // concatenates text that was already there, and every character above is a
-  // single BMP code unit, so no invisible character can be created by the loop.
-  let current = value.replace(INVISIBLE_CHARS, "");
+  // The definition lives in its own module because the posting-injection
+  // benchmark scorer measures exactly this property and has to import the same
+  // set — when it carried its own copy the gate could only ever check the
+  // characters this file already stripped, which is a gate that cannot fail.
+  let current = stripInvisibleChars(value);
   // One pass is not enough. Removing an inner token JOINS its neighbours, and
   // the join can be a live marker: "[GROUNDING_DATA_[GROUNDING_DATA_END]END]"
   // becomes "[GROUNDING_DATA_END]" after a single replace. Loop until the
