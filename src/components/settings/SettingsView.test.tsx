@@ -53,6 +53,11 @@ describe("SettingsView role split", () => {
 
     const staff = renderToString(<SettingsView initialRole="teacher" />);
     assert.ok(!staff.includes("Work availability"));
+
+    // Coordinators too: /api/work-profile refuses every non-student, so a
+    // rendered form here would promise a save that 403s.
+    const coordinator = renderToString(<SettingsView initialRole="coordinator" />);
+    assert.ok(!coordinator.includes("Work availability"));
   });
 
   it("defaults to the student-safe render when no role is supplied", () => {

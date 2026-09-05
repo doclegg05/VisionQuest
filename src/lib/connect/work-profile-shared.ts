@@ -19,8 +19,9 @@
 // mistake in the unit job.
 //
 // The scoring helpers fail SAFE: they never invent a block from missing data.
-//   - availabilityOverlap returns 1 for a lead that names no shifts (nothing
-//     was asked, so nothing is excluded) and 0 only for a real mismatch.
+//   - availabilityOverlap returns null when nothing was declared, 1 for a lead
+//     that names no shifts, and 0 only for a real, declared mismatch — which
+//     is the only case a caller may treat as a hard block.
 //   - transportFeasible returns "unknown", never "no", when the student has
 //     not answered or the posting carries no distance/transit information.
 // =============================================================================
@@ -106,6 +107,22 @@ export const shiftLimitsSchema = z
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * A YYYY-MM-DD string that is also a real day on the calendar.
+ *
+ * The pattern alone let "2026-09-31" through, which Date normalizes to
+ * October 1 — the student would have been given a start date they never
+ * chose — and "2026-13-01" produced an Invalid Date that surfaced as a 500
+ * rather than a correctable 400. Round-tripping through UTC is the check:
+ * a normalized date no longer prints as what was typed.
+ */
+export function isRealIsoDate(value: string): boolean {
+  if (!ISO_DATE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.toISOString().slice(0, 10) === value;
+}
+
+/**
  * Every field optional (a student answers what they can) and every field
  * nullable (an answer can be taken back). `.strict()` is load-bearing: it is
  * what stops a request body from carrying `studentId` or `updatedVia` into a
@@ -126,7 +143,7 @@ export const workProfileInputSchema = z
     childcareHours: childcareHoursSchema.nullable().optional(),
     earliestStart: z
       .string()
-      .regex(ISO_DATE, "earliestStart must be YYYY-MM-DD")
+      .refine(isRealIsoDate, "earliestStart must be a real date in YYYY-MM-DD form")
       .nullable()
       .optional(),
     shiftLimits: shiftLimitsSchema.nullable().optional(),
@@ -274,26 +291,37 @@ export interface LeadSchedule {
 }
 
 /**
- * What share of the shift a student can actually cover, 0..1.
+ * What share of the shift a student can actually cover, 0..1 — or `null` when
+ * they have not declared any availability at all.
  *
- * A lead that names no shifts returns 1: nothing was asked, so nothing is
- * excluded. That is deliberate — it keeps `overlap === 0` usable as a hard
- * block without blocking every lead whose schedule has not been recorded yet.
- * A student with no profile returns 0: they have declared no availability, and
- * the caller decides whether "nothing declared" should hide a job (it should
- * not — see search_jobs, which only blocks on pay and transport).
+ * Three distinct answers, because the spec (§5) makes an overlap of 0 a HARD
+ * BLOCK and the three cases must not collapse into each other:
+ *   - `null` = nothing declared (no profile row, or an all-false grid, which
+ *     upsertWorkProfile creates the moment a student answers only their pay
+ *     floor). Callers must treat this as "no block" and ask, not as a refusal;
+ *     returning 0 here would have hidden every lead from every student who
+ *     skipped the grid.
+ *   - `1` for a lead that names no shifts: nothing was asked, so nothing is
+ *     excluded.
+ *   - `0` only for a real, declared mismatch — weekends-only against a weekday
+ *     day shift. That is the one case a caller may block on.
  */
 export function availabilityOverlap(
   profile: Pick<WorkProfile, "availability"> | null | undefined,
   schedule: LeadSchedule,
-): number {
+): number | null {
   const shifts = [...new Set(schedule.shifts)];
   const cells = shifts.flatMap((shift) => SHIFT_CELLS[shift] ?? []);
   if (cells.length === 0) return 1;
-  if (!profile) return 0;
+  if (!profile || !hasDeclaredAvailability(profile.availability)) return null;
 
   const available = cells.filter(([day, slot]) => profile.availability[day]?.[slot]).length;
   return available / cells.length;
+}
+
+/** Has the student marked any cell at all? An all-false grid is "not answered". */
+export function hasDeclaredAvailability(grid: AvailabilityGrid): boolean {
+  return AVAILABILITY_DAYS.some((day) => AVAILABILITY_SLOTS.some((slot) => grid[day]?.[slot]));
 }
 
 export interface TransportLead {
@@ -329,6 +357,10 @@ export function transportFeasible(
     case "bus":
       return hasTransitNote(lead) ? "yes" : "unknown";
     case "walk": {
+      // A transit note settles it for a walker exactly as it does for someone
+      // with no ride: the bus stopping out front is the same evidence either
+      // way. Without this the two branches disagreed on identical input.
+      if (hasTransitNote(lead)) return "yes";
       const miles = lead.distanceMiles;
       if (miles === null || miles === undefined) return "unknown";
       return miles <= MAX_WALKING_MILES ? "yes" : "no";

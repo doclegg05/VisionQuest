@@ -50,10 +50,11 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
           {content}
           {isStreaming && shouldReduceMotion ? "…" : ""}
         </p>
-        {/* Read-aloud lives on Sage's finished replies: this is where a
-            plain-language job explanation (explain_job) actually reaches the
-            student, since the SSE tool_result event carries only a summary.
-            Renders nothing where speechSynthesis is unavailable. */}
+        {/* Read-aloud lives on Sage's finished replies: an explain_job
+            explanation reaches the student as Sage's own text, because
+            ChatWindow renders a tool_result as a status chip (its summary) and
+            does not render the tool's `data`. Renders nothing where the
+            browser has no on-device voice. */}
         {!isUser && !isStreaming && (
           <div className="mt-2">
             <ReadAloudButton text={content} />

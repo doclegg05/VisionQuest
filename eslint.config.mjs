@@ -25,9 +25,14 @@ const restrictedSyntaxEverywhere = [
   // identifier at any level (.claude/rules/security.md, Data Privacy).
   // Log studentLogKey(id) from src/lib/log-keys.ts when a failure needs to
   // be correlated, and redactContactInfo() for provider error text.
+  //
+  // homeZip / childcareHours / workProfile joined the list with
+  // StudentWorkProfile (Match & Connect Phase 2): a home ZIP beside a class
+  // roster is close to an address, and a childcare note is the student's own
+  // words about their household.
   {
     selector:
-      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber)$/]",
+      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber|homeZip|childcareHours|workProfile)$/]",
     message:
       "No student identifier in server logs. Use studentLogKey(studentId) from @/lib/log-keys for a correlation key, or drop the field.",
   },
