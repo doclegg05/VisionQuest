@@ -83,7 +83,9 @@ export function planTotalCost(planNode) {
  */
 export async function buildHotQueries({ bench }) {
   const { LEAD_LIST_SELECT, MAX_LEAD_PAGE } = await import("../../../src/lib/connect/leads.ts");
-  const { interventionQueueStudentSelect } = await import("../../../src/lib/teacher/dashboard.ts");
+  const { interventionQueueStudentSelect } = await import(
+    "../../../src/lib/teacher/intervention-queue-select.ts"
+  );
   const { buildManagedStudentWhere } = await import("../../../src/lib/classroom.ts");
   const { connectManagedStudentIds, MAX_CONNECT_REPORT_ROWS } = await import(
     "../../../src/lib/connect/classes.ts"

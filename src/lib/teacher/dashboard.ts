@@ -25,7 +25,10 @@ import {
   buildInterventionQueueEntry,
   type InterventionQueueStudentRecord,
 } from "@/lib/teacher/intervention-queue";
+import { interventionQueueStudentSelect } from "@/lib/teacher/intervention-queue-select";
 import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
+
+export { interventionQueueStudentSelect };
 
 export interface QueueStudent {
   studentId: string;
@@ -192,90 +195,11 @@ function latestDate(...values: Array<Date | null | undefined>) {
   }, null);
 }
 
-/**
- * Select for the intervention-queue student query. A builder rather than a
- * constant because `now` is embedded in the overdue-task filter. `as const`
- * keeps the literal types Prisma needs for payload inference.
- *
- * Exported (2026-09-05, benchmark suite B5) so scripts/bench/suites/
- * query-plans.mjs can EXPLAIN the exact select this function builds rather
- * than hand-writing a stand-in that could silently drift from it. Purely
- * additive — no other call site or behavior changes.
- */
-export function interventionQueueStudentSelect(now: Date) {
-  return {
-    id: true,
-    studentId: true,
-    displayName: true,
-    email: true,
-    createdAt: true,
-    updatedAt: true,
-    progression: { select: { state: true } },
-    goals: {
-      select: { level: true, status: true, updatedAt: true, lastReviewedAt: true, pathwayId: true },
-    },
-    orientationProgress: {
-      select: { completed: true, completedAt: true },
-    },
-    alerts: {
-      where: { status: "open" },
-      select: {
-        id: true,
-        type: true,
-        severity: true,
-        title: true,
-        summary: true,
-        sourceType: true,
-        sourceId: true,
-        detectedAt: true,
-      },
-    },
-    assignedTasks: {
-      where: {
-        status: { not: "completed" },
-        dueAt: { lt: now },
-      },
-      select: { id: true },
-    },
-    conversations: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    portfolioItems: { select: { updatedAt: true } },
-    files: { select: { uploadedAt: true } },
-    formSubmissions: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    applications: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    eventRegistrations: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    certifications: {
-      select: {
-        status: true,
-      },
-    },
-    resumeData: { select: { id: true } },
-    publicCredentialPage: { select: { isPublic: true } },
-    classEnrollments: {
-      select: {
-        enrolledAt: true,
-        status: true,
-        class: { select: { programType: true } },
-      },
-      orderBy: { enrolledAt: "desc" },
-    },
-  } as const;
-}
+// interventionQueueStudentSelect moved to ./intervention-queue-select.ts
+// (2026-09-05, benchmark suite B5, imported above) — this file's
+// `import "server-only"` at the top throws for any importer outside a
+// Next.js server-component context, which made the select unreachable from
+// a plain script (scripts/bench/suites/query-plans.mjs).
 
 /**
  * Shared tail of both queue variants: score each student, drop
