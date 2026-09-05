@@ -2,28 +2,37 @@
 // The Connect funnel — Prisma reads.
 //
 // Match & Connect Phase 6, Task 6.1. `funnel-shared.ts` does the aggregation;
-// this module fetches the rows it needs, scoped to the instructor's managed
-// students (`Connection` RLS already restricts a teacher to
-// `managed_student_ids()`, so this is belt-and-suspenders scoping via the
-// same helper every other teacher report uses, and it is what makes the
-// `classId`/`employerId` filters meaningful narrowing rather than only an
-// authorization boundary).
+// this module fetches the rows it needs.
+//
+// Scoping: `connectManagedStudentIds` (./classes), NOT `classroom.ts`'s
+// `listManagedStudentIds` — see that function's header (SEC-W1, 2026-09
+// review). It mirrors `managed_student_ids()`, the Postgres function
+// `Connection`/`Application` RLS actually calls, for both the classId and
+// no-classId cases; `assertClassIsManaged` (not the broader
+// `assertStaffCanManageClass`) gives a clear 404 on a classId the caller
+// does not instruct, instead of a query that RLS would have silently
+// emptied anyway.
 //
 // Three queries total — Connection, ConnectionEvent, and the self-directed
-// Application comparison — no N+1.
+// Application comparison — no N+1. `from`/`to` bounds are pushed into the
+// Connection/Application WHERE clauses (not just applied in-memory by
+// computeFunnel) so the event query, built from the already-period-scoped
+// connection ids, never has to look at events outside the window either.
 // =============================================================================
 
 import type { Session } from "@/lib/api-error";
-import { listManagedStudentIds } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { reportDateRangeBoundsUtc } from "@/lib/timezone";
 
-import { assertClassIsManaged } from "./classes";
+import { assertClassIsManaged, connectManagedStudentIds } from "./classes";
 import { computeFunnel, type FunnelResult } from "./funnel-shared";
 
 export interface FetchFunnelOptions {
   classId?: string;
   employerId?: string;
+  /** "YYYY-MM-DD" — resolved to ET-aware UTC instants via reportDateRangeBoundsUtc. */
   from?: string;
+  /** "YYYY-MM-DD" — resolved to the EXCLUSIVE start of the ET day after. */
   to?: string;
 }
 
@@ -31,32 +40,36 @@ export async function fetchConnectFunnel(
   session: Session,
   options: FetchFunnelOptions = {},
 ): Promise<FunnelResult> {
-  // `assertClassIsManaged` (not the broader `assertStaffCanManageClass`) —
-  // Connection RLS narrows through `managed_student_ids()`, the same
-  // instructor-assignment boundary `connectClassWhere` expresses at the app
-  // level (see classes.ts's header). Authorizing against the wider "any
-  // teacher may see any class" check would let a classId the caller does not
-  // instruct pass here and come back with a silently EMPTY funnel (RLS still
-  // filters the underlying rows correctly), which reads as "no connections"
-  // rather than "you don't have access" — this 404s instead.
   if (options.classId) {
     await assertClassIsManaged(options.classId, session);
   }
 
-  const studentIds = await listManagedStudentIds(session, {
-    classId: options.classId,
-    includeInactiveAccounts: true,
-  });
+  const studentIds = await connectManagedStudentIds(session, options.classId);
+
+  const { from, to } = reportDateRangeBoundsUtc(options.from, options.to);
 
   if (studentIds.length === 0) {
-    return computeFunnel([], [], { from: options.from, to: options.to });
+    return computeFunnel([], [], { from, to });
   }
+
+  const createdAtWhere =
+    from || to
+      ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } }
+      : {};
 
   const connections = await prisma.connection.findMany({
     where: {
       studentId: { in: studentIds },
       ...(options.employerId ? { employerId: options.employerId } : {}),
-      ...(options.classId ? { jobLead: { classId: options.classId } } : {}),
+      // A class filter must not hide PROGRAM-WIDE leads (classId null) —
+      // those are visible to every class's students, so their connections
+      // belong in every class's funnel too (W3, 2026-09 review). Dropping
+      // this OR would silently zero out any program-wide lead's numbers the
+      // moment a teacher filters by class.
+      ...(options.classId
+        ? { jobLead: { OR: [{ classId: options.classId }, { classId: null }] } }
+        : {}),
+      ...createdAtWhere,
     },
     select: {
       id: true,
@@ -65,7 +78,6 @@ export async function fetchConnectFunnel(
       status: true,
       createdAt: true,
       sentAt: true,
-      employerRespondedAt: true,
       hiredAt: true,
       packet: true,
       employer: { select: { name: true } },
@@ -89,6 +101,7 @@ export async function fetchConnectFunnel(
     where: {
       studentId: { in: studentIds },
       connection: null,
+      ...createdAtWhere,
     },
     select: { id: true, studentId: true, createdAt: true, status: true, verificationStatus: true },
   });
@@ -104,11 +117,10 @@ export async function fetchConnectFunnel(
       status: connection.status,
       createdAt: connection.createdAt,
       sentAt: connection.sentAt,
-      employerRespondedAt: connection.employerRespondedAt,
       hiredAt: connection.hiredAt,
       packet: connection.packet,
     })),
     events,
-    { from: options.from, to: options.to, selfDirectedApplications },
+    { from, to, selfDirectedApplications },
   );
 }

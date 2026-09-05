@@ -19,6 +19,7 @@
 
 import type { Session } from "@/lib/api-error";
 import { notFound } from "@/lib/api-error";
+import { NON_ARCHIVED_ENROLLMENT_STATUSES } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
 /** The minimum a caller has to know about the actor to be scoped. */
@@ -102,4 +103,60 @@ export async function assertClassIsManaged(
   // "Not found", not "forbidden": a caller should not learn that a class they
   // cannot touch exists.
   if (!spokesClass) throw notFound("That class wasn't found.");
+}
+
+/**
+ * The student ids a Connect REPORTING surface (the funnel, the DoHS export)
+ * may aggregate over — mirrors `managed_student_ids()`, the Postgres
+ * function `Connection`/`SpokesRecord`/`Application` RLS actually calls, NOT
+ * `classroom.ts`'s `listManagedStudentIds`.
+ *
+ * That distinction is load-bearing (SEC-W1, 2026-09 review): with no
+ * `classId`, `listManagedStudentIds`'s `canManageAny && !classId` branch
+ * returns EVERY student in the program to any teacher — the intentional
+ * "single staff workspace" convention for classroom-administration surfaces
+ * (intervention queue, grant-KPI, readiness reports). RLS still enforces the
+ * true boundary underneath any query built from that list, but the app-level
+ * filter being wider than what RLS actually admits means an EMPTY result and
+ * a REFUSED result look identical from here — exactly the ambiguity
+ * `assertClassIsManaged` exists to remove for the classId case. This
+ * function removes it for the "no classId, plain teacher" case too, by
+ * asking the real question up front instead of relying on RLS to quietly
+ * discard rows the app never should have queried for.
+ *
+ * Status list is `NON_ARCHIVED_ENROLLMENT_STATUSES` (`classroom.ts`), not
+ * this module's own `ENROLLED_STATUSES` — that one is Connect-matching
+ * eligibility ("in the program to be matched against a lead"), a narrower,
+ * different question. `managed_student_ids()`'s SQL admits
+ * `('active','inactive','completed','withdrawn')`, which is exactly
+ * `NON_ARCHIVED_ENROLLMENT_STATUSES`.
+ */
+export async function connectManagedStudentIds(
+  actor: ClassActor,
+  classId?: string,
+): Promise<string[]> {
+  const isAdmin = actor.role === "admin";
+
+  if (isAdmin && !classId) {
+    const students = await prisma.student.findMany({
+      where: { role: "student" },
+      select: { id: true },
+    });
+    return students.map((student) => student.id);
+  }
+
+  const students = await prisma.student.findMany({
+    where: {
+      role: "student",
+      classEnrollments: {
+        some: {
+          ...(classId ? { classId } : {}),
+          status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
+          ...(isAdmin ? {} : { class: { instructors: { some: { instructorId: actor.id } } } }),
+        },
+      },
+    },
+    select: { id: true },
+  });
+  return students.map((student) => student.id);
 }

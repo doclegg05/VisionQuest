@@ -11,18 +11,31 @@
 // P0.4(1) lands, the same way the subsidy figures in subsidies-shared.ts wait
 // on P0.8.
 //
-// No name, email, phone, or address column, ever — the identifier is the
-// SPOKES id (`Student.studentId`), the same field the existing
-// `/api/teacher/reports/spokes` report exports (see that route's `studentId:
-// record.student?.studentId` line). This module follows workforce-batch.ts's
-// discipline: a fixed, ordered column list plus a denylist test that pins the
-// exclusion by field name.
+// SEC-W3 (2026-09 security review): the identifier column is
+// `Student.studentId` — the SPOKES id, matching the existing
+// `/api/teacher/reports/spokes` report's `studentId: record.student?.
+// studentId` line (never name/email/phone/address). This is ALSO the
+// student's LOGIN USERNAME (`login/route.ts` looks a student up by it), which
+// this export was not designed around: a row here doubles as a working
+// credential identifier, not just an opaque report key. Two options once
+// P0.4(1) settles the real field list: (a) accept it — the export is
+// instructor-scoped and audited, the same exposure `spokes` already has, and
+// changing it now would break DoHS's ability to match this program's own
+// prior-period reports; or (b) mint a separate, non-authenticating report id
+// once DoHS confirms what identifier THEY actually need (a program-internal
+// id has never been asked for, and inventing one unprompted risks not
+// matching their side at all). Left as a flagged, deliberate non-fix — the
+// owner decides once P0.4(1) answers.
+//
+// This module follows workforce-batch.ts's discipline: a fixed, ordered
+// column list plus a denylist test that pins the exclusion by field name.
 //
 // This module must never import @/lib/db.
 // =============================================================================
 
 import { escapeCsvValue } from "@/lib/csv";
-import { funnelStageIndex } from "./funnel-shared";
+import { COHORT_TIME_ZONE } from "@/lib/timezone";
+import { funnelStageIndex, furthestFunnelStageIndex } from "./funnel-shared";
 import { parsePacket } from "./packet-shared";
 
 export const DOHS_EXPORT_COLUMNS = [
@@ -51,18 +64,31 @@ export type DohsExportColumn = (typeof DOHS_EXPORT_COLUMNS)[number];
 export type DohsPlacementSource = "connect" | "self_directed" | null;
 
 export interface DohsConnectionDetail {
-  /** Connection.status — used only to derive the retained_30/60/90 flags, via
-   * FUNNEL_STAGE_ORDER's cumulative order (reaching retained_60 implies
-   * retained_30 was already true). */
-  status: string;
   /** Connection.packet, parsed here for its subsidyLine. */
   packet: unknown;
   /** JobLead.schedule JSON, read defensively — see hoursPerWeekFromSchedule. */
   jobLeadSchedule: unknown;
+  /**
+   * Every ConnectionEvent.toStatus EVER recorded for this connection — used
+   * ONLY as the retention FALLBACK when the record has no
+   * SpokesEmploymentFollowUp at all (see retainedFlags below). Deliberately
+   * the full event history, not the connection's current status: a
+   * connect-sourced hire that reached "retained_60" and was later `closed`
+   * must still export retained30/60 = true, and current status alone
+   * ("closed" — not a funnel stage) cannot show that.
+   */
+  eventToStatuses: readonly string[];
+}
+
+/** One SpokesEmploymentFollowUp row. */
+export interface DohsEmploymentFollowUpRow {
+  checkpointMonths: number;
+  status: string;
+  checkedAt: string | Date;
 }
 
 /** One row of the export's SOURCE data — a SpokesRecord plus what it links
- * to. `funnel.ts`'s job is to assemble exactly this shape from Prisma. */
+ * to. `dohs-export.ts`'s job is to assemble exactly this shape from Prisma. */
 export interface DohsSourceRow {
   spokesId: string | null;
   className: string | null;
@@ -79,8 +105,10 @@ export interface DohsSourceRow {
     verificationStatus: string | null;
     connection: DohsConnectionDetail | null;
   } | null;
-  /** Latest SpokesEmploymentFollowUp.checkedAt for this record, if any. */
-  latestFollowUpAt: string | Date | null;
+  /** ALL follow-ups for this record (not just the latest) — retention needs
+   * every "employed" checkpoint's date; the export's own follow-up DATE
+   * column is derived from this same list (the latest checkedAt overall). */
+  employmentFollowUps: readonly DohsEmploymentFollowUpRow[];
 }
 
 export interface DohsExportRow {
@@ -101,10 +129,59 @@ export interface DohsExportRow {
   followUpDate: string | null;
 }
 
-function toIsoDate(value: string | Date | null): string | null {
+function parseDate(value: string | Date | null): Date | null {
   if (value === null) return null;
   const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * "YYYY-MM-DD" read from an instant's Eastern Time wall-clock date (W5,
+ * 2026-09 review's ORIGINAL ask, and the RIGHT thing for a genuine instant
+ * like "the moment this report was generated"): a 9:30pm ET run is
+ * `2026-07-01T01:30:00Z` — `.toISOString().slice(0, 10)` reads that as
+ * "2026-07-01", a day late for the ET operator who ran it. `en-CA` formats
+ * as `yyyy-mm-dd` directly.
+ *
+ * Used ONLY for `dohsExportFilename`'s `today` argument. Every ROW date
+ * column below (`toDateOnlyUtc`) deliberately does NOT use this — see that
+ * function's comment for why applying it there would be a new, worse bug.
+ */
+function toEtDateOnly(value: string | Date | null, timeZone: string = COHORT_TIME_ZONE): string | null {
+  const date = parseDate(value);
+  if (!date) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/**
+ * "YYYY-MM-DD" read from an instant's UTC calendar date — the correct
+ * reading for every SOURCE field this export shows as a row date
+ * (`enrollmentDate`, `exitDate`, `startDate`/`unsubsidizedEmploymentAt`,
+ * `followUpDate`/`checkedAt`). All four are Prisma `@db.Date` columns —
+ * plain calendar dates with NO time-of-day, which Postgres/Prisma always
+ * returns as an instant at exactly UTC midnight for that date. They are not
+ * "a moment near midnight that could fall on either side of a timezone
+ * boundary" — they ARE the date, already, with no timezone attached.
+ *
+ * A W5 review pass first "fixed" this by running these fields through
+ * `toEtDateOnly` (the function above). That is a REAL bug, not the one being
+ * fixed: Eastern Time is always behind UTC, so EVERY `@db.Date` value —
+ * with no exception, no DST edge case, every single row — reads one
+ * calendar day EARLIER once shifted through `America/New_York` (a bare
+ * "2026-09-01" `checkedAt` is UTC midnight, which is 8pm ET on 2026-08-31).
+ * The pre-review `.toISOString().slice(0, 10)` UTC-extraction was already
+ * correct for these columns; this function keeps that behavior under a name
+ * that says why, so nobody "fixes" it into the ET bug a second time.
+ */
+function toDateOnlyUtc(value: string | Date | null): string | null {
+  const date = parseDate(value);
+  if (!date) return null;
+  return date.toISOString().slice(0, 10);
 }
 
 /**
@@ -131,16 +208,86 @@ function hoursPerWeekFromSchedule(schedule: unknown): number | null {
 }
 
 const RETAINED_STAGES = ["retained_30", "retained_60", "retained_90"] as const;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** Cumulative: reaching retained_60 implies retained_30 already happened. */
-function retainedFlags(status: string): { retained30: boolean; retained60: boolean; retained90: boolean } {
-  const reached = funnelStageIndex(status);
-  const [i30, i60, i90] = RETAINED_STAGES.map((stage) => funnelStageIndex(stage));
-  return {
-    retained30: reached >= i30,
-    retained60: reached >= i60,
-    retained90: reached >= i90,
-  };
+/**
+ * retained_30/60/90 — DERIVED, never read off a literal 30/60/90-day
+ * check-in that does not exist in this program (C1, 2026-09 review).
+ *
+ * PRIMARY SOURCE: `SpokesEmploymentFollowUp`, the SAME table grant-kpi.ts's
+ * `threeMonthRetention`/`sixMonthRetention` read (src/lib/grant-kpi.ts:
+ * checkpointMonths 3|6, status "employed"). Its checkpoints are MONTHS
+ * (today, only 3 and 6 are ever written — roughly 90 and 180 days), so there
+ * is currently no observation that can satisfy "retained 30" without ALSO
+ * satisfying 60 and 90 — a 3-month "employed" follow-up trips all three at
+ * once. That is a fact about today's check-in cadence, not a bug in these
+ * columns: if a finer-grained checkpoint (e.g. a true 30-day check-in) is
+ * ever added, it will correctly light up retained30 alone. The rule applied:
+ * retainedN = true iff SOME "employed" follow-up's `checkedAt` falls at
+ * least N days after the employment start date
+ * (`unsubsidizedEmploymentAt`) — i.e. the earliest employed follow-up that
+ * already clears that many days out.
+ *
+ * FALLBACK, used ONLY when the record has ZERO follow-up rows at all: the
+ * linked Connection's own EVENT HISTORY. A "retained_60" event ever recorded
+ * (via `furthestFunnelStageIndex` over every `toStatus`, never the
+ * connection's CURRENT `status`) implies retained_30 and retained_60. This
+ * is what makes a connect-sourced hire that was later marked `closed` still
+ * export correctly: its current status is "closed" (no funnel-stage index
+ * at all), but the event history still shows it reached retained_60 first —
+ * reading current status alone (the pre-fix behavior) reported "not
+ * retained" for exactly the connections whose retention actually happened.
+ *
+ * Self-directed placements have no Connection at all, so they fall through
+ * to `false/false/false` only when they ALSO have no follow-up — the bug
+ * this replaces reported `false` unconditionally for every self-directed
+ * placement regardless of follow-up data.
+ */
+function retainedFlags(
+  source: Pick<DohsSourceRow, "unsubsidizedEmploymentAt" | "employmentFollowUps">,
+  connection: DohsConnectionDetail | null,
+): { retained30: boolean; retained60: boolean; retained90: boolean } {
+  const start = parseDate(source.unsubsidizedEmploymentAt);
+  const employedFollowUps = source.employmentFollowUps.filter((f) => f.status === "employed");
+
+  if (start && employedFollowUps.length > 0) {
+    let maxDaysEmployed: number | null = null;
+    for (const followUp of employedFollowUps) {
+      const checkedAt = parseDate(followUp.checkedAt);
+      if (!checkedAt) continue;
+      const days = (checkedAt.getTime() - start.getTime()) / MS_PER_DAY;
+      if (maxDaysEmployed === null || days > maxDaysEmployed) maxDaysEmployed = days;
+    }
+    if (maxDaysEmployed !== null) {
+      return {
+        retained30: maxDaysEmployed >= 30,
+        retained60: maxDaysEmployed >= 60,
+        retained90: maxDaysEmployed >= 90,
+      };
+    }
+  }
+
+  if (connection) {
+    const reached = furthestFunnelStageIndex(connection.eventToStatuses);
+    const [i30, i60, i90] = RETAINED_STAGES.map((stage) => funnelStageIndex(stage));
+    return { retained30: reached >= i30, retained60: reached >= i60, retained90: reached >= i90 };
+  }
+
+  return { retained30: false, retained60: false, retained90: false };
+}
+
+/** Latest `checkedAt` across ALL follow-ups (any status), for the
+ * "Follow-up date" column. */
+function latestFollowUpDate(followUps: readonly DohsEmploymentFollowUpRow[]): string | Date | null {
+  let latest: DohsEmploymentFollowUpRow | null = null;
+  for (const followUp of followUps) {
+    const checkedAt = parseDate(followUp.checkedAt);
+    if (!checkedAt) continue;
+    if (!latest || checkedAt.getTime() > (parseDate(latest.checkedAt)?.getTime() ?? -Infinity)) {
+      latest = followUp;
+    }
+  }
+  return latest?.checkedAt ?? null;
 }
 
 /**
@@ -161,18 +308,16 @@ export function buildDohsExportRow(source: DohsSourceRow): DohsExportRow {
   const packet = connection ? parsePacket(connection.packet) : null;
   const subsidyType = connection ? subsidyProgramName(packet?.subsidyLine ?? null) : null;
   const hoursPerWeek = connection ? hoursPerWeekFromSchedule(connection.jobLeadSchedule) : null;
-  const retained = connection
-    ? retainedFlags(connection.status)
-    : { retained30: false, retained60: false, retained90: false };
+  const retained = retainedFlags(source, connection);
 
   return {
     spokesId: source.spokesId,
     className: source.className,
-    enrollmentDate: toIsoDate(source.enrollmentDate),
-    exitDate: toIsoDate(source.exitDate),
+    enrollmentDate: toDateOnlyUtc(source.enrollmentDate),
+    exitDate: toDateOnlyUtc(source.exitDate),
     placed,
     employerName: source.employerName,
-    startDate: toIsoDate(source.unsubsidizedEmploymentAt),
+    startDate: toDateOnlyUtc(source.unsubsidizedEmploymentAt),
     hourlyWage: source.hourlyWage,
     hoursPerWeek,
     placementSource,
@@ -180,7 +325,7 @@ export function buildDohsExportRow(source: DohsSourceRow): DohsExportRow {
     retained30: retained.retained30,
     retained60: retained.retained60,
     retained90: retained.retained90,
-    followUpDate: toIsoDate(source.latestFollowUpAt),
+    followUpDate: toDateOnlyUtc(latestFollowUpDate(source.employmentFollowUps)),
   };
 }
 
@@ -188,8 +333,8 @@ export function buildDohsExportRows(sources: readonly DohsSourceRow[]): DohsExpo
   return sources.map(buildDohsExportRow);
 }
 
-function cell(value: string | number | boolean | null): string {
-  if (value === null) return "";
+function cell(value: string | number | boolean | null | undefined): string {
+  if (value == null) return "";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return escapeCsvValue(value);
 }
@@ -224,7 +369,9 @@ export function buildDohsExportCsv(rows: readonly DohsExportRow[]): string {
   return `${lines.join("\r\n")}\r\n`;
 }
 
-/** `dohs-spokes-report-2026-09-05.csv` */
-export function dohsExportFilename(today: Date): string {
-  return `dohs-spokes-report-${today.toISOString().slice(0, 10)}.csv`;
+/** `dohs-spokes-report-2026-09-05.csv`, dated in Eastern Time (W5) so a
+ * report run just after 8pm ET is still named for the ET calendar day an
+ * operator ran it on, not the UTC day it silently rolled into. */
+export function dohsExportFilename(today: Date, timeZone: string = COHORT_TIME_ZONE): string {
+  return `dohs-spokes-report-${toEtDateOnly(today, timeZone)}.csv`;
 }

@@ -90,13 +90,17 @@ describe("GET /api/teacher/reports/connect", () => {
     assert.equal(mockFetchConnectFunnel.mock.callCount(), 0);
   });
 
-  it("propagates a 403 when the instructor does not manage the requested class", async () => {
+  it("propagates a 404 when the instructor does not instruct the requested class", async () => {
+    // fetchConnectFunnel's real classId check is assertClassIsManaged, which
+    // throws notFound (404) — "not found", not "forbidden", so a caller
+    // cannot learn that a class they cannot touch exists. This mock error
+    // must match that real status, not an arbitrary one.
     const classId = "clx1abcd23efgh45ijkl67mn";
     mockFetchConnectFunnel.mock.mockImplementationOnce(async () => {
-      throw makeHttpError(403, "You do not have access to this class.");
+      throw makeHttpError(404, "That class wasn't found.");
     });
     const req = mockRequest(`/api/teacher/reports/connect?classId=${classId}`, { method: "GET" });
     const res = await route.GET(req as never);
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
   });
 });

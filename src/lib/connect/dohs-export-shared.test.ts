@@ -9,6 +9,7 @@ import {
   buildDohsExportRow,
   buildDohsExportRows,
   dohsExportFilename,
+  type DohsEmploymentFollowUpRow,
   type DohsSourceRow,
 } from "./dohs-export-shared";
 
@@ -22,7 +23,16 @@ function source(overrides: Partial<DohsSourceRow> = {}): DohsSourceRow {
     employerName: null,
     hourlyWage: null,
     placementApplication: null,
-    latestFollowUpAt: null,
+    employmentFollowUps: [],
+    ...overrides,
+  };
+}
+
+function followUp(overrides: Partial<DohsEmploymentFollowUpRow> = {}): DohsEmploymentFollowUpRow {
+  return {
+    checkpointMonths: 3,
+    status: "employed",
+    checkedAt: "2026-09-01",
     ...overrides,
   };
 }
@@ -89,9 +99,23 @@ describe("buildDohsExportRow", () => {
     );
   });
 
-  it("start date mirrors unsubsidizedEmploymentAt as an ISO date", () => {
+  it("start date mirrors unsubsidizedEmploymentAt's UTC calendar date", () => {
     const row = buildDohsExportRow(source({ unsubsidizedEmploymentAt: "2026-06-01T14:00:00Z" }));
     assert.equal(row.startDate, "2026-06-01");
+  });
+
+  it("row date columns are NOT shifted through Eastern Time — they are @db.Date calendar dates, not real instants", () => {
+    // unsubsidizedEmploymentAt/enrolledAt/exitDate/checkedAt are all Prisma
+    // `@db.Date` columns: Postgres stores no time-of-day for them, so Prisma
+    // always returns them as UTC midnight for that calendar date. Running
+    // THIS kind of value through an Eastern Time conversion (as the
+    // dohsExportFilename `today` argument correctly does, because THAT one
+    // really is "the instant this report ran") would shift EVERY row back
+    // one calendar day, always, with no exception — 2026-09-01 UTC midnight
+    // is 2026-08-31 8pm EDT. This test is the regression guard for exactly
+    // that mistake: a bare date-only value must round-trip unchanged.
+    const row = buildDohsExportRow(source({ unsubsidizedEmploymentAt: "2026-09-01" }));
+    assert.equal(row.startDate, "2026-09-01");
   });
 
   it("placementSource is null when there is no linked application at all", () => {
@@ -110,7 +134,6 @@ describe("buildDohsExportRow", () => {
     );
     assert.equal(row.placementSource, "self_directed");
     assert.equal(row.subsidyType, null);
-    assert.equal(row.retained30, false);
   });
 
   it("placementSource is connect when the application has a connection", () => {
@@ -119,7 +142,7 @@ describe("buildDohsExportRow", () => {
         unsubsidizedEmploymentAt: "2026-06-01",
         placementApplication: {
           verificationStatus: "verified",
-          connection: { status: "started", packet: null, jobLeadSchedule: null },
+          connection: { packet: null, jobLeadSchedule: null, eventToStatuses: ["proposed", "sent", "hired"] },
         },
       }),
     );
@@ -133,7 +156,7 @@ describe("buildDohsExportRow", () => {
         placementApplication: {
           verificationStatus: "verified",
           connection: {
-            status: "hired",
+            eventToStatuses: ["hired"],
             packet: {
               resumeVersionId: null,
               coverLetterId: null,
@@ -163,7 +186,7 @@ describe("buildDohsExportRow", () => {
         placementApplication: {
           verificationStatus: "verified",
           connection: {
-            status: "hired",
+            eventToStatuses: ["hired"],
             packet: {
               resumeVersionId: null,
               coverLetterId: null,
@@ -192,7 +215,7 @@ describe("buildDohsExportRow", () => {
         placementApplication: {
           verificationStatus: "verified",
           connection: {
-            status: "hired",
+            eventToStatuses: ["hired"],
             packet: null,
             jobLeadSchedule: { hoursPerWeekMin: 20, hoursPerWeekMax: 30 },
           },
@@ -211,26 +234,75 @@ describe("buildDohsExportRow", () => {
     );
     assert.equal(row.hoursPerWeek, null);
   });
+});
 
-  it("retained flags are cumulative: reaching retained_60 implies retained_30", () => {
+describe("buildDohsExportRow — retention (C1)", () => {
+  it("PRIMARY: derives retained30/60/90 from an employed 3-month SpokesEmploymentFollowUp, days-since-start", () => {
+    // Employment started 2026-06-01; the 3-month follow-up landed 2026-09-01
+    // (92 days later) — past 30, 60, AND 90.
     const row = buildDohsExportRow(
       source({
         unsubsidizedEmploymentAt: "2026-06-01",
-        placementApplication: {
-          verificationStatus: "verified",
-          connection: { status: "retained_60", packet: null, jobLeadSchedule: null },
-        },
+        employmentFollowUps: [followUp({ checkpointMonths: 3, status: "employed", checkedAt: "2026-09-01" })],
       }),
     );
     assert.equal(row.retained30, true);
     assert.equal(row.retained60, true);
-    assert.equal(row.retained90, false);
+    assert.equal(row.retained90, true);
   });
 
-  it("retained flags are all false for a self-directed placement", () => {
+  it("a follow-up landing between 30 and 60 days out satisfies ONLY retained30", () => {
     const row = buildDohsExportRow(
       source({
         unsubsidizedEmploymentAt: "2026-06-01",
+        employmentFollowUps: [followUp({ status: "employed", checkedAt: "2026-07-01" })],
+      }),
+    );
+    // 2026-06-01 -> 2026-07-01 = 30 days exactly.
+    assert.equal(row.retained30, true);
+    assert.equal(row.retained60, false);
+    assert.equal(row.retained90, false);
+  });
+
+  it("a NOT-employed follow-up (status !== 'employed') proves nothing", () => {
+    const row = buildDohsExportRow(
+      source({
+        unsubsidizedEmploymentAt: "2026-06-01",
+        employmentFollowUps: [followUp({ status: "unreachable", checkedAt: "2026-09-01" })],
+      }),
+    );
+    assert.equal(row.retained30, false);
+    assert.equal(row.retained60, false);
+    assert.equal(row.retained90, false);
+  });
+
+  it("FALLBACK: a self-directed placement with NO follow-up but a Connection event history derives from that history", () => {
+    // Self-directed placements normally have no Connection at all, but this
+    // proves the fallback branch itself: given a connection and zero
+    // follow-ups, retention comes from event history.
+    const row = buildDohsExportRow(
+      source({
+        unsubsidizedEmploymentAt: "2026-06-01",
+        employmentFollowUps: [],
+        placementApplication: {
+          verificationStatus: "verified",
+          connection: {
+            eventToStatuses: ["proposed", "sent", "hired", "started", "retained_30"],
+            packet: null,
+            jobLeadSchedule: null,
+          },
+        },
+      }),
+    );
+    assert.equal(row.retained30, true);
+    assert.equal(row.retained60, false);
+  });
+
+  it("a REAL self-directed placement (no Connection, no follow-up) reports all three false — not silently 'No' by construction", () => {
+    const row = buildDohsExportRow(
+      source({
+        unsubsidizedEmploymentAt: "2026-06-01",
+        employmentFollowUps: [],
         placementApplication: { verificationStatus: "verified", connection: null },
       }),
     );
@@ -239,22 +311,88 @@ describe("buildDohsExportRow", () => {
     assert.equal(row.retained90, false);
   });
 
-  it("a connection that reached retained_60 then withdrew still shows retained30/60 true", () => {
-    // "withdrawn" has no FUNNEL_STAGE_ORDER index (-1), so this exercises
-    // that a CURRENT exit status does not erase the flags — the row's
-    // `connection.status` here stands in for "furthest reached" the same way
-    // funnel.ts would derive it from event history before calling this.
+  it("a self-directed placement WITH an employed follow-up now correctly reports retained — the bug this replaces reported 'No' unconditionally", () => {
     const row = buildDohsExportRow(
       source({
         unsubsidizedEmploymentAt: "2026-06-01",
+        employmentFollowUps: [followUp({ status: "employed", checkedAt: "2026-09-01" })],
+        placementApplication: { verificationStatus: "verified", connection: null },
+      }),
+    );
+    assert.equal(row.retained30, true);
+    assert.equal(row.retained60, true);
+    assert.equal(row.retained90, true);
+  });
+
+  it("a connection that reached retained_60 and was LATER CLOSED still reports retained30/60 true (event history, not current status)", () => {
+    // This is the exact C1 bug: the connection's CURRENT state is "closed"
+    // (simulated here by the event history actually ending in a "closed"
+    // event after "retained_60" — not by skipping straight to asserting on
+    // a bare status string, which is what the pre-fix version of this test
+    // did without ever exercising a real close).
+    const row = buildDohsExportRow(
+      source({
+        unsubsidizedEmploymentAt: "2026-06-01",
+        employmentFollowUps: [],
         placementApplication: {
           verificationStatus: "verified",
-          connection: { status: "retained_60", packet: null, jobLeadSchedule: null },
+          connection: {
+            eventToStatuses: [
+              "proposed",
+              "student_approved",
+              "sent",
+              "interested",
+              "hired",
+              "started",
+              "retained_30",
+              "retained_60",
+              "closed", // <- the connection WITHDREW/CLOSED after reaching retained_60
+            ],
+            packet: null,
+            jobLeadSchedule: null,
+          },
         },
       }),
     );
     assert.equal(row.retained30, true);
     assert.equal(row.retained60, true);
+    assert.equal(row.retained90, false);
+  });
+
+  it("PRIMARY source wins over the FALLBACK when both exist (a follow-up says less than the event history claims)", () => {
+    // Employment start 2026-06-01, follow-up only 10 days out (not
+    // "retained" by the primary rule) even though the connection's event
+    // history claims retained_90 — the follow-up is the source of truth
+    // whenever one exists at all.
+    const row = buildDohsExportRow(
+      source({
+        unsubsidizedEmploymentAt: "2026-06-01",
+        employmentFollowUps: [followUp({ status: "employed", checkedAt: "2026-06-11" })],
+        placementApplication: {
+          verificationStatus: "verified",
+          connection: {
+            eventToStatuses: ["hired", "started", "retained_30", "retained_60", "retained_90"],
+            packet: null,
+            jobLeadSchedule: null,
+          },
+        },
+      }),
+    );
+    assert.equal(row.retained30, false);
+    assert.equal(row.retained60, false);
+    assert.equal(row.retained90, false);
+  });
+
+  it("the latest follow-up date (any status) fills the Follow-up date column", () => {
+    const row = buildDohsExportRow(
+      source({
+        employmentFollowUps: [
+          followUp({ checkpointMonths: 3, status: "employed", checkedAt: "2026-06-01" }),
+          followUp({ checkpointMonths: 6, status: "unreachable", checkedAt: "2026-09-01" }),
+        ],
+      }),
+    );
+    assert.equal(row.followUpDate, "2026-09-01");
   });
 });
 
@@ -297,8 +435,13 @@ describe("buildDohsExportCsv", () => {
 });
 
 describe("dohsExportFilename", () => {
-  it("names the file by date", () => {
+  it("names the file by its ET calendar date", () => {
     assert.equal(dohsExportFilename(new Date("2026-09-05T12:00:00Z")), "dohs-spokes-report-2026-09-05.csv");
+  });
+
+  it("uses the ET calendar day, not UTC, for a late-evening instant", () => {
+    // 2026-09-06T01:00:00Z = 2026-09-05 9:00pm EDT.
+    assert.equal(dohsExportFilename(new Date("2026-09-06T01:00:00.000Z")), "dohs-spokes-report-2026-09-05.csv");
   });
 });
 
@@ -349,7 +492,7 @@ describe("acceptance: grant KPI placements and the DoHS export agree", () => {
       placementApplication: record.unsubsidizedEmploymentAt
         ? { verificationStatus: "verified", connection: null }
         : null,
-      latestFollowUpAt: null,
+      employmentFollowUps: [],
     }));
 
     const grantKpiPayload = computeGrantKpis(grantKpiRecords, now);
@@ -360,5 +503,56 @@ describe("acceptance: grant KPI placements and the DoHS export agree", () => {
       dohsRows.filter((row) => row.placed).length,
       "grant-kpi and the DoHS export must agree on how many placements happened",
     );
+  });
+
+  it("DISCORDANT ROW (C1 regression guard): a closed connection + an employed 3-month follow-up — retention must still show true", () => {
+    // A placement whose Connection was later closed, but which grant-kpi's
+    // OWN retention logic (SpokesEmploymentFollowUp, 3-month "employed")
+    // would count as retained. Before the C1 fix, buildDohsExportRow read
+    // Connection.status directly ("closed" — no funnel index), so this row
+    // exported retained30/60/90 = false/false/false while grant-kpi's
+    // threeMonthRetention counted the SAME record as retained. This test
+    // fails on that pre-fix behavior and passes once the follow-up is read.
+    const now = new Date("2026-10-01T00:00:00Z");
+    const employmentStart = new Date("2026-06-01");
+    const followUpDate = new Date("2026-09-01"); // ~92 days later — a real 3-month check-in
+
+    const grantKpiRecord: GrantKpiRecord = {
+      id: "discordant-1",
+      status: "enrolled",
+      referralDate: new Date("2025-08-01"),
+      enrolledAt: new Date("2025-08-15"),
+      unsubsidizedEmploymentAt: employmentStart,
+      hourlyWage: 17,
+      postSecondaryEnteredAt: null,
+      employmentFollowUps: [{ checkpointMonths: 3, status: "employed" }],
+    };
+    const grantKpiPayload = computeGrantKpis([grantKpiRecord], now);
+    assert.equal(grantKpiPayload.metrics.threeMonthRetention.numerator, 1);
+
+    const dohsRow = buildDohsExportRow(
+      source({
+        spokesId: "SP-DISCORD",
+        unsubsidizedEmploymentAt: employmentStart,
+        employmentFollowUps: [followUp({ checkpointMonths: 3, status: "employed", checkedAt: followUpDate })],
+        placementApplication: {
+          verificationStatus: "verified",
+          connection: {
+            eventToStatuses: ["proposed", "sent", "interested", "hired", "closed"],
+            packet: null,
+            jobLeadSchedule: null,
+          },
+        },
+      }),
+    );
+
+    assert.equal(dohsRow.placed, true);
+    assert.equal(
+      dohsRow.retained30,
+      true,
+      "grant-kpi counts this record as 3-month-retained; the DoHS export must agree, not read the closed Connection status",
+    );
+    assert.equal(dohsRow.retained60, true);
+    assert.equal(dohsRow.retained90, true);
   });
 });

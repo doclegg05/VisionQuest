@@ -10,7 +10,7 @@
 // This module must never import @/lib/db.
 // =============================================================================
 
-import { percentile } from "../../../scripts/lib/percentile.mjs";
+import { percentile } from "@/lib/percentile";
 import { parsePacket } from "./packet-shared";
 
 /**
@@ -68,7 +68,6 @@ export interface FunnelConnectionRow {
   status: string;
   createdAt: string | Date;
   sentAt: string | Date | null;
-  employerRespondedAt: string | Date | null;
   hiredAt: string | Date | null;
   /** Connection.packet — parsed here via packet-shared, never re-validated
    * by the caller, so funnel.ts never needs to import packet-shared itself. */
@@ -93,7 +92,14 @@ export interface SelfDirectedApplicationRow {
 export interface FunnelOptions {
   /** Inclusive lower bound on Connection.createdAt / Application.createdAt. */
   from?: string | Date;
-  /** Inclusive upper bound on Connection.createdAt / Application.createdAt. */
+  /**
+   * EXCLUSIVE upper bound on Connection.createdAt / Application.createdAt.
+   * Callers (funnel.ts) resolve a "YYYY-MM-DD" report `to` param into the ET
+   * start of the FOLLOWING calendar day via `reportDateRangeBoundsUtc`
+   * (src/lib/timezone.ts) before calling computeFunnel — passing the raw
+   * date-only string here would parse as UTC midnight and silently drop the
+   * evening of the intended last day for this Eastern Time cohort.
+   */
   to?: string | Date;
   selfDirectedApplications?: SelfDirectedApplicationRow[];
 }
@@ -123,6 +129,12 @@ export interface FunnelSubsidySplit {
   notAttached: number;
   hiredWithSubsidy: number;
   hiredWithout: number;
+  /** `Connection.packet` was non-null but failed `packetSchema` validation —
+   * a genuinely corrupt/unparseable row, distinct from a connection that
+   * legitimately has no packet yet (still `proposed`, pre-approval). Counted
+   * separately rather than silently folded into `notAttached`, which would
+   * make a data problem indistinguishable from "no incentive offered". */
+  packetUnparseable: number;
 }
 
 export interface FunnelEmployerRow {
@@ -168,7 +180,10 @@ function toDate(value: string | Date | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** Inclusive on both ends: a `from`/`to` day boundary is meant to include it. */
+/**
+ * `from` is inclusive; `to` is EXCLUSIVE (see FunnelOptions.to) — the ONLY
+ * asymmetry here is deliberate, not an oversight.
+ */
 function withinPeriod(
   createdAt: string | Date,
   from: string | Date | undefined,
@@ -179,7 +194,7 @@ function withinPeriod(
   const fromDate = toDate(from);
   const toDateValue = toDate(to);
   if (fromDate && at.getTime() < fromDate.getTime()) return false;
-  if (toDateValue && at.getTime() > toDateValue.getTime()) return false;
+  if (toDateValue && at.getTime() >= toDateValue.getTime()) return false;
   return true;
 }
 
@@ -190,27 +205,80 @@ function daysBetween(start: Date, end: Date): number {
 }
 
 /**
- * The furthest FUNNEL_STAGE_ORDER index this connection's event history ever
- * reached. Exit-type toStatus values (not_now/withdrawn/closed) are ignored
- * here on purpose — they have no index in FUNNEL_STAGE_ORDER — so a closed
- * connection that reached "interested" first still resolves to "interested",
- * not to whatever came right before the close.
+ * Public reuse point: the furthest FUNNEL_STAGE_ORDER index among a list of
+ * ConnectionEvent.toStatus values. Exit-type values (not_now/withdrawn/
+ * closed) are ignored here on purpose — they have no index in
+ * FUNNEL_STAGE_ORDER — so a closed connection that reached "interested"
+ * first still resolves to "interested", not to whatever came right before
+ * the close.
  *
- * Defaults to 0 ("proposed") when no funnel-stage event is found at all,
+ * dohs-export-shared.ts reuses this for its retained_30/60/90 FALLBACK (a
+ * "retained_60" event ever recorded, not the connection's current status) —
+ * see that module's header for why current status alone is the wrong signal.
+ *
+ * Defaults to 0 ("proposed") when no funnel-stage status is found at all,
  * which should never happen in practice (every connection is created with a
  * "proposed" ConnectionEvent) but keeps this total rather than throwing on a
  * row a test constructs without one.
  */
-function furthestFunnelIndex(events: readonly FunnelEventRow[]): number {
+export function furthestFunnelStageIndex(toStatuses: readonly string[]): number {
   let max = 0;
-  for (const event of events) {
-    const index = funnelStageIndex(event.toStatus);
+  for (const status of toStatuses) {
+    const index = funnelStageIndex(status);
     if (index > max) max = index;
   }
   return max;
 }
 
+function furthestFunnelIndex(events: readonly FunnelEventRow[]): number {
+  return furthestFunnelStageIndex(events.map((event) => event.toStatus));
+}
+
+/**
+ * The employer's first substantive answer, in the order the employer page
+ * shows the buttons: a view isn't an answer, so it is deliberately absent —
+ * "viewed" only tells us the packet was opened, not that anyone responded.
+ */
+const RESPONSE_EVENT_STATUSES: readonly string[] = [
+  "interested",
+  "not_now",
+  "interview_scheduled",
+  "offered",
+  "hired",
+];
+
+/**
+ * The EARLIEST event whose toStatus is a response (see
+ * RESPONSE_EVENT_STATUSES), or null when the connection has none yet.
+ *
+ * `Connection.employerRespondedAt` is the LAST-WRITTEN response instant on
+ * the row (it is overwritten by the row's final `employerResponse`, e.g.
+ * "hired"), which is wrong for "how long did the first answer take": a
+ * connection sent day 0, marked interested day 2, then hired day 20 has a
+ * two-day response time and an eighteen-day hire time — reading
+ * `employerRespondedAt` (== the hire instant) would report a 20-day
+ * response, silently merging the two measurements.
+ */
+function earliestResponseEventAt(events: readonly FunnelEventRow[]): Date | null {
+  let earliest: Date | null = null;
+  for (const event of events) {
+    if (!RESPONSE_EVENT_STATUSES.includes(event.toStatus)) continue;
+    const at = toDate(event.at);
+    if (!at) continue;
+    if (!earliest || at.getTime() < earliest.getTime()) earliest = at;
+  }
+  return earliest;
+}
+
+/**
+ * Below this sample size a "middle value" could single out one student's
+ * timeline in a small class — suppress rather than report it. Exported so
+ * the threshold is documented and testable rather than a magic number.
+ */
+export const MIN_MEDIAN_SAMPLE_SIZE = 5;
+
 function median(values: number[]): number | null {
+  if (values.length < MIN_MEDIAN_SAMPLE_SIZE) return null;
   const sorted = [...values].sort((a, b) => a - b);
   return percentile(sorted, 50);
 }
@@ -258,14 +326,17 @@ export function computeFunnel(
   let subsidyNotAttached = 0;
   let hiredWithSubsidy = 0;
   let hiredWithout = 0;
+  let packetUnparseable = 0;
 
   const employerTotals = new Map<string, FunnelEmployerRow>();
   const classTotals = new Map<string, FunnelClassRow>();
 
   for (const connection of inPeriod) {
+    const connectionEvents = eventsByConnection.get(connection.id) ?? [];
+
     // --- stages: every connection contributes to exactly one, its furthest
     // funnel-order stage, regardless of whether it later exited. ---
-    const stage = FUNNEL_STAGE_ORDER[furthestFunnelIndex(eventsByConnection.get(connection.id) ?? [])];
+    const stage = FUNNEL_STAGE_ORDER[furthestFunnelIndex(connectionEvents)];
     stageCounts.set(stage, (stageCounts.get(stage) ?? 0) + 1);
 
     // --- exits: an independent overlay, keyed off the CURRENT status. ---
@@ -275,13 +346,15 @@ export function computeFunnel(
 
     // --- medians ---
     const sentAt = toDate(connection.sentAt);
-    const respondedAt = toDate(connection.employerRespondedAt);
+    const respondedAt = earliestResponseEventAt(connectionEvents);
     const hiredAt = toDate(connection.hiredAt);
     if (sentAt && respondedAt) sendToResponseDays.push(daysBetween(sentAt, respondedAt));
     if (sentAt && hiredAt) sendToHireDays.push(daysBetween(sentAt, hiredAt));
 
     // --- subsidy split ---
+    const hasRawPacket = connection.packet !== null && connection.packet !== undefined;
     const packet = parsePacket(connection.packet);
+    if (hasRawPacket && packet === null) packetUnparseable += 1;
     const hasSubsidy = packet !== null && packet.subsidyLine !== null;
     if (hasSubsidy) subsidyAttached += 1;
     else subsidyNotAttached += 1;
@@ -333,6 +406,7 @@ export function computeFunnel(
       notAttached: subsidyNotAttached,
       hiredWithSubsidy,
       hiredWithout,
+      packetUnparseable,
     },
     byEmployer: sortDesc([...employerTotals.values()]),
     byClass: sortDesc([...classTotals.values()]),
