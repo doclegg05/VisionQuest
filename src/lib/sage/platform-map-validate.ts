@@ -41,6 +41,10 @@ export const ROUTE_IGNORE: string[] = [
   "/welcome",
   "/forms/[templateId]",
   "/teacher/students/[id]/dashboard",
+  // Admin-only engineering report (the benchmark dashboard). Sage must never
+  // route anyone here: it is a read-only view of committed benchmark files
+  // with no coaching surface, and only the admin role can open it at all.
+  "/teacher/admin/benchmarks",
 ];
 
 /**
