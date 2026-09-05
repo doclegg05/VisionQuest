@@ -19,6 +19,12 @@
 // the tailoring path already uses, so a description cannot close the fence and
 // issue its own instructions to a tool whose output is handed to the student.
 //
+// The prompt is not the only path to the model. loop.ts's toHandlerResult
+// feeds `summary`, `modelHint` AND `data` back on the next hop, so a posting
+// field echoed into any of the three is the same attack surface as one in the
+// prompt. sanitizePostingFields() is applied ONCE per tool, at the point the
+// row becomes tool output, so nothing downstream has to remember.
+//
 // Phase 3 adds JobLead to both. The scoping choke point is deliberately the
 // same one the other career tools use: enrollment -> JobClassConfig -> rows.
 // =============================================================================
@@ -238,16 +244,21 @@ const searchJobs: AgentTool = {
         continue;
       }
 
+      // Sanitized HERE, once, because everything below (data, summary,
+      // modelHint) reaches the model through loop.ts.
+      const safe = sanitizePostingFields(job);
       shown.push({
         jobListingId: job.id,
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        salary: job.salary,
+        title: safe.title,
+        company: safe.company,
+        location: safe.location,
+        salary: safe.salary,
         matchLabel: rec.matchLabel,
-        reason: oneSentenceReason(
-          rec.matchReasons.map((reason) => reason.label),
-          job,
+        reason: sanitizeForPrompt(
+          oneSentenceReason(
+            rec.matchReasons.map((reason) => reason.label),
+            safe,
+          ),
         ),
       });
     }
@@ -279,16 +290,14 @@ const searchJobs: AgentTool = {
       };
     }
 
-    // Posting-derived text goes back to the model, so it is sanitized here for
-    // the same reason explain_job fences its grounding block: title, company
-    // and salary are third-party adapter data, not program copy.
+    // `shown` was sanitized as it was built, so these lines — and the `data`
+    // payload that carries the same objects — are already safe.
     const lines = shown
       .map(
         (job) =>
-          `"${sanitizeForPrompt(job.title)}" at ${sanitizeForPrompt(job.company)} ` +
-          `(${sanitizeForPrompt(job.location)})` +
-          `${job.salary ? ` — ${sanitizeForPrompt(job.salary)}` : " — pay not listed"}. ` +
-          `Reason: ${sanitizeForPrompt(job.reason)} [jobListingId=${job.jobListingId}]`,
+          `"${job.title}" at ${job.company} (${job.location})` +
+          `${job.salary ? ` — ${job.salary}` : " — pay not listed"}. ` +
+          `Reason: ${job.reason} [jobListingId=${job.jobListingId}]`,
       )
       .join("\n");
 
@@ -378,13 +387,61 @@ function explainGrounding(job: {
   ].join("\n");
 }
 
-/** A dollar amount, normalized to its numeric value for comparison. */
-const DOLLAR_AMOUNT = /\$\s?\d[\d,]*(?:\.\d+)?/g;
+interface PostingFields {
+  title: string;
+  company: string;
+  location: string;
+  salary: string | null;
+}
 
-function dollarValues(text: string): number[] {
-  return [...text.matchAll(DOLLAR_AMOUNT)]
-    .map((match) => Number(match[0].replace(/[$,\s]/g, "")))
-    .filter((value) => Number.isFinite(value));
+/**
+ * The posting fields a tool result may echo, sanitized once at the boundary.
+ *
+ * Applied where the DB row becomes tool output rather than at each
+ * interpolation site: `data`, `summary` and `modelHint` all reach the model
+ * (loop.ts), and a per-site rule is one someone forgets on the next field.
+ */
+function sanitizePostingFields<T extends PostingFields>(job: T): T {
+  return {
+    ...job,
+    title: sanitizeForPrompt(job.title),
+    company: sanitizeForPrompt(job.company),
+    location: sanitizeForPrompt(job.location),
+    salary: job.salary === null ? null : sanitizeForPrompt(job.salary),
+  };
+}
+
+/**
+ * Money in a draft or a posting, in the forms either actually uses:
+ * "$15", "15 dollars", "USD 15", "15 usd". A check that understood only the
+ * "$" form was bypassed by the model simply writing the number out, and
+ * refused a correct explanation whenever the POSTING wrote it out instead.
+ */
+const MONEY_PATTERNS = [
+  /\$\s?(\d[\d,]*(?:\.\d+)?)/gi,
+  /\b(\d[\d,]*(?:\.\d+)?)\s*(?:dollars|usd)\b/gi,
+  /\busd\s*(\d[\d,]*(?:\.\d+)?)/gi,
+];
+
+/**
+ * Bare "15/hr" and "15 an hour" count as the posting stating a wage. Only
+ * applied to the POSTING side: a draft has to name its unit, and treating any
+ * bare number in a draft as money would flag "40 pounds".
+ */
+const BARE_RATE = /\b(\d[\d,]*(?:\.\d+)?)\s*(?:\/|per\s+|an\s+|a\s+)\s*(?:hr|hour|h)\b/gi;
+
+/** Rounding a posted rate to whole dollars is not a fabrication. */
+const ROUNDING_TOLERANCE = 1;
+
+function moneyValues(text: string, patterns: RegExp[]): number[] {
+  const values: number[] = [];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = Number(match[1].replace(/,/g, ""));
+      if (Number.isFinite(value)) values.push(value);
+    }
+  }
+  return values;
 }
 
 /**
@@ -399,8 +456,15 @@ function ungroundedDollarValues(
   draft: string,
   job: { salary: string | null; description: string },
 ): number[] {
-  const grounded = new Set(dollarValues(`${job.salary ?? ""} ${job.description}`));
-  return dollarValues(draft).filter((value) => !grounded.has(value));
+  const source = `${job.salary ?? ""} ${job.description}`;
+  const grounded = [
+    ...moneyValues(source, MONEY_PATTERNS),
+    ...moneyValues(source, [BARE_RATE]),
+  ];
+  return moneyValues(draft, MONEY_PATTERNS).filter(
+    (value) =>
+      !grounded.some((posted) => Math.abs(posted - value) < ROUNDING_TOLERANCE),
+  );
 }
 
 const explainJob: AgentTool = {
@@ -452,6 +516,8 @@ const explainJob: AgentTool = {
       return { status: "error", summary: "That job wasn't found on your job board." };
     }
 
+    const grounding = explainGrounding(job);
+
     // student_record: the explanation is written for one student inside their
     // own chat, so it takes the FERPA-sensitive label rather than the posting's
     // public status. The task is classified "draft" (prose) in
@@ -473,27 +539,32 @@ const explainJob: AgentTool = {
 
     // The AI accountability report reads AuditLog, not LlmCallLog, so a
     // student_record call that skips this is invisible to the FERPA review
-    // exactly where the review matters most.
-    await logAiAuditEvent({
+    // exactly where the review matters most. It raises its flag from
+    // COMPLETED events, so "routed" alone is not enough — every exit below
+    // logs a terminal event too.
+    const providerClass = getProviderClass(baseProvider.name);
+    const auditBase = {
       actorId: studentId,
       actorRole: ctx.session.role,
       route: "sage_agent.explain_job",
-      task: "explain_job",
-      sensitivity: "student_record",
+      task: "explain_job" as const,
+      sensitivity: "student_record" as const,
       policyDecision: policyDecisionForProvider(baseProvider.name),
-      status: "routed",
       targetId: job.id,
       providerName: baseProvider.name,
-      providerClass: getProviderClass(baseProvider.name),
-      allowCloud: false,
-    });
+      providerClass,
+      // Derived, never hardcoded: a hardcoded false would report "local only"
+      // on a cloud-routed call, which is the one thing the report exists to
+      // notice (the operator flip in provider.ts makes that reachable).
+      allowCloud: providerClass === "cloud",
+    };
+    await logAiAuditEvent({ ...auditBase, status: "routed", inputChars: grounding.length });
 
     const provider = withUsageLogging(baseProvider, {
       studentId,
       callSite: "sage_agent.explain_job",
     });
 
-    const grounding = explainGrounding(job);
     const firstDraft = (
       await provider.generateResponse(EXPLAIN_SYSTEM_PROMPT, [
         { role: "user", content: `${grounding}\n\nWrite the five sections now.` },
@@ -535,6 +606,12 @@ const explainJob: AgentTool = {
     }
 
     if (explanation.length === 0) {
+      await logAiAuditEvent({
+        ...auditBase,
+        status: "failed",
+        errorCode: "empty_reply",
+        reason: "The model returned no visible content for the job explanation.",
+      });
       return {
         status: "error",
         summary: "I couldn't put that job into plain words just now.",
@@ -546,6 +623,13 @@ const explainJob: AgentTool = {
 
     const invented = ungroundedDollarValues(explanation, job);
     if (invented.length > 0) {
+      await logAiAuditEvent({
+        ...auditBase,
+        status: "failed",
+        errorCode: "ungrounded_wage",
+        reason: "The draft named a pay figure the posting does not contain; it was refused.",
+        outputChars: explanation.length,
+      });
       return {
         status: "error",
         summary: "I couldn't explain that job without guessing at the pay, so I stopped.",
@@ -563,13 +647,24 @@ const explainJob: AgentTool = {
       maxGrade: PLAIN_LANGUAGE_IDEAL_GRADE,
     });
 
+    await logAiAuditEvent({
+      ...auditBase,
+      status: "completed",
+      inputChars: grounding.length,
+      outputChars: explanation.length,
+    });
+
+    // Sanitized for the result the same way the prompt was: summary, data and
+    // modelHint all reach the model on the next hop (loop.ts).
+    const safe = sanitizePostingFields(job);
+
     return {
       status: "success",
-      summary: `Here's "${job.title}" at ${job.company} in plain words.`,
+      summary: `Here's "${safe.title}" at ${safe.company} in plain words.`,
       data: {
         jobListingId: job.id,
-        title: job.title,
-        company: job.company,
+        title: safe.title,
+        company: safe.company,
         explanation,
         readability: {
           grade: readability.grade,
@@ -578,7 +673,7 @@ const explainJob: AgentTool = {
         },
       },
       modelHint:
-        `Plain-language explanation of "${job.title}" at ${job.company}:\n${explanation}\n\n` +
+        `Plain-language explanation of "${safe.title}" at ${safe.company}:\n${explanation}\n\n` +
         "Give this to the student as written, or shorter. Do not add facts to it — anything the " +
         `posting did not say must stay "${MISSING_FIELD_LINE}"`,
     };

@@ -4,7 +4,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * A `"use client"` file may not import a module that imports Prisma.
+ * A `"use client"` file may not import — or re-export — a module that
+ * imports Prisma. Both `src/components` and `src/app` are walked: 27 client
+ * files live under `src/app`, and the first cut of this guard walked only
+ * `src/components`.
  *
  * This is a structural guard for a break that `npm test` could not see. The
  * first cut of src/lib/connect/work-profile.ts exported the client-safe
@@ -26,7 +29,13 @@ import { join } from "node:path";
  * gating unit job rather than at build time.
  */
 
-const COMPONENTS_ROOT = join(process.cwd(), "src/components");
+/**
+ * Both trees. 27 `"use client"` files live under src/app — route-group pages
+ * and their clients — and the first cut of this guard walked only
+ * src/components, so any of them could have re-introduced the break the guard
+ * exists to catch.
+ */
+const CLIENT_ROOTS = [join(process.cwd(), "src/components"), join(process.cwd(), "src/app")];
 
 /**
  * Server-only modules that must never appear in a client component's import
@@ -62,7 +71,17 @@ function isClientFile(source: string): boolean {
 }
 
 /**
- * Import specifiers, from static imports/exports and dynamic import() alike.
+ * Every module specifier the file references: static imports, dynamic
+ * import(), AND re-exports. `export * from "@/lib/connect/work-profile"` in a
+ * client file pulls the module into the same bundle as an import does, so a
+ * rule that matched only `import … from` would miss it — and re-exporting a
+ * barrel is exactly how this kind of dependency creeps back.
+ *
+ * The `from "…"` match covers both forms (`import x from`, `export * from`,
+ * `export { x } from`) because all three share that clause; it is called out
+ * here so the coverage is deliberate rather than incidental, and pinned by a
+ * test below.
+ *
  * Comments are stripped first so a doc block naming the banned module (this
  * file's own subject matter) cannot trip the rule.
  */
@@ -73,25 +92,56 @@ function importedSpecifiers(source: string): string[] {
   for (const match of code.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)) {
     specifiers.push(match[1]);
   }
+  for (const match of code.matchAll(/\brequire\s*\(\s*["']([^"']+)["']\s*\)/g)) {
+    specifiers.push(match[1]);
+  }
   return specifiers;
 }
 
-const COMPONENT_FILES = collectFiles(COMPONENTS_ROOT);
+const CLIENT_FILES = CLIENT_ROOTS.flatMap((root) => collectFiles(root));
 
-describe("client components never import a Prisma-backed module", () => {
-  it("finds component files to check (the walker itself is not silently empty)", () => {
-    // A guard that scans nothing passes forever. Pin that the walk works.
-    assert.ok(COMPONENT_FILES.length > 50, `only ${COMPONENT_FILES.length} component files found`);
+describe("client files never import or re-export a Prisma-backed module", () => {
+  it("finds files to check in BOTH trees (the walker is not silently empty)", () => {
+    // A guard that scans nothing passes forever. Pin that the walk works, and
+    // that it reaches src/app — the tree the first cut of this guard missed.
+    assert.ok(CLIENT_FILES.length > 50, `only ${CLIENT_FILES.length} files found`);
+    const clientFiles = CLIENT_FILES.filter((file) => isClientFile(readFileSync(file, "utf8")));
+    assert.ok(clientFiles.length > 0, 'no "use client" file was detected');
     assert.ok(
-      COMPONENT_FILES.some((file) => isClientFile(readFileSync(file, "utf8"))),
-      'no "use client" file was detected — the directive matcher is broken',
+      clientFiles.some((file) => file.includes("/src/app/")),
+      'no "use client" file found under src/app — the second root is not being walked',
+    );
+    assert.ok(
+      clientFiles.some((file) => file.includes("/src/components/")),
+      'no "use client" file found under src/components',
     );
   });
 
-  it('no "use client" file imports a server-only module', () => {
+  it("sees a re-export, not only an import", () => {
+    // `export * from "@/lib/connect/work-profile"` bundles the module exactly
+    // as an import does. Exercised on synthetic source so the rule is proven
+    // rather than assumed from the absence of a violation today.
+    const reExport = 'export * from "@/lib/connect/work-profile";';
+    const named = 'export { getWorkProfile } from "@/lib/connect/work-profile";';
+    const dynamic = 'const m = await import("@/lib/connect/work-profile");';
+    for (const source of [reExport, named, dynamic]) {
+      assert.ok(
+        importedSpecifiers(source).includes("@/lib/connect/work-profile"),
+        `the specifier scanner missed: ${source}`,
+      );
+    }
+  });
+
+  it('only treats a leading "use client" directive as a client file', () => {
+    assert.equal(isClientFile('"use client";\nimport x from "y";'), true);
+    assert.equal(isClientFile('// a comment\n"use client";'), true);
+    assert.equal(isClientFile('import x from "y";\n// mentions "use client" in prose'), false);
+  });
+
+  it('no "use client" file imports or re-exports a server-only module', () => {
     const violations: string[] = [];
 
-    for (const file of COMPONENT_FILES) {
+    for (const file of CLIENT_FILES) {
       const source = readFileSync(file, "utf8");
       if (!isClientFile(source)) continue;
 
@@ -99,8 +149,8 @@ describe("client components never import a Prisma-backed module", () => {
       for (const rule of SERVER_ONLY_SPECIFIERS) {
         if (specifiers.includes(rule.specifier)) {
           violations.push(
-            `${file.replace(process.cwd() + "/", "")} imports "${rule.specifier}" ` +
-              `(${rule.why}) — import "${rule.instead}" instead`,
+            `${file.replace(process.cwd() + "/", "")} references "${rule.specifier}" ` +
+              `(${rule.why}) — use "${rule.instead}" instead`,
           );
         }
       }
