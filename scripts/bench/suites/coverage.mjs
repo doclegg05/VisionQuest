@@ -1,13 +1,19 @@
 /**
- * Benchmark: coverage (include-all line coverage). See
- * config/benchmarks/coverage.json for the technique and why it's needed.
+ * Benchmark: coverage. Two metrics, two independent mechanisms:
  *
- * Runs the REAL test suite (src/**\/*.test.ts(x)) plus a synthetic
- * import-everything test, in one `tsx --test --experimental-test-coverage`
- * invocation, then parses the lcov output.
+ *  - line_coverage: runs the REAL test suite (src/**\/*.test.ts(x)) plus a
+ *    synthetic import-everything test, in one
+ *    `tsx --test --experimental-test-coverage` invocation, then parses the
+ *    lcov output. See config/benchmarks/coverage.json for why include-all
+ *    needs the force-import step at all.
+ *  - untested_modules: a SEPARATE static import-graph walk (never runs
+ *    anything) from every `*.test.ts(x)` file — see lib/import-graph.mjs.
+ *    Deliberately not derived from the force-import data above: importing a
+ *    module always executes its top-level statements, so force-import data
+ *    alone cannot tell "genuinely exercised by a test" from "merely loaded".
  *
- * This is the slowest suite in this promotion (it runs the whole unit
- * suite) — expect several minutes.
+ * Nightly tier — the line_coverage run reruns the whole unit suite plus
+ * ~850 forced imports and takes several minutes; too slow for every PR.
  *
  * Self-test:
  *   node --import tsx scripts/bench/suites/coverage.mjs --self-test
@@ -20,10 +26,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { maybeRunSelfTest } from "./lib/self-test.mjs";
-import { listEligibleSourceFiles } from "./lib/source-files.mjs";
+import { listEligibleSourceFiles, listTestFiles } from "./lib/source-files.mjs";
 import { writeImportAllTestFile } from "./lib/generate-import-all.mjs";
 import { parseLcov } from "./lib/lcov.mjs";
 import { aggregateCoverage } from "./lib/coverage-aggregate.mjs";
+import { computeUntestedModules } from "./lib/import-graph.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -78,6 +85,14 @@ export async function run(ctx) {
 
     const agg = aggregateCoverage(eligibleFiles, lcovRecords);
 
+    // untested_modules is a SEPARATE, static computation (never runs the
+    // suite, never imports anything) — see lib/import-graph.mjs's header for
+    // why force-import data (agg.forceImportZeroCoverageFiles) cannot answer
+    // this: importing a module always executes its top-level statements, so
+    // it reads as "covered" even when no real test calls into it.
+    const testFiles = listTestFiles("src");
+    const untested = computeUntestedModules({ eligibleFiles, testFiles, repoRoot: process.cwd() });
+
     return {
       metrics: [
         {
@@ -94,11 +109,12 @@ export async function run(ctx) {
         },
         {
           id: "untested_modules",
-          value: agg.untestedModules.length,
-          n: agg.eligibleFileCount,
+          value: untested.untestedModules.length,
+          n: untested.eligibleCount,
           details: {
-            untestedModules: agg.untestedModules,
-            importFailures,
+            untestedModules: untested.untestedModules,
+            reachableCount: untested.reachableCount,
+            testFileCount: testFiles.length,
           },
         },
       ],

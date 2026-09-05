@@ -2,6 +2,17 @@
  * Pure aggregation over parsed LCOV records + the eligible-file list. Kept
  * separate from I/O (spawning tsx, reading the lcov file) so it can be
  * unit-tested directly.
+ *
+ * Feeds only the `line_coverage` metric. The `untested_modules` metric is a
+ * SEPARATE, static computation (see lib/import-graph.mjs) — this module's
+ * `forceImportZeroCoverageFiles` is deliberately not that metric: because a
+ * bare `import` always executes a module's top-level statements, a file
+ * force-imported here (see lib/generate-import-all.mjs) usually reads a
+ * nonzero line-hit count even when no real test calls into it, so this list
+ * under-counts "untested" — it only catches outright import failures and
+ * files with truly nothing at module scope. Kept as a coverage-side
+ * diagnostic, not renamed to `untestedModules` any more, to stop it looking
+ * like the benchmark metric of the same name.
  */
 
 import { normalizeLcovPath } from "./lcov.mjs";
@@ -15,8 +26,7 @@ import { normalizeLcovPath } from "./lcov.mjs";
  *   coverageRatio: number,
  *   reportedFileCount: number,
  *   eligibleFileCount: number,
- *   untestedModules: string[],
- *   coveredZeroHitFiles: string[],
+ *   forceImportZeroCoverageFiles: string[],
  * }}
  */
 export function aggregateCoverage(eligibleFiles, lcovRecords) {
@@ -36,15 +46,15 @@ export function aggregateCoverage(eligibleFiles, lcovRecords) {
 
   let totalLinesFound = 0;
   let totalLinesHit = 0;
-  const coveredZeroHitFiles = [];
+  const zeroHitFiles = [];
   for (const record of byPath.values()) {
     totalLinesFound += record.linesFound;
     totalLinesHit += record.linesHit;
-    if (record.linesHit === 0) coveredZeroHitFiles.push(record.file);
+    if (record.linesHit === 0) zeroHitFiles.push(record.file);
   }
 
   const missingEntirely = eligibleFiles.filter((f) => !byPath.has(f));
-  const untestedModules = [...missingEntirely, ...coveredZeroHitFiles].sort();
+  const forceImportZeroCoverageFiles = [...missingEntirely, ...zeroHitFiles].sort();
 
   return {
     totalLinesFound,
@@ -52,7 +62,6 @@ export function aggregateCoverage(eligibleFiles, lcovRecords) {
     coverageRatio: totalLinesFound > 0 ? totalLinesHit / totalLinesFound : 0,
     reportedFileCount: byPath.size,
     eligibleFileCount: eligibleFiles.length,
-    untestedModules,
-    coveredZeroHitFiles,
+    forceImportZeroCoverageFiles,
   };
 }

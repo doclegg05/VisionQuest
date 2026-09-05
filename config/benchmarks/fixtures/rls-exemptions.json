@@ -1,0 +1,6 @@
+{
+  "_read_me": "migration-drift suite (config/benchmarks/migration-drift.json). Each key is a table CREATEd in prisma/migrations that has no ENABLE ROW LEVEL SECURITY statement anywhere in the migration history. Exempt a table here ONLY when prisma/schema.prisma shows it holds no student data at all (no studentId, no FK chain to Student, no free-text a student wrote). Every entry here was verified against the live schema on the date below, not assumed from its name. Anything with a studentId or student-derived content must NOT be listed here — it is a real gap and the suite must report it (watch tier) instead.",
+  "_measured_at": "2026-09-05",
+  "_source_commit": "the merge of claude/visionquest-job-mission-research-7pjair this suite was built against",
+  "JobBrowseListing": "Program-wide browse pool of scraped/ATS job postings (title, company, location, salary, workMode, url, source/sourceId). No studentId column, no FK to Student, and no relation from Student to it anywhere in prisma/schema.prisma — confirmed by reading the model (docs/audits/2026-09-01-full-review.md F8 names this table). It is class-agnostic reference data, the same shape as JobListing (which IS RLS-enabled) minus any per-class scoping, so there is no per-row student or class boundary for a policy to enforce."
+}

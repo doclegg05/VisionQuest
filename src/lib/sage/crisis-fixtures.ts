@@ -251,6 +251,23 @@ export const INFORMAL_MUST_DETECT: ReadonlyArray<readonly [string, string]> = [
   ["i'm overdosing on these pills", "i'm contraction"],
   ["i nearly overdosed on tylenol last night", "one adverb between i and the verb"],
 
+  // The hurt/harm/cut family in its PROGRESSIVE form. The alternation spelled
+  // "cut" + an optional "ting", so "cutting myself" matched while "hurting
+  // myself" and "harming myself" did not — the two most ordinary ways a
+  // student describes an ongoing act rather than a single one. Found by the
+  // crisis-en corpus, where all three of these rows were misses.
+  ["i keep hurting myself when i get like this", "hurting — progressive"],
+  ["i think about hurting myself when class is over", "hurting after a think-about frame"],
+  ["i been hurting myself so i can feel something", "hurting — past progressive"],
+  ["i been harming myself for a while now", "harming — progressive"],
+
+  // First-person overdose frame WITHOUT the apostrophe. This population texts
+  // "im"/"ive"/"id", and the frame accepted only the punctuated forms, so
+  // "im overdosing on these pills right now" — a disclosure in progress —
+  // passed silently while "i'm overdosing on these pills" alerted.
+  ["im overdosing on these pills right now", "im, no apostrophe"],
+  ["ive overdosed on my meds before", "ive, no apostrophe"],
+
   // "die my hair" is exempted as the dye homophone, but the exemption must end
   // at a word boundary — "my hairbrush" is a different word, so the disclosure
   // in front of it must still alert.
@@ -298,6 +315,15 @@ export const INFORMAL_MUST_NOT_DETECT: ReadonlyArray<readonly [string, string]> 
   ["i walked 5 kms today", "kms as kilometres, digit before"],
   ["caminé 5 kms hoy", "kilometres in Spanish — must not serve the English block"],
   ["the office is a few kms from here", "kilometres without a digit, distance frame"],
+  // LANGUAGE PARITY on that guard. The English distance frame is guarded by
+  // "away"/"from"; its Spanish equivalent ("a unos … de aquí", "a pocos … de
+  // distancia") had no counterpart, so a Spanish speaker writing about a
+  // commute got a CRITICAL alert AND the English 988 block — the same
+  // cross-language leak the "caminé 5 kms hoy" row was written to close, one
+  // frame over.
+  ["la oficina esta a unos kms de aqui", "Spanish distance frame, unaccented"],
+  ["la oficina está a unos kms de aquí", "Spanish distance frame, accented"],
+  ["el centro está a pocos kms de distancia", "a pocos … de distancia"],
 
   // Relationship talk is what students bring to a coach; "end things with X" is
   // the dominant benign sense of the phrase and the single highest-frequency
