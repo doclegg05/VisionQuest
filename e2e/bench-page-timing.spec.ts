@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { BENCH_INSTRUCTOR, BENCH_JOURNEY_STUDENT } from "./bench-fixtures";
+import { E2E_STUDENT, E2E_TEACHER } from "./fixtures";
 import { loginContext } from "./helpers/auth";
 
 /**
@@ -17,9 +17,28 @@ import { loginContext } from "./helpers/auth";
  * reports/benchmarks/raw/page-timing.json; scripts/bench/suites/page-timing.mjs
  * reads that file and applies the floor.
  *
- * Requires the fixture seed (idempotent — reruns are safe):
+ * Logs in as the standard seeded E2E_STUDENT/E2E_TEACHER (e2e/fixtures.ts,
+ * seeded by scripts/seed-e2e-users.ts, the SAME accounts
+ * bench-touch-targets.spec.ts and bench-axe-authenticated.spec.ts already
+ * use), NOT the synthetic benchmark cohort — this spec only needs a
+ * logged-in student and teacher to render four pages, it has no need for
+ * the cohort's Connect-specific seeded state (a live proposed connection,
+ * work profiles, ...) the way bench-connect-journey.spec.ts genuinely does.
  *
- *   npx tsx scripts/bench/seed-cohort.ts
+ * PR review round 2/3, correcting the original BENCH_JOURNEY_STUDENT/
+ * BENCH_INSTRUCTOR choice: `/api/auth/login` binds on `login:user:<studentId>`
+ * at 5 attempts (tighter than the per-IP cap), and this spec's original
+ * cbench login also 401ed unless ci.yml's cohort-seed step had already run
+ * — a dependency this spec never needed. ci.yml's "Collect browser
+ * benchmark data" step now runs each collector in its own `playwright test`
+ * invocation with scripts/seed-e2e-users.ts re-run immediately before it
+ * (clearing both the fixture rows and their rate-limit buckets — see that
+ * step's own header for why), which already isolates every collector's
+ * login budget from every other's. Using E2E_STUDENT/E2E_TEACHER here is
+ * defense in depth on top of that fix, not a substitute for it: this spec
+ * has no reason to touch the cbench accounts at all, so it does not share
+ * fate with connect-journey/journey-day1/journey-teacher-loop's login
+ * budget regardless of how that step is shaped.
  *
  * Each route gets ONE untimed, discarded warm-up navigation, then REPEATS
  * timed navigations so the scorer has a real distribution to take a p95
@@ -79,8 +98,8 @@ async function measureRoute(page: import("@playwright/test").Page, route: string
 
 test.describe("Benchmark data: page timing at 375px", () => {
   test("collects server-response and DOMContentLoaded timing for the four hottest pages", async ({ browser }) => {
-    const studentContext = await loginContext(browser, BENCH_JOURNEY_STUDENT);
-    const teacherContext = await loginContext(browser, BENCH_INSTRUCTOR);
+    const studentContext = await loginContext(browser, E2E_STUDENT);
+    const teacherContext = await loginContext(browser, E2E_TEACHER);
     const byRoute: Record<string, { route: string; samples: NavSample[]; failures: number }> = {};
 
     try {

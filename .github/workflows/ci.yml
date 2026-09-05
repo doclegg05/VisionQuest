@@ -301,13 +301,19 @@ jobs:
         run: npx tsx scripts/seed-e2e-users.ts
 
       - name: Seed the synthetic benchmark cohort
-        # e2e/bench-page-timing.spec.ts, e2e/bench-connect-journey.spec.ts,
-        # e2e/bench-journey-day1.spec.ts and e2e/bench-journey-teacher-loop
-        # .spec.ts all log in as cohort people (BENCH_INSTRUCTOR/
-        # BENCH_JOURNEY_STUDENT, e2e/bench-fixtures.ts) — cbenchinstr1 acting
-        # on cbenchstu01 — not the e2e fixture users above, so without this
-        # step they have no instructor to log in as and report `skipped`
-        # forever, the quiet-instrument failure this suite exists to prevent.
+        # e2e/bench-connect-journey.spec.ts, e2e/bench-journey-day1.spec.ts
+        # and e2e/bench-journey-teacher-loop.spec.ts log in as cohort people
+        # (BENCH_INSTRUCTOR/BENCH_JOURNEY_STUDENT, e2e/bench-fixtures.ts) —
+        # cbenchinstr1 acting on cbenchstu01 — not the e2e fixture users
+        # above, so without this step they have no instructor to log in as
+        # and report `skipped` forever, the quiet-instrument failure this
+        # suite exists to prevent. bench-page-timing.spec.ts deliberately
+        # does NOT need this seed (PR review round 2): it only needs a
+        # logged-in student and teacher to render four pages, no Connect-
+        # specific cohort state, so it logs in as the plain E2E_STUDENT/
+        # E2E_TEACHER above instead — sharing this step's cbench accounts
+        # across a fourth collector was adding load to the same 5-per-account
+        # login budget the three Connect specs above already share.
         #
         # The two seeds are safe to run together because their delete scopes
         # are disjoint by construction: seed-cohort scopes every deleteMany to
