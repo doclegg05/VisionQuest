@@ -7,7 +7,13 @@
   "fixture": "config/benchmarks/fixtures/ferpa-routing.json",
   "requires": ["prod-readonly"],
   "metrics": [
-    { "id": "student_record_cloud_ratio", "unit": "ratio", "direction": "lower" }
+    {
+      "id": "student_record_cloud_ratio",
+      "unit": "ratio",
+      "direction": "lower",
+      "floor": null,
+      "reason": "The provider fails OPEN to cloud when the local host is unavailable (VQ-R-002/003, open FERPA ruling in .claude/MEMORY.md), and no local AI host is live in prod yet, so this ratio reads 1.0 today by design, not by regression. The scorer itself enforces floor 0 by throwing when env BENCH_FERPA_LOCAL_EXPECTED=1 is set — see ferpaRoutingMetric() in the scorer — because that condition can't be expressed as a fixed number in this file."
+    }
   ],
   "notes": "student_record is local-only by policy (src/lib/ai/provider.ts, .claude/rules/sage-ai.md) but the provider fails OPEN to cloud when the local host is unavailable (VQ-R-002/003, still an open FERPA ruling in .claude/MEMORY.md) — so this ratio is expected to read 1.0 today, since no local AI host is live in prod yet. The floor is therefore 0 ONLY when env BENCH_FERPA_LOCAL_EXPECTED=1 (set once a local host is actually deployed and load-bearing); otherwise this metric is info, and the result carries a header note saying why. Reuses buildProviderMix() from scripts/sage-ai-accountability.mjs, connected via BENCH_PROD_READONLY_URL over the trailing 30 days of AuditLog(targetType=\"ai_request\")."
 }

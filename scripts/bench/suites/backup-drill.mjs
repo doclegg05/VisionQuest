@@ -18,7 +18,7 @@
  */
 
 import { runBackupVerify } from "../../backup-verify.mjs";
-import { isMainModule, runSelfTest } from "./ops-shared.mjs";
+import { selfTest } from "../lib/self-test.mjs";
 
 /**
  * Pure mapping from a backup-verify report to this suite's metric ids,
@@ -59,7 +59,7 @@ export function toMetrics(report) {
 
 /** @param {object} ctx @returns {Promise<{ metrics: Array<object> }>} */
 export async function run(ctx) {
-  const url = ctx.env.databaseUrl;
+  const url = ctx.env.prodReadonlyUrl;
   if (!url) {
     throw new Error("backup-drill requires prod-readonly: set BENCH_PROD_READONLY_URL.");
   }
@@ -67,20 +67,4 @@ export async function run(ctx) {
   return toMetrics(report);
 }
 
-function checkRequires(ctx) {
-  if (!ctx.env.databaseUrl) {
-    return "no prod-readonly connection string (BENCH_PROD_READONLY_URL not set)";
-  }
-  return null;
-}
-
-if (isMainModule(import.meta.url) && process.argv.includes("--self-test")) {
-  runSelfTest({
-    suiteName: "backup-drill",
-    configPath: "config/benchmarks/backup-drill.json",
-    run,
-    checkRequires,
-  }).then((code) => {
-    process.exitCode = code;
-  });
-}
+await selfTest(import.meta.url, run);

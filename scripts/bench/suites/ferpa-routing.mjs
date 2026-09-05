@@ -22,7 +22,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { LOCAL_ONLY_SENSITIVITIES, buildProviderMix } from "../../sage-ai-accountability.mjs";
-import { isMainModule, runSelfTest } from "./ops-shared.mjs";
+import { selfTest } from "../lib/self-test.mjs";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS = 30;
@@ -69,7 +69,7 @@ export function ferpaRoutingMetric({ cloudCompleted, totalCompleted, localHostEx
 
 /** @param {object} ctx @returns {Promise<{ metrics: Array<object> }>} */
 export async function run(ctx) {
-  const url = ctx.env.databaseUrl;
+  const url = ctx.env.prodReadonlyUrl;
   if (!url) {
     throw new Error("ferpa-routing requires prod-readonly: set BENCH_PROD_READONLY_URL.");
   }
@@ -103,20 +103,4 @@ export async function run(ctx) {
   }
 }
 
-function checkRequires(ctx) {
-  if (!ctx.env.databaseUrl) {
-    return "no prod-readonly connection string (BENCH_PROD_READONLY_URL not set)";
-  }
-  return null;
-}
-
-if (isMainModule(import.meta.url) && process.argv.includes("--self-test")) {
-  runSelfTest({
-    suiteName: "ferpa-routing",
-    configPath: "config/benchmarks/ferpa-routing.json",
-    run,
-    checkRequires,
-  }).then((code) => {
-    process.exitCode = code;
-  });
-}
+await selfTest(import.meta.url, run);

@@ -119,6 +119,14 @@ else applies to none, because there is no way to tell whose reply it is.
 
 ## Verify
 
+- `npm run cron:health` (`CRON_CHECK_DATABASE_URL` or `DATABASE_URL` set to the
+  postgres-role connection string) now covers `connect-nudges` — it was added
+  to `EXPECTED_CRON_JOBS` (`scripts/lib/cron-health.mjs`) on 2026-09-05, the
+  same day this migration landed, after
+  `scripts/bench/suites/scheduled-layer-drift.mjs` caught it registered but
+  absent from that list. A clean run means the job is present, active, and
+  its last run succeeded — the manual checks below go further (the actual
+  HTTP response, and what it sent).
 - `SELECT jobname, schedule, active FROM cron.job WHERE jobname = 'connect-nudges';`
 - The run's own outcome: `cron.job_run_details` shows `succeeded` as soon as
   pg_net accepts the request, so check the **response**:

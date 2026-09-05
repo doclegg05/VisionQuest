@@ -28,7 +28,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { EXPECTED_CRON_JOBS } from "../../lib/cron-health.mjs";
-import { isMainModule, runSelfTest } from "./ops-shared.mjs";
+import { selfTest } from "../lib/self-test.mjs";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const MIGRATIONS_DIR = path.join(REPO_ROOT, "prisma", "migrations");
@@ -99,12 +99,4 @@ export async function run(ctx) {
   };
 }
 
-if (isMainModule(import.meta.url) && process.argv.includes("--self-test")) {
-  runSelfTest({
-    suiteName: "scheduled-layer-drift",
-    configPath: "config/benchmarks/scheduled-layer-drift.json",
-    run,
-  }).then((code) => {
-    process.exitCode = code;
-  });
-}
+await selfTest(import.meta.url, run);

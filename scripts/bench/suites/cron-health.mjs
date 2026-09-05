@@ -5,22 +5,25 @@
  * on — `evaluateCronHealth()` in scripts/lib/cron-health.mjs, run via the
  * importable core `runCronHealthCheck()` this session added to
  * scripts/cron-health-check.mjs — rather than a second copy of that logic.
- * `expected_jobs_healthy` is the fraction of the 7 EXPECTED_CRON_JOBS
+ * `expected_jobs_healthy` is the fraction of the 8 EXPECTED_CRON_JOBS
  * (scripts/lib/cron-health.mjs) that are present, active, and last
  * succeeded; `pending_background_jobs` is the current BackgroundJob
  * "pending" count, reported as info because its disposition is an owner
  * call (D4 in .claude/MEMORY.md), not a floor this suite can set.
  *
- * Needs prod-readonly: BENCH_PROD_READONLY_URL, or CRON_CHECK_DATABASE_URL
- * (the secret cron-health.yml already uses) as a fallback — the postgres
- * role, since cron.job is invisible to vq_app and BackgroundJob is
- * RLS-protected (F63 class: prismaAdmin regressing to the app role must
- * never look like "all clear" here).
+ * Needs prod-readonly: ctx.env.prodReadonlyUrl (BENCH_PROD_READONLY_URL) —
+ * the runner will not even call run() without it. As a convenience for
+ * direct/manual invocation only (the runner's own `requires` gate does not
+ * know about this), CRON_CHECK_DATABASE_URL (the secret cron-health.yml
+ * already uses) is also accepted directly from process.env. Either way it
+ * must be the postgres role: cron.job is invisible to vq_app and
+ * BackgroundJob is RLS-protected (F63 class: prismaAdmin regressing to the
+ * app role must never look like "all clear" here).
  */
 
 import { EXPECTED_CRON_JOBS } from "../../lib/cron-health.mjs";
 import { runCronHealthCheck } from "../../cron-health-check.mjs";
-import { isMainModule, runSelfTest } from "./ops-shared.mjs";
+import { selfTest } from "../lib/self-test.mjs";
 
 /**
  * Pure mapping from evaluateCronHealth()'s output to this suite's two
@@ -65,7 +68,7 @@ export function toMetrics(evaluation, backgroundJobs, expected) {
 
 /** @param {object} ctx @returns {Promise<{ metrics: Array<object> }>} */
 export async function run(ctx) {
-  const url = ctx.env.databaseUrl;
+  const url = ctx.env.prodReadonlyUrl || process.env.CRON_CHECK_DATABASE_URL?.trim() || null;
   if (!url) {
     throw new Error(
       "cron-health requires prod-readonly: set BENCH_PROD_READONLY_URL (or CRON_CHECK_DATABASE_URL)."
@@ -76,20 +79,4 @@ export async function run(ctx) {
   return toMetrics(evaluation, backgroundJobs, EXPECTED_CRON_JOBS);
 }
 
-function checkRequires(ctx) {
-  if (!ctx.env.databaseUrl) {
-    return "no prod-readonly connection string (BENCH_PROD_READONLY_URL or CRON_CHECK_DATABASE_URL not set)";
-  }
-  return null;
-}
-
-if (isMainModule(import.meta.url) && process.argv.includes("--self-test")) {
-  runSelfTest({
-    suiteName: "cron-health",
-    configPath: "config/benchmarks/cron-health.json",
-    run,
-    checkRequires,
-  }).then((code) => {
-    process.exitCode = code;
-  });
-}
+await selfTest(import.meta.url, run);

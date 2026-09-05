@@ -1,27 +1,41 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { recordHost, resolveRoleModel, roleMetric } from "./model-bakeoff.mjs";
+import { buildHost, resolveRoleModel, roleMetric } from "./model-bakeoff.mjs";
 
-test("recordHost: always returns every field, never throws, even with no OLLAMA_* env set", () => {
-  const host = recordHost();
-  assert.equal(typeof host.platform, "string");
-  assert.equal(typeof host.arch, "string");
-  assert.equal(typeof host.cpuCount, "number");
-  assert.ok(host.cpuCount > 0);
-  assert.equal(typeof host.memGb, "number");
-  assert.ok(host.memGb > 0);
-  // OLLAMA_NUM_PARALLEL / OLLAMA_KEEP_ALIVE: "(unset)" not undefined, so the
-  // artifact JSON always shows the field was checked, not merely absent.
+test("buildHost: passes through ctx.host and adds the two env knobs, never throwing with no ctx.host at all", () => {
+  const host = buildHost({}, null);
+  assert.equal(host.ollama, null);
   assert.equal(typeof host.OLLAMA_NUM_PARALLEL, "string");
   assert.equal(typeof host.OLLAMA_KEEP_ALIVE, "string");
 });
 
-test("recordHost: records configured OLLAMA_NUM_PARALLEL / OLLAMA_KEEP_ALIVE verbatim", () => {
+test("buildHost: keeps ctx.host's fields (os/cpus/memGb/node) untouched", () => {
+  const ctx = { host: { os: "linux x64", cpus: 8, memGb: 16, node: "v24.0.0", ollama: null } };
+  const host = buildHost(ctx, null);
+  assert.equal(host.os, "linux x64");
+  assert.equal(host.cpus, 8);
+  assert.equal(host.memGb, 16);
+  assert.equal(host.node, "v24.0.0");
+});
+
+test("buildHost: prefers an already-probed ctx.host.ollama over the passed-in probe result", () => {
+  const ctx = { host: { ollama: "0.32.4" } };
+  const host = buildHost(ctx, "9.9.9-should-not-win");
+  assert.equal(host.ollama, "0.32.4");
+});
+
+test("buildHost: falls back to the passed-in probe result when ctx.host.ollama is not set (the --self-test case)", () => {
+  const ctx = { host: { os: "linux x64" } };
+  const host = buildHost(ctx, "0.32.4");
+  assert.equal(host.ollama, "0.32.4");
+});
+
+test("buildHost: records configured OLLAMA_NUM_PARALLEL / OLLAMA_KEEP_ALIVE verbatim", () => {
   const before = { p: process.env.OLLAMA_NUM_PARALLEL, k: process.env.OLLAMA_KEEP_ALIVE };
   process.env.OLLAMA_NUM_PARALLEL = "4";
   process.env.OLLAMA_KEEP_ALIVE = "30m";
   try {
-    const host = recordHost();
+    const host = buildHost({}, null);
     assert.equal(host.OLLAMA_NUM_PARALLEL, "4");
     assert.equal(host.OLLAMA_KEEP_ALIVE, "30m");
   } finally {

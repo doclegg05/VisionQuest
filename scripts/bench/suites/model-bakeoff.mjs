@@ -9,18 +9,23 @@
  * matrix.
  *
  * "Record the host" rule (design §6, this agent's brief): refuses to run at
- * all unless OLLAMA_HOST answers /api/tags, and records `ollama --version`,
- * chip/memory (node:os), OLLAMA_NUM_PARALLEL, and OLLAMA_KEEP_ALIVE into
- * every metric's `details.host` — every prior local-model number in this
- * repo's history has an unrecorded host, which is why they contradict each
- * other (.claude/MEMORY.md, 2026-08-21 Open Items).
+ * all unless OLLAMA_HOST answers /api/tags. The runner already attaches
+ * `ctx.host` (os/cpus/memGb/node, plus a live-probed Ollama version when it
+ * called `withOllama()` — scripts/bench/lib/host.mjs) to the top-level result
+ * file, so this suite does not re-derive any of that; it only adds the two
+ * env knobs no shared helper captures (OLLAMA_NUM_PARALLEL,
+ * OLLAMA_KEEP_ALIVE) into each metric's `details.host` — every prior
+ * local-model number in this repo's history has had one of those unrecorded,
+ * which is why they contradict each other (.claude/MEMORY.md, 2026-08-21
+ * Open Items). Under `--self-test`, `ctx.host.ollama` is not pre-probed, so
+ * this suite probes it itself via the same `ollamaVersion()` helper.
  */
 
-import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ollamaVersion } from "../lib/host.mjs";
+import { selfTest } from "../lib/self-test.mjs";
 import {
   evictModel,
   listInstalledModels,
@@ -29,7 +34,6 @@ import {
   runStructuredCase,
   warmModel,
 } from "../../sage-model-bakeoff.mjs";
-import { isMainModule, runSelfTest } from "./ops-shared.mjs";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const ROLES = ["chat", "extract", "document", "draft"];
@@ -51,28 +55,20 @@ async function pingOllama(url) {
 }
 
 /**
- * ollama --version, chip/memory, and the two env knobs this repo has
- * repeatedly gotten wrong by not recording (OLLAMA_NUM_PARALLEL,
- * OLLAMA_KEEP_ALIVE). Never throws: an unreadable field is recorded as
- * null/(unset), not fatal — the CLI binary can be absent from PATH even
- * when the HTTP server it talks to is reachable and healthy.
+ * Merges the runner's `ctx.host` with the two env knobs it does not carry.
+ * Pure and synchronous on purpose — tested without Ollama in
+ * model-bakeoff.test.mjs — so the async version-probing (only needed when
+ * `ctx.host.ollama` is not already populated, i.e. under `--self-test`)
+ * happens once in `run()` and is passed in already resolved.
+ *
+ * @param {{ host?: { os?: string, cpus?: number, memGb?: number, node?: string, ollama?: string | null } }} ctx
+ * @param {string | null} probedOllamaVersion used only when ctx.host.ollama is not already set
  */
-export function recordHost() {
-  let ollamaVersion = null;
-  try {
-    const result = spawnSync("ollama", ["--version"], { encoding: "utf8" });
-    if (result.status === 0 && result.stdout) ollamaVersion = result.stdout.trim();
-  } catch {
-    // ollama CLI not on PATH — not fatal, just unrecorded.
-  }
-  const cpus = os.cpus();
+export function buildHost(ctx, probedOllamaVersion) {
+  const base = ctx.host ?? {};
   return {
-    ollamaVersion,
-    platform: os.platform(),
-    arch: os.arch(),
-    cpuModel: cpus[0]?.model ?? null,
-    cpuCount: cpus.length,
-    memGb: Math.round((os.totalmem() / 1024 ** 3) * 10) / 10,
+    ...base,
+    ollama: base.ollama ?? probedOllamaVersion ?? null,
     OLLAMA_NUM_PARALLEL: process.env.OLLAMA_NUM_PARALLEL ?? "(unset)",
     OLLAMA_KEEP_ALIVE: process.env.OLLAMA_KEEP_ALIVE ?? "(unset)",
   };
@@ -117,7 +113,8 @@ export async function run(ctx) {
     throw new Error(`model-bakeoff requires ollama: OLLAMA_HOST (${url}) did not answer /api/tags.`);
   }
 
-  const host = recordHost();
+  const probedOllamaVersion = ctx.host?.ollama ? null : await ollamaVersion(url);
+  const host = buildHost(ctx, probedOllamaVersion);
   const date = new Date().toISOString().slice(0, 10);
   const artifactPath = `reports/benchmarks/bakeoff/${date}.json`;
 
@@ -220,22 +217,4 @@ export async function run(ctx) {
   return { metrics };
 }
 
-async function checkRequires(ctx) {
-  const url = ctx.env.ollamaHost || DEFAULT_URL;
-  const answers = await pingOllama(url);
-  if (!answers) {
-    return `OLLAMA_HOST (${url}) did not answer /api/tags — is Ollama running?`;
-  }
-  return null;
-}
-
-if (isMainModule(import.meta.url) && process.argv.includes("--self-test")) {
-  runSelfTest({
-    suiteName: "model-bakeoff",
-    configPath: "config/benchmarks/model-bakeoff.json",
-    run,
-    checkRequires,
-  }).then((code) => {
-    process.exitCode = code;
-  });
-}
+await selfTest(import.meta.url, run);
