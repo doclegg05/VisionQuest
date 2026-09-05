@@ -349,59 +349,6 @@ jobs:
           --reporter=line --timeout=120000
 
       # --- Browser-collected benchmarks -----------------------------------
-      - name: Re-seed fixtures before the collectors (resets login rate limits)
-        # WHY THIS STEP EXISTS. The gate step above and the collection step
-        # below are two separate `playwright test` invocations, but they share
-        # one database — so they also share the login rate-limit buckets, which
-        # live in `RateLimitEntry` rows and outlive the webServer each
-        # invocation boots. The gate step spends part of the budget; the
-        # collectors then 429 on `/api/auth/login` and every authenticated
-        # benchmark collects nothing.
-        #
-        # THE BINDING LIMIT IS PER USER, NOT PER IP. `/api/auth/login` applies
-        # two: `login:<ip>` at 10 per 15 minutes (the one MEMORY.md and this
-        # workflow used to name) and `login:user:<studentId>` at **5** per 15
-        # minutes. Every spec here logs in as the same two or three fixture
-        # accounts, so the per-user cap binds first — measured locally, the
-        # refusal arrives on the 6th attempt, not the 11th.
-        #
-        # It is intermittent because the job sits right at the edge: across
-        # both steps E2E_STUDENT is used 4 times and the IP 9 times, both just
-        # inside their caps. A Playwright RETRY spends the budget again, so the
-        # `1 flaky` retry in the gate step — the known `current-target-cta`
-        # hydration flake — is what tipped run 33981459864 over on both
-        # accounts at once.
-        #
-        # The seed is idempotent and already clears these buckets for exactly
-        # this reason (see its "Login rate limits" block). It refuses any
-        # non-local, non-CI database by construction
-        # (src/lib/e2e-seed-guard.ts), so this cannot reach a real one. It also
-        # returns the journey student to day-1 state, which the gate step's
-        # student-journey.spec.ts consumes and bench-journey-day1.spec.ts wants.
-        #
-        # NOT done by disabling the limiter: VISIONQUEST_DISABLE_RATE_LIMITS is
-        # read only by the chat and crisis caps (src/lib/rate-limit-switch.ts
-        # has exactly two call sites, neither in the auth path), and it is
-        # ignored when NODE_ENV=production — which `npm run start` always is,
-        # since .next/standalone/server.js sets it. Reaching the login limiter
-        # with it would mean widening a brute-force control's bypass to satisfy
-        # a benchmark, which is not a trade this repo makes.
-        run: npx tsx scripts/seed-e2e-users.ts
-
-      # Two steps, in this order, and the order is load-bearing: the Playwright
-      # specs are COLLECTORS — they walk the running app and write
-      # reports/benchmarks/raw/<suite>.json — and the scorers read those files.
-      # Run the runner first and each scorer errors, by design, because the
-      # environment says browser+server are available and the raw data is not.
-      #
-      # These are the only suites whose `requires` include `browser` and
-      # `server`, so this job is the one place they can run at all; without it
-      # they would report `skipped` forever, which is the quiet-instrument
-      # failure this whole suite exists to prevent.
-      #
-      # ONE server, one collection step. Every collector drives the job's own
-      # `npm run start` through playwright.config.ts; a second web server would
-      # double the boot cost and give the two halves different databases.
       - name: Collect browser benchmark data (non-blocking)
         # Non-blocking for the same reason as the soak scan below: a collector
         # that breaks is reported by the runner as an `error` row in the table
@@ -424,15 +371,65 @@ jobs:
         # one actually binds). playwright.config.ts already sets it under CI;
         # named here because these specs would be the first to notice.
         continue-on-error: true
-        run: >-
-          npx playwright test
-          e2e/bench-touch-targets.spec.ts
-          e2e/bench-axe-authenticated.spec.ts
-          e2e/bench-page-timing.spec.ts
-          e2e/bench-journey-day1.spec.ts
-          e2e/bench-journey-teacher-loop.spec.ts
-          e2e/bench-connect-journey.spec.ts
-          --workers=1 --reporter=line --timeout=180000
+        # ONE COLLECTOR PER INVOCATION, login rate limits cleared between.
+        #
+        # THE PROBLEM. `/api/auth/login` applies two limiters: `login:<ip>` at
+        # 10 attempts per 15 minutes, and `login:user:<studentId>` at **5**.
+        # Their buckets are `RateLimitEntry` ROWS, so they outlive the webServer
+        # that each `playwright test` invocation boots and are shared by every
+        # step running against this job's one database. Every spec here signs in
+        # as the same handful of fixture accounts, so the per-user cap binds
+        # first — measured, the refusal lands on the 6th attempt, not the 11th.
+        #
+        # A single invocation of all six does not fit that budget, measurably:
+        # run locally against a real server, `login:<ip>` reached 15 during the
+        # collection step ALONE, against a cap of 10. Clearing the buckets once
+        # before the step is necessary but not sufficient.
+        #
+        # RETRIES ARE WHY. playwright.config.ts sets `retries: 2` under CI, so a
+        # failing spec makes three attempts and spends its logins three times.
+        # These collectors are `continue-on-error` — they are EXPECTED to fail
+        # sometimes — so a design where one failing collector starves the rest
+        # of the step is exactly backwards: it converts one broken instrument
+        # into six missing measurements. (Live example: bench-page-timing
+        # currently 401s on `bench-student-01`, a fixture nothing here seeds,
+        # and its retries were consuming the budget the journey collectors
+        # needed.)
+        #
+        # Looping keeps each collector's failures its own. The cost is one
+        # webServer boot per spec, because playwright.config.ts sets
+        # `reuseExistingServer: !process.env.CI` — deliberate, so CI never
+        # scores against a stale server. `|| true` per spec preserves the
+        # step's continue-on-error semantics at the individual level, and the
+        # scoring step below is what actually reports each suite's verdict.
+        #
+        # The reset is the fixture seed itself: idempotent, it already clears
+        # these buckets for exactly this reason (see its "Login rate limits"
+        # block), it returns the journey student to the day-1 state
+        # bench-journey-day1 measures, and it refuses any non-local, non-CI
+        # database by construction (src/lib/e2e-seed-guard.ts).
+        #
+        # NOT done by disabling the limiter. VISIONQUEST_DISABLE_RATE_LIMITS is
+        # read at exactly two call sites (chat send, crisis-scan) — never the
+        # auth path — and `rateLimitsDisabled()` returns false whenever
+        # NODE_ENV=production, which `npm run start` always is, since
+        # .next/standalone/server.js sets it. Reaching the login limiter with
+        # that switch would mean widening a brute-force control's bypass to
+        # satisfy a benchmark.
+        run: |
+          for spec in \
+            e2e/bench-touch-targets.spec.ts \
+            e2e/bench-axe-authenticated.spec.ts \
+            e2e/bench-page-timing.spec.ts \
+            e2e/bench-journey-day1.spec.ts \
+            e2e/bench-journey-teacher-loop.spec.ts \
+            e2e/bench-connect-journey.spec.ts
+          do
+            echo "::group::collect $spec"
+            npx tsx scripts/seed-e2e-users.ts >/dev/null
+            npx playwright test "$spec" --workers=1 --reporter=line --timeout=180000 || true
+            echo "::endgroup::"
+          done
         env:
           # connect-journey asserts the employer email actually reached an
           # outbox, so the SERVER has to divert mail to a directory the spec

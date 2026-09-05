@@ -43,6 +43,18 @@ const REPORT_PATH =
   process.env.BENCH_JOURNEY_DAY1_REPORT ??
   path.join(process.cwd(), "reports", "benchmarks", "raw", "journey-day1.json");
 
+/**
+ * Ceiling on any single tap or field entry.
+ *
+ * Playwright's default action timeout is UNLIMITED, which is the wrong
+ * default for a collector: one missing button silently consumes the entire
+ * test budget and the report says "Test timeout exceeded" with no step named.
+ * Generous enough that a slow CI runner never trips it, short enough that
+ * eight of them cannot outlast the 180 s test timeout — so the failure that
+ * surfaces is the step's, not the suite's.
+ */
+const ACTION_TIMEOUT_MS = 20_000;
+
 /** The eight steps, in order. Their keys are what the report and scorer share. */
 const STEP_KEYS = [
   "sign_in",
@@ -94,7 +106,22 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
   async function step(key: StepKey, nextSignal: () => Promise<boolean>, act: () => Promise<void>) {
     const at = Date.now();
     const signal = await nextSignal();
-    await act();
+    // Name the step in the failure. Playwright's default action timeout is
+    // unlimited, so a single affordance that never arrives used to burn the
+    // whole 180 s test budget and report only "Test timeout exceeded" — three
+    // minutes of CI, and nothing saying WHICH of the eight steps stalled. A
+    // collector whose failures are undiagnosable is not much better than one
+    // that does not run, so every action is bounded (see ACTION_TIMEOUT_MS)
+    // and its step key is attached on the way out.
+    try {
+      await act();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `day-1 journey stalled at step "${key}" (next-step affordance ` +
+          `${signal ? "was" : "was NOT"} on screen): ${detail}`,
+      );
+    }
     steps.push({ key, seconds: Number(((Date.now() - at) / 1000).toFixed(2)), nextSignal: signal });
   }
 
@@ -144,11 +171,21 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
       "sign_in",
       () => visible(page, signIn),
       async () => {
-        await page.getByLabel(/username or email/i).fill(E2E_JOURNEY_STUDENT.login);
-        await page.getByLabel(/password/i).fill(E2E_JOURNEY_STUDENT.password);
-        await signIn.first().click();
+        await page.getByLabel(/username or email/i).fill(E2E_JOURNEY_STUDENT.login, { timeout: ACTION_TIMEOUT_MS });
+        await page.getByLabel(/password/i).fill(E2E_JOURNEY_STUDENT.password, { timeout: ACTION_TIMEOUT_MS });
+        await signIn.first().click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
         await page.waitForURL(/\/welcome/u, { timeout: 30_000 });
+        // Wait for the welcome flow to HYDRATE, not merely to render. The
+        // "Let's get started" button is server-rendered, so Playwright's
+        // actionability checks pass while its React onClick is still
+        // unattached — the tap then lands on nothing, the flow never advances,
+        // and the next step waits out the whole test budget on a page that
+        // looks correct in the failure screenshot. Observed exactly once in a
+        // six-collector run, which is the frequency that makes it worth a
+        // wait rather than a retry: retrying the tap would inflate
+        // studentTaps, and this suite's whole point is counting taps honestly.
+        await page.waitForLoadState("networkidle");
       },
     );
 
@@ -158,7 +195,7 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
       "welcome",
       () => visible(page, getStarted),
       async () => {
-        await getStarted.click();
+        await getStarted.click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
       },
     );
@@ -169,7 +206,7 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
       "meet_sage",
       () => visible(page, next),
       async () => {
-        await next.first().click();
+        await next.first().click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
       },
     );
@@ -183,7 +220,7 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
       "first_orientation_win",
       () => visible(page, readThis),
       async () => {
-        await readThis.first().click();
+        await readThis.first().click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
       },
     );
@@ -220,7 +257,7 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
         return visible(page, discover);
       },
       async () => {
-        await discover.click();
+        await discover.click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
         await page.waitForURL(/\/chat/u, { timeout: 30_000 });
       },
@@ -233,10 +270,10 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
       "first_sage_message",
       () => visible(page, composer),
       async () => {
-        await composer.click();
+        await composer.click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
-        await composer.fill("I want to find work near me.");
-        await send.click();
+        await composer.fill("I want to find work near me.", { timeout: ACTION_TIMEOUT_MS });
+        await send.click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
         await expect(page.getByText(SAGE_REPLY)).toBeVisible({ timeout: 30_000 });
       },
@@ -275,10 +312,10 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
       "first_goal",
       () => visible(page, defineVision),
       async () => {
-        await defineVision.click();
+        await defineVision.click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
-        await page.getByPlaceholder(/ultimate dream career/i).fill(goalText);
-        await page.getByRole("button", { name: /^add$/i }).click();
+        await page.getByPlaceholder(/ultimate dream career/i).fill(goalText, { timeout: ACTION_TIMEOUT_MS });
+        await page.getByRole("button", { name: /^add$/i }).click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
         await expect(page.getByText(goalText).first()).toBeVisible({ timeout: 30_000 });
       },
