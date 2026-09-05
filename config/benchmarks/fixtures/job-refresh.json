@@ -1,0 +1,62 @@
+{
+  "region": "Beckley, WV",
+  "radiusMiles": 25,
+  "fastTimeoutMs": 150,
+  "raceDeadlineMs": 5000,
+  "notes": "Canned per-adapter responses for job-refresh.mjs. Two of the five adapters are deliberately configured to fail (jsearch hangs until its own AbortSignal fires; usajobs answers 500) so the benchmark can assert the other three still complete and the sweep as a whole finishes promptly rather than serializing behind the failures.",
+  "adapters": {
+    "careeronestop": {
+      "behavior": "good",
+      "response": {
+        "Jobs": [
+          {
+            "JvId": "cos-bench-1",
+            "JobTitle": "Warehouse Associate",
+            "Company": "West Virginia Employer",
+            "Location": "Beckley, WV",
+            "URL": "https://jobs.example.invalid/cos-bench-1",
+            "Description": "Pick, pack, and ship orders in a climate-controlled warehouse.",
+            "DatePosted": "2026-08-20"
+          }
+        ]
+      }
+    },
+    "talroo": {
+      "behavior": "good",
+      "response": {
+        "jobs": [
+          {
+            "id": "talroo-bench-1",
+            "title": "Certified Nursing Assistant",
+            "company": "Hillside Care Center",
+            "city": "Beckley",
+            "state": "WV",
+            "description": "Assist residents with daily living activities on the day shift.",
+            "url": "https://jobs.example.invalid/talroo-bench-1",
+            "posted_at": "2026-08-21",
+            "salary_details": { "min": 14, "max": 17, "period": "hour" }
+          }
+        ]
+      }
+    },
+    "adzuna": {
+      "behavior": "good",
+      "response": {
+        "results": [
+          {
+            "id": "adzuna-bench-1",
+            "title": "Retail Associate",
+            "company": { "display_name": "Corner Store" },
+            "location": { "display_name": "Beckley, WV" },
+            "salary_min": 24000,
+            "salary_max": 28000,
+            "description": "Stock shelves and assist customers.",
+            "redirect_url": "https://jobs.example.invalid/adzuna-bench-1"
+          }
+        ]
+      }
+    },
+    "jsearch": { "behavior": "hangs" },
+    "usajobs": { "behavior": "500" }
+  }
+}
