@@ -24,6 +24,8 @@ const state = {
   alertResolves: [] as any[],
   sent: [] as any[],
   rankedFits: [] as any[],
+  adminPrivileged: true,
+  lockAvailable: true,
 };
 
 const prismaAdmin = {
@@ -35,7 +37,28 @@ const prismaAdmin = {
     }),
   },
   connectionEvent: { findMany: mock.fn(async () => state.events) },
-  outboundMessage: { findMany: mock.fn(async () => state.outbound) },
+  outboundMessage: {
+    /**
+     * Applies the filters the production code relies on. A mock that ignored
+     * them would make every dedupe test pass by returning nothing useful — the
+     * 8-days-ago and failed-send cases below exist precisely because they only
+     * mean something against a where clause that is honoured.
+     */
+    findMany: mock.fn(async ({ where }: any) => {
+      return state.outbound.filter((row) => {
+        if (where.status && row.status !== where.status) return false;
+        if (where.templateKey?.in && !where.templateKey.in.includes(row.templateKey)) return false;
+        if (where.templateKey && typeof where.templateKey === "string") {
+          if (row.templateKey !== where.templateKey) return false;
+        }
+        if (where.sentAt?.gte && row.sentAt < where.sentAt.gte) return false;
+        if (where.expectsReply?.not === null && row.expectsReply == null) return false;
+        if (where.repliedAt === null && row.repliedAt != null) return false;
+        if (where.toId?.in && !where.toId.in.includes(row.toId)) return false;
+        return true;
+      });
+    }),
+  },
   studentAlert: {
     findMany: mock.fn(async ({ where }: any) => {
       if (where.alertKey?.in) {
@@ -48,6 +71,9 @@ const prismaAdmin = {
   studentSavedJob: { findMany: mock.fn(async () => state.savedJobs) },
   studentClassEnrollment: { findMany: mock.fn(async () => state.enrollments) },
   jobLead: { findMany: mock.fn(async () => state.leads) },
+  // Only the advisory-lock statements reach here; the F63 probe is mocked at
+  // its own module below so the two cannot be confused for each other.
+  $queryRaw: mock.fn(async () => [{ locked: state.lockAvailable, released: true }]),
 };
 
 mock.module("@/lib/db", { namedExports: { prismaAdmin, prisma: prismaAdmin } });
@@ -72,6 +98,12 @@ mock.module("@/lib/connect/flags", {
 });
 mock.module("@/lib/connect/matching", {
   namedExports: { rankLeadsForStudent: async () => state.rankedFits },
+});
+mock.module("./admin-guard", {
+  namedExports: {
+    adminClientIsPrivileged: async () => state.adminPrivileged,
+    resetAdminClientProbe: () => {},
+  },
 });
 mock.module("./alerts", {
   namedExports: {
@@ -125,6 +157,8 @@ function unviewedConnection() {
     status: "sent",
     sentAt: daysBefore(4),
     employerViewedAt: null,
+    statusChangedAt: daysBefore(4),
+    interviewAppointmentId: null,
     employer: { name: "Mountain Metals" },
     jobLead: { title: "Production Associate" },
     interviewAppointment: null,
@@ -146,6 +180,8 @@ beforeEach(() => {
   state.alertResolves = [];
   state.sent = [];
   state.rankedFits = [];
+  state.adminPrivileged = true;
+  state.lockAvailable = true;
 });
 
 describe("flags gate everything", () => {
@@ -283,7 +319,17 @@ describe("the weekly jobs nudge", () => {
     state.leads = [{ id: "lead_new" }];
     state.rankedFits = [{ lead: { id: "lead_new" }, fit: { score: 80 } }];
     // The outbound query for the weekly dedupe returns this student's row.
-    state.outbound = [{ toId: STUDENT, templateKey: "weekly_jobs", connectionId: null }];
+    state.outbound = [
+      {
+        toId: STUDENT,
+        templateKey: "weekly_jobs",
+        connectionId: null,
+        status: "sent",
+        sentAt: NOW,
+        expectsReply: null,
+        repliedAt: NOW,
+      },
+    ];
     const result = await runNudges({ now: MONDAY });
     assert.equal(result.weeklySlot, true);
     assert.equal(state.sent.length, 0, "a second weekly text in the same week is the one that gets blocked");
@@ -301,25 +347,163 @@ describe("the result is safe to log and to hand to a cron", () => {
   });
 });
 
-describe('"did you hear back?"', () => {
-  it("asks once per saved job and never after the first ask", async () => {
-    state.savedJobs = [
-      {
-        id: "sj_1",
-        studentId: STUDENT,
-        status: "applied",
-        appliedAt: daysBefore(8),
-        jobListing: { title: "Production Associate" },
-      },
-    ];
+describe('"got an interview?" after a self-directed apply', () => {
+  function appliedEightDaysAgo() {
+    return {
+      id: "sj_1",
+      studentId: STUDENT,
+      status: "applied",
+      appliedAt: daysBefore(8),
+      jobListing: { title: "Production Associate" },
+    };
+  }
+
+  it("asks once per saved job and never after a DELIVERED ask", async () => {
+    state.savedJobs = [appliedEightDaysAgo()];
     const first = await runNudges({ now: NOW });
     assert.equal(first.textsPlanned, 1);
-    assert.equal(state.sent[0].templateKey, "heard_back");
+    assert.equal(state.sent[0].templateKey, "heard_back:sj_1");
 
-    // The second run sees the outbound row from the first.
     state.sent = [];
-    state.outbound = [{ connectionId: null, templateKey: "heard_back", expectsReply: "heard_back:sj_1" }];
+    state.outbound = [
+      {
+        connectionId: null,
+        toId: STUDENT,
+        templateKey: "heard_back:sj_1",
+        expectsReply: "heard_back:sj_1",
+        status: "sent",
+        sentAt: daysBefore(1),
+        repliedAt: NOW,
+      },
+    ];
     const second = await runNudges({ now: NOW });
     assert.equal(second.textsPlanned, 0);
+  });
+
+  it("a FAILED send does not suppress the ask once the backoff has passed", async () => {
+    state.savedJobs = [appliedEightDaysAgo()];
+    state.outbound = [
+      {
+        connectionId: null,
+        toId: STUDENT,
+        templateKey: "heard_back:sj_1",
+        expectsReply: null,
+        status: "failed",
+        sentAt: daysBefore(2),
+        repliedAt: null,
+      },
+    ];
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.textsPlanned, 1, "a message that never arrived was never asked");
+  });
+
+  it("a FAILED send inside the 24h backoff DOES suppress it", async () => {
+    state.savedJobs = [appliedEightDaysAgo()];
+    state.outbound = [
+      {
+        connectionId: null,
+        toId: STUDENT,
+        templateKey: "heard_back:sj_1",
+        expectsReply: null,
+        status: "failed",
+        sentAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+        repliedAt: null,
+      },
+    ];
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.textsPlanned, 0);
+  });
+});
+
+describe("the weekly dedupe window", () => {
+  it("a text sent 8 days ago does NOT suppress this week's", async () => {
+    state.leads = [{ id: "lead_new" }];
+    state.rankedFits = [{ lead: { id: "lead_new" }, fit: { score: 80 } }];
+    state.outbound = [
+      {
+        toId: STUDENT,
+        templateKey: "weekly_jobs",
+        connectionId: null,
+        status: "sent",
+        sentAt: daysBefore(8),
+        expectsReply: null,
+        repliedAt: NOW,
+      },
+    ];
+    const result = await runNudges({ now: MONDAY });
+    assert.equal(result.weeklySlot, true);
+    assert.equal(state.sent.length, 1, "last week's text is not this week's");
+  });
+
+  it("a FAILED weekly text does not count as sent", async () => {
+    state.leads = [{ id: "lead_new" }];
+    state.rankedFits = [{ lead: { id: "lead_new" }, fit: { score: 80 } }];
+    state.outbound = [
+      {
+        toId: STUDENT,
+        templateKey: "weekly_jobs",
+        connectionId: null,
+        status: "failed",
+        sentAt: daysBefore(1),
+        expectsReply: null,
+        repliedAt: null,
+      },
+    ];
+    await runNudges({ now: MONDAY });
+    assert.equal(state.sent.length, 1);
+  });
+});
+
+describe("guards that stop the run entirely", () => {
+  it("refuses to sweep when the admin client is not RLS-bypassing (F63)", async () => {
+    state.adminPrivileged = false;
+    state.connections = [unviewedConnection()];
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.skipped, "admin client not privileged");
+    assert.equal(result.alertsPlanned, 0);
+    assert.equal(state.alertUpserts.length, 0);
+  });
+
+  it("skips when another sweep already holds the run lock", async () => {
+    state.lockAvailable = false;
+    state.connections = [unviewedConnection()];
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.skipped, "already running");
+    assert.equal(state.alertUpserts.length, 0);
+  });
+
+  it("a dry run needs no lock — it writes nothing anyway", async () => {
+    state.lockAvailable = false;
+    state.connections = [unviewedConnection()];
+    const result = await runNudges({ now: NOW, dryRun: true });
+    assert.equal(result.skipped, null);
+    assert.equal(result.alertsPlanned, 1);
+  });
+});
+
+describe("one open question at a time", () => {
+  it("defers a retention text while a heard-back question is still open", async () => {
+    // Both are answered with one character, and a reply resolves the most
+    // recent one — two in flight means a "Y" lands on the wrong question.
+    state.connections = [
+      { ...unviewedConnection(), status: "started", sentAt: daysBefore(60) },
+    ];
+    state.events = [
+      { connectionId: "con_1", toStatus: "started", note: null, at: daysBefore(31) },
+    ];
+    state.outbound = [
+      {
+        toId: STUDENT,
+        templateKey: "heard_back:sj_9",
+        connectionId: null,
+        status: "sent",
+        sentAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+        expectsReply: "heard_back:sj_9",
+        repliedAt: null,
+      },
+    ];
+    const result = await runNudges({ now: NOW });
+    assert.equal(result.textsPlanned, 0);
+    assert.equal(result.textOutcomes["skipped:question_already_open"], 1);
   });
 });

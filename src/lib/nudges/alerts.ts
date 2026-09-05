@@ -18,8 +18,9 @@
 // =============================================================================
 
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
-import type { NudgeAlertPlan } from "./schedule-shared";
+import { NUDGE_ALERT_TYPES, type NudgeAlertPlan } from "./schedule-shared";
 
 /** Raise or refresh one alert. Idempotent on alertKey. */
 export async function upsertNudgeAlert(plan: NudgeAlertPlan, now: Date): Promise<void> {
@@ -55,6 +56,34 @@ export async function upsertNudgeAlert(plan: NudgeAlertPlan, now: Date): Promise
  * instead of a P2025, and `status: "open"` in the filter so a teacher who has
  * already dismissed or snoozed one does not have it quietly rewritten.
  */
+/**
+ * Close the "your jobs are ready" card when the student actually opens Career.
+ *
+ * They texted Y to ask for it; arriving on the page is the answer. Leaving it
+ * open would keep the Home next-step pointing at a page they are already
+ * looking at, which is the kind of small dishonesty that teaches people to
+ * ignore the next step entirely.
+ *
+ * Bounded to the one type and the one student, never throws, and takes the
+ * caller's own RLS context — it is called from a student's own page render, so
+ * the app client already has one.
+ */
+export async function resolveWeeklyJobsAlertOnView(studentId: string): Promise<void> {
+  try {
+    await prisma.studentAlert.updateMany({
+      where: {
+        studentId,
+        type: NUDGE_ALERT_TYPES.weeklyJobsReady,
+        status: "open",
+      },
+      data: { status: "resolved", resolvedAt: new Date() },
+    });
+  } catch (error) {
+    // A page render must never fail over a housekeeping write.
+    logger.warn("Could not resolve the weekly-jobs alert on view", { error: String(error) });
+  }
+}
+
 export async function resolveNudgeAlerts(alertKeys: string[], now: Date): Promise<number> {
   if (alertKeys.length === 0) return 0;
   const result = await prisma.studentAlert.updateMany({

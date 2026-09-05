@@ -37,6 +37,8 @@ const state = {
   followUpUpserts: [] as any[],
   transitions: [] as any[],
   rlsContexts: [] as string[],
+  transitionThrows: false,
+  acks: [] as any[],
   spokesRecord: { id: "spokes_1" } as { id: string } | null,
   savedJob: { id: "sj_1", studentId: "stu_1", status: "applied" } as any,
   connection: {
@@ -57,6 +59,10 @@ const prismaAdmin = {
       state.prefUpdates.push(args);
       return state.prefs[0];
     }),
+    updateMany: mock.fn(async (args: any) => {
+      state.prefUpdates.push(args);
+      return { count: (args.where.id?.in ?? []).length };
+    }),
   },
   outboundMessage: {
     findFirst: mock.fn(async ({ where }: any) => {
@@ -73,6 +79,7 @@ const prismaAdmin = {
           .sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime())[0] ?? null
       );
     }),
+    findMany: mock.fn(async () => []),
     updateMany: mock.fn(async (args: any) => {
       state.outboundClaims.push(args);
       return { count: state.claimCount };
@@ -120,11 +127,30 @@ mock.module("@/lib/spokes", {
     ensureSpokesRecordForStudent: async () => state.spokesRecord,
   },
 });
+class FakeTransitionNotAllowedError extends Error {
+  constructor() {
+    super("not allowed");
+    this.name = "TransitionNotAllowedError";
+  }
+}
+
 mock.module("@/lib/connect/pipeline", {
   namedExports: {
+    TransitionNotAllowedError: FakeTransitionNotAllowedError,
+    ConnectionConflictError: class ConnectionConflictError extends Error {},
+    ConnectionNotFoundError: class ConnectionNotFoundError extends Error {},
     transitionConnection: async (input: any) => {
+      if (state.transitionThrows) throw new FakeTransitionNotAllowedError();
       state.transitions.push(input);
       return { from: state.connection.status, to: input.to, studentId: input.studentId ?? "stu_1" };
+    },
+  },
+});
+mock.module("./sms-policy", {
+  namedExports: {
+    sendPolicySms: async (input: any) => {
+      state.acks.push(input);
+      return { status: "sent" as const, outboundMessageId: "om_ack" };
     },
   },
 });
@@ -175,6 +201,8 @@ beforeEach(() => {
   state.followUpUpserts = [];
   state.transitions = [];
   state.rlsContexts = [];
+  state.transitionThrows = false;
+  state.acks = [];
   state.spokesRecord = { id: "spokes_1" };
   state.savedJob = { id: "sj_1", studentId: "stu_1", status: "applied" };
   state.connection = {
@@ -222,6 +250,33 @@ describe("STOP and START", () => {
     const result = await handleInboundSms({ from: PHONE, body: "START", now: NOW });
     assert.equal(result.outcome, "no_prior_consent");
     assert.equal(state.prefUpdates.length, 0, "a text may not manufacture consent");
+  });
+
+  it("STOP from a SHARED handset revokes for every student on that number", async () => {
+    // Over-revoking costs a text nobody gets and a START to undo. Under-
+    // revoking keeps texting someone who asked you to stop, which is what
+    // TCPA is about.
+    state.prefs = [
+      consented(),
+      consented({ id: "pref_2", studentId: "stu_2" }),
+    ];
+    const result = await handleInboundSms({ from: PHONE, body: "STOP", now: NOW });
+    assert.equal(result.outcome, "revoked");
+    assert.deepEqual(state.prefUpdates[0].where.id.in, ["pref_1", "pref_2"]);
+    assert.equal(state.prefUpdates[0].data.enabled, false);
+  });
+
+  it("applies NOTHING but a STOP from a shared handset", async () => {
+    state.prefs = [consented(), consented({ id: "pref_2", studentId: "stu_2" })];
+    state.outbound = [question(replyToken({ kind: "weekly_jobs" }))];
+    for (const body of ["Y", "N", "START"]) {
+      state.prefUpdates = [];
+      state.alertUpserts = [];
+      const result = await handleInboundSms({ from: PHONE, body, now: NOW });
+      assert.equal(result.outcome, "ambiguous_sender", body);
+      assert.equal(state.prefUpdates.length, 0, body);
+      assert.equal(state.alertUpserts.length, 0, body);
+    }
   });
 
   it("STOP outranks a pending question — it is never read as an answer", async () => {
@@ -272,6 +327,27 @@ describe("matching a reply to the question it answers", () => {
     assert.equal(result.outcome, "already_answered");
     assert.equal(state.alertUpserts.length, 0);
     assert.equal(state.outboundClaims[0].where.repliedAt, null, "the claim is conditional");
+  });
+
+  it("reads a bare YES as an answer when a question is open, and as START when none is", async () => {
+    state.outbound = [question(replyToken({ kind: "weekly_jobs" }))];
+    const answered = await handleInboundSms({ from: PHONE, body: "YES", now: NOW });
+    assert.equal(answered.outcome, "handled");
+    assert.equal(state.alertUpserts.length, 1);
+
+    state.outbound = [];
+    state.prefs = [consented({ smsRevokedAt: new Date("2026-09-01T00:00:00Z"), enabled: false })];
+    const restarted = await handleInboundSms({ from: PHONE, body: "YES", now: NOW });
+    assert.equal(restarted.outcome, "reconsented");
+  });
+
+  it("reads NO as an answer, not as noise", async () => {
+    state.outbound = [
+      question(replyToken({ kind: "retention", connectionId: "con_1", day: 30 })),
+    ];
+    const result = await handleInboundSms({ from: PHONE, body: "NO", now: NOW });
+    assert.equal(result.outcome, "handled");
+    assert.equal(state.alertUpserts[0].create.type, NUDGE_ALERT_TYPES.retentionLost);
   });
 
   it("ignores a sentence — only Y and N are answers", async () => {
@@ -329,49 +405,73 @@ describe('Y to "did you hear back?"', () => {
 });
 
 describe("retention answers", () => {
-  it("Y writes the follow-up and advances the connection", async () => {
+  it("NEVER writes a SpokesEmploymentFollowUp row — a text is not evidence", async () => {
+    // The grant record runs on 1/3/6 MONTHS from
+    // SpokesRecord.unsubsidizedEmploymentAt and grant-kpi.ts reports months 3
+    // and 6 to DoHS. The funnel runs on 30/60/90 DAYS from
+    // Connection.startedAt. Mapping one onto the other would overwrite a
+    // teacher's verified row on the shared (recordId, checkpointMonths) key.
+    for (const answer of ["Y", "N"]) {
+      state.followUpUpserts = [];
+      state.outbound = [
+        question(replyToken({ kind: "retention", connectionId: "con_1", day: 30 })),
+      ];
+      await handleInboundSms({ from: PHONE, body: answer, now: NOW });
+      assert.deepEqual(state.followUpUpserts, [], `"${answer}" must write no follow-up row`);
+    }
+  });
+
+  it("Y advances the funnel and asks a person to record the grant follow-up", async () => {
     state.outbound = [
       question(replyToken({ kind: "retention", connectionId: "con_1", day: 30 })),
     ];
     await handleInboundSms({ from: PHONE, body: "Y", now: NOW });
 
-    assert.equal(state.followUpUpserts.length, 1);
-    const followUp = state.followUpUpserts[0];
-    assert.equal(followUp.create.recordId, "spokes_1");
-    assert.equal(followUp.create.checkpointMonths, 1, "30 days is the 1-month checkpoint");
-    assert.equal(followUp.create.status, "employed");
-
     assert.equal(state.transitions.length, 1);
     assert.equal(state.transitions[0].to, "retained_30");
     assert.equal(state.transitions[0].actorType, "system");
+
+    assert.equal(state.alertUpserts.length, 1);
+    const alert = state.alertUpserts[0].create;
+    assert.equal(alert.type, NUDGE_ALERT_TYPES.retentionConfirm);
+    assert.equal(alert.alertKey, "connect_retention_confirm:con_1:30");
+    assert.match(alert.summary, /self-reported/i);
+    assert.match(alert.summary, /different clock/i);
   });
 
-  it("maps 60 and 90 days to the 2- and 3-month checkpoints", async () => {
-    for (const [day, months, to] of [
-      [60, 2, "retained_60"],
-      [90, 3, "retained_90"],
+  it("asks once per checkpoint, so day 60 is a separate card from day 30", async () => {
+    for (const [day, to] of [
+      [60, "retained_60"],
+      [90, "retained_90"],
     ] as const) {
-      state.followUpUpserts = [];
+      state.alertUpserts = [];
       state.transitions = [];
       state.connection = { ...state.connection, status: `retained_${day - 30}` };
       state.outbound = [question(replyToken({ kind: "retention", connectionId: "con_1", day }))];
       await handleInboundSms({ from: PHONE, body: "Y", now: NOW });
-      assert.equal(state.followUpUpserts[0].create.checkpointMonths, months);
       assert.equal(state.transitions[0].to, to);
+      assert.equal(
+        state.alertUpserts[0].create.alertKey,
+        `connect_retention_confirm:con_1:${day}`,
+      );
     }
   });
 
-  it("N records the loss, closes the connection, and tells the instructor", async () => {
+  it("N closes the connection and tells the instructor, writing no grant row", async () => {
     state.outbound = [
       question(replyToken({ kind: "retention", connectionId: "con_1", day: 30 })),
     ];
     await handleInboundSms({ from: PHONE, body: "N", now: NOW });
 
-    assert.equal(state.followUpUpserts[0].create.status, "not_employed");
+    assert.equal(state.followUpUpserts.length, 0);
     assert.equal(state.transitions[0].to, "closed");
     assert.match(state.transitions[0].note, /no longer/i);
     assert.equal(state.alertUpserts.length, 1);
     assert.equal(state.alertUpserts[0].create.type, NUDGE_ALERT_TYPES.retentionLost);
+    assert.match(
+      state.alertUpserts[0].create.summary,
+      /Nothing has been written to the SPOKES employment follow-ups/i,
+    );
   });
 
   it("refuses a connection that is not the replying student's", async () => {
@@ -382,6 +482,21 @@ describe("retention answers", () => {
     await handleInboundSms({ from: PHONE, body: "Y", now: NOW });
     assert.equal(state.followUpUpserts.length, 0);
     assert.equal(state.transitions.length, 0);
+    assert.equal(state.alertUpserts.length, 0);
+  });
+
+  it("still raises the staff alert when the pipeline refuses the move", async () => {
+    // An instructor may have closed the connection between the text going out
+    // and the reply coming back. Throwing away the one thing the student told
+    // us because a status will not move is the wrong trade.
+    state.transitionThrows = true;
+    state.outbound = [
+      question(replyToken({ kind: "retention", connectionId: "con_1", day: 30 })),
+    ];
+    const result = await handleInboundSms({ from: PHONE, body: "Y", now: NOW });
+    assert.equal(result.outcome, "handled");
+    assert.equal(state.alertUpserts.length, 1);
+    assert.equal(state.alertUpserts[0].create.type, NUDGE_ALERT_TYPES.retentionConfirm);
   });
 });
 
@@ -404,6 +519,17 @@ describe("interview confirmation answers", () => {
     await handleInboundSms({ from: PHONE, body: "N", now: NOW });
     assert.equal(state.transitions.length, 0, "a machine never cancels an employer's interview");
     assert.equal(state.alertUpserts.length, 1);
+  });
+
+  it("N sends an acknowledgement THROUGH the policy, so quiet hours still apply", async () => {
+    state.connection = { ...state.connection, status: "interview_scheduled" };
+    state.outbound = [
+      question(replyToken({ kind: "interview_confirm", connectionId: "con_1" })),
+    ];
+    await handleInboundSms({ from: PHONE, body: "N", now: NOW });
+    assert.equal(state.acks.length, 1);
+    assert.equal(state.acks[0].templateKey, "interview_decline_ack:con_1");
+    assert.equal(state.acks[0].expectsReply, undefined, "an ack asks nothing");
   });
 });
 

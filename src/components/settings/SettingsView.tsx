@@ -9,6 +9,8 @@ import { ConsentSection } from "@/components/settings/ConsentSection";
 import { WorkAvailabilitySection } from "@/components/settings/WorkAvailabilitySection";
 import {
   SMS_CONSENT_CHECKBOX_LABEL,
+  SMS_CONSENT_CONFIRM_HEADING,
+  SMS_CONSENT_CONFIRM_NOTICE,
   SMS_CONSENT_HEADING,
   SMS_CONSENT_POINTS,
 } from "@/lib/nudges/sms-policy-shared";
@@ -57,6 +59,12 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
   // `smsConsented` is permission (see the SMS policy in src/lib/nudges).
   const [smsConsented, setSmsConsented] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
+  // The verify-by-code flow: send a 6-digit code to the number on file, then
+  // confirm it. Consent is stamped by the server on confirm and nowhere else.
+  const [verifyStep, setVerifyStep] = useState<"idle" | "sent">("idle");
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifyError, setVerifyError] = useState("");
+  const [verifyBusy, setVerifyBusy] = useState(false);
   /**
    * The same predicate the other student-only sections use, so the consent
    * copy appears wherever ConsentSection and the work-availability intake do.
@@ -128,16 +136,85 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
     void loadSettings();
   }, [initialRole]);
 
+  /**
+   * Step 1 of consent: text a code to the number on file.
+   *
+   * The number is saved first, because the server sends to the row's
+   * destination rather than to anything this request supplies — that is what
+   * stops the endpoint being a way to text an arbitrary phone.
+   */
+  const sendPhoneCode = async () => {
+    if (!PHONE_REGEX.test(phoneNumber)) {
+      setPhoneError("Enter a valid phone number, e.g. +12125551234");
+      return;
+    }
+    setVerifyBusy(true);
+    setVerifyError("");
+    try {
+      await saveNotificationPreferences({ phone: phoneNumber });
+      const res = await fetch("/api/notifications/preferences/verify-phone", {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setVerifyError(data.error ?? "We could not send a code. Try again.");
+        return;
+      }
+      setVerifyStep("sent");
+      setVerifyCode("");
+    } catch {
+      setVerifyError("We could not reach the server. Try again.");
+    } finally {
+      setVerifyBusy(false);
+    }
+  };
+
+  /** Step 2: the code comes back, and the SERVER stamps consent. */
+  const confirmPhoneCode = async () => {
+    setVerifyBusy(true);
+    setVerifyError("");
+    try {
+      const res = await fetch("/api/notifications/preferences/verify-phone/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: verifyCode }),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setVerifyError(data.error ?? "That code is not right. Try again.");
+        return;
+      }
+      setSmsConsented(true);
+      setSmsEnabled(true);
+      setConsentChecked(false);
+      setVerifyStep("idle");
+      setVerifyCode("");
+    } catch {
+      setVerifyError("We could not reach the server. Try again.");
+    } finally {
+      setVerifyBusy(false);
+    }
+  };
+
   const saveNotificationPreferences = async (
-    overrides: { email?: boolean; sms?: boolean; phone?: string; consent?: boolean } = {},
+    overrides: { email?: boolean; sms?: boolean; phone?: string } = {},
   ) => {
     const resolvedEmail = overrides.email ?? emailEnabled;
     const resolvedSms = overrides.sms ?? smsEnabled;
     const resolvedPhone = overrides.phone ?? phoneNumber;
-    const resolvedConsent = overrides.consent ?? consentChecked;
+
+    // Every failure branch below puts the toggles back the way they were.
+    // The switches are updated optimistically so they feel instant; leaving
+    // one showing "on" after a save that failed tells the student they are
+    // signed up for texts they will never get.
+    const revert = () => {
+      setEmailEnabled(emailEnabled);
+      setSmsEnabled(smsEnabled);
+    };
 
     if (resolvedSms && resolvedPhone && !PHONE_REGEX.test(resolvedPhone)) {
       setPhoneError("Enter a valid phone number, e.g. +12125551234");
+      revert();
       return;
     }
     setPhoneError("");
@@ -153,29 +230,25 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           sms: {
             enabled: resolvedSms,
             ...(resolvedPhone ? { phoneNumber: resolvedPhone } : {}),
-            ...(resolvedConsent ? { consent: true } : {}),
           },
         }),
       });
 
       if (!res.ok) {
         const data = await res.json() as { error?: string };
+        revert();
         setNotifStatus("error");
         setNotifError(data.error ?? "Could not save notification preferences.");
         return;
       }
 
-      // The server stamped consent on this save; the box has done its job and
-      // the checked/unchecked state must not linger into the next request.
-      if (resolvedSms) {
-        setSmsConsented(true);
-        setConsentChecked(false);
-      } else {
-        setSmsConsented(false);
-      }
+      // Consent is stamped only by the verify-code confirm, so turning the
+      // channel OFF is the only thing this save can change about it.
+      if (!resolvedSms) setSmsConsented(false);
       setNotifStatus("success");
       setTimeout(() => setNotifStatus("idle"), 3000);
     } catch {
+      revert();
       setNotifStatus("error");
       setNotifError("Could not contact the server. Please try again.");
     }
@@ -452,7 +525,13 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           scope="employer_referral"
           eyebrow="Job introductions"
           title="Let your teacher introduce you to employers"
-          description="When this is on, your teacher can ask you about sending your résumé to a real job. You still see exactly what would be sent, and nothing goes until you tap OK on that card. When you turn this off, we take back any introduction that has not finished yet. You can change this any time."
+          description="When this is on, your teacher can ask you about sending your résumé to a real job."
+          points={[
+            "You see exactly what would be sent.",
+            "Nothing goes out until you tap OK on that card.",
+            "Turn it off and we take back any introduction that has not finished.",
+            "You can change this any time.",
+          ]}
         />
       )}
 
@@ -600,15 +679,22 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
                 setEmailEnabled(next);
                 void saveNotificationPreferences({ email: next });
               }}
-              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 ${
-                emailEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
-              }`}
+              // The visible track is 28x48; the BUTTON is the touch target, so
+              // it carries the 44px minimum (the repo's touch-target rule) as
+              // padding around an unchanged track.
+              className="-m-2 inline-flex min-h-11 min-w-11 flex-shrink-0 cursor-pointer items-center justify-center rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2"
             >
               <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  emailEnabled ? "translate-x-5" : "translate-x-0"
+                className={`relative inline-flex h-7 w-12 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                  emailEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
                 }`}
-              />
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    emailEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </span>
             </button>
           </div>
 
@@ -634,27 +720,39 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
                   setSmsEnabled(next);
                   void saveNotificationPreferences({ sms: next });
                 }}
-                className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  smsEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
-                }`}
+                className="-m-2 inline-flex min-h-11 min-w-11 flex-shrink-0 cursor-pointer items-center justify-center rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    smsEnabled ? "translate-x-5" : "translate-x-0"
+                  className={`relative inline-flex h-7 w-12 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                    smsEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
                   }`}
-                />
+                >
+                  <span
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      smsEnabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </span>
               </button>
             </div>
 
             {isStudentSurface && !smsConsented && (
               <div className="mt-4 rounded-xl border border-[var(--border)] p-4">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">
-                  {SMS_CONSENT_HEADING}
+                  {smsEnabled ? SMS_CONSENT_CONFIRM_HEADING : SMS_CONSENT_HEADING}
                 </p>
+                {smsEnabled && (
+                  // Nobody's consent was backfilled — a checkbox nobody ticked
+                  // is not consent — so anyone who opted in before this shipped
+                  // lands here and is asked once.
+                  <p className="mt-2 text-sm text-[var(--ink-muted)]">
+                    {SMS_CONSENT_CONFIRM_NOTICE}
+                  </p>
+                )}
                 <ul className="mt-2 space-y-1.5 text-sm text-[var(--ink-muted)]">
                   {SMS_CONSENT_POINTS.map((point) => (
                     <li key={point} className="flex gap-2">
-                      <span aria-hidden="true">•</span>
+                      <span aria-hidden="true">&bull;</span>
                       <span>{point}</span>
                     </li>
                   ))}
@@ -668,6 +766,63 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
                   />
                   <span>{SMS_CONSENT_CHECKBOX_LABEL}</span>
                 </label>
+
+                {/* Consent has its OWN save, separate from the toggles: a code
+                    that comes back from the handset is what proves the number
+                    belongs to the person ticking the box. */}
+                {verifyStep === "idle" ? (
+                  <button
+                    type="button"
+                    onClick={() => void sendPhoneCode()}
+                    disabled={!consentChecked || !phoneNumber || verifyBusy}
+                    className="primary-button mt-4 min-h-11 px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {verifyBusy ? "Sending..." : "Text me a code"}
+                  </button>
+                ) : (
+                  <div className="mt-4">
+                    <label
+                      htmlFor="sms-verify-code"
+                      className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]"
+                    >
+                      Enter the 6-digit code we texted you
+                    </label>
+                    <div className="flex flex-col gap-3 md:flex-row">
+                      <input
+                        id="sms-verify-code"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={verifyCode}
+                        onChange={(event) => {
+                          setVerifyCode(event.target.value.replace(/\D/g, ""));
+                          setVerifyError("");
+                        }}
+                        className="field min-h-11 flex-1 px-4 py-3 text-sm tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void confirmPhoneCode()}
+                        disabled={verifyCode.length !== 6 || verifyBusy}
+                        className="primary-button min-h-11 px-6 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {verifyBusy ? "Checking..." : "Turn on texts"}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void sendPhoneCode()}
+                      disabled={verifyBusy}
+                      className="mt-2 min-h-11 text-sm underline"
+                    >
+                      Send a new code
+                    </button>
+                  </div>
+                )}
+                {verifyError && (
+                  <p className="mt-2 text-sm text-[var(--error)]">{verifyError}</p>
+                )}
               </div>
             )}
 

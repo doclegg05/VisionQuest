@@ -37,9 +37,15 @@ const restrictedSyntaxEverywhere = [
   // third party's address (which SMTP errors quote back — see
   // redactContactInfo); `candidateName` is the student's own name, abbreviated
   // but still theirs.
+  //
+  // destination / toNumber / fromNumber / smsTo / phone joined with the SMS
+  // layer (Phase 5). `destination` is the name the NotificationPreference
+  // column uses, so it is what a log line would naturally be called — and a
+  // phone number is the one identifier in this system that reaches a person
+  // directly, without anyone needing database access first.
   {
     selector:
-      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber|homeZip|childcareHours|workProfile|connectionId|token|employerTokenHash|contactEmail|candidateName)$/]",
+      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber|homeZip|childcareHours|workProfile|connectionId|token|employerTokenHash|contactEmail|candidateName|destination|toNumber|fromNumber|smsTo|phone)$/]",
     message:
       "No student identifier in server logs. Use studentLogKey(studentId) from @/lib/log-keys for a correlation key, or drop the field.",
   },

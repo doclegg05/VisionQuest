@@ -92,16 +92,24 @@ const SCAN_ROOTS = [
   { label: "components/chat", relPath: "src/components/chat" },
   { label: "components/student", relPath: "src/components/student" },
   { label: "next-step copy data (src/lib carve-out)", relPath: "src/lib/progression/student-next-step.ts" },
-  // Match & Connect Phase 4. Three surfaces that were outside every root:
-  // the Settings consent toggles a student reads before turning employer
-  // introductions on or off; the job-developer console, whose copy an
-  // instructor reads but whose student-facing strings (status phrases, packet
-  // field labels) come straight from the same helpers the student sees; and
-  // the public employer response page, which is read by someone with no
-  // account and no context at all.
+  // Added with Match & Connect Phases 4 and 5. Three surfaces were outside
+  // every existing root: the Settings page, which carries BOTH the employer-
+  // introduction consent toggles and the SMS consent step (the one screen
+  // where a student agrees to be texted); the job-developer console, whose
+  // copy an instructor reads but whose student-facing strings (status
+  // phrases, packet field labels) come straight from the same helpers the
+  // student sees; and the public employer response page, read by someone
+  // with no account and no context at all. The advising hub renders the
+  // alerts a nudge produces.
   { label: "components/settings", relPath: "src/components/settings" },
+  { label: "components/advising", relPath: "src/components/advising" },
   { label: "components/teacher/connect", relPath: "src/components/teacher/connect" },
   { label: "public employer response page", relPath: "src/app/connect" },
+  // A second src/lib carve-out, same shape as the next-step one above: every
+  // SMS body and the consent copy are DATA in sms-policy-shared.ts, only ever
+  // interpolated by the settings component, so scanning the component alone
+  // would find none of the words a student actually reads.
+  { label: "SMS + consent copy data (src/lib carve-out)", relPath: "src/lib/nudges/sms-policy-shared.ts" },
 ];
 
 // ---------------------------------------------------------------------------

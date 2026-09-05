@@ -5,6 +5,7 @@ const state = {
   handled: [] as Array<{ from: string; body: string }>,
   handlerThrows: false,
   rateLimitSuccess: true,
+  adminPrivileged: true,
   logs: [] as string[],
 };
 
@@ -25,6 +26,12 @@ mock.module("@/lib/rate-limit", {
       resetTime: 0,
       degraded: false,
     }),
+  },
+});
+mock.module("@/lib/nudges/admin-guard", {
+  namedExports: {
+    adminClientIsPrivileged: async () => state.adminPrivileged,
+    resetAdminClientProbe: () => {},
   },
 });
 mock.module("@/lib/logger", {
@@ -57,14 +64,16 @@ function request(
   params: Record<string, string>,
   signature: string | null,
 ): Request {
-  const form = new URLSearchParams(params);
+  const form = new URLSearchParams(params).toString();
   return new Request(URL_STRING, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      // Twilio always sends one; the route requires it (see MAX_BODY_BYTES).
+      "content-length": String(Buffer.byteLength(form)),
       ...(signature === null ? {} : { "x-twilio-signature": signature }),
     },
-    body: form.toString(),
+    body: form,
   });
 }
 
@@ -76,6 +85,7 @@ beforeEach(() => {
   state.handled = [];
   state.handlerThrows = false;
   state.rateLimitSuccess = true;
+  state.adminPrivileged = true;
   state.logs = [];
   process.env.TWILIO_AUTH_TOKEN = AUTH_TOKEN;
   process.env.APP_BASE_URL = "https://visionquest.example.test";
@@ -140,17 +150,61 @@ describe("POST /api/sms/inbound", () => {
     assert.equal(state.handled.length, 0);
   });
 
+  it("rejects a body with no Content-Length, and one that is too large", async () => {
+    // Unauthenticated until the signature check, so an unbounded formData()
+    // is a free way to make the server buffer whatever a stranger sends.
+    const params = { From: FROM, Body: "STOP" };
+    const signature = buildTwilioSignature(AUTH_TOKEN, URL_STRING, params);
+
+    const noLength = new Request(URL_STRING, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "x-twilio-signature": signature },
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(new URLSearchParams(params).toString()));
+          controller.close();
+        },
+      }),
+      // @ts-expect-error duplex is required for a streaming body in Node
+      duplex: "half",
+    });
+    assert.equal((await POST(noLength)).status, 400);
+
+    const tooLarge = new Request(URL_STRING, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-twilio-signature": signature,
+        "content-length": String(17 * 1024),
+      },
+      body: new URLSearchParams(params).toString(),
+    });
+    assert.equal((await POST(tooLarge)).status, 400);
+    assert.equal(state.handled.length, 0);
+  });
+
+  it("does nothing but log when the admin client is not privileged (F63)", async () => {
+    // A STOP silently dropped is the one failure here that must never be quiet.
+    state.adminPrivileged = false;
+    const response = await POST(signed({ From: FROM, Body: "STOP" }));
+    assert.equal(response.status, 200, "still 200, so Twilio does not retry into it");
+    assert.equal(state.handled.length, 0);
+    assert.ok(state.logs.some((line) => line.includes("nudges_admin_client_missing")));
+  });
+
   it("signs against the configured public origin, not the proxied request URL", async () => {
     // Render terminates TLS in front of the app, so req.url can be http on an
     // internal host while Twilio signed the public https one.
     const params = { From: FROM, Body: "STOP" };
+    const encoded = new URLSearchParams(params).toString();
     const proxied = new Request("http://10.0.0.7:10000/api/sms/inbound", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
+        "content-length": String(Buffer.byteLength(encoded)),
         "x-twilio-signature": buildTwilioSignature(AUTH_TOKEN, URL_STRING, params),
       },
-      body: new URLSearchParams(params).toString(),
+      body: encoded,
     });
     const response = await POST(proxied);
     assert.equal(response.status, 200);

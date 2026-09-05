@@ -27,17 +27,26 @@
 // withStudentRlsContext on the app client.
 // =============================================================================
 
-import { transitionConnection } from "@/lib/connect/pipeline";
+import type { Prisma } from "@prisma/client";
+
+import {
+  ConnectionConflictError,
+  ConnectionNotFoundError,
+  TransitionNotAllowedError,
+  transitionConnection,
+  type ConnectionStatus,
+} from "@/lib/connect/pipeline";
 import { prisma, prismaAdmin } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { withStudentRlsContext } from "@/lib/rls-context";
-import { ensureSpokesRecordForStudent } from "@/lib/spokes";
 
 import { upsertNudgeAlert } from "./alerts";
-import { classifyInboundSms } from "./sms-policy-shared";
+import { sendPolicySms } from "./sms-policy";
+import { buildInterviewDeclineAckSms, classifyInboundSms } from "./sms-policy-shared";
 import {
   NUDGE_ALERT_TYPES,
+  interviewDeclineAckTemplateKey,
   parseReplyToken,
   type ReplyToken,
   type RetentionDay,
@@ -56,6 +65,8 @@ export type InboundOutcome =
   | { outcome: "reconsented" }
   | { outcome: "no_prior_consent" }
   | { outcome: "unknown_sender" }
+  /** More than one student has this number on file. See findRecipients(). */
+  | { outcome: "ambiguous_sender" }
   | { outcome: "no_pending_question" }
   | { outcome: "already_answered" }
   | { outcome: "ignored" }
@@ -87,26 +98,25 @@ interface SmsRecipient {
   smsConsentAt: Date | null;
 }
 
-async function findRecipientByPhone(from: string): Promise<SmsRecipient | null> {
+/**
+ * Every preference row this number matches.
+ *
+ * Two people on one handset is real in this population — a shared family
+ * phone, a student using a partner's number. The rows are returned rather than
+ * collapsed to null because STOP and everything else need OPPOSITE answers to
+ * that ambiguity: a STOP must apply to all of them, while a "Y" must apply to
+ * none. Under-revoking keeps texting someone who asked you to stop, which is
+ * the thing TCPA is actually about; over-revoking costs a text nobody gets and
+ * a START to undo.
+ */
+async function findRecipients(from: string): Promise<SmsRecipient[]> {
   const candidates = phoneCandidates(from);
-  if (candidates.length === 0) return null;
-  const rows = await prismaAdmin.notificationPreference.findMany({
+  if (candidates.length === 0) return [];
+  return prismaAdmin.notificationPreference.findMany({
     where: { channel: "sms", destination: { in: candidates } },
     select: { id: true, studentId: true, smsConsentAt: true },
-    take: 2,
+    take: 10,
   });
-  if (rows.length === 0) return null;
-  if (rows.length > 1) {
-    // Two people on one handset is real in this population (a shared family
-    // phone). There is no way to tell whose reply this is, so nothing is
-    // applied — but the number is still loud enough to be worth an alarm.
-    logger.warn("Inbound SMS matched more than one recipient; ignoring", {
-      channel: "sms",
-      matched: rows.length,
-    });
-    return null;
-  }
-  return rows[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -119,37 +129,62 @@ export async function handleInboundSms(input: {
   now?: Date;
 }): Promise<InboundOutcome> {
   const now = input.now ?? new Date();
-  const intent = classifyInboundSms(input.body);
 
-  const recipient = await findRecipientByPhone(input.from);
-  if (!recipient) {
+  const recipients = await findRecipients(input.from);
+  if (recipients.length === 0) {
     // Never an error: an unknown number that texts STOP has still opted out of
     // everything we could send it, and telling a stranger their number is not
     // on file is an enumeration oracle.
-    logger.info("Inbound SMS from an unrecognised number", { channel: "sms", intent });
+    logger.info("Inbound SMS from an unrecognised number", { channel: "sms" });
     return { outcome: "unknown_sender" };
   }
 
-  if (intent === "stop") return revokeConsent(recipient, now);
+  // A STOP is answered before anything else is even classified in context: it
+  // must never be read as an answer to a pending question, and it applies to
+  // every row this handset matches.
+  const stopFirst = classifyInboundSms(input.body);
+  if (stopFirst === "stop") return revokeConsent(recipients, now);
+
+  if (recipients.length > 1) {
+    // Everything that is not STOP needs to know WHOSE reply this is, and here
+    // nothing can. Loud, because a shared number silently swallowing answers
+    // looks exactly like a student who never replies.
+    logger.warn("Inbound SMS matched more than one recipient; applying nothing", {
+      channel: "sms",
+      matched: recipients.length,
+    });
+    return { outcome: "ambiguous_sender" };
+  }
+
+  const recipient = recipients[0];
+  const pending = await findPendingQuestion(recipient.studentId, now);
+  // "YES" is an opt-in keyword to Twilio and an answer to a person. Only the
+  // presence of an open question can tell the two apart.
+  const intent = classifyInboundSms(input.body, { hasPendingQuestion: pending !== null });
+
   if (intent === "start") return restoreConsent(recipient, now);
   if (intent !== "yes" && intent !== "no") {
     logger.info("Inbound SMS was not a keyword; ignoring", { channel: "sms" });
     return { outcome: "ignored" };
   }
+  if (!pending) return { outcome: "no_pending_question" };
 
-  return answerPendingQuestion(recipient, intent === "yes", now);
+  return answerPendingQuestion(recipient, pending, intent === "yes", now);
 }
 
-async function revokeConsent(recipient: SmsRecipient, now: Date): Promise<InboundOutcome> {
-  await prismaAdmin.notificationPreference.update({
-    where: { id: recipient.id },
+async function revokeConsent(
+  recipients: SmsRecipient[],
+  now: Date,
+): Promise<InboundOutcome> {
+  await prismaAdmin.notificationPreference.updateMany({
+    where: { id: { in: recipients.map((row) => row.id) } },
     // Both, not one: `enabled` is what every sender already reads, and
     // `smsRevokedAt` is the record that survives a later toggle.
     data: { enabled: false, smsRevokedAt: now },
   });
   logger.info("SMS consent revoked by STOP", {
     channel: "sms",
-    student: studentLogKey(recipient.studentId),
+    recipients: recipients.length,
   });
   return { outcome: "revoked" };
 }
@@ -173,16 +208,29 @@ async function restoreConsent(recipient: SmsRecipient, now: Date): Promise<Inbou
   return { outcome: "reconsented" };
 }
 
-async function answerPendingQuestion(
-  recipient: SmsRecipient,
-  affirmative: boolean,
+interface PendingQuestion {
+  id: string;
+  expectsReply: string | null;
+}
+
+/**
+ * The most recent unanswered question sent to this student inside the window.
+ *
+ * Exported through `hasUnansweredQuestion` for the runner, which uses the same
+ * definition to avoid stacking a second question on top of an open one — two
+ * questions in flight make a bare "Y" ambiguous no matter how carefully the
+ * token is written.
+ */
+async function findPendingQuestion(
+  studentId: string,
   now: Date,
-): Promise<InboundOutcome> {
-  const pending = await prismaAdmin.outboundMessage.findFirst({
+): Promise<PendingQuestion | null> {
+  return prismaAdmin.outboundMessage.findFirst({
     where: {
       channel: "sms",
       toKind: "student",
-      toId: recipient.studentId,
+      toId: studentId,
+      status: "sent",
       expectsReply: { not: null },
       repliedAt: null,
       sentAt: { gte: new Date(now.getTime() - REPLY_WINDOW_MS) },
@@ -190,8 +238,35 @@ async function answerPendingQuestion(
     orderBy: { sentAt: "desc" },
     select: { id: true, expectsReply: true },
   });
-  if (!pending) return { outcome: "no_pending_question" };
+}
 
+/** Student ids with an open question right now — the runner's #4 guard. */
+export async function studentsWithOpenQuestions(
+  studentIds: string[],
+  now: Date,
+): Promise<Set<string>> {
+  if (studentIds.length === 0) return new Set();
+  const rows = await prismaAdmin.outboundMessage.findMany({
+    where: {
+      channel: "sms",
+      toKind: "student",
+      toId: { in: studentIds },
+      status: "sent",
+      expectsReply: { not: null },
+      repliedAt: null,
+      sentAt: { gte: new Date(now.getTime() - REPLY_WINDOW_MS) },
+    },
+    select: { toId: true },
+  });
+  return new Set(rows.map((row) => row.toId));
+}
+
+async function answerPendingQuestion(
+  recipient: SmsRecipient,
+  pending: PendingQuestion,
+  affirmative: boolean,
+  now: Date,
+): Promise<InboundOutcome> {
   const token = parseReplyToken(pending.expectsReply);
   if (!token) {
     logger.warn("Pending outbound message carried an unreadable reply token", { channel: "sms" });
@@ -280,7 +355,49 @@ async function handleHeardBackYes(
   });
 }
 
-const RETENTION_CHECKPOINT_MONTHS: Record<RetentionDay, number> = { 30: 1, 60: 2, 90: 3 };
+/**
+ * Move a connection, and treat a refusal as a fact about the world rather than
+ * an error to propagate.
+ *
+ * The pipeline legitimately refuses when the row moved between the text going
+ * out and the answer coming back — an instructor closed it, the student
+ * withdrew, a second reply raced this one. None of those mean the student's
+ * answer should be discarded, and none of them should take down the webhook.
+ * Returns whether the move landed, so a caller can say so in its alert.
+ */
+async function tryTransition(input: {
+  connectionId: string;
+  to: ConnectionStatus;
+  note: string;
+  data?: Prisma.ConnectionUpdateInput;
+}): Promise<boolean> {
+  try {
+    await transitionConnection({
+      connectionId: input.connectionId,
+      to: input.to,
+      actorType: "system",
+      note: input.note,
+      data: input.data,
+      client: prismaAdmin,
+    });
+    return true;
+  } catch (error) {
+    if (
+      error instanceof TransitionNotAllowedError ||
+      error instanceof ConnectionConflictError ||
+      error instanceof ConnectionNotFoundError
+    ) {
+      logger.warn("Retention reply could not move the connection; alerting staff anyway", {
+        channel: "sms",
+        to: input.to,
+        reason: error.name,
+      });
+      return false;
+    }
+    throw error;
+  }
+}
+
 const RETENTION_TARGET_STATUS: Record<RetentionDay, "retained_30" | "retained_60" | "retained_90"> =
   {
     30: "retained_30",
@@ -288,6 +405,22 @@ const RETENTION_TARGET_STATUS: Record<RetentionDay, "retained_30" | "retained_60
     90: "retained_90",
   };
 
+/**
+ * The retention answer moves the CONNECT funnel and asks a person to reconcile
+ * the grant record. It deliberately writes no `SpokesEmploymentFollowUp` row.
+ *
+ * Two clocks that look alike are not the same clock: the funnel counts 30/60/90
+ * days from `Connection.startedAt`, while `SpokesEmploymentFollowUp` runs on
+ * 1/3/6 MONTHS from `SpokesRecord.unsubsidizedEmploymentAt` and is what
+ * grant-kpi.ts reports to DoHS. Mapping one onto the other would have had a
+ * one-character text overwrite a teacher's verified row on the shared
+ * `(recordId, checkpointMonths)` unique key, with no provenance to tell them
+ * apart — and it would have parked the day-60 answer at `checkpointMonths: 2`,
+ * which no reader in this codebase looks at.
+ *
+ * Phase 6 reads Connect retention from the ConnectionEvent history, so the
+ * funnel loses nothing. The staff alert is the reconciliation point.
+ */
 async function handleRetentionAnswer(
   studentId: string,
   connectionId: string,
@@ -302,47 +435,50 @@ async function handleRetentionAnswer(
   if (!connection || connection.studentId !== studentId) return;
   const employerName = connection.employer?.name ?? "your employer";
 
-  // The SPOKES follow-up row is the student's own record and is written as
-  // them; the connection move is a system fact about a disclosure record,
-  // whose RLS UPDATE policy admits no student branch for these statuses.
-  await withStudentRlsContext(studentId, async () => {
-    const record = await ensureSpokesRecordForStudent(studentId);
-    const checkpointMonths = RETENTION_CHECKPOINT_MONTHS[day];
-    const status = stillWorking ? "employed" : "not_employed";
-    const checkedAt = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
-    await prisma.spokesEmploymentFollowUp.upsert({
-      where: { recordId_checkpointMonths: { recordId: record.id, checkpointMonths } },
-      update: { status, checkedAt, notes: `Recorded from the ${day}-day SPOKES text.` },
-      create: {
-        recordId: record.id,
-        checkpointMonths,
-        status,
-        checkedAt,
-        notes: `Recorded from the ${day}-day SPOKES text.`,
-      },
-    });
-  });
-
   if (stillWorking) {
-    await transitionConnection({
+    // The connection move is a system fact about a disclosure record, whose
+    // RLS UPDATE policy admits no student branch for these statuses.
+    //
+    // The transition is allowed to FAIL without losing the answer: an
+    // instructor may have closed or withdrawn the connection between the text
+    // going out and the reply coming back, and a TransitionNotAllowedError
+    // would otherwise throw away the one thing the student told us. The alert
+    // is the durable record, so it is raised either way.
+    await tryTransition({
       connectionId,
       to: RETENTION_TARGET_STATUS[day],
-      actorType: "system",
       note: `Student confirmed by text that they are still working at ${employerName}.`,
-      client: prismaAdmin,
     });
+    await withStudentRlsContext(studentId, () =>
+      upsertNudgeAlert(
+        {
+          studentId,
+          // Keyed by (connection, day): one card per checkpoint, so a teacher
+          // who records the 1-month follow-up is not asked again at day 60.
+          alertKey: `${NUDGE_ALERT_TYPES.retentionConfirm}:${connectionId}:${day}`,
+          type: NUDGE_ALERT_TYPES.retentionConfirm,
+          severity: "medium",
+          title: `${employerName}: still working at day ${day}`,
+          summary:
+            `The student replied "yes" to the day-${day} check-in text, so the Connect ` +
+            `funnel is updated. That is self-reported, not evidence. Record the SPOKES ` +
+            `employment follow-up yourself once you can confirm it — those checkpoints ` +
+            `run 1, 3 and 6 months from the employment date on the SPOKES record, which ` +
+            `is a different clock from this one.`,
+          sourceType: "connection",
+          sourceId: connectionId,
+        },
+        now,
+      ),
+    );
     return;
   }
 
-  await transitionConnection({
+  await tryTransition({
     connectionId,
     to: "closed",
-    actorType: "system",
     note: `Student replied by text that they are no longer working at ${employerName}.`,
     data: { closedReason: "retention_lost" },
-    client: prismaAdmin,
   });
   await withStudentRlsContext(studentId, () =>
     upsertNudgeAlert(
@@ -353,9 +489,10 @@ async function handleRetentionAnswer(
         severity: "high",
         title: `Placement at ${employerName} ended`,
         summary:
-          `The ${day}-day check-in text came back "no": this student says they are no longer ` +
-          `working at ${employerName}. The connection is closed and the SPOKES follow-up is ` +
-          `recorded. Reach out before the next reporting period.`,
+          `The day-${day} check-in text came back "no": this student says they are no longer ` +
+          `working at ${employerName}. The connection is closed. Nothing has been written to ` +
+          `the SPOKES employment follow-ups — record that yourself once you know what ` +
+          `happened, before the next reporting period.`,
         sourceType: "connection",
         sourceId: connectionId,
       },
@@ -383,6 +520,23 @@ async function handleInterviewAnswer(
   });
   if (!connection || connection.studentId !== studentId) return;
   const employerName = connection.employer?.name ?? "the employer";
+
+  // Tell them something happened. Saying "no" to an interview reminder and
+  // hearing nothing back is the moment a student decides the texts are a
+  // machine that does not listen.
+  //
+  // Through the policy, never inline: quiet hours and the daily cap apply to
+  // an acknowledgement exactly as they do to a nudge, so a "no" typed at 11pm
+  // is answered at 8am rather than waking the house. `sendPolicySms` returns
+  // `deferred` in that case and the NEXT runner sweep re-derives this ack from
+  // the still-open alert, so nothing is queued anywhere.
+  await sendPolicySms({
+    studentId,
+    templateKey: interviewDeclineAckTemplateKey(connectionId),
+    body: buildInterviewDeclineAckSms(),
+    connectionId,
+    now,
+  });
 
   await withStudentRlsContext(studentId, () =>
     upsertNudgeAlert(

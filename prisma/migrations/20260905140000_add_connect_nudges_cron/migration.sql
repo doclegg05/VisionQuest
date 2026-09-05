@@ -6,8 +6,19 @@
 -- weekly jobs nudge gates on its own Monday-10:00 ET slot. An hourly sweep is
 -- therefore safe and leaves one job to register instead of six.
 --
--- :30 rather than :00 so it does not contend with `appointment-reminders`
--- (0 * * * *) or land in the same minute as `cron-health-monitor` (15 * * * *).
+-- :30 rather than :00 so it does not start in the same minute as
+-- `appointment-reminders` (0 * * * *) or `cron-health-monitor` (15 * * * *).
+-- `job-processor` runs every ten minutes and so also fires at :30 — no minute
+-- of the hour is free of it — but that job posts and returns, while this one
+-- can hold a connection for a while, which is why the two are not scheduled to
+-- START together on the hour when the other four also fire.
+--
+-- `timeout_milliseconds := 240000` (4 minutes): pg_net's default is 5 seconds,
+-- and a Monday sweep that ranks leads for a whole class does not finish in
+-- five. Without it, pg_net gives up while the runner keeps going — the request
+-- SUCCEEDS server-side, so texts go out, but net._http_response records a
+-- timeout and the health check reports a broken job that is working. Four
+-- minutes sits under the hourly slot with room to spare.
 --
 -- Pattern and command text copied from 20260902120000_reregister_baseline_cron_jobs,
 -- which in turn copied 20260708121000_add_sage_briefing_cron:
@@ -54,7 +65,8 @@ BEGIN
         headers := jsonb_build_object(
           'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'CRON_SECRET' LIMIT 1),
           'Content-Type', 'application/json'
-        )
+        ),
+        timeout_milliseconds := 240000
       );
     $cmd$
     );
