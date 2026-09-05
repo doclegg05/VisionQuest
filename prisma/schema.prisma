@@ -91,6 +91,8 @@ model Student {
   careerCampaigns         CareerCampaign[]
   failedExtractions       FailedExtraction[]
   workProfile             StudentWorkProfile?
+  employerRelationships   Employer[]               @relation("EmployerRelationshipOwner")
+  createdJobLeads         JobLead[]                @relation("CreatedJobLeads")
 
   @@schema("visionquest")
 }
@@ -666,6 +668,7 @@ model SpokesClass {
   enrollments  StudentClassEnrollment[]
   jobConfig    JobClassConfig?
   requirements ClassRequirement[]
+  jobLeads     JobLead[]
 
   @@index([status, name])
   @@index([programType])
@@ -846,6 +849,150 @@ model Opportunity {
   applications Application[]
 
   @@index([status, deadline])
+  @@schema("visionquest")
+}
+
+// ─── Match & Connect: employers, contacts, and employer-linked openings ──────
+// Phase 3 of docs/superpowers/plans/2026-09-05-match-and-connect.md
+// (shape from the design spec §4). Employer and EmployerContact are STAFF-ONLY
+// under RLS; JobLead is the one row in this group a student may read, and only
+// when it is open and visible to a class they are actively enrolled in.
+
+/// A real local employer. Backfilled once from the distinct free-text
+/// `Opportunity.company` and `SpokesRecord.employerName` strings that were the
+/// program's only employer record before this table existed.
+model Employer {
+  id String @id @default(cuid())
+
+  name String
+  /// Case-folded, whitespace-collapsed `name`. Not in the design spec's field
+  /// list: it is the mechanism that makes "find or create by name" idempotent
+  /// and race-safe. The backfill and the from-listing route both need that —
+  /// without a unique key, two instructors clicking "Make this a lead" on the
+  /// same posting create two Mountain Metals.
+  nameKey   String   @unique
+  legalName String?
+  sector    String?
+  clusters  String[] @default([])
+
+  county  String
+  city    String
+  zip     String?
+  website String?
+  notes   String? @db.Text
+
+  /// The staff member who owns this relationship (Student row with a staff role).
+  relationshipOwnerId String?
+
+  hiredSpokesGradBefore Boolean   @default(false)
+  lastHiredAt           DateTime?
+
+  /// {eip, esp, ojt, wotc, bonding} as "known" / "unknown" — never a bare
+  /// boolean, because "we have not asked" and "no" are different answers and
+  /// the console shows them differently.
+  subsidyFlags Json @default("{}")
+
+  /// active | paused | do_not_contact
+  status String @default("active")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  relationshipOwner Student?          @relation("EmployerRelationshipOwner", fields: [relationshipOwnerId], references: [id], onDelete: SetNull)
+  contacts          EmployerContact[]
+  jobLeads          JobLead[]
+
+  @@index([status, county])
+  @@schema("visionquest")
+}
+
+/// A person at an employer. Students never read this table — the RLS policy
+/// has no student branch at all, and there is no route that returns it to one.
+model EmployerContact {
+  id         String @id @default(cuid())
+  employerId String
+
+  name  String
+  role  String?
+  email String?
+  phone String?
+
+  /// email | phone | sms
+  preferredChannel String @default("email")
+
+  /// They agreed to receive packets. Null = never asked.
+  contactConsentAt DateTime?
+  /// Set = never contact this person again, whatever the employer status says.
+  doNotContactAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  employer Employer  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  jobLeads JobLead[]
+
+  @@index([employerId])
+  @@schema("visionquest")
+}
+
+/// An employer-linked opening — the thing a student is matched TO. Distinct
+/// from JobListing (a scraped third-party posting) because a lead has a named
+/// employer, a contact, requirements the instructor typed, and a shift
+/// schedule the matcher can actually reason about.
+model JobLead {
+  id         String  @id @default(cuid())
+  employerId String
+  contactId  String?
+
+  /// Which class may see this lead. NULL = program-wide. Students read a lead
+  /// only when it is open AND (classId IS NULL OR they are actively enrolled
+  /// in that class) — enforced in the RLS policy, not only in the app.
+  classId String?
+
+  title       String
+  description String? @db.Text
+
+  /// { mustHaveCerts: string[], niceToHave: string[], physical: string[], licenses: string[] }
+  requirements Json @default("{}")
+
+  /// { shifts: ("day"|"evening"|"night"|"weekend")[], hoursPerWeekMin?, hoursPerWeekMax?, startDate? }
+  schedule Json @default("{}")
+
+  payMin Float?
+  payMax Float?
+  /// hour | day | week | month | year — normalized to hourly by the salary parser.
+  payPeriod String @default("hour")
+
+  location      String
+  transitNotes  String?
+  distanceMiles Float?
+
+  clusters String[] @default([])
+
+  /// manual | opportunity | joblisting | joborder
+  source String
+  /// Opportunity.id or JobListing.id when this lead was copied from one.
+  sourceRef String?
+
+  /// open | filled | paused | closed
+  status   String @default("open")
+  openings Int    @default(1)
+
+  postedAt DateTime  @default(now())
+  closesAt DateTime?
+
+  /// The staff member who entered it.
+  createdById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employer  Employer         @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  contact   EmployerContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  class     SpokesClass?     @relation(fields: [classId], references: [id], onDelete: SetNull)
+  createdBy Student?         @relation("CreatedJobLeads", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status, employerId])
+  @@index([source, sourceRef])
   @@schema("visionquest")
 }
 
