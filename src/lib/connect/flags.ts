@@ -12,6 +12,7 @@ import { ENROLLED_STATUSES } from "./classes";
 import {
   CONNECT_CONFIG_KEY,
   CONNECT_SUBSIDY_LINES_CONFIG_KEY,
+  SMS_NUDGES_CONFIG_KEY,
   isConnectEnabledForClasses,
   isSubsidyLinesEnabled,
   parseConnectScope,
@@ -23,6 +24,11 @@ export * from "./flags-shared";
 /** The pilot scope from SystemConfig (values are cached 60s upstream). */
 export async function getConnectScope(): Promise<ConnectScope> {
   return parseConnectScope(await getPlainConfigValue(CONNECT_CONFIG_KEY));
+}
+
+/** The SMS-nudge scope, same vocabulary, read the same way. */
+export async function getSmsNudgeScope(): Promise<ConnectScope> {
+  return parseConnectScope(await getPlainConfigValue(SMS_NUDGES_CONFIG_KEY));
 }
 
 /** Whether the subsidy line may be rendered at all, before any rule check. */

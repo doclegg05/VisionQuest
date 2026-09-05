@@ -7,6 +7,11 @@ import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnsw
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 import { ConsentSection } from "@/components/settings/ConsentSection";
 import { WorkAvailabilitySection } from "@/components/settings/WorkAvailabilitySection";
+import {
+  SMS_CONSENT_CHECKBOX_LABEL,
+  SMS_CONSENT_HEADING,
+  SMS_CONSENT_POINTS,
+} from "@/lib/nudges/sms-policy-shared";
 
 const PHONE_REGEX = /^\+?[1-9]\d{1,14}$/;
 
@@ -48,6 +53,19 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
   const [smsEnabled, setSmsEnabled] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  // SMS consent is separate from the toggle: `smsEnabled` is a preference,
+  // `smsConsented` is permission (see the SMS policy in src/lib/nudges).
+  const [smsConsented, setSmsConsented] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  /**
+   * The same predicate the other student-only sections use, so the consent
+   * copy appears wherever ConsentSection and the work-availability intake do.
+   * It defaults to true before the session resolves, which is the safe
+   * direction here: showing the consent step to someone who turns out to be
+   * staff costs a paragraph, hiding it from a student would let the toggle
+   * sit permanently disabled with nothing explaining why.
+   */
+  const isStudentSurface = sessionRole !== "teacher" && sessionRole !== "admin";
   const [notifStatus, setNotifStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [notifError, setNotifError] = useState("");
 
@@ -84,6 +102,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           setEmailEnabled(Boolean(notifData.email?.enabled));
           setSmsEnabled(Boolean(notifData.sms?.enabled));
           setPhoneNumber(notifData.sms?.destination ?? "");
+          setSmsConsented(Boolean(notifData.sms?.consented));
         }
 
         if (role !== "teacher" && role !== "admin") {
@@ -110,11 +129,12 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
   }, [initialRole]);
 
   const saveNotificationPreferences = async (
-    overrides: { email?: boolean; sms?: boolean; phone?: string } = {},
+    overrides: { email?: boolean; sms?: boolean; phone?: string; consent?: boolean } = {},
   ) => {
     const resolvedEmail = overrides.email ?? emailEnabled;
     const resolvedSms = overrides.sms ?? smsEnabled;
     const resolvedPhone = overrides.phone ?? phoneNumber;
+    const resolvedConsent = overrides.consent ?? consentChecked;
 
     if (resolvedSms && resolvedPhone && !PHONE_REGEX.test(resolvedPhone)) {
       setPhoneError("Enter a valid phone number, e.g. +12125551234");
@@ -133,6 +153,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           sms: {
             enabled: resolvedSms,
             ...(resolvedPhone ? { phoneNumber: resolvedPhone } : {}),
+            ...(resolvedConsent ? { consent: true } : {}),
           },
         }),
       });
@@ -144,6 +165,14 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
         return;
       }
 
+      // The server stamped consent on this save; the box has done its job and
+      // the checked/unchecked state must not linger into the next request.
+      if (resolvedSms) {
+        setSmsConsented(true);
+        setConsentChecked(false);
+      } else {
+        setSmsConsented(false);
+      }
       setNotifStatus("success");
       setTimeout(() => setNotifStatus("idle"), 3000);
     } catch {
@@ -587,21 +616,25 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           <div className="py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-[var(--ink-strong)]">SMS Notifications</p>
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">Text Messages</p>
                 <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
-                  Receive daily coaching prompts via text message
+                  Get reminders and job news by text
                 </p>
               </div>
               <button
                 type="button"
                 role="switch"
                 aria-checked={smsEnabled}
+                // Turning it ON is refused by the API without consent, so the
+                // switch is disabled until the box below is ticked. The student
+                // can always turn it OFF, whatever the box says.
+                disabled={!smsEnabled && isStudentSurface && !smsConsented && !consentChecked}
                 onClick={() => {
                   const next = !smsEnabled;
                   setSmsEnabled(next);
                   void saveNotificationPreferences({ sms: next });
                 }}
-                className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 ${
+                className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                   smsEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
                 }`}
               >
@@ -612,6 +645,31 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
                 />
               </button>
             </div>
+
+            {isStudentSurface && !smsConsented && (
+              <div className="mt-4 rounded-xl border border-[var(--border)] p-4">
+                <p className="text-sm font-semibold text-[var(--ink-strong)]">
+                  {SMS_CONSENT_HEADING}
+                </p>
+                <ul className="mt-2 space-y-1.5 text-sm text-[var(--ink-muted)]">
+                  {SMS_CONSENT_POINTS.map((point) => (
+                    <li key={point} className="flex gap-2">
+                      <span aria-hidden="true">•</span>
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+                <label className="mt-4 flex min-h-11 items-center gap-3 text-sm text-[var(--ink-strong)]">
+                  <input
+                    type="checkbox"
+                    checked={consentChecked}
+                    onChange={(event) => setConsentChecked(event.target.checked)}
+                    className="h-5 w-5 flex-shrink-0"
+                  />
+                  <span>{SMS_CONSENT_CHECKBOX_LABEL}</span>
+                </label>
+              </div>
+            )}
 
             {smsEnabled && (
               <div className="mt-4">

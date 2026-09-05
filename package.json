@@ -56,6 +56,7 @@
     "cron:health": "node scripts/cron-health-check.mjs",
     "jobs:expire-stale": "node scripts/expire-stale-background-jobs.mjs",
     "report:pathway-outcomes": "tsx scripts/pathway-outcomes-report.ts",
+    "report:dohs-spokes": "tsx scripts/dohs-spokes-report.ts",
     "clusters:backfill": "node scripts/backfill-national-clusters.mjs",
     "employers:backfill": "tsx scripts/backfill-employers.ts",
     "cos:smoke": "tsx scripts/cos-smoke.mjs",

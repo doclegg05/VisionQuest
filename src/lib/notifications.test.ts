@@ -17,6 +17,9 @@ const mockAdminNotificationFindFirst = mock.fn() as any;
 const mockAdminStudentFindUnique = mock.fn() as any;
 const mockStudentFindUnique = mock.fn() as any;
 const mockPreferenceFindMany = mock.fn() as any;
+const mockAdminPreferenceFindFirst = mock.fn() as any;
+const mockOutboundCount = mock.fn() as any;
+const mockOutboundCreate = mock.fn() as any;
 const mockSendEmail = mock.fn() as any;
 const mockSendSms = mock.fn() as any;
 
@@ -59,6 +62,22 @@ mock.module("@/lib/db", {
       student: {
         get findUnique() {
           return mockAdminStudentFindUnique;
+        },
+      },
+      // The SMS branch now runs through src/lib/nudges/sms-policy.ts, which
+      // reads the consent record and writes the outbound log on the admin
+      // client (OutboundMessage is staff-only under RLS).
+      notificationPreference: {
+        get findFirst() {
+          return mockAdminPreferenceFindFirst;
+        },
+      },
+      outboundMessage: {
+        get count() {
+          return mockOutboundCount;
+        },
+        get create() {
+          return mockOutboundCreate;
         },
       },
     },
@@ -140,6 +159,9 @@ describe("sendMultiChannelNotification logging", () => {
       mockNotificationFindFirst,
       mockStudentFindUnique,
       mockPreferenceFindMany,
+      mockAdminPreferenceFindFirst,
+      mockOutboundCount,
+      mockOutboundCreate,
       mockSendEmail,
       mockSendSms,
       mockDebug,
@@ -163,6 +185,16 @@ describe("sendMultiChannelNotification logging", () => {
       { channel: "email", destination: STUDENT_EMAIL, enabled: true },
       { channel: "sms", destination: STUDENT_PHONE, enabled: true },
     ]);
+    // A consenting recipient inside the send window, so the SMS branch is
+    // exercised end to end rather than short-circuiting on policy.
+    mockAdminPreferenceFindFirst.mock.mockImplementation(async () => ({
+      enabled: true,
+      destination: STUDENT_PHONE,
+      smsConsentAt: new Date("2026-08-01T12:00:00.000Z"),
+      smsRevokedAt: null,
+    }));
+    mockOutboundCount.mock.mockImplementation(async () => 0);
+    mockOutboundCreate.mock.mockImplementation(async () => ({ id: "outbound-1" }));
     mockSendEmail.mock.mockImplementation(async () => undefined);
     mockSendSms.mock.mockImplementation(async () => true);
   });
