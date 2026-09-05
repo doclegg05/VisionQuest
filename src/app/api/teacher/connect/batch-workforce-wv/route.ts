@@ -49,7 +49,7 @@ function countAvailableCells(profile: WorkProfile | undefined): number {
   return count;
 }
 
-export const GET = withTeacherAuth(async (session) => {
+export const GET = withTeacherAuth(async (session, _req: Request) => {
   const managedIds = (await listManagedStudentIds(session)).slice(0, MAX_STUDENTS);
 
   if (managedIds.length === 0) {

@@ -24,6 +24,8 @@ import {
   transportFeasible,
   type WorkProfile,
 } from "@/lib/connect/work-profile";
+import { describeLeadPay } from "@/lib/connect/leads-shared";
+import { rankLeadsForStudent } from "@/lib/connect/matching";
 import { dedupeJobsForDisplay } from "@/lib/job-board/duplicates";
 import { buildJobFilterWhere, parseJobFilters } from "@/lib/job-board/job-filters";
 import {
@@ -162,7 +164,7 @@ const searchJobs: AgentTool = {
     });
     const jobs = dedupeJobsForDisplay(listings);
 
-    const [savedJobs, discovery, resumeRecord, workProfile] = await Promise.all([
+    const [savedJobs, discovery, resumeRecord, workProfile, leadFits] = await Promise.all([
       prisma.studentSavedJob.findMany({
         where: { studentId },
         select: {
@@ -176,6 +178,9 @@ const searchJobs: AgentTool = {
       }),
       prisma.resumeData.findUnique({ where: { studentId }, select: { data: true } }),
       getWorkProfile(studentId),
+      // Phase 3: employer-linked leads an instructor entered, already hard-
+      // block-filtered and class-scoped by rankLeadsForStudent.
+      rankLeadsForStudent(studentId, { limit: 25 }),
     ]);
 
     const resume = resumeRecord ? parseStoredResumeData(resumeRecord.data) : null;
@@ -198,18 +203,26 @@ const searchJobs: AgentTool = {
     const byId = new Map(jobs.map((job) => [job.id, job]));
 
     const blocks = new Map<string, string>();
-    const shown: Array<{
-      jobListingId: string;
+
+    // A candidate is either a scraped posting from the class board or an
+    // employer-linked lead an instructor entered (Phase 3). Both are ranked on
+    // the same 0-100 scale — leads by fit(), listings by the job-board scorer —
+    // so the three shown are genuinely the three best, not "leads first".
+    interface Candidate {
+      kind: "lead" | "listing";
+      jobListingId?: string;
+      jobLeadId?: string;
       title: string;
       company: string;
       location: string;
       salary: string | null;
       matchLabel: string | null;
       reason: string;
-    }> = [];
+      score: number;
+    }
+    const candidates: Candidate[] = [];
 
     for (const rec of ranked) {
-      if (shown.length >= MAX_RESULTS) break;
       const job = byId.get(rec.jobListingId);
       if (!job) continue;
 
@@ -219,7 +232,8 @@ const searchJobs: AgentTool = {
         continue;
       }
 
-      shown.push({
+      candidates.push({
+        kind: "listing",
         jobListingId: job.id,
         title: job.title,
         company: job.company,
@@ -230,8 +244,28 @@ const searchJobs: AgentTool = {
           rec.matchReasons.map((reason) => reason.label),
           job,
         ),
+        score: rec.score,
       });
     }
+
+    // rankLeadsForStudent has already dropped every hard-blocked lead and
+    // applied the same class scoping the RLS policy enforces.
+    for (const entry of leadFits) {
+      candidates.push({
+        kind: "lead",
+        jobLeadId: entry.lead.id,
+        title: entry.lead.title,
+        company: entry.lead.employerName,
+        location: entry.lead.location,
+        salary: describeLeadPay(entry.lead),
+        matchLabel: null,
+        reason: entry.fit.reasons.join(" ") ||
+          `${entry.lead.title} at ${entry.lead.employerName} in ${entry.lead.location}.`,
+        score: entry.fit.score,
+      });
+    }
+
+    const shown = candidates.sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS);
 
     const blockedCount = blocks.size;
     const blockedForPay = [...blocks.values()].filter((r) => r === "pay_below_floor").length;
@@ -243,7 +277,7 @@ const searchJobs: AgentTool = {
           ? "Every job on the board was left out because they said they have no way to get there yet."
           : blockedForPay > 0
             ? "Every job on the board pays less than the floor they set."
-            : "Their class job board has no open postings right now.";
+            : "Their class job board has no open postings and no leads right now.";
       return {
         status: "success",
         summary:
@@ -261,12 +295,22 @@ const searchJobs: AgentTool = {
     }
 
     const lines = shown
-      .map(
-        (job) =>
-          `"${job.title}" at ${job.company} (${job.location})` +
+      .map((job) => {
+        // The id tag tells the model which follow-up tool applies: explain_job
+        // takes a jobListingId. A lead has no explain_job path yet, so it is
+        // tagged with its own id and the hint says so, rather than handing the
+        // model an id that would come back "not found".
+        const idTag =
+          job.kind === "listing"
+            ? `[jobListingId=${job.jobListingId}]`
+            : `[jobLeadId=${job.jobLeadId}]`;
+        const kindNote = job.kind === "lead" ? " (a job your instructor lined up)" : "";
+        return (
+          `"${job.title}" at ${job.company}${kindNote} (${job.location})` +
           `${job.salary ? ` — ${job.salary}` : " — pay not listed"}. ` +
-          `Reason: ${job.reason} [jobListingId=${job.jobListingId}]`,
-      )
+          `Reason: ${job.reason} ${idTag}`
+        );
+      })
       .join("\n");
 
     const blockedNote =
@@ -282,11 +326,12 @@ const searchJobs: AgentTool = {
       summary: `Found ${shown.length} job${shown.length === 1 ? "" : "s"} that fit you.`,
       data: { jobs: shown, blocked: blockedCount },
       modelHint:
-        `Jobs from the student's own class board:\n${lines}\n` +
+        `Jobs from the student's own class board and the leads their instructor entered:\n${lines}\n` +
         `${blockedNote}\n` +
         "Name ONLY these jobs — do not invent a company, a title, a wage, or a posting that is " +
         "not in this list. Give each one its reason in your own plain words, then offer " +
-        "explain_job for whichever one they want to hear more about.",
+        "explain_job for any entry tagged jobListingId. An entry tagged jobLeadId cannot be " +
+        "explained by a tool yet — tell them to ask their instructor about it instead.",
     };
   },
 };

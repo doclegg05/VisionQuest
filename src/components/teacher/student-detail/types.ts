@@ -203,6 +203,13 @@ export interface ApplicationData {
   status: string;
   updatedAt: string;
   appliedAt: string | null;
+  /**
+   * null = legacy row, "self_reported" = the student claimed it, "verified" =
+   * an instructor confirmed it. Carried so the Progress tab can offer the
+   * per-application Verify action that `/api/teacher/outcomes/verify` has
+   * always supported but nothing ever called.
+   */
+  verificationStatus?: string | null;
   opportunity: {
     id: string;
     title: string;

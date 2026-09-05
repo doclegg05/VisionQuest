@@ -401,6 +401,94 @@ export async function summarizeLeadFits(
 }
 
 // ---------------------------------------------------------------------------
+// rankRoster — the console's students board
+// ---------------------------------------------------------------------------
+
+export interface RosterLead {
+  jobLeadId: string;
+  title: string;
+  employerName: string;
+  score: number;
+  reasons: string[];
+}
+
+export interface RosterEntry {
+  studentId: string;
+  displayName: string;
+  /** Best leads first, capped by the caller's `leadsPerStudent`. */
+  leads: RosterLead[];
+}
+
+/**
+ * "Best leads" for every student on the roster.
+ *
+ * Deliberately NOT a loop over `rankLeadsForStudent`: that is six queries per
+ * student, so a class of thirty would be a hundred and eighty round trips for
+ * one page. This shares the same three loads `summarizeLeadFits` uses and runs
+ * the identical `fit()` per (student, lead) pair in memory — same rules, same
+ * numbers, one page load.
+ */
+export async function rankRoster(
+  options: { classId?: string | null; limit?: number; leadsPerStudent?: number } = {},
+): Promise<RosterEntry[]> {
+  const limit = Math.min(options.limit ?? MAX_CANDIDATES, MAX_CANDIDATES);
+  const leadsPerStudent = options.leadsPerStudent ?? 3;
+
+  const leadRows = (await prisma.jobLead.findMany({
+    where: { status: "open", employer: { status: { not: "do_not_contact" } } },
+    take: MAX_LEADS,
+    orderBy: { postedAt: "desc" },
+    select: LEAD_SELECT,
+  })) as LeadRow[];
+
+  const candidates = (await loadCandidates(options.classId ?? null, limit)).slice(0, limit);
+  const studentIds = candidates.map((candidate) => candidate.student.id);
+
+  const [workProfiles, withdrawnRows] = await Promise.all([
+    getWorkProfiles(studentIds),
+    loadWithdrawals(studentIds),
+  ]);
+  const withdrawn = withdrawnKeysByStudent(withdrawnRows);
+
+  return candidates.map((candidate) => {
+    const leads: RosterLead[] = [];
+
+    for (const row of leadRows) {
+      // A class-scoped lead is only a candidate for that class's students.
+      if (row.classId && row.classId !== candidate.classId) continue;
+
+      const lead = toMatchLead(row);
+      const result = fit(
+        toMatchStudent(candidate, {
+          workProfile: workProfiles.get(candidate.student.id) ?? null,
+          withdrewFromEmployer:
+            withdrawn.get(candidate.student.id)?.has(employerNameKey(row.employer.name)) ?? false,
+          employerId: lead.employerId,
+        }),
+        lead,
+      );
+      if (result.hardBlocks.length > 0) continue;
+
+      leads.push({
+        jobLeadId: lead.id,
+        title: lead.title,
+        employerName: lead.employerName,
+        score: result.score,
+        reasons: result.reasons,
+      });
+    }
+
+    leads.sort((a, b) => b.score - a.score);
+
+    return {
+      studentId: candidate.student.id,
+      displayName: candidate.student.displayName,
+      leads: leads.slice(0, leadsPerStudent),
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // rankLeadsForStudent — the student's own view and Sage's search_jobs
 // ---------------------------------------------------------------------------
 

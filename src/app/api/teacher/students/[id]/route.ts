@@ -158,6 +158,8 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           status: true,
           updatedAt: true,
           appliedAt: true,
+          // Feeds the per-application Verify action on the Progress tab.
+          verificationStatus: true,
           opportunity: {
             select: {
               id: true,
