@@ -80,6 +80,8 @@ export async function draftEndorsement(
   studentId: string,
   studentName: string,
   facts: EndorsementFacts,
+  /** The instructor asking for the draft. They are the ACTOR on the audit row. */
+  actor: { id: string; role: string },
 ): Promise<EndorsementResult> {
   const grounding = renderFacts(studentName, facts);
 
@@ -91,8 +93,14 @@ export async function draftEndorsement(
 
   const providerClass = getProviderClass(baseProvider.name);
   const auditBase = {
-    actorId: studentId,
-    actorRole: "teacher",
+    // The instructor is the actor: they asked for this draft. `studentId` is
+    // the routing subject and the `targetId`, not the person who acted — the
+    // first cut recorded the student as an actor with the role "teacher",
+    // which is wrong in both halves and would have mis-attributed every row in
+    // the FERPA accountability report.
+    actorId: actor.id,
+    actorRole: actor.role,
+    targetId: studentId,
     route: "connect.draft_endorsement",
     task: "draft_endorsement" as const,
     sensitivity: "student_record" as const,

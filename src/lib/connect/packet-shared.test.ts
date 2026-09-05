@@ -128,7 +128,7 @@ describe("the employer packet — what it may never contain", () => {
 
   it("carries the ask-them line when there is no verified subsidy figure", () => {
     assert.equal(packet({ subsidyLine: null }).subsidyLine, null);
-    assert.match(SUBSIDY_FALLBACK_LINE, /hiring incentives/i);
+    assert.match(SUBSIDY_FALLBACK_LINE, /money for hiring/i);
     // The fallback names no dollar figure and no program: an unverified number
     // on an employer-facing page is the one thing P0.8 exists to prevent.
     assert.ok(!/\$|\d/.test(SUBSIDY_FALLBACK_LINE));

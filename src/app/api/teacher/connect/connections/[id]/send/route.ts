@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 
 import { badRequest, forbidden, withTeacherAuth } from "@/lib/api-error";
 import { listManagedStudentIds } from "@/lib/classroom";
-import { ConnectionError, sendConnection } from "@/lib/connect/connections";
+import {
+  ConnectionError,
+  connectionOwner,
+  sendConnection,
+} from "@/lib/connect/connections";
 import { isConnectEnabledForStudent } from "@/lib/connect/flags";
-import { prisma } from "@/lib/db";
 
 /**
  * POST /api/teacher/connect/connections/[id]/send — Match & Connect Task 4.3.
@@ -24,21 +27,18 @@ export const POST = withTeacherAuth(
   async (session, _req: Request, context: { params: Promise<{ id: string }> }) => {
     const { id } = await context.params;
 
-    const connection = await prisma.connection.findUnique({
-      where: { id },
-      select: { studentId: true },
-    });
-    if (!connection) {
+    const ownerId = await connectionOwner(id);
+    if (!ownerId) {
       // Same 404 whether it does not exist or belongs to another instructor's
       // student: this route must not be an existence oracle on connection ids.
       return NextResponse.json({ error: "That connection wasn't found." }, { status: 404 });
     }
 
     const managed = await listManagedStudentIds(session);
-    if (!managed.includes(connection.studentId)) {
+    if (!managed.includes(ownerId)) {
       throw forbidden("That student isn't in your classes.");
     }
-    if (!(await isConnectEnabledForStudent(connection.studentId))) {
+    if (!(await isConnectEnabledForStudent(ownerId))) {
       throw badRequest("Connect isn't turned on for that student's class yet.");
     }
 

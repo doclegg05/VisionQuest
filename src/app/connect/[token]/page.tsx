@@ -78,12 +78,21 @@ export default async function EmployerConnectPage({
     : [];
 
   const fields = packetFieldList(view.packet);
+  // Gate every block on the APPROVED FIELD LIST, not on whether the value
+  // happens to be present. A packet whose `includedFields` omits a key but
+  // whose value column still carries something — a student who approved a
+  // narrower list, or a future partial packet — must not have it rendered:
+  // the list is what they consented to, and the value is just storage.
+  const included = new Set(view.packet.includedFields);
 
   return (
     <main id="main-content" className="min-h-screen px-4 py-8 md:px-8">
       <div className="mx-auto flex max-w-2xl flex-col gap-6">
         <section className="page-hero">
           <p className="page-eyebrow">SPOKES</p>
+          <p className="text-sm text-[var(--ink-muted)]">
+            SPOKES is a West Virginia program that helps people train for jobs and get hired.
+          </p>
           {/* The employer is named so a contact who handles hiring for more
               than one site knows immediately which opening this is about. */}
           <h1 className="page-title">
@@ -98,7 +107,7 @@ export default async function EmployerConnectPage({
         <section className="surface-section p-6">
           <h2 className="text-lg font-semibold text-[var(--ink-strong)]">About them</h2>
           <dl className="mt-4 flex flex-col gap-4">
-            {view.packet.certifications.length > 0 && (
+            {included.has("verified_certifications") && view.packet.certifications.length > 0 && (
               <div>
                 <dt className="text-sm font-semibold text-[var(--ink-muted)]">
                   Cards a teacher checked
@@ -108,7 +117,9 @@ export default async function EmployerConnectPage({
                 </dd>
               </div>
             )}
-            {view.packet.availabilitySummary && view.packet.availabilitySummary !== "Not set" && (
+            {included.has("availability") &&
+              view.packet.availabilitySummary &&
+              view.packet.availabilitySummary !== "Not set" && (
               <div>
                 <dt className="text-sm font-semibold text-[var(--ink-muted)]">When they can work</dt>
                 <dd className="mt-1 text-base text-[var(--ink-strong)]">
@@ -116,7 +127,7 @@ export default async function EmployerConnectPage({
                 </dd>
               </div>
             )}
-            {view.packet.earliestStart && (
+            {included.has("earliest_start") && view.packet.earliestStart && (
               <div>
                 <dt className="text-sm font-semibold text-[var(--ink-muted)]">
                   The soonest they can start
@@ -126,7 +137,7 @@ export default async function EmployerConnectPage({
                 </dd>
               </div>
             )}
-            {view.packet.endorsement.trim().length > 0 && (
+            {included.has("endorsement") && view.packet.endorsement.trim().length > 0 && (
               <div>
                 <dt className="text-sm font-semibold text-[var(--ink-muted)]">
                   What their teacher says
@@ -138,7 +149,7 @@ export default async function EmployerConnectPage({
             )}
           </dl>
 
-          {view.hasPacketPdf && (
+          {included.has("resume") && view.hasPacketPdf && (
             <a
               href={`/api/connect/employer/${token}/packet`}
               className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-base font-semibold text-[var(--ink-strong)]"
@@ -147,15 +158,22 @@ export default async function EmployerConnectPage({
             </a>
           )}
 
-          <p className="mt-5 text-sm text-[var(--ink-muted)]">
-            This is everything that was shared: {fields.join(", ")}.
-          </p>
+          <div className="mt-5 text-sm text-[var(--ink-muted)]">
+            <p>This is everything that was shared:</p>
+            <ul className="mt-1 list-disc pl-5">
+              {fields.map((field) => (
+                <li key={field}>{field}</li>
+              ))}
+            </ul>
+          </div>
         </section>
 
         <section className="surface-section p-6">
           <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Money for hiring</h2>
           <p className="mt-2 text-base text-[var(--ink-strong)]">
-            {view.packet.subsidyLine ?? SUBSIDY_FALLBACK_LINE}
+            {included.has("subsidy_line")
+              ? (view.packet.subsidyLine ?? SUBSIDY_FALLBACK_LINE)
+              : SUBSIDY_FALLBACK_LINE}
           </p>
           <p className="mt-2 text-sm text-[var(--ink-muted)]">
             Rules change. Check with the local WV Works office before you count on any of it.

@@ -69,7 +69,7 @@ export const PACKET_FIELDS: readonly PacketFieldDescriptor[] = PACKET_FIELD_KEYS
  * off (plan P0.8), and an unverified benefits number on a page an employer
  * reads is exactly the kind of thing this program cannot take back.
  */
-export const SUBSIDY_FALLBACK_LINE = "Ask about hiring incentives.";
+export const SUBSIDY_FALLBACK_LINE = "Ask us about money for hiring.";
 
 export const packetFieldKeySchema = z.enum(PACKET_FIELD_KEYS);
 

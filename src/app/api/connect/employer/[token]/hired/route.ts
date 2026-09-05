@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { withErrorHandler } from "@/lib/api-error";
+import {
+  ConnectionConflictError,
+  TransitionNotAllowedError,
+} from "@/lib/connect/pipeline";
 import { EmployerActionError, recordHired } from "@/lib/connect/employer-actions";
-import { employerTokenBodySchema, resolveEmployerRequest } from "@/lib/connect/employer-request";
+import {
+  clientIpFrom,
+  employerTokenBodySchema,
+  resolveEmployerRequest,
+} from "@/lib/connect/employer-request";
 import { parseBody } from "@/lib/schemas";
 
 /**
@@ -27,7 +35,7 @@ export const POST = withErrorHandler(
     const { token } = await context.params;
     const body = await parseBody(req, bodySchema);
 
-    const resolved = await resolveEmployerRequest(token, body.token);
+    const resolved = await resolveEmployerRequest(token, body.token, clientIpFrom(req));
     if (!resolved.ok) return resolved.response;
 
     try {
@@ -42,10 +50,21 @@ export const POST = withErrorHandler(
       if (error instanceof EmployerActionError) {
         return NextResponse.json({ error: error.message }, { status: error.status });
       }
-      // Includes the replay case: a second "Hired" on the same link finds a
-      // connection whose token was cleared, so it never reaches here — and if
-      // it did, hired → hired is not a legal transition.
-      return NextResponse.json({ error: "That link is no longer active." }, { status: 409 });
+      // A transition that is no longer legal, or a row that moved under us, is
+      // a conflict. Anything ELSE is a programming error and must reach
+      // withErrorHandler as a 500 — the first cut caught everything here and
+      // reported real bugs to the employer as "This link is no longer active",
+      // which is both wrong and unreportable.
+      if (
+        error instanceof ConnectionConflictError ||
+        error instanceof TransitionNotAllowedError
+      ) {
+        return NextResponse.json(
+          { error: "That link is no longer active." },
+          { status: 409 },
+        );
+      }
+      throw error;
     }
   },
 );

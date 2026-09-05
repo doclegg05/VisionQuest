@@ -14,6 +14,8 @@
 //      limiter FAILS CLOSED.
 // =============================================================================
 
+import { Prisma } from "@prisma/client";
+
 import { logAuditEvent } from "@/lib/audit";
 import { prisma, prismaAdmin } from "@/lib/db";
 import { sendEmail, isEmailDeliveryConfigured } from "@/lib/email";
@@ -291,12 +293,73 @@ function toStudentView(row: {
 /** Proposals waiting on this student's tap. Their own rows only, by RLS. */
 export async function listPendingForStudent(studentId: string) {
   const rows = await prisma.connection.findMany({
-    where: { studentId, status: "proposed" },
-    orderBy: { createdAt: "desc" },
+    // `packet: { not: Prisma.DbNull }` — a proposal with no packet has nothing
+    // to consent TO, and rendering a consent card for it would ask a student
+    // to approve an empty list. Cannot happen now that the packet is written in
+    // the insert, but the read stays defensive: this is the query behind the
+    // one screen in the product where "approve" means "share my information".
+    where: { studentId, status: "proposed", packet: { not: Prisma.DbNull } },
+    // OLDEST first: the panel shows one card at a time, and the one that has
+    // been waiting longest is the one to answer.
+    orderBy: { createdAt: "asc" },
     take: 20,
     select: STUDENT_CONNECTION_SELECT,
   });
   return rows.map(toStudentView).filter((row): row is StudentConnectionView => row !== null);
+}
+
+/**
+ * The student's LIVE introductions — everything after they approved and before
+ * it ended.
+ *
+ * Without this list there was no screen on which a student could act on the
+ * card's own promise that they could take it back: `listPendingForStudent`
+ * returned only `proposed`, and the disclosure log only rows already sent, so
+ * an approved-but-unsent connection existed nowhere in the product.
+ */
+export async function listActiveForStudent(studentId: string) {
+  const rows = await prisma.connection.findMany({
+    where: { studentId, status: { in: [...STUDENT_VISIBLE_CONNECTION_STATUSES] } },
+    orderBy: { statusChangedAt: "desc" },
+    take: 25,
+    select: STUDENT_CONNECTION_SELECT,
+  });
+  return rows.map(toStudentView).filter((row): row is StudentConnectionView => row !== null);
+}
+
+/**
+ * The student behind a connection, and nothing else.
+ *
+ * Exists so the teacher routes can answer "is this one of mine?" without a
+ * Prisma call of their own — route handlers hold no queries
+ * (.claude/rules/code-style.md), and three of them had grown one.
+ */
+export async function connectionOwner(connectionId: string): Promise<string | null> {
+  const row = await prisma.connection.findUnique({
+    where: { id: connectionId },
+    select: { studentId: true },
+  });
+  return row?.studentId ?? null;
+}
+
+/**
+ * How the connection was raised, and which lead — for the approve route's
+ * SageOperation attribution.
+ */
+export async function connectionProvenance(connectionId: string, studentId: string) {
+  return prisma.connection.findFirst({
+    where: { id: connectionId, studentId },
+    select: { proposedVia: true, jobLeadId: true },
+  });
+}
+
+/** The employer's subsidy flags and status for a lead — a STAFF-only read. */
+export async function leadEmployerContext(jobLeadId: string) {
+  const lead = await prisma.jobLead.findUnique({
+    where: { id: jobLeadId },
+    select: { employer: { select: { subsidyFlags: true, status: true } } },
+  });
+  return lead?.employer ?? null;
 }
 
 /** Everything ever shared about this student, for the /memory disclosure list. */
