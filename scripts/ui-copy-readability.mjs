@@ -26,15 +26,30 @@
  *   npx tsx scripts/ui-copy-readability.mjs --gate       (exits 1 if any non-exempt
  *                                                          scorable string exceeds
  *                                                          the grade ceiling)
+ *   npx tsx scripts/ui-copy-readability.mjs --json-out=<path>
+ *                                                        (additive; also writes the
+ *                                                         full candidate list + summary
+ *                                                         as JSON to <path>, alongside
+ *                                                         whatever console output
+ *                                                         --gate/report mode already
+ *                                                         produce — never a replacement
+ *                                                         for either)
  *
  * The grade ceiling is read from src/lib/sage/readability.ts's exported
  * PLAIN_LANGUAGE_MAX_GRADE — the single knob shared with the Sage gate. The
  * ideal grade (PLAIN_LANGUAGE_IDEAL_GRADE, 6) is reported as a comparison
  * point for the median but is NOT itself gated.
+ *
+ * `--json-out` was added 2026-09-05 for the benchmark suite
+ * (config/benchmarks/readability-by-surface.json), which needs the raw
+ * per-string data rather than a console report. It changes nothing about the
+ * console output or exit-code behavior of `--gate`/report mode — verified by
+ * diffing `npx tsx scripts/ui-copy-readability.mjs` (no flags) before and
+ * after this addition, byte-identical.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
@@ -343,8 +358,93 @@ function median(values) {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
+/**
+ * Reusable core of the scan: walk an arbitrary list of repo-relative root
+ * paths and return every copy-candidate string found under them, scored the
+ * same way `main()` scores its fixed SCAN_ROOTS.
+ *
+ * Added for the benchmark suite (`scripts/bench/suites/readability-by-
+ * surface.mjs`, 2026-09-05), which needs per-route-family grades rather than
+ * one pooled report. Deliberately a separate function rather than a
+ * refactor of `main()`'s own loop — `main()`'s body (below) is untouched, so
+ * this addition cannot change `--gate`'s existing behavior. Some duplication
+ * with `main()` is the accepted cost of that isolation.
+ */
+export async function scanReadabilityForRoots(rootRelPaths) {
+  const { assessReadability, PLAIN_LANGUAGE_MAX_GRADE } = await import(
+    "../src/lib/sage/readability.ts"
+  );
+  const allowlist = loadAllowlist();
+
+  const files = [];
+  for (const relPath of rootRelPaths) {
+    const abs = join(REPO_ROOT, relPath);
+    if (!existsSync(abs)) continue;
+    walk(abs, files);
+  }
+
+  const candidates = [];
+  for (const file of files) {
+    const relPath = relative(REPO_ROOT, file);
+    let source;
+    try {
+      source = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+
+    let sourceFile;
+    try {
+      sourceFile = ts.createSourceFile(
+        file,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+      );
+    } catch {
+      continue;
+    }
+
+    const record = (node, rawText) => {
+      const text = rawText.replace(/\s+/g, " ").trim();
+      if (!text || looksCodeLike(text)) return;
+      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+      const assessment = assessReadability(text, { maxGrade: PLAIN_LANGUAGE_MAX_GRADE });
+      candidates.push({
+        file: relPath,
+        line: line + 1,
+        text,
+        grade: assessment.grade,
+        words: assessment.words,
+        scorable: assessment.scorable,
+        exempt: isExempt(allowlist, text, relPath),
+      });
+    };
+
+    const visit = (node) => {
+      if (ts.isJsxText(node)) {
+        record(node, node.text);
+      } else if (ts.isStringLiteralLike(node) && isCopyCandidate(node)) {
+        record(node, node.text);
+      }
+      ts.forEachChild(node, visit);
+    };
+
+    try {
+      visit(sourceFile);
+    } catch {
+      // Same skip-on-parse-error behavior as main() below.
+    }
+  }
+
+  return candidates;
+}
+
 async function main() {
   const gate = process.argv.includes("--gate");
+  const jsonOutArg = process.argv.find((arg) => arg.startsWith("--json-out="));
+  const jsonOutPath = jsonOutArg ? jsonOutArg.slice("--json-out=".length) : null;
 
   const { assessReadability, PLAIN_LANGUAGE_MAX_GRADE, PLAIN_LANGUAGE_IDEAL_GRADE } = await import(
     "../src/lib/sage/readability.ts"
@@ -472,6 +572,34 @@ async function main() {
   );
   console.log();
 
+  // Additive: writes the full report as JSON alongside the console output
+  // above. Never gates on its own and never changes what --gate/report mode
+  // print or return — see the doc comment at the top of this file.
+  if (jsonOutPath) {
+    const jsonPath = resolve(REPO_ROOT, jsonOutPath);
+    mkdirSync(dirname(jsonPath), { recursive: true });
+    writeFileSync(
+      jsonPath,
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          ceiling: PLAIN_LANGUAGE_MAX_GRADE,
+          ideal: PLAIN_LANGUAGE_IDEAL_GRADE,
+          filesScanned: files.length,
+          candidateCount: candidates.length,
+          scorableCount: scorable.length,
+          overCeilingCount: failures.length,
+          exemptCount,
+          medianGrade,
+          candidates,
+        },
+        null,
+        2,
+      ),
+    );
+    console.log(`--json-out: wrote ${candidates.length} candidate(s) to ${relative(REPO_ROOT, jsonPath)}\n`);
+  }
+
   if (gate) {
     if (failures.length > 0) {
       console.log(`--gate: FAIL — ${failures.length} scorable string(s) exceed grade ${PLAIN_LANGUAGE_MAX_GRADE}.`);
@@ -485,7 +613,23 @@ async function main() {
   console.log("Report mode — exiting 0. Pass --gate to fail on ceiling violations.");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// Guarded so `scanReadabilityForRoots` (above) can be imported by other
+// scripts — notably the readability-by-surface benchmark suite — without
+// re-running the whole CLI report as an import side effect. Compares against
+// `process.argv[1]` rather than running unconditionally, which is what a
+// bare `main().catch(...)` at module scope would do on every import.
+const isMainModule = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return import.meta.url === new URL(`file://${resolve(process.argv[1])}`).href;
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}
