@@ -204,9 +204,10 @@ export const PLATFORM_MAP: PlatformFeature[] = [
       "generate_cover_letter",
       "update_application_status",
       "tailor_application",
+      "update_work_profile",
     ],
     mechanics:
-      "tailor_application goes one step further than a cover letter: it saves a resume version and a cover letter written for one specific posting, using only facts already in the student's profile. The student confirms it before anything is generated or saved.",
+      "tailor_application goes one step further than a cover letter: it saves a resume version and a cover letter written for one specific posting, using only facts already in the student's profile. The student confirms it before anything is generated or saved. update_work_profile saves the student's own answers about working — the days and times they can work, how they get there, the pay they need, the soonest they can start, and their kids' hours. Ask one question at a time, in plain words, and save only what they actually said. The same answers can be typed on the Work availability form in Settings, and their instructor can see them.",
   },
   {
     id: "chat",

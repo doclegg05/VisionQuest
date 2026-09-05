@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withRegistry } from "@/lib/registry/middleware";
 import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { getWorkProfile } from "@/lib/connect/work-profile";
 import { prisma } from "@/lib/db";
 import {
   buildGoalEvidenceEntries,
@@ -431,6 +432,8 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     evidenceEntries: goalEvidence,
   }));
 
+  const workProfile = await getWorkProfile(studentId);
+
   const activeEnrollment =
     student.classEnrollments.find((enrollment) => enrollment.status === "active") ??
     student.classEnrollments[0];
@@ -532,6 +535,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           completedAt: student.careerDiscovery.completedAt,
         }
       : null,
+    // Match & Connect Phase 2: the student's own answers about when and how
+    // they can work. Read through the same helper the student surfaces use so
+    // stored JSON is parsed, not trusted. recordStudentView above covers this
+    // read — it is the same surface.
+    workProfile,
   });
 });
 

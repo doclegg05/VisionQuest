@@ -4,6 +4,7 @@ import {
   type GoalPlanEntry,
 } from "@/lib/goal-resource-links";
 import { type ProgramType } from "@/lib/program-type";
+import { type WorkProfile } from "@/lib/connect/work-profile";
 
 export interface StudentTabProps {
   studentId: string;
@@ -285,4 +286,6 @@ export interface StudentData {
     circumstances: string[];
     completedAt: string | null;
   } | null;
+  /** Match & Connect Phase 2 — the student's own work constraints, or null. */
+  workProfile: WorkProfile | null;
 }

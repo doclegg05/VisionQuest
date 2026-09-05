@@ -16,6 +16,11 @@
 
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import {
+  sageWorkProfileInputSchema,
+  TRANSPORT_MODES,
+  upsertWorkProfile,
+} from "@/lib/connect/work-profile";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
 import { formatCohortDateTime } from "@/lib/timezone";
 import { isValidUrl } from "@/lib/validation";
@@ -435,6 +440,114 @@ const saveJob: AgentTool = {
     });
   },
 };
+
+// ─── update_work_profile (no confirmation — the student can change it any time) ─
+
+/**
+ * The five-question intake (Match & Connect Task 2.2). Sage asks these in the
+ * student's own words, one at a time, and saves whatever they answer.
+ *
+ * The tool writes ONLY these five fields. StudentWorkProfile also carries
+ * homeZip, county, maxCommuteMinutes and shiftLimits, which the student sets
+ * on the Settings form — a chat turn must not overwrite or clear those. The
+ * picked, strict Zod schema is what enforces that, so a sixth field cannot be
+ * added here by accident: it would have to be added to the schema too.
+ */
+const updateWorkProfile: AgentTool = {
+  name: "update_work_profile",
+  description:
+    "Save what the student tells you about working: the days and times they can work, how they " +
+    "get there, the pay they need, the soonest they can start, and anything about their kids' " +
+    "hours. Ask one question at a time in plain words, then save the answers. Save only what " +
+    "they actually said — never guess a day, a wage, or a date for them.",
+  parameters: {
+    type: "object",
+    properties: {
+      availability: {
+        type: "object",
+        description:
+          "The days and times they can work, as an object with all seven days " +
+          "(monday..sunday), each holding {morning, afternoon, evening, overnight} booleans. " +
+          "Send the whole grid, with false for every time they cannot work.",
+      },
+      transport: {
+        type: "string",
+        enum: TRANSPORT_MODES,
+        description:
+          'How they get to work: "car" (their own), "ride" (someone drives them), "bus", ' +
+          '"walk", or "none" if they have no way to get there yet.',
+      },
+      payFloorHourly: {
+        type: "number",
+        description: "The lowest hourly pay that works for them, in dollars per hour.",
+      },
+      earliestStart: {
+        type: "string",
+        description: "The soonest date they could start, as YYYY-MM-DD.",
+      },
+      childcareHours: {
+        type: "object",
+        description:
+          'What they said about their kids\' hours, as {"note": "their words"}. Leave it out ' +
+          "if they did not bring it up.",
+      },
+    },
+  },
+  requiredRoles: ["student"],
+  riskTier: "mutate_reversible",
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const parsed = sageWorkProfileInputSchema.safeParse(args);
+    if (!parsed.success) {
+      return {
+        status: "error",
+        summary: "I couldn't save that. Let's go through the questions one at a time.",
+        modelHint:
+          `update_work_profile rejected the arguments: ${parsed.error.issues
+            .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+            .join("; ")}. Ask the student again in plain words and send only the five ` +
+          "documented fields.",
+      };
+    }
+
+    const answered = Object.keys(parsed.data);
+    if (answered.length === 0) {
+      return {
+        status: "error",
+        summary: "I didn't catch an answer to save yet.",
+        modelHint:
+          "update_work_profile was called with no fields. Ask one of the five questions first, " +
+          "then call it with the student's answer.",
+      };
+    }
+
+    return executeAndLedger("update_work_profile", parsed.data, ctx, async () => {
+      await upsertWorkProfile(ctx.session.id, parsed.data, "sage");
+      return {
+        summary: `Saved your work answers: ${answered.map(workProfileFieldLabel).join(", ")}.`,
+        data: { saved: answered },
+      };
+    });
+  },
+};
+
+/** Grade-6 labels for the five questions, used in the chat confirmation line. */
+function workProfileFieldLabel(field: string): string {
+  switch (field) {
+    case "availability":
+      return "the days and times you can work";
+    case "transport":
+      return "how you get there";
+    case "payFloorHourly":
+      return "the pay you need";
+    case "earliestStart":
+      return "when you can start";
+    case "childcareHours":
+      return "your kids' hours";
+    default:
+      return field;
+  }
+}
 
 // ─── add_portfolio_item (no confirmation — trivially reversible) ────────────
 
@@ -858,6 +971,7 @@ export const WRITE_TOOLS: AgentTool[] = [
   fileDocument,
   updateGoalStatus,
   saveJob,
+  updateWorkProfile,
   addPortfolioItem,
   editPortfolioItem,
   deletePortfolioItem,
