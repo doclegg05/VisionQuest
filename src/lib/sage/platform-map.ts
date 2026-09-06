@@ -204,9 +204,13 @@ export const PLATFORM_MAP: PlatformFeature[] = [
       "generate_cover_letter",
       "update_application_status",
       "tailor_application",
+      "update_work_profile",
+      "search_jobs",
+      "explain_job",
+      "propose_connection",
     ],
     mechanics:
-      "tailor_application goes one step further than a cover letter: it saves a resume version and a cover letter written for one specific posting, using only facts already in the student's profile. The student confirms it before anything is generated or saved.",
+      "tailor_application goes one step further than a cover letter: it saves a resume version and a cover letter written for one specific posting, using only facts already in the student's profile. The student confirms it before anything is generated or saved. update_work_profile saves the student's own answers about working — the days and times they can work, how they get there, the pay they need, the soonest they can start, and their kids' hours. Ask one question at a time, in plain words, and save only what they actually said. The same answers can be typed on the Work availability form in Settings, and their instructor can see them. search_jobs returns at most three real postings from this student's own class board, ranked, each with a short reason; it leaves out jobs that pay under the floor they set or that they have no way to get to, and it says how many it left out and why. explain_job puts one posting into plain words in a fixed layout — what you'd do, hours, pay, must-haves, how you'd get there — and says \"The posting doesn't say.\" for anything the posting leaves out. Never name a job either tool did not return. propose_connection asks the student's teacher to introduce them to the employer behind one job lead. It only makes a request: the student then gets a card listing exactly what would be sent, and nothing goes until they tap OK. The teacher is the one who sends it. Never say a student has been introduced, or that an employer has been told anything, unless the tool said so.",
   },
   {
     id: "chat",
@@ -330,6 +334,30 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     compact: "AI review (replay or dismiss failed Sage extractions)",
     mechanics:
       "Each row keeps the conversation snapshot. Staff either replay the goal extraction or dismiss a failure they have already handled by hand.",
+  },
+  {
+    id: "teacher-connect",
+    name: "Connect (Job Developer Console)",
+    roles: ["teacher"],
+    route: "/teacher/connect",
+    summary:
+      "Listed in the teacher nav as Connect: the job developer console — open leads with how many students fit each one, students with their best leads, and the employer directory with relationship owner, hire history and subsidy flags.",
+    compact: "connect (leads, who fits, employer directory)",
+    mechanics:
+      "Leads come from a typed form, from a job posting on the class board (one click), or from a MACC job order. Fit is computed from the student's work profile, verified certifications and career clusters; a blocked student is listed with the reason. \"Batch to WorkForce WV\" exports the ready students as a CSV for the Business Services Rep.",
+    seeAlso: ["teacher-student-record", "teacher-connect-report"],
+  },
+  {
+    id: "teacher-connect-report",
+    name: "Connect Report",
+    roles: ["teacher"],
+    route: "/teacher/connect/report",
+    summary:
+      "The Connect funnel: where introductions stall (proposed through hired and retained), a self-directed comparison line, and the DoHS-facing export for the state statistical report.",
+    compact: "connect report (funnel, subsidy split, DoHS export)",
+    mechanics:
+      "Filterable by class, employer and date range. A connection counts at the furthest stage its history ever reached, so a closed or withdrawn connection that got an employer's interest still shows up there. The DoHS CSV export is instructor-scoped and audited.",
+    seeAlso: ["teacher-connect"],
   },
   {
     id: "teacher-manage",

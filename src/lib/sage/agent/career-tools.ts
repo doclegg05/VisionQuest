@@ -488,7 +488,7 @@ const tailorApplication: AgentTool = {
     if (gate) return gate;
 
     return executeAndLedger("tailor_application", toolArgs, ctx, async () => {
-      const artifacts = await createTailoredApplication(studentId, jobListingId, source);
+      const artifacts = await createTailoredApplication(studentId, { kind: "listing", id: jobListingId }, source);
       return {
         summary: `Saved resume version ${artifacts.version} and a cover letter for ${source.job.title} at ${source.job.company}.`,
         data: { jobListingId, ...artifacts },

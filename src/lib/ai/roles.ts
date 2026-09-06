@@ -142,6 +142,16 @@ const TASK_ROLES: Record<AiTask, AiRole | null> = {
   resume_extract: "document",
   chat_file_gist: "document",
 
+  // Plain-language rewrite of one job posting for one student (explain_job).
+  // Prose, not JSON — the same shape of work as the other draft tasks.
+  explain_job: "draft",
+
+  // The instructor endorsement in a Connection packet: three sentences of
+  // prose about one student, written from verified facts and then refused if
+  // it asserts anything else. Prose with output-length headroom — the same
+  // shape of work as the other draft tasks.
+  draft_endorsement: "draft",
+
   sage_briefing: "draft",
   conversation_summary: "draft",
   resume_assist: "draft",

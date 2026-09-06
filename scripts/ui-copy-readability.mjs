@@ -26,16 +26,31 @@
  *   npx tsx scripts/ui-copy-readability.mjs --gate       (exits 1 if any non-exempt
  *                                                          scorable string exceeds
  *                                                          the grade ceiling)
+ *   npx tsx scripts/ui-copy-readability.mjs --json-out=<path>
+ *                                                        (additive; also writes the
+ *                                                         full candidate list + summary
+ *                                                         as JSON to <path>, alongside
+ *                                                         whatever console output
+ *                                                         --gate/report mode already
+ *                                                         produce — never a replacement
+ *                                                         for either)
  *
  * The grade ceiling is read from src/lib/sage/readability.ts's exported
  * PLAIN_LANGUAGE_MAX_GRADE — the single knob shared with the Sage gate. The
  * ideal grade (PLAIN_LANGUAGE_IDEAL_GRADE, 6) is reported as a comparison
  * point for the median but is NOT itself gated.
+ *
+ * `--json-out` was added 2026-09-05 for the benchmark suite
+ * (config/benchmarks/readability-by-surface.json), which needs the raw
+ * per-string data rather than a console report. It changes nothing about the
+ * console output or exit-code behavior of `--gate`/report mode — verified by
+ * diffing `npx tsx scripts/ui-copy-readability.mjs` (no flags) before and
+ * after this addition, byte-identical.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
@@ -92,6 +107,32 @@ const SCAN_ROOTS = [
   { label: "components/chat", relPath: "src/components/chat" },
   { label: "components/student", relPath: "src/components/student" },
   { label: "next-step copy data (src/lib carve-out)", relPath: "src/lib/progression/student-next-step.ts" },
+  // Added with Match & Connect Phases 4 and 5. Three surfaces were outside
+  // every existing root: the Settings page, which carries BOTH the employer-
+  // introduction consent toggles and the SMS consent step (the one screen
+  // where a student agrees to be texted); the job-developer console, whose
+  // copy an instructor reads but whose student-facing strings (status
+  // phrases, packet field labels) come straight from the same helpers the
+  // student sees; and the public employer response page, read by someone
+  // with no account and no context at all. The advising hub renders the
+  // alerts a nudge produces.
+  { label: "components/settings", relPath: "src/components/settings" },
+  { label: "components/advising", relPath: "src/components/advising" },
+  { label: "components/teacher/connect", relPath: "src/components/teacher/connect" },
+  { label: "public employer response page", relPath: "src/app/connect" },
+  // A second src/lib carve-out, same shape as the next-step one above: every
+  // SMS body and the consent copy are DATA in sms-policy-shared.ts, only ever
+  // interpolated by the settings component, so scanning the component alone
+  // would find none of the words a student actually reads.
+  { label: "SMS + consent copy data (src/lib carve-out)", relPath: "src/lib/nudges/sms-policy-shared.ts" },
+  // Added with the benchmark dashboard (2026-09-05). The audience is the
+  // program owner, who does not write code: the whole point of the page is
+  // that a number's standing can be read without a glossary, so its copy
+  // belongs under the same gate as the student surfaces. Both halves are
+  // listed because the words live in the label module and the page renders
+  // them.
+  { label: "benchmark dashboard copy", relPath: "src/components/teacher/benchmarks" },
+  { label: "benchmark dashboard page", relPath: "src/app/(teacher)/teacher/admin/benchmarks" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -325,8 +366,118 @@ function median(values) {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
+/**
+ * Reusable core of the scan: walk an arbitrary list of repo-relative root
+ * paths and return every copy-candidate string found under them, scored the
+ * same way `main()` scores its fixed SCAN_ROOTS.
+ *
+ * Added for the benchmark suite (`scripts/bench/suites/readability-by-
+ * surface.mjs`, 2026-09-05), which needs per-route-family grades rather than
+ * one pooled report. Deliberately a separate function rather than a
+ * refactor of `main()`'s own loop — `main()`'s body (below) is untouched, so
+ * this addition cannot change `--gate`'s existing behavior. Some duplication
+ * with `main()` is the accepted cost of that isolation.
+ */
+export async function scanReadabilityForRoots(rootRelPaths) {
+  const { assessReadability, PLAIN_LANGUAGE_MAX_GRADE } = await import(
+    "../src/lib/sage/readability.ts"
+  );
+  const allowlist = loadAllowlist();
+
+  const files = [];
+  for (const relPath of rootRelPaths) {
+    const abs = join(REPO_ROOT, relPath);
+    if (!existsSync(abs)) continue;
+    walk(abs, files);
+  }
+
+  const candidates = [];
+  for (const file of files) {
+    const relPath = relative(REPO_ROOT, file);
+    let source;
+    try {
+      source = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+
+    let sourceFile;
+    try {
+      sourceFile = ts.createSourceFile(
+        file,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+      );
+    } catch {
+      continue;
+    }
+
+    const record = (node, rawText) => {
+      const text = rawText.replace(/\s+/g, " ").trim();
+      if (!text || looksCodeLike(text)) return;
+      const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+      const assessment = assessReadability(text, { maxGrade: PLAIN_LANGUAGE_MAX_GRADE });
+      candidates.push({
+        file: relPath,
+        line: line + 1,
+        text,
+        grade: assessment.grade,
+        words: assessment.words,
+        scorable: assessment.scorable,
+        exempt: isExempt(allowlist, text, relPath),
+      });
+    };
+
+    const visit = (node) => {
+      if (ts.isJsxText(node)) {
+        record(node, node.text);
+      } else if (ts.isStringLiteralLike(node) && isCopyCandidate(node)) {
+        record(node, node.text);
+      }
+      ts.forEachChild(node, visit);
+    };
+
+    try {
+      visit(sourceFile);
+    } catch {
+      // Same skip-on-parse-error behavior as main() below.
+    }
+  }
+
+  return candidates;
+}
+
+// --json-out must resolve under this directory. A CLI flag that accepted an
+// arbitrary path was a write-anywhere primitive with no consumer to justify
+// it (security review, 2026-09-05); constraining the destination rather than
+// removing the flag keeps the additive capability the benchmark suite's
+// contract asked for while closing that off.
+const REPORTS_DIR = join(REPO_ROOT, "reports");
+
+/** Null when `pathArg` resolves under REPORTS_DIR, else an error message. */
+function jsonOutPathError(pathArg) {
+  const resolved = resolve(REPO_ROOT, pathArg);
+  const rel = relative(REPORTS_DIR, resolved);
+  if (rel === "" || rel.startsWith(`..${sep}`) || rel === ".." || isAbsolute(rel)) {
+    return `--json-out must resolve under reports/ (got: ${relative(REPO_ROOT, resolved)})`;
+  }
+  return null;
+}
+
 async function main() {
   const gate = process.argv.includes("--gate");
+  const jsonOutArg = process.argv.find((arg) => arg.startsWith("--json-out="));
+  const jsonOutPath = jsonOutArg ? jsonOutArg.slice("--json-out=".length) : null;
+  if (jsonOutPath) {
+    const invalidReason = jsonOutPathError(jsonOutPath);
+    if (invalidReason) {
+      console.error(invalidReason);
+      process.exitCode = 1;
+      return;
+    }
+  }
 
   const { assessReadability, PLAIN_LANGUAGE_MAX_GRADE, PLAIN_LANGUAGE_IDEAL_GRADE } = await import(
     "../src/lib/sage/readability.ts"
@@ -454,6 +605,34 @@ async function main() {
   );
   console.log();
 
+  // Additive: writes the full report as JSON alongside the console output
+  // above. Never gates on its own and never changes what --gate/report mode
+  // print or return — see the doc comment at the top of this file.
+  if (jsonOutPath) {
+    const jsonPath = resolve(REPO_ROOT, jsonOutPath);
+    mkdirSync(dirname(jsonPath), { recursive: true });
+    writeFileSync(
+      jsonPath,
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          ceiling: PLAIN_LANGUAGE_MAX_GRADE,
+          ideal: PLAIN_LANGUAGE_IDEAL_GRADE,
+          filesScanned: files.length,
+          candidateCount: candidates.length,
+          scorableCount: scorable.length,
+          overCeilingCount: failures.length,
+          exemptCount,
+          medianGrade,
+          candidates,
+        },
+        null,
+        2,
+      ),
+    );
+    console.log(`--json-out: wrote ${candidates.length} candidate(s) to ${relative(REPO_ROOT, jsonPath)}\n`);
+  }
+
   if (gate) {
     if (failures.length > 0) {
       console.log(`--gate: FAIL — ${failures.length} scorable string(s) exceed grade ${PLAIN_LANGUAGE_MAX_GRADE}.`);
@@ -467,7 +646,39 @@ async function main() {
   console.log("Report mode — exiting 0. Pass --gate to fail on ceiling violations.");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// Guarded so `scanReadabilityForRoots` (above) can be imported by other
+// scripts — notably the readability-by-surface benchmark suite — without
+// re-running the whole CLI report as an import side effect. Compares against
+// `process.argv[1]` rather than running unconditionally, which is what a
+// bare `main().catch(...)` at module scope would do on every import.
+//
+// Uses `pathToFileURL(realpathSync(...))` rather than a bare `file://`
+// template or a raw argv[1] comparison (security review, 2026-09-05):
+// `realpathSync` resolves symlinks first — Node resolves a module's real
+// path when it loads it, so `import.meta.url` points at the target of any
+// symlink while a raw argv[1] keeps the link, and invoked through one a raw
+// comparison is false, main() never runs, and this gate EXITS 0 having
+// checked nothing (a gate that reports success without running is worse
+// than no gate) — and `pathToFileURL` percent-encodes the path the same way
+// `import.meta.url` already is, which a manual `file://${...}` template
+// does not do on a path with spaces or other reserved characters.
+//
+// The benchmark runner shares an equivalent implementation at
+// scripts/bench/lib/entry.mjs; this copy stays local deliberately, so the
+// readability gate never depends on the benchmark runner to check its own
+// copy.
+const isMainModule = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url;
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}

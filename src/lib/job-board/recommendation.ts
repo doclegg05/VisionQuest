@@ -112,7 +112,7 @@ const CLUSTER_LABELS: Record<string, string> = {
   "language-esl": "ESL",
 };
 
-function inferJobHollandCode(clusters: string[]): string {
+export function inferJobHollandCode(clusters: string[]): string {
   if (clusters.length === 0) return "";
   return CLUSTER_RIASEC[clusters[0]] ?? "";
 }
@@ -174,7 +174,7 @@ const PROXIMITY_WEIGHT_MULTIPLIERS: Record<LocalJobPriority, Record<JobProximity
   balanced:     { local: 1.0, remote: 1.0, regional_onsite: 0 },
 };
 
-function scoreLocation(
+export function scoreLocation(
   job: Pick<ScoredJob, "location" | "workMode" | "source">,
   classRegion: string,
   priority: LocalJobPriority,
@@ -205,14 +205,14 @@ function locationReason(
   return { type: "location", label: "Onsite (outside your region)", value: jobLocation };
 }
 
-function scoreCluster(jobClusters: string[], studentTopClusters: string[]): number {
+export function scoreCluster(jobClusters: string[], studentTopClusters: string[]): number {
   if (studentTopClusters.length === 0 || jobClusters.length === 0) return 0;
   const overlap = jobClusters.filter((c) => studentTopClusters.includes(c));
   const ratio = Math.min(overlap.length / Math.max(studentTopClusters.length, 1), 1);
   return Math.round(ratio * WEIGHT_CLUSTER);
 }
 
-function scoreRiasec(jobHolland: string, studentHolland: string | null): number {
+export function scoreRiasec(jobHolland: string, studentHolland: string | null): number {
   if (!studentHolland || !jobHolland) return 0;
   const jobChars = jobHolland.split("");
   const studentChars = studentHolland.split("");
@@ -380,7 +380,7 @@ function skillMatchesText(skill: string, normalizedJobText: string): boolean {
   return tokens.length <= 2 ? matchedTokens === tokens.length : matchedTokens >= 2;
 }
 
-function getSkillOverlap(job: ScoredJob, profile: StudentJobProfile): string[] {
+export function getSkillOverlap(job: ScoredJob, profile: StudentJobProfile): string[] {
   if (profile.skills.length === 0) return [];
 
   const normalizedJobText = jobSearchText(job);
@@ -396,7 +396,7 @@ function getSkillOverlap(job: ScoredJob, profile: StudentJobProfile): string[] {
   return overlap;
 }
 
-function scoreSkills(skillOverlap: string[]): number {
+export function scoreSkills(skillOverlap: string[]): number {
   if (skillOverlap.length === 0) return 0;
   if (skillOverlap.length === 1) return 8;
   if (skillOverlap.length === 2) return 14;
@@ -455,7 +455,7 @@ function scoreInteractions(job: ScoredJob, profile: JobInteractionProfile): {
   };
 }
 
-function scoreSourceTrust(
+export function scoreSourceTrust(
   job: ScoredJob,
   classRegion: string,
 ): { score: number; reason: JobMatchReason | null } {

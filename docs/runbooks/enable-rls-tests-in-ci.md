@@ -3,7 +3,7 @@
 **Status:** Enabled via Option A below. `.github/workflows/ci.yml` runs the
 suite on every push and PR against a `pgvector/pgvector:pg16` service
 container (steps "Apply migrations to RLS test database" and "Run RLS
-integration tests"). Last count: 48 cases in 13 suites, PR #191 (2026-09-02).
+integration tests"). Last count: 55 cases in 14 suites (Match & Connect Phase 2, 2026-09-05).
 Locally the suite still auto-skips because no dev database exists.
 **Owner:** CI / infra maintainer.
 **Related:** [docs/plans/rls-enforcement-runbook.md](../plans/rls-enforcement-runbook.md) (Slice C, 2026-04-23 cutover)
@@ -12,15 +12,17 @@ Locally the suite still auto-skips because no dev database exists.
 
 ## Problem
 
-`src/lib/rls.test.ts` contains 48 cross-tenant integration cases (13 suites)
+`src/lib/rls.test.ts` contains 55 cross-tenant integration cases (14 suites)
 that verify the policies in the baseline migration (which absorbed
 `20260423120000_rls_policy_recovery`) plus
 `20260701141000_scope_sage_memory_teacher_rls` and
-`20260820140000_tighten_sage_operation_read_rls` enforce the intended
+`20260820140000_tighten_sage_operation_read_rls` and
+`20260905100000_add_student_work_profile` enforce the intended
 access matrix when queries run as the `vq_app` role. Tables covered:
 Student, Conversation, Goal, CaseNote, SageMemory, SystemConfig,
-Notification, AuditLog, CoachingArc, StudentAlert, SageOperation, and
-StudentClassEnrollment (through the crisis-path join). They cover:
+Notification, AuditLog, CoachingArc, StudentAlert, SageOperation,
+StudentWorkProfile, and StudentClassEnrollment (through the crisis-path
+join). They cover:
 
 - Student A cannot see Student B's Conversation / Goal / Student /
   CoachingArc / StudentAlert / SageOperation rows
@@ -40,6 +42,10 @@ StudentClassEnrollment (through the crisis-path join). They cover:
   INSERT/UPDATE teacher branch is still unscoped and is documented as a
   known gap (F17, DB-07 in the 2026-09-01 DB review) rather than asserted
   correct
+- StudentWorkProfile: a student reads and writes only their own row and
+  cannot re-key it onto another student (the WITH CHECK clause, not USING,
+  is what refuses that); a teacher updates a managed student's profile and
+  not an unmanaged one
 - Admins see everything
 - No-RLS-context returns zero rows (fail-closed) on every table above
 - The `prismaAdmin` bypass (postgres role) still sees all rows
@@ -59,7 +65,7 @@ The job-level `DATABASE_URL` in `.github/workflows/ci.yml` is still a fake
 string (`postgresql://fake:fake@localhost:5432/fake`), so the main `npm test`
 step reports the single "SKIPPED" placeholder. The dedicated `npm run
 test:rls` step overrides `DATABASE_URL`, `DIRECT_URL`, and
-`RLS_TEST_ENABLED` for the container, and that step is where the 48 cases
+`RLS_TEST_ENABLED` for the container, and that step is where the 55 cases
 run. Read that step's log, not the `npm test` one, for the count.
 
 ## What the tests need to actually run

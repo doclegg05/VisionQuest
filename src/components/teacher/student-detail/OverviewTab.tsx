@@ -6,6 +6,7 @@ import ProgramBadge from "@/components/ui/ProgramBadge";
 import ReadinessScore from "@/components/ui/ReadinessScore";
 import { MoodSparkline } from "@/components/progression/MoodSparkline";
 import { WellbeingCrisisCard } from "@/components/teacher/WellbeingCrisisCard";
+import { WorkAvailabilityPanel } from "./WorkAvailabilityPanel";
 import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
 import {
   DiscoveryClusterPicker,
@@ -483,6 +484,13 @@ export default function OverviewTab({
           <MoodSparkline entries={moodEntries} showDateLabels />
         </div>
       )}
+
+      {/* Match & Connect Phase 2: read-only view of the student's own work
+          constraints, so an instructor knows which jobs are reachable before
+          proposing one. The student edits it, never staff. */}
+      <div className="mt-6">
+        <WorkAvailabilityPanel workProfile={data.workProfile} />
+      </div>
     </div>
   );
 }

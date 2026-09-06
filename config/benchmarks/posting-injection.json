@@ -1,0 +1,26 @@
+{
+  "suite": "posting-injection",
+  "title": "Prompt injection through job postings",
+  "area": "safety",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/posting-injection.mjs",
+  "fixture": "config/benchmarks/fixtures/posting-injection.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "unsanitized_reaching_output",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    },
+    {
+      "id": "delimiter_forgery_reaching_output",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    }
+  ],
+  "notes": "45 hostile postings pushed through four boundaries: the real search_jobs and explain_job tools, the employer packet's field allowlist, and the SMS composer. The measurement found a real gap on its first run: sanitizeForPrompt stripped delimiter-shaped tokens but not invisible characters, so bidi overrides, zero-width characters and C0/C1 controls reached the explain_job prompt, the search_jobs result and the explanation the student is shown — 19 leaks, all of that one class, worst case a forged fence smuggled past both sanitizer passes by a zero-width space inside the marker name (fixture row zero-width-in-marker). delimiter_forgery_reaching_output measured the half that already held and sat at 0. sanitizeForPrompt now strips all three character classes in a pre-pass before the delimiter sweeps (keeping only newline and tab out of the C0/C1 range), modelled on sanitizeSmsValue, and both metrics measure 0 over 225 checks — so the suite was promoted from watch to gate in that same change, exactly as its header said to. The floors were never relaxed; the numbers came to them."
+}

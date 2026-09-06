@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAdminAuth, badRequest, notFound } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
+import { withdrawConnectionsForConsentRevocation } from "@/lib/connect/connections";
 import { generateStudentArchive } from "@/lib/student-archive";
 import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
@@ -50,7 +51,9 @@ async function parseOptionalBody(
  *      the existing archive utility. If this fails, NOTHING is changed.
  *   2. In one atomic UPDATE: isActive=false, sessionVersion+1 (forces
  *      logout everywhere), offboardedAt=now.
- *   3. Audit "student.offboard".
+ *   3. Withdraw every live employer introduction, so nothing this student is
+ *      no longer here to answer stays open in front of an employer.
+ *   4. Audit "student.offboard".
  *
  * Idempotent: an already-offboarded student returns success with a note.
  * The original offboardedAt is preserved and no new archive is generated;
@@ -119,7 +122,32 @@ export const POST = withAdminAuth(
       );
     }
 
-    // Steps 2–4 — deactivate, force logout, stamp. Single atomic UPDATE.
+    // Step 2 — close the open employer introductions BEFORE the account goes
+    // dark. An offboarded student cannot answer an employer who clicks
+    // "interested" tomorrow, and their capability link would keep working
+    // (it is resolved through prismaAdmin and knows nothing about isActive).
+    // The same helper consent revocation uses, so the rules match: post-hire
+    // rows are left alone, because offboarding does not un-get someone a job.
+    //
+    // Failure here does NOT abort the offboarding — a student's right to be
+    // deactivated does not depend on an employer-facing side effect — but it
+    // is recorded on the audit row rather than swallowed, because the
+    // difference between "no live introductions" and "we could not close
+    // them" is exactly what someone will need later.
+    let connectionsWithdrawn: number | null = null;
+    let withdrawalFailed = false;
+    try {
+      const result = await withdrawConnectionsForConsentRevocation(studentId, session.id);
+      connectionsWithdrawn = result.withdrawn;
+    } catch (error) {
+      withdrawalFailed = true;
+      logger.error("Offboarding could not withdraw employer introductions", {
+        student: studentLogKey(studentId),
+        error: String(error),
+      });
+    }
+
+    // Steps 3–4 — deactivate, force logout, stamp. Single atomic UPDATE.
     const updated = await prisma.student.update({
       where: { id: studentId },
       data: {
@@ -141,6 +169,8 @@ export const POST = withAdminAuth(
         archiveStorageKey: archive.storageKey,
         archiveFileCount: archive.fileCount,
         sessionVersionBumped: true,
+        connectionsWithdrawn,
+        ...(withdrawalFailed ? { alert: "connection_withdrawal_failed" } : {}),
         ...(reason ? { reason } : {}),
       },
     });
@@ -149,6 +179,7 @@ export const POST = withAdminAuth(
       success: true,
       data: {
         archive,
+        connectionsWithdrawn,
         isActive: updated.isActive,
         offboardedAt: updated.offboardedAt?.toISOString() ?? null,
       },

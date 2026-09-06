@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { renderToString } from "react-dom/server";
 
-import { SettingsView } from "./SettingsView";
+import { SettingsView, smsToggleDisabled } from "./SettingsView";
 
 // SettingsView backs both /settings (students) and /teacher/settings (staff).
 // These renders assert the role split on first paint: staff get the MFA panel
@@ -44,10 +44,56 @@ describe("SettingsView role split", () => {
     assert.ok(student.includes("files you hand to Sage in chat"));
   });
 
+  it("shows the Work availability form to students only", () => {
+    // Staff have no work profile of their own — /api/work-profile refuses
+    // them — so rendering the form for staff would promise a save that 403s.
+    const student = renderToString(<SettingsView initialRole="student" />);
+    assert.ok(student.includes("Work availability"));
+    assert.ok(student.includes("How do you get to work?"));
+
+    const staff = renderToString(<SettingsView initialRole="teacher" />);
+    assert.ok(!staff.includes("Work availability"));
+
+    // Coordinators too: /api/work-profile refuses every non-student, so a
+    // rendered form here would promise a save that 403s.
+    const coordinator = renderToString(<SettingsView initialRole="coordinator" />);
+    assert.ok(!coordinator.includes("Work availability"));
+  });
+
   it("defaults to the student-safe render when no role is supplied", () => {
     // The (student) route renders <SettingsView /> with no prop — the session
     // fetch resolves the role after mount, exactly as before the extraction.
     const html = renderToString(<SettingsView />);
     assert.ok(!html.includes("Loading MFA settings"));
+  });
+});
+
+describe("the Text Messages switch", () => {
+  // Consent is a code that came back from the handset. The gate is
+  // `smsConsented` alone; ticking the box only reveals "Text me a code".
+  const student = { isStudentSurface: true };
+
+  it("stays disabled for a student who has ticked the box but not confirmed", () => {
+    assert.equal(
+      smsToggleDisabled({ ...student, smsEnabled: false, smsConsented: false }),
+      true,
+      "a tick is not consent, and the API refuses the flip",
+    );
+  });
+
+  it("opens once the code has come back", () => {
+    assert.equal(smsToggleDisabled({ ...student, smsEnabled: false, smsConsented: true }), false);
+  });
+
+  it("never blocks turning texts OFF", () => {
+    // Stopping messages must not depend on the state of consent.
+    assert.equal(smsToggleDisabled({ ...student, smsEnabled: true, smsConsented: false }), false);
+  });
+
+  it("does not gate the staff surface, which has no consent flow", () => {
+    assert.equal(
+      smsToggleDisabled({ isStudentSurface: false, smsEnabled: false, smsConsented: false }),
+      false,
+    );
   });
 });

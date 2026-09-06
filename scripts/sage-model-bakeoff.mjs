@@ -145,7 +145,7 @@ export function parseArgs(argv) {
 // ollama control-plane helpers (residency)
 // ---------------------------------------------------------------------------
 
-async function listInstalledModels(url) {
+export async function listInstalledModels(url) {
   let response;
   try {
     response = await fetch(`${url}/api/tags`, { method: "GET" });
@@ -165,7 +165,7 @@ async function listInstalledModels(url) {
 /** A setup problem the operator can fix — reported as one line, not a stack. */
 export class PreflightError extends Error {}
 
-async function listResidentModels(url) {
+export async function listResidentModels(url) {
   try {
     const response = await fetch(`${url}/api/ps`, { method: "GET" });
     if (!response.ok) return [];
@@ -177,7 +177,7 @@ async function listResidentModels(url) {
 }
 
 /** keep_alive 0 unloads immediately. The empty-messages form is a no-op turn. */
-async function evictModel(url, model) {
+export async function evictModel(url, model) {
   try {
     await fetch(`${url}/api/chat`, {
       method: "POST",
@@ -190,7 +190,7 @@ async function evictModel(url, model) {
   }
 }
 
-async function warmModel(url, model, numCtx) {
+export async function warmModel(url, model, numCtx) {
   const started = Date.now();
   const response = await fetch(`${url}/api/chat`, {
     method: "POST",

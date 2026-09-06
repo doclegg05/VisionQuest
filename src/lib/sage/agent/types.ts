@@ -8,11 +8,16 @@
 import type { Session } from "@/lib/api-error";
 
 /**
- * Risk tier for an agent tool. Ordered read → mutate_reversible →
+ * Risk tier for an agent tool. Ordered read → read_ai → mutate_reversible →
  * mutate_consequential by increasing blast radius. Used by flags.ts
  * (mode gating) and rate-limit.ts (per-tier default limits).
+ *
+ * "read_ai" is a read tool that GENERATES: it changes no state, so readonly
+ * mode still runs it, but each call costs one or more model generations on the
+ * box the whole classroom shares. Its cap is an order of magnitude tighter
+ * than plain "read" for that reason alone.
  */
-export type RiskTier = "read" | "mutate_reversible" | "mutate_consequential";
+export type RiskTier = "read" | "read_ai" | "mutate_reversible" | "mutate_consequential";
 
 /**
  * A tool the model is allowed to call mid-turn. The `parameters` schema is
@@ -53,13 +58,17 @@ export interface AgentTool {
   /**
    * Risk tier that governs which agent mode may run this tool and its
    * per-student rate limit. Ground truth (see write-tools.ts):
-   *  - "read": pure lookup/search/present/review — no state change.
+   *  - "read": pure lookup/search/present/review — no state change, no model
+   *    call of its own.
+   *  - "read_ai": read-only, but invokes the model to produce its result
+   *    (explain_job). Allowed in readonly mode; capped far tighter than
+   *    "read" because the cost is generations, not queries.
    *  - "mutate_reversible": writes a row the student can trivially undo and
    *    that carries no HMAC confirmation gate (save_job, add_portfolio_item,
    *    update_application_status).
    *  - "mutate_consequential": any tool that routes through confirmationGate /
    *    verifyConfirmationToken — the HMAC confirm-card round-trip IS the
-   *    boundary. readonly mode runs only "read" tools; full mode runs all.
+   *    boundary. readonly mode runs the read tiers only; full mode runs all.
    */
   riskTier: RiskTier;
 

@@ -1,0 +1,20 @@
+{
+  "suite": "cron-health",
+  "title": "Scheduled layer health (pg_cron)",
+  "area": "ops",
+  "tier": "nightly",
+  "scorer": "scripts/bench/suites/cron-health.mjs",
+  "fixture": "config/benchmarks/fixtures/cron-health.json",
+  "requires": ["prod-readonly"],
+  "metrics": [
+    { "id": "expected_jobs_healthy", "unit": "ratio", "direction": "higher", "floor": 1.0, "tolerance": 0 },
+    {
+      "id": "pending_background_jobs",
+      "unit": "count",
+      "direction": "lower",
+      "floor": null,
+      "reason": "See D4 in .claude/MEMORY.md: the disposition of the pending BackgroundJob backlog (drain vs. expire-stale) is an owner call, not a benchmark floor — a fixed ceiling here would be this suite silently making that call instead of Britt."
+    }
+  ],
+  "notes": "Wraps scripts/cron-health-check.mjs's runCronHealthCheck()/evaluateCronHealth() over the 8 EXPECTED_CRON_JOBS (scripts/lib/cron-health.mjs — connect-nudges added 2026-09-05, the same day this suite caught it missing from the list) — the same verdict logic the nightly cron-health.yml workflow gates on, not a second copy of it. Needs BENCH_PROD_READONLY_URL (falls back to CRON_CHECK_DATABASE_URL) — the postgres-role read-only connection string; cron.job and BackgroundJob are invisible to the vq_app role (F63 class)."
+}

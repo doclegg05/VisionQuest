@@ -1,11 +1,21 @@
+/**
+ * Adzuna deliberately stays out of the default set until the nonprofit-use
+ * licence question is answered (docs/plans/2026-09-04-nlx-macc-job-search-
+ * research.md Part 2, owner step P0.3 in docs/superpowers/plans/
+ * 2026-09-05-match-and-connect.md) — its trial terms cap calls/day and may
+ * require a visible logo, so it should not turn on for every class by
+ * default before that's confirmed. It stays selectable in JOB_SOURCE_OPTIONS
+ * for classes that opt in explicitly.
+ */
 export const DEFAULT_JOB_SOURCES = [
   "careeronestop",
+  "talroo",
   "usajobs",
-  "adzuna",
 ] as const;
 
 export const JOB_SOURCE_OPTIONS = [
   { value: "careeronestop", label: "WV Local Jobs — state job bank", sourceMode: "local" },
+  { value: "talroo", label: "Hourly jobs near you", sourceMode: "local" },
   { value: "remotive", label: "Remotive (remote, no key)", sourceMode: "remote" },
   { value: "remoteok", label: "Remote OK (remote, no key)", sourceMode: "remote" },
   { value: "weworkremotely", label: "We Work Remotely (remote, no key)", sourceMode: "remote" },

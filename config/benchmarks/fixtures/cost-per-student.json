@@ -1,0 +1,4 @@
+{
+  "$comment": "cost-per-student reads live prod-readonly LlmCallLog/AuditLog rows, not a fixture corpus. Kept here only so bench:validate's fixture-exists check has something to point at, and to pin the window this suite always uses.",
+  "windowDays": 30
+}

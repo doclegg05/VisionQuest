@@ -61,6 +61,9 @@ export function isTierAllowedInMode(tier: RiskTier, mode: AgentMode): boolean {
   // mode === "readonly"
   switch (tier) {
     case "read":
+    // read_ai generates but writes nothing, so readonly admits it. The cost
+    // of a generation is handled by its rate-limit tier, not by mode gating.
+    case "read_ai":
       return true;
     case "mutate_reversible":
     case "mutate_consequential":

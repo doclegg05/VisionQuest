@@ -1,0 +1,18 @@
+{
+  "suite": "axe-authenticated",
+  "title": "Authenticated axe violations (report only)",
+  "area": "a11y",
+  "tier": "watch",
+  "scorer": "scripts/bench/suites/axe-authenticated.mjs",
+  "fixture": "config/benchmarks/fixtures/axe-authenticated.json",
+  "requires": ["browser", "server"],
+  "metrics": [
+    {
+      "id": "violations_total",
+      "unit": "count",
+      "direction": "lower",
+      "tolerance": 0
+    }
+  ],
+  "notes": "No floor yet — per the design (§4.9: 'burn down to 0, then gate') and this task's brief ('lower, no floor yet; baseline is today's number so it can never grow — set tolerance 0'). e2e/a11y-authenticated.spec.ts already asserts zero violations and stays untouched; e2e/bench-axe-authenticated.spec.ts is a sibling that only reports, over the same route set plus the resolved teacher student-detail deep link. Once a real run establishes today's count, set it as the baseline via `npm run bench -- --suite=axe-authenticated --update-baseline --reason=\"initial measurement\"` (tolerance 0 means any increase opens a watch immediately; it must never be allowed to creep upward while the burn-down is in progress). Could not be measured in the authoring sandbox — no dev server or DATABASE_URL (standing worktree gotcha) — so no baseline is set here; do not invent a placeholder number."
+}

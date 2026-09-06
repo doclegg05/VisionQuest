@@ -1,0 +1,19 @@
+{
+  "suite": "backup-drill",
+  "title": "Backup restore drill (row-count proxy)",
+  "area": "ops",
+  "tier": "manual",
+  "scorer": "scripts/bench/suites/backup-drill.mjs",
+  "fixture": "config/benchmarks/fixtures/backup-drill.json",
+  "requires": ["prod-readonly"],
+  "metrics": [
+    { "id": "storage_reachable", "unit": "count", "direction": "higher", "exact": true },
+    { "id": "student_rows", "unit": "count", "direction": "higher" },
+    { "id": "form_submission_rows", "unit": "count", "direction": "higher" },
+    { "id": "file_upload_rows", "unit": "count", "direction": "higher" },
+    { "id": "certification_rows", "unit": "count", "direction": "higher" },
+    { "id": "spokes_record_rows", "unit": "count", "direction": "higher" },
+    { "id": "archive_object_count", "unit": "count", "direction": "higher" }
+  ],
+  "notes": "Wraps scripts/backup-verify.mjs's runBackupVerify() (exported this session, no CLI behavior change) over BENCH_PROD_READONLY_URL: non-zero row counts on the evidence-of-record tables (docs/DATA_RETENTION_POLICY.md, src/lib/student-archive.ts) as info, and storage_reachable as the one exact:true metric (1 = the configured object-storage backend answered ListObjectsV2, 0 = misconfigured or unreachable). THIS DOES NOT VERIFY A BACKUP OR A RESTORE — same limitation backup-verify.mjs documents in its own header: it has no access to Supabase's backup subsystem. A real restore drill is a quarterly OWNER STEP (docs/runbooks/backup-restore.md §5); this suite is the automatable proxy that runs in between, not a replacement for it."
+}

@@ -59,7 +59,14 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // without me" / "if I just disappeared". Surfaced by the sage-redteam-eval
   // crisis-paraphrase scenario, which this detector previously missed.
   { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
-  { category: "self_harm", pattern: /\b((hurt|harm|cut)(ting|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
+  // The verb list is spelled out rather than suffixed, so the PROGRESSIVE form
+  // of every member is covered. The old alternation offered only "ting" or "t"
+  // after the stem, which happens to spell "cutting" and nothing else: "hurting
+  // myself" and "harming myself" were both verified misses, and they are the
+  // ordinary way a student describes an act that is still going on ("i keep
+  // hurting myself", "i been harming myself"). "cuting" is accepted as the
+  // predictable single-t typo of the one member whose progressive doubles.
+  { category: "self_harm", pattern: /\b((?:hurt|harm|cut)(?:t?ing|t)?\s+myself|self[-\s]?harm(ing)?)\b/i },
 
   // --- Informal register (VQ-R-004). The patterns above all require formal
   // "want to" constructions, but the product targets adults at a ~6th-grade
@@ -88,7 +95,67 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // are unambiguously distance: a digit immediately before (with or without a
   // space), and a following "away"/"from". Recall is otherwise untouched —
   // bare "kms", "gonna kms" and "i might kms tonight" all still alert.
-  { category: "self_harm", pattern: /(?<!\d)(?<!\d\s)\b(?:kms|kys)\b(?!\s+(?:away|from)\b)/i },
+  //
+  // THE DISTANCE GUARDS MUST HOLD IN BOTH LANGUAGES, and the first attempt at
+  // that failed for a reason worth writing down: it ended its Spanish lookahead
+  // with \b, and JS \b is ASCII-only, so it cannot assert a boundary after "í".
+  // "a unos kms de aquí" only stayed silent because the QUANTITY lookbehind
+  // caught it — the lookahead was dead code, and "queda a kms de aquí" (no
+  // quantity word) still alerted, with lang "en", serving a Spanish speaker the
+  // ENGLISH 988 block. That is a fixture passing for the wrong reason, the exact
+  // hazard the 2026-08-21 review named. The remedy is this file's own,
+  // documented 200 lines down for the Spanish block: end on
+  // (?![\wáéíóúüñ]) instead of \b.
+  //
+  // Three guards now, each on a sense that is unambiguously distance:
+  //
+  //   1. QUANTITY BEFORE. "a unos/unas/pocos/pocas/varios/varias kms" and the
+  //      Spanish number words, plus the English "a few / a couple of / about /
+  //      around / roughly / some / several" — the last of which closes
+  //      "the office is a few kms down the road", an ENGLISH row that the
+  //      away/from lookahead alone did not cover.
+  //   2. SPANISH "de" AFTER. "kms de …" is a distance phrase in Spanish
+  //      whatever follows it — "de aquí", "de distancia", "de mi casa",
+  //      "del centro". Guarding on the preposition rather than an enumerated
+  //      list of destinations means the next destination nobody thought of is
+  //      covered too, and there is no Spanish sentence where "kms de" reads as
+  //      an English self-harm abbreviation.
+  //   3. ENGLISH direction word AFTER, widened from away/from to include
+  //      down/up/apart.
+  //
+  // Recall is untouched: bare "kms", "gonna kms", "i might kms tonight" and
+  // every "kys" form still alert, in either language, because none of them
+  // carries a quantity frame or a distance preposition.
+  //
+  // KNOWN LIMITS, written down rather than claimed closed — an earlier version
+  // of this comment said the Spanish frames were covered while one of its own
+  // guards was dead code, so the standard here is now "name what still leaks":
+  //   - a Spanish distance frame whose preposition is not "de"/"del" still
+  //     alerts: "queda a kms DESPUÉS de la gasolinera". Guarding on "después"
+  //     would start an enumeration of prepositions, which is the shape that
+  //     failed before; the quantity lookbehind covers the common phrasings.
+  //   - an English distance word outside away/from/down/up/apart does the same
+  //     ("kms east of town").
+  // Both are false POSITIVES on distance talk, never missed disclosures, so
+  // the failure direction is an instructor dismissing an alert.
+  {
+    category: "self_harm",
+    pattern: new RegExp(
+      "(?<!\\d)(?<!\\d\\s)" +
+        // Spanish quantity words, with the "a" OPTIONAL. Requiring it was
+        // wrong in a way only running it shows: "camino unos kms todos los
+        // días", "recorrí varios kms" and "son diez kms" have no "a" at all and
+        // were alerting — with the ENGLISH 988 block, since this entry carries
+        // no lang tag.
+        "(?<!\\b(?:a\\s+)?(?:unos|unas|pocos|pocas|varios|varias|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\\s)" +
+        // English quantity frames, which do require their article.
+        "(?<!\\b(?:a\\s+(?:few|couple\\s+of)|about|around|roughly|some|several)\\s)" +
+        "\\b(?:kms|kys)\\b" +
+        "(?!\\s+(?:away|from|down|up|apart)\\b)" +
+        "(?!\\s+del?(?![\\wáéíóúüñ]))",
+      "i",
+    ),
+  },
   // "ending things" — the formal pattern only covered "my life" / "it all".
   // PRECISION EXCEPTION to this module's recall-first policy, written down so
   // the owner can veto it in review: "end things WITH <someone>" is a breakup,
@@ -113,8 +180,145 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // "sobredosis" twin below has required a first-person frame all along; this
   // restores the parity.
   { category: "self_harm", pattern: /\boverdos(?:e|ed|ing)\s+myself\b/i },
-  { category: "self_harm", pattern: /\bi(?:'m|'ve|'d)?(?:\s+\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i },
-  { category: "self_harm", pattern: /\btook\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
+  // The frame accepts the UNPUNCTUATED contractions too ("im", "ive", "id").
+  // This population writes without apostrophes — the informal-register set
+  // exists because of it — so "im overdosing on these pills right now" was a
+  // miss while "i'm overdosing on these pills" alerted, and a disclosure in
+  // progress is the worst possible place for that gap. Widening the pronoun
+  // costs no precision here: the frame still demands the overdose verb and its
+  // "on" object within two words, so a bare "im" or a stray "id" elsewhere in
+  // a sentence cannot reach it, and the third-person guards below
+  // ("my mom overdosed on pills when i was little") are unaffected because
+  // their "i" sits AFTER the verb.
+  // The bounded two-word gap is what makes this frame first-person, and it was
+  // wide enough to let a third-person SUBJECT stand inside it: "i" + "worried
+  // he" + "overdosed on" matched, so a student expressing concern about
+  // somebody else raised a CRITICAL alert on themselves and named their own
+  // instructors. Measured, not theorised — four such sentences were silent
+  // before the unpunctuated pronouns were added and alerting after, which is
+  // why the earlier claim that widening the pronoun "costs no precision" was
+  // wrong. The gap now refuses third-person pronouns and possessives: this
+  // frame is about the student, so nothing inside it may name anyone else.
+  // "i nearly overdosed on tylenol" and "i think i overdosed on" still match,
+  // because "nearly" and "i" are not on the refusal list.
+  {
+    category: "self_harm",
+    pattern:
+      /\bi(?:'?m|'?ve|'?d)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|someone|somebody|everyone|people|folks)\b)\w+){0,2}\s+overdos(?:e|ed|ing)\s+on\b/i,
+  },
+  // Past act. The verb list is "took|taken|swallowed", not a bare "take":
+  // "ive taken too many pills" and "i swallowed all my medication" are the
+  // same disclosure in the same register as the pinned "i took all my pills"
+  // and were both silent, while a bare present "take" is exactly how adherence
+  // talk reads ("i take all my pills every morning", pinned silent) and must
+  // stay out. The quantity + medication bounds are unchanged, so nothing that
+  // used to alert on the NOUN side stops alerting.
+  // The verb needs a subject that is the STUDENT, and there are exactly two
+  // ways a student writes one: a first-person frame ("i took", "ive taken",
+  // "i have taken"), or no subject at all at the start of a sentence ("took all
+  // my pills last night", "just took all my pills") — the second is a real
+  // message and anchoring only on "i" would lose it.
+  //
+  // The first attempt at this bounded the entry with a lookbehind refusing any
+  // third-person word within two words BEFORE the verb, and that was wrong in a
+  // way only a sweep shows: a third-person word near the verb is not the same
+  // thing as a third-person SUBJECT. "they know i took all my pills", "she said
+  // i took all my pills", "the reason i took all my pills" — eleven such
+  // sentences alerted before that guard and were silent after it, and a
+  // generated sweep of <third-person word> <verb> i took all my pills silenced
+  // 91 of 91. A student naming who knows about their own overdose is exactly
+  // the message this entry exists for.
+  //
+  // The second attempt anchored on the first-person pronoun and refused
+  // third-person words INSIDE the gap that follows it. That recovered the
+  // eleven rows above, and cost a different 880: it accepted a subject only
+  // after ".", "!" or "?", and only across a two-word gap. Both bounds are
+  // wrong about how a frightened student writes. They write one breath and a
+  // comma — "im scared, took all my pills", "i need help - took too many
+  // pills", "help me: took all my pills" — and they write narrative, in the
+  // order it happened — "i came home last night and took all my pills". A
+  // 2,000-row generated sweep put the loss at 880 messages with nothing gained;
+  // 13 of 14 hand-written realistic disclosures went silent. The gate stayed
+  // green throughout because this file had no must-detect row with a
+  // subjectless verb after "," ";" ":" "-" and none with a gap wider than two
+  // words. It does now — every shape below is pinned, so the same narrowing
+  // cannot pass silently again.
+  //
+  // So the sentence boundary accepts any clause separator, and the gaps are
+  // wide enough for narrative. What keeps the third-person rows silent is no
+  // longer gap width, it is WHERE a competing subject can stand: immediately
+  // before the verb. The two lookbehinds refuse a third-person word in either
+  // of those two positions, which is what keeps "i heard she took all my
+  // pills" and "i think my brother swallowed all the pills" silent while the
+  // gap is six words wide. Refusing those words anywhere in the gap instead —
+  // the second attempt's rule — cannot be recovered by any gap width, because
+  // "i locked THE door and took too many pills" and "i sat in THE car and
+  // swallowed all my meds" put a determiner inside a prepositional phrase, not
+  // a subject; both are pinned. The subjectless branch keeps the whole-gap
+  // refusal, where it is correct because nothing legitimate precedes the
+  // subject: "she has taken too many pills", "my brother swallowed all the
+  // pills", "the patient had taken all the medication" and "they swallowed a
+  // bunch of pills" stay silent on it.
+  //
+  // "you" is deliberately absent from the refusal list. Adding it would silence
+  // "i told you i took all my pills" and "i already told you i swallowed all my
+  // meds" — a student disclosing to their coach, in the register they actually
+  // use — and would buy only "you took all the pills" and "i think you took too
+  // many pills", each of which costs one instructor dismissal. Measured, not
+  // assumed, and both disclosure rows are pinned so the trade cannot be made
+  // silently.
+  //
+  // A THIRD BRANCH carries the narrative register past the bounded gap: an "i"
+  // any distance back, provided NO third-person word appears anywhere between
+  // it and the verb. That is the whole-window rule an earlier round used as the
+  // ONLY rule, which was too strict to be the only rule (it silenced "i locked
+  // the door and took too many pills"); as an EXTRA branch it costs nothing,
+  // because the bounded branch above still catches everything it refuses.
+  // Measured before adding: 0 pinned rows lost, 0 must-not-detect rows leaked,
+  // and a 300-row third-person corpus unchanged at 91/300 false positives.
+  // Widening the bounded gap instead was rejected \u2014 6 -> 12 doubles those false
+  // positives to 204/300, and they land on the cohort least able to argue with
+  // a staff alert.
+  //
+  // KNOWN AND ACCEPTED LIMITS, in both directions.
+  //
+  // Missed: GAP-WIDTH TRUNCATION is now this entry's largest silent-loss mode.
+  // A disclosure whose gap exceeds six words AND contains a third-person word
+  // is reached by neither first-person branch. All four of these alerted before
+  // this entry was bounded and are silent now \u2014 recorded rather than claimed
+  // closed, because closing them means widening a bound that costs more than it
+  // buys: "i waited until everyone in the house was finally asleep and took all
+  // my pills" (gap 10, "everyone"), "im scared, last night after everyone went
+  // to bed took all my pills" (subjectless gap 7, "everyone"), "i got back from
+  // the appointment, sat down at the kitchen table and took all my pills" (the
+  // gap crosses a comma and carries "the" twice), and any narrative that puts a
+  // determiner in the two positions before the verb ("all the time" reads as a
+  // subject to the lookbehind).
+  //
+  // Alerted: a proper-name third person ("i think dave took all the pills"),
+  // because no name list can be complete; a COMMON-NOUN third person more than
+  // two positions before the verb ("i saw that my brother had swallowed all the
+  // meds", "i noticed the patient quietly took all the medication") \u2014 the
+  // lookbehind reads two word positions, so a subject pushed further back by an
+  // adverb or an auxiliary is not seen; and a third-person subject in the
+  // clause BEFORE a separator ("she was upset, took all the pills"), because
+  // the subjectless branch by construction only reads the words after the
+  // separator. All recall-first: an instructor dismisses a card, and no
+  // disclosure is lost.
+  {
+    category: "self_harm",
+    pattern:
+      /(?:\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+){0,20}\s+|\bi(?:'?m|'?ve|'?d|'?ll)?(?:\s+\w+){0,6}\s+|(?:^|[-\n.!?;:,\u2014]\s*)(?:(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\b)\w+\s+){0,4})(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s)(?<!\b(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|the|someone|somebody|everyone|people|folks)\s\w+\s)(?:took|taken|swallowed)\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i,
+  },
+  // S1: "od'd" as a completed act. The only od entry required an intent verb
+  // ("gonna od"), so the past tense — the higher-risk disclosure of the two —
+  // was silent. Same first-person frame and same third-person refusal as the
+  // "overdosed on" entry above, so "he od'd on pills" stays silent.
+  {
+    category: "self_harm",
+    pattern:
+      /\bi(?:'?m|'?ve|'?d)?(?:\s+(?!(?:he|she|they|him|her|his|hers|them|their|theirs|my|your|our|its|someone|somebody|everyone|people|folks)\b)\w+){0,2}\s+od(?:'|\u2019)?(?:d|ed)\b/i,
+  },
   // Same disclosure stated as a PLAN rather than a past act ("i'm going to take
   // all my pills tonight"). The two entries above between them only covered
   // intent toward the bare verb ("gonna od") and the completed act ("took all
@@ -148,7 +352,38 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   { category: "self_harm", lang: "es", pattern: /\b(acabar|terminar)\s+con\s+mi\s+vida\b/i },
   { category: "self_harm", lang: "es", pattern: /\bno\s+quiero\s+(vivir|seguir\s+viviendo)\b/i },
   { category: "self_harm", lang: "es", pattern: /\b(no\s+vale\s+la\s+pena\s+vivir|la\s+vida\s+no\s+vale\s+la\s+pena)\b/i },
-  { category: "self_harm", lang: "es", pattern: /\b((hacerme|me\s+hago|me\s+hice|me\s+har(é|e)|me\s+quiero\s+hacer)\s+da(ñ|n)o|lastimarme|cortarme\s+las\s+venas)\b/i },
+  // The progressive forms are included ("me estoy haciendo daño", "me estoy
+  // lastimando"): English covers the ongoing act and Spanish did not, which the
+  // sage-ai.md parity rule treats as a gap needing a fix or a written note. The
+  // clitic must be "me" — "le estoy haciendo daño a mi relación" and "está
+  // haciendo daño a la comunidad" are ordinary talk and stay silent, pinned.
+  { category: "self_harm", lang: "es", pattern: /\b((hacerme|me\s+hago|me\s+hice|me\s+har(é|e)|me\s+quiero\s+hacer|me\s+estoy\s+haciendo)\s+da(ñ|n)o|lastimarme|me\s+estoy\s+lastimando|cortarme\s+las\s+venas)\b/i },
+  // CUTTING REGISTER (es) — parity with the English hurt/harm/cutting family.
+  // English covers the act in every tense ("i hurt myself yesterday", "i been
+  // hurting myself"); Spanish covered only the fixed phrase "cortarme las
+  // venas" plus the "hacerme daño" family, so the most ordinary Spanish form of
+  // the same disclosure — "me corté los brazos" — was silent, and so was
+  // "me hice cortes", which has no benign reading at all.
+  //
+  // Discriminated by BODY PART, not by the verb: "me corté" is also exactly how
+  // a kitchen accident is described, and unlike English (where
+  // "i cut myself chopping onions" is a recorded, accepted false positive) the
+  // Spanish side can separate the two cheaply, because the disclosure names
+  // where. So "me corté con el cuchillo cocinando", "me corté afeitándome" and
+  // "me corte el dedo picando cebolla" all stay silent — pinned — while the
+  // arms/wrists/thighs/veins list alerts. "el pelo" is not on the list, which
+  // is what keeps the existing haircut guard working.
+  //
+  // "me hice cortes" needs no body part: making cuts on oneself has no
+  // everyday sense. Both clitic positions are handled ("cortarme los brazos" /
+  // "me corté los brazos"), the same climbing the sobredosis entry handles.
+  //
+  // KNOWN LIMIT: a WORK ACCIDENT naming a listed body part still alerts —
+  // "me corté la pierna en el trabajo". The body-part list is what separates
+  // disclosure from a kitchen cut, so narrowing it to exclude legs would cost
+  // a real self-injury site to buy one false positive back. Recall-first
+  // stands; recorded so the next reader knows it was weighed, not missed.
+  { category: "self_harm", lang: "es", pattern: /\b(?:me\s+(?:hice|hago|voy\s+a\s+hacer|quiero\s+hacer)\s+cortes|(?:cortarme|me\s+cort(?:o|é|e|aba|aré|are)|me\s+(?:voy\s+a|quiero)\s+cortar)\s+(?:l[oa]s|el|la|mis?)\s+(?:brazos?|mu(?:ñ|n)ecas?|piernas?|muslos?|venas|cuerpo))/i },
   { category: "self_harm", lang: "es", pattern: /\b(mejor\s+muert[oa]|quisiera\s+estar\s+muert[oa])\b/i },
   // Ambiguous like the English "can't go on" — included per err-toward-alerting.
   { category: "self_harm", lang: "es", pattern: /\b(ya\s+)?no\s+puedo\s+m(á|a)s\b/i },
@@ -187,7 +422,12 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   //    pastillas" (fires) and "…dijo que me tome todas las pastillas"
   //    (silent). The guard spans the optional clitic so the bare-verb
   //    alternative cannot re-enter the match after "que me".
-  { category: "self_harm", lang: "es", pattern: /\b(?:(?:me\s+)?tomé|(?<!\bque\s+(?:me\s+)?)(?:me\s+)?tome)\s+(?:tod[ao]s\s+(?:l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(?:as|os)\s+|un\s+(?:mont(?:o|ó)n|pu(?:ñ|n)ado)\s+de\s+)(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
+  // "tragué" (swallowed) sits beside "tomé" for the same reason the English
+  // entry gained "swallowed": it is the same disclosure in the same register.
+  // Third person keeps it silent ("se tragó todas las pastillas"), and the
+  // quantity + medication bounds keep an accidental swallow silent too
+  // ("me tragué un hueso de pollo sin querer"), both pinned.
+  { category: "self_harm", lang: "es", pattern: /\b(?:(?:me\s+)?tomé|(?:me\s+)?tragué|(?<!\bque\s+(?:me\s+)?)(?:me\s+)?(?:tome|trague))\s+(?:tod[ao]s\s+(?:l[ao]s\s+|mis\s+)?|demasiad[ao]s\s+|much(?:as|os)\s+|un\s+(?:mont(?:o|ó)n|pu(?:ñ|n)ado)\s+de\s+)(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)\b/i },
   // 2. Stated intent: an intent verb ("quiero/quisiera", "voy a"/"me voy a",
   //    "pienso en", "pensé en") governing the take-verb, the synthetic future
   //    ("me tomaré"), or a time-of-intent marker framing the bare present

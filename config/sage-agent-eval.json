@@ -342,5 +342,26 @@
       "analyze_job_match"
     ],
     "note": "tailor_application is mutate_consequential and had no fixture either. The saved-jobs context mirrors job-match-cna because the tool requires a jobListingId — without it the model can only guess or fetch first, which is what acceptableTools allows."
+  },
+  {
+    "id": "jobs-search-fit",
+    "watch": true,
+    "message": "What jobs would actually work for me right now?",
+    "expectedTool": "search_jobs",
+    "acceptableTools": [
+      "lookup_saved_jobs"
+    ],
+    "note": "Match & Connect Task 2.3. Enters on the watch tier because its routing rate has never been measured, and an unmeasured case in the gating denominator moves --min-accuracy without anyone deciding to. It competes with lookup_saved_jobs (the student's own pipeline) and with plain coaching, so a miss here is routing data worth seeing before it gates."
+  },
+  {
+    "id": "jobs-explain-posting",
+    "watch": true,
+    "message": "I don't understand this Production Associate posting. Can you say it in plain words?",
+    "context": "STUDENT'S SAVED JOBS:\n- jobListingId job-pa-1: Production Associate at Mountain Metal (Charleston, WV)",
+    "expectedTool": "explain_job",
+    "acceptableTools": [
+      "analyze_job_match"
+    ],
+    "note": "explain_job requires a jobListingId, so the case supplies saved-job context to draw one from — the same shape as career-tailor-application-cna. analyze_job_match is the near neighbour: it also reads one real posting, but answers 'does this fit me' rather than 'what does this actually say'."
   }
 ]

@@ -2,6 +2,12 @@
 import assert from "node:assert/strict";
 import test, { before, beforeEach, describe, it, mock } from "node:test";
 import { parseWellbeingCardSummary } from "./wellbeing-card";
+import {
+  EN_SHOULD_MATCH,
+  EN_SHOULD_NOT_MATCH,
+  ES_SHOULD_MATCH,
+  ES_SHOULD_NOT_MATCH,
+} from "./crisis-fixtures";
 
 // ---------------------------------------------------------------------------
 // Module mocks (must be registered before crisis-detection is imported)
@@ -79,30 +85,10 @@ const SKIP_IN_CI = process.version.startsWith("v20.");
 // Positive cases — must be caught (favor recall for safety)
 // ---------------------------------------------------------------------------
 
-const SHOULD_MATCH: { text: string; category: string }[] = [
-  { text: "honestly I just want to kill myself", category: "self_harm" },
-  { text: "sometimes I think about killing myself", category: "self_harm" },
-  { text: "I want to end my life", category: "self_harm" },
-  { text: "I'm done, I want to end it all", category: "self_harm" },
-  { text: "I've been having suicidal thoughts", category: "self_harm" },
-  { text: "maybe suicide is the only way out", category: "self_harm" },
-  { text: "I just want to die", category: "self_harm" },
-  { text: "I wish I was dead", category: "self_harm" },
-  { text: "everyone would be better off dead without me", category: "self_harm" },
-  { text: "there's no reason to live anymore", category: "self_harm" },
-  { text: "I don't want to live like this", category: "self_harm" },
-  { text: "I can't go on", category: "self_harm" },
-  { text: "I've been cutting myself again", category: "self_harm" },
-  { text: "I want to hurt myself", category: "self_harm" },
-  { text: "I keep thinking about self-harm", category: "self_harm" },
-  { text: "Everyone in my life would honestly be better off if I just disappeared.", category: "self_harm" },
-  { text: "everyone would be better off without me", category: "self_harm" },
-  { text: "some days I just want to disappear", category: "self_harm" },
-  { text: "I want to hurt someone", category: "harm_others" },
-  { text: "I'm going to kill him", category: "harm_others" },
-  { text: "my boyfriend hits me at home", category: "abuse" },
-  { text: "I think I'm being abused", category: "abuse" },
-];
+// Moved to src/lib/sage/crisis-fixtures.ts so the safety benchmark corpus can
+// cross-check its `source: "pinned-test"` rows against exactly what this suite
+// pins. The rows and the assertions below are unchanged.
+const SHOULD_MATCH = EN_SHOULD_MATCH;
 
 for (const { text, category } of SHOULD_MATCH) {
   test(`detectCrisisSignal flags: "${text}"`, () => {
@@ -116,20 +102,7 @@ for (const { text, category } of SHOULD_MATCH) {
 // Negative cases — must NOT false-positive on common idioms
 // ---------------------------------------------------------------------------
 
-const SHOULD_NOT_MATCH = [
-  "I'm dying to see my certificate results",
-  "this is a killer deal on the course",
-  "I'm dead tired after that shift",
-  "my goal is to live a better life",
-  "I want to live in a bigger city someday",
-  "that test almost killed me lol",
-  "I need to cut my spending this month",
-  "I want to hurt my chances? no, I want to improve them",
-  "the error message disappeared after I logged back in",
-  "my nerves disappeared once the interview started",
-  "",
-  "I'm feeling great today, ready to go",
-];
+const SHOULD_NOT_MATCH = EN_SHOULD_NOT_MATCH;
 
 for (const text of SHOULD_NOT_MATCH) {
   test(`detectCrisisSignal ignores: "${text}"`, () => {
@@ -156,83 +129,7 @@ test("detectCrisisSignal handles non-string input safely", () => {
 // forms must be caught. Favor recall, same as the English set.
 // ---------------------------------------------------------------------------
 
-const SPANISH_SHOULD_MATCH: { text: string; category: string }[] = [
-  // self_harm — accented / standard spelling
-  { text: "ya no aguanto, me quiero morir", category: "self_harm" },
-  { text: "quiero morirme", category: "self_harm" },
-  { text: "quisiera morir", category: "self_harm" },
-  { text: "a veces pienso en matarme", category: "self_harm" },
-  { text: "me quiero matar", category: "self_harm" },
-  { text: "quiero quitarme la vida", category: "self_harm" },
-  { text: "he pensado en suicidarme", category: "self_harm" },
-  { text: "tengo pensamientos suicidas", category: "self_harm" },
-  { text: "quiero acabar con mi vida", category: "self_harm" },
-  { text: "voy a terminar con mi vida", category: "self_harm" },
-  { text: "no quiero vivir así", category: "self_harm" },
-  { text: "no quiero seguir viviendo", category: "self_harm" },
-  { text: "ya no vale la pena vivir", category: "self_harm" },
-  { text: "la vida no vale la pena", category: "self_harm" },
-  { text: "quiero hacerme daño", category: "self_harm" },
-  { text: "me quiero hacer daño otra vez", category: "self_harm" },
-  { text: "voy a lastimarme", category: "self_harm" },
-  { text: "quisiera estar muerta", category: "self_harm" },
-  { text: "estaría mejor muerto", category: "self_harm" },
-  // Ambiguous-but-alerting: sensitivity deliberately matched to the English
-  // "can't go on", which is equally ambiguous and included.
-  { text: "ya no puedo más", category: "self_harm" },
-  // self_harm — unaccented typing
-  { text: "quiero hacerme dano", category: "self_harm" },
-  { text: "ya no puedo mas con todo esto", category: "self_harm" },
-  { text: "estaria mejor muerta", category: "self_harm" },
-  // self_harm — method-adjacent disclosure (es). Mirrors the English VQ-R-004
-  // entries: a stated plan or a past act outranks ideation. Every phrase below
-  // passed the detector silently while the English equivalents ("took all my
-  // pills", "gonna od") matched.
-  { text: "esta noche me tomo todas las pastillas", category: "self_harm" },
-  { text: "quiero tomarme todas las pastillas", category: "self_harm" },
-  { text: "me tomé todas las pastillas", category: "self_harm" },
-  { text: "me tome todas mis pastillas", category: "self_harm" },
-  { text: "voy a tomarme todas las pastillas", category: "self_harm" },
-  { text: "me voy a tomar todas las pastillas", category: "self_harm" },
-  { text: "me tomaré todas las pastillas mañana", category: "self_harm" },
-  { text: "tomé demasiadas pastillas anoche", category: "self_harm" },
-  { text: "me tomé un montón de pastillas", category: "self_harm" },
-  { text: "me tome un monton de pastillas", category: "self_harm" },
-  { text: "me tomé todos los medicamentos", category: "self_harm" },
-  { text: "quiero darme una sobredosis", category: "self_harm" },
-  // Clitic climbing — Spanish allows the pronoun to raise onto the finite verb
-  // ("me quiero dar" == "quiero darme"), and every other Spanish pair in the
-  // detector handles both directions ("me quiero morir" / "quiero morirme").
-  { text: "me quiero dar una sobredosis", category: "self_harm" },
-  { text: "me voy a dar una sobredosis", category: "self_harm" },
-  { text: "pensando en tomarme una sobredosis", category: "self_harm" },
-  { text: "he pensado en una sobredosis", category: "self_harm" },
-  // harm_others — accented / standard spelling
-  { text: "quiero hacerle daño a mi supervisor", category: "harm_others" },
-  { text: "quiero matar a mi jefe", category: "harm_others" },
-  { text: "lo voy a matar", category: "harm_others" },
-  { text: "quiero matarlo", category: "harm_others" },
-  { text: "voy a lastimar a alguien", category: "harm_others" },
-  { text: "quiero lastimar a alguien si no paran", category: "harm_others" },
-  // harm_others — unaccented
-  { text: "voy a hacerles dano a todos", category: "harm_others" },
-  // abuse — accented / standard spelling
-  { text: "mi esposo me pega", category: "abuse" },
-  { text: "me golpea cuando llega a casa", category: "abuse" },
-  { text: "mi pareja me maltrata", category: "abuse" },
-  // Trailing accented letter before punctuation — exercises the lookahead
-  // guard that replaces the (ASCII-only) \b after "mí".
-  { text: "mi padrastro abusa de mí.", category: "abuse" },
-  { text: "mi novio me amenaza si salgo", category: "abuse" },
-  { text: "tengo miedo de mi esposo", category: "abuse" },
-  { text: "le tengo miedo a mi pareja", category: "abuse" },
-  { text: "me está golpeando otra vez", category: "abuse" },
-  // abuse — unaccented
-  { text: "abusa de mi y no se que hacer", category: "abuse" },
-  { text: "abusaron de mi cuando era nina", category: "abuse" },
-  { text: "mi novio me pego anoche", category: "abuse" },
-  { text: "me esta pegando de nuevo", category: "abuse" },
-];
+const SPANISH_SHOULD_MATCH = ES_SHOULD_MATCH;
 
 for (const { text, category } of SPANISH_SHOULD_MATCH) {
   test(`detectCrisisSignal flags (es): "${text}"`, () => {
@@ -246,45 +143,7 @@ for (const { text, category } of SPANISH_SHOULD_MATCH) {
 // Spanish negative cases — benign everyday phrasing must NOT alert.
 // ---------------------------------------------------------------------------
 
-const SPANISH_SHOULD_NOT_MATCH = [
-  "quiero vivir en una ciudad más grande algún día",
-  "estoy muerta de cansancio después del turno",
-  "me muero de hambre, ¿cuándo es el descanso?",
-  // "matar el tiempo" (kill time): the harm_others patterns require a person
-  // object (clitic or personal "a"), mirroring the English object list.
-  "voy a matar el tiempo antes de la clase",
-  // Haircut, not self-injury — the pattern requires "cortarme las venas".
-  "voy a cortarme el pelo este fin de semana",
-  "no hay que abusar del café",
-  // "tengo miedo de mi ..." is bounded to partner nouns.
-  "tengo miedo de mi examen final",
-  "quiero terminar el curso este mes",
-  // Method-adjacent guards (es) — ordinary medication adherence and
-  // third-person overdose mentions must stay silent, mirroring the English
-  // informal-corpus guards ("i took my medication this morning", "that
-  // overdose documentary was sad"). A quantifier ("todas las", "demasiadas")
-  // or a first-person frame is what separates disclosure from adherence.
-  "me tomé la pastilla de la presión esta mañana",
-  "ya me tomé mis pastillas hoy",
-  "tengo que tomarme las pastillas con comida",
-  "el doctor me dijo que tome las pastillas por la noche",
-  "las pastillas que me recetaron me ayudan",
-  "mi primo murió de una sobredosis",
-  "vi un documental sobre las sobredosis de fentanilo",
-  // VERB-REGISTER PARITY (the guards above dodge the branch by omitting the
-  // quantifier, which is test rot — they prove nothing about the register).
-  // These carry the quantifier AND the medication noun, exactly like the
-  // disclosures, so the only thing that may keep them quiet is the verb: a
-  // bare habitual present, an obligation modal, or a subjunctive after "que"
-  // is adherence talk, not disclosure. English pins the identical set ("i take
-  // all my pills every morning", "i need to take all my meds before bed").
-  "me tomo todas las pastillas cada mañana con el desayuno",
-  "me tomo todas las pastillas todos los dias con el desayuno",
-  "necesito tomarme todas las pastillas antes de dormir",
-  "tengo que tomarme todas las pastillas con comida",
-  "el doctor me dijo que me tome todas las pastillas",
-  "el doctor me dijo que debo tomarme todas las pastillas",
-];
+const SPANISH_SHOULD_NOT_MATCH = ES_SHOULD_NOT_MATCH;
 
 for (const text of SPANISH_SHOULD_NOT_MATCH) {
   test(`detectCrisisSignal ignores (es): "${text}"`, () => {

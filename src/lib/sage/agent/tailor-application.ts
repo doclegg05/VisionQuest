@@ -293,16 +293,59 @@ async function generateGroundedPlan(
   return plan;
 }
 
+/**
+ * WHICH opening the tailored documents belong to.
+ *
+ * `ResumeVersion` and `CoverLetter` each carry two nullable FKs — one to a
+ * scraped `JobListing`, one to a Match & Connect `JobLead` — and exactly one
+ * must be set (a CHECK constraint enforces it). The first cut of the Phase 4
+ * packet passed a JobLead id into the `jobListingId` column and then tried to
+ * re-key the rows afterwards: the FK rejected the insert with P2003, the
+ * re-key never ran, and a bare `catch` turned every packet into one with no
+ * résumé at all, silently. The discriminator makes that unrepresentable.
+ */
+export type TailoringTarget =
+  | { kind: "listing"; id: string }
+  | { kind: "lead"; id: string };
+
+function targetColumns(target: TailoringTarget) {
+  return target.kind === "lead"
+    ? { jobLeadId: target.id, jobListingId: null }
+    : { jobListingId: target.id, jobLeadId: null };
+}
+
+/**
+ * The same invariant the CHECK constraints enforce, asserted before the write.
+ *
+ * The database is the real guarantee — `ResumeVersion_one_opening` and
+ * `CoverLetter_one_opening` reject a row with both columns set or neither, for
+ * every writer including a future one that never reads this file. This is here
+ * because a constraint violation arrives as an opaque P2010 several frames
+ * away from the mistake, and because `targetColumns` is one careless edit away
+ * from spreading both keys into the same row.
+ */
+function assertExactlyOneOpening(columns: {
+  jobLeadId: string | null;
+  jobListingId: string | null;
+}): void {
+  const set = [columns.jobLeadId, columns.jobListingId].filter(Boolean).length;
+  if (set !== 1) {
+    throw new GroundingViolationError(
+      "A tailored document must belong to exactly one opening.",
+    );
+  }
+}
+
 export async function createTailoredApplication(
   studentId: string,
-  jobListingId: string,
+  target: TailoringTarget,
   source: TailoringSource,
 ): Promise<{
   resumeVersionId: string;
   coverLetterId: string;
   version: number;
 }> {
-  if (source.job.id !== jobListingId) {
+  if (source.job.id !== target.id) {
     throw new GroundingViolationError("The gathered job does not match the requested listing.");
   }
 
@@ -310,14 +353,24 @@ export async function createTailoredApplication(
   const resume = renderTailoredResume(source, plan);
   const coverLetter = renderCoverLetter(source, plan);
 
+  const columns = targetColumns(target);
+  assertExactlyOneOpening(columns);
+  // The version scan filters on the SAME column the write uses, or a lead's
+  // first résumé would collide with the version numbering of some unrelated
+  // listing.
+  const scope =
+    target.kind === "lead"
+      ? { studentId, jobLeadId: target.id }
+      : { studentId, jobListingId: target.id };
+
   const [latestResume, latestLetter] = await Promise.all([
     prisma.resumeVersion.findFirst({
-      where: { studentId, jobListingId },
+      where: scope,
       orderBy: { version: "desc" },
       select: { version: true },
     }),
     prisma.coverLetter.findFirst({
-      where: { studentId, jobListingId },
+      where: scope,
       orderBy: { version: "desc" },
       select: { version: true },
     }),
@@ -328,14 +381,14 @@ export async function createTailoredApplication(
     prisma.resumeVersion.create({
       data: {
         studentId,
-        jobListingId,
+        ...columns,
         version,
         content: resume as unknown as Prisma.InputJsonValue,
       },
       select: { id: true },
     }),
     prisma.coverLetter.create({
-      data: { studentId, jobListingId, version, content: coverLetter },
+      data: { studentId, ...columns, version, content: coverLetter },
       select: { id: true },
     }),
   ]);

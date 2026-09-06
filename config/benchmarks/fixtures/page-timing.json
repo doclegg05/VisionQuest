@@ -1,0 +1,12 @@
+{
+  "_comment": "Documents the walk e2e/bench-page-timing.spec.ts performs; the spec's own constants are the source of truth. Exists so the suite config has one per the contract's five-part rule and so a future runner can display what the raw-data file's numbers mean without opening the spec.",
+  "viewport": { "width": 375, "height": 667 },
+  "repeats": 5,
+  "routes": [
+    { "id": "dashboard", "route": "/dashboard", "role": "student", "label": "student home" },
+    { "id": "career", "route": "/career", "role": "student", "label": "student jobs page (/jobs redirects here)" },
+    { "id": "teacher", "route": "/teacher", "role": "teacher", "label": "teacher dashboard" },
+    { "id": "teacher_connect", "route": "/teacher/connect", "role": "teacher", "label": "Connect console" }
+  ],
+  "rawDataPath": "reports/benchmarks/raw/page-timing.json"
+}

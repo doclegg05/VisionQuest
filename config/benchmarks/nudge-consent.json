@@ -1,0 +1,43 @@
+{
+  "suite": "nudge-consent",
+  "title": "Nobody is texted who did not agree to be",
+  "area": "nudges",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/nudge-consent.mjs",
+  "fixture": "config/benchmarks/fixtures/nudge-consent.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "ineligible_selected",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "exact": true,
+      "tolerance": 0
+    },
+    {
+      "id": "eligible_missed",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    },
+    {
+      "id": "shared_phone_questions_sent",
+      "unit": "count",
+      "direction": "lower",
+      "floor": null,
+      "reason": "Owner decision, 2026-09-05: two students on one handset each consented individually, so the question IS sent; the safety is at the reply end, where an ambiguous answer is applied to nobody (gated by nudge-attribution's misattributed_replies). Reported so the size of the documented limit is visible, never gated.",
+      "tolerance": 0
+    },
+    {
+      "id": "decisions_evaluated",
+      "unit": "count",
+      "direction": "higher",
+      "floor": null,
+      "reason": "corpus size, not a quality bar — it exists so a shrinking matrix is visible in the diff rather than silently weakening the two gates above",
+      "tolerance": 0
+    }
+  ],
+  "notes": "The real runNudges and the real sendPolicySms, driven over the committed synthetic cohort (50 students, 3 classes) through an in-memory Prisma-shaped store, once for each of 11 scenarios: every combination of the two pilot flags (both all, each scoped to one pilot class, disjoint class lists, each off), fuzzed consent state across all 16 combinations of enabled / number present / smsConsentAt / smsRevokedAt, a quiet-hours clock, a daily-cap scenario, and a shared-handset scenario. 550 decisions per run. The oracle is written independently in the scorer and is the reviewable artifact; the store's where-matcher throws on any filter clause it does not understand, so a suite cannot pass by being blind to the filter that carries the invariant. eligible_missed is measured against a control run of the same fixture with every gate satisfied — a consent gate that refuses everybody would otherwise score perfectly, and 'the feature went quiet and nobody noticed' is finding F63's exact failure mode. Red-first: two throwaway breaks were measured before the floors were trusted — dropping the smsRevokedAt clause from canSendSms put ineligible_selected at 5 (the STOP'd-but-otherwise-valid rows in the fuzzed scenarios), and moving the daily-cap comparison one message early (>= SMS_DAILY_CAP - 1, an over-refusal) put eligible_missed at 17; both restored. A third break — forcing isConnectEnabledForClasses to return false — is caught earlier still, by the control-run guard, which errors the suite outright rather than reporting a number. scripts/bench/suites/nudge-consent.test.mjs keeps the oracle's own falsifiability durable."
+}

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "note": "This suite has no corpus. Its input is the run report `e2e/bench-connect-journey.spec.ts` writes, and this file holds the contract between the two so neither has to guess at the other's shape.",
+  "reportPath": "reports/benchmarks/raw/connect-journey.json",
+  "reportShape": {
+    "completed": "1 when the whole journey finished, absent when the spec never ran",
+    "studentTaps": "taps the STUDENT made — not the instructor's or the employer's",
+    "elapsedMs": "wall clock for the run, including database polling",
+    "measuredAt": "ISO instant, so a stale report can be recognised"
+  },
+  "maxReportAgeHours": 24,
+  "ageNote": "A report older than this is treated as absent rather than scored. The alternative is worse than no number: a green `completed: 1` from last week, reported against today's commit, is a passing gate that measured nothing.",
+  "howToRun": [
+    "npx tsx scripts/bench/seed-cohort.ts",
+    "EMAIL_SINK_DIR=.bench-outbox npm run dev   # the SERVER needs the sink, not the spec",
+    "npx playwright test e2e/bench-connect-journey.spec.ts --workers=1"
+  ],
+  "workersNote": "--workers=1 is not optional. /api/auth/login rate-limits to 10 attempts per IP per 15 minutes, and parallel specs sharing one IP exhaust it and fail with 429 (see the standing note in .claude/MEMORY.md)."
+}

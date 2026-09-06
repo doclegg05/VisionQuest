@@ -18,6 +18,16 @@ interface ProgressTabProps {
   /** Certification outcome verification (P1-4) */
   certOutcomeVerifying: boolean;
   onCertOutcomeVerify: (certificationId: string) => void;
+  /**
+   * Application outcome verification (P1-4). The API has existed since P1-4
+   * shipped; this is its first UI. Grant reports split verified placements
+   * from student claims, so an unverified application is a placement nobody
+   * can count.
+   */
+  applicationVerifying: string | null;
+  /** Set when the last verify failed; shown next to the applications list. */
+  applicationVerifyError: string | null;
+  onApplicationVerify: (applicationId: string) => void;
   /** Orientation honor-system verification (P1-1) */
   orientationVerifying: string | null;
   onOrientationVerify: (itemId: string, decision: "confirm" | "decline") => void;
@@ -33,6 +43,9 @@ export default function ProgressTab({
   onVerify,
   certOutcomeVerifying,
   onCertOutcomeVerify,
+  applicationVerifying,
+  applicationVerifyError,
+  onApplicationVerify,
   orientationVerifying,
   onOrientationVerify,
   showAllConversations,
@@ -99,6 +112,7 @@ export default function ProgressTab({
                       <button
                         onClick={() => onOrientationVerify(item.id, "confirm")}
                         disabled={busy}
+                        aria-label={`Confirm orientation step: ${item.label}`}
                         className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
                       >
                         {busy ? "..." : "Confirm"}
@@ -106,6 +120,7 @@ export default function ProgressTab({
                       <button
                         onClick={() => onOrientationVerify(item.id, "decline")}
                         disabled={busy}
+                        aria-label={`Decline orientation step: ${item.label}`}
                         className="text-xs px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
                       >
                         {busy ? "..." : "Decline"}
@@ -148,6 +163,7 @@ export default function ProgressTab({
             <button
               onClick={() => certification.cert && onCertOutcomeVerify(certification.cert.id)}
               disabled={certOutcomeVerifying}
+              aria-label="Verify Ready to Work certification progress"
               className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
             >
               {certOutcomeVerifying ? "..." : "Verify"}
@@ -233,6 +249,11 @@ export default function ProgressTab({
         <div className="grid gap-6 xl:grid-cols-2">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-faint)]">Applications</p>
+            {applicationVerifyError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {applicationVerifyError}
+              </p>
+            )}
             {applications.length === 0 ? (
               <p className="mt-3 text-sm text-[var(--ink-faint)]">No tracked applications yet.</p>
             ) : (
@@ -253,6 +274,26 @@ export default function ProgressTab({
                     <p className="mt-2 text-xs text-[var(--ink-faint)]">
                       Updated {dateFormatter.format(new Date(application.updatedAt))}
                     </p>
+                    {application.verificationStatus === "verified" ? (
+                      <p className="mt-2 text-xs text-green-700">Outcome verified</p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-xs bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded">
+                          {application.verificationStatus === "self_reported"
+                            ? "Student-reported \u2014 verify"
+                            : "Not verified"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onApplicationVerify(application.id)}
+                          disabled={applicationVerifying === application.id}
+                          aria-label={`Verify application for ${application.opportunity.title} at ${application.opportunity.company}`}
+                          className="min-h-[44px] text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                        >
+                          {applicationVerifying === application.id ? "..." : "Verify"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

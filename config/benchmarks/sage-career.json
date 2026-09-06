@@ -1,0 +1,11 @@
+{
+  "suite": "sage-career",
+  "title": "Sage chat — career family",
+  "area": "sage-quality",
+  "tier": "watch",
+  "scorer": "scripts/bench/suites/sage-career.mjs",
+  "fixture": "config/sage-chat-eval.json",
+  "requires": ["gemini"],
+  "metrics": [{ "id": "pass_rate", "unit": "ratio", "direction": "higher" }],
+  "notes": "Promotes the existing `career` family of scripts/sage-chat-harness.mjs (5 cases today) to a reported metric — watch tier, NO floor, per the plan's explicit instruction: the family is deliberately not in the harness's CI --families list yet ('soaking', see the file header) and the design's 40-question corpus with CareerOneStop reference answers does not exist. Promote to gate with a floor once that corpus lands and COS credentials are live (design §4.2: 'gate once COS credentials land; watch before')."
+}

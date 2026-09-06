@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isAuthorizedInternalRequest, isUrlHostMatch } from "./csrf";
+import { readFileSync } from "node:fs";
+import { isAuthorizedInternalRequest, isSignedWebhookPath, SIGNED_WEBHOOK_PATHS } from "./csrf";
+import { isUrlHostMatch } from "./csrf";
 
 describe("CSRF origin validation", () => {
   it("accepts same-origin requests", () => {
@@ -54,5 +56,34 @@ describe("internal request authorization", () => {
         "secret-123"
       )
     );
+  });
+});
+
+describe("signed third-party webhooks", () => {
+  it("exempts the Twilio inbound path, and nothing else", () => {
+    assert.deepEqual([...SIGNED_WEBHOOK_PATHS], ["/api/sms/inbound"]);
+    assert.ok(isSignedWebhookPath("/api/sms/inbound"));
+    for (const path of [
+      "/api/sms/inbound/",
+      "/api/sms/inbound/anything",
+      "/api/sms",
+      "/api/auth/login",
+    ]) {
+      assert.ok(!isSignedWebhookPath(path), `${path} must not be exempt`);
+    }
+  });
+
+  it("every exempt path verifies a provider signature before it acts", () => {
+    // The exemption is only safe because the route authenticates the request
+    // itself. A path added to the list without a signature check would be an
+    // unauthenticated write endpoint, so the list is checked against the code.
+    for (const path of SIGNED_WEBHOOK_PATHS) {
+      const source = readFileSync(`src/app${path}/route.ts`, "utf8");
+      assert.match(
+        source,
+        /verifyTwilioSignature|verify[A-Za-z]*Signature/,
+        `${path} is CSRF-exempt but verifies no signature`,
+      );
+    }
   });
 });

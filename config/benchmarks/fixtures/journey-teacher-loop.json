@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "note": "No corpus. The input is the run report `e2e/bench-journey-teacher-loop.spec.ts` writes, and this file is the contract between the two so neither has to guess at the other's shape.",
+  "reportPath": "reports/benchmarks/raw/journey-teacher-loop.json",
+  "expectedStepCount": 4,
+  "stepKeys": [
+    "queue",
+    "open_student",
+    "record_action",
+    "return_to_queue"
+  ],
+  "reportShape": {
+    "completed": "1 when the loop closed — queue, student, a recorded action, back to the queue",
+    "teacherTaps": "controls the instructor pressed, including the two navigations they make themselves; typing is not a tap",
+    "queueToActionSeconds": "from opening the queue to the action being recorded — the half of the loop an instructor feels",
+    "totalSeconds": "wall clock for the whole run",
+    "stepCount": "how many steps the spec walked, checked against expectedStepCount",
+    "action": "which action was recorded; `case_note` today",
+    "measuredAt": "ISO instant, so a stale report can be recognised"
+  },
+  "maxReportAgeHours": 24,
+  "ageNote": "A report older than this is treated as absent rather than scored. A green `completed: 1` from last week, reported against today's commit, is a passing gate that measured nothing.",
+  "designFloors": {
+    "note": "The design proposes 6 taps or fewer (spec section 4.6, marked with a dagger). Not set as a floor yet: no run has established today's number, and the authoring worktree had no dev server or database. Set the baseline from the first CI run, then floor it.",
+    "teacherTaps": 6
+  },
+  "actionNote": "The recorded action is a case note rather than the seeded pending orientation verification. Verifying is the better story and consumes the fixture — the second run would find nothing pending and quietly measure a shorter loop. A case note is a real recorded action (POST /api/teacher/students/[id]/notes, audit-logged) that can be taken again tomorrow.",
+  "howToRun": [
+    "npx tsx scripts/seed-e2e-users.ts   # idempotent; also clears login rate limits",
+    "npm run dev   # or npm run start against a build",
+    "npx playwright test e2e/bench-journey-teacher-loop.spec.ts --workers=1"
+  ],
+  "workersNote": "--workers=1 is not optional, and it is not sufficient on its own. /api/auth/login applies TWO limiters: login:<ip> at 10 attempts per 15 minutes, and login:user:<studentId> at 5 — and since every e2e spec signs in as the same handful of fixture accounts, the PER-USER cap binds first (measured: the 429 lands on the 6th attempt, not the 11th). The buckets are RateLimitEntry rows, so they outlive the webServer and are shared by every `playwright test` invocation against one database. Re-run `npx tsx scripts/seed-e2e-users.ts` before a collection pass that follows another suite run — it is idempotent and clears the login buckets, and it refuses any non-local, non-CI database by construction (src/lib/e2e-seed-guard.ts). CI does exactly this between its gate step and its collection step."
+}

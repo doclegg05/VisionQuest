@@ -25,11 +25,24 @@ mock.module("@/lib/db", {
 mock.module("@/lib/rls-context", {
   namedExports: { withRlsContext: (_ctx: unknown, fn: () => unknown) => fn() },
 });
+// Mutable so one test can hand the briefing an oversized bundle without
+// changing what every other test sees.
+let bundleGoals: string[] = ["finish resume"];
 mock.module("@/lib/sage/context-bundle", {
-  namedExports: { assembleStudentContextBundle: async () => ({ goals: ["finish resume"] }) },
+  namedExports: { assembleStudentContextBundle: async () => ({ goals: bundleGoals }) },
 });
+// Identity, but it RECORDS what it was handed. An identity mock that records
+// nothing cannot tell slice-then-sanitize from sanitize-then-slice — both
+// produce the same prompt — so the ordering this file's call sites depend on
+// was untestable until the mock observed its own input.
+const sanitizeInputLengths: number[] = [];
 mock.module("@/lib/sage/system-prompts", {
-  namedExports: { sanitizeForPrompt: (text: string) => text },
+  namedExports: {
+    sanitizeForPrompt: (text: string) => {
+      sanitizeInputLengths.push(text.length);
+      return text;
+    },
+  },
 });
 
 const logSageActionMock = mock.fn<(...args: unknown[]) => Promise<void>>(async () => {});
@@ -113,6 +126,30 @@ describe("runDailyBriefing", () => {
   });
   afterEach(() => {
     delete process.env.SAGE_AUTOPILOT_ENABLED;
+    bundleGoals = ["finish resume"];
+    sanitizeInputLengths.length = 0;
+  });
+
+  it("caps the context bundle BEFORE sanitizing it, not after", async () => {
+    // Big enough that the two orders are distinguishable: sanitize-first hands
+    // the sanitizer the whole bundle, slice-first hands it exactly the 4000
+    // characters that reach the prompt.
+    bundleGoals = Array.from({ length: 400 }, (_, i) => `goal ${i} ${"x".repeat(40)}`);
+    sanitizeInputLengths.length = 0;
+
+    await briefing.runDailyBriefing("student-a");
+
+    const fullBundleLength = JSON.stringify({ goals: bundleGoals }).length;
+    assert.ok(
+      fullBundleLength > 4000,
+      `fixture must exceed the cap to distinguish the orders (was ${fullBundleLength})`,
+    );
+    assert.ok(sanitizeInputLengths.length > 0, "sanitizeForPrompt was never called");
+    assert.equal(
+      sanitizeInputLengths[0],
+      4000,
+      "the bundle must be sliced to 4000 before sanitizeForPrompt sees it",
+    );
   });
 
   it("no-ops when SAGE_AUTOPILOT_ENABLED is not 'true'", async () => {

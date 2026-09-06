@@ -1,0 +1,286 @@
+name: Benchmarks
+
+# Nightly benchmark run: the tiers that cannot go on every PR because they
+# need a migrated database, a seeded cohort, a paid key, or simply too much
+# wall-clock time.
+#
+#   --tier=nightly --compare   numbers with floors; a breach fails this run
+#                              and opens the tracking issue
+#   --tier=watch               numbers without consequence; reported, never
+#                              fails (design §3)
+#
+# Suites whose `requires` are unmet report `skipped` and are never a failure:
+# the Gemini-backed suites run only when GEMINI_API_KEY exists, the
+# prod-read-only ones only when BENCH_PROD_READONLY_URL does. Those secrets
+# are owner steps (design §9.7), so an unconfigured repository stays green and
+# says so in the results rather than going quiet.
+#
+# "A number nobody reads is not a benchmark" (design §6): every run uploads
+# its results, main runs commit them so the trend is in git, and any failure
+# opens or updates one issue.
+#
+# Permissions are split across two jobs on purpose. The job that RUNS the
+# suites executes scorer code and third-party test dependencies, so it holds
+# no write token at all — `contents: read`, and its checkout does not persist
+# credentials, so nothing it runs can push. Only `commit-results`, which runs
+# no suite code and merely downloads an artifact, is allowed to write, and
+# only on `main`. GitHub Actions has no step-level permissions, so this is a
+# job boundary rather than a step boundary.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *" # nightly 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    services:
+      # Same hermetic pgvector service as the RLS and e2e jobs in ci.yml, so a
+      # benchmark measures a real, migrated schema rather than a mock.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionquest_bench
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_bench"
+      # Hermetic CI Postgres has no pooler, so direct == pooled (schema.prisma
+      # declares directUrl and the Prisma CLI validates it).
+      DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_bench"
+      JWT_SECRET: "ci-test-secret-not-real-at-all-32"
+      API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      APP_BASE_URL: "http://localhost:3000"
+      # Presence is what the runner's `requires` check reads. An unset secret
+      # is an empty string here, so gemini/prod-readonly suites report
+      # `skipped` instead of failing. Values that reach a scorer through
+      # ctx.env are redacted out of every result file by
+      # scripts/bench/lib/redact.mjs before it is written.
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      BENCH_PROD_READONLY_URL: ${{ secrets.BENCH_PROD_READONLY_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # This job runs benchmark scorers and their dependencies. Leaving a
+          # push token in .git/config for that code to find serves no purpose
+          # here — the commit-back happens in a separate job.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Validate benchmark suites
+        # Same gate as ci.yml. A malformed suite must stop the nightly before
+        # it writes half a result set.
+        run: npm run bench:validate
+
+      - name: Apply migrations to the benchmark database
+        run: npx prisma migrate deploy
+
+      - name: Seed the synthetic benchmark cohort
+        # Owned by the Connect benchmark phase (A3); guarded so this workflow
+        # is correct before that script exists and needs no edit after.
+        run: |
+          if [ -f scripts/bench/seed-cohort.ts ]; then
+            npx tsx scripts/bench/seed-cohort.ts
+          else
+            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort suites will report skipped."
+          fi
+
+      - name: Nightly-tier benchmarks
+        id: nightly
+        # continue-on-error so the watch tier still runs and the regression
+        # issue is still filed; the job's own verdict is re-applied at the end.
+        continue-on-error: true
+        run: npm run bench -- --tier=nightly --compare
+
+      - name: Watch-tier benchmarks
+        # No --compare: watch numbers are reported, never enforced.
+        continue-on-error: true
+        run: npm run bench -- --tier=watch
+
+      - name: Benchmark summary
+        if: always()
+        # Suite titles, metric ids and error text end up inside this block, so
+        # the fence is five backticks and any run of three or more backticks in
+        # the content is neutralised — otherwise a suite could close the fence
+        # and write arbitrary markdown into the job summary.
+        run: |
+          npm run --silent bench:compare > bench-compare.txt 2>&1 || true
+          sed -i 's/`\{3,\}/[backticks]/g' bench-compare.txt
+          {
+            echo "## Benchmarks"
+            echo
+            echo '`````'
+            cat bench-compare.txt
+            echo '`````'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: reports/benchmarks/latest/
+          if-no-files-found: warn
+
+      - name: Open or update the regression issue
+        if: always() && steps.nightly.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const { pathToFileURL } = require("url");
+
+            // Second line of defence: result files are already redacted by
+            // the runner (scripts/bench/lib/redact.mjs) before being written,
+            // but the issue body is public, so the same redactor runs again
+            // over whatever is about to be posted. If the module cannot be
+            // loaded for any reason, fall back to posting nothing but a link
+            // rather than posting unredacted text.
+            let redactSecrets = null;
+            try {
+              ({ redactSecrets } = await import(
+                pathToFileURL(path.join(process.cwd(), "scripts/bench/lib/redact.mjs")).href
+              ));
+            } catch (error) {
+              core.warning(`redact.mjs unavailable (${error.message}); omitting failure detail.`);
+            }
+            const safe = (text) => (redactSecrets ? String(redactSecrets(text)) : null);
+
+            const dir = "reports/benchmarks/latest";
+            const failures = [];
+            let files = [];
+            try {
+              files = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
+            } catch {
+              files = [];
+            }
+            for (const file of files) {
+              let result;
+              try {
+                result = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
+              } catch {
+                continue;
+              }
+              if (!["gate", "nightly"].includes(result.tier)) continue;
+              if (result.status === "error") {
+                const detail = safe((result.error || "").split("\n")[0]);
+                failures.push(
+                  `- **${safe(result.suite) ?? "a suite"}** — scorer error${detail ? `: ${detail}` : ""}`
+                );
+                continue;
+              }
+              for (const metric of result.metrics || []) {
+                if (metric.status !== "fail") continue;
+                failures.push(
+                  `- **${safe(result.suite)}.${safe(metric.id)}** — ${metric.value} against floor ${metric.floor}` +
+                    (metric.baseline != null ? ` (baseline ${metric.baseline})` : "")
+                );
+              }
+            }
+
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              "The nightly benchmark run reported a regression.",
+              "",
+              failures.length > 0
+                ? failures.join("\n")
+                : "The nightly run failed with no failing metric recorded — check the run log.",
+              "",
+              `Run: ${runUrl}`,
+              `Commit: ${context.sha}`,
+              "",
+              "Flake protocol (design §6): a gate-tier benchmark that fails is re-run at most once; a second failure is real.",
+              "Updating a floor or a baseline needs a recorded reason — see docs/runbooks/benchmarks.md.",
+            ].join("\n");
+
+            const title = "Benchmark regression";
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              per_page: 100,
+            });
+            const match = existing.data.find((issue) => issue.title === title && !issue.pull_request);
+
+            if (match) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body,
+              });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body: `Still failing as of ${new Date().toISOString()}.\n\n${failures.join("\n")}\n\nRun: ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+            }
+
+      - name: Fail the run when a nightly benchmark regressed
+        if: always() && steps.nightly.outcome == 'failure'
+        run: |
+          echo "::error::A nightly-tier benchmark crossed its floor. See the Benchmark regression issue."
+          exit 1
+
+  # The only job with a write token. It runs no suite code — it downloads the
+  # artifact the previous job produced and commits it — so the token is never
+  # in scope while third-party code is executing.
+  commit-results:
+    needs: benchmarks
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: benchmark-results
+          path: reports/benchmarks/latest
+
+      - name: Commit results
+        # The dashboard and the 90-day trend read committed results (design
+        # §5). [skip ci] keeps this from re-triggering the CI workflow.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/benchmarks/latest
+          if git diff --cached --quiet; then
+            echo "No benchmark result changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(bench): nightly benchmark results [skip ci]"
+          git push

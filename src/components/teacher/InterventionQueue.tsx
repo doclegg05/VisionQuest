@@ -117,6 +117,12 @@ const CONSOLIDATION_GROUPS: Record<string, { label: string; groupCategory: strin
   certification_stalled:           { label: "certifications stalled",            groupCategory: "Certifications" },
   profile_birthdate_missing:       { label: "birthdates missing",                groupCategory: "Profile" },
   placement_outcome_pending:       { label: "employment outcomes to record",     groupCategory: "Placement" },
+  connect_employer_no_view:        { label: "packets employers have not opened", groupCategory: "Connect" },
+  connect_employer_no_response:    { label: "employers with no answer",          groupCategory: "Connect" },
+  connect_interview_unconfirmed:   { label: "interviews not confirmed",          groupCategory: "Connect" },
+  connect_retention_confirm:       { label: "retention check-ins to record",     groupCategory: "Connect" },
+  connect_retention_unanswered:    { label: "retention check-ins with no reply", groupCategory: "Connect" },
+  connect_retention_lost:          { label: "placements reported ended",         groupCategory: "Connect" },
 };
 
 interface ConsolidatedItem {

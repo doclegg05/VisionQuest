@@ -1,0 +1,21 @@
+{
+  "suite": "explain-faithfulness",
+  "title": "explain_job faithfulness, against a real model",
+  "area": "connect",
+  "tier": "nightly",
+  "scorer": "scripts/bench/suites/explain-faithfulness.mjs",
+  "fixture": "config/benchmarks/fixtures/explain-faithfulness.json",
+  "requires": ["gemini", "postgres"],
+  "metrics": [
+    {
+      "id": "faithful_explanations",
+      "unit": "ratio",
+      "direction": "higher",
+      "floor": 1,
+      "tolerance": 0
+    },
+    { "id": "median_reading_grade", "unit": "grade", "direction": "lower", "floor": 6, "tolerance": 0.5 },
+    { "id": "empty_replies", "unit": "count", "direction": "lower", "floor": 0, "tolerance": 0 }
+  ],
+  "notes": "The model half. Generates an explanation for each of the ten fixture postings with the PRODUCTION prompt (EXPLAIN_SYSTEM_PROMPT and explainGrounding are imported, never copied — the 2026-08-21 bake-off rule) and runs the same post-generation checker explain_job runs. Nightly, never per-PR: it spends money and it is non-deterministic, and the plan's owner default is that Gemini-backed suites run only in the nightly workflow. Its deterministic sibling `explain-faithfulness-check` carries the gate. Reports `skipped` without a key rather than failing."
+}

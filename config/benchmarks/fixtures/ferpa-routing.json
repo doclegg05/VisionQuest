@@ -1,0 +1,5 @@
+{
+  "$comment": "ferpa-routing reads live prod-readonly AuditLog rows, not a fixture corpus. Kept here only so bench:validate's fixture-exists check has something to point at.",
+  "windowDays": 30,
+  "sensitivity": "student_record"
+}

@@ -15,6 +15,7 @@ import {
   nextStepShortLabel,
 } from "@/lib/progression/student-next-step";
 import { PathToEmployment } from "@/components/progression/PathToEmployment";
+import { SmsReconsentNotice } from "@/components/student/SmsReconsentNotice";
 
 /**
  * Chat-first student home (Phase 4 redesign, user-approved 2026-06-09).
@@ -41,6 +42,7 @@ export default async function DashboardPage() {
     readinessData,
     incompleteOrientationItems,
     sagePanel,
+    smsPreference,
   ] = await Promise.all([
       prisma.goal.count({
         where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
@@ -71,9 +73,25 @@ export default async function DashboardPage() {
         take: 3,
       }),
       getLatestPanelSpec(session.id),
+      // Whether this student's texts are paused pending code verification.
+      // Read here, on the student's own page, rather than fetched by the
+      // component: DashboardClient is also mounted by the teacher's
+      // student-detail dashboard, where "your" preferences means the
+      // teacher's. Two booleans, no client round trip, no layout shift.
+      prisma.notificationPreference.findUnique({
+        where: { studentId_channel: { studentId: session.id, channel: "sms" } },
+        select: { enabled: true, smsConsentAt: true, smsRevokedAt: true },
+      }),
     ]);
 
   const { state, readiness, orientationProgress } = readinessData;
+
+  // Enabled but unconfirmed: the channel is on and nothing is being delivered.
+  // A revoked row is not this case — that student chose to stop.
+  const smsAwaitingConfirmation =
+    smsPreference?.enabled === true &&
+    smsPreference.smsConsentAt === null &&
+    smsPreference.smsRevokedAt === null;
 
   // Brand-new students still start at the welcome flow. "Brand new" is a
   // recorded fact (shouldEnterWelcome), never an inference from a row the app
@@ -101,6 +119,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="page-shell page-shell-wide space-y-6">
+      <SmsReconsentNotice show={smsAwaitingConfirmation} />
       <PathToEmployment
         currentStepKey={nextStep.currentStepKey}
         title={nextStep.title}

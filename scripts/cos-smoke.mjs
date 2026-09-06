@@ -10,6 +10,12 @@
  * own header notes it has never been exercised against the live authenticated
  * API — this script is what closes that gap, on demand.
  *
+ * Also runs the job-board adapter (src/lib/job-board/adapters/careeronestop.ts)
+ * for Charleston, WV and reports how many "West Virginia Employer" (WorkForce
+ * WV / MACC) postings came back and where one of their apply links resolves —
+ * the two facts docs/plans/2026-09-04-nlx-macc-job-search-research.md could
+ * not verify without live credentials.
+ *
  * Read-only in effect: every request either GETs data or (for the Skills
  * Matcher) POSTs a self-assessment that CareerOneStop does not persist
  * against a student record — this script writes nothing locally (no DB
@@ -235,8 +241,71 @@ async function main() {
     (v) => `${v.programs.length}/${v.totalCount} programs returned`,
   );
 
+  await runJobBoardFamilies();
+
   const allPassed = printReport();
   process.exit(allPassed ? 0 : 1);
+}
+
+const JOB_REGION = "Charleston, WV";
+const JOB_RADIUS_MILES = 25;
+
+/**
+ * Job-board adapter families. The adapter never throws and returns [] on any
+ * failure, so an empty result while configured is reported as a FAIL — a
+ * 25-mile circle around Charleston with zero NLx postings is not a pass.
+ */
+async function runJobBoardFamilies() {
+  const { careerOneStopAdapter } = await import(
+    "../src/lib/job-board/adapters/careeronestop.ts"
+  );
+  const { isWorkForceWvPosting, WORKFORCE_WV_COMPANY_LABEL } = await import(
+    "../src/lib/job-board/wv-employer.ts"
+  );
+
+  const jobs = await runFamily(
+    `jobsearch.adapter (${JOB_REGION}, ${JOB_RADIUS_MILES} mi)`,
+    async () => {
+      const rows = await careerOneStopAdapter.fetchJobs(JOB_REGION, JOB_RADIUS_MILES);
+      if (rows.length === 0) return { error: "empty" };
+      return rows;
+    },
+    (rows) => {
+      const companies = new Set(rows.map((r) => r.company));
+      return `${rows.length} postings from ${companies.size} companies`;
+    },
+  );
+  if (!jobs) return;
+
+  const wvPostings = jobs.filter(isWorkForceWvPosting);
+  results.push({
+    name: `jobsearch.workforceWv ("${WORKFORCE_WV_COMPANY_LABEL}" filter)`,
+    ok: wvPostings.length > 0,
+    elapsedMs: 0,
+    detail:
+      wvPostings.length > 0
+        ? `${wvPostings.length} WorkForce WV postings; first: "${truncate(wvPostings[0].title, 60)}" (${wvPostings[0].location})`
+        : `0 postings carried the company label — check whether NLx still labels MACC rows "${WORKFORCE_WV_COMPANY_LABEL}" (the WVDE handout says it does)`,
+  });
+  if (wvPostings.length === 0) return;
+
+  // Where does a WorkForce WV apply link land? The handout says the MACC.
+  // GET with redirects followed, body discarded — reads nothing personal.
+  await runFamily(
+    "jobsearch.workforceWv.applyLink (redirect target)",
+    async () => {
+      const response = await fetch(wvPostings[0].url, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(20_000),
+      });
+      const finalHost = new URL(response.url).host;
+      const startHost = new URL(wvPostings[0].url).host;
+      return { startHost, finalHost, status: response.status };
+    },
+    (v) =>
+      `${v.startHost} → ${v.finalHost} (HTTP ${v.status})` +
+      (v.finalHost.endsWith("workforcewv.org") ? " — lands in the MACC as expected" : " — NOT the MACC; revisit the job-card hint"),
+  );
 }
 
 main().catch((error) => {

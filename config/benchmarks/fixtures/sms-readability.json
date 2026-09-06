@@ -1,0 +1,38 @@
+{
+  "_comment": "Realistic-stress values for every SMS template in src/lib/nudges/sms-policy-shared.ts — long employer names (some with punctuation a job feed or an instructor might type), long job titles, and boundary counts. The scorer renders each template's real function with each value and scores the result; it does not re-implement composeSmsBody's own logic.",
+  "employerNames": [
+    "O'Brien's Auto & Truck Repair, LLC — Beckley, WV",
+    "Walmart Supercenter #1234",
+    "Mountain State Health Alliance Regional Medical Center",
+    "Tudor's Biscuit World",
+    "West Virginia Division of Highways — District 10",
+    "St. Mary's Medical Center Food & Nutrition Services",
+    "Go-Mart #452",
+    "Appalachian Regional Healthcare — Beckley ARH Hospital"
+  ],
+  "jobTitles": [
+    "Certified Nursing Assistant (CNA) — Night Shift",
+    "Warehouse Associate / Forklift Operator",
+    "Administrative Assistant II",
+    "Heavy Equipment Operator Trainee",
+    "Customer Service Representative — Bilingual Preferred",
+    "Licensed Practical Nurse (LPN), Long-Term Care",
+    "Class A CDL Truck Driver, Regional Routes"
+  ],
+  "whens": [
+    "Tuesday, October 14 at 10:00 AM",
+    "this Friday afternoon at 2:30",
+    "Monday morning"
+  ],
+  "places": ["Suite 200, Main Entrance", null],
+  "counts": [1, 2, 3, 7, 14],
+  "notificationTitles": [
+    "Your weekly check-in with your coach is ready",
+    "New message from your coach about your Career page",
+    "A form needs your signature before Friday"
+  ],
+  "actionUrls": [
+    "https://visionquest.onrender.com/goals",
+    "https://visionquest.onrender.com/career"
+  ]
+}

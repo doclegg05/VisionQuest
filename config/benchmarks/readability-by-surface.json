@@ -1,0 +1,33 @@
+{
+  "suite": "readability-by-surface",
+  "title": "Reading grade by surface",
+  "area": "a11y",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/readability-by-surface.mjs",
+  "fixture": "config/benchmarks/fixtures/readability-by-surface.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "median_grade_student",
+      "unit": "grade",
+      "direction": "lower",
+      "floor": 6,
+      "tolerance": 0.5
+    },
+    {
+      "id": "max_grade_student",
+      "unit": "grade",
+      "direction": "lower",
+      "floor": 8,
+      "tolerance": 0.5
+    },
+    {
+      "id": "median_grade_employer",
+      "unit": "grade",
+      "direction": "lower",
+      "floor": 8,
+      "tolerance": 0.5
+    }
+  ],
+  "notes": "Reuses scanReadabilityForRoots() from scripts/ui-copy-readability.mjs (the same Flesch-Kincaid scorer that already gates `ui-copy:readability`), grouped by route family instead of pooled. student = student_home+career+goals+orientation+settings+connect_student; employer = teacher_connect+employer_page (the job-developer console and the public employer response page, held to the same 8th-grade ceiling as Sage's own replies rather than the 6th-grade student floor). Per-family median/max and the worst offenders sit in each metric's `details`."
+}

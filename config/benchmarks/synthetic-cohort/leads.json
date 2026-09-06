@@ -1,0 +1,1654 @@
+[
+  {
+    "id": "cbenchlead01",
+    "employerId": "cbenchemp01",
+    "employerName": "Ridgeline Metal Works",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact01",
+    "classId": null,
+    "title": "Production Associate",
+    "description": "Ridgeline Metal Works is hiring a production associate in Beckley. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "osha-10"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 10,
+    "payMax": 13,
+    "payPeriod": "hour",
+    "location": "Beckley, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-07-08T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead02",
+    "employerId": "cbenchemp02",
+    "employerName": "New River Care Home",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact02",
+    "classId": "cbenchclass2",
+    "title": "Warehouse Selector",
+    "description": "New River Care Home is hiring a warehouse selector in Charleston. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [
+        "forklift-operator"
+      ],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 11,
+    "payMax": 14,
+    "payPeriod": "hour",
+    "location": "Charleston, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-06-20T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead03",
+    "employerId": "cbenchemp03",
+    "employerName": "Blackwater Logistics",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact03",
+    "classId": "cbenchclass3",
+    "title": "Certified Nursing Assistant",
+    "description": "Blackwater Logistics is hiring a certified nursing assistant in Huntington. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "evening"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 12,
+    "payMax": 15,
+    "payPeriod": "hour",
+    "location": "Huntington, WV",
+    "transitNotes": null,
+    "distanceMiles": 24,
+    "clusters": [
+      "Digital Technology",
+      "Marketing & Sales"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-06-12T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead04",
+    "employerId": "cbenchemp04",
+    "employerName": "Kanawha Valley Grocers",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact04",
+    "classId": "cbenchclass1",
+    "title": "Front Desk Associate",
+    "description": "Kanawha Valley Grocers is hiring a front desk associate in Morgantown. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "flagger"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "night"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 13,
+    "payMax": 16,
+    "payPeriod": "hour",
+    "location": "Morgantown, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "source": "joborder",
+    "sourceRef": "cbenchsrc04",
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-06-16T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead05",
+    "employerId": "cbenchemp05",
+    "employerName": "Coalfield Machine & Tool",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact05",
+    "classId": null,
+    "title": "Machine Operator",
+    "description": "Coalfield Machine & Tool is hiring a machine operator in Parkersburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 14,
+    "payMax": 17,
+    "payPeriod": "hour",
+    "location": "Parkersburg, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Hospitality, Events, & Tourism",
+      "Advanced Manufacturing"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-07-03T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead06",
+    "employerId": "cbenchemp06",
+    "employerName": "Greenbrier Family Dental",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact06",
+    "classId": "cbenchclass3",
+    "title": "Delivery Driver Helper",
+    "description": "Greenbrier Family Dental is hiring a delivery driver helper in Wheeling. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "evening"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 600,
+    "payMax": 720,
+    "payPeriod": "week",
+    "location": "Wheeling, WV",
+    "transitNotes": null,
+    "distanceMiles": 24,
+    "clusters": [
+      "Marketing & Sales",
+      "Construction"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-06-07T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead07",
+    "employerId": "cbenchemp07",
+    "employerName": "Tygart Freight Lines",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact07",
+    "classId": "cbenchclass1",
+    "title": "Grocery Stocker",
+    "description": "Tygart Freight Lines is hiring a grocery stocker in Martinsburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [
+        "flagger"
+      ],
+      "niceToHave": [
+        "forklift-operator"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "evening",
+        "night"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 16,
+    "payMax": 19,
+    "payPeriod": "hour",
+    "location": "Martinsburg, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Supply Chain & Transportation",
+      "Digital Technology"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-07-03T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead08",
+    "employerId": "cbenchemp08",
+    "employerName": "Appalachian Print & Sign",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact08",
+    "classId": "cbenchclass2",
+    "title": "Dental Office Assistant",
+    "description": "Appalachian Print & Sign is hiring a dental office assistant in Fairmont. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": []
+    },
+    "payMin": 17,
+    "payMax": 20,
+    "payPeriod": "hour",
+    "location": "Fairmont, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services"
+    ],
+    "source": "opportunity",
+    "sourceRef": "cbenchsrc08",
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-06-16T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead09",
+    "employerId": "cbenchemp09",
+    "employerName": "Cheat River Hospitality",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact09",
+    "classId": null,
+    "title": "Print Finisher",
+    "description": "Cheat River Hospitality is hiring a print finisher in Clarksburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "evening",
+        "night",
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 18,
+    "payMax": 21,
+    "payPeriod": "hour",
+    "location": "Clarksburg, WV",
+    "transitNotes": null,
+    "distanceMiles": 15,
+    "clusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-08-16T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead10",
+    "employerId": "cbenchemp10",
+    "employerName": "Mountain State Data Services",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact10",
+    "classId": "cbenchclass1",
+    "title": "Housekeeping Attendant",
+    "description": "Mountain State Data Services is hiring a housekeeping attendant in Lewisburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "cpr-first-aid"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 20,
+    "payMax": 23,
+    "payPeriod": "hour",
+    "location": "Lewisburg, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Digital Technology",
+      "Marketing & Sales"
+    ],
+    "source": "joblisting",
+    "sourceRef": "cbenchsrc10",
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-08-19T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead11",
+    "employerId": "cbenchemp11",
+    "employerName": "Elk Fork Building Supply",
+    "employerStatus": "do_not_contact",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact11",
+    "classId": "cbenchclass2",
+    "title": "Data Entry Clerk",
+    "description": "Elk Fork Building Supply is hiring a data entry clerk in Oak Hill. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 10,
+    "payMax": 13,
+    "payPeriod": "hour",
+    "location": "Oak Hill, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-07-20T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead12",
+    "employerId": "cbenchemp12",
+    "employerName": "Seneca Home Health",
+    "employerStatus": "paused",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact12",
+    "classId": "cbenchclass3",
+    "title": "Building Supply Cashier",
+    "description": "Seneca Home Health is hiring a building supply cashier in Princeton. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [
+        "osha-10"
+      ],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 11,
+    "payMax": 14,
+    "payPeriod": "hour",
+    "location": "Princeton, WV",
+    "transitNotes": null,
+    "distanceMiles": 27,
+    "clusters": [
+      "Hospitality, Events, & Tourism",
+      "Advanced Manufacturing"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-08-09T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead13",
+    "employerId": "cbenchemp01",
+    "employerName": "Ridgeline Metal Works",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact01",
+    "classId": null,
+    "title": "Home Health Aide",
+    "description": "Ridgeline Metal Works is hiring a home health aide in Beckley. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "nccer-core"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "evening"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": null,
+    "payMax": null,
+    "payPeriod": "hour",
+    "location": "Beckley, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Marketing & Sales",
+      "Construction"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-07-07T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead14",
+    "employerId": "cbenchemp02",
+    "employerName": "New River Care Home",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact02",
+    "classId": "cbenchclass2",
+    "title": "Shipping Clerk",
+    "description": "New River Care Home is hiring a shipping clerk in Charleston. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "night"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 13,
+    "payMax": 16,
+    "payPeriod": "hour",
+    "location": "Charleston, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Supply Chain & Transportation",
+      "Digital Technology"
+    ],
+    "source": "joborder",
+    "sourceRef": "cbenchsrc14",
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-06-06T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead15",
+    "employerId": "cbenchemp03",
+    "employerName": "Blackwater Logistics",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact03",
+    "classId": "cbenchclass3",
+    "title": "Line Cook",
+    "description": "Blackwater Logistics is hiring a line cook in Huntington. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 14,
+    "payMax": 17,
+    "payPeriod": "hour",
+    "location": "Huntington, WV",
+    "transitNotes": null,
+    "distanceMiles": 20,
+    "clusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-06-25T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead16",
+    "employerId": "cbenchemp04",
+    "employerName": "Kanawha Valley Grocers",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact04",
+    "classId": "cbenchclass1",
+    "title": "Maintenance Helper",
+    "description": "Kanawha Valley Grocers is hiring a maintenance helper in Morgantown. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "servsafe-food-handler"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "evening"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 15,
+    "payMax": 18,
+    "payPeriod": "hour",
+    "location": "Morgantown, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-07-24T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead17",
+    "employerId": "cbenchemp05",
+    "employerName": "Coalfield Machine & Tool",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact05",
+    "classId": null,
+    "title": "Quality Inspector",
+    "description": "Coalfield Machine & Tool is hiring a quality inspector in Parkersburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [
+        "ready-to-work"
+      ],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "evening",
+        "night"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 16,
+    "payMax": 19,
+    "payPeriod": "hour",
+    "location": "Parkersburg, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Digital Technology",
+      "Marketing & Sales"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-08-21T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead18",
+    "employerId": "cbenchemp06",
+    "employerName": "Greenbrier Family Dental",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact06",
+    "classId": "cbenchclass3",
+    "title": "Customer Care Representative",
+    "description": "Greenbrier Family Dental is hiring a customer care representative in Wheeling. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": []
+    },
+    "payMin": 35360,
+    "payMax": 41600,
+    "payPeriod": "year",
+    "location": "Wheeling, WV",
+    "transitNotes": null,
+    "distanceMiles": 10,
+    "clusters": [
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "source": "opportunity",
+    "sourceRef": "cbenchsrc18",
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-07-24T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead19",
+    "employerId": "cbenchemp07",
+    "employerName": "Tygart Freight Lines",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact07",
+    "classId": "cbenchclass1",
+    "title": "Forklift Operator",
+    "description": "Tygart Freight Lines is hiring a forklift operator in Martinsburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "cna"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "evening",
+        "night",
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 18,
+    "payMax": 21,
+    "payPeriod": "hour",
+    "location": "Martinsburg, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Hospitality, Events, & Tourism",
+      "Advanced Manufacturing"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-07-02T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead20",
+    "employerId": "cbenchemp08",
+    "employerName": "Appalachian Print & Sign",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact08",
+    "classId": "cbenchclass2",
+    "title": "Receiving Associate",
+    "description": "Appalachian Print & Sign is hiring a receiving associate in Fairmont. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 20,
+    "payMax": 23,
+    "payPeriod": "hour",
+    "location": "Fairmont, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Marketing & Sales",
+      "Construction"
+    ],
+    "source": "joblisting",
+    "sourceRef": "cbenchsrc20",
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-08-06T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead21",
+    "employerId": "cbenchemp09",
+    "employerName": "Cheat River Hospitality",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact09",
+    "classId": null,
+    "title": "Production Associate",
+    "description": "Cheat River Hospitality is hiring a production associate in Clarksburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 10,
+    "payMax": 13,
+    "payPeriod": "hour",
+    "location": "Clarksburg, WV",
+    "transitNotes": null,
+    "distanceMiles": 13,
+    "clusters": [
+      "Supply Chain & Transportation",
+      "Digital Technology"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-07-12T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead22",
+    "employerId": "cbenchemp10",
+    "employerName": "Mountain State Data Services",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact10",
+    "classId": "cbenchclass1",
+    "title": "Warehouse Selector",
+    "description": "Mountain State Data Services is hiring a warehouse selector in Lewisburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [
+        "cna"
+      ],
+      "niceToHave": [
+        "ready-to-work"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 11,
+    "payMax": 14,
+    "payPeriod": "hour",
+    "location": "Lewisburg, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-08-22T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead23",
+    "employerId": "cbenchemp11",
+    "employerName": "Elk Fork Building Supply",
+    "employerStatus": "do_not_contact",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact11",
+    "classId": "cbenchclass2",
+    "title": "Certified Nursing Assistant",
+    "description": "Elk Fork Building Supply is hiring a certified nursing assistant in Oak Hill. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "evening"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 12,
+    "payMax": 15,
+    "payPeriod": "hour",
+    "location": "Oak Hill, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-08-30T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead24",
+    "employerId": "cbenchemp12",
+    "employerName": "Seneca Home Health",
+    "employerStatus": "paused",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact12",
+    "classId": "cbenchclass3",
+    "title": "Front Desk Associate",
+    "description": "Seneca Home Health is hiring a front desk associate in Princeton. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "night"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 13,
+    "payMax": 16,
+    "payPeriod": "hour",
+    "location": "Princeton, WV",
+    "transitNotes": null,
+    "distanceMiles": 11,
+    "clusters": [
+      "Digital Technology",
+      "Marketing & Sales"
+    ],
+    "source": "joborder",
+    "sourceRef": "cbenchsrc24",
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-08-06T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead25",
+    "employerId": "cbenchemp01",
+    "employerName": "Ridgeline Metal Works",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact01",
+    "classId": null,
+    "title": "Machine Operator",
+    "description": "Ridgeline Metal Works is hiring a machine operator in Beckley. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "osha-10"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 14,
+    "payMax": 17,
+    "payPeriod": "hour",
+    "location": "Beckley, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-07-19T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead26",
+    "employerId": "cbenchemp02",
+    "employerName": "New River Care Home",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact02",
+    "classId": "cbenchclass2",
+    "title": "Delivery Driver Helper",
+    "description": "New River Care Home is hiring a delivery driver helper in Charleston. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "evening"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": null,
+    "payMax": null,
+    "payPeriod": "hour",
+    "location": "Charleston, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Hospitality, Events, & Tourism",
+      "Advanced Manufacturing"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-08-13T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead27",
+    "employerId": "cbenchemp03",
+    "employerName": "Blackwater Logistics",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact03",
+    "classId": "cbenchclass3",
+    "title": "Grocery Stocker",
+    "description": "Blackwater Logistics is hiring a grocery stocker in Huntington. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [
+        "servsafe-food-handler"
+      ],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "evening",
+        "night"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 16,
+    "payMax": 19,
+    "payPeriod": "hour",
+    "location": "Huntington, WV",
+    "transitNotes": null,
+    "distanceMiles": 13,
+    "clusters": [
+      "Marketing & Sales",
+      "Construction"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-07-24T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead28",
+    "employerId": "cbenchemp04",
+    "employerName": "Kanawha Valley Grocers",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact04",
+    "classId": "cbenchclass1",
+    "title": "Dental Office Assistant",
+    "description": "Kanawha Valley Grocers is hiring a dental office assistant in Morgantown. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "flagger"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": []
+    },
+    "payMin": 17,
+    "payMax": 20,
+    "payPeriod": "hour",
+    "location": "Morgantown, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Supply Chain & Transportation",
+      "Digital Technology"
+    ],
+    "source": "opportunity",
+    "sourceRef": "cbenchsrc28",
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-08-20T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead29",
+    "employerId": "cbenchemp05",
+    "employerName": "Coalfield Machine & Tool",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact05",
+    "classId": null,
+    "title": "Print Finisher",
+    "description": "Coalfield Machine & Tool is hiring a print finisher in Parkersburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "evening",
+        "night",
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 18,
+    "payMax": 21,
+    "payPeriod": "hour",
+    "location": "Parkersburg, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-06-03T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead30",
+    "employerId": "cbenchemp06",
+    "employerName": "Greenbrier Family Dental",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact06",
+    "classId": "cbenchclass3",
+    "title": "Housekeeping Attendant",
+    "description": "Greenbrier Family Dental is hiring a housekeeping attendant in Wheeling. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 20,
+    "payMax": 23,
+    "payPeriod": "hour",
+    "location": "Wheeling, WV",
+    "transitNotes": null,
+    "distanceMiles": 4,
+    "clusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism"
+    ],
+    "source": "joblisting",
+    "sourceRef": "cbenchsrc30",
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-07-21T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead31",
+    "employerId": "cbenchemp07",
+    "employerName": "Tygart Freight Lines",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact07",
+    "classId": "cbenchclass1",
+    "title": "Data Entry Clerk",
+    "description": "Tygart Freight Lines is hiring a data entry clerk in Martinsburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "forklift-operator"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 10,
+    "payMax": 13,
+    "payPeriod": "hour",
+    "location": "Martinsburg, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Digital Technology",
+      "Marketing & Sales"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 1,
+    "postedAt": "2026-06-22T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead32",
+    "employerId": "cbenchemp08",
+    "employerName": "Appalachian Print & Sign",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact08",
+    "classId": "cbenchclass2",
+    "title": "Building Supply Cashier",
+    "description": "Appalachian Print & Sign is hiring a building supply cashier in Fairmont. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [
+        "nccer-core"
+      ],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 11,
+    "payMax": 14,
+    "payPeriod": "hour",
+    "location": "Fairmont, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-08-22T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead33",
+    "employerId": "cbenchemp09",
+    "employerName": "Cheat River Hospitality",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact09",
+    "classId": null,
+    "title": "Home Health Aide",
+    "description": "Cheat River Hospitality is hiring a home health aide in Clarksburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "evening"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 12,
+    "payMax": 15,
+    "payPeriod": "hour",
+    "location": "Clarksburg, WV",
+    "transitNotes": null,
+    "distanceMiles": 20,
+    "clusters": [
+      "Hospitality, Events, & Tourism",
+      "Advanced Manufacturing"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-08-27T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead34",
+    "employerId": "cbenchemp10",
+    "employerName": "Mountain State Data Services",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact10",
+    "classId": "cbenchclass1",
+    "title": "Shipping Clerk",
+    "description": "Mountain State Data Services is hiring a shipping clerk in Lewisburg. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "cpr-first-aid"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "night"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 13,
+    "payMax": 16,
+    "payPeriod": "hour",
+    "location": "Lewisburg, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Marketing & Sales",
+      "Construction"
+    ],
+    "source": "joborder",
+    "sourceRef": "cbenchsrc34",
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-06-30T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead35",
+    "employerId": "cbenchemp11",
+    "employerName": "Elk Fork Building Supply",
+    "employerStatus": "do_not_contact",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact11",
+    "classId": "cbenchclass2",
+    "title": "Line Cook",
+    "description": "Elk Fork Building Supply is hiring a line cook in Oak Hill. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 14,
+    "payMax": 17,
+    "payPeriod": "hour",
+    "location": "Oak Hill, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Supply Chain & Transportation",
+      "Digital Technology"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 2,
+    "postedAt": "2026-06-08T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead36",
+    "employerId": "cbenchemp12",
+    "employerName": "Seneca Home Health",
+    "employerStatus": "paused",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact12",
+    "classId": "cbenchclass3",
+    "title": "Maintenance Helper",
+    "description": "Seneca Home Health is hiring a maintenance helper in Princeton. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "evening"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 15,
+    "payMax": 18,
+    "payPeriod": "hour",
+    "location": "Princeton, WV",
+    "transitNotes": null,
+    "distanceMiles": 4,
+    "clusters": [
+      "Advanced Manufacturing",
+      "Healthcare & Human Services"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "open",
+    "openings": 3,
+    "postedAt": "2026-08-14T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead37",
+    "employerId": "cbenchemp01",
+    "employerName": "Ridgeline Metal Works",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact01",
+    "classId": null,
+    "title": "Quality Inspector",
+    "description": "Ridgeline Metal Works is hiring a quality inspector in Beckley. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [
+        "cpr-first-aid"
+      ],
+      "niceToHave": [
+        "nccer-core"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "evening",
+        "night"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 16,
+    "payMax": 19,
+    "payPeriod": "hour",
+    "location": "Beckley, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Construction",
+      "Hospitality, Events, & Tourism"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "filled",
+    "openings": 3,
+    "postedAt": "2026-08-28T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  },
+  {
+    "id": "cbenchlead38",
+    "employerId": "cbenchemp02",
+    "employerName": "New River Care Home",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact02",
+    "classId": "cbenchclass2",
+    "title": "Customer Care Representative",
+    "description": "New River Care Home is hiring a customer care representative in Charleston. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": []
+    },
+    "payMin": 17,
+    "payMax": 20,
+    "payPeriod": "hour",
+    "location": "Charleston, WV",
+    "transitNotes": "The number 7 bus stops at the front gate.",
+    "distanceMiles": null,
+    "clusters": [
+      "Digital Technology",
+      "Marketing & Sales"
+    ],
+    "source": "opportunity",
+    "sourceRef": "cbenchsrc38",
+    "status": "paused",
+    "openings": 2,
+    "postedAt": "2026-08-17T12:00:00.000Z",
+    "createdById": "cbenchinstr2"
+  },
+  {
+    "id": "cbenchlead39",
+    "employerId": "cbenchemp03",
+    "employerName": "Blackwater Logistics",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": false,
+    "contactId": "cbenchcontact03",
+    "classId": "cbenchclass3",
+    "title": "Forklift Operator",
+    "description": "Blackwater Logistics is hiring a forklift operator in Huntington. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "evening",
+        "night",
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 18,
+    "payMax": 21,
+    "payPeriod": "hour",
+    "location": "Huntington, WV",
+    "transitNotes": null,
+    "distanceMiles": 8,
+    "clusters": [
+      "Healthcare & Human Services",
+      "Supply Chain & Transportation"
+    ],
+    "source": "manual",
+    "sourceRef": null,
+    "status": "closed",
+    "openings": 1,
+    "postedAt": "2026-07-26T12:00:00.000Z",
+    "createdById": "cbenchinstr3"
+  },
+  {
+    "id": "cbenchlead40",
+    "employerId": "cbenchemp04",
+    "employerName": "Kanawha Valley Grocers",
+    "employerStatus": "active",
+    "employerHiredSpokesGradBefore": true,
+    "contactId": "cbenchcontact04",
+    "classId": "cbenchclass1",
+    "title": "Receiving Associate",
+    "description": "Kanawha Valley Grocers is hiring a receiving associate in Morgantown. The team trains on the job. Steady hours.",
+    "requirements": {
+      "mustHaveCerts": [],
+      "niceToHave": [
+        "servsafe-food-handler"
+      ],
+      "physical": [],
+      "licenses": []
+    },
+    "schedule": {
+      "shifts": [
+        "day",
+        "weekend"
+      ],
+      "hoursPerWeekMin": 20,
+      "hoursPerWeekMax": 40
+    },
+    "payMin": 20,
+    "payMax": 23,
+    "payPeriod": "hour",
+    "location": "Morgantown, WV",
+    "transitNotes": null,
+    "distanceMiles": null,
+    "clusters": [
+      "Hospitality, Events, & Tourism",
+      "Advanced Manufacturing"
+    ],
+    "source": "joblisting",
+    "sourceRef": "cbenchsrc40",
+    "status": "filled",
+    "openings": 2,
+    "postedAt": "2026-07-24T12:00:00.000Z",
+    "createdById": "cbenchinstr1"
+  }
+]

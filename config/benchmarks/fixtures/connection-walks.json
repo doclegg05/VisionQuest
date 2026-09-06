@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "seed": "connection-walks/v1",
+  "walks": 1000,
+  "maxSteps": 14,
+  "note": "The walk count, the seed and the exploration bias are fixture data, not scorer constants, so changing the sampling is a fixture diff rather than an edit buried in a scorer. `pathsCovered` and `edgesCovered` in the result say what the sample actually reached, which is what a future reader needs to judge whether these numbers are worth raising.",
+  "startStatus": "proposed",
+  "actorTypes": ["teacher", "admin", "employer", "system"],
+  "exploreProbability": 0.85,
+  "exploreNote": "A UNIFORM random walk over this machine is useless: `withdrawn` and `closed` are legal from almost every state, so two thirds of walks end on their first step and nothing past `sent` is ever reached. 500 uniform walks measured the first two edges five hundred times and the last ten not once. With probability `exploreProbability` the walk therefore prefers a successor that is not terminal, which is a sampling choice, not a claim about how students behave — the remaining 15% still exercise every early exit, and `edgesCovered` reports how much of the 44-edge machine each run actually touched.",
+  "expectAtLeastEdgesCovered": 44,
+  "expectAtLeastPathsCovered": 90
+}

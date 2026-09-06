@@ -18,6 +18,25 @@ function constantTimeEqual(a: string, b: string): boolean {
   return result === 0;
 }
 
+/**
+ * Paths whose POST comes from a named third party that cannot send our Origin
+ * header, and which authenticate the request THEMSELVES with a provider
+ * signature over the body.
+ *
+ * This is an exemption from the Origin check only, and it is not free: a path
+ * listed here MUST verify a signature before it acts, or it becomes an
+ * unauthenticated write endpoint. `/api/sms/inbound` verifies Twilio's
+ * `X-Twilio-Signature` (HMAC-SHA1 over the URL plus the sorted form fields,
+ * src/lib/nudges/twilio-signature.ts) and fails closed when TWILIO_AUTH_TOKEN
+ * is unset. The list is exact-match and deliberately not a prefix: adding a
+ * whole subtree here would exempt routes nobody reviewed.
+ */
+export const SIGNED_WEBHOOK_PATHS = ["/api/sms/inbound"] as const;
+
+export function isSignedWebhookPath(pathname: string): boolean {
+  return (SIGNED_WEBHOOK_PATHS as readonly string[]).includes(pathname);
+}
+
 export function isAuthorizedInternalRequest(
   pathname: string,
   authorizationHeader: string | null,

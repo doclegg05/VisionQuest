@@ -1,0 +1,14 @@
+{
+  "suite": "pii-log-grep",
+  "title": "PII in logs — runtime grep and static rule",
+  "area": "data-integrity",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/pii-log-grep.mjs",
+  "fixture": "config/benchmarks/fixtures/pii-log-grep.json",
+  "requires": [],
+  "metrics": [
+    { "id": "pii_hits_in_logs", "unit": "count", "direction": "lower", "floor": 0, "tolerance": 0 },
+    { "id": "pii_eslint_violations", "unit": "count", "direction": "lower", "floor": 0, "tolerance": 0 }
+  ],
+  "notes": "pii_hits_in_logs greps only lines matching src/lib/logger.ts's own output format (never test-runner chatter or assertion text) for cuid-shaped ids collected from test-file `id:`/`studentId:` literals plus phone/email patterns — the runtime backstop for what the static ESLint selector can't see (interpolated strings, spreads, caught-error messages). pii_eslint_violations isolates the four PII selectors already in eslint.config.mjs's `restrictedSyntaxEverywhere` (2026-08-20 sweep, PR #164) from that array's unrelated dark-mode rgba() guards, by filtering on their shared 'No student identifier ...' message prefix. Reads $BENCH_TEST_LOG when set; otherwise spawns `npm test` itself with a 240s bound and captures its output. Both measured 0 on 2026-09-05."
+}

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { parseState } from "@/lib/progression/engine";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { progressionStateReadiness } from "@/lib/progression/readiness-consumers";
 
 export interface ClassProgressStats {
   className: string;
@@ -68,12 +68,15 @@ export async function getClassProgress(studentId: string): Promise<ClassProgress
 
   let readinessSum = 0;
   for (const prog of progressions) {
-    const state = parseState(prog.state);
-    const completed = orientationMap.get(prog.studentId) || 0;
-    const readiness = computeReadinessScore({
-      ...state,
+    // The mapping lives in readiness-consumers.ts, next to the six other
+    // surfaces that render a readiness number, so this one cannot drift away
+    // from them unnoticed. `totalOrientation` is prisma.orientationItem.count()
+    // — ALL items, per the 2026-07-31 decision.
+    const readiness = progressionStateReadiness({
+      progressionState: prog.state,
       bhagCompleted: bhagCompletedSet.has(prog.studentId),
-      orientationProgress: { completed, total: totalOrientation },
+      orientationCompletedCount: orientationMap.get(prog.studentId) || 0,
+      orientationTotalCount: totalOrientation,
     });
     readinessSum += readiness.score;
   }

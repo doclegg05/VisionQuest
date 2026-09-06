@@ -1,0 +1,11 @@
+{
+  "suite": "sage-grounding",
+  "title": "Sage chat — grounding family",
+  "area": "sage-quality",
+  "tier": "nightly",
+  "scorer": "scripts/bench/suites/sage-grounding.mjs",
+  "fixture": "config/sage-chat-eval.json",
+  "requires": ["gemini"],
+  "metrics": [{ "id": "pass_rate", "unit": "ratio", "direction": "higher", "floor": 1.0, "tolerance": 0 }],
+  "notes": "Promotes the existing `grounding` family of scripts/sage-chat-harness.mjs (3 cases today) to a gated numeric metric. Spawned unmodified via `--families=grounding --provider=gemini`; reads the harness's own byFamily.grounding bucket. Floor 1.0 per the design table (§4.2): grounding failures mean a fabricated or unsupported claim, which this repo treats as zero-tolerance. Expanding to the 30-golden-Q&A corpus the design calls for is future work, not part of this promotion."
+}

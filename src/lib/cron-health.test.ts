@@ -6,9 +6,10 @@ import {
   formatCronHealthReport,
 } from "../../scripts/lib/cron-health.mjs";
 
-// The seven names the scheduled layer must carry: the four baseline jobs the
-// 2026-09 repair re-registers plus the three Sage jobs that already existed.
-const ALL_SEVEN = [
+// The eight names the scheduled layer must carry: the four baseline jobs the
+// 2026-09 repair re-registers, the three Sage jobs that already existed, and
+// connect-nudges (2026-09-05, migration 20260905140000_add_connect_nudges_cron).
+const ALL_EIGHT = [
   "appointment-reminders",
   "job-processor",
   "daily-coaching",
@@ -16,13 +17,14 @@ const ALL_SEVEN = [
   "sage-daily-briefing",
   "sage-memory-consolidate",
   "sage-wager-resolve",
+  "connect-nudges",
 ];
 
-function healthyJobs(names = ALL_SEVEN) {
+function healthyJobs(names = ALL_EIGHT) {
   return names.map((jobname) => ({ jobname, schedule: "0 * * * *", active: true }));
 }
 
-function healthyRuns(names = ALL_SEVEN) {
+function healthyRuns(names = ALL_EIGHT) {
   return names.map((jobname) => ({
     jobname,
     status: "succeeded",
@@ -32,8 +34,8 @@ function healthyRuns(names = ALL_SEVEN) {
 }
 
 describe("EXPECTED_CRON_JOBS (scripts/lib/cron-health.mjs)", () => {
-  it("lists exactly the seven scheduled jobs", () => {
-    assert.deepEqual([...EXPECTED_CRON_JOBS].sort(), [...ALL_SEVEN].sort());
+  it("lists exactly the eight scheduled jobs", () => {
+    assert.deepEqual([...EXPECTED_CRON_JOBS].sort(), [...ALL_EIGHT].sort());
   });
 });
 
@@ -42,11 +44,38 @@ describe("evaluateCronHealth", () => {
     const result = evaluateCronHealth({ jobs: healthyJobs(), latestRuns: healthyRuns() });
     assert.equal(result.ok, true);
     assert.deepEqual(result.problems, []);
-    assert.equal(result.jobs.length, 7);
+    assert.equal(result.jobs.length, 8);
+  });
+
+  it("fails when connect-nudges is missing from cron.job (the eighth job, added 2026-09-05)", () => {
+    const names = ALL_EIGHT.filter((n) => n !== "connect-nudges");
+    const result = evaluateCronHealth({ jobs: healthyJobs(names), latestRuns: healthyRuns(names) });
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.problems, ["connect-nudges: missing from cron.job"]);
+    const row = result.jobs.find((j) => j.jobname === "connect-nudges");
+    assert.equal(row?.present, false);
+  });
+
+  it("fails when connect-nudges is registered but its latest run failed", () => {
+    const runs = healthyRuns().map((r) =>
+      r.jobname === "connect-nudges"
+        ? {
+            ...r,
+            status: "failed",
+            start_time: new Date("2026-09-05T15:30:00Z"),
+            return_message: "ERROR: relation \"vault.decrypted_secrets\" does not exist",
+          }
+        : r
+    );
+    const result = evaluateCronHealth({ jobs: healthyJobs(), latestRuns: runs });
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.problems, [
+      'connect-nudges: latest run failed at 2026-09-05T15:30:00.000Z: ERROR: relation "vault.decrypted_secrets" does not exist',
+    ]);
   });
 
   it("fails when an expected job is missing from cron.job", () => {
-    const names = ALL_SEVEN.filter((n) => n !== "job-processor");
+    const names = ALL_EIGHT.filter((n) => n !== "job-processor");
     const result = evaluateCronHealth({ jobs: healthyJobs(names), latestRuns: healthyRuns(names) });
     assert.equal(result.ok, false);
     assert.deepEqual(result.problems, ["job-processor: missing from cron.job"]);
@@ -55,8 +84,12 @@ describe("evaluateCronHealth", () => {
   });
 
   it("reports every missing baseline job when none were ever registered (the F1 state)", () => {
-    const sageOnly = ["sage-daily-briefing", "sage-memory-consolidate", "sage-wager-resolve"];
-    const result = evaluateCronHealth({ jobs: healthyJobs(sageOnly), latestRuns: healthyRuns(sageOnly) });
+    // connect-nudges did not exist at the time of the 2026-09-01 F1 incident
+    // this replays — included here (as present) so this scenario keeps
+    // testing exactly "the four baseline jobs are missing", not incidentally
+    // also flagging a job the F1 state predates.
+    const sageAndConnect = ["sage-daily-briefing", "sage-memory-consolidate", "sage-wager-resolve", "connect-nudges"];
+    const result = evaluateCronHealth({ jobs: healthyJobs(sageAndConnect), latestRuns: healthyRuns(sageAndConnect) });
     assert.equal(result.ok, false);
     assert.deepEqual(result.problems, [
       "appointment-reminders: missing from cron.job",
@@ -173,7 +206,7 @@ describe("formatCronHealthReport", () => {
       generatedAt: "2026-09-02T12:00:00.000Z",
     });
     const text = lines.join("\n");
-    assert.match(text, /PROBLEMS \(7\):/);
+    assert.match(text, /PROBLEMS \(8\):/);
     assert.match(text, /- job-processor: missing from cron.job/);
     assert.match(text, /BackgroundJob: \(no rows\)/);
     assert.match(text, /oldest pending createdAt=none/);

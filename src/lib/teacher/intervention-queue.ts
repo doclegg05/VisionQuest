@@ -123,6 +123,16 @@ const ALERT_TYPE_PRIORITY: Record<string, number> = {
   overdue_task: 65,
   missed_appointment: 60,
   certification_stalled: 55,
+  // Match & Connect Phase 5. A lost placement outranks everything above it:
+  // it is the outcome the whole programme is measured on, and it has a
+  // reporting deadline. The rest sit around the advising tier — real work,
+  // but nothing that stops a grant number being wrong.
+  connect_retention_lost: 115,
+  connect_retention_unanswered: 92,
+  connect_interview_unconfirmed: 88,
+  connect_retention_confirm: 68,
+  connect_employer_no_response: 63,
+  connect_employer_no_view: 58,
 };
 
 function severityRank(value: string) {

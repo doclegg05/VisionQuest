@@ -1,7 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { inferJobWorkMode } from "../work-mode";
-import { logger } from "@/lib/logger";
+import { fetchJson, mapEachJob } from "./shared";
 
 /**
  * Adzuna adapter — aggregated job listings API.
@@ -21,6 +21,10 @@ interface AdzunaResult {
   redirect_url: string;
 }
 
+interface AdzunaApiResponse {
+  results?: AdzunaResult[];
+}
+
 export const adzunaAdapter: JobSourceAdapter = {
   source: "adzuna",
   sourceType: "api",
@@ -34,57 +38,56 @@ export const adzunaAdapter: JobSourceAdapter = {
     const appKey = process.env.ADZUNA_APP_KEY;
     if (!appId || !appKey) return [];
 
-    try {
-      const params = new URLSearchParams({
-        app_id: appId,
-        app_key: appKey,
-        where: region,
-        distance: String(radiusMiles),
-        results_per_page: "50",
-        content_type: "application/json",
-      });
+    const params = new URLSearchParams({
+      app_id: appId,
+      app_key: appKey,
+      where: region,
+      distance: String(radiusMiles),
+      results_per_page: "50",
+      content_type: "application/json",
+    });
+    const url = `${ADZUNA_BASE}?${params}`;
 
-      const res = await fetch(`${ADZUNA_BASE}?${params}`);
+    // fetchJson (VQ-R-019) applies a 30s AbortSignal.timeout so a stalled
+    // Adzuna response cannot hang the whole refresh sweep. Unlike the other
+    // adapters, ADZUNA_APP_ID/ADZUNA_APP_KEY ride in the query string rather
+    // than a header, so redact them from the URL a failure would otherwise
+    // log verbatim (mirrors the CareerOneStop logUrl convention).
+    const logParams = new URLSearchParams(params);
+    logParams.set("app_id", "[redacted]");
+    logParams.set("app_key", "[redacted]");
+    const json = await fetchJson<AdzunaApiResponse>(url, {}, { logUrl: `${ADZUNA_BASE}?${logParams}` });
+    const results: AdzunaResult[] = json?.results ?? [];
 
-      if (!res.ok) {
-        logger.error("Adzuna API error", { status: res.status });
-        return [];
-      }
+    // mapEachJob isolates one malformed row from the rest of the batch —
+    // see its doc comment in ./shared.
+    return mapEachJob(results, "adzuna", (r) => {
+      const salaryText =
+        r.salary_min != null
+          ? r.salary_max && r.salary_max !== r.salary_min
+            ? `$${r.salary_min}-$${r.salary_max}/year`
+            : `$${r.salary_min}/year`
+          : null;
 
-      const json = await res.json();
-      const results: AdzunaResult[] = json.results ?? [];
-
-      return results.map((r) => {
-        const salaryText =
-          r.salary_min != null
-            ? r.salary_max && r.salary_max !== r.salary_min
-              ? `$${r.salary_min}-$${r.salary_max}/year`
-              : `$${r.salary_min}/year`
-            : null;
-
-        return {
-          title: r.title,
-          company: r.company?.display_name ?? "Unknown",
-          location: r.location?.display_name ?? "",
-          workMode: inferJobWorkMode({
-            source: "adzuna",
-            title: r.title,
-            company: r.company?.display_name,
-            location: r.location?.display_name,
-            description: r.description,
-          }),
-          salary: salaryText,
-          salaryMin: parseSalaryToHourly(salaryText),
-          description: r.description?.slice(0, 5000) ?? "",
-          url: r.redirect_url,
+      return {
+        title: r.title,
+        company: r.company?.display_name ?? "Unknown",
+        location: r.location?.display_name ?? "",
+        workMode: inferJobWorkMode({
           source: "adzuna",
-          sourceType: "api" as const,
-          sourceId: `adzuna:${r.id}`,
-        };
-      });
-    } catch (err) {
-      logger.error("Adzuna adapter error", { error: String(err) });
-      return [];
-    }
+          title: r.title,
+          company: r.company?.display_name,
+          location: r.location?.display_name,
+          description: r.description,
+        }),
+        salary: salaryText,
+        salaryMin: parseSalaryToHourly(salaryText),
+        description: r.description?.slice(0, 5000) ?? "",
+        url: r.redirect_url,
+        source: "adzuna",
+        sourceType: "api" as const,
+        sourceId: `adzuna:${r.id}`,
+      };
+    });
   },
 };

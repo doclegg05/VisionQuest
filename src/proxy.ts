@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedInternalRequest, isUrlHostMatch } from "@/lib/csrf";
+import { isAuthorizedInternalRequest, isSignedWebhookPath, isUrlHostMatch } from "@/lib/csrf";
 import { verifyToken } from "@/lib/session-token";
 import {
   RLS_HEADER_NAMES,
@@ -62,7 +62,17 @@ export function proxy(request: NextRequest) {
       process.env.CRON_SECRET,
     );
 
-    if (!isInternal && !isUrlHostMatch(origin, host) && !isUrlHostMatch(referer, host)) {
+    // A third-party webhook cannot send our Origin. The exemption is narrow
+    // and the route pays for it by verifying the provider's own signature
+    // before it acts — see SIGNED_WEBHOOK_PATHS in src/lib/csrf.ts.
+    const isSignedWebhook = isSignedWebhookPath(pathname);
+
+    if (
+      !isInternal &&
+      !isSignedWebhook &&
+      !isUrlHostMatch(origin, host) &&
+      !isUrlHostMatch(referer, host)
+    ) {
       return NextResponse.json(
         { error: "Forbidden: origin mismatch." },
         { status: 403 },

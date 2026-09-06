@@ -1,0 +1,17 @@
+{
+  "suite": "model-bakeoff",
+  "title": "Local model bake-off, per role",
+  "area": "ops",
+  "tier": "manual",
+  "host": "recorded",
+  "scorer": "scripts/bench/suites/model-bakeoff.mjs",
+  "fixture": "config/sage-model-bakeoff.json",
+  "requires": ["ollama"],
+  "metrics": [
+    { "id": "chat_score", "unit": "ratio", "direction": "higher" },
+    { "id": "extract_score", "unit": "ratio", "direction": "higher" },
+    { "id": "document_score", "unit": "ratio", "direction": "higher" },
+    { "id": "draft_score", "unit": "ratio", "direction": "higher" }
+  ],
+  "notes": "Wraps scripts/sage-model-bakeoff.mjs (exports added this session: listInstalledModels, listResidentModels, evictModel, warmModel — no CLI behavior change) scored against the CANDIDATE MODEL CURRENTLY CONFIGURED PER ROLE, not a comparison matrix across many models — that matrix is the standalone `npm run sage:model:bakeoff -- --models=a,b,c` tool, unchanged by this suite. Set BENCH_BAKEOFF_MODEL_CHAT / _EXTRACT / _DOCUMENT / _DRAFT (or a single BENCH_BAKEOFF_MODEL for all four) to the Ollama tag under evaluation for that role; a role with no model configured reports value=null with a details.skipped reason rather than failing the suite, matching the honest 'no model is assigned to any role yet' state recorded in docs/plans/2026-08-21-local-ai-role-models.md and .claude/MEMORY.md Open Items. All four metrics are info — there is no committed baseline correctness floor for any role yet; that is itself an owner-facing gap this suite makes visible rather than papering over with an invented number. `\"host\": \"recorded\"` plus the refuse-unless-OLLAMA_HOST-answers rule and details.host on every metric are the 'record the host' discipline (every prior local-model number in this repo's history has an unrecorded host — see .claude/MEMORY.md's 2026-08-21 Open Items). Every run also writes reports/benchmarks/bakeoff/<date>.json (the full per-case detail), whose path appears in details.artifactPath — the first such artifact this repo has ever committed."
+}

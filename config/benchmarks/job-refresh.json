@@ -1,0 +1,27 @@
+{
+  "suite": "job-refresh",
+  "title": "Job-board refresh sweep isolation",
+  "area": "performance",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/job-refresh.mjs",
+  "fixture": "config/benchmarks/fixtures/job-refresh.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "sweep_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "floor": 1000,
+      "tolerance": 200
+    },
+    {
+      "id": "adapters_completed_despite_failure",
+      "unit": "count",
+      "exact": true,
+      "floor": 3,
+      "direction": "higher",
+      "tolerance": 0
+    }
+  ],
+  "notes": "In-process, fetch mocked (design §4.7 'Job refresh sweep'). Drives the REAL careeronestop/talroo/adzuna/jsearch/usajobs adapters (src/lib/job-board/adapters/*.ts) concurrently via Promise.allSettled — the same shape runScrapeForConfig uses — with jsearch configured to hang and usajobs to 500. Both go through fetchJson's VQ-R-019 hardening, which never throws on either failure and returns [] instead, so 'adapters_completed_despite_failure' counts adapters that actually delivered postings (careeronestop, talroo, adzuna = 3 = adapter count − 2), not merely settled-without-rejecting (which would always read 5/5 and hide a regression). sweep_ms measured 203ms in a --self-test run on this container (up to ~18 sequential mocked fetchJson calls across careeronestop's WV pass + per-title passes and talroo's per-title loop, plus the ~150ms fastTimeoutMs wait for jsearch's hang); the 1000ms floor is about 5x that with a 200ms tolerance, deliberately generous because the property under test is 'does not serialize behind the hang' rather than a tight timing target — a regression that turns the sweep sequential (18 real awaits instead of one Promise.allSettled) or that stops honoring the per-adapter timeout would blow well past 1000ms, while ordinary CI jitter should not. The suite also races the whole sweep against a 5s deadline (fixture raceDeadlineMs) so a genuine regression (the hang never isolated) throws a clear error instead of hanging the CI job. AbortSignal.timeout is monkey-patched to fire in ~150ms rather than waiting out the real 30_000ms constant — same technique as jsearch.test.ts/adzuna.test.ts — so this measures the TIMEOUT MECHANISM, not the literal constant. adapters_completed_despite_failure carries floor:3/direction:higher (was exact:true with no floor, which per the runner's own status.mjs comment reports INFO and cannot fail until a baseline exists — the same exact-without-floor class A0 fixed for hard-blocks/connection-walks/report-parity). 3 = adapter count (5) minus the two adapters this fixture deliberately breaks (jsearch, usajobs); exact:true is kept alongside the floor so a run that exceeds 3 (a fixture drift making a 'broken' adapter succeed) is ALSO caught once a baseline exists, not only a regression that drops below 3. Verified red->green by temporarily forcing a third adapter (adzuna) to also fail: adapters_completed_despite_failure read 2 against floor 3 and the suite reported FAIL/exit 1 under --compare, then reverted and reported PASS again — see the B5 round-2 commit message for the exact run."
+}

@@ -1,0 +1,30 @@
+{
+  "seed": "nudge-consent-2026-09-05",
+  "employerName": "Ashgrove Fabrication",
+  "jobTitle": "Warehouse Associate",
+  "startedDaysAgo": 40,
+  "phoneBase": "+1304555",
+  "clocks": {
+    "in_window": "2026-10-11T15:00:00.000Z",
+    "quiet": "2026-10-11T05:00:00.000Z"
+  },
+  "scenarios": [
+    { "id": "control", "connectScope": "all", "smsScope": "all", "clock": "in_window", "preferences": "all_valid" },
+    { "id": "fuzzed-scope-all", "connectScope": "all", "smsScope": "all", "clock": "in_window", "preferences": "fuzzed" },
+    { "id": "connect-pilot-class", "connectScope": "class:0", "smsScope": "all", "clock": "in_window", "preferences": "fuzzed" },
+    { "id": "sms-pilot-class", "connectScope": "all", "smsScope": "class:0", "clock": "in_window", "preferences": "fuzzed" },
+    { "id": "disjoint-scopes", "connectScope": "class:0", "smsScope": "class:1", "clock": "in_window", "preferences": "fuzzed" },
+    { "id": "both-pilot-classes", "connectScope": "class:0,1", "smsScope": "class:0,1", "clock": "in_window", "preferences": "fuzzed" },
+    { "id": "connect-off", "connectScope": "off", "smsScope": "all", "clock": "in_window", "preferences": "all_valid" },
+    { "id": "sms-off", "connectScope": "all", "smsScope": "off", "clock": "in_window", "preferences": "all_valid" },
+    { "id": "quiet-hours", "connectScope": "all", "smsScope": "all", "clock": "quiet", "preferences": "all_valid" },
+    { "id": "at-daily-cap", "connectScope": "all", "smsScope": "all", "clock": "in_window", "preferences": "capped" },
+    { "id": "shared-phones", "connectScope": "all", "smsScope": "all", "clock": "in_window", "preferences": "shared_phones" }
+  ],
+  "notes": [
+    "The population is the committed synthetic cohort (config/benchmarks/synthetic-cohort/), so this suite's numbers are comparable with every other cohort-based benchmark. Each student is given exactly one due rule — a `started` connection 40 days past its day-30 retention checkpoint — so 'who was texted' answers 'who was eligible' one-for-one and a wrongly-withheld text cannot hide behind a rule that was not due.",
+    "Preference generators: all_valid (every gate satisfied); fuzzed (a seeded walk over all 16 combinations of enabled / destination present / smsConsentAt stamped / smsRevokedAt set, so the STOP'd, the never-consented, the channel-off and the number-less all appear many times); capped (valid, with 0, 1 or 2 messages already sent in the same local day); shared_phones (valid, with students paired onto one handset).",
+    "Clocks: in_window is 11:00 America/New_York on a Sunday — inside the send window and NOT the Monday-10:00 weekly slot, so the weekly roster path stays out of this measurement (it has its own coverage in nudge-sweep). quiet is 01:00 America/New_York, deep inside quiet hours.",
+    "Phone numbers are +1304555 01xx, the reserved fiction range the cohort README pins. Nothing here is a real number."
+  ]
+}

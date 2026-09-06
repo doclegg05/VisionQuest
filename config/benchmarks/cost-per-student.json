@@ -1,0 +1,34 @@
+{
+  "suite": "cost-per-student",
+  "title": "Cost per active student per month",
+  "area": "ops",
+  "tier": "nightly",
+  "scorer": "scripts/bench/suites/cost-per-student.mjs",
+  "fixture": "config/benchmarks/fixtures/cost-per-student.json",
+  "requires": ["prod-readonly"],
+  "metrics": [
+    {
+      "id": "usd_per_active_student_month",
+      "unit": "count",
+      "displayUnit": "usd",
+      "direction": "lower",
+      "floor": null,
+      "reason": "config/sage-budget.json.monthlyBudgetUsd ships null on purpose (a guessed ceiling would let a real overrun read as 'under budget'), and even once Britt sets it the floor is budget/activeStudents — a number that moves with enrollment, not a fixed value this config can hold. The scorer computes the would-be floor and VisionQuest's existing budgetCheck verdict (ok/warning/no_price/no_budget) into metrics[0].details on every run regardless."
+    },
+    {
+      "id": "cloud_calls_total",
+      "unit": "count",
+      "direction": "lower",
+      "floor": null,
+      "reason": "A raw descriptive count with no correctness bar of its own — the thing that should be floored is the FERPA routing RATIO, which the sibling ferpa-routing suite already covers. This number exists so a reader can see the denominator behind that ratio."
+    },
+    {
+      "id": "local_calls_total",
+      "unit": "count",
+      "direction": "lower",
+      "floor": null,
+      "reason": "Same as cloud_calls_total: a descriptive count, not a metric with its own floor."
+    }
+  ],
+  "notes": "Reuses scripts/sage-ai-accountability.mjs's buildProviderMix()/buildCostReport() (this session added exports for both, no CLI behavior change) over the trailing 30 days from AuditLog(targetType=\"ai_request\") and LlmCallLog, connected via BENCH_PROD_READONLY_URL rather than the script's own DATABASE_URL default. 'Active student' = distinct LlmCallLog.studentId in the window (an aggregate count only; no student id is ever logged or included in output). displayUnit:\"usd\" on usd_per_active_student_month is a pass-through hint for the dashboard — the contract's unit enum (ratio|percent|count|ms|grade|seconds) has no currency type, so unit stays \"count\" and this says what the count actually means."
+}

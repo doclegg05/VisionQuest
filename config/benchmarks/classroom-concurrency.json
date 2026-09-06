@@ -1,0 +1,25 @@
+{
+  "suite": "classroom-concurrency",
+  "title": "Classroom concurrency (local Ollama)",
+  "area": "performance",
+  "tier": "manual",
+  "host": "recorded",
+  "scorer": "scripts/bench/suites/classroom-concurrency.mjs",
+  "fixture": "config/benchmarks/fixtures/classroom-concurrency.json",
+  "requires": ["ollama"],
+  "metrics": [
+    { "id": "p50_ms_n1", "unit": "ms", "direction": "lower", "floor": null, "reason": "Design §4.7: 'record; decision input for the queue-UX call' — no owner target set. Manual tier; recorded for trend and to decide the OLLAMA_NUM_PARALLEL / queue-with-feedback question (scripts/sage-load-test.mjs's two levers), not gated." },
+    { "id": "p95_ms_n1", "unit": "ms", "direction": "lower", "floor": null, "reason": "See p50_ms_n1." },
+    { "id": "p50_ms_n5", "unit": "ms", "direction": "lower", "floor": null, "reason": "See p50_ms_n1." },
+    { "id": "p95_ms_n5", "unit": "ms", "direction": "lower", "floor": null, "reason": "See p50_ms_n1." },
+    { "id": "p50_ms_n15", "unit": "ms", "direction": "lower", "floor": null, "reason": "See p50_ms_n1." },
+    { "id": "p95_ms_n15", "unit": "ms", "direction": "lower", "floor": null, "reason": "See p50_ms_n1." },
+    { "id": "queue_wait_p50_ms_n1", "unit": "ms", "direction": "lower", "floor": null, "reason": "By construction ~0 — N=1 is its own baseline. Reported for schema symmetry across the three levels." },
+    { "id": "queue_wait_p95_ms_n1", "unit": "ms", "direction": "lower", "floor": null, "reason": "See queue_wait_p50_ms_n1." },
+    { "id": "queue_wait_p50_ms_n5", "unit": "ms", "direction": "lower", "floor": null, "reason": "Queue-wait proxy (this level's p50 duration minus the N=1 p50 baseline — see the scorer's header comment on why a non-streaming call cannot separate queue time from compute time any more precisely). Decision input, not gated." },
+    { "id": "queue_wait_p95_ms_n5", "unit": "ms", "direction": "lower", "floor": null, "reason": "See queue_wait_p50_ms_n5." },
+    { "id": "queue_wait_p50_ms_n15", "unit": "ms", "direction": "lower", "floor": null, "reason": "See queue_wait_p50_ms_n5 — this is the number the design's 'decision input for the queue-UX call' is really asking for." },
+    { "id": "queue_wait_p95_ms_n15", "unit": "ms", "direction": "lower", "floor": null, "reason": "See queue_wait_p50_ms_n15." }
+  ],
+  "notes": "Cannot run in this authoring container — no local Ollama (requires: [\"ollama\"], checked via OLLAMA_HOST). Replaces the 'run N=1, multiply p50 by classroomSize' PROJECTION scripts/sage-load-test.mjs's CLASSROOM VERDICT block produces with three REAL runs at N=1/5/15, by importing that script's own runClient (no copied logic) — see its header for the corrected OLLAMA_NUM_PARALLEL claim (.claude/MEMORY.md Known Issues, 2026-09-05) and the pointer added there back to this suite. host: \"recorded\" per design §6 — every prior local-model number in this repo's history had an unrecorded host, which is why they contradict each other; an operator running this suite gets the host block on every result and must record which Mac/box it was. Owner step: run on the real host once quiet (`OLLAMA_HOST=... npm run bench -- --suite=classroom-concurrency --update-baseline --reason=\"first real N=1/5/15 measurement, host <name>\"`), per the standing 'evict between arms' discipline if any OTHER model is resident first."
+}

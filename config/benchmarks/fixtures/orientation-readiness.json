@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "note": "Parameters, not a corpus. The 50 students come from config/benchmarks/synthetic-cohort/ so this suite's numbers describe the same population as the matching, Connect and nudge suites; the readiness FACTS for each are drawn deterministically from `seed` here, because the shared cohort is Connect-shaped and carries no orientation, progression, certification or portfolio state.",
+  "seed": "orientation-readiness:v1",
+  "orientationItemCount": 12,
+  "referenceConsumer": "student_dashboard",
+  "referenceNote": "The student's own dashboard is the reference because it is the number the student is told, and the surfaces that disagree are the ones describing that student to somebody else.",
+  "drift": {
+    "note": "How far each student's stored Progression.state has fallen behind the live rows. `inSync` writes the live counts into the state; `stale` leaves the state at its defaults, which is what a student whose certifications and portfolio were recorded without a matching progression write looks like; `partial` carries some of it.",
+    "inSyncShare": 0.34,
+    "partialShare": 0.33
+  },
+  "ranges": {
+    "orientationCompleted": [0, 12],
+    "certificationsEarned": [0, 5],
+    "certificationRequirementsDone": [0, 6],
+    "requiredCertificationTemplateCount": 7,
+    "portfolioItemCount": [0, 6],
+    "longestStreak": [0, 40],
+    "goalLevels": ["bhag", "monthly", "weekly", "daily", "task"]
+  },
+  "monotonicity": {
+    "note": "The design's second half: a readiness score must never DECREASE when a student completes an orientation item. Each student's facts are replayed with orientationCompleted walked from 0 to the item count, and every consumer's score is checked at each step. A scripted order rather than a random one so a failure names a step somebody can reproduce.",
+    "steps": 12
+  },
+  "denominatorCallSites": [
+    "src/lib/progression/fetch-readiness-data.ts",
+    "src/lib/class-progress.ts",
+    "src/lib/teacher/dashboard.ts",
+    "src/app/api/teacher/reports/academic-kpi/route.ts",
+    "src/app/api/teacher/students/[id]/route.ts"
+  ],
+  "denominatorNote": "Every production query that supplies the orientation denominator to a readiness mapping. A `where` on any of them is the 2026-07-31 regression: readiness counts ALL orientation items on every surface. A file that no longer contains such a call is an offender too — it means this list is naming a call site that moved, and a check reading the wrong file measures nothing."
+}

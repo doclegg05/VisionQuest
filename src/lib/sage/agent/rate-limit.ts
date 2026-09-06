@@ -10,6 +10,7 @@
 //   - mutate_consequential : 5  / day    (HMAC-confirmed writes; low volume)
 //   - mutate_reversible    : 20 / day    (trivially-undoable writes)
 //   - read                 : 200 / hour  (lookups/search — higher volume)
+//   - read_ai              : 20  / hour  (read-only, but each call GENERATES)
 //
 // This composes WITH — and never replaces — the #97 token/cost quota
 // (checkTokenQuota). Cost quota caps total model spend per student per day;
@@ -46,6 +47,12 @@ function limitForTier(tier: RiskTier): TierLimit {
       return { window: "day", limit: envInt("SAGE_TOOL_RATE_REVERSIBLE", 20) };
     case "read":
       return { window: "hour", limit: envInt("SAGE_TOOL_RATE_READ", 200) };
+    // A read tool that generates costs model time, not just a query.
+    // explain_job can make two generations per call, so the plain read cap
+    // would allow up to 400 an hour for ONE student on the local box the
+    // whole classroom queues behind.
+    case "read_ai":
+      return { window: "hour", limit: envInt("SAGE_TOOL_RATE_READ_AI", 20) };
   }
 }
 

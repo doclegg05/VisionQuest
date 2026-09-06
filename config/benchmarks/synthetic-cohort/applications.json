@@ -1,0 +1,110 @@
+[
+  {
+    "id": "cbenchapp15",
+    "studentId": "cbenchstu15",
+    "opportunityId": "cbenchopp15",
+    "connectionId": "cbenchconn15",
+    "jobLeadId": "cbenchlead07",
+    "status": "accepted",
+    "verificationStatus": "verified",
+    "appliedAt": "2026-08-10T12:00:00.000Z",
+    "createdAt": "2026-08-10T12:00:00.000Z",
+    "selfDirected": false
+  },
+  {
+    "id": "cbenchapp16",
+    "studentId": "cbenchstu16",
+    "opportunityId": "cbenchopp16",
+    "connectionId": "cbenchconn16",
+    "jobLeadId": "cbenchlead10",
+    "status": "accepted",
+    "verificationStatus": "verified",
+    "appliedAt": "2026-08-14T12:00:00.000Z",
+    "createdAt": "2026-08-14T12:00:00.000Z",
+    "selfDirected": false
+  },
+  {
+    "id": "cbenchapp17",
+    "studentId": "cbenchstu17",
+    "opportunityId": "cbenchopp17",
+    "connectionId": "cbenchconn17",
+    "jobLeadId": "cbenchlead13",
+    "status": "accepted",
+    "verificationStatus": "verified",
+    "appliedAt": "2026-07-29T12:00:00.000Z",
+    "createdAt": "2026-07-29T12:00:00.000Z",
+    "selfDirected": false
+  },
+  {
+    "id": "cbenchapp18",
+    "studentId": "cbenchstu18",
+    "opportunityId": "cbenchopp18",
+    "connectionId": "cbenchconn18",
+    "jobLeadId": "cbenchlead16",
+    "status": "accepted",
+    "verificationStatus": "verified",
+    "appliedAt": "2026-07-21T12:00:00.000Z",
+    "createdAt": "2026-07-21T12:00:00.000Z",
+    "selfDirected": false
+  },
+  {
+    "id": "cbenchapp19",
+    "studentId": "cbenchstu19",
+    "opportunityId": "cbenchopp19",
+    "connectionId": "cbenchconn19",
+    "jobLeadId": "cbenchlead19",
+    "status": "accepted",
+    "verificationStatus": "verified",
+    "appliedAt": "2026-07-21T12:00:00.000Z",
+    "createdAt": "2026-07-21T12:00:00.000Z",
+    "selfDirected": false
+  },
+  {
+    "id": "cbenchapp20",
+    "studentId": "cbenchstu20",
+    "opportunityId": "cbenchopp20",
+    "connectionId": "cbenchconn20",
+    "jobLeadId": "cbenchlead22",
+    "status": "accepted",
+    "verificationStatus": "verified",
+    "appliedAt": "2026-07-13T12:00:00.000Z",
+    "createdAt": "2026-07-13T12:00:00.000Z",
+    "selfDirected": false
+  },
+  {
+    "id": "cbenchselfapp01",
+    "studentId": "cbenchstu31",
+    "opportunityId": "cbenchselfopp01",
+    "connectionId": null,
+    "jobLeadId": null,
+    "status": "applied",
+    "verificationStatus": null,
+    "appliedAt": "2026-08-02T12:00:00.000Z",
+    "createdAt": "2026-07-31T12:00:00.000Z",
+    "selfDirected": true
+  },
+  {
+    "id": "cbenchselfapp02",
+    "studentId": "cbenchstu32",
+    "opportunityId": "cbenchselfopp02",
+    "connectionId": null,
+    "jobLeadId": null,
+    "status": "applied",
+    "verificationStatus": "self_reported",
+    "appliedAt": "2026-07-28T12:00:00.000Z",
+    "createdAt": "2026-07-26T12:00:00.000Z",
+    "selfDirected": true
+  },
+  {
+    "id": "cbenchselfapp03",
+    "studentId": "cbenchstu33",
+    "opportunityId": "cbenchselfopp03",
+    "connectionId": null,
+    "jobLeadId": null,
+    "status": "accepted",
+    "verificationStatus": "self_reported",
+    "appliedAt": "2026-07-23T12:00:00.000Z",
+    "createdAt": "2026-07-21T12:00:00.000Z",
+    "selfDirected": true
+  }
+]
