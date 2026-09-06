@@ -1,4 +1,4 @@
-import { prisma } from "./db";
+import { prismaAdmin } from "./db";
 
 /**
  * RBAC permission checker.
@@ -7,8 +7,44 @@ import { prisma } from "./db";
  * Results are cached in-memory for CACHE_TTL_MS to avoid a DB round-trip on
  * every request while still honouring runtime permission changes within a
  * reasonable window.
+ *
+ * Deliberately prismaAdmin, in the same spirit as the doc block on
+ * confirmation-use.ts: Role, Permission and RolePermission are SERVER POLICY
+ * DATA, not student data. Their RLS policies (`role_admin_only`,
+ * `permission_admin_only`, `role_permission_admin_only` in the baseline
+ * migration) are admin-only BY DESIGN — `USING (current_setting(
+ * 'app.current_role', true) = 'admin')` — so reading them through the
+ * RLS-scoped app client returned zero rows on every student and teacher
+ * request. That broke the layer in two directions at once:
+ *
+ *   1. RBAC was inert for non-admins: `hasSeededRolePermissions()` saw count
+ *      0 and every resolve returned `{ allowed: false, source: "fallback" }`,
+ *      so registry routes silently fell through to their static
+ *      `requiredRoles` arrays and no granular permission ever applied.
+ *   2. Worse, the caches below are module-global and NOT keyed by actor. One
+ *      admin request warmed the seed caches to true; the next student request
+ *      then took the RBAC branch, read an empty grant set under its own RLS
+ *      context, and middleware.ts turned that into a 403 with no fallback —
+ *      for every withRegistry route, for the whole 60s TTL, whenever
+ *      RolePermission was seeded.
+ *
+ * The cache invariant this restores, and which any future change here must
+ * keep: EVERY read below must be actor-independent. These caches are shared
+ * across concurrent requests from different roles, so a read whose result
+ * depends on who is asking poisons them for everyone. `permissionCache` is
+ * keyed by role name and `permissionSeedCache` by permission key precisely so
+ * that the cached value is a property of the data, not of the caller.
+ *
+ * F63 caveat, and why it is safe: if ADMIN_DATABASE_URL is unset, prismaAdmin
+ * falls back to DATABASE_URL (`vq_app`) AND carries no RLS extension, so it
+ * sets no `app.current_role` at all and the admin-only policies reject it
+ * uniformly — for admins too. Uniform blindness reads as "RBAC unseeded", so
+ * every actor falls back to static roles exactly as before. It cannot produce
+ * the mixed-visibility state that caused (2). Pinned by a test.
  */
 
+// Shared by every concurrent request regardless of role — see the
+// actor-independence invariant in the module doc block before adding a read.
 const permissionCache = new Map<
   string,
   { permissions: Set<string>; expiresAt: number }
@@ -21,8 +57,11 @@ let rolePermissionSeedState:
   | { hasAssignments: boolean; expiresAt: number }
   | null = null;
 const CACHE_TTL_MS = 60_000; // 1 minute
-type RbacPrismaClient = Pick<typeof prisma, "permission" | "rolePermission">;
-let rbacPrisma: RbacPrismaClient = prisma;
+type RbacPrismaClient = Pick<typeof prismaAdmin, "permission" | "rolePermission">;
+/** The production client, named so the test-injection escape hatch below has
+ *  one place to restore rather than a second copy of the choice. */
+const DEFAULT_RBAC_CLIENT: RbacPrismaClient = prismaAdmin;
+let rbacPrisma: RbacPrismaClient = DEFAULT_RBAC_CLIENT;
 
 export interface PermissionResolution {
   allowed: boolean;
@@ -154,7 +193,7 @@ export function setRbacPrismaClientForTests(client: RbacPrismaClient): () => voi
   rbacPrisma = client;
   clearPermissionCache();
   return () => {
-    rbacPrisma = prisma;
+    rbacPrisma = DEFAULT_RBAC_CLIENT;
     clearPermissionCache();
   };
 }
