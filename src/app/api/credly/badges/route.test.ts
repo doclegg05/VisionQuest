@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding covers Prisma methods with different signatures. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
-import { mockRequest, mockStudentSession } from "@/lib/test-helpers";
+import { mockStudentSession } from "@/lib/test-helpers";
 
 /**
  * GET /api/credly/badges — per-account rate limit.
@@ -102,8 +102,9 @@ beforeEach(() => {
   mockFindUnique.mock.resetCalls();
 });
 
+// The route handler takes no request argument — it reads only the session.
 function get(): Promise<Response> {
-  return route.GET(mockRequest("/api/credly/badges") as any);
+  return route.GET();
 }
 
 describe("GET /api/credly/badges rate limit", () => {
