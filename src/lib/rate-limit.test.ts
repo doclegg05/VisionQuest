@@ -15,6 +15,11 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import { Prisma } from "@prisma/client";
+// The derivation `rateLimit` applies before touching the store. Imported
+// rather than duplicated: a test that reproduces the transform instead of
+// calling it cannot notice the transform changing (2026-09-05 advisory-lock
+// lesson, same shape).
+import { rateLimitStorageKey } from "./rate-limit-key";
 
 interface StoredRow {
   count: number;
@@ -71,14 +76,33 @@ class FakeStore {
    * on the row whose window matches. Bound values arrive in interpolation
    * order: values[0] = now, values[1] = key, values[2] = resetTime.
    */
+  /**
+   * When set, the modelled DELETE reports this many rows without touching
+   * `rows`. Lets the batch-ceiling test drive the loop without materializing
+   * hundreds of thousands of fake entries.
+   */
+  forceDeleteCount: number | null = null;
+
   $executeRaw = async (
     strings: TemplateStringsArray,
     ...values: unknown[]
   ): Promise<number> => {
-    this.statements.push(strings.join("?"));
+    const statement = strings.join("?");
+    this.statements.push(statement);
 
     const queued = this.failWith.shift();
     if (queued) throw queued;
+
+    // The purge is a DELETE over a LIMITed subquery, not the refund UPDATE.
+    if (statement.includes("DELETE FROM")) {
+      const [now, limit] = values as [Date, number];
+      if (this.forceDeleteCount !== null) return this.forceDeleteCount;
+      const expired = [...this.rows.entries()]
+        .filter(([, row]) => row.resetTime.getTime() < now.getTime())
+        .slice(0, limit);
+      for (const [key] of expired) this.rows.delete(key);
+      return expired.length;
+    }
 
     const [, key, resetTime] = values as [Date, string, Date];
     const existing = this.rows.get(key);
@@ -115,9 +139,19 @@ mock.module("./logger", {
 let rateLimit: typeof import("./rate-limit").rateLimit;
 let rateLimitDaily: typeof import("./rate-limit").rateLimitDaily;
 let refundRateLimit: typeof import("./rate-limit").refundRateLimit;
+let purgeExpiredRateLimitEntries: typeof import("./rate-limit").purgeExpiredRateLimitEntries;
+let PURGE_BATCH_SIZE: number;
+let PURGE_MAX_BATCHES: number;
 
 before(async () => {
-  ({ rateLimit, rateLimitDaily, refundRateLimit } = await import("./rate-limit"));
+  ({
+    rateLimit,
+    rateLimitDaily,
+    refundRateLimit,
+    purgeExpiredRateLimitEntries,
+    PURGE_BATCH_SIZE,
+    PURGE_MAX_BATCHES,
+  } = await import("./rate-limit"));
 });
 
 describe("rateLimit", () => {
@@ -160,18 +194,21 @@ describe("rateLimit", () => {
   });
 
   it("starts a fresh window once the previous one has expired", async () => {
-    store.rows.set("ip:expired", { count: 9, resetTime: new Date(Date.now() - 1_000) });
+    store.rows.set(rateLimitStorageKey("ip:expired"), {
+      count: 9,
+      resetTime: new Date(Date.now() - 1_000),
+    });
 
     const result = await rateLimit("ip:expired", 10, 60_000);
 
     assert.equal(result.success, true);
     assert.equal(result.remaining, 9, "an expired window restarts the count at 1");
-    assert.equal(store.rows.get("ip:expired")?.count, 1);
+    assert.equal(store.rows.get(rateLimitStorageKey("ip:expired"))?.count, 1);
   });
 
   it("keeps the original resetTime while a window is open", async () => {
     const openUntil = new Date(Date.now() + 30_000);
-    store.rows.set("ip:open", { count: 1, resetTime: openUntil });
+    store.rows.set(rateLimitStorageKey("ip:open"), { count: 1, resetTime: openUntil });
 
     const result = await rateLimit("ip:open", 10, 60_000);
 
@@ -198,7 +235,7 @@ describe("rateLimit", () => {
     await rateLimit("ip:retry-count", 10, 60_000);
 
     assert.equal(
-      store.rows.get("ip:retry-count")?.count,
+      store.rows.get(rateLimitStorageKey("ip:retry-count"))?.count,
       1,
       "a retry must not double-count the attempt it is retrying",
     );
@@ -292,11 +329,11 @@ describe("refundRateLimit", () => {
   it("gives back one unit in the window it was consumed from", async () => {
     await rateLimit("chat:stu-1", 40, 60_000);
     const consumed = await rateLimit("chat:stu-1", 40, 60_000);
-    assert.equal(store.rows.get("chat:stu-1")?.count, 2);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-1"))?.count, 2);
 
     await refundRateLimit("chat:stu-1", consumed.resetTime);
 
-    assert.equal(store.rows.get("chat:stu-1")?.count, 1);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-1"))?.count, 1);
   });
 
   it("leaves a different window alone", async () => {
@@ -304,7 +341,7 @@ describe("refundRateLimit", () => {
 
     await refundRateLimit("chat:stu-2", consumed.resetTime + 1);
 
-    assert.equal(store.rows.get("chat:stu-2")?.count, 1);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-2"))?.count, 1);
   });
 
   it("never drives the counter below zero", async () => {
@@ -313,7 +350,7 @@ describe("refundRateLimit", () => {
     await refundRateLimit("chat:stu-3", consumed.resetTime);
     await refundRateLimit("chat:stu-3", consumed.resetTime);
 
-    assert.equal(store.rows.get("chat:stu-3")?.count, 0);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-3"))?.count, 0);
   });
 
   it("spends exactly one store round trip", async () => {
@@ -331,9 +368,178 @@ describe("refundRateLimit", () => {
 
     await assert.doesNotReject(() => refundRateLimit("chat:stu-5", consumed.resetTime));
 
-    assert.equal(store.rows.get("chat:stu-5")?.count, 1);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-5"))?.count, 1);
     assert.equal(loggedWarnings.length, 1);
     assert.equal(loggedWarnings[0].context?.keyFamily, "chat");
     assert.doesNotMatch(JSON.stringify(loggedWarnings[0]), /stu-5/);
+  });
+});
+
+/**
+ * Row-key contract (2026-09-06 security fix).
+ *
+ * Callers still pass a readable key. What lands in `RateLimitEntry.key` — the
+ * table's PRIMARY KEY — is derived from it, because every per-IP limiter
+ * builds its key out of `X-Forwarded-For` and that header is chosen by the
+ * client. The two properties that matter are asserted over the fake store,
+ * since they belong to this module rather than to Postgres: the row key is
+ * bounded, and the caller's plaintext key never reaches the store.
+ * rate-limit.db.test.ts pins the database consequence of getting it wrong.
+ */
+describe("rate limit row keys", () => {
+  beforeEach(() => {
+    store.rows.clear();
+    store.failWith = [];
+    store.statements = [];
+    loggedErrors.length = 0;
+    loggedWarnings.length = 0;
+  });
+
+  it("never writes the caller's key into the store verbatim", async () => {
+    // `login:<ip>` identifies a person much as a log line does, and the
+    // limiter table is not an audit log (.claude/rules/security.md).
+    await rateLimit("login:198.51.100.9", 10, 60_000);
+
+    assert.equal(store.rows.has("login:198.51.100.9"), false);
+    assert.equal(store.rows.size, 1);
+    assert.doesNotMatch([...store.rows.keys()].join(" "), /198\.51\.100\.9/);
+  });
+
+  it("bounds the stored key however long the caller key is", async () => {
+    await rateLimit(`login:${"9".repeat(4000)}`, 10, 60_000);
+
+    const [stored] = [...store.rows.keys()];
+    assert.ok(
+      stored.length <= 80,
+      `an attacker-chosen key must not size the row; stored key was ${stored.length} chars`,
+    );
+  });
+
+  it("keeps the family prefix readable", async () => {
+    // scripts/seed-e2e-users.ts clears login buckets with
+    // `deleteMany({ where: { key: { startsWith: "login:" } } })`, and the
+    // fail-open log reports `keyFamily`. Both keep working only because the
+    // family survives in front of the digest.
+    await rateLimit("login:203.0.113.4", 10, 60_000);
+    await rateLimit("login:user:stu-1", 5, 60_000);
+
+    const stored = [...store.rows.keys()];
+    assert.equal(stored.length, 2);
+    assert.ok(
+      stored.every((key) => key.startsWith("login:")),
+      `both login-family keys must stay under the login: prefix; got ${stored.join(", ")}`,
+    );
+  });
+
+  it("keeps distinct caller keys in distinct rows", async () => {
+    // Bounding the key must not merge two callers into one bucket, which
+    // would let one student's attempts lock another student out.
+    await rateLimit("login:203.0.113.4", 10, 60_000);
+    await rateLimit("login:203.0.113.5", 10, 60_000);
+    await rateLimit("forgot-password:203.0.113.4", 10, 60_000);
+
+    assert.equal(store.rows.size, 3);
+    assert.ok([...store.rows.values()].every((row) => row.count === 1));
+  });
+
+  it("sends the same caller key to the same row every time", async () => {
+    for (let i = 0; i < 4; i += 1) {
+      await rateLimit("login:203.0.113.6", 10, 60_000);
+    }
+
+    assert.equal(store.rows.size, 1);
+    assert.equal([...store.rows.values()][0].count, 4);
+  });
+
+  it("refunds against the same row the consuming call wrote", async () => {
+    const consumed = await rateLimit("chat:stu-refund", 40, 60_000);
+    const [stored] = [...store.rows.keys()];
+    assert.equal(store.rows.get(stored)?.count, 1);
+
+    await refundRateLimit("chat:stu-refund", consumed.resetTime);
+
+    assert.equal(store.rows.size, 1, "a refund must not create a second row");
+    assert.equal(store.rows.get(stored)?.count, 0);
+  });
+});
+
+/**
+ * Review suggestion (2026-09-06): the purge was one unbounded `deleteMany`.
+ *
+ * `RateLimitEntry` had no TTL and nothing removing rows until 2026-09-06, so
+ * the first purge in a long-lived deployment meets whatever backlog has
+ * accumulated — and it runs on the admin pool, opportunistically, from
+ * inside a request path. One statement over an arbitrarily large row set
+ * holds an admin connection for as long as that delete takes, which is the
+ * one thing this best-effort housekeeping must never do.
+ *
+ * Batching bounds each statement. The interesting properties are the shape
+ * (a LIMIT is present at all), the stopping rule (a short batch ends the
+ * loop), and the ceiling (a backlog larger than the loop can clear leaves
+ * the rest for the next interval rather than running until it is done).
+ */
+describe("purgeExpiredRateLimitEntries", () => {
+  const HOUR = 60 * 60 * 1000;
+
+  beforeEach(() => {
+    store.rows.clear();
+    store.failWith = [];
+    store.statements = [];
+    store.forceDeleteCount = null;
+  });
+
+  function seedRows(expired: number, live: number) {
+    for (let i = 0; i < expired; i += 1) {
+      store.rows.set(`expired:${i}`, { count: 1, resetTime: new Date(Date.now() - HOUR) });
+    }
+    for (let i = 0; i < live; i += 1) {
+      store.rows.set(`live:${i}`, { count: 1, resetTime: new Date(Date.now() + HOUR) });
+    }
+  }
+
+  it("deletes expired rows in one statement when they fit in a batch", async () => {
+    seedRows(3, 2);
+
+    const removed = await purgeExpiredRateLimitEntries();
+
+    assert.equal(removed, 3);
+    assert.equal(store.rows.size, 2, "a row whose window is still open survives");
+    assert.equal(store.statements.length, 1, "a short batch ends the loop immediately");
+  });
+
+  it("bounds each statement with a LIMIT rather than deleting the whole backlog at once", async () => {
+    seedRows(1, 0);
+
+    await purgeExpiredRateLimitEntries();
+
+    assert.equal(store.statements.length, 1);
+    assert.match(
+      store.statements[0],
+      /LIMIT/i,
+      "the purge must delete a LIMITed batch, not every matching row in one statement",
+    );
+    assert.ok(PURGE_BATCH_SIZE > 0 && PURGE_BATCH_SIZE <= 10_000, `implausible batch size ${PURGE_BATCH_SIZE}`);
+  });
+
+  it("keeps going while batches come back full", async () => {
+    seedRows(PURGE_BATCH_SIZE + 1, 1);
+
+    const removed = await purgeExpiredRateLimitEntries();
+
+    assert.equal(removed, PURGE_BATCH_SIZE + 1);
+    assert.equal(store.statements.length, 2, "one full batch, then the remainder");
+    assert.equal(store.rows.size, 1, "only the live row is left");
+  });
+
+  it("stops at the batch ceiling instead of running until the backlog is gone", async () => {
+    // A backlog that never returns a short batch. Without a ceiling this
+    // loops until the table is empty, holding an admin connection the whole
+    // time; with one it leaves the rest for the next interval.
+    store.forceDeleteCount = PURGE_BATCH_SIZE;
+
+    const removed = await purgeExpiredRateLimitEntries();
+
+    assert.equal(store.statements.length, PURGE_MAX_BATCHES);
+    assert.equal(removed, PURGE_BATCH_SIZE * PURGE_MAX_BATCHES);
   });
 });

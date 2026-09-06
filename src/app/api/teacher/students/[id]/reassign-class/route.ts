@@ -10,7 +10,7 @@ import {
 import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
 import { tryLogAuditEvent } from "@/lib/audit";
-import { canManageAnyClass } from "@/lib/classroom";
+import { canPerformElevatedStaffAction } from "@/lib/classroom";
 import { type ProgramType } from "@/lib/program-type";
 import { getStudentProgramType } from "@/lib/program-type-server";
 
@@ -36,7 +36,11 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export const POST = withAuth(
   async (session, req: NextRequest, ctx: unknown) => {
-    if (!canManageAnyClass(session.role)) {
+    // Privilege TIER, not scope breadth: canManageAnyClass admits plain
+    // teachers (they read across classes by design), which is not who may
+    // move a student's enrollment and rewrite their programType/cohort
+    // attribution. See the contrast doc block in src/lib/classroom.ts.
+    if (!canPerformElevatedStaffAction(session.role)) {
       throw forbidden("Only admins and coordinators can reassign students.");
     }
 

@@ -60,6 +60,24 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
     const targetStudentId = await resolveTargetStudentId(session, studentId);
 
+    // `fileId` was validated only as a cuid, so any student could attach any
+    // other student's upload as their own signed form — and the teacher's
+    // forms view and student-detail page render `FormSubmission.fileId`
+    // without re-scoping, so staff would then see and download the victim's
+    // file labelled as this student's signature. Every sibling route
+    // (portfolio, certifications, vision-board, applications) scopes its file
+    // lookup to the student; this one is the outlier. Checked before the
+    // upsert so a foreign id never reaches the write.
+    if (fileId) {
+      const ownedFile = await prisma.fileUpload.findFirst({
+        where: { id: fileId, studentId: targetStudentId },
+        select: { id: true },
+      });
+      if (!ownedFile) {
+        throw badRequest("Attached file was not found.");
+      }
+    }
+
     // Decode and upload signature image
     const base64Data = signature.replace(/^data:image\/png;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");

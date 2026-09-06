@@ -34,9 +34,35 @@ export function signToken(studentId: string, role: string, sessionVersion: numbe
   });
 }
 
+/**
+ * Verify a full-session token (the `vq-session` cookie).
+ *
+ * Session tokens and MFA-challenge tokens are deliberately NOT
+ * interchangeable. Both are HS256 over the same JWT_SECRET and carry the same
+ * sub/role/sv claims, so a signature check alone cannot tell them apart — the
+ * `purpose` claim is the only separator, and it must be enforced HERE as well
+ * as in `verifyMfaSessionToken`.
+ *
+ * Why it matters: /api/auth/login mints an MFA challenge token the moment the
+ * PASSWORD verifies, before any TOTP code is presented, and returns it in a
+ * Set-Cookie header. A non-browser client can read that header and replay the
+ * token as `vq-session`. While this verifier ignored `purpose`, that replay
+ * produced a full teacher/admin session with the second factor never
+ * presented. The same shape applies to the emailed password-reset flow and the
+ * Google OAuth callback, both of which also hand out challenge tokens.
+ *
+ * The check is "carries a purpose claim at all", not "carries mfa_challenge",
+ * so any future purpose-scoped token is rejected by default rather than
+ * inheriting session authority the day it is added. Session tokens themselves
+ * are never given a purpose claim, so existing 7-day tokens keep working.
+ */
 export function verifyToken(token: string): SessionClaims | null {
   try {
     const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as Partial<SessionClaims>;
+    // Fail closed on any purpose-scoped token before looking at anything else.
+    if ("purpose" in (payload as Record<string, unknown>)) {
+      return null;
+    }
     if (
       typeof payload.sub !== "string" ||
       typeof payload.role !== "string" ||
@@ -58,6 +84,14 @@ export function signMfaSessionToken(studentId: string, role: string, sessionVers
   );
 }
 
+/**
+ * Verify a short-lived MFA challenge token (the `vq-mfa-challenge` cookie).
+ *
+ * The counterpart to `verifyToken`, and non-interchangeable with it by design:
+ * this verifier requires `purpose === "mfa_challenge"`, so a full session
+ * token can never be presented as a completed-password-step challenge, just as
+ * a challenge token can never be presented as a session.
+ */
 export function verifyMfaSessionToken(token: string): MfaSessionClaims | null {
   try {
     const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as Partial<MfaSessionClaims>;

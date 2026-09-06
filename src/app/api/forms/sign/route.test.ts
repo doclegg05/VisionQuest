@@ -28,6 +28,9 @@ const mockFormSubmissionUpsert = mock.fn<
     update: Record<string, unknown>;
   }) => Promise<Record<string, unknown>>
 >();
+const mockFileUploadFindFirst = mock.fn<
+  (args: { where: Record<string, unknown> }) => Promise<{ id: string } | null>
+>();
 const mockSyncStudentAlerts = mock.fn<(studentId: string) => Promise<void>>();
 const mockWarn = mock.fn<(message: string, context?: Record<string, unknown>) => void>();
 const mockError = mock.fn<(message: string, context?: Record<string, unknown>) => void>();
@@ -41,7 +44,7 @@ mock.module("@/lib/auth", {
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
-      fileUpload: { create: mockFileUploadCreate },
+      fileUpload: { create: mockFileUploadCreate, findFirst: mockFileUploadFindFirst },
       formSubmission: { upsert: mockFormSubmissionUpsert },
     },
   },
@@ -96,6 +99,7 @@ describe("POST /api/forms/sign", () => {
     currentSession = student;
     mockUploadFile.mock.resetCalls();
     mockFileUploadCreate.mock.resetCalls();
+    mockFileUploadFindFirst.mock.resetCalls();
     mockFormSubmissionUpsert.mock.resetCalls();
     mockSyncStudentAlerts.mock.resetCalls();
     mockWarn.mock.resetCalls();
@@ -103,6 +107,7 @@ describe("POST /api/forms/sign", () => {
 
     mockUploadFile.mock.mockImplementation(async () => undefined);
     mockFileUploadCreate.mock.mockImplementation(async () => ({ id: "sig-file-1" }));
+    mockFileUploadFindFirst.mock.mockImplementation(async () => ({ id: "own-file-1" }));
     mockFormSubmissionUpsert.mock.mockImplementation(async () => ({
       id: "submission-1",
       studentId: student.id,
@@ -133,6 +138,61 @@ describe("POST /api/forms/sign", () => {
     assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [student.id]);
     assert.equal(mockWarn.mock.callCount(), 0);
     assert.equal(mockError.mock.callCount(), 0);
+  });
+
+  // `fileId` names the FILE a signed submission points at, and the teacher's
+  // forms view and student-detail page render it without re-scoping. Every
+  // sibling route scopes its file lookup to the student (portfolio,
+  // certifications, vision-board, applications); this one validated the id as
+  // a cuid and nothing more, so a student could attach another student's
+  // upload as their own signed form and staff would download the victim's file
+  // labelled as this student's signature.
+  it("refuses a fileId that does not belong to the target student", async () => {
+    mockFileUploadFindFirst.mock.mockImplementation(async () => null);
+
+    const res = await post({
+      formId: FORM_ID,
+      signature: SIGNATURE,
+      fileId: "cm00000000000000000000000",
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error, "Attached file was not found.");
+    assert.equal(
+      mockFormSubmissionUpsert.mock.callCount(),
+      0,
+      "a foreign fileId must never reach the submission write",
+    );
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
+
+    // Scoped by owner, not merely by id.
+    const where = mockFileUploadFindFirst.mock.calls[0].arguments[0].where;
+    assert.deepEqual(where, { id: "cm00000000000000000000000", studentId: student.id });
+  });
+
+  it("accepts a fileId the target student owns and writes it to the submission", async () => {
+    mockFileUploadFindFirst.mock.mockImplementation(async () => ({ id: "own-file-1" }));
+
+    const res = await post({
+      formId: FORM_ID,
+      signature: SIGNATURE,
+      fileId: "cm11111111111111111111111",
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 1);
+    const args = mockFormSubmissionUpsert.mock.calls[0].arguments[0];
+    assert.equal(args.create.fileId, "cm11111111111111111111111");
+    assert.equal(args.update.fileId, "cm11111111111111111111111");
+  });
+
+  it("does not look up a file when no fileId was supplied", async () => {
+    const res = await post({ formId: FORM_ID, signature: SIGNATURE });
+
+    assert.equal(res.status, 200);
+    assert.equal(mockFileUploadFindFirst.mock.callCount(), 0);
+    // The signature file stands in as the submission's file, as before.
+    assert.equal(mockFormSubmissionUpsert.mock.calls[0].arguments[0].create.fileId, "sig-file-1");
   });
 
   it("rejects a body with no signature before touching storage or the database", async () => {
