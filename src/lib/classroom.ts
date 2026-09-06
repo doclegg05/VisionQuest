@@ -25,6 +25,38 @@ export function canManageAnyClass(role: string): boolean {
   return STAFF_CAN_MANAGE_ANY.includes(role);
 }
 
+/**
+ * Roles allowed to take an admin/coordinator-only action. This is a
+ * PRIVILEGE TIER, not a scope breadth.
+ *
+ * Read it against `STAFF_CAN_MANAGE_ANY` above, which answers a different
+ * question:
+ *
+ *   canManageAnyClass(role)            → "may this role see students outside
+ *                                        the classes they teach?" (BREADTH —
+ *                                        teacher: yes, single staff workspace)
+ *   canPerformElevatedStaffAction(role) → "may this role take an action
+ *                                        reserved to admins/coordinators?"
+ *                                        (TIER — teacher: no)
+ *
+ * They disagree about `teacher` on purpose, and that disagreement is the
+ * whole point. Two routes once used the breadth predicate as a tier gate
+ * while their own error copy said "admins and coordinators": the form-response
+ * CSV export (a plain teacher could stream every non-draft response) and
+ * student class reassignment (a plain teacher could move a student between
+ * classes, changing programType/cohort attribution, with the audit row
+ * recorded as if by admin authority).
+ *
+ * Do NOT merge these two lists, and do not add `teacher` here to make a call
+ * site compile — a call site that needs teachers wants `canManageAnyClass`.
+ * `src/lib/classroom.test.ts` pins the pair apart.
+ */
+export const ELEVATED_STAFF: readonly string[] = ["admin", "coordinator"];
+
+export function canPerformElevatedStaffAction(role: string): boolean {
+  return ELEVATED_STAFF.includes(role);
+}
+
 export function normalizeClassCode(value: string) {
   return value
     .trim()

@@ -1,12 +1,54 @@
 import archiver from "archiver";
+import path from "path";
 import { Writable } from "stream";
 import { prisma } from "./db";
 import { downloadFile, uploadFile } from "./storage";
 import { FORMS } from "./spokes/forms";
 import { logger } from "./logger";
+import { safeUploadName } from "./upload-name";
 import { studentLogKey } from "@/lib/log-keys";
 
 const FORM_BY_ID = new Map(FORMS.map((f) => [f.id, f]));
+
+/** Characters an archive entry name may keep: letters, digits, and the
+ * punctuation an ordinary filename actually uses. `\p{L}`/`\p{N}` rather than
+ * `\w` so a Spanish or Japanese filename stays readable — the student is the
+ * one receiving this bundle. */
+const UNSAFE_ENTRY_CHARS = /[^\p{L}\p{N}_. \-()\[\]]/gu;
+
+const MAX_ENTRY_NAME_LENGTH = 120;
+
+/**
+ * The authoritative sanitizer for a ZIP entry name.
+ *
+ * `FileUpload.filename` is student-controlled (it is `File.name`, which undici
+ * preserves verbatim through `req.formData()`), and `archiver` does not
+ * normalize entry names — so without this the central directory of a retention
+ * archive literally contains `files/../../../../home/staff/.bashrc`. Staff and
+ * admins download and unzip these bundles, which makes it a zip-slip write on
+ * any extractor that does not normalize; and on one that DOES normalize, a
+ * student could still plant `files/../forms/DoHS Release.pdf` beside or over a
+ * real signed form inside their own archive.
+ *
+ * This runs at the archive boundary rather than only at upload time because
+ * the database already holds rows written before upload-time sanitizing
+ * existed, and because the boundary is where the string stops being a name and
+ * starts being a path.
+ */
+export function safeEntryName(rawName: string | null | undefined): string {
+  // First the shared upload-time pass: separators, control characters,
+  // leading dots, and the length cap (tighter here than at upload).
+  const base = safeUploadName(rawName, MAX_ENTRY_NAME_LENGTH);
+
+  const name = base
+    .replace(UNSAFE_ENTRY_CHARS, "_")
+    // The substitution can expose new leading dots, so strip them again.
+    .replace(/^\.+/, "")
+    .trim()
+    .slice(0, MAX_ENTRY_NAME_LENGTH);
+
+  return name || "file";
+}
 
 interface ArchiveManifestEntry {
   path: string;
@@ -180,6 +222,31 @@ export async function generateStudentArchive(
   const archive = archiver("zip", { zlib: { level: 6 } });
   archive.pipe(bufferStream);
 
+  // Sanitizing flattens names, so two uploads that differed only by directory
+  // ("../report.pdf" and "sub/report.pdf") now collide. Renaming the later one
+  // is the honest outcome — dropping it would silently lose a file from the
+  // one copy the student takes with them.
+  const usedEntryPaths = new Set<string>();
+
+  function reserveEntryPath(folder: string, rawFilename: string | null | undefined): string {
+    const safe = safeEntryName(rawFilename);
+    const first = `${folder}/${safe}`;
+    if (!usedEntryPaths.has(first)) {
+      usedEntryPaths.add(first);
+      return first;
+    }
+
+    const ext = path.posix.extname(safe);
+    const stem = safe.slice(0, safe.length - ext.length);
+    for (let n = 2; ; n++) {
+      const candidate = `${folder}/${stem} (${n})${ext}`;
+      if (!usedEntryPaths.has(candidate)) {
+        usedEntryPaths.add(candidate);
+        return candidate;
+      }
+    }
+  }
+
   // Helper to add a file to the archive
   async function addFile(
     folder: string,
@@ -193,7 +260,7 @@ export async function generateStudentArchive(
       const result = await downloadFile(fileRecord.storageKey);
       if (!result) return false;
 
-      const archivePath = `${folder}/${fileRecord.filename}`;
+      const archivePath = reserveEntryPath(folder, fileRecord.filename);
       archive.append(result.buffer, { name: archivePath });
       manifest.entries.push({ ...entry, path: archivePath });
       manifest.fileCount++;
@@ -256,21 +323,20 @@ export async function generateStudentArchive(
   }
 
   // 4. General uploads (resume files, etc.)
-  const alreadyArchived = new Set(manifest.entries.map((e) => e.path));
   for (const file of student.files) {
     if (file.category === "resume" || file.category === "general") {
-      const archivePath = `files/${file.filename}`;
-      if (!alreadyArchived.has(archivePath)) {
-        try {
-          const result = await downloadFile(file.storageKey);
-          if (result) {
-            archive.append(result.buffer, { name: archivePath });
-            manifest.entries.push({ path: archivePath, type: file.category });
-            manifest.fileCount++;
-          }
-        } catch {
-          // Skip files that fail to download
+      try {
+        const result = await downloadFile(file.storageKey);
+        if (result) {
+          // Reserved only once the download succeeded, so a failed download
+          // does not burn a name and push the next file to " (2)".
+          const archivePath = reserveEntryPath("files", file.filename);
+          archive.append(result.buffer, { name: archivePath });
+          manifest.entries.push({ path: archivePath, type: file.category });
+          manifest.fileCount++;
         }
+      } catch {
+        // Skip files that fail to download
       }
     }
   }

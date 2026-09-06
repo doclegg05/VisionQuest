@@ -73,12 +73,12 @@ mock.module("@/lib/schemas", {
   },
 });
 
-mock.module("@/lib/classroom", {
-  namedExports: {
-    canManageAnyClass: (role: string) =>
-      role === "admin" || role === "coordinator",
-  },
-});
+// @/lib/classroom is deliberately NOT mocked: the role gate under test is the
+// production predicate. An earlier version of this file mocked
+// canManageAnyClass as admin-or-coordinator, which is not what it returns —
+// so "rejects a teacher session" passed against a route that admitted
+// teachers. A mock that restates the intended answer cannot detect the route
+// asking the wrong question.
 
 mock.module("@/lib/program-type-server", {
   namedExports: {
@@ -172,10 +172,15 @@ async function callRoute(body: unknown): Promise<Response> {
 }
 
 describe("POST /api/teacher/students/:id/reassign-class", () => {
-  it("rejects a teacher session with 403", async () => {
+  it("rejects a teacher session with 403 and writes nothing", async () => {
     currentSession = mockTeacherSession();
     const res = await callRoute({ newClassId: "class-target" });
     assert.equal(res.status, 403);
+    // A refused reassignment must not archive an enrollment, create one, or
+    // leave an audit row claiming admin authority for a teacher's action.
+    assert.equal(mockEnrollmentUpdate.mock.callCount(), 0);
+    assert.equal(mockEnrollmentCreate.mock.callCount(), 0);
+    assert.equal(mockAdminAuditLogCreate.mock.callCount(), 0);
   });
 
   it("rejects a student session with 403", async () => {

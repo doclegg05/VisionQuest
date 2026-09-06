@@ -8,6 +8,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { buildFileGist } from "@/lib/sage/file-gist";
 import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
+import { safeUploadName } from "@/lib/upload-name";
 
 /**
  * POST /api/chat/upload — hand Sage a file in chat (Phase 3).
@@ -32,7 +33,13 @@ export const POST = withAuth(async (session, req: Request) => {
   if (validationError) throw badRequest(validationError);
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const storageKey = generateStorageKey(session.id, file.name);
+  // `File.name` is student-controlled and undici preserves it verbatim, so the
+  // stored name must be a name and not a path — the retention archive turns
+  // this column into a ZIP entry path. The gist sees the same sanitized name,
+  // so the prompt and the stored row never disagree about what the file is
+  // called.
+  const filename = safeUploadName(file.name);
+  const storageKey = generateStorageKey(session.id, filename);
 
   try {
     await uploadFile(storageKey, buffer, file.type);
@@ -46,7 +53,7 @@ export const POST = withAuth(async (session, req: Request) => {
 
   const { gist, method } = await buildFileGist({
     buffer,
-    filename: file.name,
+    filename,
     mimeType: file.type,
     studentId: session.id,
     cloudAllowed,
@@ -55,7 +62,7 @@ export const POST = withAuth(async (session, req: Request) => {
   const record = await prisma.fileUpload.create({
     data: {
       studentId: session.id,
-      filename: file.name,
+      filename,
       mimeType: file.type,
       sizeBytes: file.size,
       storageKey,
@@ -100,6 +107,6 @@ export const POST = withAuth(async (session, req: Request) => {
 
   return NextResponse.json({
     success: true,
-    data: { fileUploadId: record.id, filename: file.name, gist, gistMethod: method },
+    data: { fileUploadId: record.id, filename, gist, gistMethod: method },
   });
 });

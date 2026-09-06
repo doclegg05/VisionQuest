@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { withAuth, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
+import { safeUploadName } from "@/lib/upload-name";
 
 async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
   const targetStudentId = requestedStudentId?.trim() || session.id;
@@ -53,7 +54,11 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const storageKey = generateStorageKey(targetStudentId, file.name);
+    // `File.name` is student-controlled and undici preserves it verbatim, so
+    // the stored name must be a name and not a path — the retention archive
+    // turns this column into a ZIP entry path.
+    const filename = safeUploadName(file.name);
+    const storageKey = generateStorageKey(targetStudentId, filename);
 
     // Upload to storage
     await uploadFile(storageKey, buffer, file.type);
@@ -62,7 +67,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     const fileRecord = await prisma.fileUpload.create({
       data: {
         studentId: targetStudentId,
-        filename: file.name,
+        filename,
         mimeType: file.type,
         sizeBytes: file.size,
         storageKey,
