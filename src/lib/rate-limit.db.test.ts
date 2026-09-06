@@ -235,6 +235,44 @@ if (!SHOULD_RUN) {
       );
     });
 
+    // Review suggestion (2026-09-06): the purge is a LIMITed batch loop, not
+    // one unbounded deleteMany. The batching lives in raw SQL, so only a real
+    // Postgres proves the statement parses and binds — the in-process
+    // companion runs against a fake that reproduces the shape, and a fake
+    // cannot notice a signature the code got wrong (the 2026-09-05
+    // advisory-lock lesson).
+    it("clears a backlog larger than one batch, in batches", async () => {
+      const { PURGE_BATCH_SIZE } = await import("./rate-limit");
+      const rows = PURGE_BATCH_SIZE + 25;
+      const expiredAt = new Date(Date.now() - 60 * 60 * 1000);
+      const prefix = `${KEY_PREFIX}batch:${process.pid}:`;
+
+      await prismaAdmin.rateLimitEntry.createMany({
+        data: Array.from({ length: rows }, (_, i) => ({
+          key: `${prefix}${i}`,
+          count: 1,
+          resetTime: expiredAt,
+        })),
+      });
+      const liveKey = uniqueKey("batch-live");
+      await rateLimit(liveKey, 10, 60 * 60 * 1000);
+
+      const removed = await purgeExpiredRateLimitEntries();
+
+      assert.ok(
+        removed >= rows,
+        `every expired row must go in one pass at this size; removed ${removed} of ${rows}`,
+      );
+      const leftover = await prismaAdmin.rateLimitEntry.count({
+        where: { key: { startsWith: prefix } },
+      });
+      assert.equal(leftover, 0, "no expired fixture row may survive");
+      const live = await prismaAdmin.rateLimitEntry.count({
+        where: { key: rateLimitStorageKey(liveKey) },
+      });
+      assert.equal(live, 1, "a row whose window is still open survives a multi-batch purge");
+    });
+
     it("resets the counter once the window has expired", async () => {
       const key = uniqueKey("window-reset");
       // Short window, then wait past it. Sized well above the round-trip so

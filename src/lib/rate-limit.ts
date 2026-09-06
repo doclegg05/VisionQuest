@@ -230,12 +230,51 @@ export async function refundRateLimit(key: string, resetTime: number): Promise<v
  * `@@index([resetTime])` already exists on the model, so this is an index
  * scan rather than a table sweep. Exported so it can also be called from a
  * script or a maintenance route.
+ *
+ * --- Why batched (2026-09-06) ---
+ * This was one unbounded `deleteMany`. The table accumulated rows for the
+ * whole life of the deployment before anything purged it, so the FIRST purge
+ * after this ships meets that entire backlog — and it runs on the admin pool,
+ * opportunistically, from inside a request path. A single statement over an
+ * arbitrarily large row set holds an admin connection for as long as that
+ * delete takes, which is the one thing best-effort housekeeping must never
+ * do to a request-serving pool.
+ *
+ * Each statement now deletes at most `PURGE_BATCH_SIZE` rows, chosen by a
+ * LIMITed subquery on the same `resetTime` index. A short batch means the
+ * backlog is gone and the loop stops. `PURGE_MAX_BATCHES` caps one
+ * invocation regardless: a backlog bigger than that is left for the next
+ * interval rather than turning a fire-and-forget purge into a long-running
+ * job. The count answered is what this invocation actually removed.
  */
+export const PURGE_BATCH_SIZE = 5000;
+
+/**
+ * Statements one invocation will issue at most. 20 x 5,000 = 100,000 rows per
+ * pass, so even a large backlog clears within a few purge intervals while no
+ * single pass runs unbounded.
+ */
+export const PURGE_MAX_BATCHES = 20;
+
 export async function purgeExpiredRateLimitEntries(): Promise<number> {
-  const { count } = await prisma.rateLimitEntry.deleteMany({
-    where: { resetTime: { lt: new Date() } },
-  });
-  return count;
+  let removed = 0;
+
+  for (let batch = 0; batch < PURGE_MAX_BATCHES; batch += 1) {
+    // `now` is re-read per batch so a long pass keeps deleting rows that
+    // expired while it ran, rather than working from a stale cutoff.
+    const deleted = await prisma.$executeRaw`
+      DELETE FROM "visionquest"."RateLimitEntry"
+      WHERE "key" IN (
+        SELECT "key" FROM "visionquest"."RateLimitEntry"
+        WHERE "resetTime" < ${new Date()}
+        LIMIT ${PURGE_BATCH_SIZE}
+      )
+    `;
+    removed += deleted;
+    if (deleted < PURGE_BATCH_SIZE) break;
+  }
+
+  return removed;
 }
 
 /**

@@ -19,6 +19,23 @@ const UNSAFE_ENTRY_CHARS = /[^\p{L}\p{N}_. \-()\[\]]/gu;
 const MAX_ENTRY_NAME_LENGTH = 120;
 
 /**
+ * Names Windows reserves for devices, matched on the STEM and case-insensitively.
+ *
+ * Windows refuses to create a file called `CON`, and refuses it just as
+ * firmly when it carries an extension — `CON.pdf`, `com1.txt` and
+ * `AUX.tar.gz` are all the same reservation. A student who names an upload
+ * that way, deliberately or otherwise, produces a retention archive that
+ * fails partway through extraction on a staff machine, which is where these
+ * bundles are actually opened. Everything else in `safeEntryName` keeps the
+ * entry from escaping the extraction directory; this keeps the archive
+ * extractable at all.
+ *
+ * Anchored on the whole stem on purpose: `console.log.txt`, `contract.pdf`
+ * and `COM10.txt` are ordinary names and must not be renamed.
+ */
+const WINDOWS_RESERVED_STEM = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+
+/**
  * The authoritative sanitizer for a ZIP entry name.
  *
  * `FileUpload.filename` is student-controlled (it is `File.name`, which undici
@@ -47,7 +64,17 @@ export function safeEntryName(rawName: string | null | undefined): string {
     .trim()
     .slice(0, MAX_ENTRY_NAME_LENGTH);
 
-  return name || "file";
+  if (!name) return "file";
+
+  // Windows reserves the stem, so the check runs on everything before the
+  // FIRST dot: `AUX.tar.gz` is as reserved as `AUX`. The `_` prefix keeps the
+  // name recognizable to the student who uploaded it — renaming it to
+  // something generic would lose the one thing the entry name is for. A
+  // reserved stem is at most four characters, so the prefix cannot push the
+  // name past the cap applied above.
+  if (WINDOWS_RESERVED_STEM.test(name.split(".")[0])) return `_${name}`;
+
+  return name;
 }
 
 interface ArchiveManifestEntry {

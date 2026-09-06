@@ -76,14 +76,33 @@ class FakeStore {
    * on the row whose window matches. Bound values arrive in interpolation
    * order: values[0] = now, values[1] = key, values[2] = resetTime.
    */
+  /**
+   * When set, the modelled DELETE reports this many rows without touching
+   * `rows`. Lets the batch-ceiling test drive the loop without materializing
+   * hundreds of thousands of fake entries.
+   */
+  forceDeleteCount: number | null = null;
+
   $executeRaw = async (
     strings: TemplateStringsArray,
     ...values: unknown[]
   ): Promise<number> => {
-    this.statements.push(strings.join("?"));
+    const statement = strings.join("?");
+    this.statements.push(statement);
 
     const queued = this.failWith.shift();
     if (queued) throw queued;
+
+    // The purge is a DELETE over a LIMITed subquery, not the refund UPDATE.
+    if (statement.includes("DELETE FROM")) {
+      const [now, limit] = values as [Date, number];
+      if (this.forceDeleteCount !== null) return this.forceDeleteCount;
+      const expired = [...this.rows.entries()]
+        .filter(([, row]) => row.resetTime.getTime() < now.getTime())
+        .slice(0, limit);
+      for (const [key] of expired) this.rows.delete(key);
+      return expired.length;
+    }
 
     const [, key, resetTime] = values as [Date, string, Date];
     const existing = this.rows.get(key);
@@ -120,9 +139,19 @@ mock.module("./logger", {
 let rateLimit: typeof import("./rate-limit").rateLimit;
 let rateLimitDaily: typeof import("./rate-limit").rateLimitDaily;
 let refundRateLimit: typeof import("./rate-limit").refundRateLimit;
+let purgeExpiredRateLimitEntries: typeof import("./rate-limit").purgeExpiredRateLimitEntries;
+let PURGE_BATCH_SIZE: number;
+let PURGE_MAX_BATCHES: number;
 
 before(async () => {
-  ({ rateLimit, rateLimitDaily, refundRateLimit } = await import("./rate-limit"));
+  ({
+    rateLimit,
+    rateLimitDaily,
+    refundRateLimit,
+    purgeExpiredRateLimitEntries,
+    PURGE_BATCH_SIZE,
+    PURGE_MAX_BATCHES,
+  } = await import("./rate-limit"));
 });
 
 describe("rateLimit", () => {
@@ -431,5 +460,86 @@ describe("rate limit row keys", () => {
 
     assert.equal(store.rows.size, 1, "a refund must not create a second row");
     assert.equal(store.rows.get(stored)?.count, 0);
+  });
+});
+
+/**
+ * Review suggestion (2026-09-06): the purge was one unbounded `deleteMany`.
+ *
+ * `RateLimitEntry` had no TTL and nothing removing rows until 2026-09-06, so
+ * the first purge in a long-lived deployment meets whatever backlog has
+ * accumulated — and it runs on the admin pool, opportunistically, from
+ * inside a request path. One statement over an arbitrarily large row set
+ * holds an admin connection for as long as that delete takes, which is the
+ * one thing this best-effort housekeeping must never do.
+ *
+ * Batching bounds each statement. The interesting properties are the shape
+ * (a LIMIT is present at all), the stopping rule (a short batch ends the
+ * loop), and the ceiling (a backlog larger than the loop can clear leaves
+ * the rest for the next interval rather than running until it is done).
+ */
+describe("purgeExpiredRateLimitEntries", () => {
+  const HOUR = 60 * 60 * 1000;
+
+  beforeEach(() => {
+    store.rows.clear();
+    store.failWith = [];
+    store.statements = [];
+    store.forceDeleteCount = null;
+  });
+
+  function seedRows(expired: number, live: number) {
+    for (let i = 0; i < expired; i += 1) {
+      store.rows.set(`expired:${i}`, { count: 1, resetTime: new Date(Date.now() - HOUR) });
+    }
+    for (let i = 0; i < live; i += 1) {
+      store.rows.set(`live:${i}`, { count: 1, resetTime: new Date(Date.now() + HOUR) });
+    }
+  }
+
+  it("deletes expired rows in one statement when they fit in a batch", async () => {
+    seedRows(3, 2);
+
+    const removed = await purgeExpiredRateLimitEntries();
+
+    assert.equal(removed, 3);
+    assert.equal(store.rows.size, 2, "a row whose window is still open survives");
+    assert.equal(store.statements.length, 1, "a short batch ends the loop immediately");
+  });
+
+  it("bounds each statement with a LIMIT rather than deleting the whole backlog at once", async () => {
+    seedRows(1, 0);
+
+    await purgeExpiredRateLimitEntries();
+
+    assert.equal(store.statements.length, 1);
+    assert.match(
+      store.statements[0],
+      /LIMIT/i,
+      "the purge must delete a LIMITed batch, not every matching row in one statement",
+    );
+    assert.ok(PURGE_BATCH_SIZE > 0 && PURGE_BATCH_SIZE <= 10_000, `implausible batch size ${PURGE_BATCH_SIZE}`);
+  });
+
+  it("keeps going while batches come back full", async () => {
+    seedRows(PURGE_BATCH_SIZE + 1, 1);
+
+    const removed = await purgeExpiredRateLimitEntries();
+
+    assert.equal(removed, PURGE_BATCH_SIZE + 1);
+    assert.equal(store.statements.length, 2, "one full batch, then the remainder");
+    assert.equal(store.rows.size, 1, "only the live row is left");
+  });
+
+  it("stops at the batch ceiling instead of running until the backlog is gone", async () => {
+    // A backlog that never returns a short batch. Without a ceiling this
+    // loops until the table is empty, holding an admin connection the whole
+    // time; with one it leaves the rest for the next interval.
+    store.forceDeleteCount = PURGE_BATCH_SIZE;
+
+    const removed = await purgeExpiredRateLimitEntries();
+
+    assert.equal(store.statements.length, PURGE_MAX_BATCHES);
+    assert.equal(removed, PURGE_BATCH_SIZE * PURGE_MAX_BATCHES);
   });
 });
