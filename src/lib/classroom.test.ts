@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ELEVATED_STAFF,
   NON_ARCHIVED_ENROLLMENT_STATUSES,
   STAFF_CAN_MANAGE_ANY,
   buildManagedStudentWhere,
   buildStudentIdentifierWhere,
   canManageAnyClass,
+  canPerformElevatedStaffAction,
   normalizeClassCode,
 } from "./classroom";
 import { getRoleHomePath } from "./role-home";
@@ -226,6 +228,40 @@ test("canManageAnyClass returns true for instructor/admin staff roles", () => {
   assert.equal(canManageAnyClass("cdc"), false);
   assert.equal(canManageAnyClass("student"), false);
   assert.equal(canManageAnyClass(""), false);
+});
+
+// --- Scope BREADTH vs privilege TIER -------------------------------------
+// canManageAnyClass answers "may this role see students outside the classes
+// they teach?" (breadth). canPerformElevatedStaffAction answers "may this
+// role take an admin/coordinator-only action?" (tier). They are different
+// questions and they disagree about `teacher`. Two routes once used the
+// breadth predicate as a tier gate — a plain teacher could stream a CSV of
+// every form response and could reassign a student between classes. These
+// assertions pin the two apart so they can never be silently re-merged.
+
+test("canPerformElevatedStaffAction refuses plain teachers and non-staff", () => {
+  assert.equal(canPerformElevatedStaffAction("teacher"), false);
+  assert.equal(canPerformElevatedStaffAction("cdc"), false);
+  assert.equal(canPerformElevatedStaffAction("student"), false);
+  assert.equal(canPerformElevatedStaffAction(""), false);
+});
+
+test("canPerformElevatedStaffAction admits admins and coordinators", () => {
+  assert.equal(canPerformElevatedStaffAction("admin"), true);
+  assert.equal(canPerformElevatedStaffAction("coordinator"), true);
+});
+
+test("ELEVATED_STAFF and STAFF_CAN_MANAGE_ANY are NOT interchangeable", () => {
+  assert.deepEqual([...ELEVATED_STAFF], ["admin", "coordinator"]);
+  assert.ok(
+    !ELEVATED_STAFF.includes("teacher"),
+    "ELEVATED_STAFF must never list teacher — it is the admin/coordinator privilege tier",
+  );
+  // The breadth predicate still admits teachers, by design. If this ever
+  // stops being true the two predicates have been merged and every
+  // cross-class teacher surface (dashboard, exports, reports) changed.
+  assert.equal(canManageAnyClass("teacher"), true);
+  assert.equal(canPerformElevatedStaffAction("teacher"), false);
 });
 
 test("getRoleHomePath routes each role to the correct landing page", () => {
