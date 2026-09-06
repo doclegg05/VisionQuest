@@ -29,6 +29,33 @@ describe("safeUploadName", () => {
     assert.equal(safeUploadName("re\nsu\tme.pdf"), "resume.pdf");
   });
 
+  // Review suggestion (2026-09-06). `CONTROL_CHARS` covered C0/C1 only, so
+  // every invisible formatting character survived — including the bidi
+  // overrides. `resume‮fdp.exe` renders in a teacher's file list as
+  // `resumeexe.pdf`: a staff member deciding whether to open an attachment
+  // reads the reversed name, not the bytes. `safeEntryName` in
+  // student-archive.ts already drops these (its allowlist keeps only
+  // \p{L}/\p{N} and a little punctuation); this brings the upload-time pass
+  // into line so the two agree about what a name may contain.
+  it("strips bidi overrides so a name cannot render as a different extension", () => {
+    // U+202E RIGHT-TO-LEFT OVERRIDE: displays as "resumeexe.pdf".
+    assert.equal(safeUploadName("resume‮fdp.exe"), "resumefdp.exe");
+    // The isolate family (U+2066–U+2069) does the same job.
+    assert.equal(safeUploadName("⁦invoice⁩.pdf"), "invoice.pdf");
+    for (const raw of ["a‪b.pdf", "a‫b.pdf", "a‬b.pdf", "a‭b.pdf"]) {
+      assert.equal(safeUploadName(raw), "ab.pdf", `bidi control survived in ${JSON.stringify(raw)}`);
+    }
+  });
+
+  it("strips zero-width characters, which are invisible collision fodder", () => {
+    // Two names that look identical in every list this app renders must not
+    // stay distinguishable only by a character nobody can see.
+    assert.equal(safeUploadName("resume​.pdf"), "resume.pdf");
+    for (const raw of ["a‌b.pdf", "a‍b.pdf", "a‎b.pdf", "a‏b.pdf"]) {
+      assert.equal(safeUploadName(raw), "ab.pdf", `zero-width survived in ${JSON.stringify(raw)}`);
+    }
+  });
+
   it("strips leading dots so nothing becomes a dotfile", () => {
     assert.equal(safeUploadName(".bashrc"), "bashrc");
     assert.equal(safeUploadName("..."), "file");

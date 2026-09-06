@@ -87,7 +87,11 @@ beforeEach(() => {
 });
 
 async function get(search: string): Promise<string> {
-  const res = await route.GET(mockRequest("/api/documents", { searchParams: { search } }) as any);
+  return getWith({ search });
+}
+
+async function getWith(searchParams: Record<string, string>): Promise<string> {
+  const res = await route.GET(mockRequest("/api/documents", { searchParams }) as any);
   assert.equal(res.status, 200);
   assert.equal(cacheKeys.length, 1, "expected exactly one cached() call per request");
   return cacheKeys[0];
@@ -130,5 +134,65 @@ describe("GET /api/documents cache key", () => {
       !key.toLowerCase().includes("sensitive"),
       `raw search text leaked into the cache key: ${key}`,
     );
+  });
+
+  // ── Review W4 (2026-09-06) ─────────────────────────────────────────────
+  //
+  // `search` was hashed; `platformId` and `certificationId` came straight
+  // from `searchParams.get()` with no cap and went into the key verbatim.
+  // Neither is validated against an allowlist the way `category` is, so
+  // either one is the same cache-filling primitive the search hash closed:
+  // the shared cache is capped at 10,000 keys and node-cache refuses to
+  // store rather than evicting, so filling it stops every other `cached()`
+  // caller — getSession() included — from storing anything. Verified before
+  // the fix: a 5,000-character `platformId` produced a 5,000-character-longer
+  // cache key.
+  for (const field of ["platformId", "certificationId"] as const) {
+    it(`does not let a caller grow the cache key through ${field}`, async () => {
+      const short = await getWith({ [field]: "a" });
+      cacheKeys.length = 0;
+      const long = await getWith({ [field]: "x".repeat(5000) });
+
+      assert.equal(
+        long.length,
+        short.length,
+        `${field} must be a fixed-length digest, not caller text`,
+      );
+      assert.ok(long.length < 200, `cache key should stay small, got ${long.length} chars`);
+    });
+
+    it(`still gives distinct ${field} values distinct cache keys`, async () => {
+      const keyA = await getWith({ [field]: "aztec" });
+      cacheKeys.length = 0;
+      const keyB = await getWith({ [field]: "northstar" });
+
+      assert.notEqual(keyA, keyB, `distinct ${field} values must not collide in the cache`);
+    });
+
+    it(`never embeds the raw ${field} in the key`, async () => {
+      const key = await getWith({ [field]: "sensitive-platform-name" });
+
+      assert.ok(
+        !key.includes("sensitive-platform-name"),
+        `raw ${field} leaked into the cache key: ${key}`,
+      );
+    });
+  }
+
+  it("uses one digest width for every hashed segment", async () => {
+    // 32 hex characters, the width src/lib/rate-limit-key.ts settled on for
+    // the same job. One width means a reader does not have to work out which
+    // segment is which by counting characters.
+    const key = await getWith({
+      search: "welcome",
+      platformId: "aztec",
+      certificationId: "ic3",
+    });
+
+    const digests = key.split(":").filter((part) => /^[0-9a-f]+$/.test(part) && part.length > 8);
+    assert.equal(digests.length, 3, `expected three hashed segments, got key: ${key}`);
+    for (const digest of digests) {
+      assert.equal(digest.length, 32, `every hashed segment is 32 hex chars, got ${digest.length}`);
+    }
   });
 });

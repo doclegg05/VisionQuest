@@ -34,6 +34,30 @@ function timingSafeCompare(a: string, b: string): boolean {
 const KEY_ATTEMPT_LIMIT = 5;
 const KEY_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
+/**
+ * Route-global ceiling: attempts allowed across the whole endpoint per
+ * window, regardless of address or presented key (W3, 2026-09-06).
+ *
+ * The per-key limiter below bounds REUSE of one key. It does not bound
+ * GUESSING — a brute-forcer presents a different guess every request, so
+ * every request opens its own fresh bucket and the 5/15min ceiling is never
+ * reached. This one counter is the only thing in the route that a guesser
+ * cannot route around, because there is nothing about it left to vary.
+ *
+ * 20 per 15 minutes is ~1,900 guesses a day against a high-entropy shared
+ * secret, and it caps `RateLimitEntry` row growth from this endpoint at the
+ * same rate (each attempt writes an IP row and a key-digest row).
+ *
+ * COST, stated plainly: this is one shared bucket, so 20 attempts from
+ * anyone — including an attacker — close staff registration for everyone
+ * until the window rolls. That is a self-healing 15-minute outage on a
+ * rarely-used endpoint, traded against unbounded guessing at the one place a
+ * correct ADMIN_KEY mints an admin account. If the outage ever bites in
+ * practice, raise the ceiling; do not remove the counter.
+ */
+const GLOBAL_ATTEMPT_KEY = "register-staff:global";
+const GLOBAL_ATTEMPT_LIMIT = 20;
+
 /** One refusal message for both limiters, so neither can be told from the other. */
 const TOO_MANY_ATTEMPTS = "Too many attempts. Please try again later.";
 
@@ -48,6 +72,18 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return tooManyAttempts();
   }
 
+  // THIRD limiter by construction, second by execution order: the route-wide
+  // ceiling (W3). It runs before the body is parsed because it needs nothing
+  // from it, and its refusal is byte-identical to the other two.
+  const globalRl = await rateLimit(
+    GLOBAL_ATTEMPT_KEY,
+    GLOBAL_ATTEMPT_LIMIT,
+    KEY_ATTEMPT_WINDOW_MS,
+  );
+  if (!globalRl.success) {
+    return tooManyAttempts();
+  }
+
   const body = await parseBody(req, registerStaffSchema);
   const registrationKey = normalizeKey(body.registrationKey);
   const role = body.role;
@@ -55,15 +91,23 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const email = normalizeEmail(body.email);
   const password = body.password.trim();
 
-  // SECOND limiter, keyed on the presented registration key rather than the
-  // caller's address (2026-09-06 security fix).
+  // Limiter keyed on the presented registration key rather than the caller's
+  // address (2026-09-06 security fix).
   //
-  // The per-IP limiter above is the only one this route had, and
+  // The per-IP limiter above was the only one this route had, and
   // `X-Forwarded-For` is chosen by the caller: a fresh value per request meant
   // a fresh bucket per request and no effective limit at all — against the one
-  // endpoint where a correct ADMIN_KEY mints an admin account. Keying on the
-  // key itself bounds the attempt rate no matter how the caller spoofs its
-  // address.
+  // endpoint where a correct ADMIN_KEY mints an admin account.
+  //
+  // WHAT THIS ONE BOUNDS, precisely (corrected in W3, 2026-09-06): REUSE of a
+  // single key, which is the shared-secret-leaked case. It does NOT bound
+  // GUESSING — a brute-forcer presenting a different guess each request opens
+  // a fresh bucket every time and never reaches this ceiling. An earlier
+  // version of this comment claimed it bounded the rate "no matter how the
+  // caller spoofs its address", which was false for exactly that attack.
+  // `GLOBAL_ATTEMPT_KEY` above is what bounds guessing; this limiter is kept
+  // because the two cover different attacks and the global one alone would let
+  // 20 reuses of a known key through per window.
   //
   // It runs BEFORE the key is validated, and its refusal is byte-identical to
   // the IP limiter's, on purpose: a limiter that bit only on wrong keys, or

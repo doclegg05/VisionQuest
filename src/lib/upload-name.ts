@@ -18,8 +18,25 @@ import path from "path";
  * still in the database.
  */
 
-/** C0 and C1 control characters, NUL included. */
-const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
+/**
+ * Characters that carry no visible glyph. `\p{Cc}` is exactly the C0 and C1
+ * controls this used to enumerate (NUL included); `\p{Cf}` adds the format
+ * characters.
+ *
+ * `\p{Cf}` is the 2026-09-06 addition, and it is not cosmetic. It covers the
+ * bidi overrides and isolates (U+202A-U+202E, U+2066-U+2069): a file named
+ * `resume<U+202E>fdp.exe` renders in a teacher's file list as
+ * `resumeexe.pdf`, and the staff member deciding whether to open it reads
+ * the rendering, not the bytes. It also covers the zero-width characters
+ * (U+200B-U+200F), which otherwise let two names that look identical in
+ * every list this app renders stay distinct.
+ *
+ * `safeEntryName` in student-archive.ts already dropped all of these — its
+ * allowlist keeps only `\p{L}`/`\p{N}` and a little punctuation — so this
+ * brings the upload-time pass into agreement with the archive boundary
+ * rather than inventing a new rule.
+ */
+const INVISIBLE_CHARS = /[\p{Cc}\p{Cf}]/gu;
 
 /** Anything that could still read as a separator or a drive spec. */
 const SEPARATOR_CHARS = /[/\\:]/g;
@@ -39,7 +56,7 @@ export function safeUploadName(
 
   // Backslashes first: a Windows-style "..\..\x" must lose its components too,
   // and posix `basename` would otherwise hand back the whole string.
-  const normalized = rawName.replace(/\\/g, "/").replace(CONTROL_CHARS, "");
+  const normalized = rawName.replace(/\\/g, "/").replace(INVISIBLE_CHARS, "");
 
   let name = path.posix.basename(normalized);
 

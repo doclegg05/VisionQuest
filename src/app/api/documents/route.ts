@@ -19,6 +19,22 @@ const VALID_CATEGORIES = new Set([
 ]);
 
 /**
+ * Hex characters kept from a cache-key segment's digest. 32 = 128 bits, the
+ * same width `src/lib/rate-limit-key.ts` uses to bound a caller-sized row key.
+ */
+const CACHE_KEY_DIGEST_CHARS = 32;
+
+/**
+ * One caller-supplied cache-key segment, as a fixed-width digest. An absent
+ * or empty value stays empty, so "no filter" keeps its own distinct key
+ * rather than sharing one with a filter that happens to hash to zeroes.
+ */
+function keySegment(value: string | null | undefined): string {
+  if (!value) return "";
+  return crypto.createHash("sha256").update(value, "utf8").digest("hex").slice(0, CACHE_KEY_DIGEST_CHARS);
+}
+
+/**
  * GET /api/documents?category=ORIENTATION&platformId=aztec&search=welcome
  *
  * Lists active ProgramDocuments filtered by category, platformId,
@@ -61,16 +77,36 @@ export const GET = withAuth(async (session, req: Request) => {
     }),
   };
 
-  // Normalize search for cache key to prevent cache fragmentation, then hash
-  // it. The raw term is caller-supplied free text, and embedding it made the
-  // key grow with the input — a way to mint cache entries against the shared
-  // 10,000-key ceiling, which refuses writes rather than evicting. The digest
-  // keeps distinct searches distinct while pinning the key to a fixed length.
+  // Every caller-sized segment of the cache key is a fixed-width digest.
+  //
+  // The raw values are caller-supplied and unvalidated: `search` is free
+  // text, and `platformId`/`certificationId` come straight off the query
+  // string with no allowlist behind them (unlike `category`, which is checked
+  // against VALID_CATEGORIES above, and `limit`/`offset`, which are clamped to
+  // numbers). Embedding any of them made the key grow with the input, which
+  // is a cache-filling primitive: the shared cache is capped at 10,000 keys
+  // and node-cache REFUSES to store rather than evicting, so filling it stops
+  // every other `cached()` caller — getSession() included — from storing
+  // anything.
+  //
+  // W4 (2026-09-06): `search` was already hashed; the other two were not.
+  // One helper now covers all three, at the 32-hex width
+  // src/lib/rate-limit-key.ts settled on for the same job — 128 bits, so a
+  // collision needs ~2^64 distinct values, and one width means a reader does
+  // not have to count characters to tell which segment is which. Widening
+  // `search` from 16 to 32 changes its key once, costing one 120-second
+  // cache miss per distinct search on deploy.
   const normalizedSearch = search?.toLowerCase() || "";
-  const searchKeyPart = normalizedSearch
-    ? crypto.createHash("sha256").update(normalizedSearch).digest("hex").slice(0, 16)
-    : "";
-  const cacheKey = `docs:${isStaff ? "staff" : "student"}:${category || ""}:${platformId || ""}:${certificationId || ""}:${searchKeyPart}:${limit}:${offset}`;
+  const cacheKey = [
+    "docs",
+    isStaff ? "staff" : "student",
+    category || "",
+    keySegment(platformId),
+    keySegment(certificationId),
+    keySegment(normalizedSearch),
+    limit,
+    offset,
+  ].join(":");
 
   const payload = await cached(cacheKey, 120, async () => {
     const [documents, total] = await Promise.all([

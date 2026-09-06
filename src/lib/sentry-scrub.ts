@@ -24,6 +24,9 @@ import type { Breadcrumb, Event, EventHint } from "@sentry/nextjs";
 type RequestData = NonNullable<Event["request"]>;
 type QueryParams = NonNullable<RequestData["query_string"]>;
 type SentryUser = NonNullable<Event["user"]>;
+type EventSpan = NonNullable<Event["spans"]>[number];
+type EventException = NonNullable<Event["exception"]>;
+type EventTags = NonNullable<Event["tags"]>;
 
 /** Parameter and body keys whose values are credentials or one-time secrets. */
 const SECRET_KEY_NAMES =
@@ -72,8 +75,14 @@ const EMAIL = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
  *
  * Extend-only: this is a second `.replace` in `redactText`, and no existing
  * rule is touched.
+ *
+ * W1 (2026-09-06): case-insensitive, and `/+` at every separator. A URL is
+ * not case-normalized on its way into an event, and a doubled slash survives
+ * every layer between the browser and Sentry — `/CONNECT/<token>` and
+ * `/connect//<token>` both reach the same route and both slipped the
+ * original pattern. Widening here only ever redacts more.
  */
-const CAPABILITY_PATH_SEGMENT = /(\/(?:api\/connect\/employer|connect)\/)[A-Za-z0-9_-]{20,}/g;
+const CAPABILITY_PATH_SEGMENT = /(\/+(?:api\/+connect\/+employer|connect)\/+)[A-Za-z0-9_-]{20,}/gi;
 
 const REDACTED = "[REDACTED]";
 /** On an auth route the body is a credential by definition; drop it whole. */
@@ -162,16 +171,78 @@ function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
 }
 
 /**
+ * A traced request carries its URL in the span tree, not in `request.url`:
+ * `description` is the route and `data["http.url"]` the absolute URL.
+ */
+function scrubSpan(span: EventSpan): EventSpan {
+  const { data, description } = span;
+  return {
+    ...span,
+    ...(description !== undefined && { description: redactText(description) }),
+    ...(data !== undefined && { data: scrubRecord(data, 0) as EventSpan["data"] }),
+  };
+}
+
+/** The URL usually lands in `exception.values[].value` as the error message. */
+function scrubException(exception: EventException): EventException {
+  const { values } = exception;
+  if (values === undefined) return exception;
+  return {
+    ...exception,
+    values: values.map((entry) => ({
+      ...entry,
+      ...(entry.value !== undefined && { value: redactText(entry.value) }),
+    })),
+  };
+}
+
+/** Tag values are primitives, so only the strings among them are text. */
+function scrubTags(tags: EventTags): EventTags {
+  return Object.fromEntries(
+    Object.entries(tags).map(([key, value]) => {
+      if (SECRET_KEY.test(key)) return [key, REDACTED];
+      return [key, typeof value === "string" ? redactText(value) : value];
+    }),
+  );
+}
+
+/**
  * Generic over the event kind so one function serves `beforeSend`
  * (ErrorEvent) and `beforeSendTransaction` (TransactionEvent); the SDK
  * package does not re-export the transaction type, so overloads are not an
  * option here.
+ *
+ * W1 (2026-09-06): the patch used to cover `user`, `request` and
+ * `breadcrumbs` only, which is most of an ERROR event and almost none of a
+ * TRANSACTION — and this same function is `beforeSendTransaction` in all
+ * three configs. A transaction names its route in `transaction`, repeats it
+ * in every `spans[].description` and `spans[].data["http.url"]`, and again in
+ * `contexts.trace.data["http.url"]`; an error repeats it in `message`,
+ * `exception.values[].value`, `extra`, and `tags`. A capability token in the
+ * path therefore reached Sentry through six fields the scrub never touched.
+ * Every field below goes through the same `redactText`/`scrubData` the
+ * request already used, which are idempotent, so this only ever removes more.
+ *
+ * `scrubData` on `contexts` also blanks a context literally named `state`,
+ * `code`, or `key` (SECRET_KEY). That is the safe direction and it costs
+ * nothing an operator needs: `contexts.trace` and `contexts.runtime`, the two
+ * that carry the debugging value, are untouched.
  */
 export function scrubPii<E extends Event>(event: E, _hint?: EventHint): E {
-  const patch: Pick<Event, "user" | "request" | "breadcrumbs"> = {
+  const patch: Pick<
+    Event,
+    "user" | "request" | "breadcrumbs" | "transaction" | "message" | "extra" | "tags" | "contexts" | "spans" | "exception"
+  > = {
     ...(event.user !== undefined && { user: scrubUser(event.user) }),
     ...(event.request !== undefined && { request: scrubRequest(event.request) }),
     ...(event.breadcrumbs !== undefined && { breadcrumbs: event.breadcrumbs.map(scrubBreadcrumb) }),
+    ...(event.transaction !== undefined && { transaction: redactText(event.transaction) }),
+    ...(event.message !== undefined && { message: redactText(event.message) }),
+    ...(event.extra !== undefined && { extra: scrubRecord(event.extra, 0) as Event["extra"] }),
+    ...(event.tags !== undefined && { tags: scrubTags(event.tags) }),
+    ...(event.contexts !== undefined && { contexts: scrubData(event.contexts) as Event["contexts"] }),
+    ...(event.spans !== undefined && { spans: event.spans.map(scrubSpan) }),
+    ...(event.exception !== undefined && { exception: scrubException(event.exception) }),
   };
   return { ...event, ...patch };
 }

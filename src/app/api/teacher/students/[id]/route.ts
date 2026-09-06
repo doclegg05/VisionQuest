@@ -327,9 +327,22 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
       where: { certType: "ready-to-work" },
       orderBy: { sortOrder: "asc" },
     }),
+    // Scoped by owner as well as by id, matching the sibling route
+    // (teacher/students/[id]/forms/route.ts:32). A `FormSubmission` row
+    // written before the ownership check existed can carry a `fileId`
+    // belonging to another student, and this page renders that file's name
+    // and a download link. Reading nothing is the right failure here: the
+    // entry is already nullable and the UI handles a missing one.
+    //
+    // The scope value is `studentId` (= managedStudent.id), NOT the raw path
+    // segment: `assertStaffCanManageStudent` accepts either the cuid or the
+    // human login id (buildStudentIdentifierWhere), so filtering on the path
+    // segment would silently return zero files whenever a teacher arrived by
+    // the login id. `studentId` is the same value this route's own
+    // `student.findUnique` is keyed by, so the two can never disagree.
     formFileIds.length > 0
       ? prisma.fileUpload.findMany({
-          where: { id: { in: formFileIds } },
+          where: { id: { in: formFileIds }, studentId },
           select: {
             id: true,
             filename: true,

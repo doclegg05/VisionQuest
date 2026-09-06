@@ -293,4 +293,44 @@ describe("safeEntryName", () => {
     const result = safeEntryName(`${"a".repeat(500)}.pdf`);
     assert.ok(result.length <= 120, `expected <= 120 chars, got ${result.length}`);
   });
+
+  // Review suggestion (2026-09-06). Everything above keeps the entry from
+  // escaping the extraction directory. This keeps the archive EXTRACTABLE:
+  // Windows reserves a handful of device names, with or without an
+  // extension, and refuses to create a file with one. A student who names an
+  // upload `CON.pdf` — deliberately or otherwise — produces a retention
+  // archive that fails partway through extraction on a staff member's
+  // Windows machine, which is where these bundles are actually opened.
+  describe("Windows reserved device names", () => {
+    const reserved = [
+      "CON",
+      "con",
+      "PRN",
+      "AUX",
+      "NUL",
+      "nul",
+      "COM1",
+      "com1.txt",
+      "COM9.pdf",
+      "LPT1",
+      "lpt9.doc",
+      "CON.pdf",
+      "AUX.tar.gz",
+    ];
+
+    for (const raw of reserved) {
+      it(`prefixes "${raw}" so it can be created on Windows`, () => {
+        const result = safeEntryName(raw);
+        assert.equal(result, `_${raw}`, `"${raw}" must not stay a reserved device name`);
+      });
+    }
+
+    it("leaves names that merely start with a reserved word alone", () => {
+      // The reservation is on the exact stem, not on a prefix — mangling
+      // these would rename ordinary student files for no reason.
+      for (const raw of ["console.log.txt", "contract.pdf", "communication.pdf", "COM10.txt", "LPT0.txt", "NULL.txt"]) {
+        assert.equal(safeEntryName(raw), raw, `"${raw}" is not reserved and must be untouched`);
+      }
+    });
+  });
 });

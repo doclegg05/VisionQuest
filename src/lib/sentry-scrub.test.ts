@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import type { ErrorEvent, EventHint } from "@sentry/nextjs";
+import type { ErrorEvent, Event, EventHint } from "@sentry/nextjs";
 import { scrubPii } from "./sentry-scrub";
 
 // Review F14 / SEC-06 (2026-09-01). The password-reset token travels in a
@@ -283,6 +283,127 @@ describe("scrubPii: employer capability tokens in the path", () => {
     const out = scrubPii(resetPageEvent(), HINT);
     assert.doesNotMatch(serialized(out), new RegExp(TOKEN));
     assert.match(out.request?.url ?? "", /token=\[REDACTED\]/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review W1 (2026-09-06). `scrubPii` patched only `user`, `request`, and
+// `breadcrumbs`, but the same function is `beforeSendTransaction` as well
+// (sentry.client.config.ts:12). A transaction carries the URL in
+// `transaction`, `spans[].description`, `spans[].data["http.url"]`, and
+// `contexts.trace.data["http.url"]`; an error event carries it in `message`,
+// `exception.values[].value`, `extra`, and `tags`. Verified before the fix: a
+// token placed in each of those fields came back out of `scrubPii` intact.
+// ---------------------------------------------------------------------------
+
+/** A second minted-shaped token so a leak here cannot be masked by the first. */
+const TRANSACTION_TOKEN = "aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2yZ3aB4c";
+
+function transactionEvent(): Event {
+  return {
+    type: "transaction",
+    transaction: `GET /connect/${TRANSACTION_TOKEN}`,
+    message: `rendering /connect/${TRANSACTION_TOKEN}`,
+    exception: {
+      values: [
+        {
+          type: "Error",
+          value: `fetch failed for https://vq.example/api/connect/employer/${TRANSACTION_TOKEN}/hired`,
+        },
+      ],
+    },
+    extra: { lastUrl: `https://vq.example/connect/${TRANSACTION_TOKEN}` },
+    tags: { route: `/connect/${TRANSACTION_TOKEN}`, sampled: true },
+    contexts: {
+      trace: {
+        trace_id: "1".repeat(32),
+        span_id: "2".repeat(16),
+        data: { "http.url": `https://vq.example/connect/${TRANSACTION_TOKEN}` },
+      },
+    },
+    spans: [
+      {
+        span_id: "3".repeat(16),
+        trace_id: "1".repeat(32),
+        start_timestamp: 0,
+        description: `GET /connect/${TRANSACTION_TOKEN}`,
+        data: { "http.url": `https://vq.example/api/connect/employer/${TRANSACTION_TOKEN}/interested` },
+      },
+    ],
+  };
+}
+
+describe("scrubPii: every event field a capability URL reaches", () => {
+  it("leaves no copy of the token anywhere in a serialized transaction event", () => {
+    const out = scrubPii(transactionEvent(), HINT);
+
+    assert.doesNotMatch(
+      serialized(out),
+      new RegExp(TRANSACTION_TOKEN),
+      "beforeSendTransaction sends the whole event; every field that can carry the URL must be scrubbed",
+    );
+  });
+
+  it("redacts the token in transaction, message, extra, and tags", () => {
+    const out = scrubPii(transactionEvent(), HINT);
+
+    assert.equal(out.transaction, "GET /connect/[REDACTED]");
+    assert.equal(out.message, "rendering /connect/[REDACTED]");
+    assert.equal((out.extra as { lastUrl: string }).lastUrl, "https://vq.example/connect/[REDACTED]");
+    assert.equal(out.tags?.route, "/connect/[REDACTED]");
+    // A non-string tag survives unchanged.
+    assert.equal(out.tags?.sampled, true);
+  });
+
+  it("redacts the token in contexts.trace.data and in exception values", () => {
+    const out = scrubPii(transactionEvent(), HINT);
+
+    assert.equal(
+      (out.contexts?.trace?.data as { "http.url": string })["http.url"],
+      "https://vq.example/connect/[REDACTED]",
+    );
+    assert.equal(
+      out.exception?.values?.[0]?.value,
+      "fetch failed for https://vq.example/api/connect/employer/[REDACTED]/hired",
+    );
+    // The trace ids the event is threaded by are untouched.
+    assert.equal(out.contexts?.trace?.trace_id, "1".repeat(32));
+  });
+
+  it("redacts the token in span descriptions and span data", () => {
+    const out = scrubPii(transactionEvent(), HINT);
+    const span = out.spans?.[0];
+
+    assert.equal(span?.description, "GET /connect/[REDACTED]");
+    assert.equal(
+      (span?.data as { "http.url": string })["http.url"],
+      "https://vq.example/api/connect/employer/[REDACTED]/interested",
+    );
+    assert.equal(span?.span_id, "3".repeat(16));
+  });
+
+  it("catches the token behind an uppercased path and a doubled slash", () => {
+    // A URL is not case-normalized on its way into an event, and a doubled
+    // slash survives every layer between the browser and Sentry.
+    const event: Event = {
+      type: undefined,
+      transaction: `GET /CONNECT/${TRANSACTION_TOKEN}`,
+      message: `GET /connect//${TRANSACTION_TOKEN}`,
+      request: { url: `https://vq.example/Api/Connect/Employer/${TRANSACTION_TOKEN}/hired` },
+    };
+
+    const out = scrubPii(event, HINT);
+    assert.doesNotMatch(serialized(out), new RegExp(TRANSACTION_TOKEN));
+    assert.equal(out.transaction, "GET /CONNECT/[REDACTED]");
+    assert.equal(out.message, "GET /connect//[REDACTED]");
+  });
+
+  it("leaves an operator-useful transaction name alone", () => {
+    // The whole point of the transaction field is knowing which route broke.
+    const event: Event = { type: "transaction", transaction: "GET /teacher/connect" };
+
+    const out = scrubPii(event, HINT);
+    assert.equal(out.transaction, "GET /teacher/connect");
   });
 });
 
