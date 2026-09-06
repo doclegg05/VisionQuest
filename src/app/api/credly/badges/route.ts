@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/api-error";
+import { withAuth, rateLimited } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
+import { rateLimit } from "@/lib/rate-limit";
 
 interface CredlyBadgeTemplate {
   name?: string;
@@ -37,6 +38,15 @@ interface CredlyBadgesResponse {
 const DB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const GET = withAuth(async (session) => {
+  // 30 requests per minute per account. The cache key below is
+  // `credly:<username>`, and the username is whatever the student last saved
+  // through PUT /api/settings/credly — so without a limit one account can mint
+  // unbounded 10-minute cache entries against a shared 10,000-key ceiling that
+  // refuses writes rather than evicting. Generous for a page that fetches
+  // badges on load; cheap for anyone driving it in a loop.
+  const rl = await rateLimit(`credly:${session.id}`, 30, 60 * 1000);
+  if (!rl.success) throw rateLimited();
+
   const student = await prisma.student.findUnique({
     where: { id: session.id },
     select: { credlyUsername: true, credlyBadgesCache: true, credlyBadgesCachedAt: true },
