@@ -4,6 +4,7 @@ import { generateStorageKey, uploadFile, deleteFile, validateFile } from "@/lib/
 import { logger } from "@/lib/logger";
 import { ApiError, withAuth, badRequest, notFound } from "@/lib/api-error";
 import { parseBody, deleteFileSchema } from "@/lib/schemas";
+import { safeUploadName } from "@/lib/upload-name";
 
 // GET — list student's files
 export const GET = withAuth(async (session) => {
@@ -27,7 +28,11 @@ export const POST = withAuth(async (session, req: Request) => {
   if (validationError) throw badRequest(validationError);
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const storageKey = generateStorageKey(session.id, file.name);
+  // `File.name` is student-controlled and undici preserves it verbatim, so the
+  // stored name must be a name and not a path — the retention archive turns
+  // this column into a ZIP entry path.
+  const filename = safeUploadName(file.name);
+  const storageKey = generateStorageKey(session.id, filename);
 
   try {
     await uploadFile(storageKey, buffer, file.type);
@@ -39,7 +44,7 @@ export const POST = withAuth(async (session, req: Request) => {
   const record = await prisma.fileUpload.create({
     data: {
       studentId: session.id,
-      filename: file.name,
+      filename,
       mimeType: file.type,
       sizeBytes: file.size,
       storageKey,
