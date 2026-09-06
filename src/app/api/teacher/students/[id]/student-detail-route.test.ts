@@ -196,4 +196,50 @@ describe("GET /api/teacher/students/[id]", () => {
     assert.equal(evidence.evidenceStatus, "approved");
     assert.equal(evidence.summary, "IC3 Digital Literacy is complete.");
   });
+
+  // Review W2 (2026-09-06). The sibling route
+  // (teacher/students/[id]/forms/route.ts:32) scopes this same lookup by
+  // `studentId`; this one did not. A `FormSubmission` row written before the
+  // ownership check existed can carry a `fileId` belonging to another
+  // student, and the student-detail page renders that file's name and a
+  // download link. Reading nothing is the right failure: the file entry is
+  // already nullable and the UI handles a missing one.
+  //
+  // The path segment here is the HUMAN login id, which
+  // `assertStaffCanManageStudent` also accepts (buildStudentIdentifierWhere),
+  // while the resolved row's id is the cuid. Scoping on the path segment
+  // would look correct and return zero files for every teacher who arrived by
+  // the login id, so the assertion pins the resolved id.
+  it("scopes the form-file lookup to the resolved student, not the path segment", async () => {
+    mockStudentFindUnique.mock.mockImplementation(async () => ({
+      ...makeStudent(),
+      formSubmissions: [
+        {
+          id: "sub-1",
+          formId: "spokes-intake",
+          fileId: "file-belonging-to-another-student",
+          signatureFileId: "sig-belonging-to-another-student",
+          submittedAt: new Date("2026-06-03T12:00:00.000Z"),
+          status: "submitted",
+        },
+      ],
+    }));
+
+    const req = mockRequest("/api/teacher/students/VQ-0001", { method: "GET" });
+    const ctx = { params: Promise.resolve({ id: "VQ-0001" }) };
+
+    const res = await route.GET(req as never, ctx as never);
+    assert.equal(res.status, 200);
+
+    const where = mockFileUploadFindMany.mock.calls[0]?.arguments[0]?.where;
+    assert.ok(where, "the route must have looked the form files up");
+    assert.deepEqual(where.id, {
+      in: ["file-belonging-to-another-student", "sig-belonging-to-another-student"],
+    });
+    assert.equal(
+      where.studentId,
+      "student-1",
+      "a form file is only ever shown on the detail page of the student who owns it",
+    );
+  });
 });

@@ -15,6 +15,12 @@
  * The in-process companions are rate-limit.test.ts (store contract) and
  * src/app/api/auth/login/__tests__/route.concurrency.test.ts (route contract).
  *
+ * It also pins the 2026-09-06 finding that the caller's key was the row's
+ * PRIMARY KEY: an oversized key overflowed Postgres' 2704-byte btree limit
+ * (SQLSTATE 54000, not retryable), so the limiter failed open and admitted
+ * the request, and short distinct keys inserted one permanent row apiece.
+ * Both are database behaviors, so both belong here rather than over a fake.
+ *
  * Prerequisites (auto-skipped when missing):
  *   - DATABASE_URL points at a migrated, NON-PRODUCTION Postgres.
  *   - RATE_LIMIT_DB_TEST_ENABLED=true. Opt-in because the test writes real
@@ -27,6 +33,9 @@
 
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
+// Pure derivation, no database import — safe to load even when the suite skips.
+import { rateLimitStorageKey } from "./rate-limit-key";
 
 const SHOULD_RUN =
   process.env.RATE_LIMIT_DB_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
@@ -51,10 +60,11 @@ if (!SHOULD_RUN) {
 } else {
   describe("rate limiter under concurrency (integration)", () => {
     let rateLimit: typeof import("./rate-limit").rateLimit;
+    let purgeExpiredRateLimitEntries: typeof import("./rate-limit").purgeExpiredRateLimitEntries;
     let prismaAdmin: typeof import("./db").prismaAdmin;
 
     before(async () => {
-      ({ rateLimit } = await import("./rate-limit"));
+      ({ rateLimit, purgeExpiredRateLimitEntries } = await import("./rate-limit"));
       ({ prismaAdmin } = await import("./db"));
     });
 
@@ -94,7 +104,9 @@ if (!SHOULD_RUN) {
         Array.from({ length: BURST }, () => rateLimit(key, BURST + 5, 15 * 60 * 1000)),
       );
 
-      const row = await prismaAdmin.rateLimitEntry.findUnique({ where: { key } });
+      const row = await prismaAdmin.rateLimitEntry.findUnique({
+        where: { key: rateLimitStorageKey(key) },
+      });
       assert.equal(
         row?.count,
         BURST,
@@ -133,6 +145,134 @@ if (!SHOULD_RUN) {
       assert.equal(second.success, false, "a second call inside the window is limited");
     });
 
+    // ── Row-key bounding (2026-09-06 security fix) ──────────────────────
+    //
+    // Every per-IP limiter builds its key from `X-Forwarded-For`, which the
+    // client chooses. Before the fix the caller's key WAS the row's primary
+    // key, so a caller controlled the size of a btree index entry.
+
+    it("limits an oversized key instead of failing open", async () => {
+      // Mirrors `login:<X-Forwarded-For>` with a 3000-character header.
+      // Postgres rejects a btree index row over 2704 bytes with SQLSTATE
+      // 54000; that code is not retryable, so `rateLimit` took its fail-open
+      // path and returned `{ success: true, degraded: true }` — i.e. an
+      // attacker switched every per-IP limiter off by sending a long header.
+      //
+      // The filler is random rather than repeated: btree index tuples are
+      // TOAST-COMPRESSED, so `"a".repeat(3000)` shrinks under the limit and
+      // inserts fine. A spoofed header does not have to be compressible, and
+      // this test is worthless if it only tries the one shape that is.
+      const key = `${uniqueKey("oversized")}:${randomBytes(2250).toString("base64")}`;
+
+      const first = await rateLimit(key, 10, 60_000);
+      const second = await rateLimit(key, 10, 60_000);
+
+      assert.equal(
+        first.degraded,
+        false,
+        "an oversized caller key must be a normal limited request, not a fail-open admission",
+      );
+      assert.equal(second.degraded, false);
+      assert.ok(
+        second.remaining < first.remaining,
+        `the counter must advance across calls on one oversized key (${first.remaining} -> ${second.remaining})`,
+      );
+    });
+
+    it("bounds the stored row key however long the caller key is", async () => {
+      // 50 distinct caller keys, the shape a spoofer sends one per request.
+      // The invariant is about the ROW, not the caller: whatever arrives, the
+      // stored primary key stays short enough that no index entry overflows.
+      const keys = Array.from(
+        { length: 50 },
+        (_, i) => `${uniqueKey("bounded")}:203.0.113.${i}:${randomBytes(150).toString("base64")}`,
+      );
+      for (const key of keys) {
+        await rateLimit(key, 10, 60_000);
+      }
+
+      const rows = await prismaAdmin.$queryRaw<Array<{ len: number }>>`
+        SELECT MAX(LENGTH("key"))::int AS len
+        FROM "visionquest"."RateLimitEntry"
+        WHERE "key" LIKE ${`${KEY_PREFIX}%`}
+      `;
+      const longest = rows[0]?.len ?? 0;
+      assert.ok(
+        longest > 0,
+        "the fixture rows must exist under the family prefix the cleanup deletes",
+      );
+      assert.ok(
+        longest <= 80,
+        `stored keys must stay bounded regardless of caller input; longest was ${longest}`,
+      );
+    });
+
+    it("purges rows whose window has already expired", async () => {
+      // RateLimitEntry has no TTL and no purge job anywhere in the repo, so
+      // before this every distinct key ever seen left a permanent row.
+      const expired = uniqueKey("purge-expired");
+      const live = uniqueKey("purge-live");
+
+      await rateLimit(expired, 10, 1);
+      await rateLimit(live, 10, 60 * 60 * 1000);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const removed = await purgeExpiredRateLimitEntries();
+      assert.ok(removed >= 1, "the expired row must be removed");
+
+      const remaining = await prismaAdmin.rateLimitEntry.findMany({
+        where: { key: { startsWith: KEY_PREFIX } },
+        select: { key: true, resetTime: true },
+      });
+      assert.equal(
+        remaining.filter((row) => row.resetTime.getTime() < Date.now()).length,
+        0,
+        "no expired row may survive a purge",
+      );
+      assert.ok(
+        remaining.length >= 1,
+        "a row whose window is still open must survive the purge",
+      );
+    });
+
+    // Review suggestion (2026-09-06): the purge is a LIMITed batch loop, not
+    // one unbounded deleteMany. The batching lives in raw SQL, so only a real
+    // Postgres proves the statement parses and binds — the in-process
+    // companion runs against a fake that reproduces the shape, and a fake
+    // cannot notice a signature the code got wrong (the 2026-09-05
+    // advisory-lock lesson).
+    it("clears a backlog larger than one batch, in batches", async () => {
+      const { PURGE_BATCH_SIZE } = await import("./rate-limit");
+      const rows = PURGE_BATCH_SIZE + 25;
+      const expiredAt = new Date(Date.now() - 60 * 60 * 1000);
+      const prefix = `${KEY_PREFIX}batch:${process.pid}:`;
+
+      await prismaAdmin.rateLimitEntry.createMany({
+        data: Array.from({ length: rows }, (_, i) => ({
+          key: `${prefix}${i}`,
+          count: 1,
+          resetTime: expiredAt,
+        })),
+      });
+      const liveKey = uniqueKey("batch-live");
+      await rateLimit(liveKey, 10, 60 * 60 * 1000);
+
+      const removed = await purgeExpiredRateLimitEntries();
+
+      assert.ok(
+        removed >= rows,
+        `every expired row must go in one pass at this size; removed ${removed} of ${rows}`,
+      );
+      const leftover = await prismaAdmin.rateLimitEntry.count({
+        where: { key: { startsWith: prefix } },
+      });
+      assert.equal(leftover, 0, "no expired fixture row may survive");
+      const live = await prismaAdmin.rateLimitEntry.count({
+        where: { key: rateLimitStorageKey(liveKey) },
+      });
+      assert.equal(live, 1, "a row whose window is still open survives a multi-batch purge");
+    });
+
     it("resets the counter once the window has expired", async () => {
       const key = uniqueKey("window-reset");
       // Short window, then wait past it. Sized well above the round-trip so
@@ -144,7 +284,9 @@ if (!SHOULD_RUN) {
 
       const afterReset = await rateLimit(key, 1, windowMs);
       assert.equal(afterReset.success, true, "a new window admits callers again");
-      const row = await prismaAdmin.rateLimitEntry.findUnique({ where: { key } });
+      const row = await prismaAdmin.rateLimitEntry.findUnique({
+        where: { key: rateLimitStorageKey(key) },
+      });
       assert.equal(row?.count, 1, "an expired window restarts the count at 1");
     });
   });

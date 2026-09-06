@@ -234,3 +234,64 @@ test("invalidateAllChatContext clears chat layers for every student but not laye
   assert.equal(rateLimitRecomputed, false, "layerless chat:<id> key must survive");
   invalidate(rateLimitKey);
 });
+
+// ---------------------------------------------------------------------------
+// Cache overflow — a full cache must degrade to a miss, never to an error.
+//
+// node-cache is configured with `maxKeys: 10_000` and THROWS `ECACHEFULL`
+// from set() once it is full instead of evicting. `cached()` used to call
+// set() unguarded, so the throw propagated to whoever was awaiting it —
+// including `getSession()` in src/lib/auth.ts, which caches every session
+// lookup for 10s. Attacker-growable key sources exist (`credly:<username>`,
+// with the username set by the caller, and the documents-list key), so the
+// cache could be filled deliberately and every authenticated request would
+// then 500.
+//
+// This block runs LAST in the file on purpose: it fills the module's
+// singleton adapter and never empties it.
+// ---------------------------------------------------------------------------
+
+const MAX_KEYS = 10_000;
+
+async function fillCacheToCapacity(): Promise<void> {
+  for (let i = 0; i < MAX_KEYS; i++) {
+    await cached(`cache-test:fill:${i}`, 600, async () => i);
+  }
+}
+
+test("cached() returns the fetched value when the cache is full instead of throwing", async () => {
+  await fillCacheToCapacity();
+
+  const value = await cached("cache-test:overflow:a", 10, async () => "fresh-value");
+
+  assert.equal(
+    value,
+    "fresh-value",
+    "a full cache must degrade to a miss and still return the fetched value",
+  );
+});
+
+test("cached() treats a full cache as a permanent miss, re-invoking the fetcher", async () => {
+  await fillCacheToCapacity();
+
+  let callCount = 0;
+  const fetcher = async () => {
+    callCount++;
+    return `value-${callCount}`;
+  };
+
+  const first = await cached("cache-test:overflow:b", 10, fetcher);
+  const second = await cached("cache-test:overflow:b", 10, fetcher);
+
+  assert.equal(first, "value-1");
+  assert.equal(second, "value-2", "the un-stored key must be re-fetched, not error");
+  assert.equal(callCount, 2);
+});
+
+test("invalidate() and invalidatePrefix() stay quiet when the cache is full", async () => {
+  await fillCacheToCapacity();
+
+  assert.doesNotThrow(() => invalidate("cache-test:overflow:never-stored"));
+  assert.doesNotThrow(() => invalidatePrefix("cache-test:overflow:"));
+  assert.doesNotThrow(() => invalidateChatContext("cache-test-overflow-sid"));
+});

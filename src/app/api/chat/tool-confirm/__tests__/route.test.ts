@@ -188,6 +188,44 @@ describe("POST /api/chat/tool-confirm", () => {
     assert.equal(mockExecuteAgentTool.mock.callCount(), 1);
   });
 
+  it("counts prefix-mutated tokens as the SAME single-use claim", async () => {
+    // The claim keys on sha256 of the whole token string, so any prefix
+    // spelling that still verifies is a fresh claim — one approved card
+    // executing unlimited times. Observed before the fix: six 200s and six
+    // executions. Five of the six must now be refused as bad tokens.
+    const body = signedBody();
+    const token = body.token as string;
+    const separator = token.indexOf(".");
+    const prefix = token.slice(0, separator);
+    const rest = token.slice(separator);
+    const variants = [
+      token,
+      `${prefix}x${rest}`,
+      `${prefix}zz${rest}`,
+      ` ${prefix}${rest}`,
+      `+${prefix}${rest}`,
+      `0${prefix}${rest}`,
+    ];
+    assert.equal(new Set(variants).size, 6);
+
+    const statuses: number[] = [];
+    for (const variant of variants) {
+      const res = await route.POST(confirmRequest({ ...body, token: variant }));
+      statuses.push(res.status);
+    }
+
+    assert.deepEqual(
+      statuses,
+      [200, 400, 400, 400, 400, 400],
+      "only the canonical token may execute; every prefix variant is an invalid token",
+    );
+    assert.equal(
+      mockExecuteAgentTool.mock.callCount(),
+      1,
+      "one approval must authorize exactly one execution",
+    );
+  });
+
   it("never claims or executes on an invalid token", async () => {
     // Verification stays FIRST: unverified garbage must not write claim rows
     // (which would hand unauthenticated payload-tamperers a DB write) and

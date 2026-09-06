@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { hashPasswordResetToken } from "@/lib/password-reset";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -15,7 +16,7 @@ import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = clientIpBucket(req);
   const rl = await rateLimit(`reset-password:${ip}`, 10, 60 * 60 * 1000);
 
   if (!rl.success) {
