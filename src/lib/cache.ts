@@ -1,4 +1,5 @@
 import NodeCache from "node-cache";
+import { logger } from "./logger";
 
 // ---------------------------------------------------------------------------
 // Cache adapter interface
@@ -78,8 +79,53 @@ const adapter: CacheAdapter = new InMemoryCacheAdapter();
 // Public API — unchanged signatures, backed by adapter
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Cache failures degrade to misses, never to errors.
+//
+// node-cache is configured with `maxKeys: 10_000` and THROWS `ECACHEFULL` from
+// set() once full — it does not evict. `cached()` used to call set() unguarded,
+// so that throw propagated to whoever was awaiting it. getSession() caches
+// every session lookup here for 10s, so a full cache turned every
+// authenticated request into a 500, and the cache is fillable from outside:
+// `credly:<username>` takes a caller-set username with a 600s TTL, and the
+// documents-list key carries caller-supplied search text.
+//
+// A cache is an optimisation. Failing to store a value must cost a re-fetch,
+// never a request. Every adapter call a request path can reach is therefore
+// guarded, and failures are logged at warn level with the key OMITTED — cache
+// keys carry student ids (`session:<id>:<sv>`, `chat:profile:<sid>`), which
+// are PII in logs per .claude/rules/security.md.
+// ---------------------------------------------------------------------------
+
+/** Log at most one cache-failure line per minute, so a full cache cannot
+ *  itself become a log flood on top of the degradation it already causes. */
+const CACHE_WARN_INTERVAL_MS = 60_000;
+let lastCacheWarnAt = 0;
+let suppressedCacheWarnings = 0;
+
+function noteCacheFailure(operation: string, error: unknown): void {
+  const now = Date.now();
+  if (now - lastCacheWarnAt < CACHE_WARN_INTERVAL_MS) {
+    suppressedCacheWarnings++;
+    return;
+  }
+  const suppressed = suppressedCacheWarnings;
+  lastCacheWarnAt = now;
+  suppressedCacheWarnings = 0;
+  logger.warn("cache_operation_failed", {
+    operation,
+    // ECACHEFULL is the expected value here; anything else is worth seeing.
+    reason: error instanceof Error ? error.name : "unknown",
+    suppressedSinceLastLog: suppressed,
+  });
+}
+
 /**
  * Get a cached value, or compute + store it on miss.
+ *
+ * A store failure is swallowed: the freshly fetched value is still returned,
+ * and the key simply stays uncached (so the next call re-fetches). See the
+ * block comment above for why this must never throw.
  *
  * Usage:
  *   const goals = await cached(`goals:${userId}`, 30, () => prisma.goal.findMany(...));
@@ -89,19 +135,33 @@ export async function cached<T>(
   ttlSeconds: number,
   fetcher: () => Promise<T>,
 ): Promise<T> {
-  const hit = adapter.get<T>(key);
+  let hit: T | undefined;
+  try {
+    hit = adapter.get<T>(key);
+  } catch (error) {
+    noteCacheFailure("get", error);
+  }
   if (hit !== undefined) return hit;
 
   const value = await fetcher();
-  adapter.set(key, value, ttlSeconds);
+  try {
+    adapter.set(key, value, ttlSeconds);
+  } catch (error) {
+    noteCacheFailure("set", error);
+  }
   return value;
 }
 
 /**
- * Invalidate a single cache key.
+ * Invalidate a single cache key. Never throws — a failed invalidation is
+ * logged and the stale entry is left to expire on its TTL.
  */
 export function invalidate(key: string): void {
-  adapter.del(key);
+  try {
+    adapter.del(key);
+  } catch (error) {
+    noteCacheFailure("del", error);
+  }
 }
 
 /**
@@ -109,7 +169,11 @@ export function invalidate(key: string): void {
  * Useful for busting all of a user's cached data on writes.
  */
 export function invalidatePrefix(prefix: string): void {
-  adapter.delPrefix(prefix);
+  try {
+    adapter.delPrefix(prefix);
+  } catch (error) {
+    noteCacheFailure("delPrefix", error);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +212,7 @@ const CHAT_CONTEXT_LAYER_PREFIXES = [
  */
 export function invalidateChatContext(studentId: string): void {
   for (const prefix of CHAT_CONTEXT_LAYER_PREFIXES) {
-    adapter.delPrefix(`${prefix}${studentId}`);
+    invalidatePrefix(`${prefix}${studentId}`);
   }
 }
 
@@ -161,6 +225,6 @@ export function invalidateChatContext(studentId: string): void {
  */
 export function invalidateAllChatContext(): void {
   for (const prefix of CHAT_CONTEXT_LAYER_PREFIXES) {
-    adapter.delPrefix(prefix);
+    invalidatePrefix(prefix);
   }
 }

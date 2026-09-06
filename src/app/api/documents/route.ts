@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
@@ -60,9 +61,16 @@ export const GET = withAuth(async (session, req: Request) => {
     }),
   };
 
-  // Normalize search for cache key to prevent cache fragmentation
+  // Normalize search for cache key to prevent cache fragmentation, then hash
+  // it. The raw term is caller-supplied free text, and embedding it made the
+  // key grow with the input — a way to mint cache entries against the shared
+  // 10,000-key ceiling, which refuses writes rather than evicting. The digest
+  // keeps distinct searches distinct while pinning the key to a fixed length.
   const normalizedSearch = search?.toLowerCase() || "";
-  const cacheKey = `docs:${isStaff ? "staff" : "student"}:${category || ""}:${platformId || ""}:${certificationId || ""}:${normalizedSearch}:${limit}:${offset}`;
+  const searchKeyPart = normalizedSearch
+    ? crypto.createHash("sha256").update(normalizedSearch).digest("hex").slice(0, 16)
+    : "";
+  const cacheKey = `docs:${isStaff ? "staff" : "student"}:${category || ""}:${platformId || ""}:${certificationId || ""}:${searchKeyPart}:${limit}:${offset}`;
 
   const payload = await cached(cacheKey, 120, async () => {
     const [documents, total] = await Promise.all([
