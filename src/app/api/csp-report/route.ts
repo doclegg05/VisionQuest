@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { rateLimited, withErrorHandler } from "@/lib/api-error";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 
 /**
@@ -36,7 +37,7 @@ const reportFieldsSchema = z.object({
 
 /** First forwarded hop, the same key the auth routes limit on. */
 function clientIp(req: NextRequest): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  return clientIpBucket(req);
 }
 
 /** Read at most `maxBytes`; null when the body is larger. */

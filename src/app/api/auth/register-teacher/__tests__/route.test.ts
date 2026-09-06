@@ -516,4 +516,132 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       assert.equal(cookieSets.length, 0);
     });
   });
+
+  // ── Brute force on the registration key (2026-09-06 security fix) ───────
+  //
+  // This route had ONE limiter, keyed on `X-Forwarded-For`. That header is
+  // chosen by the caller, so a new value per request meant a new bucket per
+  // request and no limit at all — against an endpoint where a correct
+  // ADMIN_KEY creates an admin account. A second limiter keyed on the
+  // presented key bounds the attempt rate no matter how the caller spoofs
+  // its address.
+  describe("per-key limiter", () => {
+    /** Counting stand-in for the real store, so the route's own ordering and
+     *  key construction are what the assertions see. */
+    function countingRateLimit() {
+      const counts = new Map<string, number>();
+      return Object.assign(
+        async (key: string, limit: number, windowMs: number) => {
+          const next = (counts.get(key) ?? 0) + 1;
+          counts.set(key, next);
+          return {
+            success: next <= limit,
+            remaining: Math.max(limit - next, 0),
+            resetTime: Date.now() + windowMs,
+            degraded: false,
+          };
+        },
+        { counts },
+      );
+    }
+
+    function attemptFrom(ip: string, registrationKey: string) {
+      return mockRequest("/api/auth/register-teacher", {
+        method: "POST",
+        headers: { "x-forwarded-for": ip },
+        body: {
+          registrationKey,
+          role: "teacher",
+          displayName: "Mallory Attacker",
+          email: "mallory@example.com",
+          password: "attacker-chosen-password-1",
+        },
+      });
+    }
+
+    async function sixAttempts(registrationKey: string) {
+      const statuses: number[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        // A fresh forwarded address every time — the shape the IP limiter
+        // cannot see, and the whole reason this second limiter exists.
+        const res = await registerRoute.POST(attemptFrom(`203.0.113.${i}`, registrationKey) as never);
+        statuses.push(res.status);
+      }
+      return statuses;
+    }
+
+    it("refuses the sixth attempt on one key even when every request claims a new IP", async () => {
+      const counting = countingRateLimit();
+      mockRateLimit.mock.mockImplementation(counting);
+      mockFindFirst.mock.mockImplementation(async () => null);
+
+      const statuses = await sixAttempts("wrong-key-guess");
+
+      assert.deepEqual(
+        statuses,
+        [403, 403, 403, 403, 403, 429],
+        "five attempts on one registration key, then the sixth is refused",
+      );
+    });
+
+    it("keys the second limiter on a digest, never on the key itself", async () => {
+      const counting = countingRateLimit();
+      mockRateLimit.mock.mockImplementation(counting);
+      mockFindFirst.mock.mockImplementation(async () => null);
+
+      await registerRoute.POST(attemptFrom("203.0.113.9", "super-secret-key") as never);
+
+      const keys = mockRateLimit.mock.calls.map((call: any) => call.arguments[0] as string);
+      assert.equal(keys.length, 2, "the IP limiter runs first, then the per-key limiter");
+      assert.match(keys[0], /^register-staff:203\.0\.113\.9$/);
+      assert.match(keys[1], /^register-staff:key:[0-9a-f]{64}$/);
+      assert.doesNotMatch(
+        keys.join(" "),
+        /super-secret-key/,
+        "the registration secret must never become a database row key",
+      );
+    });
+
+    it("refuses a correct key at the same point, so the limiter is not a key oracle", async () => {
+      // A limiter that only bit on wrong keys — or answered differently for
+      // the right one — would tell an attacker when they had guessed it.
+      const counting = countingRateLimit();
+      mockRateLimit.mock.mockImplementation(counting);
+      mockFindFirst.mock.mockImplementation(async () => null);
+      mockCreate.mock.mockImplementation(async () => ({
+        id: "new-1",
+        studentId: "mallory",
+        displayName: "Mallory Attacker",
+        role: "teacher",
+        sessionVersion: 1,
+      }));
+
+      const statuses = await sixAttempts(TEACHER_KEY);
+
+      assert.equal(
+        statuses[5],
+        429,
+        "the sixth attempt is refused for a valid key exactly as for an invalid one",
+      );
+      assert.equal(mockCreate.mock.callCount(), 5, "the refused attempt creates no account");
+    });
+
+    it("does not consume the per-key bucket when the IP limiter already refused", async () => {
+      mockRateLimit.mock.mockImplementation(async (key: string) => ({
+        success: !key.startsWith("register-staff:203."),
+        remaining: 0,
+        resetTime: Date.now() + 60_000,
+        degraded: false,
+      }));
+
+      const res = await registerRoute.POST(attemptFrom("203.0.113.1", "wrong-key-guess") as never);
+
+      assert.equal(res.status, 429);
+      assert.equal(
+        mockRateLimit.mock.callCount(),
+        1,
+        "an IP-refused request must not spend a unit of the per-key allowance",
+      );
+    });
+  });
 });
