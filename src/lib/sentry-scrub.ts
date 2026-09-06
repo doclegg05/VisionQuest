@@ -13,6 +13,12 @@ import type { Breadcrumb, Event, EventHint } from "@sentry/nextjs";
  * `/reset-password?token=...` (forgot-password/route.ts), so request.url,
  * query_string, and navigation breadcrumbs are scrubbed of secret-bearing
  * parameters, and a request body never leaves an auth route.
+ *
+ * 2026-09-06: a secret is not always a query parameter. Connect's employer
+ * links carry the capability as a path SEGMENT (`/connect/<token>` and
+ * `/api/connect/employer/<token>/…`), which the `key=value` rule never saw —
+ * see CAPABILITY_PATH_SEGMENT below. Header values are text-scrubbed now too,
+ * because `referer` carried whatever the URL carried.
  */
 
 type RequestData = NonNullable<Event["request"]>;
@@ -32,6 +38,43 @@ const SECRET_PARAM = new RegExp(`(^|[?&#;\\s])(${SECRET_KEY_NAMES})=[^&#\\s]*`, 
 const SECRET_JSON_FIELD = new RegExp(`("(?:${SECRET_KEY_NAMES})"\\s*:\\s*")(?:[^"\\\\]|\\\\.)*"`, "gi");
 const EMAIL = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
+/**
+ * Capability tokens that are a PATH SEGMENT rather than a query parameter
+ * (2026-09-06).
+ *
+ * `SECRET_PARAM` above matches `key=value`, which is the shape the
+ * password-reset token travels in. PR #204 added employer response links
+ * where the token IS a path segment — `/connect/<token>` for the response
+ * page and `/api/connect/employer/<token>/{interested,not-now,hired}` for its
+ * actions — so nothing here matched them and the token arrived at Sentry
+ * intact in `request.url`, in the referer header, and in navigation and fetch
+ * breadcrumbs. That token is a 14-day bearer capability over one student's
+ * packet and résumé: a copy of it is a copy of the access.
+ *
+ * The 20-character floor is what keeps route names readable. Real tokens are
+ * 43 characters (32 random bytes, base64url); `/connect/report` and the three
+ * action suffixes are far shorter, and blanking those would cost the one
+ * thing the event is for — knowing which page broke — while protecting
+ * nothing. The character class is base64url plus `-` and `_`, which is every
+ * character a minted token can contain.
+ *
+ * IT ALSO CATCHES `/api/connect/<connectionId>/{approve,withdraw}`, whose id
+ * is a cuid long enough to clear the floor. That is deliberate rather than
+ * collateral: a `Connection.id` resolves to one student's employer
+ * disclosure, and .claude/rules/security.md counts a student identifier as
+ * PII in a log sink. Redacting it is the call the rest of the codebase
+ * already makes, and the route still names the failing endpoint.
+ *
+ * Deliberately NOT caught: `/api/teacher/connect/employers/<id>/contacts` and
+ * `/api/teacher/connect/connections/<id>`, where the segment directly after
+ * `/connect/` is a literal (`employers`, `connections`) and the id sits a
+ * level deeper. Those are staff-authenticated routes carrying no capability.
+ *
+ * Extend-only: this is a second `.replace` in `redactText`, and no existing
+ * rule is touched.
+ */
+const CAPABILITY_PATH_SEGMENT = /(\/(?:api\/connect\/employer|connect)\/)[A-Za-z0-9_-]{20,}/g;
+
 const REDACTED = "[REDACTED]";
 /** On an auth route the body is a credential by definition; drop it whole. */
 const AUTH_ROUTE = /\/api\/auth(?:[/?#]|$)/;
@@ -42,6 +85,7 @@ const MAX_DATA_DEPTH = 8;
 function redactText(text: string): string {
   return text
     .replace(SECRET_PARAM, `$1$2=${REDACTED}`)
+    .replace(CAPABILITY_PATH_SEGMENT, `$1${REDACTED}`)
     .replace(SECRET_JSON_FIELD, `$1${REDACTED}"`)
     .replace(EMAIL, "[EMAIL_REDACTED]");
 }
@@ -76,9 +120,18 @@ function scrubQuery(query: QueryParams): QueryParams {
   );
 }
 
+/**
+ * Headers were previously filtered but never text-scrubbed, so anything the
+ * URL rules would have stripped survived in `referer` — which on the employer
+ * response page is a byte-for-byte copy of the capability URL. Surviving
+ * headers now go through `redactText` as well, which is strictly more
+ * redaction: the drop list is unchanged and applies first.
+ */
 function scrubHeaders(headers: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(headers).filter(([name]) => !DROPPED_HEADERS.has(name.toLowerCase())),
+    Object.entries(headers)
+      .filter(([name]) => !DROPPED_HEADERS.has(name.toLowerCase()))
+      .map(([name, value]) => [name, typeof value === "string" ? redactText(value) : value]),
   );
 }
 
