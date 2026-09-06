@@ -149,6 +149,143 @@ describe("scrubPii: existing guarantees still hold", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Employer capability tokens in the PATH (2026-09-06).
+//
+// F14's rule matches `key=value`, which covers `?token=`. PR #204 then added
+// tokens that are a path SEGMENT — `/connect/<token>` (the employer response
+// page) and `/api/connect/employer/<token>/…` (its three actions) — and those
+// URLs land in `request.url`, in the referer header, and in navigation and
+// fetch breadcrumbs. The token is a 14-day bearer capability over a student's
+// packet and résumé, so a copy of it sitting in Sentry is a copy of that
+// access. Verified before the fix: a realistic event came out of `scrubPii`
+// with the token intact everywhere, while `?token=` in the same event was
+// redacted.
+// ---------------------------------------------------------------------------
+
+/** Shaped like the real thing: 32 random bytes, base64url, 43 characters. */
+const EMPLOYER_TOKEN = "hQ7nZ2xK9vB4mL0pR6sT8wY1cD3fG5jN7qA2eU4iO6k";
+
+function employerPacketEvent(): ErrorEvent {
+  return {
+    type: undefined,
+    message: "boom",
+    request: {
+      url: `https://vq.example/connect/${EMPLOYER_TOKEN}`,
+      headers: {
+        referer: `https://vq.example/connect/${EMPLOYER_TOKEN}`,
+        "user-agent": "test-agent",
+      },
+    },
+    breadcrumbs: [
+      {
+        category: "navigation",
+        data: { from: "/", to: `/connect/${EMPLOYER_TOKEN}` },
+      },
+      {
+        category: "fetch",
+        data: {
+          url: `https://vq.example/api/connect/employer/${EMPLOYER_TOKEN}/interested`,
+          method: "POST",
+          status_code: 500,
+        },
+      },
+      {
+        category: "console",
+        message: `POST /api/connect/employer/${EMPLOYER_TOKEN}/hired failed`,
+      },
+    ],
+  };
+}
+
+describe("scrubPii: employer capability tokens in the path", () => {
+  it("leaves the whole event free of the token", () => {
+    const out = scrubPii(employerPacketEvent(), HINT);
+
+    assert.doesNotMatch(
+      serialized(out),
+      new RegExp(EMPLOYER_TOKEN),
+      "a 14-day bearer capability over a student's packet must not reach Sentry anywhere in the event",
+    );
+  });
+
+  it("redacts the token in request.url", () => {
+    const out = scrubPii(employerPacketEvent(), HINT);
+    assert.equal(out.request?.url, "https://vq.example/connect/[REDACTED]");
+  });
+
+  it("redacts the token in the referer header", () => {
+    // Headers were filtered but never text-scrubbed, so the referer carried a
+    // full copy of whatever the URL carried.
+    const out = scrubPii(employerPacketEvent(), HINT);
+    assert.equal(out.request?.headers?.referer, "https://vq.example/connect/[REDACTED]");
+  });
+
+  it("redacts the token in navigation, fetch, and console breadcrumbs", () => {
+    const out = scrubPii(employerPacketEvent(), HINT);
+    const crumb = (category: string) => out.breadcrumbs?.find((b) => b.category === category);
+
+    assert.equal((crumb("navigation")?.data as { to: string }).to, "/connect/[REDACTED]");
+    assert.equal(
+      (crumb("fetch")?.data as { url: string }).url,
+      "https://vq.example/api/connect/employer/[REDACTED]/interested",
+    );
+    assert.match(crumb("console")?.message ?? "", /\/api\/connect\/employer\/\[REDACTED\]\/hired/);
+  });
+
+  it("leaves short /connect/ segments alone", () => {
+    // Only a segment long enough to be a token is redacted. A route name is
+    // not a secret, and blanking it would cost the one thing the event is
+    // for — knowing which page broke.
+    const event: ErrorEvent = {
+      type: undefined,
+      request: { url: "https://vq.example/connect/report" },
+      breadcrumbs: [{ category: "navigation", data: { to: "/connect/report" } }],
+    };
+
+    const out = scrubPii(event, HINT);
+    assert.equal(out.request?.url, "https://vq.example/connect/report");
+    assert.equal((out.breadcrumbs?.[0]?.data as { to: string }).to, "/connect/report");
+  });
+
+  it("redacts the connection id on the student approve/withdraw routes", () => {
+    // Not collateral damage — a Connection.id resolves to one student's
+    // employer disclosure, and a student identifier is PII in a log sink
+    // (.claude/rules/security.md). The route still names itself.
+    const connectionId = "clz9k2m4x0001qw8h7v3n5t2b";
+    const event: ErrorEvent = {
+      type: undefined,
+      request: { url: `https://vq.example/api/connect/${connectionId}/approve` },
+    };
+
+    const out = scrubPii(event, HINT);
+    assert.equal(out.request?.url, "https://vq.example/api/connect/[REDACTED]/approve");
+  });
+
+  it("leaves the staff Connect routes readable", () => {
+    // On these the segment after /connect/ is a literal and the id sits a
+    // level deeper, so the rule does not reach it. Pinned so a future
+    // widening of the pattern has to face this case on purpose.
+    const event: ErrorEvent = {
+      type: undefined,
+      request: {
+        url: "https://vq.example/api/teacher/connect/employers/clz9k2m4x0001qw8h7v3n5t2b/contacts",
+      },
+    };
+
+    const out = scrubPii(event, HINT);
+    assert.match(out.request?.url ?? "", /\/api\/teacher\/connect\/employers\//);
+  });
+
+  it("still redacts the reset token in a query parameter (F14 unchanged)", () => {
+    // The path rule is additive. This is the case F14 shipped, re-asserted
+    // here so a future edit to `redactText` cannot trade one for the other.
+    const out = scrubPii(resetPageEvent(), HINT);
+    assert.doesNotMatch(serialized(out), new RegExp(TOKEN));
+    assert.match(out.request?.url ?? "", /token=\[REDACTED\]/);
+  });
+});
+
 describe("Sentry configs route through the scrub", () => {
   const configs = ["sentry.server.config.ts", "sentry.edge.config.ts", "sentry.client.config.ts"];
   for (const name of configs) {

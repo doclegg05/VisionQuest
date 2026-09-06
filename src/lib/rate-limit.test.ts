@@ -15,6 +15,11 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import { Prisma } from "@prisma/client";
+// The derivation `rateLimit` applies before touching the store. Imported
+// rather than duplicated: a test that reproduces the transform instead of
+// calling it cannot notice the transform changing (2026-09-05 advisory-lock
+// lesson, same shape).
+import { rateLimitStorageKey } from "./rate-limit-key";
 
 interface StoredRow {
   count: number;
@@ -160,18 +165,21 @@ describe("rateLimit", () => {
   });
 
   it("starts a fresh window once the previous one has expired", async () => {
-    store.rows.set("ip:expired", { count: 9, resetTime: new Date(Date.now() - 1_000) });
+    store.rows.set(rateLimitStorageKey("ip:expired"), {
+      count: 9,
+      resetTime: new Date(Date.now() - 1_000),
+    });
 
     const result = await rateLimit("ip:expired", 10, 60_000);
 
     assert.equal(result.success, true);
     assert.equal(result.remaining, 9, "an expired window restarts the count at 1");
-    assert.equal(store.rows.get("ip:expired")?.count, 1);
+    assert.equal(store.rows.get(rateLimitStorageKey("ip:expired"))?.count, 1);
   });
 
   it("keeps the original resetTime while a window is open", async () => {
     const openUntil = new Date(Date.now() + 30_000);
-    store.rows.set("ip:open", { count: 1, resetTime: openUntil });
+    store.rows.set(rateLimitStorageKey("ip:open"), { count: 1, resetTime: openUntil });
 
     const result = await rateLimit("ip:open", 10, 60_000);
 
@@ -198,7 +206,7 @@ describe("rateLimit", () => {
     await rateLimit("ip:retry-count", 10, 60_000);
 
     assert.equal(
-      store.rows.get("ip:retry-count")?.count,
+      store.rows.get(rateLimitStorageKey("ip:retry-count"))?.count,
       1,
       "a retry must not double-count the attempt it is retrying",
     );
@@ -292,11 +300,11 @@ describe("refundRateLimit", () => {
   it("gives back one unit in the window it was consumed from", async () => {
     await rateLimit("chat:stu-1", 40, 60_000);
     const consumed = await rateLimit("chat:stu-1", 40, 60_000);
-    assert.equal(store.rows.get("chat:stu-1")?.count, 2);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-1"))?.count, 2);
 
     await refundRateLimit("chat:stu-1", consumed.resetTime);
 
-    assert.equal(store.rows.get("chat:stu-1")?.count, 1);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-1"))?.count, 1);
   });
 
   it("leaves a different window alone", async () => {
@@ -304,7 +312,7 @@ describe("refundRateLimit", () => {
 
     await refundRateLimit("chat:stu-2", consumed.resetTime + 1);
 
-    assert.equal(store.rows.get("chat:stu-2")?.count, 1);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-2"))?.count, 1);
   });
 
   it("never drives the counter below zero", async () => {
@@ -313,7 +321,7 @@ describe("refundRateLimit", () => {
     await refundRateLimit("chat:stu-3", consumed.resetTime);
     await refundRateLimit("chat:stu-3", consumed.resetTime);
 
-    assert.equal(store.rows.get("chat:stu-3")?.count, 0);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-3"))?.count, 0);
   });
 
   it("spends exactly one store round trip", async () => {
@@ -331,9 +339,97 @@ describe("refundRateLimit", () => {
 
     await assert.doesNotReject(() => refundRateLimit("chat:stu-5", consumed.resetTime));
 
-    assert.equal(store.rows.get("chat:stu-5")?.count, 1);
+    assert.equal(store.rows.get(rateLimitStorageKey("chat:stu-5"))?.count, 1);
     assert.equal(loggedWarnings.length, 1);
     assert.equal(loggedWarnings[0].context?.keyFamily, "chat");
     assert.doesNotMatch(JSON.stringify(loggedWarnings[0]), /stu-5/);
+  });
+});
+
+/**
+ * Row-key contract (2026-09-06 security fix).
+ *
+ * Callers still pass a readable key. What lands in `RateLimitEntry.key` — the
+ * table's PRIMARY KEY — is derived from it, because every per-IP limiter
+ * builds its key out of `X-Forwarded-For` and that header is chosen by the
+ * client. The two properties that matter are asserted over the fake store,
+ * since they belong to this module rather than to Postgres: the row key is
+ * bounded, and the caller's plaintext key never reaches the store.
+ * rate-limit.db.test.ts pins the database consequence of getting it wrong.
+ */
+describe("rate limit row keys", () => {
+  beforeEach(() => {
+    store.rows.clear();
+    store.failWith = [];
+    store.statements = [];
+    loggedErrors.length = 0;
+    loggedWarnings.length = 0;
+  });
+
+  it("never writes the caller's key into the store verbatim", async () => {
+    // `login:<ip>` identifies a person much as a log line does, and the
+    // limiter table is not an audit log (.claude/rules/security.md).
+    await rateLimit("login:198.51.100.9", 10, 60_000);
+
+    assert.equal(store.rows.has("login:198.51.100.9"), false);
+    assert.equal(store.rows.size, 1);
+    assert.doesNotMatch([...store.rows.keys()].join(" "), /198\.51\.100\.9/);
+  });
+
+  it("bounds the stored key however long the caller key is", async () => {
+    await rateLimit(`login:${"9".repeat(4000)}`, 10, 60_000);
+
+    const [stored] = [...store.rows.keys()];
+    assert.ok(
+      stored.length <= 80,
+      `an attacker-chosen key must not size the row; stored key was ${stored.length} chars`,
+    );
+  });
+
+  it("keeps the family prefix readable", async () => {
+    // scripts/seed-e2e-users.ts clears login buckets with
+    // `deleteMany({ where: { key: { startsWith: "login:" } } })`, and the
+    // fail-open log reports `keyFamily`. Both keep working only because the
+    // family survives in front of the digest.
+    await rateLimit("login:203.0.113.4", 10, 60_000);
+    await rateLimit("login:user:stu-1", 5, 60_000);
+
+    const stored = [...store.rows.keys()];
+    assert.equal(stored.length, 2);
+    assert.ok(
+      stored.every((key) => key.startsWith("login:")),
+      `both login-family keys must stay under the login: prefix; got ${stored.join(", ")}`,
+    );
+  });
+
+  it("keeps distinct caller keys in distinct rows", async () => {
+    // Bounding the key must not merge two callers into one bucket, which
+    // would let one student's attempts lock another student out.
+    await rateLimit("login:203.0.113.4", 10, 60_000);
+    await rateLimit("login:203.0.113.5", 10, 60_000);
+    await rateLimit("forgot-password:203.0.113.4", 10, 60_000);
+
+    assert.equal(store.rows.size, 3);
+    assert.ok([...store.rows.values()].every((row) => row.count === 1));
+  });
+
+  it("sends the same caller key to the same row every time", async () => {
+    for (let i = 0; i < 4; i += 1) {
+      await rateLimit("login:203.0.113.6", 10, 60_000);
+    }
+
+    assert.equal(store.rows.size, 1);
+    assert.equal([...store.rows.values()][0].count, 4);
+  });
+
+  it("refunds against the same row the consuming call wrote", async () => {
+    const consumed = await rateLimit("chat:stu-refund", 40, 60_000);
+    const [stored] = [...store.rows.keys()];
+    assert.equal(store.rows.get(stored)?.count, 1);
+
+    await refundRateLimit("chat:stu-refund", consumed.resetTime);
+
+    assert.equal(store.rows.size, 1, "a refund must not create a second row");
+    assert.equal(store.rows.get(stored)?.count, 0);
   });
 });

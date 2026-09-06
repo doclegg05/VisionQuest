@@ -120,44 +120,9 @@ export const UNKNOWN_TOKEN_LIMIT = 20;
 /**
  * The client's IP, for the unknown-token bucket only.
  *
- * Behind Render's proxy the socket address is the proxy's, so the forwarded
- * header is the only signal available. It is spoofable, which is why it gates
- * nothing but this coarse bucket — never authorization.
+ * The implementation moved to `src/lib/client-ip.ts` on 2026-09-06, when the
+ * auth routes stopped hand-rolling their own uncapped version of it. Kept
+ * exported here because the three `/api/connect/employer/[token]/…` handlers
+ * import it from this module.
  */
-export function clientIpFrom(req: Request): string | null {
-  const forwarded = req.headers.get("x-forwarded-for");
-  const first = forwarded?.split(",")[0]?.trim();
-  if (!first) return null;
-
-  // The value becomes part of a RateLimitEntry key, and the header is
-  // attacker-controlled. Unbounded, a caller could mint a distinct bucket per
-  // request — each one a row — and turn a rate limiter into a way to fill the
-  // table. So anything that is not IP-shaped collapses to one shared bucket:
-  // a spoofer gets to share a queue with every other spoofer, which is the
-  // correct outcome for a signal that gates nothing but this.
-  //
-  // 45 is the longest possible textual IPv6 address
-  // (an IPv4-mapped form: 45 characters), so no real client is truncated.
-  //
-  // THE TRADE, stated so nobody has to rediscover it: everything that lands in
-  // `"unknown"` shares ONE bucket, so a single spoofer sending malformed
-  // headers can exhaust it and make the unknown-token limit refuse legitimate
-  // traffic that also landed there. That is the direction to fail — an
-  // employer with a real token never reaches this bucket, and refusing
-  // guesses is what it is for. It also catches IPv6 zone ids ("fe80::1%eth0",
-  // whose "%" is not in the shape test), which collapse to the shared bucket
-  // rather than getting one each; a link-local address is not a public client
-  // in this deployment, so that costs nothing real.
-  if (first.length > MAX_FORWARDED_IP_CHARS || !IP_SHAPED.test(first)) return "unknown";
-  return first;
-}
-
-/** Longest textual IPv6 address, including the IPv4-mapped form. */
-const MAX_FORWARDED_IP_CHARS = 45;
-
-/**
- * Deliberately a SHAPE test, not a parser. Hex, digits, dots and colons is
- * every character a v4 or v6 address can contain; anything else is not an
- * address and does not need to be told apart from anything else.
- */
-const IP_SHAPED = /^[0-9a-fA-F.:]+$/u;
+export { clientIpFrom } from "@/lib/client-ip";

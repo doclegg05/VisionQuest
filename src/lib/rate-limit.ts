@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prismaAdmin as prisma } from "./db";
 import { logger } from "./logger";
+import { rateLimitKeyFamily, rateLimitStorageKey } from "./rate-limit-key";
 
 /**
  * Fixed-window rate limiter backed by the `RateLimitEntry` table.
@@ -40,6 +41,14 @@ import { logger } from "./logger";
  * Callers that would rather fail closed can do so themselves: check
  * `result.degraded` and refuse. The mechanism lives here; the policy belongs
  * at the call site.
+ *
+ * --- Row keys are derived, not the caller's (2026-09-06) ---
+ * `key` stays readable for callers and logs, but what reaches the table is
+ * `rateLimitStorageKey(key)`. The caller's key is built from `X-Forwarded-For`
+ * on every per-IP limiter, so leaving it as the primary key handed the client
+ * the size of a btree index entry — and an oversized one raised SQLSTATE
+ * 54000, which is not retryable and therefore took the fail-open path above.
+ * See src/lib/rate-limit-key.ts for the shape and the reasoning.
  */
 
 /** Attempts per call, including the first. Kept small — a login request is
@@ -99,6 +108,8 @@ function sleep(ms: number): Promise<void> {
  * out. `now` and `nextReset` are supplied by the caller rather than read from
  * `now()` so the comparison stays timestamp-to-timestamp against the
  * `TIMESTAMP(3)` column, with no session-timezone cast in the middle.
+ *
+ * `key` here is already the derived storage key, never the caller's.
  */
 async function bumpCounter(key: string, now: Date, nextReset: Date): Promise<CounterRow> {
   const rows = await prisma.$queryRaw<CounterRow[]>`
@@ -114,8 +125,9 @@ async function bumpCounter(key: string, now: Date, nextReset: Date): Promise<Cou
   const row = rows[0];
   if (!row) {
     // RETURNING on an upsert always yields the row it wrote; an empty result
-    // means something other than this statement answered.
-    throw new Error(`Rate limit upsert returned no row for key "${key}".`);
+    // means something other than this statement answered. The storage key is
+    // safe to name — it is a digest, not the caller's key.
+    throw new Error(`Rate limit upsert returned no row for storage key "${key}".`);
   }
   return row;
 }
@@ -126,13 +138,15 @@ export async function rateLimit(
   windowMs: number,
 ): Promise<RateLimitResult> {
   let lastError: unknown;
+  const storageKey = rateLimitStorageKey(key);
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const now = new Date();
     const nextReset = new Date(now.getTime() + windowMs);
 
     try {
-      const row = await bumpCounter(key, now, nextReset);
+      const row = await bumpCounter(storageKey, now, nextReset);
+      maybePurgeExpired(now);
 
       // `count` is the value AFTER this attempt was recorded, so the first
       // `limit` callers in a window see count <= limit and are admitted.
@@ -158,7 +172,7 @@ export async function rateLimit(
   // are not an audit log (see .claude/rules/security.md). The family names
   // the affected subsystem, which is what a store outage is diagnosed from.
   logger.error("Rate limit store unavailable — failing open", {
-    keyFamily: key.split(":")[0],
+    keyFamily: rateLimitKeyFamily(key),
     limit,
     attempts: MAX_ATTEMPTS,
     error: String(lastError),
@@ -192,14 +206,78 @@ export async function refundRateLimit(key: string, resetTime: number): Promise<v
     await prisma.$executeRaw`
       UPDATE "visionquest"."RateLimitEntry"
       SET "count" = GREATEST("count" - 1, 0), "updatedAt" = ${now}
-      WHERE "key" = ${key} AND "resetTime" = ${new Date(resetTime)}
+      WHERE "key" = ${rateLimitStorageKey(key)} AND "resetTime" = ${new Date(resetTime)}
     `;
   } catch (error) {
     logger.warn("Rate limit refund failed — unit stays consumed", {
-      keyFamily: key.split(":")[0],
+      keyFamily: rateLimitKeyFamily(key),
       error: String(error),
     });
   }
+}
+
+/**
+ * Delete every counter row whose window has already closed, and answer how
+ * many went.
+ *
+ * `RateLimitEntry` has no TTL and, before 2026-09-06, nothing in the repo
+ * removed a row from it: each distinct key ever seen was permanent, and the
+ * per-IP families take a fresh key per client. An expired row is dead weight
+ * by definition — `bumpCounter` restarts the count on any row it finds past
+ * its `resetTime`, so deleting one can never lose a live allowance, and a row
+ * inserted between the delete and the next request is simply a new window.
+ *
+ * `@@index([resetTime])` already exists on the model, so this is an index
+ * scan rather than a table sweep. Exported so it can also be called from a
+ * script or a maintenance route.
+ */
+export async function purgeExpiredRateLimitEntries(): Promise<number> {
+  const { count } = await prisma.rateLimitEntry.deleteMany({
+    where: { resetTime: { lt: new Date() } },
+  });
+  return count;
+}
+
+/**
+ * How often a process attempts the purge.
+ *
+ * WHY OPPORTUNISTIC AND NOT A CRON JOB: the repo's scheduled layer is
+ * confirmed dead in production — the baseline pg_cron jobs were never
+ * registered and the `app.base_url` GUC is still unset (2026-09-01 review,
+ * finding F1), so a purge wired into an internal cron route would ship inert
+ * and the table would keep growing exactly as it does today. This runs
+ * wherever the limiter itself runs, which is the one place guaranteed to be
+ * reached, and it needs no migration, no secret and no owner step.
+ *
+ * Time-based rather than 1-in-N random so the cost is bounded by wall clock
+ * instead of by traffic: a burst cannot trigger a burst of deletes, and a
+ * quiet instance does not skip the purge indefinitely.
+ */
+const PURGE_INTERVAL_MS = 15 * 60 * 1000;
+
+/**
+ * Deliberately one full interval AFTER module load, not immediately: a
+ * freshly booted process has nothing to purge, and starting the clock here
+ * keeps short-lived processes (a test run, a one-shot script) from issuing a
+ * delete they have no reason to issue.
+ */
+let nextPurgeAt = Date.now() + PURGE_INTERVAL_MS;
+
+/**
+ * Best-effort, off the hot path: the caller already has its answer, so the
+ * purge is neither awaited nor allowed to affect the result. A failure is
+ * swallowed — an un-purged table is a housekeeping problem, never a reason to
+ * fail a request that was already decided.
+ */
+function maybePurgeExpired(now: Date): void {
+  if (now.getTime() < nextPurgeAt) return;
+  nextPurgeAt = now.getTime() + PURGE_INTERVAL_MS;
+
+  void purgeExpiredRateLimitEntries().catch((error: unknown) => {
+    logger.warn("Rate limit purge failed — expired rows stay for now", {
+      error: String(error),
+    });
+  });
 }
 
 /**

@@ -3,6 +3,7 @@ import { prismaAdmin as prisma } from "@/lib/db";
 import { normalizeEmail, normalizeStudentId } from "@/lib/auth";
 import { generatePasswordResetToken } from "@/lib/password-reset";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { isValidEmail } from "@/lib/validation";
 import { withErrorHandler } from "@/lib/api-error";
@@ -17,7 +18,7 @@ const GENERIC_MESSAGE =
   "If that account has an email on file, you will receive a reset link shortly. If not, contact your program staff.";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = clientIpBucket(req);
   const rl = await rateLimit(`forgot-password:${ip}`, 5, 15 * 60 * 1000);
 
   if (!rl.success) {

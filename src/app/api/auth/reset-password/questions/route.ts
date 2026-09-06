@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   hasConfiguredSecurityQuestionSet,
@@ -28,7 +29,7 @@ const ACCOUNT_LIMIT_ATTEMPTS = 5;
 const ACCOUNT_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = clientIpBucket(req);
   const rl = await rateLimit(`reset-password-questions:${ip}`, 5, 60 * 60 * 1000);
 
   if (!rl.success) {
