@@ -146,3 +146,58 @@ describe("confirmationTokenExpiry", () => {
     assert.equal(confirmationTokenExpiry("notanumber.deadbeef"), null);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Prefix malleability (Bug 1).
+//
+// The single-use claim in confirmation-use.ts keys on sha256 of the WHOLE
+// token string, so any prefix spelling that still verifies is a fresh claim —
+// one approval executing unlimited times. Number.parseInt tolerated leading
+// whitespace, a leading "+", leading zeros and trailing garbage, so five
+// distinct strings all recovered the same expiresAt, the same expected HMAC,
+// and all verified. The prefix must therefore be CANONICAL: exactly the
+// digits String(expiresAt) produces, nothing else.
+// ---------------------------------------------------------------------------
+
+/** Rewrite a token's expiry prefix, leaving its signature half untouched. */
+function mutatePrefix(token: string, mutate: (prefix: string) => string): string {
+  const separator = token.indexOf(".");
+  return `${mutate(token.slice(0, separator))}${token.slice(separator)}`;
+}
+
+const PREFIX_MUTATIONS: Array<{ label: string; mutate: (prefix: string) => string }> = [
+  { label: 'trailing "x"', mutate: (p) => `${p}x` },
+  { label: 'trailing "zz"', mutate: (p) => `${p}zz` },
+  { label: "leading space", mutate: (p) => ` ${p}` },
+  { label: 'leading "+"', mutate: (p) => `+${p}` },
+  { label: 'leading "0"', mutate: (p) => `0${p}` },
+];
+
+describe("confirmation token expiry prefix is canonical", () => {
+  it("still verifies the canonical prefix createConfirmationToken produces", () => {
+    const token = createConfirmationToken(payload, NOW);
+    assert.equal(verifyConfirmationToken(token, payload, NOW), true);
+  });
+
+  for (const { label, mutate } of PREFIX_MUTATIONS) {
+    it(`rejects a token whose prefix carries ${label}`, () => {
+      const token = createConfirmationToken(payload, NOW);
+      const mutated = mutatePrefix(token, mutate);
+      assert.notEqual(mutated, token);
+      assert.equal(
+        verifyConfirmationToken(mutated, payload, NOW),
+        false,
+        `${label}: mutated prefix must not verify (it hashes to a different single-use claim)`,
+      );
+    });
+
+    it(`reads no expiry from a token whose prefix carries ${label}`, () => {
+      const token = createConfirmationToken(payload, NOW);
+      assert.equal(
+        confirmationTokenExpiry(mutatePrefix(token, mutate)),
+        null,
+        `${label}: a non-canonical prefix must not resolve to an expiry`,
+      );
+    });
+  }
+});
