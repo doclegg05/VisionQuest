@@ -526,8 +526,11 @@ describe("save_job — class scoping", () => {
     assert.deepEqual(where.classConfig, { classId: "class-1" });
   });
 
-  it("refuses to save another cohort's job listing", async () => {
-    // The id is real, but it lives on a different class's board.
+  it("refuses to save another cohort's job listing with the same not_your_class_board code as the HTTP route (S4)", async () => {
+    // The id is real, but it lives on a different class's board (or the
+    // program-wide browse pool) — same ambiguity POST /api/jobs/save has,
+    // so this tool now gives the same plain-language message rather than
+    // the bare "not found" a student can't act on.
     mockListingFindFirst.mock.mockImplementation(async () => null);
 
     const record = await executeAgentTool({
@@ -538,7 +541,7 @@ describe("save_job — class scoping", () => {
     });
 
     assert.equal(record.result.status, "error");
-    assert.match(record.result.summary, /not found/i);
+    assert.match(record.result.summary, /class's board/i);
     assert.equal(mockSavedJobUpsert.mock.callCount(), 0);
   });
 
