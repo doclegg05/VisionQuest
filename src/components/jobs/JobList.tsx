@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { JobCard } from "./JobCard";
 import type { JobTrackingUpdate } from "./JobCard";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
@@ -11,6 +11,18 @@ import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-boar
  * "Show more jobs" reveals the rest of this list in one tap.
  */
 export const JOB_LIST_PAGE_SIZE = 20;
+
+/**
+ * Which job index will receive focus once "Show more" reveals the rest —
+ * the first card that was hidden a moment ago. `null` when every job
+ * already fits on the first page (no reveal ever happens). Exported and
+ * pure so the CRITICAL focus-target fix has a real unit test independent
+ * of rendering — this repo's `.test.tsx` files only exercise
+ * `renderToString`, which cannot render the post-click revealed state.
+ */
+export function firstRevealedIndex(totalJobs: number): number | null {
+  return totalJobs > JOB_LIST_PAGE_SIZE ? JOB_LIST_PAGE_SIZE : null;
+}
 
 export interface ListJob {
   id: string;
@@ -51,6 +63,19 @@ export function JobList({ jobs, onSave }: JobListProps) {
     setRevealedAll(false);
   }
 
+  // UX review CRITICAL (2026-09-07): "Show more jobs" used to unmount the
+  // instant it was pressed (remaining drops to 0), dropping keyboard focus
+  // to <body> with nothing to tell a screen-reader user what happened.
+  // firstRevealedRef targets the first card that was hidden a moment ago —
+  // JOB_LIST_PAGE_SIZE was already visible, so that card is index
+  // JOB_LIST_PAGE_SIZE — and gets focus once the reveal actually happens.
+  const firstRevealedRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (revealedAll) {
+      firstRevealedRef.current?.focus();
+    }
+  }, [revealedAll]);
+
   if (jobs.length === 0) {
     return (
       <div className="text-center py-12 text-[var(--text-secondary)]">
@@ -63,20 +88,35 @@ export function JobList({ jobs, onSave }: JobListProps) {
   const visibleJobs = revealedAll ? jobs : jobs.slice(0, JOB_LIST_PAGE_SIZE);
   const remaining = jobs.length - visibleJobs.length;
 
+  const focusTargetIndex = firstRevealedIndex(jobs.length);
+
   return (
     <div className="space-y-3">
-      {visibleJobs.map((job) => (
-        <JobCard key={job.id} {...job} onSave={onSave} />
-      ))}
+      {visibleJobs.map((job, index) => {
+        const isFirstRevealed = index === focusTargetIndex;
+        return (
+          <div
+            key={job.id}
+            ref={isFirstRevealed ? firstRevealedRef : undefined}
+            tabIndex={isFirstRevealed ? -1 : undefined}
+            data-first-revealed={isFirstRevealed ? "true" : undefined}
+          >
+            <JobCard {...job} onSave={onSave} />
+          </div>
+        );
+      })}
       {remaining > 0 && (
         <button
           type="button"
           onClick={() => setRevealedAll(true)}
           className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:text-[var(--primary)]"
         >
-          Show more jobs
+          Show {remaining} more jobs
         </button>
       )}
+      <div aria-live="polite" className="sr-only">
+        {revealedAll ? `Showing all ${jobs.length} jobs` : ""}
+      </div>
     </div>
   );
 }
