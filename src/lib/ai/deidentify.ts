@@ -353,6 +353,17 @@ export interface StreamRehydrator {
 
 const MAX_WALK_DEPTH = 64;
 
+/**
+ * What an OUTBOUND walk substitutes for a value it cannot traverse: a Map, a
+ * Set, a class instance, or anything below the depth cap. Fail-closed —
+ * before this, such a value was returned verbatim, so a student name inside a
+ * Map or 65 levels down reached the model unsubstituted while every visible
+ * test passed (2026-09-07 security audit suggestion). Inbound re-hydration
+ * still passes them through: there is nothing to protect on the way back, and
+ * destroying a caller's value would be the worse failure.
+ */
+const UNSUPPORTED_VALUE = "[UNSUPPORTED]";
+
 export class TokenVault {
   /** token → value, for every token this vault has issued. */
   private readonly issued = new Map<string, string>();
@@ -615,14 +626,32 @@ export class TokenVault {
     };
   }
 
-  /** Deep-walk a JSON-ish value, pseudonymizing every string leaf. */
+  /**
+   * Deep-walk a JSON-ish value, pseudonymizing every string leaf. Fails
+   * CLOSED: anything it cannot traverse becomes `[UNSUPPORTED]` rather than
+   * passing through unread.
+   */
   pseudonymizeValue(value: unknown): unknown {
-    return this.walk(value, (s) => this.pseudonymize(s), 0);
+    return this.walk(value, (s) => this.pseudonymize(s), 0, true);
   }
 
-  /** Deep-walk a JSON-ish value, re-hydrating every string leaf. */
+  /**
+   * Deep-walk a JSON-ish value applying `fn` to every string leaf, with the
+   * same depth cap, prototype rules and fail-closed behaviour as
+   * `pseudonymizeValue`. Exists so the decorator can run one composed
+   * transform (neutralise, then substitute) over a tool result in a single
+   * pass rather than traversing twice.
+   */
+  mapStrings(value: unknown, fn: (text: string) => string): unknown {
+    return this.walk(value, fn, 0, true);
+  }
+
+  /**
+   * Deep-walk a JSON-ish value, re-hydrating every string leaf. Fails OPEN on
+   * an untraversable value — see `UNSUPPORTED_VALUE`.
+   */
   rehydrateValue(value: unknown): unknown {
-    return this.walk(value, (s) => this.rehydrate(s), 0);
+    return this.walk(value, (s) => this.rehydrate(s), 0, false);
   }
 
   // ── internals ──────────────────────────────────────────────────────────────
@@ -664,20 +693,29 @@ export class TokenVault {
     return this.prefixCache;
   }
 
-  private walk(value: unknown, fn: (s: string) => string, depth: number): unknown {
+  private walk(value: unknown, fn: (s: string) => string, depth: number, failClosed: boolean): unknown {
     if (typeof value === "string") return fn(value);
-    if (depth >= MAX_WALK_DEPTH) return value;
-    if (Array.isArray(value)) return value.map((item) => this.walk(item, fn, depth + 1));
+    const unreadable = failClosed ? UNSUPPORTED_VALUE : value;
+    // The cap bounds recursion on a cyclic or pathological structure. Past it
+    // an outbound walk must destroy the value, not return it: everything
+    // below is unread, and unread is exactly what must not reach the model.
+    if (depth >= MAX_WALK_DEPTH) return unreadable;
+    if (Array.isArray(value)) return value.map((item) => this.walk(item, fn, depth + 1, failClosed));
     if (value !== null && typeof value === "object") {
       const proto = Object.getPrototypeOf(value);
       if (proto === Object.prototype || proto === null) {
         const out: Record<string, unknown> = {};
         for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-          out[key] = this.walk(item, fn, depth + 1);
+          out[key] = this.walk(item, fn, depth + 1, failClosed);
         }
         return out;
       }
+      // A Map, a Set, a Date, a class instance: `Object.entries` would not
+      // reach its contents, so it is unread.
+      return unreadable;
     }
+    // Numbers, booleans, null, undefined, bigint, symbols, functions: no
+    // string content to substitute, so they are read and safe either way.
     return value;
   }
 }

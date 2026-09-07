@@ -37,13 +37,20 @@ async function getConfiguredProviderType(): Promise<AIProviderType> {
  * student_record or staff_entered prompt sent under it would leave every
  * contractual protection behind (FERPA review, report C2). Those calls use
  * the platform key whatever the student has entered in Settings.
+ *
+ * The predicate is an ALLOWLIST (`=== "public_program"`), not the negation of
+ * `isLocalOnlySensitivity`. The negation admitted `configured` and `system`
+ * too — sensitivities no production call site declares, so the hole was
+ * latent, but the next caller to declare one would have got a personal key on
+ * student content with nothing failing (2026-09-07 security audit, W3). An
+ * allowlist means a sensitivity added later is refused by default.
  */
 async function getCloudProvider(
   studentId: string,
   sensitivity: DataSensitivity,
 ): Promise<AIProvider> {
   const apiKey = await resolveApiKey(studentId, {
-    allowPersonalKey: !isLocalOnlySensitivity(sensitivity),
+    allowPersonalKey: sensitivity === "public_program",
   });
   return new GeminiProvider(apiKey);
 }
@@ -159,24 +166,15 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
   );
 }
 
-/**
- * Resolve the active AI provider based on SystemConfig.
- *
- * - "local" -> OllamaProvider (reads ai_provider_url, ai_provider_model)
- * - "cloud" or unset -> GeminiProvider (uses existing API key resolution)
- *
- * Prefer resolveAiProvider() for new call sites so the task's data
- * sensitivity is explicit.
- */
-export async function getProvider(
-  studentId: string,
-  role: AiRole | null = null,
-): Promise<AIProvider> {
-  const providerType = await getConfiguredProviderType();
-  return providerType === "local"
-    ? getLocalProvider(role)
-    : getCloudProvider(studentId, "configured");
-}
+// `getProvider(studentId, role)` was removed on 2026-09-07. It resolved a
+// provider with sensitivity "configured" and consulted NEITHER the cloud
+// policy nor the de-identification layer, so on a `local_only` deployment it
+// returned Gemini with no audit event and a personal key permitted — a
+// complete bypass of both controls, exported from the barrel for anyone to
+// reach (security audit W3). It had no production caller; its coverage of the
+// local-provider config path moved to `resolveAiProvider` in
+// `__tests__/provider.test.ts`. Do not reintroduce a resolver that takes no
+// sensitivity: the sensitivity is what both controls key off.
 
 /**
  * Resolve a provider for a specific task.

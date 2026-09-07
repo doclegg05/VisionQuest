@@ -103,3 +103,42 @@ describe("DeidentifyOptions.allowlist (Wave 2 addendum)", () => {
     assert.equal(withEmpty.pseudonymize(text), without.pseudonymize(text));
   });
 });
+
+describe("pseudonymizeValue fails CLOSED on what it cannot walk (audit suggestion)", () => {
+  function deep(depth: number, leaf: unknown): unknown {
+    let value = leaf;
+    for (let i = 0; i < depth; i += 1) value = { next: value };
+    return value;
+  }
+
+  it("replaces a string leaf past the depth cap instead of passing it through", () => {
+    const vault = TokenVault.fromIdentity({ studentName: "Jordan Lee" });
+    const out = vault.pseudonymizeValue(deep(200, "Jordan Lee lives at 12 Oak Street")) as Record<string, unknown>;
+    const flat = JSON.stringify(out);
+    assert.ok(!flat.includes("Jordan"), flat.slice(-120));
+    assert.ok(!flat.includes("Oak Street"), flat.slice(-120));
+    assert.match(flat, /\[UNSUPPORTED\]/);
+  });
+
+  it("still walks the shallow levels normally", () => {
+    const vault = TokenVault.fromIdentity({ studentName: "Jordan Lee" });
+    assert.deepEqual(vault.pseudonymizeValue({ a: { b: ["Jordan Lee"] } }), { a: { b: ["[STUDENT_NAME]"] } });
+  });
+
+  it("does not hand a Map or a Set through un-pseudonymized", () => {
+    const vault = TokenVault.fromIdentity({ studentName: "Jordan Lee" });
+    const out = vault.pseudonymizeValue({
+      byId: new Map([["k", "Jordan Lee"]]),
+      names: new Set(["Jordan Lee"]),
+    }) as Record<string, unknown>;
+    const flat = JSON.stringify(out);
+    assert.ok(!flat.includes("Jordan"), flat);
+    assert.equal(out.byId, "[UNSUPPORTED]");
+    assert.equal(out.names, "[UNSUPPORTED]");
+  });
+
+  it("leaves non-string primitives alone", () => {
+    const vault = TokenVault.fromIdentity({ studentName: "Jordan Lee" });
+    assert.deepEqual(vault.pseudonymizeValue({ n: 3, b: true, z: null }), { n: 3, b: true, z: null });
+  });
+});

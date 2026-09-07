@@ -19,7 +19,6 @@ mock.module("@/lib/chat/api-key", {
 });
 
 // Dynamic imports must happen after mock.module but inside before() to avoid TLA
-let getProvider: Awaited<typeof import("../provider")>["getProvider"];
 let resolveAiProvider: Awaited<typeof import("../provider")>["resolveAiProvider"];
 let getPromptTier: Awaited<typeof import("../provider")>["getPromptTier"];
 let OllamaProvider: Awaited<typeof import("../ollama-provider")>["OllamaProvider"];
@@ -29,14 +28,24 @@ before(async () => {
   const providerMod = await import("../provider");
   const ollamaMod = await import("../ollama-provider");
   const geminiMod = await import("../gemini-provider");
-  getProvider = providerMod.getProvider;
   resolveAiProvider = providerMod.resolveAiProvider;
   getPromptTier = providerMod.getPromptTier;
   OllamaProvider = ollamaMod.OllamaProvider;
   GeminiProvider = geminiMod.GeminiProvider;
 });
 
-describe("getProvider", () => {
+/**
+ * `getProvider(studentId, role)` was deleted on 2026-09-07 (security audit
+ * W3): it resolved a provider with sensitivity "configured" and consulted
+ * neither the cloud policy nor the de-identification layer. Its coverage of
+ * the local-provider CONFIG path — URL required, URL validated, Cloudflare
+ * service-token assembly — is what mattered and lives on here, driven through
+ * `resolveAiProvider` with the same `legacy`/`configured` pair it used to
+ * pass, so no case was lost in the move.
+ */
+const LEGACY = { task: "legacy", sensitivity: "configured" } as const;
+
+describe("resolveAiProvider — provider selection and local config", () => {
   beforeEach(() => {
     mockGetPlain.mock.resetCalls();
     mockGetConfig.mock.resetCalls();
@@ -51,7 +60,7 @@ describe("getProvider", () => {
     mockGetConfig.mock.mockImplementation(async () => null);
     mockResolveKey.mock.mockImplementationOnce(async () => "test-gemini-key");
 
-    const provider = await getProvider("student-123");
+    const provider = await resolveAiProvider({ studentId: "student-123", ...LEGACY });
     assert.ok(provider instanceof GeminiProvider);
     assert.equal(provider.name, "gemini");
   });
@@ -61,7 +70,7 @@ describe("getProvider", () => {
     mockGetConfig.mock.mockImplementation(async () => null);
     mockResolveKey.mock.mockImplementationOnce(async () => "test-gemini-key");
 
-    const provider = await getProvider("student-123");
+    const provider = await resolveAiProvider({ studentId: "student-123", ...LEGACY });
     assert.ok(provider instanceof GeminiProvider);
   });
 
@@ -79,7 +88,7 @@ describe("getProvider", () => {
       return null;
     });
 
-    const provider = await getProvider("student-123");
+    const provider = await resolveAiProvider({ studentId: "student-123", ...LEGACY });
     assert.ok(provider instanceof OllamaProvider);
     assert.equal(provider.name, "ollama");
     assert.deepEqual(
@@ -101,7 +110,7 @@ describe("getProvider", () => {
     mockGetConfig.mock.mockImplementation(async () => null);
 
     await assert.rejects(
-      getProvider("student-123"),
+      resolveAiProvider({ studentId: "student-123", ...LEGACY }),
       /Local AI server URL is not configured/,
     );
   });
@@ -115,7 +124,7 @@ describe("getProvider", () => {
     mockGetConfig.mock.mockImplementation(async () => null);
 
     await assert.rejects(
-      getProvider("student-123"),
+      resolveAiProvider({ studentId: "student-123", ...LEGACY }),
       /Local AI server URL is invalid/,
     );
   });

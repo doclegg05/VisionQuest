@@ -1,7 +1,6 @@
 export {
   AI_DEIDENTIFY_CONFIG_KEY,
   AI_DEIDENTIFY_ENV,
-  getProvider,
   getPromptTier,
   resolveAiProvider,
 } from "./provider";

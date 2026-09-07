@@ -438,9 +438,14 @@ describe("TokenVault.pseudonymizeValue / rehydrateValue", () => {
     assert.equal(input.who, "Jordan Lee");
   });
 
-  it("passes non-plain objects through untouched", () => {
+  it("replaces a non-plain object on the way OUT and passes it through on the way IN", () => {
+    // Superseded 1C behaviour: both directions passed it through, so a Map or
+    // a class instance carrying a name reached the model unread (2026-09-07
+    // audit). Outbound now fails closed; inbound still passes through, since
+    // there is nothing to protect on the way back and destroying a caller's
+    // value would be the worse failure. Cases in deidentify.wave2.test.ts.
     const when = new Date("2026-09-07T00:00:00Z");
-    assert.equal(vault.pseudonymizeValue(when), when);
+    assert.equal(vault.pseudonymizeValue(when), "[UNSUPPORTED]");
     assert.equal(vault.rehydrateValue(when), when);
   });
 });

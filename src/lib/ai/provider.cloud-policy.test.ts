@@ -223,4 +223,32 @@ describe("personal Gemini keys (AC3)", () => {
     await resolveAiProvider({ studentId: "student-1", task: "public_program_help", sensitivity: "public_program" });
     assert.deepEqual(mockResolveKey.mock.calls[0].arguments[1], { allowPersonalKey: true });
   });
+
+  it("refuses a personal key for EVERY sensitivity other than public_program (audit W3)", async () => {
+    // The predicate used to be `!isLocalOnlySensitivity(...)`, which admitted
+    // `configured` and `system`. No production call site declares either
+    // today, so the hole was latent — and the next one to declare it would
+    // have got a personal consumer key on student content with nothing
+    // failing. An allowlist refuses a sensitivity added later by default.
+    mockGetPlain.mock.mockImplementation(configStore({ ai_provider: "cloud" }));
+    for (const sensitivity of ["configured", "system", "student_record", "staff_entered"] as DataSensitivity[]) {
+      mockResolveKey.mock.resetCalls();
+      await resolveAiProvider({ studentId: "student-1", task: "legacy", sensitivity });
+      assert.deepEqual(
+        mockResolveKey.mock.calls[0].arguments[1],
+        { allowPersonalKey: false },
+        sensitivity,
+      );
+    }
+  });
+
+  it("no longer exports a resolver that takes no sensitivity (audit W3)", async () => {
+    // `getProvider` bypassed the cloud policy AND the de-identification layer
+    // because it declared none. Both controls key off `sensitivity`, so a
+    // resolver without one cannot honour either; the barrel must not offer it.
+    const barrel = await import("./index");
+    assert.equal("getProvider" in barrel, false);
+    const providerModule = await import("./provider");
+    assert.equal("getProvider" in providerModule, false);
+  });
 });
