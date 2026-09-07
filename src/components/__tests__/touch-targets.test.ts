@@ -100,12 +100,23 @@ describe("D3 touch targets — /orientation (203x20 download link)", () => {
   });
 });
 
-describe("D3 touch targets — /goals (220x20 Sage link)", () => {
+describe("D3 touch targets — /goals (220x20 Sage link, 193x38 Add Monthly Goal Card button)", () => {
   it("StudentPathwayPlan's 'Talk to Sage about your goals' link meets the 44px floor", () => {
     const src = read("src/components/goals/StudentPathwayPlan.tsx");
     const match = src.match(/className="(mt-3 inline-flex[^"]*)"/);
     assert.ok(match, "could not find the Sage link's className");
     assert.ok(match![1].includes("min-h-11"), `Sage link missing min-h-11: ${match![1]}`);
+  });
+
+  it("GoalsPageClient's 'Add Monthly Goal Card' empty-state button meets the 44px floor", () => {
+    const src = read("src/components/goals/GoalsPageClient.tsx");
+    const anchor = src.indexOf("onClick={() => setAddingMonthly(true)}");
+    assert.ok(anchor > -1, "could not find the Add Monthly Goal Card button's onClick");
+    const block = src.slice(anchor, anchor + 400);
+    assert.ok(block.includes("Add Monthly Goal Card"), "onClick anchor did not lead to the expected label");
+    const classMatch = block.match(/className="([^"]*)"/);
+    assert.ok(classMatch, "could not find the button's className");
+    assert.ok(classMatch![1].includes("min-h-11"), `Add Monthly Goal Card button missing min-h-11: ${classMatch![1]}`);
   });
 });
 
