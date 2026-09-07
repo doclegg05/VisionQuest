@@ -28,6 +28,7 @@ import { isStaffRole } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
+import { transcriptWindowFor } from "@/lib/chat/transcript-window";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
 import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
@@ -700,13 +701,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Parallelize conversation history loading with RAG/form/memory loads.
   // Previously this happened sequentially after context assembly (line 719),
   // adding ~100-200ms to first-token latency. Now it runs in parallel.
-  const maxRecentMessages =
-    promptTier === "compact"
-      ? conversationStage === "discovery" ||
-        conversationStage === "career_profile_review"
-        ? 12
-        : 6
-      : 20;
+  // Transcript window by provider CLASS, not tier: the cloud number is a
+  // disclosure decision (FERPA review W9) and lives in transcript-window.ts.
+  const maxRecentMessages = transcriptWindowFor({
+    providerClass,
+    stage: conversationStage,
+  });
   const conversationContextPromise = getConversationContext(
     conversation.id,
     maxRecentMessages,
