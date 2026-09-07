@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { readDeidentifyNames, describeDeidentify, wrapWithDeidentification } from "./sage-eval-provider.mjs";
+import {
+  readDeidentifyNames,
+  describeDeidentify,
+  wrapWithDeidentification,
+  isBudgetExhausted,
+  wrapWithBudgetDetection,
+  EvalBudgetExhaustedError,
+  reportEvalFailure,
+} from "./sage-eval-provider.mjs";
 
 /**
  * AC5 — the eval harness must be able to measure the SHIPPED configuration.
@@ -60,5 +68,184 @@ describe("wrapWithDeidentification", () => {
     const reply = await wrapped.generateResponse("You are coaching Sam. Their teacher is Ms. Lee.", []);
     assert.equal(fake.lastSystemPrompt, "You are coaching [STUDENT_NAME]. Their teacher is [TEACHER_NAME_1].");
     assert.equal(reply, "Hi Sam, ask Ms. Lee.");
+  });
+});
+
+/**
+ * 2026-09-05: six eval runs drained the Gemini prepaid balance and every
+ * Sage-touching PR read red for hours under a 429 "prepayment credits
+ * depleted" — under the repo's rule an ungraded scenario is not a pass, so
+ * red-for-money blocked merges exactly like a real regression would.
+ * `isBudgetExhausted` must name the ONE 429 shape that means the wallet is
+ * empty, and must NOT fire on an ordinary per-minute rate-limit 429 (which
+ * stays a transient, retryable failure elsewhere in the codebase — see
+ * `RETRYABLE_STATUSES` in src/lib/ai/gemini-provider.ts).
+ */
+describe("isBudgetExhausted", () => {
+  it("is true for the exact incident wording: prepayment credits depleted", () => {
+    assert.equal(isBudgetExhausted(429, "prepayment credits depleted"), true);
+  });
+
+  it("is true for 'insufficient credits' phrasing", () => {
+    assert.equal(isBudgetExhausted(429, "Your account has insufficient credits to continue."), true);
+  });
+
+  it("is true for 'quota exhausted' phrasing", () => {
+    assert.equal(isBudgetExhausted(429, "Your prepaid quota exhausted for this billing cycle."), true);
+  });
+
+  it("is FALSE for an ordinary per-minute rate-limit 429 — that must stay retryable, not a budget outage", () => {
+    assert.equal(
+      isBudgetExhausted(429, "You exceeded your current quota, please check your plan and billing details."),
+      false,
+    );
+  });
+
+  it("is false for budget wording on any non-429 status", () => {
+    assert.equal(isBudgetExhausted(503, "prepayment credits depleted"), false);
+    assert.equal(isBudgetExhausted(500, "insufficient credits"), false);
+  });
+
+  it("is false for missing, empty, or non-string body text", () => {
+    assert.equal(isBudgetExhausted(429, null), false);
+    assert.equal(isBudgetExhausted(429, ""), false);
+    assert.equal(isBudgetExhausted(429, undefined), false);
+  });
+});
+
+describe("wrapWithBudgetDetection", () => {
+  function fakeProviderThrowingOnGenerate(error) {
+    return {
+      name: "fake",
+      async generateResponse() {
+        throw error;
+      },
+      async *streamResponse() {
+        yield "";
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+  }
+
+  it("rethrows a budget-exhausted 429 as EvalBudgetExhaustedError, from generateResponse", async () => {
+    const error = new Error(
+      "[GoogleGenerativeAI Error]: Error fetching from https://x: [429 Too Many Requests] prepayment credits depleted",
+    );
+    error.status = 429;
+    const wrapped = wrapWithBudgetDetection(fakeProviderThrowingOnGenerate(error));
+    await assert.rejects(() => wrapped.generateResponse("sys", []), EvalBudgetExhaustedError);
+  });
+
+  it("passes an unrelated error through untouched (not reclassified)", async () => {
+    const wrapped = wrapWithBudgetDetection(fakeProviderThrowingOnGenerate(new Error("boom")));
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (err) => {
+        assert.ok(!(err instanceof EvalBudgetExhaustedError));
+        assert.equal(err.message, "boom");
+        return true;
+      },
+    );
+  });
+
+  it("classifies a budget-exhausted error thrown mid-stream from streamResponse", async () => {
+    const provider = {
+      name: "fake",
+      async generateResponse() {
+        return "ok";
+      },
+      async *streamResponse() {
+        yield "partial chunk";
+        const error = new Error("quota exhausted");
+        error.status = 429;
+        throw error;
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+    const wrapped = wrapWithBudgetDetection(provider);
+    async function drain() {
+      const chunks = [];
+      for await (const chunk of wrapped.streamResponse("sys", [])) chunks.push(chunk);
+      return chunks;
+    }
+    await assert.rejects(drain, EvalBudgetExhaustedError);
+  });
+
+  it("classifies a budget-exhausted error from streamWithTools when the provider implements it", async () => {
+    const error = new Error("prepayment credits depleted");
+    error.status = 429;
+    const provider = {
+      name: "fake",
+      async generateResponse() {
+        return "ok";
+      },
+      async *streamResponse() {
+        yield "";
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+      async *streamWithTools() {
+        throw error;
+      },
+    };
+    const wrapped = wrapWithBudgetDetection(provider);
+    assert.ok(wrapped.streamWithTools, "streamWithTools must stay capability-detected through the wrapper");
+    async function drain() {
+      const events = [];
+      for await (const event of wrapped.streamWithTools("sys", [], [], async () => ({}))) events.push(event);
+      return events;
+    }
+    await assert.rejects(drain, EvalBudgetExhaustedError);
+  });
+
+  it("does not add streamWithTools when the wrapped provider lacks it", () => {
+    const wrapped = wrapWithBudgetDetection(fakeProviderThrowingOnGenerate(new Error("boom")));
+    assert.equal(wrapped.streamWithTools, undefined);
+  });
+});
+
+/**
+ * Every eval script's `main().catch(reportEvalFailure)` — the shared
+ * top-level handler the workflow's exit-code branching depends on.
+ */
+describe("reportEvalFailure", () => {
+  function withCapturedExitCodeAndConsoleError(fn) {
+    const originalExitCode = process.exitCode;
+    const originalConsoleError = console.error;
+    const loggedArgs = [];
+    console.error = (...args) => loggedArgs.push(args);
+    try {
+      process.exitCode = undefined;
+      fn();
+      return { exitCode: process.exitCode, loggedArgs };
+    } finally {
+      process.exitCode = originalExitCode;
+      console.error = originalConsoleError;
+    }
+  }
+
+  it("sets exit code 3 and logs the named ::error:: line for a budget-exhausted run", () => {
+    const budgetError = new EvalBudgetExhaustedError(new Error("prepayment credits depleted"));
+    const { exitCode, loggedArgs } = withCapturedExitCodeAndConsoleError(() => reportEvalFailure(budgetError));
+    assert.equal(exitCode, 3);
+    assert.ok(
+      loggedArgs.some((args) => args[0] === "::error::Gemini budget exhausted — evals not run"),
+      `expected the named ::error:: line, got: ${JSON.stringify(loggedArgs)}`,
+    );
+  });
+
+  it("sets the ORDINARY exit code 1 for any other error, unchanged from today's behavior", () => {
+    const ordinary = new Error("something else broke");
+    const { exitCode, loggedArgs } = withCapturedExitCodeAndConsoleError(() => reportEvalFailure(ordinary));
+    assert.equal(exitCode, 1);
+    assert.ok(
+      !loggedArgs.some((args) => args[0] === "::error::Gemini budget exhausted — evals not run"),
+      "an ordinary failure must never print the budget-exhausted line",
+    );
   });
 });
