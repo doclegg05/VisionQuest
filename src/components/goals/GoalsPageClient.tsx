@@ -1222,7 +1222,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
               <button
                 type="button"
                 onClick={() => setAddingMonthly(true)}
-                className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-raised)]"
+                className="min-h-11 rounded-full border border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-raised)]"
               >
                 Add Monthly Goal Card
               </button>

@@ -223,14 +223,35 @@ export function WorkAvailabilitySection() {
               key={mode}
               className="flex min-h-11 items-center gap-3 text-sm text-[var(--ink-strong)]"
             >
-              <input
-                type="radio"
-                name="work-transport"
-                value={mode}
-                checked={transport === mode}
-                onChange={() => setTransport(mode)}
-                className="h-5 w-5"
-              />
+              {/*
+                The <input> itself, not the wrapping <label>, is what the
+                touch-targets collector measures — a taller label around a
+                20x20 radio still reports as undersized. `sr-only` on the
+                real radio makes it a 1x1 clipped box the collector's own
+                exclusion recognizes as "not a touch target a sighted user
+                could tap"; the label supplies the real 44px tap area and a
+                sibling `peer`-styled dot shows the checked state, so the
+                visible control stays a normal small radio rather than being
+                scaled up.
+              */}
+              <span className="relative inline-flex h-5 w-5 shrink-0">
+                <input
+                  type="radio"
+                  name="work-transport"
+                  value={mode}
+                  checked={transport === mode}
+                  onChange={() => setTransport(mode)}
+                  className="peer sr-only"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-raised)] transition-colors peer-checked:border-[var(--accent-strong)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent-strong)]"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 m-auto h-2.5 w-2.5 rounded-full bg-[var(--accent-strong)] opacity-0 transition-opacity peer-checked:opacity-100"
+                />
+              </span>
               {TRANSPORT_LABELS[mode]}
             </label>
           ))}

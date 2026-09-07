@@ -240,7 +240,7 @@ export default function OpportunitiesHub({
                       href={opportunity.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="shrink-0 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+                      className="shrink-0 inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                     >
                       Open listing
                     </a>
@@ -266,7 +266,7 @@ export default function OpportunitiesHub({
                         type="button"
                         onClick={() => void attachCurrentResume(opportunity.id)}
                         disabled={attachingId === opportunity.id || savingId === opportunity.id}
-                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {attachingId === opportunity.id
                           ? "Preparing resume..."
@@ -279,7 +279,7 @@ export default function OpportunitiesHub({
                           href={`/api/files/download?id=${draft.resumeFileId}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
+                          className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
                         >
                           View Resume
                         </a>
@@ -289,7 +289,7 @@ export default function OpportunitiesHub({
                           type="button"
                           onClick={() => void removeAttachedResume(opportunity.id)}
                           disabled={savingId === opportunity.id || attachingId === opportunity.id}
-                          className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="min-h-11 rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Remove Resume
                         </button>

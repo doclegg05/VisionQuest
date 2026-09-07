@@ -290,52 +290,63 @@ function StudentAccordion({
 
   return (
     <div className={`overflow-hidden rounded-[1.15rem] border ${borderColor} ${bgColor} transition-colors`}>
-      {/* Collapsed header — always visible */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-black/[0.02]"
-        aria-expanded={isOpen}
-      >
-        {/* Chevron */}
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={[
-            "shrink-0 text-[var(--ink-muted)] transition-transform",
-            isOpen ? "rotate-90" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+      {/*
+        Collapsed header — always visible. Split across a toggle <button> and
+        a sibling actions <div> rather than one <button> wrapping everything:
+        the "Ask Sage" <button> and "View student" <Link> used to be nested
+        INSIDE this row's own <button>, which axe's nested-interactive rule
+        (and the HTML spec — a <button> cannot contain interactive content)
+        correctly rejects. Splitting them into siblings inside one flex row
+        keeps the same visual layout and click targets with no nesting.
+      */}
+      <div className="flex w-full items-center gap-3 px-4 py-3.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 text-left transition-colors hover:bg-black/[0.02]"
+          aria-expanded={isOpen}
         >
-          <path d="m9 18 6-6-6-6" />
-        </svg>
+          {/* Chevron */}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={[
+              "shrink-0 text-[var(--ink-muted)] transition-transform",
+              isOpen ? "rotate-90" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-[var(--ink-strong)]">
-              {group.student.displayName}
-            </span>
-            {group.highCount > 0 && (
-              <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-800">
-                {group.highCount} urgent
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-[var(--ink-strong)]">
+                {group.student.displayName}
               </span>
-            )}
-            <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
-              {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
-            </span>
+              {group.highCount > 0 && (
+                <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-800">
+                  {group.highCount} urgent
+                </span>
+              )}
+              <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
+                {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">{preview}</p>
           </div>
-          <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">{preview}</p>
-        </div>
+        </button>
 
-        {/* Quick actions on the collapsed row */}
-        <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        {/* Quick actions on the collapsed row — siblings of the toggle
+            button, not children of it */}
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => openSageWithMessage(buildSageMessage(group))}
@@ -350,7 +361,7 @@ function StudentAccordion({
             View student
           </Link>
         </div>
-      </button>
+      </div>
 
       {/* Expanded — consolidated items grouped by category */}
       {isOpen && (

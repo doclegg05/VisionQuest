@@ -2,7 +2,7 @@
   "suite": "touch-targets",
   "title": "Touch targets at 375px (student routes)",
   "area": "a11y",
-  "tier": "watch",
+  "tier": "gate",
   "scorer": "scripts/bench/suites/touch-targets.mjs",
   "fixture": "config/benchmarks/fixtures/touch-targets.json",
   "requires": ["browser", "server"],
@@ -15,5 +15,5 @@
       "tolerance": 0
     }
   ],
-  "notes": "TIER IS WATCH, NOT GATE (builder A8, 2026-09-05): this worktree has no DATABASE_URL/dev server (standing 'a worktree has no .env.local either' gotcha), so e2e/bench-touch-targets.spec.ts could not actually be run here to establish today's real count — per the task brief ('if the count is > 0 today, set tier watch ... do not fix pages in this task'), the safe default when the count is UNKNOWN is the same as when it is known-nonzero: watch, not gate. Promote to gate once someone with a working local server + DATABASE_URL (or CI) runs `npx playwright test e2e/bench-touch-targets.spec.ts` and confirms undersized_targets is 0 — if it is not 0, this suite's `details.violations` names every offending route/selector for a follow-up fix, deliberately not attempted in this task. e2e spec walks /dashboard, /career, /goals, /orientation, /settings, /appointments, /memory at 375x667 as the seeded E2E_STUDENT fixture; excludes not-visible, disabled, and .sr-only elements."
+  "notes": "TIER PROMOTED TO GATE (Ticket D3, 2026-09-07): CI run 34072983383 measured 51 undersized elements across /dashboard, /career, /goals, /orientation, /settings, /appointments, /memory at 375x667. Every row got a named source-level fix — min-h-11/min-w-11 on the shared shell (NotificationBell h-9w-9->h-11w-11, NavBar's mobile log-out button, ChatWindow's sidebar toggle which matched the /dashboard-only 42x38 row exactly: icon 20 + px-2.5 padding 20 + border 2 = 42, and py-2 padding 16 + border 2 = 38), JobFilters' proximity tabs, JobCard's status select/Update button, StudentAdvisingHub's booking select/select/input, OrientationWelcomeVideo's download link, StudentPathwayPlan's Sage link, the universal AskSageLink component (min-h-10, 40px, was under the 44px floor on every route that uses it — appointments/career/dashboard/etc.), OpportunitiesHub/EventsHub's pill controls, and an sr-only-input-plus-peer-styled-visual-span pattern for the 6 settings checkboxes/radios (SMS consent + the 5 work-transport radios) — the collector measures the raw <input>'s own bounding box, so a taller wrapping <label> alone does not clear a violation; the real 20x20 checkbox is made a 1x1 .sr-only box (which the collector's own exclusion already treats as 'not a touch target a sighted user could tap'), and the label becomes the real 44px tap area. Fixed from source, not re-verified against a running browser in this container (no Playwright/BENCH_BASE_URL/DATABASE_URL here — standing worktree gotcha); CI's next run is the real measurement, and per the ticket the orchestrator routes any residual back to this ticket rather than silently reverting the gate."
 }
