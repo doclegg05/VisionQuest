@@ -727,6 +727,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         isStaffChat ? "staff" : "student",
         3,
         promptTier === "compact" ? 2000 : 6000,
+        // Attribution for the query embedding's LlmCallLog row and audit event
+        // (FERPA review W5). Staff chat has no student subject here.
+        { studentId: isStaffChat ? null : session.id },
       ),
       Promise.resolve(getFormContext(userMessage)),
       memoryEnabled

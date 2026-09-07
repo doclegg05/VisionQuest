@@ -169,6 +169,11 @@ export async function searchForms(params: {
   query: string;
   role: string;
   limit?: number;
+  /**
+   * The student whose query this is, for LlmCallLog / AI-audit attribution of
+   * the query embedding (FERPA review W5). Null or absent for staff callers.
+   */
+  studentId?: string | null;
 }): Promise<FormSearchResult> {
   const query = params.query.trim();
   const limit = Math.min(Math.max(params.limit ?? DEFAULT_LIMIT, 1), 8);
@@ -184,7 +189,11 @@ export async function searchForms(params: {
   const formEmbeddings = await getFormEmbeddings();
   if (formEmbeddings) {
     try {
-      const queryVec = await embedQuery(query, { callSite: "sage_form_search_query" });
+      const queryVec = await embedQuery(query, {
+        callSite: "sage_form_search_query",
+        studentId: params.studentId ?? null,
+        sensitivity: params.studentId ? "student_record" : "staff_entered",
+      });
       semantic = new Map<string, number>();
       for (const form of visible) {
         const vec = formEmbeddings.get(form.id);

@@ -5,6 +5,7 @@ import { cached, invalidatePrefix } from "@/lib/cache";
 export const SYSTEM_CONFIG_KEYS = [
   "gemini_api_key",
   "ai_provider",
+  "ai_cloud_policy",
   "ai_provider_url",
   "ai_provider_model",
   // Per-role local model overrides. Unset → the role uses

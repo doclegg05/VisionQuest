@@ -80,15 +80,8 @@ export type AiCloudPolicy = (typeof AI_CLOUD_POLICIES)[number];
  */
 export const DEFAULT_AI_CLOUD_POLICY: AiCloudPolicy = "permissive";
 
-/**
- * SystemConfig key. NOT yet a member of `SYSTEM_CONFIG_KEYS` in
- * src/lib/system-config.ts (outside this change's file fence), so the admin
- * settings surface cannot set it and `isValidConfigKey` rejects it; until that
- * one-line addition lands the switch is set through the `AI_CLOUD_POLICY`
- * env var. The cast is what lets the read compile meanwhile — remove it when
- * the key is registered.
- */
-export const AI_CLOUD_POLICY_CONFIG_KEY = "ai_cloud_policy" as SystemConfigKey;
+/** SystemConfig key (registered in `SYSTEM_CONFIG_KEYS`, so the admin settings surface can set it). */
+export const AI_CLOUD_POLICY_CONFIG_KEY: SystemConfigKey = "ai_cloud_policy";
 export const AI_CLOUD_POLICY_ENV = "AI_CLOUD_POLICY";
 
 export function isAiCloudPolicy(value: string): value is AiCloudPolicy {
