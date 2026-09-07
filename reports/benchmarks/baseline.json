@@ -458,13 +458,13 @@
   },
   "rls-coverage": {
     "coverage_ratio": {
-      "value": 0.1956521739130435,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:58:54.091Z",
+      "value": 1,
+      "commit": "e32b65fd",
+      "measuredAt": "2026-09-07T03:38:58.747Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "D6: RLS suite extended from 19 to 93 of 93 policy-bearing tables (one positive + one negative case each, written against the installed pg_policies); floor raised from 0.15 to 1.00 so a new policy-bearing table with no case reds the gate"
     }
   },
   "scheduled-layer-drift": {
