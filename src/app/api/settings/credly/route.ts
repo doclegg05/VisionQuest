@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { withAuth, badRequest } from "@/lib/api-error";
+import { withAuth, badRequest, rateLimited } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * GET /api/settings/credly — get current Credly username
@@ -17,6 +18,19 @@ export const GET = withAuth(async (session) => {
  * POST /api/settings/credly — save Credly username
  */
 export const POST = withAuth(async (session, req: Request) => {
+  // Five saves per fifteen minutes, per account. The READ side
+  // (GET /api/credly/badges) already limits at 30/minute because it mints
+  // `credly:<username>` cache entries against a ceiling that refuses writes
+  // rather than evicting — but the username it caches under is chosen HERE,
+  // so without a limit on the write the read limit bounded how often one
+  // account could ask about a username and not how many it could nominate
+  // (2026-09-06 hunt, follow-up 9). Own bucket, not the read one: a badge
+  // page refresh must not spend the write budget, and 30/minute is not the
+  // ceiling a settings field wants. Counted before the body is read, so a
+  // spent bucket cannot be probed for validation behaviour.
+  const rl = await rateLimit(`credly:write:${session.id}`, 5, 15 * 60 * 1000);
+  if (!rl.success) throw rateLimited();
+
   const body = await req.json();
   let username = (typeof body.credlyUsername === "string" ? body.credlyUsername : "").trim();
 
