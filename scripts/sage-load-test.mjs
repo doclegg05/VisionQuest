@@ -31,6 +31,29 @@
  * indistinguishable from an outage from that student's chair. No load test
  * or queue/backpressure design existed before this script.
  *
+ * CORRECTED 2026-09-07 (E3, docs/plans/2026-09-07-todo-completion-plan.md;
+ * see .claude/MEMORY.md Known Issues, "sage-load-test.mjs's stated premise is
+ * wrong"): the charter's own "15-student 9.0 min p50" figure was NEVER a
+ * measurement of 15 concurrent requests — it was `classroomSize x measured
+ * single-call p50` computed from a run at --concurrency=1, i.e. pure
+ * arithmetic extrapolation from a 1-way sample. Worse, 9.0min / 15 ≈ 36s,
+ * which did not even match this script's own documented ~20-21s single-call
+ * baseline at the time, and nothing in the report said "projected" out
+ * loud. The CLASSROOM VERDICT block below now gets its measured/projected
+ * decision and its arithmetic from the pure, unit-tested
+ * `scripts/lib/sage-load-test-projection.mjs` (see that file's header for
+ * the exact rule) rather than computing `classroomSize x p50` inline and
+ * printing it under a bare "p50" label:
+ *   - The per-reply pace (p50/p95 latency of one reply) is always labeled
+ *     MEASURED — it was read directly off real completed requests.
+ *   - The classroom-wait figure (how long the Nth student waits) is labeled
+ *     MEASURED only when this run actually sent >= --classroom-size
+ *     concurrent requests in one wave (--turns=1) — i.e. only when the
+ *     script ran the real N-way test from the FULL 15-WAY PROCEDURE below.
+ *     Any smaller run's classroom-wait figure is always labeled PROJECTED
+ *     and its basis string says exactly what was multiplied by what, so a
+ *     reader cannot mistake an extrapolation for a measurement again.
+ *
  * THIS SCRIPT VS. THE BENCHMARK SUITE: this file remains the manual,
  * exploratory instrument — full control over concurrency/turns/model/prompt
  * size, verbose per-request output, JSON export. `scripts/bench/suites/
@@ -154,6 +177,11 @@
 
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
 import { percentile } from "./lib/percentile.mjs";
+import {
+  LABEL_MEASURED,
+  buildClassroomWait,
+  isAtOrPastTimeout,
+} from "./lib/sage-load-test-projection.mjs";
 import { writeFileSync } from "node:fs";
 
 loadEnvFile();
@@ -491,12 +519,13 @@ function report(allResults, wallClockMs, args) {
 
   console.log("\n--- CLASSROOM VERDICT ---");
   if (p50 === null) {
-    console.log("  No successful replies this run — cannot project a classroom wait time.");
+    console.log("  No successful replies this run — cannot report a classroom wait time.");
   } else {
-    const projectedP50Ms = args.classroomSize * p50;
-    const projectedP95Ms = args.classroomSize * (p95 ?? p50);
+    // Per-reply pace is always a real measurement of completed requests,
+    // however many ran — labeled explicitly so it is never confused with
+    // the classroom-wait figure below, which is not always a measurement.
     console.log(
-      `  Measured serial pace this run: p50=${fmtSec(p50)}/reply, p95=${fmtSec(p95 ?? p50)}/reply ` +
+      `  [${LABEL_MEASURED}] per-reply pace this run: p50=${fmtSec(p50)}/reply, p95=${fmtSec(p95 ?? p50)}/reply ` +
         `(n=${ok.length} successful replies, concurrency=${args.concurrency}, turns=${args.turns}).`,
     );
     console.log(
@@ -505,31 +534,53 @@ function report(allResults, wallClockMs, args) {
         `(fit ratio ${serialFitRatio === null ? "n/a" : serialFitRatio.toFixed(2)}) — ` +
         (serialFitRatio !== null && serialFitRatio > 0.85 && serialFitRatio < 1.3
           ? "consistent with full FIFO serialization (no parallel inference observed)."
-          : "NOT consistent with full serialization — investigate before trusting the projection below."),
+          : "NOT consistent with full serialization — investigate before trusting the figures below."),
+    );
+
+    // buildClassroomWait refuses to call this MEASURED unless this run
+    // actually sent >= classroomSize concurrent requests in one wave
+    // (turns=1) — see scripts/lib/sage-load-test-projection.mjs. Otherwise
+    // it is always PROJECTED (classroomSize x pace), and says so.
+    const p50Wait = buildClassroomWait({
+      classroomSize: args.classroomSize,
+      concurrency: args.concurrency,
+      turns: args.turns,
+      paceMs: p50,
+      observedWaitMs: wallClockMs,
+    });
+    const p95Wait = buildClassroomWait({
+      classroomSize: args.classroomSize,
+      concurrency: args.concurrency,
+      turns: args.turns,
+      paceMs: p95 ?? p50,
+      observedWaitMs: max ?? wallClockMs,
+    });
+
+    console.log(
+      `  Wait for the ${args.classroomSize}th student (all sending around the same time, one Ollama ` +
+        `instance serving them in submission order):`,
     );
     console.log(
-      `  Projected wait for the ${args.classroomSize}th student (all sending around the same time, ` +
-        `one Ollama instance serving them in submission order):`,
+      `    [${p50Wait.label}] p50 case = ${fmtSec(p50Wait.waitMs)} (~${(p50Wait.waitMs / 60000).toFixed(1)} min) — ${p50Wait.basis}`,
     );
     console.log(
-      `    ${args.classroomSize} x ${fmtSec(p50)} (p50 pace) = ${fmtSec(projectedP50Ms)} (~${(projectedP50Ms / 60000).toFixed(1)} min)`,
+      `    [${p95Wait.label}] p95 case (pessimistic) = ${fmtSec(p95Wait.waitMs)} (~${(p95Wait.waitMs / 60000).toFixed(1)} min) — ${p95Wait.basis}`,
     );
-    console.log(
-      `    ${args.classroomSize} x ${fmtSec(p95 ?? p50)} (p95 pace, pessimistic) = ${fmtSec(projectedP95Ms)} (~${(projectedP95Ms / 60000).toFixed(1)} min)`,
-    );
+
     const timeoutFlag = (label, ms) =>
-      ms >= NON_STREAMING_TIMEOUT_MS
+      isAtOrPastTimeout(ms, NON_STREAMING_TIMEOUT_MS)
         ? `  *** AT/PAST the ${fmtSec(NON_STREAMING_TIMEOUT_MS)} non-streaming request timeout ` +
           `(OllamaProvider.GENERATE_TIMEOUT_MS) — ${label} would see their request TIME OUT, not just arrive late. ***`
         : `  (${fmtSec(NON_STREAMING_TIMEOUT_MS - ms)} of headroom before the ${fmtSec(NON_STREAMING_TIMEOUT_MS)} non-streaming timeout)`;
-    console.log(`    p50 projection${timeoutFlag(`the ${args.classroomSize}th student`, projectedP50Ms)}`);
-    console.log(`    p95 projection${timeoutFlag(`the ${args.classroomSize}th student`, projectedP95Ms)}`);
-    if (args.concurrency < args.classroomSize) {
+    console.log(`    p50 case${timeoutFlag(`the ${args.classroomSize}th student`, p50Wait.waitMs)}`);
+    console.log(`    p95 case${timeoutFlag(`the ${args.classroomSize}th student`, p95Wait.waitMs)}`);
+
+    if (p50Wait.label !== LABEL_MEASURED) {
       console.log(
-        `  NOTE: this run used --concurrency=${args.concurrency}, a fraction of a full ` +
-          `${args.classroomSize}-student classroom. This projection extrapolates a small sample —` +
-          ` run the real ${args.classroomSize}-way test (see the FULL 15-WAY PROCEDURE in this ` +
-          `script's header comment) on a quiet box before treating it as a go/no-go number.`,
+        `  NOTE: this run used --concurrency=${args.concurrency} and --turns=${args.turns}, so the ` +
+          `wait figures above are PROJECTED, not measured — run the real ${args.classroomSize}-way, ` +
+          `single-turn test (see the FULL 15-WAY PROCEDURE in this script's header comment) on a ` +
+          `quiet box before treating this as a go/no-go number.`,
       );
     }
   }
