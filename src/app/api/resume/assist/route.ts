@@ -75,14 +75,11 @@ export const POST = withAuth(async (session, req: Request) => {
         : "Operator configured cloud AI; resume drafting routed to the configured provider.",
   });
 
-  const [student, goals, portfolioItems, certifications, storedResume] = await Promise.all([
-    prisma.student.findUnique({
-      where: { id: session.id },
-      select: {
-        displayName: true,
-        email: true,
-      },
-    }),
+  // No Student row is read here any more: the draft prompt carries neither
+  // the display name nor the email (FERPA review W10), and the résumé's own
+  // contact block is withheld from the model and re-attached locally in
+  // generateResumeDraft.
+  const [goals, portfolioItems, certifications, storedResume] = await Promise.all([
     prisma.goal.findMany({
       where: { studentId: session.id, status: { in: ["active", "completed"] } },
       orderBy: { updatedAt: "desc" },
@@ -125,8 +122,6 @@ export const POST = withAuth(async (session, req: Request) => {
 
   try {
     const result = await generateResumeDraft(provider, {
-      studentName: student?.displayName || session.displayName,
-      studentEmail: student?.email || "",
       prompt: body.prompt,
       existingResume: parseStoredResumeData(storedResume?.data),
       goals: goals.map((goal) => goal.content),

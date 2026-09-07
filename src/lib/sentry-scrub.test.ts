@@ -125,9 +125,12 @@ describe("scrubPii: request bodies", () => {
 });
 
 describe("scrubPii: existing guarantees still hold", () => {
-  it("removes user email, username, and ip, and keeps the id", () => {
+  it("removes user email, username, ip, and id", () => {
+    // W11 (2026-09-06): `user.id` is the student's cuid, which resolves to one
+    // student's record for anyone who can also read the database
+    // (.claude/rules/security.md). Before this it was the one user field kept.
     const out = scrubPii(resetPageEvent(), HINT);
-    assert.deepEqual(out?.user, { id: "u1" });
+    assert.deepEqual(out?.user, {});
   });
 
   it("removes cookies and the cookie, authorization, and x-forwarded-for headers regardless of case", () => {
@@ -417,4 +420,88 @@ describe("Sentry configs route through the scrub", () => {
       assert.match(source, /beforeSendTransaction: scrubPii/, `${name} lacks beforeSendTransaction: scrubPii`);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Review W11 (2026-09-06). Two gaps that survived the W1 field sweep above:
+// `redactText` knew emails and secrets but not PHONE NUMBERS, so a Twilio
+// error quoting a student's handset reached Sentry through every field the
+// sweep routes; and `user.id` — the student's cuid — was the one user field
+// deliberately kept. Verified before the fix: the phone came back intact in
+// `exception.values[].value`, and `user.id` came back verbatim.
+// ---------------------------------------------------------------------------
+
+const STUDENT_EMAIL = "tanesha.rivers@example.org";
+const STUDENT_PHONE = "+13045550142";
+const STUDENT_PHONE_FORMATTED = "(304) 555-0142";
+const STUDENT_CUID = "clzstudent00000000000042";
+
+function studentContactEvent(): ErrorEvent {
+  return {
+    type: undefined,
+    message: `notification failed for ${STUDENT_EMAIL}`,
+    user: { id: STUDENT_CUID, email: STUDENT_EMAIL },
+    exception: {
+      values: [
+        {
+          type: "Error",
+          value: `The 'To' number ${STUDENT_PHONE} is not a valid phone number`,
+        },
+      ],
+    },
+    breadcrumbs: [
+      { category: "console", message: `sms to ${STUDENT_PHONE_FORMATTED} bounced` },
+    ],
+    extra: { lastRecipient: STUDENT_PHONE },
+  };
+}
+
+describe("scrubPii: student contact details and user.id (W11)", () => {
+  it("redacts a student email in event.message", () => {
+    const out = scrubPii(studentContactEvent(), HINT);
+    assert.doesNotMatch(out.message ?? "", new RegExp(STUDENT_EMAIL.replace(".", "\\.")));
+    assert.match(out.message ?? "", /notification failed for/);
+  });
+
+  it("redacts a phone number in exception.values[].value", () => {
+    const out = scrubPii(studentContactEvent(), HINT);
+    const value = out.exception?.values?.[0]?.value ?? "";
+    assert.ok(!value.includes(STUDENT_PHONE), `phone reached Sentry: ${value}`);
+    assert.match(value, /is not a valid phone number/, "the provider's reason survives");
+  });
+
+  it("redacts a separator-formatted phone number in a breadcrumb message", () => {
+    const out = scrubPii(studentContactEvent(), HINT);
+    const crumb = out.breadcrumbs?.[0]?.message ?? "";
+    assert.ok(!crumb.includes(STUDENT_PHONE_FORMATTED), `phone reached Sentry: ${crumb}`);
+    assert.ok(!crumb.includes("555-0142"));
+  });
+
+  it("drops user.id", () => {
+    const out = scrubPii(studentContactEvent(), HINT);
+    assert.equal(out.user?.id, undefined);
+    assert.equal(out.user?.email, undefined);
+  });
+
+  it("leaves no copy of the email, the phone, or the cuid anywhere in the event", () => {
+    const out = scrubPii(studentContactEvent(), HINT);
+    const text = serialized(out);
+    assert.ok(!text.includes(STUDENT_EMAIL));
+    assert.ok(!text.includes(STUDENT_PHONE));
+    assert.ok(!text.includes("555-0142"));
+    assert.ok(!text.includes(STUDENT_CUID));
+  });
+
+  it("leaves bare digit runs alone so trace ids and timestamps survive", () => {
+    // The phone rule is the one log-redaction.ts already uses: E.164 or
+    // separator-formatted only. A 32-hex trace id and an epoch are not phones.
+    const event: Event = {
+      type: undefined,
+      message: "failed at 1755691234567 with code 21211",
+      contexts: { trace: { trace_id: "1".repeat(32), span_id: "2".repeat(16) } },
+    };
+    const out = scrubPii(event, HINT);
+    assert.equal(out.message, "failed at 1755691234567 with code 21211");
+    assert.equal(out.contexts?.trace?.trace_id, "1".repeat(32));
+  });
 });

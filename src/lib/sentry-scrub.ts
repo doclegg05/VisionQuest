@@ -1,4 +1,5 @@
 import type { Breadcrumb, Event, EventHint } from "@sentry/nextjs";
+import { redactContactInfo } from "@/lib/log-redaction";
 
 /**
  * Strip PII and secrets from Sentry events before transmission.
@@ -19,6 +20,13 @@ import type { Breadcrumb, Event, EventHint } from "@sentry/nextjs";
  * `/api/connect/employer/<token>/…`), which the `key=value` rule never saw —
  * see CAPABILITY_PATH_SEGMENT below. Header values are text-scrubbed now too,
  * because `referer` carried whatever the URL carried.
+ *
+ * FERPA review W11 (2026-09-06): `redactText` knew emails and secrets but not
+ * phone numbers, and `user.id` — the student's cuid — was the one user field
+ * kept. Phones now go through the same `redactContactInfo` the delivery
+ * boundaries use (one phone pattern in the codebase, not two), and `user.id`
+ * is dropped: a student identifier is PII in a log sink
+ * (.claude/rules/security.md), and Sentry is a log sink.
  */
 
 type RequestData = NonNullable<Event["request"]>;
@@ -92,11 +100,16 @@ const DROPPED_HEADERS = new Set(["cookie", "authorization", "x-forwarded-for"]);
 const MAX_DATA_DEPTH = 8;
 
 function redactText(text: string): string {
-  return text
-    .replace(SECRET_PARAM, `$1$2=${REDACTED}`)
-    .replace(CAPABILITY_PATH_SEGMENT, `$1${REDACTED}`)
-    .replace(SECRET_JSON_FIELD, `$1${REDACTED}"`)
-    .replace(EMAIL, "[EMAIL_REDACTED]");
+  // `redactContactInfo` runs last: its own email rule is a no-op on
+  // "[EMAIL_REDACTED]" (no "@"), and its phone rule matches E.164 and
+  // separator-formatted numbers only, so trace ids and epochs survive.
+  return redactContactInfo(
+    text
+      .replace(SECRET_PARAM, `$1$2=${REDACTED}`)
+      .replace(CAPABILITY_PATH_SEGMENT, `$1${REDACTED}`)
+      .replace(SECRET_JSON_FIELD, `$1${REDACTED}"`)
+      .replace(EMAIL, "[EMAIL_REDACTED]"),
+  );
 }
 
 function scrubRecord(record: object, depth: number): Record<string, unknown> {
@@ -156,8 +169,13 @@ function scrubRequest(request: RequestData): RequestData {
   };
 }
 
+/**
+ * Nothing that resolves to a student survives: `id` is the Student cuid
+ * (W11), and email/username/ip were already dropped. Correlate through the
+ * request id or `studentLogKey` in the log line instead.
+ */
 function scrubUser(user: SentryUser): SentryUser {
-  const { email: _email, username: _username, ip_address: _ipAddress, ...rest } = user;
+  const { id: _id, email: _email, username: _username, ip_address: _ipAddress, ...rest } = user;
   return rest;
 }
 

@@ -19,7 +19,31 @@ const SESSION_COOKIE_NAME = "vq-session";
 //   3. Per-request CSP nonce generation (replaces static unsafe-inline)
 //   4. X-API-Version response header on /api/* responses
 //   5. RLS context headers derived from the session JWT (Slice B).
+//   6. X-Robots-Tag on the two public per-student pages (crawlerHeadersFor).
 // The static CSP in next.config.ts has been removed — this proxy is the single source of truth.
+// Referrer-Policy and X-Content-Type-Options are NOT set here: next.config.ts
+// `headers()` already applies both (plus HSTS and X-Frame-Options) to `/(.*)`.
+
+/**
+ * Prefixes under which every response renders ONE student's data behind an
+ * opaque identifier with no login: the public credential page and the
+ * employer response page (plus the packet PDF it links). FERPA review W7
+ * (2026-09-06): neither carried `noindex`, and the repo has no robots.txt, so
+ * a search engine could index a TANF recipient's name against a credential.
+ * The pages also export `robots` metadata; the header is the layer that
+ * covers non-HTML responses and any renderer that forgets the metadata.
+ *
+ * `/teacher/connect` is the staff console and is not a prefix match here.
+ */
+const NOINDEX_PREFIXES = ["/credentials", "/connect"] as const;
+
+/** Pure: response headers a path earns from its prefix alone. */
+export function crawlerHeadersFor(pathname: string): Record<string, string> {
+  const noindex = NOINDEX_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix + "/"),
+  );
+  return noindex ? { "X-Robots-Tag": "noindex, nofollow" } : {};
+}
 
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -135,6 +159,10 @@ export function proxy(request: NextRequest) {
   // API version header
   if (isApi) {
     response.headers.set("X-API-Version", "1");
+  }
+
+  for (const [name, value] of Object.entries(crawlerHeadersFor(pathname))) {
+    response.headers.set(name, value);
   }
 
   return response;
