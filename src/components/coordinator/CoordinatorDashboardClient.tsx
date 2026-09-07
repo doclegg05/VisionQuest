@@ -262,7 +262,7 @@ export default function CoordinatorDashboardClient({ regions }: { regions: Regio
           <WagerHitRateCard metrics={data.wagerHitRate} />
           <GrantProgressPanel goals={data.rollup.grantGoals} regionId={regionId} onChange={() => loadRollup(regionId)} />
           <InstructorGrid metrics={data.instructorMetrics} />
-          <FormRollupList />
+          <FormRollupList regionId={regionId} />
         </div>
       ) : null}
     </>
