@@ -220,10 +220,21 @@ const ALL_TEACHERS = [
   { id: "teacher-all-2", email: "all2@example.test" },
 ];
 
+// Real rows always carry a non-null role and a class status; the shared
+// resolver (src/lib/staff-recipients.ts) filters on both, so the fixture
+// must too — a missing field would be filtered out as non-staff.
 function enrollmentWithInstructors(
-  instructors: { id: string; email: string | null; isActive: boolean }[],
+  instructors: { id: string; email: string | null; isActive: boolean; role?: string }[],
+  classStatus = "active",
 ) {
-  return { class: { instructors: instructors.map((instructor) => ({ instructor })) } };
+  return {
+    class: {
+      status: classStatus,
+      instructors: instructors.map(({ role = "teacher", ...instructor }) => ({
+        instructor: { ...instructor, role },
+      })),
+    },
+  };
 }
 
 function notifiedIds(): string[] {

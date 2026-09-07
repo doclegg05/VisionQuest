@@ -196,7 +196,13 @@ test.describe("Day-1 student journey", () => {
       // Exactly one next-step badge. ("Current Target" was renamed to plain
       // language on 2026-08-20 — the invariant this pins is the count, not
       // the wording.)
-      const nextStepBadge = page.getByText("Do this next", { exact: true });
+      // Scoped to #main-content on purpose: while a route segment streams,
+      // React parks a second copy of the page in a hidden <div id="S:n"> at
+      // the end of <body> for ~200 ms before swapping it in (reproduced
+      // locally 2026-09-07 — the copy is outside <main>). Strict locators see
+      // both; the student sees one. The invariant is what is inside <main>.
+      const main = page.locator("#main-content");
+      const nextStepBadge = main.getByText("Do this next", { exact: true });
       await expect(nextStepBadge).toHaveCount(1);
       await expect(nextStepBadge).toBeVisible();
 
@@ -204,7 +210,7 @@ test.describe("Day-1 student journey", () => {
       // step 0, and the seeded student's orientation is deliberately kept
       // incomplete (one item pending teacher verification), so the one
       // next step must be orientation with its CTA pointing at /orientation.
-      const cta = page.getByTestId("current-target-cta");
+      const cta = main.getByTestId("current-target-cta");
       // Same transient-duplicate guard as the secondary-page loop below.
       await expect(cta).toHaveCount(1, { timeout: 20_000 });
       await expect(cta).toBeVisible();
@@ -231,10 +237,11 @@ test.describe("Day-1 student journey", () => {
         await page.goto("/dashboard");
 
         // The summary replaces the strip — not both, not neither.
-        const summary = page.getByTestId("journey-step-summary");
+        const main = page.locator("#main-content");
+        const summary = main.getByTestId("journey-step-summary");
         await expect(summary).toBeVisible();
         await expect(summary).toContainText(/Step \d+ of \d+/);
-        await expect(page.getByTestId("journey-steps")).toBeHidden();
+        await expect(main.getByTestId("journey-steps")).toBeHidden();
 
         // The whole journey block must fit inside one phone screen's worth of
         // page. Measured in DOCUMENT coordinates on purpose: the chat-first
@@ -265,7 +272,9 @@ test.describe("Day-1 student journey", () => {
         for (const path of ["/goals", "/learning", "/portfolio", "/career"]) {
           await page.goto(path);
 
-          const cta = page.getByTestId("current-target-cta");
+          // Scoped to <main>: see the note in the next-step-card test above.
+          const main = page.locator("#main-content");
+          const cta = main.getByTestId("current-target-cta");
           // Poll for exactly one before touching it. A strict locator throws
           // the instant a second CTA exists, and during this page group's
           // streamed hydration a transient duplicate has been observed twice
@@ -280,8 +289,8 @@ test.describe("Day-1 student journey", () => {
 
           // The full card's parts must be absent here — that is the whole
           // point of the compact variant.
-          await expect(page.getByText("Do this next", { exact: true })).toHaveCount(0);
-          await expect(page.getByTestId("journey-step-summary")).toHaveCount(0);
+          await expect(main.getByText("Do this next", { exact: true })).toHaveCount(0);
+          await expect(main.getByTestId("journey-step-summary")).toHaveCount(0);
 
           const box = await cta.boundingBox();
           expect(box, `${path}: the CTA should be laid out`).toBeTruthy();
