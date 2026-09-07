@@ -1,0 +1,73 @@
+-- VQ-R-018 (2026-09-07 career/job-search fluidity memo): "JobListing.sourceId"
+-- was a bare, program-wide unique key, and the scrape upsert
+-- (scrape-engine.ts) matched a row by that key alone with an `update`
+-- clause that never touched classConfigId.
+--
+-- THE REAL MECHANISM (corrected from an earlier draft of this comment,
+-- which described a "classConfigId reassignment" that never happens): a
+-- shared national posting's classConfigId never actually changes hands.
+-- When two classes' regions both surface the same posting, class B's
+-- scrape finds class A's pre-existing row (matched by sourceId alone),
+-- overwrites its title/company/description and scrapeBatchId with B's
+-- version, and never creates a row of its own — B gets nothing, A's row
+-- silently shows B's content while still carrying A's own classConfigId,
+-- and A's stale-sweep sees the row as freshly touched (by B) and leaves it
+-- alone. This is SELF-HEALING once the key below is class-scoped: the very
+-- next scrape of either class no longer matches the other's row, so B
+-- creates its own and A rewrites its own correct content on its own
+-- following cycle. No manual recovery is needed.
+--
+-- This scopes the uniqueness to (classConfigId, source, sourceId) instead —
+-- a true mirror of JobBrowseListing's existing
+-- "@@unique([source, sourceId])" pattern, with the class scope this table
+-- (unlike the program-wide browse pool) has. Additive-plus-one-drop: no
+-- columns added or removed, no data rewritten, no rows deleted.
+--
+-- GUARDED (IF EXISTS / IF NOT EXISTS): this branch has not merged and this
+-- migration has not been deployed anywhere, but the guarded form is the
+-- pattern the sibling adoption migration
+-- (20260907150000_adopt_career_assessment_snapshot) already established for
+-- this repo, and it costs nothing to apply it here too — a second run of
+-- this migration.sql (by hand, or via a future `prisma migrate resolve`
+-- recovery) is then a no-op instead of an error.
+--
+-- OPERATIONAL NOTE: the DROP INDEX below removes the only index on
+-- JobListing that leads with sourceId. Between the drop and the
+-- CREATE UNIQUE INDEX immediately after, any lookup of this table by bare
+-- sourceId has no index to use (falls back to a sequential scan), and
+-- Postgres takes a lock that blocks concurrent WRITES to JobListing for the
+-- duration of both statements — reads are unaffected. On this table's
+-- current size (bounded by ~one class's worth of postings per class
+-- config) that duration is milliseconds; this note exists so a much larger
+-- future table doesn't hit this migration as a surprise.
+--
+-- PROD PRE-CHECKS REQUIRED BEFORE THIS MIGRATION IS DEPLOYED (memo §5.3):
+--
+--   -- 1. Confirm today's indexes match what this migration expects to find
+--   --    and replace (the DROP is a no-op if this doesn't exist by then):
+--   SELECT indexname, indexdef FROM pg_indexes
+--   WHERE schemaname='visionquest' AND tablename='JobListing';
+--
+--   -- 2. Same check via pg_constraint, for the unique CONSTRAINT shape
+--   --    (as opposed to the index Postgres uses to enforce it):
+--   SELECT conname, contype FROM pg_constraint
+--   WHERE conrelid='visionquest."JobListing"'::regclass;
+--
+--   -- 3. Whether any collision has already happened under the OLD bare-
+--   --    unique constraint. Under that constraint this can only ever
+--   --    return zero rows today (duplicates were structurally impossible
+--   --    pre-migration) — it is a sanity check on the constraint itself,
+--   --    not a collision finder; the actual collisions this migration
+--   --    closes leave no trace of which class's content was overwritten
+--   --    (see "THE REAL MECHANISM" above).
+--   SELECT source, "sourceId", count(*)
+--   FROM visionquest."JobListing"
+--   GROUP BY 1, 2
+--   HAVING count(*) > 1;
+
+-- DropIndex
+DROP INDEX IF EXISTS "visionquest"."JobListing_sourceId_key";
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "JobListing_classConfigId_source_sourceId_key"
+  ON "visionquest"."JobListing"("classConfigId", "source", "sourceId");
