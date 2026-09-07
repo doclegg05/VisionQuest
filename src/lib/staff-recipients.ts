@@ -1,3 +1,4 @@
+import { isStaffRole } from "./api-error";
 import { prismaAdmin } from "./db";
 
 /**
@@ -27,6 +28,9 @@ export interface StaffRecipient {
  * (possibly zero) instructors, which every caller answers by falling back to
  * all active teachers: the safe direction.
  */
+/** A class in this status no longer makes its instructors the student's. */
+const ARCHIVED_CLASS_STATUS = "archived";
+
 export const MANAGED_ENROLLMENT_STATUSES = [
   "active",
   "inactive",
@@ -35,8 +39,34 @@ export const MANAGED_ENROLLMENT_STATUSES = [
 ] as const;
 
 /**
- * The unique, active instructor accounts assigned to the classes a student is
- * (non-archived) enrolled in. Returns [] when none resolve.
+ * The unique, active, STAFF instructor accounts assigned to the non-archived
+ * classes a student is (non-archived) enrolled in. Returns [] when none
+ * resolve.
+ *
+ * Three filters, and each one is a gate rather than an optimisation:
+ *
+ *   isActive            a deactivated account is not a person to notify.
+ *   isStaffRole         W2 (2026-09-07 audit): SpokesClassInstructor has no
+ *                       role constraint, so a coordinator — or any non-staff
+ *                       account — can be linked as an instructor.
+ *                       `assertStaffRecipient` in notifications.ts refuses
+ *                       exactly `teacher | admin` on the admin client, so
+ *                       resolving anyone else produces a recipient whose
+ *                       in-app write throws while the callers' email loops
+ *                       would still mail a body naming the student. The same
+ *                       predicate is imported rather than a second list
+ *                       written here, so the two can never disagree.
+ *   class not archived  S1: an instructor whose only link to this student is
+ *                       an archived cohort is not their instructor any more.
+ *                       region-rollup.ts and classroom.ts both draw the line
+ *                       here.
+ *
+ * The filters are applied in JavaScript, over a `where` that already narrows
+ * the same three things. The duplication is deliberate: the `where` keeps the
+ * query small, and the JS pass is the enforced gate, so the behaviour is
+ * provable against a mocked client as well as a real one. Drift can only make
+ * this resolve FEWER instructors, which every caller answers by falling back
+ * to all active teachers — the safe direction.
  *
  * Throws rather than swallowing: under a student's RLS context this join
  * raises Prisma's inconsistency error instead of returning zero rows, and a
@@ -48,14 +78,22 @@ export async function findAssignedInstructors(studentId: string): Promise<StaffR
     where: {
       studentId,
       status: { in: [...MANAGED_ENROLLMENT_STATUSES] },
+      class: { status: { not: ARCHIVED_CLASS_STATUS } },
     },
     select: {
       class: {
         select: {
+          status: true,
           instructors: {
             select: {
               instructor: {
-                select: { id: true, email: true, displayName: true, isActive: true },
+                select: {
+                  id: true,
+                  email: true,
+                  displayName: true,
+                  isActive: true,
+                  role: true,
+                },
               },
             },
           },
@@ -65,9 +103,10 @@ export async function findAssignedInstructors(studentId: string): Promise<StaffR
   });
 
   const activeInstructors = enrollments
+    .filter((enrollment) => enrollment.class.status !== ARCHIVED_CLASS_STATUS)
     .flatMap((enrollment) => enrollment.class.instructors)
     .map((link) => link.instructor)
-    .filter((instructor) => instructor.isActive);
+    .filter((instructor) => instructor.isActive && isStaffRole(instructor.role));
 
   return [
     ...new Map(

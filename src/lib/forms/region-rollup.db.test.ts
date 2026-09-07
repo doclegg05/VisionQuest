@@ -44,8 +44,13 @@ async function seed() {
     data: [
       { id: id("coordA"), studentId: id("coordA"), displayName: "Coord A", role: "coordinator" },
       { id: id("coordB"), studentId: id("coordB"), displayName: "Coord B", role: "coordinator" },
-      { id: id("stuA1"), studentId: id("stuA1"), displayName: "Student A1" },
-      { id: id("stuA2"), studentId: id("stuA2"), displayName: "Student A2" },
+      // Region A carries MIN_CELL_SIZE students so its per-template counts
+      // are reported; region B stays below it on purpose (W1).
+      ...Array.from({ length: 5 }, (_, i) => ({
+        id: id(`stuA${i + 1}`),
+        studentId: id(`stuA${i + 1}`),
+        displayName: `Student A${i + 1}`,
+      })),
       { id: id("stuB1"), studentId: id("stuB1"), displayName: "Student B1" },
       { id: id("stuNone"), studentId: id("stuNone"), displayName: "Student Unregioned" },
     ],
@@ -76,8 +81,11 @@ async function seed() {
 
   await db.studentClassEnrollment.createMany({
     data: [
-      { id: id("enrA1"), classId: id("clsA"), studentId: id("stuA1") },
-      { id: id("enrA2"), classId: id("clsA"), studentId: id("stuA2") },
+      ...Array.from({ length: 5 }, (_, i) => ({
+        id: id(`enrA${i + 1}`),
+        classId: id("clsA"),
+        studentId: id(`stuA${i + 1}`),
+      })),
       { id: id("enrB1"), classId: id("clsB"), studentId: id("stuB1") },
       { id: id("enrNone"), classId: id("clsNone"), studentId: id("stuNone") },
       // Region A's archived class holds the region-B student. If the rollup
@@ -155,35 +163,36 @@ describe("getRegionFormRollup region scoping", { skip: !ENABLED }, () => {
     const rollup = await getRegionFormRollup(id("rgnA"));
 
     assert.equal(rollup.classCount, 1, "the archived class in region A is excluded");
-    assert.equal(rollup.studentCount, 2, "stuA1 + stuA2, never stuB1 or stuNone");
+    assert.equal(rollup.studentCount, 5, "region A's own roster, never stuB1 or stuNone");
 
     const row = rollup.templates.find((t) => t.templateId === id("tpl"));
     assert.ok(row, "the active template appears");
+    assert.equal(row.suppressed, false, "region A is at the minimum cell size");
     assert.equal(row.responseCount, 1, "only stuA1's response — not B's, not the unregioned one");
     assert.equal(row.assignmentCount, 1, "only the assignment targeting region A's class");
   });
 
-  it("counts only region B's students, classes and responses", async () => {
+  it("suppresses region B's per-template counts: one student, one named form (W1)", async () => {
     const rollup = await getRegionFormRollup(id("rgnB"));
 
+    // The region's own size is still reported — knowing a region is small
+    // discloses nothing about anyone in it, and hiding it would leave the
+    // reader unable to tell "no data" from "too little data".
     assert.equal(rollup.classCount, 1);
     assert.equal(rollup.studentCount, 1, "stuB1 only");
 
     const row = rollup.templates.find((t) => t.templateId === id("tpl"));
     assert.ok(row);
-    assert.equal(row.responseCount, 1, "only stuB1's response");
-    assert.equal(row.assignmentCount, 1);
+    assert.equal(row.suppressed, true);
+    assert.equal(row.responseCount, null, "stuB1 DID respond; the count is still withheld");
+    assert.equal(row.assignmentCount, null);
+    assert.equal(row.completionRate, null);
   });
 
-  it("the two regions' response sets are disjoint — no row is counted twice", async () => {
-    const [a, b] = await Promise.all([
-      getRegionFormRollup(id("rgnA")),
-      getRegionFormRollup(id("rgnB")),
-    ]);
-    const total =
-      (a.templates.find((t) => t.templateId === id("tpl"))?.responseCount ?? 0) +
-      (b.templates.find((t) => t.templateId === id("tpl"))?.responseCount ?? 0);
-    assert.equal(total, 2, "3 responses exist; the unregioned one belongs to neither region");
+  it("region A's counts exclude every out-of-region response", async () => {
+    const a = await getRegionFormRollup(id("rgnA"));
+    // Three responses exist (stuA1, stuB1, stuNone). Region A may see one.
+    assert.equal(a.templates.find((t) => t.templateId === id("tpl"))?.responseCount, 1);
   });
 
   it("returns an empty rollup for a region with no classes", async () => {

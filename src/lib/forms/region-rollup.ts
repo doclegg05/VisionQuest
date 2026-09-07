@@ -24,6 +24,19 @@ import { canPerformElevatedStaffAction } from "@/lib/classroom";
  * module therefore reads through `prismaAdmin` and enforces the scope in the
  * query instead of relying on RLS to enforce it.
  *
+ * SMALL-CELL SUPPRESSION (W1, 2026-09-07 audit)
+ * -------------------------------------------
+ * Counts are not automatically anonymous. In a region with two enrolled
+ * students, "1 response" against a titled form — "Substance Use Screening",
+ * "Domestic Violence Intake" — is one identifiable person's answer status to
+ * anyone who knows the roster, which a coordinator does. So a template row is
+ * reported only when the region holds at least MIN_CELL_SIZE students;
+ * below that the row comes back `suppressed: true` with null counts, and the
+ * counting queries are never run at all rather than run and hidden. The
+ * region's own size (classCount, studentCount) is still reported: knowing a
+ * region is small is not a disclosure about anybody in it, and hiding it
+ * would leave the reader unable to tell "no data" from "too little data".
+ *
  * The invariant that makes that safe, and which every function here must
  * keep: **no read is wider than one named region**. The caller supplies a
  * regionId, `coordinatorCanReadRegion` proves this session is assigned to
@@ -39,15 +52,31 @@ import { canPerformElevatedStaffAction } from "@/lib/classroom";
  * same blindness the app client already has.
  */
 
+/**
+ * Fewest students a region may hold before per-template counts are reported.
+ * Five is the floor used across public-sector education reporting (NCES,
+ * state report cards) for exactly this reason. Raising it is safe; lowering
+ * it is a disclosure decision, not a tuning knob.
+ */
+export const MIN_CELL_SIZE = 5;
+
 export interface RegionFormTemplateRow {
   templateId: string;
   title: string;
   isOfficial: boolean;
-  /** Assignments targeting this region's classes, or its students directly. */
-  assignmentCount: number;
-  /** Submitted or reviewed responses from students enrolled in this region. */
-  responseCount: number;
-  /** responseCount / studentCount, or null when the region has no students. */
+  /** True when the region holds fewer than MIN_CELL_SIZE students. */
+  suppressed: boolean;
+  /**
+   * Assignments targeting this region's classes, or its students directly.
+   * Null when suppressed — the query was never run.
+   */
+  assignmentCount: number | null;
+  /**
+   * Submitted or reviewed responses from students enrolled in this region.
+   * Null when suppressed.
+   */
+  responseCount: number | null;
+  /** responseCount / studentCount; null when suppressed or the region is empty. */
   completionRate: number | null;
 }
 
@@ -137,40 +166,77 @@ export async function getRegionFormRollup(regionId: string): Promise<RegionFormR
       .then((rows) => rows.map((row) => row.id)),
   ]);
 
-  const rows = await Promise.all(
-    templates.map(async (template) => {
-      const [assignmentCount, responseCount] = await Promise.all([
-        prismaAdmin.formAssignment.count({
-          where: {
-            templateId: template.id,
-            OR: [
-              { scope: "class", targetId: { in: classIds } },
-              { scope: "student", targetId: { in: studentIds } },
-            ],
-          },
-        }),
-        prismaAdmin.formResponse.count({
-          where: {
-            templateId: template.id,
-            status: { in: ["submitted", "reviewed"] },
-            // The region scope. Enrollment status is unfiltered here on
-            // purpose (see the doc block); the CLASS set is what bounds it.
-            student: { classEnrollments: { some: { classId: { in: classIds } } } },
-          },
-        }),
-      ]);
-
-      return {
+  // Below the floor nothing per-template is read, so a suppressed number
+  // cannot leak through a log, a timing difference, or a later refactor that
+  // forgets to re-apply the mask on the way out.
+  if (studentIds.length < MIN_CELL_SIZE) {
+    return {
+      regionId,
+      classCount: classIds.length,
+      studentCount: studentIds.length,
+      templates: templates.map((template) => ({
         templateId: template.id,
         title: template.title,
         isOfficial: template.isOfficial,
-        assignmentCount,
-        responseCount,
-        completionRate:
-          studentIds.length === 0 ? null : Number((responseCount / studentIds.length).toFixed(3)),
-      };
+        suppressed: true,
+        assignmentCount: null,
+        responseCount: null,
+        completionRate: null,
+      })),
+    };
+  }
+
+  // Two grouped queries rather than two per template (S6). The region scope
+  // still appears exactly once in each `where`, and neither query can see a
+  // template outside the active set or a row outside this region's classes.
+  const templateIds = templates.map((template) => template.id);
+
+  const [assignmentGroups, responseGroups] = await Promise.all([
+    prismaAdmin.formAssignment.groupBy({
+      by: ["templateId"],
+      where: {
+        templateId: { in: templateIds },
+        OR: [
+          { scope: "class", targetId: { in: classIds } },
+          { scope: "student", targetId: { in: studentIds } },
+        ],
+      },
+      _count: { _all: true },
     }),
-  );
+    prismaAdmin.formResponse.groupBy({
+      by: ["templateId"],
+      where: {
+        templateId: { in: templateIds },
+        status: { in: ["submitted", "reviewed"] },
+        // The region scope. Enrollment status is unfiltered here on
+        // purpose (see the doc block); the CLASS set is what bounds it.
+        student: { classEnrollments: { some: { classId: { in: classIds } } } },
+      },
+      _count: { _all: true },
+    }),
+  ]);
+
+  // groupBy returns no row for a template with no matches, so every lookup
+  // defaults to 0 rather than to undefined.
+  const countByTemplate = (groups: { templateId: string; _count: { _all: number } }[]) =>
+    new Map(groups.map((group) => [group.templateId, group._count._all]));
+  const assignmentCounts = countByTemplate(assignmentGroups);
+  const responseCounts = countByTemplate(responseGroups);
+
+  const rows = templates.map((template) => {
+    const assignmentCount = assignmentCounts.get(template.id) ?? 0;
+    const responseCount = responseCounts.get(template.id) ?? 0;
+
+    return {
+      templateId: template.id,
+      title: template.title,
+      isOfficial: template.isOfficial,
+      suppressed: false,
+      assignmentCount,
+      responseCount,
+      completionRate: Number((responseCount / studentIds.length).toFixed(3)),
+    };
+  });
 
   return {
     regionId,
