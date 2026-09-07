@@ -2197,7 +2197,7 @@ model JobListing {
   url            String
   source         String
   sourceType     String
-  sourceId       String    @unique
+  sourceId       String
   clusters       String[]  @default([])
   status         String    @default("active")
   expiresAt      DateTime?
@@ -2211,6 +2211,11 @@ model JobListing {
   resumeVersions  ResumeVersion[]
   coverLetters    CoverLetter[]
 
+  // VQ-R-018: was a bare `sourceId @unique` (program-wide), which let one
+  // class's overnight scrape silently steal a shared national posting away
+  // from another class's board by reassigning classConfigId on upsert.
+  // Class-scoped, mirroring JobBrowseListing's `@@unique([source, sourceId])`.
+  @@unique([classConfigId, sourceId])
   @@index([classConfigId, status])
   @@index([classConfigId, status, workMode])
   @@index([status, createdAt])

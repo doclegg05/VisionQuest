@@ -268,7 +268,11 @@ export async function runScrapeForConfig(
       const clusters = matchJobToClusters(job);
 
       await prisma.jobListing.upsert({
-        where: { sourceId: job.sourceId },
+        // VQ-R-018: was `{ sourceId: job.sourceId }` alone — a bare,
+        // program-wide key that let one class's scrape silently reassign a
+        // shared national posting away from another class's board. Scoped
+        // to match the (classConfigId, sourceId) compound unique.
+        where: { classConfigId_sourceId: { classConfigId: configId, sourceId: job.sourceId } },
         create: {
           title: job.title,
           company: job.company,
