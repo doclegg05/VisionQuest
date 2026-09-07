@@ -8,6 +8,7 @@ import { JobFilters, type JobProximityFilter } from "@/components/jobs/JobFilter
 import { BandedJobList } from "@/components/jobs/BandedJobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
 import type { JobTrackingUpdate } from "@/components/jobs/JobCard";
+import { describeSaveError, SaveJobError } from "@/lib/job-board/save-error";
 import AskSageLink from "@/components/sage/AskSageLink";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import type { JobBand } from "@/lib/job-board/job-bands-response";
@@ -138,15 +139,21 @@ export default function CareerHub({
     };
   }, [cluster, proximity, sort, debouncedKeyword, postedWithinDays, minPay, jobType, refreshKey]);
 
+  // VQ-R-016: a failed save used to be silently dropped here — the button
+  // reset and the student never knew why. A non-ok response now throws a
+  // SaveJobError carrying plain-language copy (see save-error.ts), which
+  // JobCard's Save/Update button catches and shows inline.
   const handleSaveJob = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
     const res = await fetch("/api/jobs/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobListingId: jobId, ...(updates ?? {}) }),
     });
-    if (res.ok) {
-      setRefreshKey((key) => key + 1);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}) as { code?: string });
+      throw new SaveJobError(describeSaveError(body.code), body.code);
     }
+    setRefreshKey((key) => key + 1);
   }, []);
 
   const matchedCount =

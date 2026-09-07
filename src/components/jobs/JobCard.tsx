@@ -11,6 +11,7 @@ import {
   isWorkForceWvPosting,
 } from "@/lib/job-board/wv-employer";
 import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
+import { describeSaveError, SaveJobError } from "@/lib/job-board/save-error";
 
 export interface JobTrackingUpdate {
   status?: SavedJobStatus;
@@ -67,6 +68,30 @@ const TRACKING_STATUSES: Array<{ value: SavedJobStatus; label: string }> = [
   { value: "offered", label: "Offered" },
   { value: "withdrawn", label: "Withdrawn" },
 ];
+
+/**
+ * VQ-R-016: the pure decision behind the Save/Update error banner, exported
+ * so the mapping from "what onSave did" to "what the student sees" is
+ * testable without a DOM (see JobCard.save-error.test.ts). Returns the
+ * plain-language message to show, or null when there is nothing to show.
+ */
+export async function runSaveAndDescribeError(
+  onSave: JobCardProps["onSave"],
+  id: string,
+  update: JobTrackingUpdate,
+): Promise<string | null> {
+  if (!onSave) return null;
+  try {
+    await onSave(id, update);
+    return null;
+  } catch (err) {
+    // Only a SaveJobError's message is student-facing copy we authored
+    // ourselves (see save-error.ts); anything else (a network failure, a
+    // thrown non-Error) falls back to the generic message rather than
+    // leaking a raw error string onto the page.
+    return err instanceof SaveJobError ? err.message : describeSaveError();
+  }
+}
 
 const WORK_MODE_STYLES: Record<JobWorkMode, string> = {
   onsite: "bg-emerald-500/15 text-emerald-700",
@@ -128,6 +153,7 @@ export function JobCard({
   const [draftStatus, setDraftStatus] = useState<SavedJobStatus>(savedStatus ?? "saved");
   const [draftNotes, setDraftNotes] = useState(savedNotes ?? "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Adjust-during-render: keep the drafts in sync with the saved* props
   // without an effect (React's documented pattern for resetting state when
@@ -144,11 +170,10 @@ export function JobCard({
   async function persistTracking(update: JobTrackingUpdate) {
     if (!onSave) return;
     setSaving(true);
-    try {
-      await onSave(id, update);
-    } finally {
-      setSaving(false);
-    }
+    setSaveError(null);
+    const message = await runSaveAndDescribeError(onSave, id, update);
+    setSaveError(message);
+    setSaving(false);
   }
 
   return (
@@ -249,6 +274,11 @@ export function JobCard({
       {/* Actions */}
       {!compact && (
         <div className="mt-3 space-y-3">
+          {saveError && (
+            <p role="alert" className="text-xs leading-5 text-[var(--error)]">
+              {saveError}
+            </p>
+          )}
           {savedStatus ? (
             <div className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
               <select
