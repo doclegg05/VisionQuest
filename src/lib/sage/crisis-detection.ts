@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { prisma, prismaAdmin } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendNotificationWithCooldown } from "@/lib/notifications";
 import { enqueueJobWithCooldown } from "@/lib/jobs";
