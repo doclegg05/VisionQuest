@@ -13,6 +13,23 @@ services:
         sync: false
       - key: DIRECT_URL
         sync: false
+      # Both of these were set in the Render dashboard only, so this file did
+      # not show that production depends on them and a fresh service created
+      # from it would have started with RLS unenforced and prismaAdmin
+      # unprivileged — silently, in both cases. src/lib/boot-probes.ts now
+      # refuses to boot production without them; they are listed here so the
+      # blueprint says so too.
+      #
+      # ADMIN_DATABASE_URL is the `postgres` role (RLS-bypassing) that
+      # prismaAdmin uses for crons, job handlers and pre-auth routes. Unset, it
+      # falls back to DATABASE_URL (`vq_app`) and every cross-student read
+      # returns zero rows.
+      - key: ADMIN_DATABASE_URL
+        sync: false
+      # Compared against this exact string in src/lib/db.ts. Anything else and
+      # the Prisma RLS extension runs every query with no session context.
+      - key: RLS_CONTEXT_INJECTION
+        value: "true"
       - key: JWT_SECRET
         generateValue: true
       - key: TEACHER_KEY
