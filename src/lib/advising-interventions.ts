@@ -9,7 +9,13 @@ import {
 import { enqueueJobWithCooldown } from "./jobs";
 import { sendNotificationWithCooldown } from "./notifications";
 import { isEmailDeliveryConfigured } from "./email";
-import { prismaAdmin } from "./db";
+import { logger } from "./logger";
+import { studentLogKey } from "./log-keys";
+import {
+  findAssignedInstructors,
+  listActiveTeachers,
+  type StaffRecipient,
+} from "./staff-recipients";
 import type { AlertDescriptor } from "./advising-alerts";
 
 export async function syncInterventionNotifications({
@@ -97,28 +103,7 @@ export async function syncInterventionNotifications({
     return;
   }
 
-  // Teacher resolution and the teacher nudge rows below use prismaAdmin: via
-  // syncStudentAlerts this runs inside a STUDENT's RLS context on student
-  // routes, where the app client returns zero teacher rows and
-  // `notification_access` WITH CHECK rejects a Notification addressed to a
-  // teacher. Only staff identities are read here; the student's own nudge
-  // above stays on the app client.
-  //
-  // Audience: ALL active teachers is main's pre-RLS intent for nudges. It is
-  // broader than the crisis path's assigned-instructor-first scoping in
-  // src/lib/sage/crisis-detection.ts. Narrowing it is an open product
-  // decision (D8, 2026-09-01 review) and is deliberately not changed here.
-  const teachers = await prismaAdmin.student.findMany({
-    where: {
-      role: "teacher",
-      isActive: true,
-    },
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-    },
-  });
+  const teachers = await resolveNudgeRecipients(studentId);
 
   await Promise.allSettled(
     teachers.flatMap((teacher) =>
@@ -164,4 +149,62 @@ export async function syncInterventionNotifications({
       });
     }),
   );
+}
+
+/**
+ * Who is told that THIS student has an overdue task or a goal needing review.
+ *
+ * D8 (2026-09-01 review, decided 2026-09-07): assigned instructors first.
+ * A teacher nudge names the student in its title and body, so delivering it
+ * to every active teacher discloses one class's students to every other
+ * class's instructor — a FERPA-relevant over-disclosure with no operational
+ * benefit, since an unassigned teacher cannot act on the nudge anyway. The
+ * program-wide audience survives only as the fallback: a student nobody is
+ * assigned to, or a resolution that fails outright, still produces a nudge
+ * somebody sees. Over-notifying beats a nudge nobody receives, the same
+ * failure direction resolveWellbeingRecipients chose for the crisis path.
+ *
+ * Both branches read through prismaAdmin (see staff-recipients.ts): via
+ * syncStudentAlerts this runs inside a STUDENT's RLS context on student
+ * routes, where the app client returns zero teacher rows and
+ * `notification_access` WITH CHECK rejects a Notification addressed to a
+ * teacher. Only staff identities are read; the student's own nudge stays on
+ * the app client.
+ *
+ * The structured log names the branch that fired and carries a recipient
+ * count only — no student identifier, not even a correlation key: an
+ * audience-size line does not need one, and the fallback's whole point is
+ * that it is about the program, not the student
+ * (.claude/rules/security.md, Data Privacy).
+ */
+async function resolveNudgeRecipients(studentId: string): Promise<StaffRecipient[]> {
+  let assigned: StaffRecipient[] = [];
+  try {
+    assigned = await findAssignedInstructors(studentId);
+  } catch (err) {
+    // Under the student's RLS context the enrollment→instructor join raises
+    // Prisma's inconsistency error rather than returning zero rows. Caught
+    // here for the same reason the crisis path catches it: a broken lookup
+    // must widen the audience, never silence the nudge.
+    logger.error("Nudge: instructor resolution failed; falling back to all active teachers", {
+      student: studentLogKey(studentId),
+      alert: "intervention_nudge_instructor_resolution_failed",
+      error: String(err),
+    });
+  }
+
+  if (assigned.length > 0) {
+    logger.debug("Nudge: delivering to assigned instructors", {
+      alert: "intervention_nudge_assigned_instructors",
+      recipientCount: assigned.length,
+    });
+    return assigned;
+  }
+
+  const everyone = await listActiveTeachers();
+  logger.warn("Nudge: no assigned instructor resolved; delivering program-wide", {
+    alert: "intervention_nudge_fallback_program_wide",
+    recipientCount: everyone.length,
+  });
+  return everyone;
 }
