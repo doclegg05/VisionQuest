@@ -28,7 +28,11 @@ const EXEMPTIONS_PATH = path.join(
   "config/benchmarks/fixtures/rls-exemptions.json",
 );
 
-const CREATE_TABLE_RE = /CREATE TABLE "visionquest"\."([A-Za-z0-9_]+)"/g;
+// `IF NOT EXISTS` is accepted so an idempotent adoption migration (the
+// 2026-09-07 CareerAssessmentSnapshot one) cannot drop its table out of this
+// gate's inventory by being written the obvious way — a table the gate never
+// sees is a table whose missing RLS is never reported.
+export const CREATE_TABLE_RE = /CREATE TABLE (?:IF NOT EXISTS )?"visionquest"\."([A-Za-z0-9_]+)"/g;
 const ENABLE_RLS_RE =
   /ALTER TABLE "visionquest"\."([A-Za-z0-9_]+)"\s+ENABLE ROW LEVEL SECURITY/g;
 const DROP_TABLE_RE = /DROP TABLE (?:IF EXISTS )?"visionquest"\."([A-Za-z0-9_]+)"/g;
