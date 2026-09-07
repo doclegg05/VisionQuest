@@ -330,6 +330,177 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // must precede a medication noun (so "i want to take all my certifications"
   // stays silent). Verb list is deliberately identical to the od/overdose entry.
   { category: "self_harm", pattern: /\b(wanna|gonna|going\s+to|want\s+to|tried\s+to)\s+take\s+(all|a\s+bunch\s+of|a\s+lot\s+of|too\s+many)\s+(of\s+)?(my\s+|the\s+)?(pills|meds|medication|tylenol|advil)\b/i },
+
+  // --- MEANS FAMILIES (B1): FIREARMS, HANGING, JUMPING. English first; the
+  // Spanish counterparts are in the (es) block below, and the two English
+  // entries that deliberately have NO Spanish twin say so where they stand.
+  //
+  // Why this block exists: every pattern above is about IDEATION or about
+  // pills. `.claude/MEMORY.md` named these three families the largest
+  // remaining coverage gap, and the crisis-en benchmark measured it —
+  // means_firearm 0/16, means_hanging 0/13, means_jumping 0/12, all zero, with
+  // the headline recall held down to 0.794 by them alone. A stated method is
+  // the highest-risk disclosure this detector will ever see, and it was the
+  // one thing it could not see at all.
+  //
+  // Why it is harder than the pills family: pills have one benign sense
+  // (adherence) and a quantity word separates it. These three have MANY, and
+  // they are the ordinary vocabulary of this population and this region —
+  // "shoot me a text", "hang in there", "jump at the chance", plus deer
+  // season, gun safety class, rope courses, and a bridge people cross to get
+  // to class. So each entry below carries its guard, and every guard is proven
+  // to BITE in crisis-detection-means.test.ts: the unguarded shape is written
+  // out there and shown to match the phrase the guard silences. A guard that
+  // could never fire is the "ksy"/"kys" hazard this file already carries a
+  // comment about.
+  //
+  // The general discriminator, family by family, stated once so a future
+  // reader can extend rather than re-derive:
+  //   firearms — a REFLEXIVE object ("myself"), a body part ("to my head"), or
+  //     a firearm reserved FOR THE STUDENT ("is for me", "for when im ready").
+  //     A firearm noun alone is never enough: this is West Virginia.
+  //   hanging  — the reflexive again ("hang myself"), the purpose-built object
+  //     ("noose", "rope around my neck"), or rope acquired FOR ME/FOR IT. Bare
+  //     "hang"/"rope" is idiom or hardware nine times out of ten.
+  //   jumping  — the OBJECT jumped from decides it (bridge/roof/overpass, not
+  //     diving board), or the vehicle stepped in front of, or a first-person
+  //     stance at an edge.
+
+  // Firearms 1/8 — the reflexive. Covers shoot/shooting/shot + myself in every
+  // tense, which is the plainest form of the disclosure.
+  // GUARD: "shooting myself in the foot" is the self-sabotage idiom and is the
+  // single most likely benign use of these exact words in a coaching
+  // conversation ("i keep shooting myself in the foot in interviews"). Only
+  // that object is exempt — "shoot myself in the head" still alerts.
+  { category: "self_harm", pattern: /\b(?:shoot|shoots|shooting|shot)\s+my\s?self\b(?!\s+in\s+the\s+foot\b)/i },
+  // Firearms 2/8 — means named without the verb. No guard: none of "blow my
+  // brains out", "a bullet in my head" or "eat a bullet" has an everyday
+  // sense, and the near-miss idioms ("bullet points", "bite the bullet",
+  // "dodged a bullet") cannot reach these shapes. Pinned silent anyway.
+  { category: "self_harm", pattern: /\b(?:blow(?:ing)?\s+my\s+(?:brains|head)\s+(?:out|off)|(?:put(?:ting)?\s+)?a\s+bullet\s+(?:in|into|through)\s+my\s+(?:head|brain|skull|chest|mouth)|eat(?:ing)?\s+a\s+bullet)\b/i },
+  // Firearms 3/8 — the weapon at a body part.
+  // GUARDS, two, both for idioms that use these exact words about someone
+  // else's coercion or a hypothetical:
+  //   1. "WITH a gun to my head i still couldnt tell you" — the conditional.
+  //   2. a THIRD PARTY holding it: "my boss had a gun to my head about the
+  //      deadline". Written as the file's existing two-position lookbehind
+  //      rather than an enumeration of holders: a third-person word plus a
+  //      holding verb immediately before the article is what makes it somebody
+  //      else's hand. "i put a gun to my head" and "i had the gun in my mouth"
+  //      keep alerting, because "i" is not on the refusal list.
+  // KNOWN LIMIT: a named third party ("dave had a gun to my head") is not
+  // covered, for the same reason the pills entry cannot cover proper names —
+  // no name list is complete. That direction is a false positive, never a
+  // missed disclosure.
+  {
+    category: "self_harm",
+    pattern: new RegExp(
+      "(?<!\\bwith\\s+a\\s+)" +
+        "(?<!\\b(?:he|she|they|his|her|their|my|the)\\s+\\w+\\s+(?:had|has|held|holds|put|puts|pointed|points|kept|keeps)\\s+(?:a|the)\\s+)" +
+        "(?<!\\b(?:he|she|they)\\s+(?:had|has|held|holds|put|puts|pointed|points|kept|keeps)\\s+(?:a|the)\\s+)" +
+        "\\b(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock|barrel)\\s+(?:to|in|into|against|at)\\s+my\\s+(?:head|mouth|temple|chest|chin|throat)\\b",
+      "i",
+    ),
+  },
+  // Firearms 4/8 — a means turned on the student. Deliberately MEANS-AGNOSTIC
+  // ("use it on myself" carries no noun at all), because the sentence that
+  // produced it names the weapon in the clause before: "i have my dads gun and
+  // im going to use it on myself".
+  { category: "self_harm", pattern: /\b(?:use|using|used|turn(?:ing|ed)?|point(?:ing|ed)?)\s+(?:it|that|this|them|the\s+\w+|my\s+\w+|his\s+\w+|her\s+\w+)\s+on\s+my\s?self\b/i },
+  // Firearms 5/8 — finishing it WITH a named means. The "ending things" entry
+  // above covers the bare phrase; this covers the instrument, and it covers
+  // rope and belt too so the hanging family inherits it.
+  { category: "self_harm", pattern: /\b(?:end|ending|finish|finishing)\s+(?:it|this|things)\s+with\s+(?:my|the|a|his|her)\s+(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock|rope|belt|noose)\b/i },
+  // Firearms 6/8 — a firearm or ammunition reserved FOR THE STUDENT. This is
+  // the disclosure with no verb in it at all ("the gun in the closet is for
+  // me", "i bought bullets for myself"), and the beneficiary is the whole
+  // signal: the corpus's benign rows are full of firearms bought, cleaned,
+  // sold, stored and taught, and every one of them is for somebody or
+  // something else ("for him", "for his birthday", "to pay the car note").
+  // The four-word gap is what lets a location clause sit between the noun and
+  // the beneficiary ("gun IN THE CLOSET IS for me").
+  // KNOWN LIMIT, recall-first and recorded: an innocent transfer phrased the
+  // same way still alerts — "my uncle is holding the shotgun for me while i
+  // move". That costs an instructor one dismissal.
+  { category: "self_harm", pattern: /\b(?:gun|guns|handgun|pistol|revolver|rifle|shotgun|firearm|glock|bullet|bullets|shells|rounds|ammo|ammunition)\b(?:\s+\w+){0,4}\s+(?:is\s+|are\s+)?for\s+(?:me|my\s?self)\b/i },
+  // Firearms 7/8 — possession at a time of intent. "load the gun tonight",
+  // "i been holding the gun tonight". The time word is what separates it from
+  // ordinary ownership talk; "we keep the shotgun locked in the safe" carries
+  // neither the verb nor the marker and is pinned silent.
+  { category: "self_harm", pattern: /\b(?:hold(?:ing)?|sit(?:ting)?\s+(?:here\s+)?with|sleep(?:ing)?\s+with|load(?:ing|ed)?)\s+(?:the|my|a)\s+(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock)\b(?:\s+\w+){0,3}\s+(?:tonight|right\s+now|all\s+night|in\s+the\s+morning)\b/i },
+  // Firearms 8/8 — a firearm with a readiness or finishing tail, and the
+  // "sitting with" stance that needs no tail. "i keep the pistol loaded FOR
+  // WHEN IM READY", "i bought a gun SO I CAN FINISH IT", "i been SITTING WITH
+  // THE RIFLE thinking about it". The tails are the intent; the stance one is
+  // separate because a person sitting alone with their gun has already said
+  // enough.
+  { category: "self_harm", pattern: /\b(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock)\b(?:\s+\w+){0,3}\s+(?:for\s+when\s+i(?:'?m|m)?\s+ready|when\s+i(?:'?m|m)\s+ready|so\s+i\s+can\s+(?:finish|end|do)\s+(?:it|this)|to\s+(?:finish|end)\s+(?:it|this))\b/i },
+  { category: "self_harm", pattern: /\b(?:sit(?:ting)?|sat|lay(?:ing)?|laid|stand(?:ing)?|stood)\s+(?:here\s+|there\s+|out\s+)?with\s+(?:the|my)\s+(?:gun|handgun|pistol|revolver|rifle|shotgun|firearm|glock)\b/i },
+
+  // Hanging 1/5 — the reflexive, every tense including the archaic "hanged".
+  // GUARD: "hung myself out to dry" is the idiom, and it is the only benign
+  // reading of "hung myself" a coach will meet. "gonna hang out then probably
+  // hang myself" still alerts — the guard is on the object, not the sentence.
+  { category: "self_harm", pattern: /\b(?:hang|hangs|hanging|hung|hanged)\s+my\s?self\b(?!\s+out\s+to\s+dry\b)/i },
+  // Hanging 2/5 — the image rather than the act: "i keep picturing myself
+  // hanging from the rafters". The preposition carries it — "hanging OVER my
+  // head" (the deadline) and "hanging IN the door" (keys) are pinned silent,
+  // and the second branch names the fixtures a person hangs FROM so a bare
+  // "hanging from" cannot fire on laundry.
+  { category: "self_harm", pattern: /\b(?:my\s?self|me)\s+hanging\s+(?:from|by)\b|\bi(?:'?ll|'?m)?\s+(?:be|been)\s+hanging\s+from\s+(?:the|a|that)\s+(?:rafters?|beam|joist|ceiling|pipe|tree)\b/i },
+  // Hanging 3/5 — the purpose-built object. A noose has no everyday sense, so
+  // the bound here is only that somebody made, got or hung one, which keeps
+  // documentary and history talk ("they showed a noose in the exhibit") out.
+  { category: "self_harm", pattern: /\b(?:made|make|making|tied|tie|tying|got|bought|hung|hang|hanging|have|had)\s+(?:a|the|my|another)\s+noose\b|\bnoose\s+(?:for\s+(?:me|my\s?self|it|this)|is\s+ready)\b/i },
+  // Hanging 4/5 — the object at the neck. "neck pain", "a crick in my neck"
+  // and "a necklace" cannot reach it because the ligature noun is required.
+  { category: "self_harm", pattern: /\b(?:rope|cord|belt|cable|wire|chain)\s+a?round\s+my\s+neck\b/i },
+  // Hanging 5/5 — rope acquired or rigged FOR THE STUDENT, the exact shape of
+  // Firearms 6 and for the same reason: this population buys rope constantly
+  // and every benign row says what for. "i bought rope AT THE HARDWARE STORE
+  // FOR THE TRAILER" is pinned silent and "i bought rope FOR IT" alerts, which
+  // is the whole distinction. "i need rope to tie down the mattress" is silent
+  // on the verb instead — needing is not acquiring.
+  { category: "self_harm", pattern: /\b(?:bought|got|tied|tie|tying|hung|made|making|kept|keeping|found|hid|hiding|stashed)\s+(?:a\s+|the\s+|some\s+|my\s+|another\s+)?(?:rope|cord|noose|belt|cable|extension\s+cord|chain)\b(?:\s+\w+){0,4}\s+for\s+(?:me|my\s?self|it|this)\b/i },
+  // Hanging, the ambiguous one, kept on purpose: "i been looking at the beam
+  // in the basement" is a real corpus row and it is a disclosure in a house
+  // where somebody has already decided. It is ALSO home repair. Recall-first
+  // resolves it toward alerting, and the guard narrows it as far as it can go
+  // without losing the disclosure: only LOOKING or STARING at a beam fires, so
+  // "we are replacing the beam in the basement" stays silent (pinned, with its
+  // bite proof). KNOWN LIMIT: a student who says "i keep looking at that beam,
+  // it's sagging" gets an alert. That is the trade, written down.
+  { category: "self_harm", pattern: /\b(?:looking|look|staring|stare|stared|looked)\s+at\s+(?:the|that|them)\s+(?:beam|beams|rafter|rafters|joist|joists)\b/i },
+
+  // Jumping 1/6 — the object jumped from is the discriminator, not the verb.
+  // "he jumped off the diving board at the pool" and "we did a bungee jump"
+  // are pinned silent because a diving board and a bungee tower are not on the
+  // list; bridges, roofs, overpasses and parking garages are.
+  { category: "self_harm", pattern: /\b(?:jump|jumps|jumping|jumped|leap|leaping|leapt)\s+(?:off|from|out\s+of)\s+(?:the\s+|a\s+|that\s+|my\s+|this\s+)?(?:bridge|overpass|roof|rooftop|building|parking\s+garage|garage|balcony|ledge|tower|cliff|window|dam|silo|something\s+high|somewhere\s+high)\b/i },
+  // Jumping 2/6 — into traffic. The vehicle list is what keeps "she jumped in
+  // and helped me finish" and "lets jump on a call" away from it.
+  { category: "self_harm", pattern: /\b(?:jump(?:ing|ed|s)?|step(?:ping|ped|s)?|walk(?:ing|ed|s)?|lay|laid)\s+(?:out\s+)?in\s+front\s+of\s+(?:a|the|that)\s+(?:train|bus|truck|car|semi|subway|traffic)\b/i },
+  // Jumping 3/6 — "throw myself off/under". The preposition list is closed on
+  // purpose: "throw myself INTO the job search" is ordinary and must not fire.
+  { category: "self_harm", pattern: /\b(?:throw(?:ing|s)?|threw)\s+my\s?self\s+(?:off|under|in\s+front\s+of|down)\b/i },
+  // Jumping 4/6 — the vehicle used as the means. "on purpose" is REQUIRED
+  // within a short window, because "i drove into a wall" without it is an
+  // accident report and a student telling their coach about a wreck must not
+  // raise a critical alert. KNOWN LIMIT: a deliberate crash described without
+  // those two words ("i aimed at the guardrail") is missed.
+  { category: "self_harm", pattern: /\b(?:driv(?:e|ing)|drove|crash(?:ing|ed)?|steer(?:ing)?)\s+(?:my\s+\w+\s+|the\s+\w+\s+)?(?:off\s+the\s+road|into\s+(?:a|the)\s+(?:wall|tree|pole|guardrail|barrier|bridge|abutment|semi|truck))\b(?:\s+\w+){0,3}\s+on\s+purpose\b/i },
+  // Jumping 5/6 — the intent tail with no object at all: "im going to jump and
+  // end it".
+  { category: "self_harm", pattern: /\bjump(?:ing)?\s+and\s+(?:end|finish)\s+(?:it|this|it\s+all)\b/i },
+  // Jumping 6/6 — the stance. "i stood at the edge and almost jumped", "i been
+  // standing on the bridge for an hour": no verb of self-harm anywhere, and
+  // both are disclosures.
+  // GUARD: "on the edge OF MY SEAT" is the idiom this shape walks straight
+  // into, so that object is exempt (pinned, with its bite proof).
+  // KNOWN LIMIT, recall-first: "i been sitting on the bridge waiting for my
+  // ride" alerts. An instructor dismisses it.
+  { category: "self_harm", pattern: /\b(?:stood|standing|stand|sat|sitting)\s+(?:there\s+|out\s+|up\s+)?(?:at|on|by)\s+(?:the|that)\s+(?:edge|ledge|railing|rail|bridge|overpass|rooftop|guardrail)\b(?!\s+of\s+my\s+seat\b)/i },
+
   { category: "harm_others", pattern: /\b(want|going)\s+to\s+(hurt|kill)\s+(someone|him|her|them|people|everyone)\b/i },
   { category: "abuse", pattern: /\b(be(ing)?\s+abused|he\s+hits\s+me|she\s+hits\s+me|they\s+hit\s+me|hits?\s+me\s+at\s+home|hurt(s|ing)?\s+me\s+at\s+home|being\s+(hurt|hit)\s+at\s+home)\b/i },
 
@@ -440,6 +611,136 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // "quiero morirme"), so "me quiero dar una sobredosis" must match exactly as
   // "quiero darme una sobredosis" already did.
   { category: "self_harm", lang: "es", pattern: /\b(?:darme|tomarme|meterme|me\s+(?:di|doy|dar(?:e|é)|tom(?:o|e|é)|voy\s+a\s+(?:dar|tomar|meter)|(?:quiero|quisiera)\s+(?:dar|tomar|meter))|(?:pienso|pens(?:e|é|ado|ando))\s+en)\s+una\s+sobredosis\b/i },
+
+  // --- MEANS FAMILIES (es) — the Spanish counterparts of the English firearms,
+  // hanging and jumping block above. Same measured gap: means_firearm 0/11,
+  // means_hanging 0/10, means_jumping 0/9 in the crisis-es corpus, holding
+  // Spanish recall at 0.696.
+  //
+  // Two Spanish-specific mechanics do most of the work here, and both are the
+  // file's existing conventions rather than anything new:
+  //   1. CLITIC CLIMBING. "quiero dispararme" and "me quiero disparar" are the
+  //      same sentence, so every entry below carries both directions, exactly
+  //      as the sobredosis and cortarme entries already do.
+  //   2. (?![\wáéíóúüñ]) INSTEAD OF \b. JS \b is ASCII-only and cannot assert a
+  //      boundary after "í" or "ó"; the kms guard's dead lookahead is this
+  //      file's own recorded example of getting that wrong.
+  //
+  // The Spanish false positives are not translations of the English ones —
+  // they are their own set, and three of them are load-bearing:
+  //   "me ahorcan los plazos"  deadlines are strangling me
+  //   "se me disparó la presión" my blood pressure spiked
+  //   "tengo la soga al cuello"  I am drowning in debt
+  // Each is silenced by a DIFFERENT mechanism (verb person, the "se" clitic, a
+  // required first-person placement verb), and each has a bite proof in
+  // crisis-detection-means.test.ts.
+
+  // Armas 1/5 — dispararse. GUARD: the "se" clitic. "se me disparó la presión"
+  // and "se disparó el precio de la gasolina" are the everyday senses of this
+  // verb in this register, and both put "me"/nothing right after "se". The
+  // person endings are enumerated rather than stemmed for the same reason the
+  // ahorcar entry below does it: "me dispararon" (somebody shot me) is not
+  // this signal.
+  {
+    category: "self_harm",
+    lang: "es",
+    pattern: new RegExp(
+      "(?<!\\bse\\s)\\b(?:dispararme|me\\s+dispar(?:o|ó|é|e)|me\\s+(?:voy\\s+a|quiero|quisiera|pienso|pens(?:é|e))\\s+disparar)(?![\\wáéíóúüñ])",
+      "i",
+    ),
+  },
+  // Armas 2/5 — "pegarme/meterme un tiro". The reflexive clitic is the whole
+  // guard: "tiro libre", "tiro al blanco", "campo de tiro" and "de un tiro"
+  // (in one go) are all pinned silent and none of them can carry it.
+  { category: "self_harm", lang: "es", pattern: /\b(?:(?:pegarme|meterme|darme|encajarme)\s+un\s+(?:tiro|balazo|plomazo)|me\s+(?:quiero|quisiera|voy\s+a|pienso)\s+(?:pegar|meter|dar)\s+un\s+(?:tiro|balazo|plomazo))(?![\wáéíóúüñ])/i },
+  // Armas 3/5 — "volarme la cabeza / los sesos", the twin of the English "blow
+  // my brains out". "abrirme la cabeza" is deliberately NOT here: it is how
+  // Spanish describes splitting your head open in an accident.
+  { category: "self_harm", lang: "es", pattern: /\b(?:(?:volarme|reventarme)\s+(?:la\s+cabeza|los\s+sesos)|me\s+(?:voy\s+a|quiero|quisiera)\s+(?:volar|reventar)\s+(?:la\s+cabeza|los\s+sesos))(?![\wáéíóúüñ])/i },
+  // Armas 4/5 — the weapon at a body part, twin of English Firearms 3. It
+  // needs no idiom guard: Spanish has no "with a gun to my head" conditional,
+  // so the first-person placement verb is bound enough on its own.
+  { category: "self_harm", lang: "es", pattern: /\b(?:me\s+(?:puse|pongo|pondr(?:é|e))|ponerme|poni(?:é|e)ndome)\s+(?:la|el|una|un|mi)\s+(?:pistola|arma|escopeta|rifle|rev(?:ó|o)lver)\s+(?:en|a)\s+la\s+(?:cabeza|boca|sien)(?![\wáéíóúüñ])/i },
+  // Armas 5/5 — the weapon reserved for the student, twin of English Firearms
+  // 6, plus "lo tengo conmigo" and the "acabar con todo usando …" frame.
+  //
+  // GUARD, and it is a Spanish-only hazard worth naming: "para mi" unaccented
+  // is also the POSSESSIVE. "le compre una pistola de agua para mi hijo" would
+  // otherwise alert. So the unaccented spelling only counts when nothing
+  // follows it — end of message or punctuation — while the accented "mí",
+  // which can only be the pronoun, is free. Students do drop accents (the
+  // whole reason this block spells both), and "…es para mi" at the end of a
+  // sentence is exactly how the corpus rows read.
+  { category: "self_harm", lang: "es", pattern: /\b(?:pistola|escopeta|rifle|arma|armas|rev(?:ó|o)lver|carabina|bala|balas|cartuchos)(?:\s+[\wáéíóúüñ]+){0,4}\s+(?:es\s+|son\s+)?para\s+(?:mí(?![\wáéíóúüñ])|mi(?!\s*[\wáéíóúüñ]))/i },
+  { category: "self_harm", lang: "es", pattern: /\btengo\s+(?:el|la|un|una|mi)\s+(?:pistola|escopeta|rifle|arma|rev(?:ó|o)lver)\s+(?:conmigo|en\s+la\s+mano)(?![\wáéíóúüñ])/i },
+  { category: "self_harm", lang: "es", pattern: /\b(?:acabar|terminar)\s+con\s+(?:todo|esto|mi\s+vida)\s+(?:usando|con)\s+(?:la|el|mi|un|una)\s+(?:pistola|escopeta|rifle|arma|rev(?:ó|o)lver|soga|cuerda)(?![\wáéíóúüñ])/i },
+
+  // Ahorcarse 1/4 — the reflexive, both clitic positions.
+  // GUARDS, two, and they are the reason the person endings are spelled out
+  // instead of stemmed to "ahorc":
+  //   "me ahorcan los plazos / las cuentas" — third-person plural, the
+  //     figurative "X is strangling me", which is ORDINARY talk for a student
+  //     juggling bills and deadlines and is the single likeliest false
+  //     positive in the Spanish set;
+  //   "el trabajo me ahorcaba" — the same figure in the imperfect.
+  // Only first-person singular forms (ahorco/ahorcó-as-typo/ahorqué) and the
+  // infinitives fire. "se me cuelga la computadora" is caught by the same "se"
+  // lookbehind the dispararse entry uses.
+  {
+    category: "self_harm",
+    lang: "es",
+    pattern: new RegExp(
+      "(?<!\\bse\\s)\\b(?:ahorcarme|colgarme|me\\s+(?:ahorc(?:o|ó)|ahorqu(?:é|e)|cuelgo|colgu(?:é|e))|me\\s+(?:voy\\s+a|quiero|quisiera|pienso|pens(?:é|e))\\s+(?:ahorcar|colgar))(?![\\wáéíóúüñ])",
+      "i",
+    ),
+  },
+  // Ahorcarse 2/4 — the rope rigged. "ya amarré la soga" has no benign reading
+  // once the rope is definite and the verb is first-person singular preterite;
+  // "necesito una soga para amarrar el colchón" is silent on the verb.
+  // KNOWN LIMIT, recorded rather than claimed closed: "amarré la soga al
+  // remolque" alerts. Excluding it would mean enumerating benign attachment
+  // points, which is the shape that failed for the kms guard.
+  { category: "self_harm", lang: "es", pattern: /\b(?:amarr(?:é|e)|at(?:é|e)|prepar(?:é|e)|colgu(?:é|e))\s+(?:la|una|mi)\s+(?:soga|cuerda|reata|mecate)(?![\wáéíóúüñ])/i },
+  // Ahorcarse 3/4 — the rope at the neck.
+  // GUARD, and this is why "soga al cuello" is NOT matched on its own: it is
+  // an established idiom for being crushed by debt ("con las cuentas tengo la
+  // soga al cuello"), and "ponerse la soga al cuello" is a second idiom again
+  // (getting yourself into it — or married). So a first-person PLACEMENT verb
+  // is required, and the "poner" branch additionally requires the indefinite
+  // "una", because the idiom takes the definite "la". The English twin,
+  // "rope around my neck", needs none of this — recorded here rather than
+  // left as an unexplained asymmetry.
+  { category: "self_harm", lang: "es", pattern: /\bme\s+(?:(?:amarr(?:é|e)|at(?:é|e)|voy\s+a\s+(?:amarrar|atar))\s+(?:una|la|el|mi)|(?:puse|pongo)\s+una)\s+(?:soga|cuerda|cable|cintur(?:ó|o)n)\s+(?:al|en\s+el)\s+cuello(?![\wáéíóúüñ])/i },
+  // Ahorcarse 4/4 — rope acquired FOR THAT, twin of English Hanging 5, and the
+  // beam-staring twin of the English one. "compramos soga en la ferretería
+  // para el remolque" is silent twice over: first person plural, and a
+  // beneficiary that is a thing.
+  { category: "self_harm", lang: "es", pattern: /\b(?:compr(?:é|e)|consegu(?:í|i)|busqu(?:é|e)|guard(?:é|e)|escond(?:í|i))\s+(?:una\s+|la\s+|el\s+)?(?:soga|cuerda|reata|mecate|cable|cintur(?:ó|o)n)(?:\s+[\wáéíóúüñ]+){0,4}\s+para\s+(?:eso|esto|mí(?![\wáéíóúüñ])|mi(?!\s*[\wáéíóúüñ]))/i },
+  { category: "self_harm", lang: "es", pattern: /\b(?:viendo|mirando|observando)\s+(?:la|el|esa|ese)\s+(?:viga|vigas|travesa(?:ñ|n)o)(?![\wáéíóúüñ])/i },
+
+  // Tirarse 1/4 — from a height. THE PREPOSITION IS THE GUARD, and it is the
+  // cleanest discriminator in either language: a person throws themselves
+  // DE/DEL/DESDE a bridge, and A la piscina, A la cama, A el agua. So
+  // "me tiro a la piscina cuando hace calor", "mi hijo se tiro a la alberca",
+  // "me lancé a estudiar", "quiero aventarme a pedir el aumento" and
+  // "tirarme un clavado" are all silent without naming any of them, while
+  // "tirarme del puente" alerts. "aventarme" is the Mexican register the
+  // ticket asks for and is first-class here, not an afterthought.
+  { category: "self_harm", lang: "es", pattern: /\b(?:tirarme|aventarme|lanzarme|arrojarme|me\s+(?:tir(?:o|é|e)|avent(?:é|e|o)|lanc(?:é|e)|arroj(?:é|e))|me\s+(?:voy\s+a|quiero|quisiera|pienso|pens(?:é|e))\s+(?:tirar|aventar|lanzar|arrojar|saltar)|(?:quiero|quisiera|voy\s+a|pienso\s+en|pens(?:é|e)\s+en)\s+saltar)\s+(?:de|del|desde)\s+(?:el\s+|la\s+|un\s+|una\s+|los\s+|las\s+)?(?:puente|edificio|techo|azotea|estacionamiento|balc(?:ó|o)n|piso|ventana|barranco|cerro|torre|algo\s+alto)/i },
+  // Tirarse 2/4 — in front of a vehicle.
+  { category: "self_harm", lang: "es", pattern: /\b(?:tirarme|aventarme|lanzarme|arrojarme|echarme|me\s+(?:voy\s+a|quiero|quisiera|pienso)\s+(?:tirar|aventar|lanzar|arrojar|echar))\s+(?:en?frente|delante)\s+(?:de|del)\s+(?:un\s+|una\s+|el\s+|la\s+|los\s+)?(?:tren|cami(?:ó|o)n|carro|coche|troca|autob(?:ú|u)s|tr(?:á|a)iler|metro)/i },
+  // Tirarse 3/4 — onto the tracks. This one takes "al / a las", the very
+  // preposition the entry above refuses, so the OBJECT has to carry it: a
+  // train, the rails, the metro. That is why it is a separate entry rather
+  // than a widened alternation — widening the first entry's preposition would
+  // have re-admitted every "me tiro a la cama" row it exists to exclude.
+  { category: "self_harm", lang: "es", pattern: /\b(?:tirarme|aventarme|lanzarme|arrojarme|me\s+(?:voy\s+a|quiero|quisiera|pienso)\s+(?:tirar|aventar|lanzar|arrojar))\s+(?:al|a\s+las|a\s+la)\s+(?:tren|v(?:í|i)as|v(?:í|i)a|metro)(?![\wáéíóúüñ])/i },
+  // Tirarse 4/4 — the stance, twin of English Jumping 6, and the deliberate
+  // crash, twin of English Jumping 4 (which likewise requires "a propósito"
+  // within a short window, so an ordinary wreck stays silent).
+  { category: "self_harm", lang: "es", pattern: /\b(?:estuve|estaba|ando|he\s+estado|sigo|me\s+qued(?:é|e))\s+(?:parad[oa]|sentad[oa]|de\s+pie)\s+(?:en|sobre)\s+(?:el|la|ese|esa)\s+(?:puente|barandal|orilla|borde|azotea|techo|cornisa)(?![\wáéíóúüñ])/i },
+  { category: "self_harm", lang: "es", pattern: /\b(?:estrellarme|estamparme|me\s+(?:voy\s+a|quiero|quisiera)\s+(?:estrellar|estampar))(?:\s+[\wáéíóúüñ]+){0,5}\s+a\s+prop(?:ó|o)sito(?![\wáéíóúüñ])/i },
+
   // harm_others (es) — a person object (attached clitic or personal "a") is
   // required, mirroring the English object list; that keeps "matar el tiempo"
   // ("kill time") from false-positive while catching "quiero matar a mi jefe".
