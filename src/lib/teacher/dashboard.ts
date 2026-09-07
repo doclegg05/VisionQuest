@@ -19,7 +19,7 @@ import {
 } from "@/lib/inactivity";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
 import { NUDGE_ALERT_TYPES } from "@/lib/nudges/schedule-shared";
-import { rosterReadiness } from "@/lib/progression/readiness-consumers";
+import { fetchReadinessDataForStudents } from "@/lib/progression/fetch-readiness-data";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import {
   buildInterventionQueueEntry,
@@ -428,20 +428,24 @@ export async function getTeacherDashboardPage(
       : Promise.resolve(new Map()),
   ]);
 
+  // Ticket D1 (2026-09-07): the roster's readiness score is the SAME
+  // reconciled mapping every other surface uses (readiness-consumers.ts),
+  // reached through the batched loader so one page of students costs a
+  // constant number of queries, not one query per student.
+  const readinessByStudent = await fetchReadinessDataForStudents(
+    students.map((student) => student.id),
+  );
+
   const overview = students.map((student) => {
     let xp = 0;
     let level = 1;
     let streak = 0;
-    let longestStreak = 0;
-    let portfolioShared = false;
     if (student.progression?.state) {
       try {
         const state = JSON.parse(student.progression.state);
         xp = state.xp || 0;
         level = state.level || 1;
         streak = state.currentStreak || state.streaks?.daily?.current || 0;
-        longestStreak = state.longestStreak || state.streaks?.daily?.longest || 0;
-        portfolioShared = !!state.portfolioShared;
       } catch {
         // Ignore malformed progression state and fall back to defaults.
       }
@@ -466,27 +470,11 @@ export async function getTeacherDashboardPage(
       ? certification.requirements.filter((requirement) => requirement.completed && !requirement.verifiedBy).length
       : 0;
 
-    const bhagCompleted = student.goals.some(
-      (goal) => goal.level === "bhag" && goal.status === "completed",
-    );
-    // The roster's mapping lives in readiness-consumers.ts alongside the six
-    // other surfaces that show a readiness number, so the three definitions
-    // cannot drift apart unremarked. `orientationTotal` is
-    // prisma.orientationItem.count() — ALL items (2026-07-31 decision).
-    const readiness = rosterReadiness({
-      orientationCompletedCount: student.orientationProgress.length,
-      orientationTotalCount: orientationTotal,
-      completedGoalLevels,
-      bhagCompleted,
-      certificationRequirementsDone: certDone,
-      portfolioItemCount: student._count.portfolioItems,
-      hasResume: !!student.resumeData,
-      portfolioShared,
-      longestStreak,
-      requiredCertificationTemplateCount: certTemplates.filter(
-        (template) => template.required,
-      ).length,
-    });
+    // Ticket D1 (2026-09-07): the roster no longer builds its own readiness
+    // input — it reads the SAME reconciled score every other surface uses,
+    // from the batch fetched above. `readinessByStudent` always has an entry
+    // for every id in `students`, since that is exactly what it was asked for.
+    const readiness = readinessByStudent.get(student.id)!.readiness;
     const lastActiveAt =
       latestDate(
         student.createdAt,

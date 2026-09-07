@@ -5,7 +5,7 @@
 // KPI page.
 
 import { goalCountsTowardPlan } from "./goals";
-import { progressionStateReadiness } from "./progression/readiness-consumers";
+import { reconciledReadiness } from "./progression/readiness-consumers";
 
 // ---------------------------------------------------------------------------
 // Input shape — matches what the API route fetches from Prisma
@@ -233,16 +233,25 @@ export function computeAcademicKpis(
 
     if (studentHasActivity) studentsWithAnyActivity++;
 
-    // Readiness score. The mapping lives in readiness-consumers.ts, shared with
-    // the class-progress panel — the two read the same projection, and holding
-    // one definition is what keeps them from drifting apart. `orientationTotal`
-    // is prisma.orientationItem.count(): ALL items (2026-07-31 decision).
+    // Ticket D1 (2026-09-07): the readiness score is the reconciled mapping
+    // every surface now uses (readiness-consumers.ts) — live rows win over
+    // the stored progression state. Unlike the roster and class-progress
+    // panel, this route's own query (src/app/api/teacher/reports/academic-kpi/route.ts)
+    // already fetches certifications, portfolioItems, resumeData and
+    // publicCredentialPage in the same single findMany as everything else on
+    // `KpiStudentRow`, so no batched loader or extra query is needed here —
+    // the live facts were already in hand. `orientationTotal` is
+    // prisma.orientationItem.count(): ALL items (2026-07-31 decision).
     const studentBhagCompleted = student.goals.some((g) => g.level === "bhag" && g.status === "completed");
-    const readiness = progressionStateReadiness({
+    const readiness = reconciledReadiness({
       progressionState: student.progressionState,
       bhagCompleted: studentBhagCompleted,
       orientationCompletedCount: student.orientationProgress.length,
       orientationTotalCount: orientationTotal,
+      certificationsEarned: student.certifications.filter((c) => c.status === "completed").length,
+      portfolioItemCount: student.portfolioItems.length,
+      hasResume: !!student.resumeData,
+      portfolioShared: !!student.publicCredentialPage?.isPublic,
     });
     readinessScores.push(readiness.score);
 

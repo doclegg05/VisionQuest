@@ -311,31 +311,31 @@
   },
   "orientation-readiness": {
     "consumer_disagreements": {
-      "value": 116,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:58:54.009Z",
+      "value": 0,
+      "commit": "3d4f2724",
+      "measuredAt": "2026-09-07T02:08:24.191Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "Ticket D1 (2026-09-07, owner-approved): live rows win everywhere — progressionStateReadiness and rosterReadiness are now thin wrappers around reconciledReadiness, and the roster/class-progress panel read live certification/portfolio/resume/shared-page facts via the new batched fetchReadinessDataForStudents loader instead of trusting stored Progression.state alone. consumer_disagreements moves from 116 (info, floor null) to 0 (gate, floor 0)."
     },
     "denominator_is_all_items": {
       "value": 1,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:58:54.009Z",
+      "commit": "3d4f2724",
+      "measuredAt": "2026-09-07T02:08:24.191Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "Ticket D1 (2026-09-07, owner-approved): live rows win everywhere — progressionStateReadiness and rosterReadiness are now thin wrappers around reconciledReadiness, and the roster/class-progress panel read live certification/portfolio/resume/shared-page facts via the new batched fetchReadinessDataForStudents loader instead of trusting stored Progression.state alone. consumer_disagreements moves from 116 (info, floor null) to 0 (gate, floor 0)."
     },
     "score_decreases_on_completion": {
       "value": 0,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:58:54.009Z",
+      "commit": "3d4f2724",
+      "measuredAt": "2026-09-07T02:08:24.191Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "Ticket D1 (2026-09-07, owner-approved): live rows win everywhere — progressionStateReadiness and rosterReadiness are now thin wrappers around reconciledReadiness, and the roster/class-progress panel read live certification/portfolio/resume/shared-page facts via the new batched fetchReadinessDataForStudents loader instead of trusting stored Progression.state alone. consumer_disagreements moves from 116 (info, floor null) to 0 (gate, floor 0)."
     }
   },
   "pii-log-grep": {
