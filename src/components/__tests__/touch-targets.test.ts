@@ -146,6 +146,17 @@ describe("D3 touch targets — /career OpportunitiesHub + EventsHub pill control
     }
   });
 
+  it("OpportunitiesHub's application-status select is 44px tall and has an accessible name (CI residual: 9x 304x39 + select-name)", () => {
+    const src = read("src/components/career/OpportunitiesHub.tsx");
+    const idx = src.indexOf("APPLICATION_STATUSES.map");
+    assert.ok(idx > -1, "could not find the status select in OpportunitiesHub.tsx");
+    const block = src.slice(Math.max(0, idx - 900), idx);
+    const nearest = [...block.matchAll(/className="([^"]*)"/g)].at(-1);
+    assert.ok(nearest, "could not find the select's className");
+    assert.ok(nearest![1].includes("min-h-11"), `status select missing min-h-11: ${nearest![1]}`);
+    assert.ok(/aria-label="Application status"/.test(block), "status select missing aria-label");
+  });
+
   it("EventsHub's Open link / registration toggle controls meet the 44px floor", () => {
     const src = read("src/components/career/EventsHub.tsx");
     const openLinkMatch = src.match(/className="([^"]*)"\s*>\s*Open link/);
