@@ -31,6 +31,21 @@ jobs:
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # E8 (2026-09-07 budget guard): GEMINI_EVAL_BUDGET_OK is a repo VARIABLE
+      # (not a secret) an operator flips to "1" after confirming the Gemini
+      # project's prepaid balance can absorb this run. Unset/not "1" = every
+      # model-backed step below prints a ::warning:: and exits 0 rather than
+      # spending against a wallet nobody confirmed is funded. This is
+      # DELIBERATELY separate from GEMINI_API_KEY: the key can be present and
+      # valid while the wallet behind it is empty, which is exactly the
+      # 2026-09-05 incident (six runs 429'd on "prepayment credits depleted"
+      # for hours). GEMINI_EVAL_BUDGET_SOFT_FAIL controls what happens if the
+      # wallet runs out mid-run anyway (see the runtime classifier below) —
+      # "1" downgrades that outcome to a warning + exit 0, unset/anything
+      # else keeps exit 3 (a real job failure, per the standing rule that an
+      # ungraded scenario is not a pass). See docs/runbooks/sage-eval-budget.md.
+      GEMINI_EVAL_BUDGET_OK: ${{ vars.GEMINI_EVAL_BUDGET_OK }}
+      GEMINI_EVAL_BUDGET_SOFT_FAIL: ${{ vars.GEMINI_EVAL_BUDGET_SOFT_FAIL }}
     steps:
       - uses: actions/checkout@v4
       - name: Print Sage prompt revision
@@ -59,7 +74,23 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping live red-team eval."
             exit 0
           fi
+          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
+            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
+            echo "- **Red-team eval**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
           npm run sage:redteam:eval -- "--deidentify=Sam,Ms. Lee"
+          status=$?
+          set -e
+          if [ "$status" -eq 3 ]; then
+            echo "::warning::Gemini budget exhausted at runtime — red-team eval NOT RUN (not a pass, not a code failure)"
+            echo "- **Red-team eval**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
+              exit 0
+            fi
+          fi
+          exit $status
 
       - name: Quality eval (informational)
         continue-on-error: true
@@ -68,7 +99,23 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping quality eval."
             exit 0
           fi
+          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
+            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
+            echo "- **Quality eval**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
           npm run sage:quality:eval
+          status=$?
+          set -e
+          if [ "$status" -eq 3 ]; then
+            echo "::warning::Gemini budget exhausted at runtime — quality eval NOT RUN (not a pass, not a code failure)"
+            echo "- **Quality eval**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
+              exit 0
+            fi
+          fi
+          exit $status
 
       - name: Tool-selection eval (gating when GEMINI_API_KEY is set — accuracy < 75% fails the run; skips when the secret is unset)
         run: |
@@ -76,7 +123,23 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping tool-selection eval."
             exit 0
           fi
+          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
+            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
+            echo "- **Tool-selection eval**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
           npm run sage:agent:eval -- --min-accuracy=75 "--deidentify=Sam,Ms. Lee"
+          status=$?
+          set -e
+          if [ "$status" -eq 3 ]; then
+            echo "::warning::Gemini budget exhausted at runtime — tool-selection eval NOT RUN (not a pass, not a code failure)"
+            echo "- **Tool-selection eval**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
+              exit 0
+            fi
+          fi
+          exit $status
 
       - name: Chat harness — deterministic families (gating — tool + guardrail failures fail the run)
         # --samples=3: Gemini tool selection is not fully deterministic even at
@@ -90,7 +153,23 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping live chat harness."
             exit 0
           fi
+          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
+            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
+            echo "- **Chat harness**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
           npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,tool_watch,guardrail --temperature=0 --samples=3
+          status=$?
+          set -e
+          if [ "$status" -eq 3 ]; then
+            echo "::warning::Gemini budget exhausted at runtime — chat harness NOT RUN (not a pass, not a code failure)"
+            echo "- **Chat harness**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
+              exit 0
+            fi
+          fi
+          exit $status
 
   sage-memory-eval:
     runs-on: ubuntu-latest
@@ -113,6 +192,10 @@ jobs:
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # See the matching block in the sage-evals job above — same guard, same
+      # rationale (E8, 2026-09-07): docs/runbooks/sage-eval-budget.md.
+      GEMINI_EVAL_BUDGET_OK: ${{ vars.GEMINI_EVAL_BUDGET_OK }}
+      GEMINI_EVAL_BUDGET_SOFT_FAIL: ${{ vars.GEMINI_EVAL_BUDGET_SOFT_FAIL }}
     steps:
       - uses: actions/checkout@v4
       - name: Print Sage prompt revision
@@ -134,7 +217,23 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping sage memory eval."
             exit 0
           fi
+          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
+            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
+            echo "- **Memory eval**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
           npm run sage:memory:eval
+          status=$?
+          set -e
+          if [ "$status" -eq 3 ]; then
+            echo "::warning::Gemini budget exhausted at runtime — memory eval NOT RUN (not a pass, not a code failure)"
+            echo "- **Memory eval**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
+              exit 0
+            fi
+          fi
+          exit $status
 
   catalog-drift:
     # Compares each approved catalog node's expected sageContextNote against
