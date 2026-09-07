@@ -58,7 +58,18 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // Passive ideation phrased around absence rather than death — "better off
   // without me" / "if I just disappeared". Surfaced by the sage-redteam-eval
   // crisis-paraphrase scenario, which this detector previously missed.
-  { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
+  //
+  // GUARD (B1b): "better off without me ON THE TEAM / IN the group project" is
+  // a statement about a group, and it is ordinary talk for a student who feels
+  // like a burden in a class or at work. The exemption is only the locative
+  // frame — a following on/in/at + determiner — so the pinned rows "everyone
+  // would be better off without me" and "my kids would be better off without
+  // me" (which end there) keep alerting. KNOWN LIMIT, recall-first and
+  // recorded: "the class would be better off without me in it" is now silent,
+  // and that sentence can be a disclosure. It is the price of the guard, and
+  // the guard exists because the unguarded form fires on a real work-stress
+  // register this population uses weekly.
+  { category: "self_harm", pattern: /\b(better\s+off\s+(without\s+me\b(?!\s+(?:on|in|at)\s+(?:the|this|that|my|our)\b)|if\s+i\s+(just\s+)?disappeared)|want\s+to\s+(just\s+)?disappear)\b/i },
   // The verb list is spelled out rather than suffixed, so the PROGRESSIVE form
   // of every member is covered. The old alternation offered only "ting" or "t"
   // after the stem, which happens to spell "cutting" and nothing else: "hurting
@@ -501,8 +512,129 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // ride" alerts. An instructor dismisses it.
   { category: "self_harm", pattern: /\b(?:stood|standing|stand|sat|sitting)\s+(?:there\s+|out\s+|up\s+)?(?:at|on|by)\s+(?:the|that)\s+(?:edge|ledge|railing|rail|bridge|overpass|rooftop|guardrail)\b(?!\s+of\s+my\s+seat\b)/i },
 
+  // --- RESIDUAL FAMILIES (B1b), English. B1 closed the three means families
+  // and moved crisis-en recall 0.794 -> 0.9498 against a 0.98 floor. The 14
+  // rows that remained were in families B1 never touched, and they are grouped
+  // here rather than spliced into the entries above so the next reader can see
+  // what the corpus actually said was missing:
+  //   passive ideation phrased around ABSENCE rather than death;
+  //   an explicit plan carrying a TIME or a NOTE already written;
+  //   pills PREPARATION — the step before the act, which both existing pills
+  //     entries (the past act and the stated plan) sit on either side of;
+  //   burning, the one self-injury method the hurt/harm/cut entry cannot spell;
+  //   one abuse phrasing, passive ("getting hurt at home").
+  //
+  // The discriminator, family by family, stated once:
+  //   absence     — the frame is counterfactual and TERMINAL ("if i was gone",
+  //     "wish i wasnt here" with nothing locative after it). A locative tail is
+  //     what makes the same words a complaint about a room.
+  //   plan        — a first-person intent verb governing "end it"/"be gone"
+  //     plus a time word, or a note with NO ADDRESSEE. An addressee makes a
+  //     note correspondence.
+  //   preparation — the TAIL is the whole signal, exactly as with the firearms
+  //     "for me" entries: pills saved "to take them all", counted against
+  //     "enough". Saving pills for a trip and counting them for a refill are
+  //     the same nouns and the same verbs.
+
+  // Passive 1/6 — "i wish i wasnt here".
+  // GUARD: the locative frame. "i wish i wasnt here at this meeting", "wish i
+  // wasn't here at work today" and "i wish i wasnt here in this class" are
+  // ordinary complaints; "anymore", "at all", or nothing at all is the
+  // disclosure. "at" is refused EXCEPT before "all", because "i wish i wasnt
+  // here at all" is the disclosure and it starts with the guarded preposition.
+  { category: "self_harm", pattern: /\bwish\s+i\s+(?:wasn'?t|was\s+not|weren'?t)\s+here\b(?!\s+(?:at(?!\s+all\b)|in|on|for|with|during)\b)/i },
+  // Passive 2/6 — not waking up.
+  // GUARD: "i hope i dont wake up late for my interview" / "sick tomorrow" is
+  // the everyday sense of the identical words, and this population writes it
+  // before every early shift.
+  { category: "self_harm", pattern: /\b(?:wish|wishing|hope|hoping|pray|praying)\s+i\s+(?:could\s+)?(?:just\s+)?(?:not|never|don'?t|didn'?t|wouldn'?t)\s+wake\s+up\b(?!\s+(?:late|early|sick|tired|hungover|with|before|to)\b)/i },
+  // Passive 3/6 — no point left. The OBJECT is the guard: "any of this",
+  // "anything", "living", "life", "going on" alert; "this assignment", "this
+  // class", "arguing with my landlord" do not, and those are what a student
+  // actually says about program work.
+  { category: "self_harm", pattern: /\b(?:don'?t|can'?t|do\s+not)\s+(?:see|find)\s+(?:a|the|any)\s+(?:point|reason|purpose)\s+(?:in|to|for)\s+(?:any\s+of\s+(?:this|it)|anything|it\s+all|living|life|be\s+here|going\s+on|keep\s+going|continuing|this\s+anymore)\b/i },
+  // Passive 4/6 — "i'd rather be dead". No guard: the hyperbolic register this
+  // population uses for the same idea is "im dead tired" / "dying laughing"
+  // (both pinned silent through their own entries), and neither can reach this
+  // shape. Consistent with the documented decision that "want to die laughing"
+  // alerts — recall-first, an instructor dismisses a card.
+  { category: "self_harm", pattern: /\b(?:i'?d|i\s+would)\s+rather\s+be\s+dead\b/i },
+  // Passive 5/6 — the counterfactual absence. "nothing would change if i was
+  // gone", "nobody would even notice if i was gone". "gone" is the load-bearing
+  // word: "if i was late", "if i was wrong" cannot reach it, and the ordinary
+  // sense of "gone" ("shes gone to the store") has no "if i was" frame.
+  { category: "self_harm", pattern: /\bif\s+i\s+(?:was|were|wasn'?t|weren'?t)\s+(?:gone|around\s+anymore|here\s+anymore)\b/i },
+  // Passive 6/6 — never born. Bound to a wish/should-have frame so a sentence
+  // about someone else's birth cannot reach it.
+  { category: "self_harm", pattern: /\b(?:wish|wishing)\s+i\s+(?:had\s+|was\s+|were\s+)?never\s+(?:been\s+)?born\b|\bshould(?:'?ve|\s+have)\s+never\s+been\s+born\b/i },
+
+  // Intent 1/3 — a note already written.
+  // GUARD: an ADDRESSEE or a SURFACE. "i wrote a note to my teacher", "i left
+  // a note for my roommate on the counter", "note to self" are correspondence;
+  // "i wrote a note already", with nobody named, is the disclosure. The second
+  // entry is the unambiguous form and carries no guard.
+  // KNOWN LIMIT, recorded rather than claimed closed: a benign note with no
+  // addressee still alerts — "i wrote a note already, its on your desk" —
+  // because nothing in the words distinguishes it. That costs an instructor
+  // one dismissal; the other direction costs a disclosure.
+  { category: "self_harm", pattern: /\b(?:wrote|written|writing|left|leaving|typed|finished)\s+(?:a|the|my)\s+(?:note|letter)\b(?!\s+(?:to|for|about|on|in|from|with|saying|reminding|explaining|asking)\b)/i },
+  { category: "self_harm", pattern: /\b(?:goodbye|good\s?bye|suicide|farewell)\s+(?:note|letter)\b/i },
+  // Intent 2/3 — "end it" with a time. The bare phrase is covered by the
+  // "ending things" entry above; what was missing is the pronoun form with a
+  // deadline attached, which is the higher-risk disclosure of the two.
+  // GUARDS, two, and both are load-bearing in this corpus:
+  //   1. a FIRST-PERSON INTENT FRAME is required, so "lets end it there for
+  //      today" and "we should end it tonight" (a meeting, a shift) stay out.
+  //   2. the time word must follow "it"/"this" IMMEDIATELY, which is what
+  //      keeps the #173 breakup guard holding through this entry too: "i want
+  //      to end it with him tonight" puts "with" in that position.
+  // "today" and "this week" are deliberately NOT in the time list — "i want to
+  // finish this today" is the most ordinary sentence in the program.
+  { category: "self_harm", pattern: /\bi(?:'?m|\s+am)?\s+(?:going\s+to|gonna|will|wanna|want\s+to|plan(?:ning)?\s+to|about\s+to)\s+(?:end|finish)\s+(?:it|this)\s+(?:tonight|tomorrow|soon|this\s+weekend|in\s+the\s+morning|before\s+morning)\b/i },
+  // Intent 3/3 — "i want to be gone".
+  // GUARD: a destination or a deadline. "i want to be gone by five so i can
+  // pick up my son" and "i wanna be gone before the traffic starts" are
+  // logistics; the bare form is not.
+  { category: "self_harm", pattern: /\b(?:want|wanna|need|needa|going|gonna)\s+(?:to\s+)?be\s+gone\b(?!\s+(?:from|by|before|for|until|till|to|when|after|in|on|at)\b)/i },
+
+  // Preparation 1/3 — pills saved for the purpose. Same shape as Firearms 6
+  // and Hanging 5: the noun is everywhere in this corpus and the BENEFICIARY
+  // or PURPOSE is the signal. "im saving my pills for the trip next month" is
+  // pinned silent and "i been saving up my pills to take them all" alerts.
+  { category: "self_harm", pattern: /\b(?:saving|saved|stockpiling|stockpiled|hoarding|hoarded|stashing|stashed|hiding|collecting)\s+(?:up\s+)?(?:my|the|these|all\s+my)\s+(?:pills|meds|medication|medicine|tylenol|advil)\b(?:\s+\w+){0,4}\s+(?:to\s+(?:take|swallow|down)\s+(?:them\s+|it\s+|em\s+)?all|for\s+when\s+i(?:'?m|m)?\s+ready)\b/i },
+  // Preparation 2/3 — counting against a sufficiency question. The word
+  // "enough" is the signal, and it is guarded on the other side: "enough FOR
+  // the month" / "to last" is a supply, not a dose, so "i counted my pills and
+  // i have enough for the month" stays silent while "i counted my pills to see
+  // if its enough" alerts. "i counted my pills to refill my prescription"
+  // never reaches the tail at all.
+  { category: "self_harm", pattern: /\b(?:counted|counting|count)\s+(?:up\s+)?(?:my|the|all\s+my)\s+(?:pills|meds|medication|medicine)\b(?:\s+\w+){0,8}\s+enough\b(?!\s+(?:for|to\s+last|until|till|through)\b)/i },
+  // Preparation 3/3 — the whole cabinet.
+  // GUARD: the preposition. "take everything OUT OF the cabinet to clean it"
+  // is housework; "take everything IN the cabinet" is a dose. Only in/inside/
+  // from are accepted, which is the entire distinction.
+  { category: "self_harm", pattern: /\b(?:take|taking|took|swallow|swallowing|swallowed|down)\s+everything\s+(?:in|inside|from)\s+(?:the|my)\s+(?:medicine\s+cabinet|cabinet|drawer|bottle|cupboard|pill\s+box)\b/i },
+
+  // Self-injury — burning. The hurt/harm/cut entry above fires on the bare
+  // verb, which is right for those three because their benign readings are
+  // rare; burning is the opposite — a stove, an iron and a curling iron are
+  // the ordinary readings — so this entry REQUIRES "on purpose" and accepts
+  // the false negatives that come with it. KNOWN LIMIT: "i been burning myself
+  // again" is silent, and it is a disclosure. Closing it would put every
+  // kitchen accident in the alert queue, which is the trade the corpus's
+  // knife_kitchen rows already show the cost of.
+  { category: "self_harm", pattern: /\b(?:burn|burns|burned|burnt|burning)\s+my\s?self\b(?:\s+\w+){0,3}\s+on\s+purpose\b/i },
+
   { category: "harm_others", pattern: /\b(want|going)\s+to\s+(hurt|kill)\s+(someone|him|her|them|people|everyone)\b/i },
   { category: "abuse", pattern: /\b(be(ing)?\s+abused|he\s+hits\s+me|she\s+hits\s+me|they\s+hit\s+me|hits?\s+me\s+at\s+home|hurt(s|ing)?\s+me\s+at\s+home|being\s+(hurt|hit)\s+at\s+home)\b/i },
+  // Abuse, passive voice (B1b). The entry above spells the ACTIVE forms ("he
+  // hits me", "hurts me at home") and the passive "being hurt at home", but
+  // not the "get" passive this population actually uses — "i keep getting hurt
+  // at home", "i got hit at home again last night" were both verified misses.
+  // The PLACE is the whole discriminator and it is guarded on the other side:
+  // "i got hurt at work last week" and "i keep getting hurt at the gym" are
+  // injuries, not disclosures, and stay silent because only home is listed.
+  { category: "abuse", pattern: /\b(?:get(?:ting|s)?|got|gotten)\s+(?:hurt|hit|beat|beaten|jumped|knocked\s+around)\s+(?:at|in)\s+(?:home|the\s+house|my\s+house)\b/i },
 
   // --- Spanish (es) — P2-7. Same phrase-level, case-insensitive, word-boundary
   // style as the English set above; English entries are untouched and tested
@@ -516,7 +648,13 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // "want to die" matches "I want to die laughing".
   // self_harm (es)
   { category: "self_harm", lang: "es", pattern: /\b(me\s+quiero\s+morir|(quiero|quisiera)\s+morir(me)?)\b/i },
-  { category: "self_harm", lang: "es", pattern: /\b(matarme|me\s+quiero\s+matar)\b/i },
+  // "me voy a matar" (B1b) is the near-future form, and its English twin
+  // ("i'm going to kill myself") has always matched through the "killing
+  // myself" entry. Only the want-frame was spelled here, so the plainest
+  // Spanish statement of intent in this whole file was a verified MISS. The
+  // reflexive clitic "me" is what keeps "voy a matar el tiempo" (kill time,
+  // pinned silent) and the harm_others rows ("lo voy a matar") out.
+  { category: "self_harm", lang: "es", pattern: /\b(matarme|me\s+(?:quiero|quisiera|voy\s+a|pienso)\s+matar)\b/i },
   { category: "self_harm", lang: "es", pattern: /\bquitarme\s+la\s+vida\b/i },
   // Stem match — suicidio, suicida(s), suicidarme, suicidarse, suicidé, ...
   { category: "self_harm", lang: "es", pattern: /\bsuicid/i },
@@ -741,6 +879,105 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   { category: "self_harm", lang: "es", pattern: /\b(?:estuve|estaba|ando|he\s+estado|sigo|me\s+qued(?:é|e))\s+(?:parad[oa]|sentad[oa]|de\s+pie)\s+(?:en|sobre)\s+(?:el|la|ese|esa)\s+(?:puente|barandal|orilla|borde|azotea|techo|cornisa)(?![\wáéíóúüñ])/i },
   { category: "self_harm", lang: "es", pattern: /\b(?:estrellarme|estamparme|me\s+(?:voy\s+a|quiero|quisiera)\s+(?:estrellar|estampar))(?:\s+[\wáéíóúüñ]+){0,5}\s+a\s+prop(?:ó|o)sito(?![\wáéíóúüñ])/i },
 
+  // --- RESIDUAL FAMILIES (es) — B1b. The Spanish twins of the English block
+  // above, plus the two families Spanish was weakest in: passive_ideation
+  // scored 13/23 and explicit_intent 25/30 in the crisis-es corpus, holding
+  // headline recall at 0.88 after B1.
+  //
+  // The Spanish false positives here are again their own set, not translations,
+  // and four are load-bearing — each is silenced by a DIFFERENT mechanism and
+  // each has a bite proof in crisis-detection-residual.test.ts:
+  //   "sin mi ayuda / sin mi carro"                the unaccented possessive
+  //   "quisiera desaparecer entre la gente"        desaparecer with a complement
+  //   "quiero acabar con todo el trabajo"          a determiner after "todo"
+  //   "no le veo sentido a esta tarea"             the object of "sentido a"
+  // The first reuses this file's existing accent trick (Armas 5/5): unaccented
+  // "mi" counts as the pronoun ONLY at the end of a clause, because "mi" before
+  // a noun is the possessive; accented "mí" can only be the pronoun and is free.
+
+  // Ideación pasiva 1/7 — "estarían mejor sin mí". The copular verb is
+  // required so an ordinary "el equipo trabaja mejor sin mi supervisión" style
+  // sentence cannot reach it; the possessive guard does the rest.
+  { category: "self_harm", lang: "es", pattern: /\b(?:estar(?:í|i)an?|ser(?:í|i)an?|vivir(?:í|i)an?|andar(?:í|i)an?)\s+(?:mucho\s+)?mejor\s+sin\s+(?:mí(?![\wáéíóúüñ])|mi(?!\s*[\wáéíóúüñ]))/i },
+  // Ideación pasiva 2/7 — no despertar. Twin of the English "wish i could just
+  // not wake up". No guard is needed on the "ojalá" branch: it is a wish, not
+  // a schedule, so the English "dont wake up LATE" hazard has no Spanish
+  // counterpart in this frame.
+  { category: "self_harm", lang: "es", pattern: /\bojal(?:á|a)\s+(?:ya\s+)?no\s+(?:me\s+)?(?:despertara|despierte|despertase|amanezca|amaneciera|despertar(?:í|i)a)(?![\wáéíóúüñ])/i },
+  { category: "self_harm", lang: "es", pattern: /\b(?:quisiera|quiero|ojal(?:á|a)\s+pudiera)\s+no\s+(?:volver\s+a\s+)?despertar(?![\wáéíóúüñ])/i },
+  // Ideación pasiva 3/7 — desaparecer.
+  // GUARD, and it is the reason this entry ends on punctuation instead of the
+  // usual (?![\wáéíóúüñ]): "quisiera desaparecer ENTRE la gente en las juntas"
+  // is a real corpus row about social anxiety, and a lookahead that only
+  // forbids a word CHARACTER passes straight over the space in front of
+  // "entre". So the verb must be TERMINAL — end of message or a clause
+  // boundary — or carry a permanence tail ("y no volver", "para siempre").
+  // "quiero desaparecer un rato" is silent by the same rule.
+  { category: "self_harm", lang: "es", pattern: /\b(?:quiero|quisiera|necesito|ojal(?:á|a)\s+pudiera|me\s+gustar(?:í|i)a)\s+desaparecer(?:\s+(?:y\s+no\s+(?:volver|regresar|despertar)|para\s+siempre|de\s+este\s+mundo|de\s+una\s+vez|y\s+ya))?\s*(?:[.,;!?]|$)/i },
+  // Ideación pasiva 4/7 — sin sentido. The OBJECT is the guard, exactly as in
+  // the English twin: "a nada", "a seguir", "a la vida" alert; "a esta tarea",
+  // "a este formulario" do not.
+  { category: "self_harm", lang: "es", pattern: /\bno\s+(?:le\s+)?(?:veo|encuentro|hallo)\s+(?:el\s+)?sentido\s+a\s+(?:nada\s+de\s+esto|nada|seguir|vivir|la\s+vida|todo\s+esto|esto\s+ya)(?![\wáéíóúüñ])/i },
+  // Ideación pasiva 5/7 — "no estuviera". Two frames, both counterfactual:
+  // the comparative ("sería mejor que yo no estuviera") and the
+  // nothing-would-change one ("nada cambiaría si yo no estuviera"). Requiring
+  // one of the two frames keeps ordinary conditionals ("si no estuviera
+  // lloviendo") out.
+  { category: "self_harm", lang: "es", pattern: /\b(?:ser(?:í|i)a|estar(?:í|i)a)\s+mejor\s+que\s+(?:yo\s+)?no\s+estuviera(?![\wáéíóúüñ])/i },
+  { category: "self_harm", lang: "es", pattern: /\b(?:nada|nadie|todo|todos)\s+(?:cambiar(?:í|i)an?|notar(?:í|i)an?|extra(?:ñ|n)ar(?:í|i)an?|importar(?:í|i)an?)\s+si\s+(?:yo\s+)?no\s+estuviera(?![\wáéíóúüñ])/i },
+  // Ideación pasiva 6/7 — no haber nacido.
+  { category: "self_harm", lang: "es", pattern: /\b(?:nunca|jam(?:á|a)s|no|ni)\s+hubiera\s+nacido(?![\wáéíóúüñ])/i },
+  // Ideación pasiva 7/7 — "prefiero estar muerta". The existing entry spells
+  // "mejor muerto" and "quisiera estar muerto"; the preference frame, which is
+  // how the corpus rows read, was missing.
+  { category: "self_harm", lang: "es", pattern: /\bprefiero\s+(?:estar\s+)?muert[oa](?![\wáéíóúüñ])/i },
+
+  // Intención 1/3 — "acabar con todo".
+  // TWO GUARDS. First, a first-person intent verb is required, which is what
+  // keeps "este turno va a acabar conmigo" and "esta semana va a acabar
+  // conmigo" — the ordinary work-stress figure — silent. Second, "todo"/"esto"
+  // must not be followed by a determiner or "de/del", because that turns it
+  // into an object: "quiero acabar con todo EL TRABAJO", "quiero terminar con
+  // ESTO DEL papeleo". The target row survives both because "todo esto de una
+  // vez" backtracks to the bare "todo", whose next word is the pronoun "esto",
+  // which is deliberately NOT on the refusal list.
+  // KNOWN LIMIT, recorded: "ya casi, voy a terminar con todo" said about
+  // homework alerts. An instructor dismisses it.
+  { category: "self_harm", lang: "es", pattern: /\b(?:quiero|quisiera|ya\s+quiero|necesito|voy\s+a|me\s+voy\s+a|pienso\s+en|pens(?:é|e)\s+en)\s+(?:acabar|terminar)\s+con\s+(?:todo\s+esto|esto|todo)(?!\s+(?:el|la|los|las|mi|mis|tu|tus|su|sus|este|esta|estos|estas|ese|esa|esos|esas|de|del)\b)/i },
+  // Intención 2/3 — "irme de este mundo". Bound to the destination, which is
+  // the whole guard: "irme de la clase", "irme a casa", "irme del trabajo" are
+  // the ordinary uses and none of them can reach "de este mundo".
+  { category: "self_harm", lang: "es", pattern: /\b(?:irme|irnos)\s+de\s+este\s+mundo(?![\wáéíóúüñ])|\bme\s+(?:quiero|quisiera|voy\s+a)\s+ir\s+de\s+este\s+mundo(?![\wáéíóúüñ])|\birme\s+para\s+siempre(?![\wáéíóúüñ])/i },
+  // Intención 3/3 — carta de despedida. The NOUN is the guard: "carta de
+  // renuncia" and "carta de presentación" are program paperwork and both are
+  // in the corpus. A first-person writing verb is also required so a mention
+  // of somebody else's farewell letter stays silent.
+  // KNOWN LIMIT: "escribí una carta de despedida para mi compañera que se va"
+  // alerts. Recall-first.
+  { category: "self_harm", lang: "es", pattern: /\b(?:escrib(?:í|i|o|iendo)|dej(?:é|e|o|ando)|hice|redact(?:é|e))\s+(?:una|la|mi)\s+(?:carta|nota)\s+de\s+despedida(?![\wáéíóúüñ])/i },
+
+  // Preparación 1/3 — pastillas guardadas para eso. Same tail-is-the-signal
+  // shape as the English twin. "guardo mis pastillas en un pastillero semanal"
+  // and "guardo mis pastillas para el viaje" stay silent twice over: the verb
+  // is the habitual present, not the preterite, and neither carries the
+  // "para tomármelas todas" tail.
+  { category: "self_harm", lang: "es", pattern: /\b(?:guard(?:é|e)|junt(?:é|e)|ahorr(?:é|e)|escond(?:í|i)|apart(?:é|e))\s+(?:las\s+|mis\s+|unas\s+|todas\s+las\s+)?(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)(?:\s+[\wáéíóúüñ]+){0,4}\s+para\s+(?:tom|trag)(?:á|a)r(?:me)?(?:las|melas)?\s+(?:todas|toditas|de\s+una\s+vez)(?![\wáéíóúüñ])/i },
+  // Preparación 2/3 — contar pastillas contra una pregunta de suficiencia.
+  // "conté mis pastillas para el pastillero de la semana" never reaches the
+  // tail; "para ver si alcanzan" / "si son suficientes" is the disclosure.
+  { category: "self_harm", lang: "es", pattern: /\b(?:cont(?:é|e)|contando|cuento)\s+(?:mis|las|todas\s+mis|todas\s+las)\s+(?:pastillas|p(?:í|i)ldoras|medicinas|medicamentos|tabletas)(?:\s+[\wáéíóúüñ]+){0,6}\s+(?:me\s+alcanzan|alcanzan|alcanza|son\s+suficientes|hay\s+suficientes|bastan)(?![\wáéíóúüñ])/i },
+  // Preparación 3/3 — el botiquín entero, twin of the English cabinet entry.
+  { category: "self_harm", lang: "es", pattern: /\b(?:tomarme|tragarme|quiero\s+tomarme|voy\s+a\s+tomarme|me\s+(?:quiero|quisiera|voy\s+a)\s+(?:tomar|tragar))\s+todo\s+lo\s+que\s+hay\s+en\s+(?:el|mi)\s+(?:botiqu(?:í|i)n|caj(?:ó|o)n|gabinete|estante|mueble)(?![\wáéíóúüñ])/i },
+
+  // Autolesión (es) — quemarse a propósito, y la autolesión "para sentir".
+  // "a propósito" is REQUIRED for burning, for the same reason the English
+  // twin requires "on purpose": "me quemé cocinando" and "me quemé con la
+  // plancha" are the ordinary readings and both are pinned silent. The second
+  // entry covers the reason a student gives for it ("para sentir algo"), which
+  // the existing lastimarme entry could not reach in the present tense.
+  { category: "self_harm", lang: "es", pattern: /\b(?:me\s+quem(?:é|e|o)|quemarme|me\s+(?:voy\s+a|quiero)\s+quemar)(?:\s+[\wáéíóúüñ]+){0,4}\s+a\s+prop(?:ó|o)sito(?![\wáéíóúüñ])/i },
+  { category: "self_harm", lang: "es", pattern: /\bme\s+(?:lastimo|lastim(?:é|e)|corto|quemo|golpeo|hago\s+da(?:ñ|n)o)(?:\s+[\wáéíóúüñ]+){0,3}\s+para\s+(?:sentir|no\s+sentir|dejar\s+de\s+sentir|aguantar)/i },
+
   // harm_others (es) — a person object (attached clitic or personal "a") is
   // required, mirroring the English object list; that keeps "matar el tiempo"
   // ("kill time") from false-positive while catching "quiero matar a mi jefe".
@@ -756,6 +993,15 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   { category: "abuse", lang: "es", pattern: /\bme\s+est(á|a)n?\s+(pegando|golpeando|maltratando|amenazando|abusando)\b/i },
   { category: "abuse", lang: "es", pattern: /\babus(a|an|ó|o|aba|aban|aron|ando)\s+de\s+m[ií](?![\wáéíóúüñ])/i },
   { category: "abuse", lang: "es", pattern: /\b(tengo\s+miedo\s+de|le\s+tengo\s+miedo\s+a)\s+mi\s+(pareja|esposo|esposa|marido|mujer|novio|novia)\b/i },
+  // Abuso en casa (B1b) — twin of the English "getting hurt at home". The
+  // stem list above deliberately omits "lastim", because "me lastimo" is
+  // FIRST-PERSON self-injury (handled in the self_harm block) and "me lastimé
+  // la espalda" is an injury report; only the third-person forms, immediately
+  // followed by the place, read as somebody else doing it. The place is the
+  // discriminator and the verb must sit directly against it, so "me lastimé la
+  // mano en el trabajo" and "me lastimé la espalda en la casa moviendo
+  // muebles" both stay silent.
+  { category: "abuse", lang: "es", pattern: /\bme\s+(?:lastiman|lastima|golpean|pegan|maltratan)\s+en\s+(?:la\s+)?casa(?![\wáéíóúüñ])/i },
 ];
 
 export interface CrisisDetection {
