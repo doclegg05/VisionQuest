@@ -2,7 +2,7 @@
   "suite": "offboarding-completeness",
   "title": "Offboarding export completeness",
   "area": "data-integrity",
-  "tier": "watch",
+  "tier": "gate",
   "scorer": "scripts/bench/suites/offboarding-completeness.mjs",
   "fixture": "config/benchmarks/fixtures/archive-exemptions.json",
   "requires": [],
@@ -15,5 +15,5 @@
       "tolerance": 0
     }
   ],
-  "notes": "Measured 2026-09-05: 42 models have a direct studentId FK to Student; generateStudentArchive() (src/lib/student-archive.ts) reads 7 of them (FormSubmission, FileUpload, Certification, PortfolioItem, ResumeData, StudentWorkProfile, Connection). 5 more are exempted in the fixture as non-personal/derivable (Progression, ProgressionEvent, LlmCallLog, PasswordResetToken, SecurityQuestionAnswer). The remaining 30 — Message (the actual chat transcripts) and SageInsight foremost among them — are real gaps and stay reported at watch tier pending an owner decision on scope/priority; this is not yet a gate because today's baseline is 30, not 0."
+  "notes": "Ticket D5 (2026-09-07): the offboarding export now covers all 42 models with a direct studentId FK to Student, so this is a gate — a future model that gains a studentId FK and is neither exported nor exempted fails the PR that adds it, rather than drifting in unremarked the way the original 30 did. generateStudentArchive() (src/lib/student-archive.ts) reads 37 of the 42: the original 7 (FormSubmission, FileUpload, Certification, PortfolioItem, ResumeData, StudentWorkProfile, Connection) plus the 30 this ticket added — Conversation+Message (the Sage transcripts, ordered, verbatim — the single biggest prior gap), SageInsight, SagePanel, Goal+GoalResourceLink, CareerDiscovery, CareerCampaign, CoachingArc, VisionBoardItem, MoodEntry, ResumeVersion, CoverLetter, Application, StudentSavedJob, Wager, StudentTask, Appointment, EventRegistration, OrientationProgress, FormResponse, ConsentRecord, SpokesRecord, StudentClassEnrollment, PublicCredentialPage, NotificationPreference (consent fields only — the SMS verification-code hash and its expiry are never selected, same reasoning as the PasswordResetToken exemption below), Notification, CaseNote (every category, including 'risk' — no category is documented staff-confidential in the schema, docs/DATA_RETENTION_POLICY.md, or .claude/rules/security.md today), StudentAlert, and FailedExtraction (a capped snapshot of the student's own message, not a new class of data). The remaining 5 stay exempted in the fixture as non-personal/derivable bookkeeping or authentication artifacts (Progression, ProgressionEvent, LlmCallLog, PasswordResetToken, SecurityQuestionAnswer) — unchanged from before this ticket. De-identification is deliberately NOT applied anywhere in this export: it is the student's own record of their own words, choices, and what they were told."
 }

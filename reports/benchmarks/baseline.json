@@ -269,6 +269,17 @@
       "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
     }
   },
+  "offboarding-completeness": {
+    "student_linked_models_not_exported": {
+      "value": 0,
+      "commit": "7097c66",
+      "measuredAt": "2026-09-07T01:41:15.861Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "Ticket D5: export covers all 42 student-linked models (37 exported + 5 exempted); tier gate, floor 0"
+    }
+  },
   "orientation-readiness": {
     "consumer_disagreements": {
       "value": 116,
