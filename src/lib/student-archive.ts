@@ -19,6 +19,27 @@ const UNSAFE_ENTRY_CHARS = /[^\p{L}\p{N}_. \-()\[\]]/gu;
 const MAX_ENTRY_NAME_LENGTH = 120;
 
 /**
+ * Ticket D5 (AC5) — the archive is built entirely in memory: every section
+ * appended above accumulates in `chunks` and is `Buffer.concat`-ed into one
+ * ZIP buffer before `uploadFile` ever sees it (below). None of the three
+ * callers (the offboard route, the teacher archive route, or the
+ * fire-and-forget status-change trigger) stream the result, and none of them
+ * change here — this ticket only adds content to sections they already
+ * treat as an opaque `{ storageKey, fileCount }`.
+ *
+ * Adding the full Sage transcript (potentially years of daily conversations)
+ * is exactly the kind of section that can make one student's archive large
+ * enough to matter. 25 MB is not a hard limit — it would take a genuinely
+ * exceptional history to reach it, well past a typical multi-month
+ * transcript — so this logs a warning rather than throwing: an operator
+ * finds out an archive got unusually large, without a bigger transcript ever
+ * turning "the export failed" into new instructions the retention policy
+ * doesn't already give ("if the export fails, the student is left
+ * untouched," docs/DATA_RETENTION_POLICY.md).
+ */
+const ARCHIVE_SIZE_WARNING_BYTES = 25 * 1024 * 1024; // 25 MB
+
+/**
  * Names Windows reserves for devices, matched on the STEM and case-insensitively.
  *
  * Windows refuses to create a file called `CON`, and refuses it just as
@@ -219,6 +240,411 @@ export async function generateStudentArchive(
           },
         },
       },
+      // Ticket D5 — the offboarding export was missing 30 of the 42
+      // student-linked models, Message (the Sage transcript) foremost among
+      // them. Everything below is the student's own words, choices, or what
+      // they were told; see docs/DATA_RETENTION_POLICY.md and
+      // config/benchmarks/fixtures/archive-exemptions.json for what stayed
+      // out and why.
+
+      // Sage transcripts — the single biggest gap. Ordered oldest-first so
+      // the export reads like the conversation happened, both at the
+      // conversation level and within each conversation's messages.
+      conversations: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          module: true,
+          stage: true,
+          title: true,
+          summary: true,
+          active: true,
+          createdAt: true,
+          updatedAt: true,
+          messages: {
+            orderBy: { createdAt: "asc" },
+            select: { role: true, content: true, createdAt: true },
+          },
+        },
+      },
+      // Sage's own observations about the student and its daily/weekly
+      // panels — content Sage generated FROM the student's own words, kept
+      // alongside the transcript that produced it.
+      sageInsights: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          category: true,
+          content: true,
+          confidence: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+      sagePanels: {
+        orderBy: { panelDate: "asc" },
+        select: {
+          panelDate: true,
+          spec: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+      // Goals the student set (with the resources staff or Sage attached to
+      // each one). GoalResourceLink is fetched at top level under its own
+      // Student relation name (`goalResourceLinks`) and merged into its goal
+      // below, rather than nested under Goal.resourceLinks — same data,
+      // named the way the ownership relation actually is.
+      goals: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          level: true,
+          parentId: true,
+          content: true,
+          status: true,
+          confirmedAt: true,
+          lastReviewedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      goalResourceLinks: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          goalId: true,
+          resourceType: true,
+          title: true,
+          description: true,
+          url: true,
+          linkType: true,
+          status: true,
+          dueAt: true,
+          createdAt: true,
+        },
+      },
+      // Career exploration — RIASEC/cluster results, the multi-week campaign
+      // and coaching-arc trackers, all student-specific narrative or choice
+      // data.
+      careerDiscovery: {
+        select: {
+          status: true,
+          interests: true,
+          strengths: true,
+          subjects: true,
+          problems: true,
+          values: true,
+          circumstances: true,
+          topClusters: true,
+          sageSummary: true,
+          riasecScores: true,
+          hollandCode: true,
+          nationalClusters: true,
+          transferableSkills: true,
+          workValues: true,
+          assessmentSummary: true,
+          profileSource: true,
+          assessedAt: true,
+          assessmentPayload: true,
+          completedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      careerCampaigns: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          status: true,
+          targetClusters: true,
+          currentStage: true,
+          weeklyApplicationTarget: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      coachingArcs: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          arcType: true,
+          weekNumber: true,
+          milestones: true,
+          status: true,
+          startedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      // Vision board and mood — student-chosen imagery/text and
+      // Sage-extracted mood context.
+      visionBoardItems: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          type: true,
+          content: true,
+          fileId: true,
+          goalId: true,
+          createdAt: true,
+        },
+      },
+      moodEntries: {
+        orderBy: { extractedAt: "asc" },
+        select: {
+          score: true,
+          context: true,
+          source: true,
+          conversationId: true,
+          extractedAt: true,
+        },
+      },
+      // Every resume/cover-letter draft the student produced, not only the
+      // Portfolio's current one (already covered by resumeData above).
+      resumeVersions: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          jobListingId: true,
+          jobLeadId: true,
+          version: true,
+          content: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+      coverLetters: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          jobListingId: true,
+          jobLeadId: true,
+          version: true,
+          content: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+      // Job search activity — what the student applied to, saved, and
+      // wagered on their own progress.
+      applications: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          status: true,
+          notes: true,
+          appliedAt: true,
+          verificationStatus: true,
+          verifiedAt: true,
+          createdAt: true,
+          opportunity: { select: { title: true, company: true } },
+        },
+      },
+      savedJobs: {
+        orderBy: { savedAt: "asc" },
+        select: {
+          status: true,
+          notes: true,
+          savedAt: true,
+          appliedAt: true,
+          jobListing: { select: { title: true, company: true } },
+        },
+      },
+      wagers: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          wagerType: true,
+          hypothesis: true,
+          predictedOutcome: true,
+          confidence: true,
+          horizonAt: true,
+          status: true,
+          createdAt: true,
+        },
+      },
+      // Advising — tasks, appointments, event sign-ups, and the checklist of
+      // orientation items, none of which is currently exported.
+      assignedTasks: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          title: true,
+          description: true,
+          dueAt: true,
+          status: true,
+          priority: true,
+          completedAt: true,
+          createdAt: true,
+          createdBy: { select: { displayName: true } },
+        },
+      },
+      appointments: {
+        orderBy: { startsAt: "asc" },
+        select: {
+          title: true,
+          description: true,
+          startsAt: true,
+          endsAt: true,
+          status: true,
+          locationType: true,
+          locationLabel: true,
+          notes: true,
+          createdAt: true,
+          advisor: { select: { displayName: true } },
+        },
+      },
+      eventRegistrations: {
+        orderBy: { registeredAt: "asc" },
+        select: {
+          status: true,
+          registeredAt: true,
+          event: { select: { title: true, startsAt: true } },
+        },
+      },
+      orientationProgress: {
+        select: {
+          completed: true,
+          completedAt: true,
+          verificationStatus: true,
+          verifiedAt: true,
+          item: { select: { label: true } },
+        },
+      },
+      // Digital form answers (distinct from the signed-PDF FormSubmission
+      // rows already exported above as files).
+      formResponses: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          answers: true,
+          status: true,
+          submittedAt: true,
+          reviewedAt: true,
+          createdAt: true,
+          template: { select: { title: true } },
+        },
+      },
+      // The student's own consent decisions and their SPOKES/DoHS intake
+      // and enrollment record.
+      consentRecords: {
+        orderBy: { grantedAt: "asc" },
+        select: {
+          scope: true,
+          grantedAt: true,
+          revokedAt: true,
+          createdAt: true,
+        },
+      },
+      spokesRecord: {
+        select: {
+          firstName: true,
+          lastName: true,
+          county: true,
+          householdType: true,
+          requiredParticipationHours: true,
+          referralDate: true,
+          status: true,
+          enrolledAt: true,
+          exitDate: true,
+          barriersOnEntry: true,
+          barriersRemaining: true,
+          educationalLevel: true,
+          tabeDate: true,
+          postSecondaryProgram: true,
+          unsubsidizedEmploymentAt: true,
+          employerName: true,
+          hourlyWage: true,
+          nonCompleterAt: true,
+          nonCompleterReason: true,
+          notes: true,
+          createdAt: true,
+        },
+      },
+      classEnrollments: {
+        orderBy: { enrolledAt: "asc" },
+        select: {
+          status: true,
+          enrolledAt: true,
+          archivedAt: true,
+          archiveReason: true,
+          class: { select: { name: true } },
+        },
+      },
+      // The public credential page's own content (not the page's traffic —
+      // just what the student put on it) and the notification layer: their
+      // own channel preferences, and every notification they were sent.
+      publicCredentialPage: {
+        select: {
+          slug: true,
+          headline: true,
+          summary: true,
+          isPublic: true,
+          createdAt: true,
+        },
+      },
+      // smsVerifyCodeHash/smsVerifyExpiresAt are excluded: an unexpired
+      // verification code hash is an authentication artifact, the same
+      // reasoning PasswordResetToken/SecurityQuestionAnswer are exempted
+      // under in the fixture, not something the student wrote or said.
+      notificationPreferences: {
+        select: {
+          channel: true,
+          enabled: true,
+          destination: true,
+          smsConsentAt: true,
+          smsRevokedAt: true,
+          createdAt: true,
+        },
+      },
+      notifications: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          type: true,
+          title: true,
+          body: true,
+          createdAt: true,
+        },
+      },
+      // Staff-authored content ABOUT the student. Every CaseNote category
+      // (general, check_in, risk, career, celebration — src/lib/advising.ts)
+      // is exported verbatim: neither the schema nor
+      // docs/DATA_RETENTION_POLICY.md nor .claude/rules/security.md marks any
+      // category "staff-confidential" today. CaseNote.visibility currently
+      // has exactly one legal value ("teacher", src/lib/advising.ts
+      // NOTE_VISIBILITIES) — that describes who the in-app UI shows a note
+      // to today, not a confidentiality classification, so it is not read as
+      // grounds to redact here. If a category or a visibility value is ever
+      // documented as staff-confidential, exclude that category with a
+      // comment here and count it as exported-with-redaction rather than
+      // folding it into the archive-exemptions fixture (which is for whole
+      // MODELS, not categories within one).
+      caseNotes: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          category: true,
+          body: true,
+          createdAt: true,
+          author: { select: { displayName: true } },
+        },
+      },
+      alerts: {
+        orderBy: { detectedAt: "asc" },
+        select: {
+          type: true,
+          severity: true,
+          status: true,
+          title: true,
+          summary: true,
+          detectedAt: true,
+          resolvedAt: true,
+        },
+      },
+      // Dead-letter copies of failed Sage extractions. `payload` is a capped
+      // snapshot of the student's own message the extractor was working
+      // from — a transcript excerpt, not a new class of data — so this leans
+      // include per the ticket's guidance rather than joining the fixture's
+      // exemptions.
+      failedExtractions: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          extractorKey: true,
+          payload: true,
+          error: true,
+          status: true,
+          createdAt: true,
+        },
+      },
     },
   });
 
@@ -300,6 +726,25 @@ export async function generateStudentArchive(
       });
       return false;
     }
+  }
+
+  /**
+   * Append one JSON section, but only when there is something to say.
+   *
+   * An empty array or a null singular relation means "the student has none
+   * of this" — writing `[]` or `{}` anyway would look identical to that in
+   * the exported bundle and give it no evidentiary meaning, exactly the
+   * reasoning the existing work-profile.json/connections.json sections
+   * already use above.
+   */
+  function addJsonSection(name: string, type: string, data: unknown): void {
+    const isEmptyArray = Array.isArray(data) && data.length === 0;
+    const isAbsent = data === null || data === undefined || isEmptyArray;
+    if (isAbsent) return;
+
+    archive.append(JSON.stringify(data, null, 2), { name });
+    manifest.entries.push({ path: name, type });
+    manifest.fileCount++;
   }
 
   // 1. Form submissions (completed forms + signatures)
@@ -420,7 +865,88 @@ export async function generateStudentArchive(
     manifest.fileCount++;
   }
 
-  // 8. Add manifest
+  // 8. Sage transcripts — conversations with their messages nested, both
+  // ordered oldest-first by the Prisma query above. The single biggest gap
+  // this ticket closes.
+  addJsonSection("sage/conversations.json", "sage_conversation", student.conversations);
+
+  // 9. Sage's own observations and daily/weekly panels.
+  addJsonSection("sage/insights.json", "sage_insight", student.sageInsights);
+  addJsonSection("sage/panels.json", "sage_panel", student.sagePanels);
+
+  // 10. Goals, with each goal's resource links nested under it — same data
+  // as GoalResourceLink, grouped by the goal it belongs to rather than left
+  // as a second flat list the student would have to cross-reference by hand.
+  const studentGoals = student.goals ?? [];
+  const studentGoalResourceLinks = student.goalResourceLinks ?? [];
+  if (studentGoals.length > 0) {
+    const resourceLinksByGoal = new Map<string, typeof studentGoalResourceLinks>();
+    for (const link of studentGoalResourceLinks) {
+      const existing = resourceLinksByGoal.get(link.goalId);
+      if (existing) existing.push(link);
+      else resourceLinksByGoal.set(link.goalId, [link]);
+    }
+    const goalsWithLinks = studentGoals.map((goal) => ({
+      ...goal,
+      resourceLinks: resourceLinksByGoal.get(goal.id) ?? [],
+    }));
+    addJsonSection("goals.json", "goal", goalsWithLinks);
+  }
+
+  // 11. Career exploration.
+  addJsonSection("career/discovery.json", "career_discovery", student.careerDiscovery);
+  addJsonSection("career/campaigns.json", "career_campaign", student.careerCampaigns);
+  addJsonSection("career/coaching-arcs.json", "coaching_arc", student.coachingArcs);
+
+  // 12. Vision board and mood.
+  addJsonSection("vision-board.json", "vision_board_item", student.visionBoardItems);
+  addJsonSection("mood-entries.json", "mood_entry", student.moodEntries);
+
+  // 13. Every resume/cover-letter draft (distinct from resume/resume-data.json,
+  // the Portfolio's current one, exported above).
+  addJsonSection("resume/resume-versions.json", "resume_version", student.resumeVersions);
+  addJsonSection("cover-letters.json", "cover_letter", student.coverLetters);
+
+  // 14. Job search activity.
+  addJsonSection("applications.json", "application", student.applications);
+  addJsonSection("saved-jobs.json", "saved_job", student.savedJobs);
+  addJsonSection("wagers.json", "wager", student.wagers);
+
+  // 15. Advising — tasks, appointments, event sign-ups, orientation checklist.
+  addJsonSection("tasks.json", "student_task", student.assignedTasks);
+  addJsonSection("appointments.json", "appointment", student.appointments);
+  addJsonSection("event-registrations.json", "event_registration", student.eventRegistrations);
+  addJsonSection("orientation-progress.json", "orientation_progress", student.orientationProgress);
+
+  // 16. Digital form answers (distinct from the signed-PDF FormSubmission
+  // rows already exported above under forms/).
+  addJsonSection("form-responses.json", "form_response", student.formResponses);
+
+  // 17. Consent decisions and the SPOKES/DoHS intake record.
+  addJsonSection("consent-records.json", "consent_record", student.consentRecords);
+  addJsonSection("spokes-record.json", "spokes_record", student.spokesRecord);
+  addJsonSection("class-enrollments.json", "class_enrollment", student.classEnrollments);
+
+  // 18. The public credential page's own content, notification preferences,
+  // and every notification the student was sent.
+  addJsonSection("credential-page.json", "public_credential_page", student.publicCredentialPage);
+  addJsonSection(
+    "notification-preferences.json",
+    "notification_preference",
+    student.notificationPreferences,
+  );
+  addJsonSection("notifications.json", "notification", student.notifications);
+
+  // 19. Staff-authored content about the student. See the select block above
+  // for the CaseNote-category confidentiality decision.
+  addJsonSection("case-notes.json", "case_note", student.caseNotes);
+  addJsonSection("alerts.json", "student_alert", student.alerts);
+
+  // 20. Dead-letter copies of failed Sage extractions — a capped snapshot of
+  // the student's own message, not a new class of data.
+  addJsonSection("failed-extractions.json", "failed_extraction", student.failedExtractions);
+
+  // 21. Add manifest
   archive.append(JSON.stringify(manifest, null, 2), { name: "manifest.json" });
 
   await archive.finalize();
@@ -432,6 +958,15 @@ export async function generateStudentArchive(
   });
 
   const zipBuffer = Buffer.concat(chunks);
+
+  if (zipBuffer.length > ARCHIVE_SIZE_WARNING_BYTES) {
+    logger.warn("Student archive exceeded the size-warning threshold", {
+      student: studentLogKey(studentId),
+      archiveSize: zipBuffer.length,
+      thresholdBytes: ARCHIVE_SIZE_WARNING_BYTES,
+    });
+  }
+
   const dateStamp = new Date().toISOString().slice(0, 10);
   const safeName = student.displayName.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40);
   const storageKey = `archives/${studentId}/${safeName}_${dateStamp}.zip`;
