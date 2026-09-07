@@ -40,6 +40,7 @@
     "catalog:drift": "tsx scripts/catalog/drift.mjs",
     "platform:validate": "tsx scripts/platform/validate.mjs",
     "sage:rag:backfill": "tsx scripts/backfill-embeddings.mjs",
+    "memory:pseudonymize:backfill": "tsx scripts/memory-pseudonymize-backfill.mjs",
     "sage:memory:eval": "tsx scripts/sage-memory-eval.mjs",
     "sage:agent:eval": "tsx scripts/sage-agent-eval.mjs",
     "sage:redteam:eval": "tsx scripts/sage-redteam-eval.mjs",

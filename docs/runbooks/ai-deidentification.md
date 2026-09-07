@@ -138,6 +138,44 @@ delay.
 | `metadata.tokens` is short or the row is absent | The identity loader found little or nothing (RLS refused a read, or the row is gone). Fail-open: the call still went out, unwrapped. |
 | Sage stops using the student's name at all | The model declined to echo an obviously synthetic token. Measure with `sage:quality:eval`; the review flagged placeholder-dense prompts as a known reasoning cost. |
 
+## Backfill
+
+`scripts/memory-pseudonymize-backfill.mjs` (`npm run memory:pseudonymize:backfill`)
+rewrites `SageMemory` rows written before store.ts's write-time pseudonymization
+pass shipped. A legacy row holds the raw name; its `sourceHash` was computed
+over that raw text, so it no longer matches the pseudonymized version a later
+turn extracts for the same fact, and the pair can double-store instead of
+deduping. Per active row (`subjectType: "student"`, `validTo: null`) the
+script builds the same `TokenVault` `store.ts` builds at write time from that
+student's own identity fields (display name, email, login id, SMS
+destination — the same four `loadIdentityInput` vaults, read through
+`prismaAdmin` rather than the RLS app client, since the script has no
+session to run `loadIdentityInput` under) and re-runs `pseudonymize()`
+against the stored content:
+
+- **Unchanged** — the pseudonymized text is identical to what is stored
+  (nothing to catch, including a row that is already pseudonymized).
+- **Rewrite** — the text changes and no other active row for that student
+  lands on the same final content: `content` and `sourceHash` are updated
+  and the row is re-embedded so its vector matches the new text.
+- **Dedupe** — two rows land on the same final content (the double-store the
+  write-time pass was meant to prevent): the OLDER row is deleted and the
+  newer one is kept, rewritten if it still needs it.
+
+Dry run by default — it prints aggregate counts only (students scanned, rows
+rewritten, deduped, unchanged) and never a name or a content string. `--apply`
+performs the writes; `--student=<cuid>` scopes the run to one student;
+`--limit=N` bounds how many students a run scans. Like the nudge runner and
+the SMS inbound webhook, it refuses to run at all — dry run included — unless
+`adminClientIsPrivileged()` confirms `ADMIN_DATABASE_URL` actually bypasses
+RLS: under `vq_app` with no session context a cross-student read returns zero
+rows, which would otherwise print "nothing to pseudonymize" when the real
+answer is "this connection cannot see any rows at all."
+
+What it cannot catch: the same residual the write-time pass cannot catch
+either — a third party named in passing ("her son Jayden"), because the vault
+only knows the acting student's own identity fields.
+
 ## Not covered here
 
 Homoglyph and fullwidth look-alikes of the tokens; the identity vault (review
