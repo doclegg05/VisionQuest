@@ -45,6 +45,11 @@ jobs:
       # See src/lib/db.ts#warnMissingRlsContext for the three-mode ladder.
       RLS_CONTEXT_INJECTION: "true"
       RLS_CONTEXT_STRICT: "true"
+      # Boot probes (src/lib/boot-probes.ts) stop a production-mode boot when
+      # ADMIN_DATABASE_URL is unset — the smoke-test step boots `npm run start`,
+      # which is production mode. Presence is all the config probe checks; the
+      # privilege probe is advisory. Fake, like DATABASE_URL above.
+      ADMIN_DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
 
     steps:
       - uses: actions/checkout@v4
@@ -272,6 +277,13 @@ jobs:
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
       BASE_URL: "http://localhost:3000"
+      # The standalone server is production mode, and the boot probes
+      # (src/lib/boot-probes.ts) refuse to start it without these two — the
+      # same two Render must carry. The hermetic Postgres is a superuser, so
+      # the admin URL is simply the same connection; RLS context injection on
+      # is production parity (the verify job already runs the RLS suite with it).
+      RLS_CONTEXT_INJECTION: "true"
+      ADMIN_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_e2e"
       # playwright.config.ts webServer honors this: boot the built standalone
       # server (scripts/start-production.mjs), matching the smoke-test boot
       # path, instead of `next dev`.
