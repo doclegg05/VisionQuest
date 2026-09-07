@@ -168,12 +168,36 @@ export function proxy(request: NextRequest) {
   return response;
 }
 
+/**
+ * Every path the proxy runs on, exported so a test can exercise the negative
+ * lookahead directly (`config.matcher` is read by the build, not by any code
+ * a unit test can call).
+ *
+ * The pattern used to carry a fourth exclusion, `.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$`.
+ * A matcher exclusion does not skip a rule inside the proxy — it skips the
+ * proxy — so any path ending in one of those extensions got no CSRF Origin
+ * check and no `x-vq-*` stripping (2026-09-06 hunt, follow-up 3). Nothing
+ * routes there today; the day a catch-all or a dynamic segment can end in
+ * `.png`, `POST /api/anything.png` is an unauthenticated write and a
+ * client-supplied `x-vq-role: admin` reaches the handler looking exactly like
+ * one this proxy derived from a verified session JWT. An exclusion whose only
+ * purpose is to save work on assets is not worth holding open a hole in two
+ * security controls.
+ *
+ * Cost of dropping it: the seven image files in `public/` now run the proxy,
+ * which adds a CSP header and — only when a session cookie is present — one JWT
+ * verification. Nothing else changes, and this is not a guess: the other three
+ * files in `public/` are `.mp4`/`.vtt`, extensions the clause never listed, so
+ * public assets have always been served through this proxy. `_next/static` and
+ * `_next/image`, where the built and optimized assets actually live, are still
+ * excluded by name, so the hot path is untouched. No path under `public/`
+ * matches a gated prefix, so none of them can be redirected.
+ */
+export const PROXY_MATCHER = "/((?!_next/static|_next/image|favicon.ico).*)";
+
 export const config = {
   // Next.js 16 proxy (renamed from middleware) always runs on Node.js runtime —
   // no `runtime` key allowed here. `jsonwebtoken`'s Node-crypto dependency
   // works out of the box.
-  matcher: [
-    // Match all paths except static files and _next internals
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
-  ],
+  matcher: [PROXY_MATCHER],
 };

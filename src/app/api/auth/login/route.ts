@@ -33,15 +33,19 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     ? await prisma.student.findUnique({ where: { email: normalizeEmail(login) } })
     : await prisma.student.findUnique({ where: { studentId: normalizeStudentId(login) } });
 
-  // Per-user rate limit — prevents distributed brute force against a single account
+  // Per-user rate limit — prevents distributed brute force against a single
+  // account. The refusal is deliberately NOT a 429: this route is reachable
+  // without a session, the login is not a secret, and the per-IP bucket is 10
+  // while this one is 5 — so a distinct status on the sixth attempt told an
+  // anonymous caller whether the account exists, for six cheap requests per
+  // address (2026-09-06 hunt, follow-up 1). A locked account now answers
+  // exactly like a wrong password and exactly like an unknown login, the
+  // attempt is still counted above, and the limit itself is unchanged.
+  // Precedent and identical reasoning: reset-password/questions/route.ts.
+  let accountLocked = false;
   if (student) {
     const userRl = await rateLimit(`login:user:${student.id}`, 5, 15 * 60 * 1000);
-    if (!userRl.success) {
-      return NextResponse.json(
-        { error: "Too many login attempts. Please try again later." },
-        { status: 429 },
-      );
-    }
+    accountLocked = !userRl.success;
   }
 
   // Consolidate all failure cases into a single generic response to prevent account enumeration.
@@ -55,14 +59,24 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const isInvalidCredentials =
     !student || !student.passwordHash || !passwordMatches || !student.isActive;
 
-  if (isOAuthOnly || isInvalidCredentials) {
+  if (accountLocked || isOAuthOnly || isInvalidCredentials) {
+    // The response says nothing the caller could not already guess; the audit
+    // log, which only staff read, keeps the three cases apart.
+    const failureStudent = accountLocked || isOAuthOnly ? student : null;
+    const action = accountLocked
+      ? "auth.login_failed_rate_limited"
+      : isOAuthOnly
+        ? "auth.login_failed_oauth"
+        : "auth.login_failed";
     await logAuditEvent({
-      actorId: isOAuthOnly ? student.id : null,
-      actorRole: isOAuthOnly ? student.role : null,
-      action: isOAuthOnly ? "auth.login_failed_oauth" : "auth.login_failed",
+      actorId: failureStudent?.id ?? null,
+      actorRole: failureStudent?.role ?? null,
+      action,
       targetType: "student",
-      targetId: isOAuthOnly ? student.id : undefined,
-      summary: `Failed login attempt for "${login}".`,
+      targetId: failureStudent?.id,
+      summary: accountLocked
+        ? `Failed login attempt for "${login}" — refused, per-account attempt limit reached.`
+        : `Failed login attempt for "${login}".`,
       metadata: { ip },
     });
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });

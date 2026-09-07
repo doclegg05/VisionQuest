@@ -130,7 +130,7 @@ describe("POST /api/auth/login — concurrent attempts from one IP", () => {
     queuedFailures = [];
   });
 
-  it("answers every concurrent attempt with a sign-in or a clean 429, never a 500", async () => {
+  it("answers every concurrent attempt with a sign-in or a clean refusal, never a 500", async () => {
     const statuses = await burst(BURST);
 
     assert.equal(
@@ -139,8 +139,8 @@ describe("POST /api/auth/login — concurrent attempts from one IP", () => {
       `no attempt may fail with a server error; got ${JSON.stringify(statuses)}`,
     );
     assert.ok(
-      statuses.every((s) => s === 200 || s === 429),
-      `every attempt is a sign-in or a rate-limit refusal; got ${JSON.stringify(statuses)}`,
+      statuses.every((s) => s === 200 || s === 429 || s === 401),
+      `every attempt is a sign-in or a refusal; got ${JSON.stringify(statuses)}`,
     );
   });
 
@@ -151,7 +151,23 @@ describe("POST /api/auth/login — concurrent attempts from one IP", () => {
     // per-user limiter, which admits USER_LIMIT. Lost increments would let
     // more through — that is the brute-force protection this counts on.
     assert.equal(statuses.filter((s) => s === 200).length, Math.min(IP_LIMIT, USER_LIMIT));
-    assert.equal(statuses.filter((s) => s === 429).length, BURST - Math.min(IP_LIMIT, USER_LIMIT));
+
+    // The two refusals have different shapes on purpose (2026-09-06 hunt,
+    // follow-up 1). The per-IP bucket names no account, so it keeps its 429.
+    // The per-ACCOUNT bucket answers with the generic 401 the wrong-password
+    // path returns, because a distinct status there tells an anonymous caller
+    // that the account exists. This pins both counts, so neither refusal can
+    // silently take the other's shape.
+    assert.equal(
+      statuses.filter((s) => s === 429).length,
+      BURST - IP_LIMIT,
+      "everything past the per-IP bucket is refused with 429",
+    );
+    assert.equal(
+      statuses.filter((s) => s === 401).length,
+      IP_LIMIT - USER_LIMIT,
+      "the attempts the IP bucket admitted but the account bucket did not answer 401, not 429",
+    );
   });
 
   it("survives a store that raises transient contention errors", async () => {
