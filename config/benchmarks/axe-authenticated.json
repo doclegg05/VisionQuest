@@ -2,7 +2,7 @@
   "suite": "axe-authenticated",
   "title": "Authenticated axe violations (report only)",
   "area": "a11y",
-  "tier": "watch",
+  "tier": "gate",
   "scorer": "scripts/bench/suites/axe-authenticated.mjs",
   "fixture": "config/benchmarks/fixtures/axe-authenticated.json",
   "requires": ["browser", "server"],
@@ -11,8 +11,9 @@
       "id": "violations_total",
       "unit": "count",
       "direction": "lower",
+      "floor": 0,
       "tolerance": 0
     }
   ],
-  "notes": "No floor yet — per the design (§4.9: 'burn down to 0, then gate') and this task's brief ('lower, no floor yet; baseline is today's number so it can never grow — set tolerance 0'). e2e/a11y-authenticated.spec.ts already asserts zero violations and stays untouched; e2e/bench-axe-authenticated.spec.ts is a sibling that only reports, over the same route set plus the resolved teacher student-detail deep link. Once a real run establishes today's count, set it as the baseline via `npm run bench -- --suite=axe-authenticated --update-baseline --reason=\"initial measurement\"` (tolerance 0 means any increase opens a watch immediately; it must never be allowed to creep upward while the burn-down is in progress). Could not be measured in the authoring sandbox — no dev server or DATABASE_URL (standing worktree gotcha) — so no baseline is set here; do not invent a placeholder number."
+  "notes": "FLOOR SET, TIER PROMOTED TO GATE (Ticket D3, 2026-09-07): CI run 34072983383 measured 7 violations — color-contrast on /learning (14 nodes), teacher /teacher (54) and /teacher/students/:id (11); select-name on /career (9, critical) and /teacher/students/:id (1, critical); link-name on /teacher (52); nested-interactive on /teacher (1). All seven got named fixes. color-contrast: the shared light-theme tokens driving all three routes' badges/captions were under WCAG's 4.5:1 floor — `--ink-faint` measured 1.83:1 (rgba(0,0,0,0.25) on white) and is now rgba(0,0,0,0.55) (>=4.5:1 on every light surface, used in 50 files incl. CertTracker on /learning and the teacher roster/detail badges); `--badge-warning-text`/`--urgency-high-text`/`--toast-celebration-text` shared #8a6d05 at 4.34:1 on their tinted backgrounds, now #7a5f04 (5.34-5.60:1); `--program-ietp-text` #c2410c measured 4.47:1, now #a53509 (5.82:1). select-name: JobCard's per-job status <select> and OperationsTab's case-notes category <select> had no <label> or aria-label; both now carry aria-label. link-name: InterventionQueuePanel's per-student avatar Link wrapped only a UserCircle icon with no text; now carries aria-label naming the student. nested-interactive: InterventionQueue.tsx's StudentAccordion had a real <button> (Ask Sage) and a <Link> (View student) nested INSIDE the row's own toggle <button> — invalid HTML axe correctly flags — split into a toggle button wrapping only the chevron+name and a sibling actions row, same visual layout, no nesting. Fixed from source, not re-verified against a running browser in this container (no Playwright/BENCH_BASE_URL/DATABASE_URL here); CI's next run is the real measurement."
 }
