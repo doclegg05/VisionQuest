@@ -210,7 +210,7 @@ describe("D3 axe-authenticated — nested-interactive", () => {
     // actions (Ask Sage button, View student Link) moved to a sibling <div>
     // after the toggle button's closing tag, not before it.
     assert.ok(
-      src.includes('className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 text-left'),
+      src.includes('className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg py-1 text-left'),
       "toggle button must wrap only the chevron+name column now",
     );
     const toggleButtonStart = src.indexOf("onClick={onToggle}");
