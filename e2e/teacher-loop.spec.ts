@@ -74,7 +74,7 @@ test("teacher works the loop: queue → student detail → anchors → verificat
       timeout: 20_000,
     });
     // Detail loads client-side; the tab bar is the loaded-state marker.
-    await expect(page.getByRole("button", { name: "Coach" })).toBeVisible({
+    await expect(page.getByRole("tab", { name: "Coach" })).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.getByRole("button", { name: "Progress" })).toBeVisible();

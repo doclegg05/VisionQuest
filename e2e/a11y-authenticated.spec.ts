@@ -113,7 +113,7 @@ test.describe("Accessibility — authenticated routes (WCAG 2.x A/AA)", () => {
       await page.goto(detailPath);
       // Student detail loads client-side — wait for real content, not the
       // "Loading student data..." placeholder, before scanning.
-      await expect(page.getByRole("button", { name: "Coach" })).toBeVisible({
+      await expect(page.getByRole("tab", { name: "Coach" })).toBeVisible({
         timeout: 20_000,
       });
       await page.waitForTimeout(500);

@@ -21,15 +21,23 @@ const PACKAGE_JSON = readFileSync(path.join(REPO_ROOT, "package.json"), "utf8");
 const SPEC_HEADER = readFileSync(path.join(REPO_ROOT, "e2e/a11y-authenticated.spec.ts"), "utf8").slice(0, 1500);
 
 describe("CI: authenticated a11y spec runs in the gating E2E step, not a separate soak step", () => {
-  it("the gating 'E2E gate' step's spec list includes e2e/a11y-authenticated.spec.ts", () => {
-    const gateStepMatch = CI_YML.match(
-      /name: E2E gate[\s\S]*?run: >-\n([\s\S]*?)\n\s*\n/,
+  it("a gating 'E2E gate' step runs e2e/a11y-authenticated.spec.ts in its own invocation, after re-seeding, and is not continue-on-error", () => {
+    // Its own invocation because the shared per-IP login budget is spent by
+    // the other gate specs once retries count; the seed clears the buckets.
+    const stepMatch = CI_YML.match(
+      /- name: E2E gate — authenticated a11y[^\n]*\n([\s\S]*?)(?=\n\s*- name: |\n\s*# ---)/,
     );
-    assert.ok(gateStepMatch, "expected to find the 'E2E gate' step's run block in ci.yml");
-    assert.match(
-      gateStepMatch![1],
-      /e2e\/a11y-authenticated\.spec\.ts/,
-      "the gating E2E step's spec list should include e2e/a11y-authenticated.spec.ts",
+    assert.ok(stepMatch, "expected an 'E2E gate — authenticated a11y' step in ci.yml");
+    const body = stepMatch![1];
+    assert.match(body, /seed-e2e-users\.ts/, "the step must re-run the e2e seed before the spec");
+    assert.match(body, /playwright test e2e\/a11y-authenticated\.spec\.ts/, "the step must run the authenticated spec");
+    assert.doesNotMatch(body, /continue-on-error/, "the step must gate, not soak");
+    const mainGate = CI_YML.match(/name: E2E gate — public[\s\S]*?run: >-\n([\s\S]*?)\n\s*\n/);
+    assert.ok(mainGate, "expected the main E2E gate step");
+    assert.doesNotMatch(
+      mainGate![1],
+      /a11y-authenticated/,
+      "the authenticated spec must not also run inside the shared-budget invocation",
     );
   });
 

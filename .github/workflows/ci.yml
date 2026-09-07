@@ -372,7 +372,6 @@ jobs:
         run: >-
           npx playwright test
           e2e/a11y.spec.ts
-          e2e/a11y-authenticated.spec.ts
           e2e/public-routes.spec.ts
           e2e/student-login-chat.spec.ts
           e2e/teacher-dashboard.spec.ts
@@ -380,6 +379,17 @@ jobs:
           e2e/teacher-loop.spec.ts
           e2e/theme-variant.spec.ts
           --reporter=line --timeout=120000
+
+      # Gating, in its own Playwright invocation with the seed re-run first:
+      # the seed clears the login rate-limit buckets, and the per-IP budget
+      # (10 logins / 15 min) is already spent by the specs above once their
+      # retries are counted — the first gated run of this spec 429'd on
+      # e2e-a11y-teacher for exactly that reason (2026-09-07). Same pattern
+      # as the benchmark collectors below.
+      - name: E2E gate — authenticated a11y (own login budget)
+        run: |
+          npx tsx scripts/seed-e2e-users.ts >/dev/null
+          npx playwright test e2e/a11y-authenticated.spec.ts --workers=1 --reporter=line --timeout=180000
 
       # --- Browser-collected benchmarks -----------------------------------
       - name: Collect browser benchmark data (non-blocking)
