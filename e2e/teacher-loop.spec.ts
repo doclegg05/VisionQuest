@@ -77,8 +77,8 @@ test("teacher works the loop: queue → student detail → anchors → verificat
     await expect(page.getByRole("tab", { name: "Coach" })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByRole("button", { name: "Progress" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Admin" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Progress" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Admin" })).toBeVisible();
 
     // 3. Deep-link anchors switch tabs (useAnchorTabSwitch): only the active
     // tab's content is in the DOM, so the target becoming visible proves the
