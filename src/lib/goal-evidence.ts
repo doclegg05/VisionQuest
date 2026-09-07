@@ -1,4 +1,5 @@
 import { goalCountsTowardPlan } from "@/lib/goals";
+import { READY_TO_WORK_CERT_TYPE, READY_TO_WORK_FAMILY_CERT_TYPES } from "@/lib/certifications";
 import type {
   GoalPlanEntry,
   GoalResourceLinkStatus,
@@ -353,18 +354,23 @@ function evidenceFromPortfolioTask(
   return manualEvidence(link);
 }
 
-// FOLLOW-UP: certification rows are created with the hardcoded certType
-// "ready-to-work" (src/app/api/certifications/route.ts:28-45), while
-// certification goal links carry one of the ~20 catalog ids from
-// src/lib/spokes/certifications.ts — so an exact certType match can never
-// see the tracked Ready-to-Work credential. Until cert rows carry
-// catalog-aligned certTypes, links to the catalog's Ready-to-Work family
-// soft-match the student's "ready-to-work" certification. The family is
-// the catalog's career-readiness credential ("workkeys-ncrc", ACT WorkKeys
-// NCRC) — the only catalog entry denoting the Ready-to-Work certificate
-// track (see the career-readiness SPOKES module family in seed data).
-const READY_TO_WORK_CERT_TYPE = "ready-to-work";
-export const READY_TO_WORK_FAMILY_CERT_IDS: readonly string[] = ["workkeys-ncrc"];
+// D7 (2026-09-07): the create path (src/app/api/certifications/route.ts)
+// now accepts an optional catalog certId and stores it as certType, so a
+// NEW Certification row can carry "workkeys-ncrc" directly and an exact
+// match above already finds it. This soft-match fallback now covers only
+// LEGACY rows written before D7 — every one of which still carries the
+// hardcoded "ready-to-work" certType with no catalog-aligned id at all —
+// by treating a goal link to any Ready-to-Work-family catalog id
+// (READY_TO_WORK_FAMILY_CERT_TYPES, exported from src/lib/certifications.ts
+// so readers share one list) as satisfied by the student's legacy
+// "ready-to-work" certification. Once scripts/certifications-backfill-cert
+// -type.mjs has a real name/issuer signal to work from and legacy rows are
+// rewritten onto catalog ids, this fallback becomes dead code for anyone it
+// already applied to — but is not removed here, since it is exactly what
+// still protects any row the backfill leaves alone (see that script's
+// header for why that is every row today).
+export const READY_TO_WORK_FAMILY_CERT_IDS: readonly string[] =
+  READY_TO_WORK_FAMILY_CERT_TYPES.filter((certType) => certType !== READY_TO_WORK_CERT_TYPE);
 
 function resolveCertificationForLink(
   resourceId: string,

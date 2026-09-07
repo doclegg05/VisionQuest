@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
-import { getCertificationProgress, validateRequirementUpdate } from "@/lib/certifications";
+import {
+  getCertificationProgress,
+  validateRequirementUpdate,
+  READY_TO_WORK_CERT_TYPE,
+  READY_TO_WORK_FAMILY_CERT_TYPES,
+} from "@/lib/certifications";
+import { CERTIFICATIONS } from "@/lib/spokes/certifications";
 import { recomputeCertificationStatus } from "@/lib/certification-service";
 import { withAuth, badRequest, notFound } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
@@ -23,15 +29,38 @@ export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const shouldEnsureCertification = searchParams.get("ensure") !== "false";
 
-  // Get all templates
+  // D7 (2026-09-07): an optional catalog certId — validated against the
+  // SPOKES catalog (src/lib/spokes/certifications.ts) — picks which
+  // specific credential a newly-created Certification row represents.
+  // Absent, it defaults to the legacy "ready-to-work" certType exactly as
+  // before, so existing clients keep working unchanged.
+  const certIdParam = searchParams.get("certId");
+  let targetCertType: string = READY_TO_WORK_CERT_TYPE;
+  if (certIdParam) {
+    const catalogMatch = CERTIFICATIONS.find((entry) => entry.id === certIdParam);
+    if (!catalogMatch) {
+      throw badRequest("Unknown certification id.");
+    }
+    targetCertType = catalogMatch.id;
+  }
+
+  // Get all templates — the generic Ready-to-Work checklist (attendance,
+  // resume, cover letter, mock interview, …) applies to any certId a
+  // student pursues, so this stays keyed to the literal legacy certType
+  // regardless of targetCertType.
   const templates = await prisma.certTemplate.findMany({
-    where: { certType: "ready-to-work" },
+    where: { certType: READY_TO_WORK_CERT_TYPE },
     orderBy: { sortOrder: "asc" },
   });
 
-  // Get or create certification record
-  let cert = await prisma.certification.findUnique({
-    where: { studentId_certType: { studentId: session.id, certType: "ready-to-work" } },
+  // Get or create certification record. Looked up by the Ready-to-Work
+  // FAMILY (READY_TO_WORK_FAMILY_CERT_TYPES), not an exact "ready-to-work"
+  // match: a family-member row (e.g. certType "workkeys-ncrc") already on
+  // file must be found here so re-opening this page never creates a
+  // second, duplicate checklist under a different certType for the same
+  // student.
+  let cert = await prisma.certification.findFirst({
+    where: { studentId: session.id, certType: { in: [...READY_TO_WORK_FAMILY_CERT_TYPES] } },
     include: { requirements: true },
   });
 
@@ -40,7 +69,7 @@ export const GET = withAuth(async (session, req: Request) => {
     cert = await prisma.certification.create({
       data: {
         studentId: session.id,
-        certType: "ready-to-work",
+        certType: targetCertType,
         requirements: {
           create: templates.map((t) => ({
             templateId: t.id,

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { READY_TO_WORK_FAMILY_CERT_TYPES } from "@/lib/certifications";
 
 /**
  * Public, no login, one student's data behind an opaque slug. FERPA review
@@ -30,7 +31,9 @@ export default async function PublicCredentialPage({
             select: { id: true },
           },
           certifications: {
-            where: { certType: "ready-to-work" },
+            // D7 (2026-09-07): Ready-to-Work FAMILY, not an exact
+            // "ready-to-work" match — see src/lib/certifications.ts.
+            where: { certType: { in: [...READY_TO_WORK_FAMILY_CERT_TYPES] } },
             select: {
               status: true,
               completedAt: true,
