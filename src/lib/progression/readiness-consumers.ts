@@ -13,10 +13,25 @@
 // DENOMINATOR ("readiness counts ALL orientation items on every surface", after
 // a per-surface split showed the same student different scores on the KPI
 // report vs dashboard/class-progress/profile). The numerator had the same split
-// and did not get the same treatment.
+// and did not get the same treatment — until Ticket D1 (2026-09-07).
 //
-// This module does not change any number. It gives each mapping ONE definition,
-// in one Prisma-free place, so:
+// TICKET D1 (2026-09-07): the owner-approved fix for the numerator split.
+// "Live rows win everywhere; the roster passes orientation progress; the
+// stored Progression.state is reconciled against live rows, never trusted
+// alone; the certification sub-score is the reconciled mapping's (completed
+// certifications over the catalog), not the roster's requirements-ticked
+// ratio." `progressionStateReadiness` and `rosterReadiness` used to hold two
+// other mappings; they are now thin deprecated wrappers around
+// `reconciledReadiness`, kept under their old names because
+// `src/lib/class-progress.ts`, `src/lib/academic-kpi.ts` and
+// `src/lib/teacher/dashboard.ts` still call them. Before this ticket the
+// benchmark's `consumer_disagreements` measured 116 of 300 (student, surface)
+// pairs; the ticket floors it at 0 (`config/benchmarks/orientation-readiness.json`).
+//
+// This module still does not change how any ONE mapping computes a score —
+// `reconciledReadiness` is `buildReadinessSnapshot`, untouched by this ticket.
+// What changed is which surfaces ARE ROUTED to it. The module still gives
+// every mapping one definition, in one Prisma-free place, so:
 //   - the consumers cannot drift apart without the diff saying so;
 //   - `scripts/bench/suites/orientation-readiness.mjs` can drive all seven from
 //     one set of facts and report, as a number, how far apart they are.
@@ -25,17 +40,20 @@
 // imports it with no database, and so does anything rendering a label.
 // =============================================================================
 
-import { parseState } from "./engine";
-import { computeReadinessScore, type ReadinessResult } from "./readiness-score";
+import { type ReadinessResult } from "./readiness-score";
 import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 
 /**
- * One student's world, as much of it as any readiness surface reads.
+ * One student's world, as much of it as `reconciledReadiness` needs.
  *
- * A superset: no single consumer reads all of it. `readinessForConsumer`
- * projects out the subset a given surface actually has in hand, which is what
- * makes a comparison across surfaces fair — each mapping is fed what its own
- * query loads, not a normalised input none of them could obtain.
+ * Before Ticket D1 this was a superset — `rosterReadiness` also read
+ * `completedGoalLevels` and `longestStreak` live, since it built its own
+ * goal-planning and consistency sub-scores from the roster's own query
+ * instead of the stored `Progression.state`. Now that every consumer routes
+ * through `reconciledReadiness`, which has never read either of those two
+ * fields (goal-planning and consistency have always come from the stored
+ * state alone, for every surface — see `buildReadinessSnapshot`), they were
+ * removed rather than kept as unread ballast.
  */
 export interface ReadinessFacts {
   /** The stored `Progression.state` JSON, or null when the row is absent. */
@@ -44,22 +62,17 @@ export interface ReadinessFacts {
   /** ALL orientation items, never a required-only subset (2026-07-31). */
   orientationTotalCount: number;
   bhagCompleted: boolean;
-  /** `Certification` rows at status "completed". */
-  certificationsEarned: number;
   /**
-   * Requirements ticked inside the student's certification row — the teacher
-   * roster's own notion of "certifications earned", which is a different
-   * quantity from `certificationsEarned` above and is scored against a
-   * different denominator.
+   * `Certification` rows at status "completed". Until Ticket D1 the roster
+   * scored a DIFFERENT quantity here — requirements ticked inside one
+   * certification row, over a denominator of required templates — which is
+   * why `rosterReadiness` is now a wrapper: there is no longer a second
+   * certification quantity for it to carry.
    */
-  certificationRequirementsDone: number;
-  /** The roster's denominator: certification templates marked required. */
-  requiredCertificationTemplateCount: number;
+  certificationsEarned: number;
   portfolioItemCount: number;
   hasResume: boolean;
   portfolioShared: boolean;
-  completedGoalLevels: string[];
-  longestStreak: number;
 }
 
 export const READINESS_MAPPINGS = [
@@ -159,109 +172,68 @@ export function reconciledReadiness(facts: ReadinessFacts): ReadinessResult {
   }).readiness;
 }
 
-export interface ProgressionStateReadinessInput {
-  progressionState: string | null;
-  bhagCompleted: boolean;
-  orientationCompletedCount: number;
-  orientationTotalCount: number;
+/**
+ * @deprecated Thin wrapper around `reconciledReadiness`.
+ *
+ * Until Ticket D1 (2026-09-07) this was a DIFFERENT mapping: the stored
+ * `Progression.state` verbatim, with only orientation and the big goal
+ * supplied live. Nothing reconciled the state against the database, so a
+ * student whose certifications, portfolio items, résumé or shared page were
+ * recorded without a matching progression write scored lower on the
+ * class-progress panel and the KPI report than on their own dashboard — the
+ * `orientation-readiness` benchmark's `consumer_disagreements` measured
+ * exactly this (116 of 300 pairs, worked case 26 vs 5).
+ *
+ * The owner-approved fix (plan §4, D1 ticket): live rows win everywhere, so
+ * this function now IS `reconciledReadiness`. It stays exported under its old
+ * name — and the file keeps this comment — because `src/lib/class-progress.ts`
+ * and `src/lib/academic-kpi.ts` still call it, and a reader who lands here
+ * from either of those files should find out why the mapping they expected no
+ * longer exists as a separate thing, not just that it doesn't.
+ */
+export function progressionStateReadiness(facts: ReadinessFacts): ReadinessResult {
+  return reconciledReadiness(facts);
 }
 
 /**
- * The class-progress and KPI-report mapping: the stored progression state
- * verbatim, with only orientation and the big goal supplied live.
+ * @deprecated Thin wrapper around `reconciledReadiness` — same story as
+ * `progressionStateReadiness` above, for the teacher roster.
  *
- * Nothing here reconciles the state against the database, so a student whose
- * certifications, portfolio items, résumé or shared page were recorded without
- * a matching progression write scores lower on these two surfaces than on their
- * own dashboard. That is a property of the mapping, stated rather than fixed —
- * see the benchmark's `consumer_disagreements`.
+ * Until Ticket D1 (2026-09-07) the roster computed everything from live
+ * counts EXCEPT its certification sub-score, which was requirements ticked
+ * inside the student's certification row over the count of REQUIRED
+ * templates — a different quantity on a different denominator than every
+ * other surface, and structurally unfixable by keeping the progression state
+ * in sync. It also passed no `orientationProgress` at all, so partial
+ * orientation scored 0 of 10 regardless of how close a student was.
+ *
+ * The owner-approved fix: the roster's certification sub-score is now the
+ * reconciled mapping's (completed `Certification` rows over the catalog,
+ * same as everywhere else), and orientation is supplied live like every
+ * other surface. Kept as a named export for the same reason as
+ * `progressionStateReadiness` — `src/lib/teacher/dashboard.ts` still calls it
+ * by name.
  */
-export function progressionStateReadiness(
-  input: ProgressionStateReadinessInput,
-): ReadinessResult {
-  const state = parseState(input.progressionState);
-  return computeReadinessScore({
-    ...state,
-    bhagCompleted: input.bhagCompleted,
-    orientationProgress: {
-      completed: input.orientationCompletedCount,
-      total: input.orientationTotalCount,
-    },
-  });
-}
-
-export interface RosterReadinessInput {
-  orientationCompletedCount: number;
-  orientationTotalCount: number;
-  completedGoalLevels: string[];
-  bhagCompleted: boolean;
-  /** Requirements ticked, NOT completed `Certification` rows. */
-  certificationRequirementsDone: number;
-  portfolioItemCount: number;
-  hasResume: boolean;
-  portfolioShared: boolean;
-  longestStreak: number;
-  /** The roster's certification denominator: required templates. */
-  requiredCertificationTemplateCount: number;
+export function rosterReadiness(facts: ReadinessFacts): ReadinessResult {
+  return reconciledReadiness(facts);
 }
 
 /**
- * The teacher-roster mapping: live counts throughout, except `portfolioShared`
- * and `longestStreak`, which the roster reads out of the progression state.
+ * One student's facts, scored the way `consumerId`'s surface scores them.
  *
- * Its certification sub-score is the one structural difference from the other
- * two mappings: requirements ticked inside one certification row, over the
- * count of REQUIRED templates — not completed certifications over 19. No amount
- * of keeping the progression state in sync brings the two into line.
+ * Every consumer now returns the reconciled result (Ticket D1, 2026-09-07:
+ * "live rows win everywhere"). `consumer.mapping` is kept on the registry as
+ * documentation of which module a surface's code lives in — useful for the
+ * next reader, and for the benchmark's `details.mappings` — not as a live
+ * branch: a future consumer registered under any mapping name gets the same
+ * reconciled behaviour by construction, which is the property that keeps the
+ * seven surfaces from drifting apart again.
  */
-export function rosterReadiness(input: RosterReadinessInput): ReadinessResult {
-  return computeReadinessScore(
-    {
-      orientationComplete:
-        input.orientationCompletedCount >= input.orientationTotalCount &&
-        input.orientationTotalCount > 0,
-      completedGoalLevels: input.completedGoalLevels,
-      bhagCompleted: input.bhagCompleted,
-      certificationsEarned: input.certificationRequirementsDone,
-      portfolioItemCount: input.portfolioItemCount,
-      resumeCreated: input.hasResume,
-      portfolioShared: input.portfolioShared,
-      longestStreak: input.longestStreak,
-    },
-    input.requiredCertificationTemplateCount,
-  );
-}
-
-/** One student's facts, scored the way `consumerId`'s surface scores them. */
 export function readinessForConsumer(
   consumerId: ReadinessConsumerId,
   facts: ReadinessFacts,
 ): ReadinessResult {
   const consumer = READINESS_CONSUMERS.find((entry) => entry.id === consumerId);
   if (!consumer) throw new Error(`Unknown readiness consumer "${consumerId}".`);
-
-  switch (consumer.mapping) {
-    case "reconciled":
-      return reconciledReadiness(facts);
-    case "progression_state":
-      return progressionStateReadiness({
-        progressionState: facts.progressionState,
-        bhagCompleted: facts.bhagCompleted,
-        orientationCompletedCount: facts.orientationCompletedCount,
-        orientationTotalCount: facts.orientationTotalCount,
-      });
-    case "roster":
-      return rosterReadiness({
-        orientationCompletedCount: facts.orientationCompletedCount,
-        orientationTotalCount: facts.orientationTotalCount,
-        completedGoalLevels: facts.completedGoalLevels,
-        bhagCompleted: facts.bhagCompleted,
-        certificationRequirementsDone: facts.certificationRequirementsDone,
-        portfolioItemCount: facts.portfolioItemCount,
-        hasResume: facts.hasResume,
-        portfolioShared: facts.portfolioShared,
-        longestStreak: facts.longestStreak,
-        requiredCertificationTemplateCount: facts.requiredCertificationTemplateCount,
-      });
-  }
+  return reconciledReadiness(facts);
 }
