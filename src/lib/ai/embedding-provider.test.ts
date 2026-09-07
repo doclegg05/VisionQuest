@@ -18,6 +18,19 @@ mock.module("@/lib/chat/api-key", {
   },
 });
 
+// Every resolution now writes an AI audit event; the policy and audit
+// behaviour is pinned in embedding-provider.policy.test.ts. Here it is a
+// no-op so these routing tests stay about routing.
+mock.module("@/lib/ai/audit", {
+  namedExports: {
+    logAiAuditEvent: async () => undefined,
+    getProviderClass: (name?: string | null) =>
+      name === "ollama" ? "local" : name === "gemini" ? "cloud" : name ? "unknown" : "none",
+    policyDecisionForProvider: (name?: string | null) =>
+      name === "ollama" ? "local_only" : "configured_provider",
+  },
+});
+
 let resolveEmbeddingProvider: typeof import("./embedding-provider").resolveEmbeddingProvider;
 let getActiveEmbeddingModel: typeof import("./embedding-provider").getActiveEmbeddingModel;
 let GeminiEmbeddingProvider: typeof import("./gemini-embedding-provider").GeminiEmbeddingProvider;
@@ -48,7 +61,7 @@ describe("resolveEmbeddingProvider", () => {
   it("resolves GeminiEmbeddingProvider when ai_provider is unset (default cloud)", async () => {
     mockGetPlainConfigValue.mock.mockImplementation(configStore({}));
 
-    const provider = await resolveEmbeddingProvider();
+    const provider = await resolveEmbeddingProvider({ sensitivity: "system" });
 
     assert.ok(provider instanceof GeminiEmbeddingProvider);
     assert.equal(provider.name, "gemini");
@@ -58,7 +71,7 @@ describe("resolveEmbeddingProvider", () => {
   it("resolves GeminiEmbeddingProvider when ai_provider is 'cloud'", async () => {
     mockGetPlainConfigValue.mock.mockImplementation(configStore({ ai_provider: "cloud" }));
 
-    const provider = await resolveEmbeddingProvider({ studentId: "student-1" });
+    const provider = await resolveEmbeddingProvider({ studentId: "student-1", sensitivity: "public_program" });
 
     assert.ok(provider instanceof GeminiEmbeddingProvider);
     assert.equal(mockResolveApiKey.mock.callCount(), 1);
@@ -74,7 +87,7 @@ describe("resolveEmbeddingProvider", () => {
       }),
     );
 
-    const provider = await resolveEmbeddingProvider();
+    const provider = await resolveEmbeddingProvider({ sensitivity: "system" });
 
     assert.ok(provider instanceof OllamaEmbeddingProvider);
     assert.equal(provider.name, "ollama");
@@ -89,7 +102,7 @@ describe("resolveEmbeddingProvider", () => {
       }),
     );
 
-    const provider = await resolveEmbeddingProvider();
+    const provider = await resolveEmbeddingProvider({ sensitivity: "system" });
 
     assert.ok(provider instanceof OllamaEmbeddingProvider);
     assert.equal(provider.model, "nomic-embed-text");
@@ -98,7 +111,7 @@ describe("resolveEmbeddingProvider", () => {
   it("throws when local provider is selected but no URL is configured", async () => {
     mockGetPlainConfigValue.mock.mockImplementation(configStore({ ai_provider: "local" }));
 
-    await assert.rejects(() => resolveEmbeddingProvider(), /url is not configured/i);
+    await assert.rejects(() => resolveEmbeddingProvider({ sensitivity: "system" }), /url is not configured/i);
   });
 
   it("throws when the configured local URL is unsafe", async () => {
@@ -106,13 +119,13 @@ describe("resolveEmbeddingProvider", () => {
       configStore({ ai_provider: "local", ai_provider_url: "http://10.0.0.5:11434" }),
     );
 
-    await assert.rejects(() => resolveEmbeddingProvider(), /invalid/i);
+    await assert.rejects(() => resolveEmbeddingProvider({ sensitivity: "system" }), /invalid/i);
   });
 
   it("passes null studentId through to resolveApiKey as empty string fallback", async () => {
     mockGetPlainConfigValue.mock.mockImplementation(configStore({ ai_provider: "cloud" }));
 
-    await resolveEmbeddingProvider({ studentId: null });
+    await resolveEmbeddingProvider({ studentId: null, sensitivity: "system" });
 
     assert.equal(mockResolveApiKey.mock.calls[0].arguments[0], "");
   });
@@ -130,7 +143,7 @@ describe("getActiveEmbeddingModel", () => {
   it("matches resolveEmbeddingProvider's model for cloud config (invariant)", async () => {
     mockGetPlainConfigValue.mock.mockImplementation(configStore({ ai_provider: "cloud" }));
 
-    const provider = await resolveEmbeddingProvider();
+    const provider = await resolveEmbeddingProvider({ sensitivity: "system" });
     const activeModel = await getActiveEmbeddingModel();
 
     assert.equal(provider.model, activeModel);
@@ -145,7 +158,7 @@ describe("getActiveEmbeddingModel", () => {
       }),
     );
 
-    const provider = await resolveEmbeddingProvider();
+    const provider = await resolveEmbeddingProvider({ sensitivity: "system" });
     const activeModel = await getActiveEmbeddingModel();
 
     assert.equal(provider.model, activeModel);
@@ -157,7 +170,7 @@ describe("getActiveEmbeddingModel", () => {
       configStore({ ai_provider: "local", ai_provider_url: "http://localhost:11434" }),
     );
 
-    const provider = await resolveEmbeddingProvider();
+    const provider = await resolveEmbeddingProvider({ sensitivity: "system" });
     const activeModel = await getActiveEmbeddingModel();
 
     assert.equal(provider.model, activeModel);

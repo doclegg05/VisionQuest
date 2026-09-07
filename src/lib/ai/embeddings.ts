@@ -8,10 +8,19 @@
  * resolveEmbeddingProvider directly) so existing call sites
  * (document-embedding, hybrid-retrieval, memory/*, form-search) compile
  * unchanged.
+ *
+ * The resolver requires a sensitivity; this facade supplies one when the
+ * caller does not, in the fail-closed direction:
+ *  - `embedTexts` with a known student → `student_record`; with no student
+ *    and nothing declared → `system` (document ingest, backfills).
+ *  - `embedQuery` → `student_record` unless told otherwise: a retrieval
+ *    query is someone's message, never system data, even when the caller
+ *    has no student id to hand.
  */
 
 import { resolveEmbeddingProvider } from "./embedding-provider";
 import { EMBEDDING_DIMENSIONS, type EmbeddingTaskType } from "./embedding-types";
+import type { DataSensitivity } from "./types";
 
 export { EMBEDDING_DIMENSIONS };
 
@@ -20,6 +29,11 @@ export interface EmbeddingUsageContext {
   studentId?: string | null;
   /** e.g. "sage_embedding_query", "sage_embedding_backfill". */
   callSite: string;
+  /**
+   * What the texts carry (src/lib/ai/types.ts DataSensitivity). Declare it
+   * at every call site that knows; the inference above is only the floor.
+   */
+  sensitivity?: DataSensitivity;
 }
 
 interface EmbedTextsOptions {
@@ -37,23 +51,31 @@ export function toVectorLiteral(vector: number[]): string {
   return `[${vector.join(",")}]`;
 }
 
+function inferSensitivity(usage: EmbeddingUsageContext | undefined): DataSensitivity {
+  if (usage?.sensitivity) return usage.sensitivity;
+  return usage?.studentId ? "student_record" : "system";
+}
+
 /**
  * Embed a list of texts using the currently configured embedding provider
  * (Gemini or local Ollama, per SystemConfig `ai_provider`). Returns vectors
- * in input order.
+ * in input order. Throws `AiCloudRefusedError` when `ai_cloud_policy`
+ * refuses the declared sensitivity on the cloud provider.
  */
 export async function embedTexts(
   texts: string[],
   { taskType, usage }: EmbedTextsOptions,
 ): Promise<number[][]> {
+  const studentId = usage?.studentId ?? null;
   const provider = await resolveEmbeddingProvider({
-    studentId: usage?.studentId ?? null,
+    studentId,
     callSite: usage?.callSite,
+    sensitivity: inferSensitivity(usage),
   });
   return provider.embed(texts, {
     taskType,
     callSite: usage?.callSite,
-    studentId: usage?.studentId ?? null,
+    studentId,
   });
 }
 
@@ -64,7 +86,11 @@ export async function embedQuery(
 ): Promise<number[]> {
   const [vector] = await embedTexts([text], {
     taskType: "RETRIEVAL_QUERY",
-    usage: usage ?? { callSite: "sage_embedding_query" },
+    usage: {
+      callSite: "sage_embedding_query",
+      ...usage,
+      sensitivity: usage?.sensitivity ?? "student_record",
+    },
   });
   return vector;
 }
