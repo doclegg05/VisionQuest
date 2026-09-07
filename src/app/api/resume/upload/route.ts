@@ -6,6 +6,12 @@ import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/
 import { extractTextFromFile, extractResumeFromText } from "@/lib/resume-extract";
 import { logger } from "@/lib/logger";
 
+// FERPA review §2.c.3 (2026-09-06): the raw résumé text is the payload and
+// cannot be de-identified, so resume_extract is lane `batch`. Recorded on every
+// audit event this route writes; Ticket 1A's policy switch is what refuses it
+// on a cloud provider under `lanes`.
+const RESUME_EXTRACT_LANE = "batch";
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = [
   "application/pdf",
@@ -62,6 +68,7 @@ export const POST = withAuth(async (session, req: Request) => {
       errorCode: "LOCAL_AI_UNAVAILABLE",
       metadata: {
         fileType: file.type,
+        lane: RESUME_EXTRACT_LANE,
       },
     });
     return NextResponse.json(
@@ -91,6 +98,7 @@ export const POST = withAuth(async (session, req: Request) => {
         : "Operator configured cloud AI; resume parsing routed to the configured provider.",
     metadata: {
       fileType: file.type,
+      lane: RESUME_EXTRACT_LANE,
     },
   });
 
@@ -111,7 +119,7 @@ export const POST = withAuth(async (session, req: Request) => {
   }
 
   try {
-    const result = await extractResumeFromText(provider, rawText, session.displayName);
+    const result = await extractResumeFromText(provider, rawText);
     await logAiAuditEvent({
       actorId: session.id,
       actorRole: session.role,
@@ -128,6 +136,7 @@ export const POST = withAuth(async (session, req: Request) => {
       outputChars: JSON.stringify(result).length,
       metadata: {
         fileType: file.type,
+        lane: RESUME_EXTRACT_LANE,
       },
     });
     return NextResponse.json(result);
@@ -150,6 +159,7 @@ export const POST = withAuth(async (session, req: Request) => {
       errorCode: "RESUME_EXTRACT_FAILED",
       metadata: {
         fileType: file.type,
+        lane: RESUME_EXTRACT_LANE,
       },
     });
     return NextResponse.json(
