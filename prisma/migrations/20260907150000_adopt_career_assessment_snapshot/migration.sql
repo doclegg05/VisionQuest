@@ -31,6 +31,13 @@
 -- and index names, same FK name and ON DELETE CASCADE.  It adds no column
 -- (notably no `updatedAt`, which would be a NOT NULL backfill on live rows).
 --
+-- ONE PRIVILEGE ASSUMPTION, stated so a failure is diagnosable: the closing
+-- GRANT requires ownership of prod's PRE-EXISTING table, which this migration
+-- did not create.  That holds because the apify migration and this one both run
+-- as `postgres` on Supabase, the table's owner.  So a 42501
+-- (insufficient_privilege) on deploy is an ownership problem in that database,
+-- not a defect in this SQL.
+--
 -- NOT COVERED HERE, deliberately: that same apify migration also added
 -- `riasecSource`, `riasecInstrument` and `riasecAssessedAt` to CareerDiscovery.
 -- `main` solved provenance differently (`profileSource` / `assessedAt` /
@@ -56,6 +63,50 @@ BEGIN
 
         CONSTRAINT "CareerAssessmentSnapshot_pkey" PRIMARY KEY ("id")
     );
+  END IF;
+END
+$$;
+
+-- Assert the shape we just DIDN'T create.
+--
+-- The block above guards on EXISTENCE only, which is not enough on its own: if
+-- prod's table differs from the apify DDL in any column, the create is skipped
+-- silently and prisma/schema.prisma then claims a shape prod does not have —
+-- the adoption would manufacture exactly the drift it exists to end, and every
+-- later `prisma migrate diff` would agree with the lie because it replays these
+-- migrations rather than reading prod.  So: state the adopted shape as a fact
+-- and fail loudly if the database disagrees.  The whole migration runs in one
+-- transaction, so a mismatch rolls back having changed nothing, and the error
+-- names both strings.
+--
+-- The expected string was MEASURED against the table this migration creates,
+-- not written from the model.  Its limits, deliberately: `data_type` drops the
+-- precision, so `TIMESTAMP(3)` and `TIMESTAMP(6)` compare equal, and defaults,
+-- keys and indexes are not compared.  It catches the case that actually
+-- threatens the adoption — an extra, missing, renamed, retyped or
+-- re-nullabled column.
+DO $$
+DECLARE
+  expected constant text :=
+    'createdAt:timestamp without time zone:NO,hollandCode:text:YES,id:text:NO,'
+    'instrument:text:NO,note:text:YES,riasecScoresNormalized:text:NO,'
+    'riasecScoresRaw:text:NO,source:text:NO,studentId:text:NO';
+  actual text;
+BEGIN
+  SELECT string_agg(column_name || ':' || data_type || ':' || is_nullable, ',' ORDER BY column_name)
+    INTO actual
+    FROM information_schema.columns
+   WHERE table_schema = 'visionquest'
+     AND table_name = 'CareerAssessmentSnapshot';
+
+  IF actual IS DISTINCT FROM expected THEN
+    RAISE EXCEPTION
+      'visionquest."CareerAssessmentSnapshot" is not the table this migration adopts.'
+      ' expected [%] actual [%]', expected, actual
+      USING HINT =
+        'This database already had the table in a different shape. Reconcile it by hand'
+        ' before deploying: adopting it here would put a shape in prisma/schema.prisma'
+        ' that this database does not have. See F8 in docs/audits/2026-09-01-full-review.md.';
   END IF;
 END
 $$;

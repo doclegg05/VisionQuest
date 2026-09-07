@@ -1072,18 +1072,28 @@ if (!SHOULD_RUN) {
       });
 
       it("student cannot insert a snapshot for another student", async () => {
+        // `createMany`, not `create`, and that is load-bearing. Prisma's
+        // `create` ends in RETURNING, which Postgres filters through the USING
+        // clause — so a `create` is refused even when WITH CHECK would have
+        // admitted the row, and the case would pass for the wrong reason if the
+        // WITH CHECK student branch were ever widened. `createMany` returns no
+        // rows, so only WITH CHECK can refuse it. (Verified by mutation: with
+        // the student branch of WITH CHECK widened to a bare role check, the
+        // `create` form still passed and this form goes red.)
         await assert.rejects(
           () =>
             asRole("student", fixtures.studentA, (tx) =>
-              tx.careerAssessmentSnapshot.create({
-                data: {
-                  id: `${fixtures.suffix}-snapEvil`,
-                  studentId: fixtures.studentB,
-                  instrument: "onet_mini_ip_30",
-                  source: "manual_entry",
-                  riasecScoresRaw: "{}",
-                  riasecScoresNormalized: "{}",
-                },
+              tx.careerAssessmentSnapshot.createMany({
+                data: [
+                  {
+                    id: `${fixtures.suffix}-snapEvil`,
+                    studentId: fixtures.studentB,
+                    instrument: "onet_mini_ip_30",
+                    source: "manual_entry",
+                    riasecScoresRaw: "{}",
+                    riasecScoresNormalized: "{}",
+                  },
+                ],
               }),
             ),
           /row-level security/i,
@@ -1110,6 +1120,79 @@ if (!SHOULD_RUN) {
           }),
         );
         assert.deepEqual(rows.map((r) => r.studentId), [fixtures.studentA], "Student C is Teacher B's");
+      });
+
+      it("admin sees every snapshot", async () => {
+        // Pins the `app.current_role = 'admin'` branch of the USING clause.
+        // Without this case that branch can be deleted with every other case in
+        // this block still green — admins would simply see nothing, silently,
+        // and the offboarding export and any future staff review surface would
+        // come back empty rather than refused.
+        const rows = await asRole("admin", fixtures.admin, (tx) =>
+          tx.careerAssessmentSnapshot.findMany({
+            where: { studentId: { in: [fixtures.studentA, fixtures.studentC] } },
+            select: { studentId: true },
+            orderBy: { studentId: "asc" },
+          }),
+        );
+        // Compared as a set, so a later case adding another of Student A's
+        // snapshots cannot turn this red for the wrong reason.
+        assert.deepEqual(
+          [...new Set(rows.map((r) => r.studentId))].sort(),
+          [fixtures.studentA, fixtures.studentC].sort(),
+          "admin must see both students' snapshots",
+        );
+      });
+
+      it("teacher can insert a snapshot for a managed student", async () => {
+        // `source: "manual_entry"` is a staff-entered result, so the teacher
+        // branch of the WITH CHECK clause is load-bearing, not incidental.
+        // Deleting it would break instructor entry; this is the case that
+        // notices.
+        const created = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.careerAssessmentSnapshot.create({
+            data: {
+              id: `${fixtures.suffix}-snapByTeacher`,
+              studentId: fixtures.studentA,
+              instrument: "onet_mini_ip_30",
+              source: "manual_entry",
+              riasecScoresRaw: "{}",
+              riasecScoresNormalized: "{}",
+            },
+            select: { studentId: true },
+          }),
+        );
+        assert.equal(created.studentId, fixtures.studentA);
+      });
+
+      it("teacher cannot insert a snapshot for an unmanaged student", async () => {
+        // And this is the case that notices if that same branch is WIDENED to a
+        // bare role check: a teacher would be able to write assessment results
+        // onto any student in the program. Student C is Teacher B's.
+        //
+        // `createMany` for the reason spelled out on the student case above —
+        // this exact case was first written with `create` and stayed GREEN
+        // against a deliberately widened WITH CHECK, because the USING clause
+        // refused the RETURNING. It was pinning the read side and reporting the
+        // write side.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.careerAssessmentSnapshot.createMany({
+                data: [
+                  {
+                    id: `${fixtures.suffix}-snapCrossClass`,
+                    studentId: fixtures.studentC,
+                    instrument: "onet_mini_ip_30",
+                    source: "manual_entry",
+                    riasecScoresRaw: "{}",
+                    riasecScoresNormalized: "{}",
+                  },
+                ],
+              }),
+            ),
+          /row-level security/i,
+        );
       });
 
       it("coordinator sees nothing (the policy names no coordinator branch)", async () => {
