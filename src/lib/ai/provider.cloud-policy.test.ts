@@ -22,6 +22,20 @@ mock.module("@/lib/chat/api-key", {
   namedExports: { resolveApiKey: mockResolveKey },
 });
 
+// The Wave 2 de-identification branch calls this on every cloud resolution.
+// Pinned to an empty identity here so these rows keep measuring ROUTING only:
+// an empty vault leaves the provider unwrapped and writes no event, which is
+// what the `deepEqual(auditEvents, [])` assertions below depend on. The
+// wrapping itself is measured in provider.deidentify.test.ts.
+mock.module("@/lib/ai/identity", {
+  namedExports: {
+    loadIdentityInput: async () => ({}),
+    listManagedRosterNames: async () => [],
+    MANAGED_ROSTER_CAP: 500,
+    clearIdentityCache: () => {},
+  },
+});
+
 const auditEvents: Record<string, unknown>[] = [];
 mock.module("@/lib/ai/audit", {
   namedExports: {

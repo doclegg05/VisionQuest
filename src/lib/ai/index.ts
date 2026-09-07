@@ -1,4 +1,20 @@
-export { getProvider, getPromptTier, resolveAiProvider } from "./provider";
+export {
+  AI_DEIDENTIFY_CONFIG_KEY,
+  AI_DEIDENTIFY_ENV,
+  getProvider,
+  getPromptTier,
+  resolveAiProvider,
+} from "./provider";
+export { TokenVault, neutralizeTokenShapes } from "./deidentify";
+export type { IdentityInput, DeidentifyOptions } from "./deidentify";
+export { DEIDENTIFY_ALLOWLIST } from "./deidentify-allowlist";
+export { withDeidentification } from "./with-deidentification";
+export {
+  IDENTITY_CACHE_TTL_SECONDS,
+  MANAGED_ROSTER_CAP,
+  listManagedRosterNames,
+  loadIdentityInput,
+} from "./identity";
 export { checkOllamaHealth } from "./health";
 export {
   detectModelCapabilities,
