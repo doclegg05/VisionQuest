@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, badRequest, type Session } from "@/lib/api-error";
+import { withAuth, badRequest, ApiError, type Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { MAX_LENGTHS } from "@/lib/validation";
@@ -14,6 +14,32 @@ const saveJobSchema = z.object({
   status: z.enum(VALID_STATUSES).optional(),
   notes: z.string().trim().max(MAX_LENGTHS.notes, "Job notes must be 10000 characters or fewer.").optional(),
 });
+
+/**
+ * VQ-R-016: a bare 400 here used to be indistinguishable from "that id
+ * doesn't exist anywhere" — the client (`CareerHub.handleSaveJob`) ignored
+ * `!res.ok` entirely, so an enrolled student saving a `JobBrowseListing` row
+ * (or an unenrolled/browse-mode student saving one at all) saw the Save
+ * button silently do nothing. `StudentSavedJob.jobListingId` has an FK to
+ * `JobListing` only, so a browse-pool row can't be tracked there yet
+ * (memo §3 leaves the two-tracker question open) — this returns a distinct,
+ * client-legible code instead so the UI can say something specific.
+ */
+function notYourClassBoard() {
+  return new ApiError(
+    400,
+    "This job isn't on your class's board yet. Try a different job below, or ask your teacher.",
+    "not_your_class_board",
+  );
+}
+
+async function isBrowsePoolJob(id: string): Promise<boolean> {
+  const row = await prisma.jobBrowseListing.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  return row !== null;
+}
 
 /**
  * POST /api/jobs/save
@@ -31,6 +57,12 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     select: { classId: true },
   });
   if (!enrollment) {
+    // No class board to save against — the GET route serves these students
+    // the program-wide browse pool, so a jobListingId here is almost always
+    // a JobBrowseListing id.
+    if (await isBrowsePoolJob(jobListingId)) {
+      throw notYourClassBoard();
+    }
     throw badRequest("No active class enrollment found");
   }
 
@@ -43,6 +75,9 @@ export const POST = withAuth(async (session: Session, req: Request) => {
     select: { id: true, title: true },
   });
   if (!job) {
+    if (await isBrowsePoolJob(jobListingId)) {
+      throw notYourClassBoard();
+    }
     throw badRequest("Job listing not found");
   }
 
