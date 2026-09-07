@@ -45,11 +45,6 @@ jobs:
       # See src/lib/db.ts#warnMissingRlsContext for the three-mode ladder.
       RLS_CONTEXT_INJECTION: "true"
       RLS_CONTEXT_STRICT: "true"
-      # Boot probes (src/lib/boot-probes.ts) stop a production-mode boot when
-      # ADMIN_DATABASE_URL is unset — the smoke-test step boots `npm run start`,
-      # which is production mode. Presence is all the config probe checks; the
-      # privilege probe is advisory. Fake, like DATABASE_URL above.
-      ADMIN_DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
 
     steps:
       - uses: actions/checkout@v4
@@ -237,6 +232,14 @@ jobs:
         run: npm run test:smoke
         env:
           SMOKE_SERVER_SCRIPT: start
+          # Boot probes (src/lib/boot-probes.ts) stop a production-mode boot
+          # when ADMIN_DATABASE_URL is unset, and `start` is production mode.
+          # Presence is all the config probe checks (the privilege probe is
+          # advisory), so a fake URL like DATABASE_URL's is enough. Step-scoped
+          # on purpose: at job level it reached the rate-limiter and RLS
+          # integration steps, whose prismaAdmin must fall back to the real
+          # container URL those steps set.
+          ADMIN_DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
 
   # --- Browser-level workflow gate: Playwright E2E + a11y ------------------
   # Runs the journey-critical specs against a REAL built server and a
