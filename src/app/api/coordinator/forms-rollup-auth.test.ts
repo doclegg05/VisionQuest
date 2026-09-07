@@ -18,8 +18,8 @@ const mockRegionCount = mock.fn() as any;
 const mockClassFindMany = mock.fn() as any;
 const mockTemplateFindMany = mock.fn() as any;
 const mockStudentFindMany = mock.fn() as any;
-const mockAssignmentCount = mock.fn() as any;
-const mockResponseCount = mock.fn() as any;
+const mockAssignmentGroupBy = mock.fn() as any;
+const mockResponseGroupBy = mock.fn() as any;
 
 let currentSession: ReturnType<typeof mockTeacherSession> | null = mockTeacherSession({
   role: "coordinator",
@@ -86,8 +86,8 @@ mock.module("@/lib/db", {
       spokesClass: { findMany: mockClassFindMany },
       formTemplate: { findMany: mockTemplateFindMany },
       student: { findMany: mockStudentFindMany },
-      formAssignment: { count: mockAssignmentCount },
-      formResponse: { count: mockResponseCount },
+      formAssignment: { groupBy: mockAssignmentGroupBy },
+      formResponse: { groupBy: mockResponseGroupBy },
     },
     prisma: {},
   },
@@ -119,8 +119,12 @@ function seedRollupRows() {
   mockStudentFindMany.mock.mockImplementation(async () =>
     Array.from({ length: 7 }, (_, i) => ({ id: `stu${i}` })),
   );
-  mockAssignmentCount.mock.mockImplementation(async () => 2);
-  mockResponseCount.mock.mockImplementation(async () => 5);
+  mockAssignmentGroupBy.mock.mockImplementation(async () => [
+    { templateId: "tpl1", _count: { _all: 2 } },
+  ]);
+  mockResponseGroupBy.mock.mockImplementation(async () => [
+    { templateId: "tpl1", _count: { _all: 5 } },
+  ]);
 }
 
 let route: Awaited<typeof import("./forms/[regionId]/route")>;
@@ -143,8 +147,8 @@ describe("GET /api/coordinator/forms/[regionId] — authorization", () => {
       mockClassFindMany,
       mockTemplateFindMany,
       mockStudentFindMany,
-      mockAssignmentCount,
-      mockResponseCount,
+      mockAssignmentGroupBy,
+      mockResponseGroupBy,
       mockTryLogAuditEvent,
     ]) {
       m.mock.resetCalls();
@@ -188,9 +192,14 @@ describe("GET /api/coordinator/forms/[regionId] — authorization", () => {
       status: { not: "archived" },
     });
     assert.deepEqual(
-      mockResponseCount.mock.calls[0].arguments[0].where.student,
+      mockResponseGroupBy.mock.calls[0].arguments[0].where.student,
       { classEnrollments: { some: { classId: { in: ["cls1", "cls2"] } } } },
       "responses are bounded by the region's classes",
+    );
+    assert.deepEqual(
+      mockResponseGroupBy.mock.calls[0].arguments[0].where.templateId,
+      { in: ["tpl1"] },
+      "and by the active template set",
     );
   });
 
@@ -198,7 +207,7 @@ describe("GET /api/coordinator/forms/[regionId] — authorization", () => {
     const res = await get(OTHER_REGION_ID);
     assert.equal(res.status, 403);
     assert.equal(
-      mockClassFindMany.mock.callCount() + mockResponseCount.mock.callCount(),
+      mockClassFindMany.mock.callCount() + mockResponseGroupBy.mock.callCount(),
       0,
       "an out-of-region request must not read a single class or form row",
     );
@@ -327,7 +336,7 @@ describe("GET /api/coordinator/forms/[regionId] — authorization", () => {
       },
     ]);
     assert.equal(
-      mockResponseCount.mock.callCount(),
+      mockResponseGroupBy.mock.callCount(),
       0,
       "a suppressed row is not counted at all, not counted then hidden",
     );

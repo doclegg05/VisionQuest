@@ -186,40 +186,57 @@ export async function getRegionFormRollup(regionId: string): Promise<RegionFormR
     };
   }
 
-  const rows = await Promise.all(
-    templates.map(async (template) => {
-      const [assignmentCount, responseCount] = await Promise.all([
-        prismaAdmin.formAssignment.count({
-          where: {
-            templateId: template.id,
-            OR: [
-              { scope: "class", targetId: { in: classIds } },
-              { scope: "student", targetId: { in: studentIds } },
-            ],
-          },
-        }),
-        prismaAdmin.formResponse.count({
-          where: {
-            templateId: template.id,
-            status: { in: ["submitted", "reviewed"] },
-            // The region scope. Enrollment status is unfiltered here on
-            // purpose (see the doc block); the CLASS set is what bounds it.
-            student: { classEnrollments: { some: { classId: { in: classIds } } } },
-          },
-        }),
-      ]);
+  // Two grouped queries rather than two per template (S6). The region scope
+  // still appears exactly once in each `where`, and neither query can see a
+  // template outside the active set or a row outside this region's classes.
+  const templateIds = templates.map((template) => template.id);
 
-      return {
-        templateId: template.id,
-        title: template.title,
-        isOfficial: template.isOfficial,
-        suppressed: false,
-        assignmentCount,
-        responseCount,
-        completionRate: Number((responseCount / studentIds.length).toFixed(3)),
-      };
+  const [assignmentGroups, responseGroups] = await Promise.all([
+    prismaAdmin.formAssignment.groupBy({
+      by: ["templateId"],
+      where: {
+        templateId: { in: templateIds },
+        OR: [
+          { scope: "class", targetId: { in: classIds } },
+          { scope: "student", targetId: { in: studentIds } },
+        ],
+      },
+      _count: { _all: true },
     }),
-  );
+    prismaAdmin.formResponse.groupBy({
+      by: ["templateId"],
+      where: {
+        templateId: { in: templateIds },
+        status: { in: ["submitted", "reviewed"] },
+        // The region scope. Enrollment status is unfiltered here on
+        // purpose (see the doc block); the CLASS set is what bounds it.
+        student: { classEnrollments: { some: { classId: { in: classIds } } } },
+      },
+      _count: { _all: true },
+    }),
+  ]);
+
+  // groupBy returns no row for a template with no matches, so every lookup
+  // defaults to 0 rather than to undefined.
+  const countByTemplate = (groups: { templateId: string; _count: { _all: number } }[]) =>
+    new Map(groups.map((group) => [group.templateId, group._count._all]));
+  const assignmentCounts = countByTemplate(assignmentGroups);
+  const responseCounts = countByTemplate(responseGroups);
+
+  const rows = templates.map((template) => {
+    const assignmentCount = assignmentCounts.get(template.id) ?? 0;
+    const responseCount = responseCounts.get(template.id) ?? 0;
+
+    return {
+      templateId: template.id,
+      title: template.title,
+      isOfficial: template.isOfficial,
+      suppressed: false,
+      assignmentCount,
+      responseCount,
+      completionRate: Number((responseCount / studentIds.length).toFixed(3)),
+    };
+  });
 
   return {
     regionId,
