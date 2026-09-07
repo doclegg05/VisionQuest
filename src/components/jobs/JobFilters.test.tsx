@@ -102,9 +102,61 @@ describe("JobFilters", () => {
     // children for hydration ("Filters<!-- --> (1)") — strip comments before
     // reading the button's rendered text.
     const html = renderFilters({ minPay: "15" }).replace(/<!--.*?-->/g, "");
-    const trigger = html.match(/<button[^>]*aria-controls="job-filters-panel"[^>]*>([^<]*)<\/button>/);
+    const trigger = html.match(/<button[^>]*aria-controls="job-filters-panel"[^>]*>([\s\S]*?)<\/button>/);
     assert.ok(trigger, "expected the Filters trigger button");
     assert.match(trigger![1], /Filters \(1\)/);
+  });
+
+  // UX review WARNING (2026-09-07): the Filters trigger needs a visual
+  // expand/collapse cue, not just aria-expanded.
+  it("shows a caret icon on the Filters trigger that rotates when open", () => {
+    const closedHtml = renderFilters();
+    const openHtml = renderFilters({ minPay: "15" }); // active filter seeds it open (WARNING #4)
+
+    const closedTrigger = closedHtml.match(/<button[^>]*aria-controls="job-filters-panel"[^>]*>[\s\S]*?<\/button>/);
+    const openTrigger = openHtml.match(/<button[^>]*aria-controls="job-filters-panel"[^>]*>[\s\S]*?<\/button>/);
+    assert.ok(closedTrigger && openTrigger, "expected the Filters trigger in both states");
+
+    const closedSvg = closedTrigger![0].match(/<svg[^>]*aria-hidden="true"[^>]*>/);
+    const openSvg = openTrigger![0].match(/<svg[^>]*aria-hidden="true"[^>]*>/);
+    assert.ok(closedSvg, "expected an aria-hidden caret icon in the closed trigger");
+    assert.ok(openSvg, "expected an aria-hidden caret icon in the open trigger");
+    assert.ok(!closedSvg![0].includes("rotate-180"), "caret should not be rotated while closed");
+    assert.ok(openSvg![0].includes("rotate-180"), "caret should rotate when the panel is open");
+  });
+
+  // UX review WARNING (2026-09-07): an already-active secondary filter must
+  // never be hidden behind a closed disclosure on first paint.
+  it("seeds the Filters disclosure open when a secondary filter is already active", () => {
+    for (const overrides of [
+      { postedWithinDays: "7" },
+      { minPay: "15" },
+      { jobType: "part_time" },
+      { cluster: "tech-digital" },
+    ]) {
+      const html = renderFilters(overrides);
+      const trigger = html.match(/<button[^>]*aria-controls="job-filters-panel"[^>]*>/);
+      assert.ok(trigger, "expected the Filters trigger button");
+      assert.ok(trigger![0].includes('aria-expanded="true"'), `expected open trigger for ${JSON.stringify(overrides)}`);
+
+      const panel = html.match(/<div id="job-filters-panel"[^>]*>/);
+      assert.ok(panel, "expected the filters panel container");
+      assert.ok(!panel![0].includes("hidden"), `expected the panel visible for ${JSON.stringify(overrides)}`);
+    }
+  });
+
+  it("still starts the Filters disclosure closed when no secondary filter is active", () => {
+    const html = renderFilters();
+    const trigger = html.match(/<button[^>]*aria-controls="job-filters-panel"[^>]*>/);
+    assert.ok(trigger![0].includes('aria-expanded="false"'));
+  });
+
+  it("uses a visible label text size that reads clearly (text-sm, not text-xs)", () => {
+    const html = renderFilters();
+    const label = html.match(/<label[^>]*for="job-posted"[^>]*>/);
+    assert.ok(label, "expected the Posted label");
+    assert.ok(label![0].includes("text-sm"), `expected text-sm on the visible label: ${label![0]}`);
+    assert.ok(!label![0].includes("text-xs"), `label should not still be text-xs: ${label![0]}`);
   });
 
   it("proximity tab buttons meet the 44px touch-target floor (D3)", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CaretDown } from "@phosphor-icons/react";
 
 const CLUSTER_OPTIONS = [
   { value: "", label: "All Clusters" },
@@ -43,7 +44,7 @@ const JOB_TYPE_OPTIONS = [
 const CONTROL_CLASSES =
   "min-h-11 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm";
 
-const VISIBLE_LABEL_CLASSES = "text-xs font-medium text-[var(--text-secondary)]";
+const VISIBLE_LABEL_CLASSES = "text-sm font-medium text-[var(--text-secondary)]";
 
 export type JobProximityFilter = "local" | "remote" | "all";
 
@@ -102,8 +103,12 @@ export function JobFilters({
   // UX finding #4 (2026-09-07 fluidity memo): 9 controls in one flex-wrap
   // row, every select labeled sr-only-only, wrapped into 4-5 look-alike
   // rows at 375px. Proximity + search stay always visible; the four
-  // secondary filters collapse behind this disclosure, closed by default.
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // secondary filters collapse behind this disclosure. Seeded open when a
+  // secondary filter already has a value (UX review WARNING) so an applied
+  // filter is never hidden from the student who set it on first paint.
+  const [filtersOpen, setFiltersOpen] = useState(
+    () => [postedWithinDays, minPay, jobType, cluster].some(Boolean),
+  );
   const activeSecondaryCount = [postedWithinDays, minPay, jobType, cluster].filter(Boolean).length;
 
   return (
@@ -181,9 +186,14 @@ export function JobFilters({
         aria-expanded={filtersOpen}
         aria-controls="job-filters-panel"
         onClick={() => setFiltersOpen((current) => !current)}
-        className="min-h-11 self-end rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:text-[var(--primary)]"
+        className="flex min-h-11 items-center gap-1.5 self-end rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:text-[var(--primary)]"
       >
         Filters{activeSecondaryCount > 0 ? ` (${activeSecondaryCount})` : ""}
+        <CaretDown
+          size={14}
+          aria-hidden="true"
+          className={`transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+        />
       </button>
 
       <div

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } from "@phosphor-icons/react";
+import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut, X } from "@phosphor-icons/react";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
@@ -91,6 +91,27 @@ export async function runSaveAndDescribeError(
     // leaking a raw error string onto the page.
     return err instanceof SaveJobError ? err.message : describeSaveError();
   }
+}
+
+/**
+ * UX review WARNING (2026-09-07): the save-error message had no dismiss
+ * control. Icon-only 44px button (p-2.5 padding around a 24px X) clears the
+ * error; the message itself reads at text-sm rather than text-xs.
+ */
+export function SaveErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div role="alert" className="flex items-start justify-between gap-2">
+      <p className="text-sm leading-5 text-[var(--error)]">{message}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss error"
+        className="min-h-11 min-w-11 shrink-0 rounded-lg p-2.5 text-[var(--error)] transition-colors hover:bg-[var(--surface-elevated)]"
+      >
+        <X size={24} aria-hidden="true" />
+      </button>
+    </div>
+  );
 }
 
 const WORK_MODE_STYLES: Record<JobWorkMode, string> = {
@@ -274,11 +295,7 @@ export function JobCard({
       {/* Actions */}
       {!compact && (
         <div className="mt-3 space-y-3">
-          {saveError && (
-            <p role="alert" className="text-xs leading-5 text-[var(--error)]">
-              {saveError}
-            </p>
-          )}
+          {saveError && <SaveErrorBanner message={saveError} onDismiss={() => setSaveError(null)} />}
           {savedStatus ? (
             <div className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
               <select
