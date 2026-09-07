@@ -23,6 +23,17 @@ export interface PlatformMapRefs {
 }
 
 const COMPACT_CHAR_LIMIT = 650;
+/**
+ * Ceiling for the full-tier "PLATFORM MODULES:" render (header + mechanics
+ * lines only — the per-role preamble text lives in platform-map.ts and is
+ * fixed, not sourced from `entries`, so it plays no part in what this rule
+ * needs to catch: unbounded entry growth). Measured against today's
+ * highest-usage role (student, 6,952 chars for this rendering) and rounded
+ * up to the next 250, mirroring COMPACT_CHAR_LIMIT's role — nothing caught
+ * full-tier growth before this (student full grew 3,840 -> 6,269 -> 6,952+
+ * chars unguarded while compact-budget only ever watched the compact tier).
+ */
+const FULL_CHAR_LIMIT = 7000;
 const ALL_ROLES: PlatformRole[] = ["student", "teacher", "coordinator", "admin"];
 
 /**
@@ -77,6 +88,16 @@ export function validatePlatformMap(
       push("id-unique", entry.id, `duplicate entry id: ${entry.id}`);
     }
     seenIds.add(entry.id);
+  }
+
+  // ── seeAlso-exists: every id an entry cross-references must be a real
+  //    entry id in the same map ───────────────────────────────────────────
+  for (const entry of entries) {
+    for (const relatedId of entry.seeAlso ?? []) {
+      if (!seenIds.has(relatedId)) {
+        push("seeAlso-exists", entry.id, `seeAlso references unknown entry id: ${relatedId}`);
+      }
+    }
   }
 
   // ── roles-nonempty / summary-nonempty / route-exists / tool-exists /
@@ -158,6 +179,29 @@ export function validatePlatformMap(
         "compact-budget",
         role,
         `compact render for role "${role}" is ${rendered.length} chars, exceeds ${COMPACT_CHAR_LIMIT}`,
+      );
+    }
+  }
+
+  // ── full-budget: <=FULL_CHAR_LIMIT chars per role render ────────────────
+  // Mirrors buildPlatformKnowledge's full-tier "PLATFORM MODULES:" section
+  // (header + mechanics lines), against the `entries` argument so this rule
+  // stays testable against crafted entries like compact-budget above. The
+  // role preamble text is deliberately excluded — see FULL_CHAR_LIMIT's doc
+  // comment.
+  for (const role of ALL_ROLES) {
+    const fullEntries = entries.filter((entry) => entry.roles.includes(role));
+    const lines = fullEntries.map((entry) => {
+      const routePart = entry.route ? ` (${entry.route})` : "";
+      const header = `- ${entry.name}${routePart}: ${entry.summary}`;
+      return entry.mechanics ? `${header}\n  ${entry.mechanics}` : header;
+    });
+    const rendered = ["PLATFORM MODULES:", ...lines].join("\n");
+    if (rendered.length > FULL_CHAR_LIMIT) {
+      push(
+        "full-budget",
+        role,
+        `full render for role "${role}" is ${rendered.length} chars, exceeds ${FULL_CHAR_LIMIT}`,
       );
     }
   }
