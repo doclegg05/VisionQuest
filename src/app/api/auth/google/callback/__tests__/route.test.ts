@@ -439,7 +439,7 @@ describe("GET /api/auth/google/callback", () => {
 
     const res = await route.GET(callbackRequest() as never);
 
-    assert.equal(redirectTarget(res), "/?error=account_deactivated");
+    assert.equal(redirectTarget(res), "/?error=oauth_failed");
     assert.equal(cookieSets.length, 0);
     assert.equal(mfaCookieSets.length, 0, "a deactivated account gets no MFA challenge either");
   });
@@ -449,7 +449,7 @@ describe("GET /api/auth/google/callback", () => {
 
     const res = await route.GET(callbackRequest() as never);
 
-    assert.equal(redirectTarget(res), "/?error=account_deactivated");
+    assert.equal(redirectTarget(res), "/?error=oauth_failed");
     assert.equal(mockUpdate.mock.callCount(), 0);
     assert.equal(mockCreate.mock.callCount(), 0);
     assert.equal(cookieSets.length + mfaCookieSets.length, 0);

@@ -124,6 +124,27 @@ async function refuseUnknownAccount(req: NextRequest) {
   return NextResponse.redirect(new URL("/?error=oauth_failed", req.url));
 }
 
+/**
+ * A deactivated account answers exactly like an unknown one. The password
+ * route already does this (its 401 body is identical for unknown, wrong
+ * password and deactivated); a distinct `account_deactivated` code here told
+ * anyone who owned the address that a VisionQuest account had existed
+ * (2026-09-07 audit, suggestion 5). The audit row keeps the distinction for
+ * staff; the student's screen does not.
+ */
+async function refuseDeactivatedAccount(req: NextRequest, student: GoogleAccount) {
+  logger.warn("Google sign-in refused: account deactivated", {
+    student: studentLogKey(student.id),
+  });
+  await logAuditEvent({
+    action: "auth.google_login_refused_deactivated",
+    targetType: "student",
+    targetId: student.id,
+    summary: "Google sign-in refused: the account is deactivated.",
+  });
+  return NextResponse.redirect(new URL("/?error=oauth_failed", req.url));
+}
+
 async function refuseAccountMismatch(req: NextRequest, student: GoogleAccount) {
   logger.warn("Google sign-in refused: email is bound to a different Google account", {
     student: studentLogKey(student.id),
@@ -247,7 +268,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!resolution.student.isActive) {
-      return redirectTo("/?error=account_deactivated");
+      return refuseDeactivatedAccount(req, resolution.student);
     }
 
     // Same second factor as the password route (login/route.ts): the

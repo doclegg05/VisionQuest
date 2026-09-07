@@ -174,9 +174,14 @@ function scrubRequest(request: RequestData): RequestData {
  * (W11), and email/username/ip were already dropped. Correlate through the
  * request id or `studentLogKey` in the log line instead.
  */
+/**
+ * Allowlist, not a denylist (2026-09-07 audit, suggestion 3): the previous
+ * destructure kept every field it had not named, so a custom user field such
+ * as `displayName` — nothing sets one today — would have reached Sentry
+ * verbatim. Only `segment` survives, a non-identifying cohort label.
+ */
 function scrubUser(user: SentryUser): SentryUser {
-  const { id: _id, email: _email, username: _username, ip_address: _ipAddress, ...rest } = user;
-  return rest;
+  return user.segment === undefined ? {} : { segment: user.segment };
 }
 
 function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {

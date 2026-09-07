@@ -483,6 +483,16 @@ describe("scrubPii: student contact details and user.id (W11)", () => {
     assert.equal(out.user?.email, undefined);
   });
 
+  it("keeps only `segment` on user: any other field, named or not, is dropped (allowlist)", () => {
+    // 2026-09-07 audit: the old denylist let an unnamed custom field such as
+    // displayName through. Nothing sets one today; this pins that nothing can.
+    const event = studentContactEvent();
+    event.user = { ...event.user, segment: "cohort-a", displayName: "Jordan Alvarez" } as Event["user"];
+    const out = scrubPii(event, HINT);
+    assert.deepEqual(out.user, { segment: "cohort-a" });
+    assert.ok(!serialized(out).includes("Jordan Alvarez"));
+  });
+
   it("leaves no copy of the email, the phone, or the cuid anywhere in the event", () => {
     const out = scrubPii(studentContactEvent(), HINT);
     const text = serialized(out);
