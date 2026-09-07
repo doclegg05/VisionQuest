@@ -47,6 +47,12 @@ import type { IdentityInput } from "./deidentify";
  * Same cap `staff-student-context.ts` puts on the roster it loads for the
  * ambiguous-name branch: one number, so the set of names the vault can
  * tokenize is never smaller than the set the prompt can mention.
+ *
+ * It is also a LATENCY knob. The structured name pattern is one alternation
+ * over every vaulted name, and on a realistic staff turn (21 kB prompt + 20
+ * transcript turns) pseudonymize measured ~2 ms at 25 names, ~6 ms at 100
+ * and ~77 ms at 500 (2026-09-07 review). Raise it knowing the first token
+ * moves with it.
  */
 export const MANAGED_ROSTER_CAP = 500;
 

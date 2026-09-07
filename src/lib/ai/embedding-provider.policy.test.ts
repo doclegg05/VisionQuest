@@ -94,17 +94,21 @@ describe("resolveEmbeddingProvider — permissive (default)", () => {
     assert.deepEqual(event.metadata, { callSite: "sage_memory_extract", lane: "coaching", policy: "permissive" });
   });
 
-  it("withholds the personal key for a local-only sensitivity and keeps it for system calls", async () => {
+  it("allows the personal key ONLY for public_program: student_record, system and configured all refuse it", async () => {
+    // Allowlist, not a negation (2026-09-07 review, W3's twin on the
+    // embeddings path): `system` with a studentId used to get a personal key.
     mockGetPlainConfigValue.mock.mockImplementation(configStore({}));
 
     await resolveEmbeddingProvider({ studentId: "student-1", sensitivity: "student_record" });
-    await resolveEmbeddingProvider({ studentId: null, sensitivity: "system", callSite: "sage_embedding_backfill" });
+    await resolveEmbeddingProvider({ studentId: "student-1", sensitivity: "system", callSite: "sage_embedding_backfill" });
+    await resolveEmbeddingProvider({ studentId: "student-1", sensitivity: "configured" });
+    await resolveEmbeddingProvider({ studentId: "student-1", sensitivity: "public_program" });
 
-    assert.equal(mockResolveApiKey.mock.callCount(), 2);
-    assert.equal(mockResolveApiKey.mock.calls[0].arguments[0], "student-1");
+    assert.equal(mockResolveApiKey.mock.callCount(), 4);
     assert.deepEqual(mockResolveApiKey.mock.calls[0].arguments[1], { allowPersonalKey: false });
-    assert.equal(mockResolveApiKey.mock.calls[1].arguments[0], "");
-    assert.deepEqual(mockResolveApiKey.mock.calls[1].arguments[1], { allowPersonalKey: true });
+    assert.deepEqual(mockResolveApiKey.mock.calls[1].arguments[1], { allowPersonalKey: false });
+    assert.deepEqual(mockResolveApiKey.mock.calls[2].arguments[1], { allowPersonalKey: false });
+    assert.deepEqual(mockResolveApiKey.mock.calls[3].arguments[1], { allowPersonalKey: true });
   });
 
   it("returns Ollama under ai_provider=local and records the local decision", async () => {

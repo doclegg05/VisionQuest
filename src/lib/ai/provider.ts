@@ -11,7 +11,7 @@ import {
 import { isSameModelTag, roleForTask, type AiRole } from "./roles";
 import { enforceCloudPolicy, isLocalOnlySensitivity } from "./lanes";
 import { getProviderClass, logAiAuditEvent } from "./audit";
-import { TokenVault, type IdentityInput } from "./deidentify";
+import { TokenVault, neutralizeTokenShapes, type IdentityInput } from "./deidentify";
 import { DEIDENTIFY_ALLOWLIST } from "./deidentify-allowlist";
 import { withDeidentification } from "./with-deidentification";
 import { loadIdentityInput } from "./identity";
@@ -308,7 +308,13 @@ function preserveProviderExtras(raw: AIProvider, wrapped: AIProvider, vault: Tok
       mimeType: string,
       prompt: string,
       options?: DescribeDocumentOptions,
-    ): Promise<string> => vault.rehydrate(await describe(buffer, mimeType, vault.pseudonymize(prompt), options));
+    ): Promise<string> =>
+      // Same outbound transform as the decorator's four methods: the prompt
+      // interpolates the uploaded filename, so a file named "[PERSON_3].pdf"
+      // must not reach the model as a live token shape.
+      vault.rehydrate(
+        await describe(buffer, mimeType, vault.pseudonymize(neutralizeTokenShapes(prompt)), options),
+      );
   }
   return wrapped;
 }

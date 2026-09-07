@@ -82,6 +82,15 @@ to expect:
 - On a **local** turn there is no vault, so a model that echoes the token
   verbatim shows the student `[STUDENT_NAME]`. Loud, not silent, and the correct
   direction — but it is a visible behaviour, not a hypothetical.
+- On a **cloud** turn the recalled memory reaches the model as
+  `(STUDENT_NAME) wants a CNA job` — the decorator neutralises every token shape
+  in text the model is shown, including stored rows, so a forged token can
+  never re-hydrate. The system prompt still carries the real display name
+  separately, so greetings are unaffected.
+- **Rows stored before this shipped** hold the raw name. Their hash does not
+  match the pseudonymised twin a later turn extracts, so the pair can
+  double-store until `scripts/memory-pseudonymize-backfill.mjs` (dry-run by
+  default) rewrites the legacy rows.
 
 **Evals.** `--deidentify=<name>[,<name>…]` on any script resolving through
 `scripts/lib/sage-eval-provider.mjs` puts the same decorator in front of the eval

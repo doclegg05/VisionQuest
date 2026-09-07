@@ -34,7 +34,6 @@ import {
 } from "./local-config";
 import {
   enforceCloudPolicy,
-  isLocalOnlySensitivity,
   laneForTask,
   readAiCloudPolicy,
   type AiCloudPolicy,
@@ -75,7 +74,11 @@ async function getCloudEmbeddingProvider(
   // Same rule as the generative resolver: a personal consumer key may serve
   // only content outside the FERPA rule (src/lib/chat/api-key.ts).
   const apiKey = await resolveApiKey(studentId ?? "", {
-    allowPersonalKey: !isLocalOnlySensitivity(sensitivity),
+    // Allowlist, not a negation: the negated form admitted `configured` and
+    // `system` too, so the next caller to declare one with a studentId would
+    // have got a personal key on student content (audit W3; provider.ts has
+    // the same rule and the longer explanation).
+    allowPersonalKey: sensitivity === "public_program",
   });
   return new GeminiEmbeddingProvider(apiKey);
 }
