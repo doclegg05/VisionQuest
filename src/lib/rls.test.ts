@@ -4215,6 +4215,36 @@ if (!SHOULD_RUN) {
           assert.deepEqual(rows.map((r) => r.id), [d6("rec-a")]);
         });
 
+        it("SpokesRecord: ANY teacher reads an UNLINKED intake record, not only their own students'", async () => {
+          // Pinning current behaviour, not endorsing it. spokes_record_access
+          // reads `(teacher AND (studentId IN managed OR studentId IS NULL))`,
+          // so a record entered before the student has an account is visible
+          // to every instructor in the program, in any class or county — the
+          // one branch of this policy that is not classroom-scoped. It exists
+          // because intake happens before the login does. This case is here so
+          // that narrowing it (or widening it further) has to be a deliberate
+          // edit to a red test rather than a silent change of reach.
+          const unlinked = d6("rec-unlinked");
+          await db.spokesRecord.create({
+            data: { id: unlinked, studentId: null, firstName: "Walk", lastName: "In" },
+          });
+          try {
+            const rows = await asRole("teacher", fixtures.teacherB, (tx) =>
+              tx.spokesRecord.findMany({
+                where: { id: { in: [unlinked, d6("rec-a")] } },
+                select: { id: true },
+              }),
+            );
+            assert.deepEqual(
+              rows.map((r) => r.id),
+              [unlinked],
+              "Teacher B instructs Class Beta only: the unlinked record is visible, Student A's is not",
+            );
+          } finally {
+            await db.spokesRecord.deleteMany({ where: { id: unlinked } });
+          }
+        });
+
         it("SpokesRecord: a student cannot write a SPOKES record onto another student", async () => {
           await assert.rejects(
             () =>
