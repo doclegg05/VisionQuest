@@ -2648,7 +2648,7 @@ if (!SHOULD_RUN) {
 
       before(async () => {
         // ---- Global / catalog rows (no owner column; policies key off role).
-        const [opp, evt, orient, certTpl, checkTpl, modTpl, formTpl, region] = await Promise.all([
+        const [opp, evt, orient, certTpl, checkTpl, modTpl, , , formTpl, region] = await Promise.all([
           db.opportunity.create({
             data: { id: d6("opp"), title: "RLS Opportunity", company: "Acme WV" },
           }),
@@ -2666,6 +2666,15 @@ if (!SHOULD_RUN) {
             data: { id: d6("checktpl"), label: "RLS checklist", category: "intake" },
           }),
           db.spokesModuleTemplate.create({ data: { id: d6("modtpl"), label: "RLS module" } }),
+          // Second templates, used ONLY by the two forge cases below. Both
+          // progress tables are unique on (recordId, templateId), so reusing
+          // the first template would make the forged row collide with the
+          // fixture row and throw 23505 -- a rejection that looks like a pass
+          // and would survive the policy being deleted.
+          db.spokesChecklistTemplate.create({
+            data: { id: d6("checktpl2"), label: "RLS checklist 2", category: "intake" },
+          }),
+          db.spokesModuleTemplate.create({ data: { id: d6("modtpl2"), label: "RLS module 2" } }),
           db.formTemplate.create({
             data: { id: d6("formtpl"), title: "RLS form", schema: {}, status: "active" },
           }),
@@ -3668,7 +3677,9 @@ if (!SHOULD_RUN) {
                   data: [
                     {
                       templateId: ids.formTemplate,
-                      studentId: fixtures.studentC,
+                      // Student B, not C: (template, C) already exists and its
+                      // unique index would reject this before the policy could.
+                      studentId: fixtures.studentB,
                       answers: { forged: true },
                     },
                   ],
@@ -4142,7 +4153,9 @@ if (!SHOULD_RUN) {
                       goalId: ids.goalC,
                       studentId: fixtures.studentC,
                       resourceType: "document",
-                      resourceId: ids.docBoth,
+                      // NOT ids.docBoth: that tuple already exists on Student
+                      // C's row and 23505 would stand in for the policy.
+                      resourceId: d6("forged-resource"),
                       title: "forged",
                     },
                   ],
@@ -5058,7 +5071,10 @@ if (!SHOULD_RUN) {
                     {
                       id: d6("forged-chk"),
                       recordId: ids.recordC,
-                      templateId: ids.checklistTemplate,
+                      // A template Student C has no progress row for, so the
+                      // (recordId, templateId) unique index cannot be what
+                      // rejects this -- only the policy may.
+                      templateId: d6("checktpl2"),
                     },
                   ],
                 }),
@@ -5086,7 +5102,7 @@ if (!SHOULD_RUN) {
                     {
                       id: d6("forged-mod"),
                       recordId: ids.recordC,
-                      templateId: ids.moduleTemplate,
+                      templateId: d6("modtpl2"),
                       completedAt: new Date("2026-09-02T00:00:00Z"),
                     },
                   ],
