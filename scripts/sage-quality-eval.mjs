@@ -27,7 +27,7 @@
 
 import { readFileSync } from "node:fs";
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
+import { resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 import { buildQualityEvalPrompt } from "./lib/sage-quality-eval-prompt.mjs";
 
 loadEnvFile();
@@ -206,7 +206,4 @@ async function main() {
   console.log(passRate >= 0.7 ? `\nPASS-level quality (informational).` : `\nREVIEW: pass rate below 70% — inspect the low scorers above.`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main().catch(reportEvalFailure);

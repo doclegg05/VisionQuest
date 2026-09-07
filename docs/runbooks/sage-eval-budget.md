@@ -77,12 +77,9 @@ This lives in `sage-redteam-eval.mjs`, `sage-agent-eval.mjs`,
 call a live model through `resolveEvalProvider`. `sage-freshness-eval.mjs`
 never resolves a model provider, so it has nothing to classify and was left
 untouched. `sage-quality-eval.mjs` also resolves a provider through the same
-chokepoint and so already benefits from the classification (a budget-drained
-run there raises `EvalBudgetExhaustedError` same as the others), but its own
-`main().catch()` was not repointed at `reportEvalFailure` in this ticket — it
-still exits 1 either way. Its workflow step is non-gating
-(`continue-on-error: true`) regardless, so this is a cosmetic gap, not a
-functional one; wiring it up is a one-line follow-up (see the ticket report).
+chokepoint and its `main().catch()` goes through `reportEvalFailure` too, so a
+budget-drained run there exits 3 like the others; its workflow step stays
+non-gating (`continue-on-error: true`), so the exit code only changes the label.
 
 ## Topping up the wallet
 
