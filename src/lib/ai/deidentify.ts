@@ -130,11 +130,17 @@ interface StructuredEntry {
   length: number;
   /** Match only when the source text has the value capitalised. */
   requireCapital: boolean;
+  /**
+   * A literal contact value (email, login id, phone) rather than a person's
+   * name. Contact values are substituted BEFORE the free-text families and
+   * names AFTER — see `pseudonymizeSegment` for why the order matters.
+   */
+  contact: boolean;
 }
 
 type NameKind = "student" | "other";
 
-type NameCandidate = Omit<StructuredEntry, "token"> & {
+type NameCandidate = Omit<StructuredEntry, "token" | "contact"> & {
   key: string;
   /**
    * True for the FIRST word of a multi-word name (skipping honorifics). The
@@ -328,6 +334,14 @@ export function neutralizeTokenShapes(userText: string): string {
   );
 }
 
+function buildStructuredPattern(entries: StructuredEntry[]): RegExp | null {
+  if (entries.length === 0) return null;
+  return new RegExp(
+    `${NOT_AFTER_WORD}(?:${entries.map((e) => `(${e.source})`).join("|")})${NOT_BEFORE_WORD}`,
+    "giu",
+  );
+}
+
 // ─── The vault ───────────────────────────────────────────────────────────────
 
 export interface StreamRehydrator {
@@ -345,8 +359,12 @@ export class TokenVault {
   /** Bumped whenever `issued` changes so derived regexes rebuild lazily. */
   private version = 0;
 
-  private readonly structuredEntries: StructuredEntry[];
-  private readonly structuredPattern: RegExp | null;
+  /** Literal contact values, substituted before the free-text families. */
+  private readonly contactEntries: StructuredEntry[];
+  private readonly contactPattern: RegExp | null;
+  /** Person names, substituted after them. */
+  private readonly nameEntriesList: StructuredEntry[];
+  private readonly namePattern: RegExp | null;
   private readonly families: FreeTextFamily[];
   /** Values never tokenized; null when the allowlist is empty. */
   private readonly allowlist: RegExp | null;
@@ -368,14 +386,11 @@ export class TokenVault {
     allowlist: RegExp | null,
   ) {
     this.allowlist = allowlist;
-    this.structuredEntries = [...entries].sort((a, b) => b.length - a.length);
-    this.structuredPattern =
-      this.structuredEntries.length === 0
-        ? null
-        : new RegExp(
-            `${NOT_AFTER_WORD}(?:${this.structuredEntries.map((e) => `(${e.source})`).join("|")})${NOT_BEFORE_WORD}`,
-            "giu",
-          );
+    const byLength = (a: StructuredEntry, b: StructuredEntry) => b.length - a.length;
+    this.contactEntries = entries.filter((entry) => entry.contact).sort(byLength);
+    this.nameEntriesList = entries.filter((entry) => !entry.contact).sort(byLength);
+    this.contactPattern = buildStructuredPattern(this.contactEntries);
+    this.namePattern = buildStructuredPattern(this.nameEntriesList);
     this.families = families;
     for (const [token, value] of values) this.issued.set(token, value);
   }
@@ -387,7 +402,12 @@ export class TokenVault {
     /** Lower-cased value keys already claimed, so a shared value keeps its first token. */
     const claimed = new Set<string>();
 
-    const add = (token: string, candidates: Array<{ key: string; source: string; length: number; requireCapital?: boolean }>, value: string): boolean => {
+    const add = (
+      token: string,
+      candidates: Array<{ key: string; source: string; length: number; requireCapital?: boolean }>,
+      value: string,
+      contact = false,
+    ): boolean => {
       let added = false;
       for (const candidate of candidates) {
         if (claimed.has(candidate.key)) continue;
@@ -397,6 +417,7 @@ export class TokenVault {
           source: candidate.source,
           length: candidate.length,
           requireCapital: candidate.requireCapital ?? false,
+          contact,
         });
         added = true;
       }
@@ -430,15 +451,15 @@ export class TokenVault {
     }
     if (input.studentEmail?.trim()) {
       const entry = literalEntry(input.studentEmail, 3);
-      if (entry) add("[STUDENT_EMAIL]", [entry], input.studentEmail);
+      if (entry) add("[STUDENT_EMAIL]", [entry], input.studentEmail, true);
     }
     if (input.studentLoginId?.trim()) {
       const entry = literalEntry(input.studentLoginId, 3);
-      if (entry) add("[STUDENT_LOGIN]", [entry], input.studentLoginId);
+      if (entry) add("[STUDENT_LOGIN]", [entry], input.studentLoginId, true);
     }
     if (input.studentPhone?.trim()) {
       const entry = phoneEntry(input.studentPhone);
-      if (entry) add("[STUDENT_PHONE]", [entry], input.studentPhone);
+      if (entry) add("[STUDENT_PHONE]", [entry], input.studentPhone, true);
     }
     let teacherIndex = 0;
     for (const name of input.staffNames ?? []) {
@@ -498,28 +519,45 @@ export class TokenVault {
     return out + this.pseudonymizeSegment(text.slice(last));
   }
 
+  /**
+   * Three passes, in this order, and the order is the whole point:
+   *
+   *  1. Literal contact values we already know (`[STUDENT_EMAIL]`,
+   *     `[STUDENT_LOGIN]`, `[STUDENT_PHONE]`) — the most specific tokens win.
+   *  2. The free-text families, so an email or phone we did NOT know still
+   *     becomes one token.
+   *  3. Person names.
+   *
+   * Names must come last because a multi-word name pattern matches INSIDE an
+   * address: "jordan.lee@example.org" contains `Jordan[.\s-]Lee`, so a
+   * names-first pass produced "[STUDENT_NAME]@example.org" — the local part
+   * substituted, the domain left behind, and the EMAIL family never fired
+   * because its match had already been broken up. Found by the memory
+   * write-time pass, which vaults a name without an email.
+   */
   private pseudonymizeSegment(text: string): string {
-    let out = text;
-    if (this.structuredPattern) {
-      const entries = this.structuredEntries;
-      out = out.replace(this.structuredPattern, (match: string, ...rest: unknown[]) => {
-        let index = -1;
-        for (let i = 0; i < entries.length; i += 1) {
-          if (rest[i] !== undefined) {
-            index = i;
-            break;
-          }
-        }
-        if (index === -1) return match;
-        const entry = entries[index];
-        if (entry.requireCapital && !isCapitalised(match)) return match;
-        return entry.token;
-      });
-    }
+    let out = this.applyStructured(text, this.contactPattern, this.contactEntries);
     for (const family of this.families) {
       out = out.replace(family.pattern, (match: string) => this.issueFreeText(family, match));
     }
-    return out;
+    return this.applyStructured(out, this.namePattern, this.nameEntriesList);
+  }
+
+  private applyStructured(text: string, pattern: RegExp | null, entries: StructuredEntry[]): string {
+    if (!pattern) return text;
+    return text.replace(pattern, (match: string, ...rest: unknown[]) => {
+      let index = -1;
+      for (let i = 0; i < entries.length; i += 1) {
+        if (rest[i] !== undefined) {
+          index = i;
+          break;
+        }
+      }
+      if (index === -1) return match;
+      const entry = entries[index];
+      if (entry.requireCapital && !isCapitalised(match)) return match;
+      return entry.token;
+    });
   }
 
   /**
