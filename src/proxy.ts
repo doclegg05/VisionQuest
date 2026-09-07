@@ -199,5 +199,10 @@ export const config = {
   // Next.js 16 proxy (renamed from middleware) always runs on Node.js runtime —
   // no `runtime` key allowed here. `jsonwebtoken`'s Node-crypto dependency
   // works out of the box.
-  matcher: [PROXY_MATCHER],
+  //
+  // The matcher MUST be a string literal here: Next parses `config` statically
+  // at build time and rejects an identifier ("Entry `matcher[0]` need to be
+  // static strings"). `PROXY_MATCHER` above is the SAME string exported for the
+  // tests; `proxy.test.ts` pins that the two never drift apart.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

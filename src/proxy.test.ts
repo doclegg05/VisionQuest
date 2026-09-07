@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { NextRequest } from "next/server";
-import { crawlerHeadersFor, proxy, PROXY_MATCHER } from "./proxy";
+import { config as proxyConfig, crawlerHeadersFor, proxy, PROXY_MATCHER } from "./proxy";
 
 // FERPA review W7 (2026-09-06): the two public pages that render one
 // student's data behind an opaque identifier — /credentials/[slug] and
@@ -48,6 +48,14 @@ describe("crawlerHeadersFor", () => {
 
 /** The matcher pattern is already valid regex; anchor it the way Next does. */
 const matcherRe = new RegExp(`^${PROXY_MATCHER}$`);
+
+describe("proxy config.matcher", () => {
+  it("is the literal PROXY_MATCHER string (Next requires a static literal in config)", () => {
+    // Next.js parses `config` at build time and rejects an identifier there,
+    // so the literal is duplicated on purpose; this pins the two together.
+    assert.deepEqual(proxyConfig.matcher, [PROXY_MATCHER]);
+  });
+});
 
 describe("proxy matcher", () => {
   it("covers paths that end in an image extension", () => {
