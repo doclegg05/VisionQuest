@@ -181,6 +181,19 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           RATE_LIMIT_DB_TEST_ENABLED: "true"
 
+      - name: Run JobListing class-scoped uniqueness integration test
+        # VQ-R-018: the constraint that stops one class's scrape from
+        # silently overwriting another class's row (see migration
+        # 20260907160000) is a Postgres CONSTRAINT behavior, so it only
+        # reproduces against a real database — same reasoning, and the same
+        # hermetic Postgres migrated for the RLS step above, as the
+        # rate-limiter step directly above this one.
+        run: npm run test:joblisting
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          JOB_LISTING_UNIQUE_TEST_ENABLED: "true"
+
       # --- Gate-tier benchmarks ------------------------------------------
       # Numbers, not pass/fail: each suite writes reports/benchmarks/latest/
       # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric
