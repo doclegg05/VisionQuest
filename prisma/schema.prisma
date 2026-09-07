@@ -2211,11 +2211,21 @@ model JobListing {
   resumeVersions  ResumeVersion[]
   coverLetters    CoverLetter[]
 
-  // VQ-R-018: was a bare `sourceId @unique` (program-wide), which let one
-  // class's overnight scrape silently steal a shared national posting away
-  // from another class's board by reassigning classConfigId on upsert.
-  // Class-scoped, mirroring JobBrowseListing's `@@unique([source, sourceId])`.
-  @@unique([classConfigId, sourceId])
+  // VQ-R-018: was a bare `sourceId @unique` (program-wide). The upsert's
+  // `where` matched a row by sourceId alone and its `update` clause never
+  // touched classConfigId, so a shared national posting's classConfigId
+  // never actually changed hands — instead, class B's scrape found class
+  // A's existing row (matched purely by sourceId), overwrote it with B's
+  // title/company/description and scrapeBatchId, and never created a row
+  // of its own for B. A's board then silently showed B's job content under
+  // A's own classConfigId, and A's stale-sweep saw the row as freshly
+  // touched (by B) and never re-synced it. Self-healing once this key is
+  // class-scoped: the very next scrape of either class no longer matches
+  // the other's row, so B creates its own and A rewrites its own correct
+  // content on its own following cycle — no manual recovery needed.
+  // A true mirror of JobBrowseListing's `@@unique([source, sourceId])`,
+  // with the class scope this table (unlike the browse pool) has.
+  @@unique([classConfigId, source, sourceId])
   @@index([classConfigId, status])
   @@index([classConfigId, status, workMode])
   @@index([status, createdAt])

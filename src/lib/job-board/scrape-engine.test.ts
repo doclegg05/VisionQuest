@@ -100,11 +100,16 @@ test("runScrapeForConfig upserts JobListing keyed on the class-scoped compound u
   const arg = upserts[0] as { where: Record<string, unknown> };
 
   // The old bug: `where: { sourceId: "..." }` alone. A shared posting's
-  // upsert must key on (classConfigId, sourceId) so a second class's scrape
+  // upsert must key on (classConfigId, source, sourceId) so a second class's scrape
   // of the SAME national posting creates its own row instead of stealing
   // this class's copy.
-  assert.deepEqual(Object.keys(arg.where), ["classConfigId_sourceId"]);
-  const compoundKey = arg.where.classConfigId_sourceId as { classConfigId: string; sourceId: string };
+  assert.deepEqual(Object.keys(arg.where), ["classConfigId_source_sourceId"]);
+  const compoundKey = arg.where.classConfigId_source_sourceId as {
+    classConfigId: string;
+    source: string;
+    sourceId: string;
+  };
   assert.equal(compoundKey.classConfigId, "config-alpha");
+  assert.equal(compoundKey.source, "usajobs");
   assert.equal(compoundKey.sourceId, "usajobs:shared-posting-1");
 });

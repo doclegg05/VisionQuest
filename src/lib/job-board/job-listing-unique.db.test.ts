@@ -2,23 +2,38 @@
  * VQ-R-018 — cross-class JobListing collision, integration-verified.
  *
  * `JobListing.sourceId` was a bare, program-wide `@unique` key, and the
- * scrape upsert (`scrape-engine.ts`) keyed on it alone. Two classes whose
- * regions both surface the same national posting (a USAJobs/Greenhouse/
- * Lever listing, say) collided: the second class's overnight refresh
- * reassigned that row's `classConfigId`, silently vanishing it from the
- * first class's board. `JobBrowseListing` already gets this right with
+ * scrape upsert (`scrape-engine.ts`) matched a row by that key alone with
+ * an `update` clause that never touched `classConfigId`. So a shared
+ * national posting's `classConfigId` never actually changed hands: class
+ * B's scrape found class A's pre-existing row (matched by sourceId alone),
+ * overwrote its title/company/description and `scrapeBatchId` with B's
+ * version, and never created a row of its own — B got nothing, A's row
+ * silently showed B's content while still carrying A's own
+ * `classConfigId`, and A's stale-sweep saw the row as freshly touched (by
+ * B) and left it alone. Self-healing once the key is class-scoped: the
+ * very next scrape of either class no longer matches the other's row, so B
+ * creates its own and A rewrites its own correct content on its own
+ * following cycle.
+ *
+ * `JobBrowseListing` already gets this right with
  * `@@unique([source, sourceId])`; this pins the same pattern applied to
- * `JobListing` as `@@unique([classConfigId, sourceId])` — this is a
- * database CONSTRAINT bug, so it is verified against real Postgres rather
- * than mocked, the same reasoning as `rate-limit.db.test.ts`.
+ * `JobListing` as `@@unique([classConfigId, source, sourceId])` — a true
+ * mirror, with the class scope this table (unlike the program-wide browse
+ * pool) has. This is a database CONSTRAINT bug, so it is verified against
+ * real Postgres rather than mocked, the same reasoning as
+ * `rate-limit.db.test.ts`.
  *
  * Prerequisites (auto-skipped when missing):
- *   - DATABASE_URL points at a migrated, NON-PRODUCTION Postgres.
- *   - JOB_LISTING_UNIQUE_TEST_ENABLED=true. Opt-in because this test writes
- *     real SpokesClass/JobClassConfig/JobListing rows (cleaned up after).
+ *   - DATABASE_URL points at a migrated Postgres on localhost/127.0.0.1
+ *     (see `isLocalOnlyDatabaseUrl` below — the seed-e2e-users precedent:
+ *     this test writes and deletes real rows, so it refuses anything that
+ *     doesn't clearly look like a disposable local/CI database, never a
+ *     shared dev DB or worse).
+ *   - JOB_LISTING_UNIQUE_TEST_ENABLED=true. Opt-in on top of the host
+ *     check, matching `rate-limit.db.test.ts`'s two-gate pattern.
  *
  * Typical usage:
- *   JOB_LISTING_UNIQUE_TEST_ENABLED=true DATABASE_URL=postgres://...test... \
+ *   JOB_LISTING_UNIQUE_TEST_ENABLED=true DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/... \
  *     npx tsx --test src/lib/job-board/job-listing-unique.db.test.ts
  */
 
@@ -26,14 +41,50 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { PrismaClient, Prisma } from "@prisma/client";
 
-const SHOULD_RUN = process.env.JOB_LISTING_UNIQUE_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/**
+ * True when `databaseUrl`'s host is clearly local (localhost/127.0.0.1/::1).
+ * Pure and side-effect-free so it can run before any connection opens —
+ * same reasoning as `src/lib/e2e-seed-guard.ts`'s host check, inlined here
+ * rather than imported so this test file's fence stays self-contained.
+ * An unparseable URL is refused, not assumed safe.
+ */
+export function isLocalOnlyDatabaseUrl(databaseUrl: string | undefined): boolean {
+  if (!databaseUrl) return false;
+  try {
+    return LOCAL_HOSTS.has(new URL(databaseUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+describe("isLocalOnlyDatabaseUrl", () => {
+  it("allows localhost and 127.0.0.1", () => {
+    assert.equal(isLocalOnlyDatabaseUrl("postgresql://postgres:postgres@localhost:5432/db"), true);
+    assert.equal(isLocalOnlyDatabaseUrl("postgresql://postgres:postgres@127.0.0.1:5432/db"), true);
+  });
+
+  it("refuses a remote host, even one that looks dev/staging-named", () => {
+    assert.equal(isLocalOnlyDatabaseUrl("postgresql://u:p@db.dev.example.com:5432/vq_dev"), false);
+    assert.equal(isLocalOnlyDatabaseUrl("postgresql://u:p@aws-0-us-east-1.pooler.supabase.com:6543/postgres"), false);
+  });
+
+  it("refuses undefined and unparseable input", () => {
+    assert.equal(isLocalOnlyDatabaseUrl(undefined), false);
+    assert.equal(isLocalOnlyDatabaseUrl("not a url"), false);
+  });
+});
+
+const SHOULD_RUN =
+  process.env.JOB_LISTING_UNIQUE_TEST_ENABLED === "true" && isLocalOnlyDatabaseUrl(process.env.DATABASE_URL);
 
 if (!SHOULD_RUN) {
   describe("JobListing class-scoped uniqueness (integration) — SKIPPED", () => {
-    it("requires JOB_LISTING_UNIQUE_TEST_ENABLED=true and DATABASE_URL pointing at a test DB", () => {
+    it("requires JOB_LISTING_UNIQUE_TEST_ENABLED=true and a local/127.0.0.1 DATABASE_URL", () => {
       assert.ok(
         true,
-        "Set JOB_LISTING_UNIQUE_TEST_ENABLED=true and point DATABASE_URL at a non-production, migrated DB.",
+        "Set JOB_LISTING_UNIQUE_TEST_ENABLED=true and point DATABASE_URL at a migrated Postgres on localhost/127.0.0.1.",
       );
     });
   });
@@ -96,8 +147,8 @@ if (!SHOULD_RUN) {
 
       // Before the fix, this second class's copy of the SAME national
       // posting collides on the bare `sourceId @unique` key and throws
-      // P2002 — the exact mechanism that silently reassigned the row away
-      // from class Alpha's board on the next scrape.
+      // P2002 — the exact mechanism that let class B's write silently land
+      // on class A's row instead of creating its own.
       await db.jobListing.create({ data: listing(configBetaId) });
 
       const rows = await db.jobListing.findMany({ where: { sourceId: sharedSourceId } });
@@ -106,11 +157,11 @@ if (!SHOULD_RUN) {
       assert.deepEqual(classConfigIds, [configAlphaId, configBetaId].sort());
     });
 
-    it("still refuses a second row for the SAME class and sourceId (the constraint is scoped, not removed)", async () => {
+    it("still refuses a second row for the SAME class, source and sourceId (the constraint is scoped, not removed)", async () => {
       await assert.rejects(
         () => db.jobListing.create({ data: listing(configAlphaId) }),
         (err: unknown) => err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002",
-        "a duplicate (classConfigId, sourceId) pair must still violate a unique constraint",
+        "a duplicate (classConfigId, source, sourceId) triple must still violate a unique constraint",
       );
     });
   });
