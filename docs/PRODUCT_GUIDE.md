@@ -1,8 +1,10 @@
 # VisionQuest Product Guide
 
-Status: Window lapsed — charter content remains authoritative until the next 90-day window is authored  
-Effective window: March 23, 2026 through June 21, 2026 (ended; successor window not yet defined)  
+Status: Window lapsed — the successor outcome frame is [docs/plans/2026-08-19-what-better-means-charter.md](./plans/2026-08-19-what-better-means-charter.md) ("What better means for VisionQuest"), owner-approved for execution 2026-08-20 with Phases 1–5 shipped (PR #158). It stays formally DRAFT — a separate, dated 90-day window with its own outcome percentages was never authored on top of it — but it is the document agents should read for current outcomes, not the lapsed table below.  
+Effective window: March 23, 2026 through June 21, 2026 (ended). See "90-Day Outcomes" below for a per-outcome status against that lapsed window, and the charter linked above for what "better" means now.  
 Audience: AI agents, coding agents, and development contributors
+
+> **2026-09-07 status note (E5):** The 2026-07-20 note below said "authoring the next 90-day charter is owner work" — that happened: Britt approved the "what better means" charter 2026-08-20 and its Phases 1–5 executed the same day (`.claude/MEMORY.md`, "Also 2026-08-20 — charter Phases 1–5"). It is the current product-shaping reference; this file's mission/JTBD/decision-lens sections below remain valid and unchanged, but its dated 90-Day Outcomes table is a record of the lapsed March–June window, not a live target.
 
 > **2026-07-20 status note:** The full-project maturity review and repair session is recorded in
 > [MATURITY_REVIEW.md](./MATURITY_REVIEW.md) — it seeds the next window. The "Next" priority
@@ -119,13 +121,18 @@ If a change makes students more likely to take the next meaningful step, or make
 
 ## 90-Day Outcomes
 
-By June 21, 2026, the product should achieve all of the following:
+By June 21, 2026, the product should achieve all of the following. **Status notes added 2026-09-07 (E5)** — each reflects what `docs/plans/2026-08-19-what-better-means-charter.md`'s "Execution status" section and `.claude/MEMORY.md` can actually show, not an estimate; see the charter for the current outcome frame these lapsed targets were superseded by.
 
 - 90% of active students have one confirmed long-term goal and one active monthly goal reviewed within the last 14 days.
+  - **Status: not measured.** The goal-confirmation model (`confirmed` status, `confirmedAt`/`confirmedBy`, 2026-04-01) and the single canonical next-step engine (charter Pillar 1 exit gate, contract-tested) shipped, but no report computes what share of active students actually hold both a confirmed long-term goal and a monthly goal reviewed in the trailing 14 days.
 - 80% of active students have at least one approved course or certification pathway linked to a confirmed goal.
+  - **Status: not measured; underlying chain was found dark, then partly repaired.** The 2026-08-19 charter's Pillar 6 review found CareerOneStop never connected and assessed profiles had no persistence path; Phase 4 of its execution (2026-08-20) shipped student-reported CareerOneStop results with provenance and Career DNA source labels, but no report counts the 80% pathway-linked-to-confirmed-goal figure this outcome asks for.
 - Every active class has a published requirement matrix with each item marked `required`, `optional`, or `not_applicable`.
+  - **Status: partially met.** `ClassRequirement` (`src/lib/class-requirement-compliance.ts`, `ClassRequirementEditor`) ships exactly this three-state model (`required` | `optional` | `not_applicable`) with a teacher-facing editor, but no instrument confirms every active class has actually published one.
 - Instructors can identify stalled students from one review queue in under 5 minutes.
+  - **Status: partially met.** The intervention queue is the primary teacher dashboard (2026-04-01 decision), and the teacher loop is now e2e-tested in CI (`journey-teacher-loop`, 5 taps against a 6-tap floor, 2026-09-05 benchmark suite) — but no instrument measures wall-clock time to identification, so the "under 5 minutes" figure itself remains unverified.
 - Any gamification shipped in this period must improve at least one real behavior by 10% in a pilot.
+  - **Status: not applicable.** No gamification shipped in this window — `docs/archive/GAMIFICATION_BACKLOG.md` is a frozen, unbuilt planning artifact per `docs/PRODUCT_DECISIONS.md` — so this outcome's kill condition was never triggered.
 
 ## 90-Day Build Order
 
