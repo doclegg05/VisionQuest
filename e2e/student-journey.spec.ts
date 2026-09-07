@@ -205,6 +205,8 @@ test.describe("Day-1 student journey", () => {
       // incomplete (one item pending teacher verification), so the one
       // next step must be orientation with its CTA pointing at /orientation.
       const cta = page.getByTestId("current-target-cta");
+      // Same transient-duplicate guard as the secondary-page loop below.
+      await expect(cta).toHaveCount(1, { timeout: 20_000 });
       await expect(cta).toBeVisible();
       await expect(cta).toHaveAttribute("href", "/orientation");
       await expect(cta).not.toHaveText(/^\s*$/);
@@ -264,6 +266,15 @@ test.describe("Day-1 student journey", () => {
           await page.goto(path);
 
           const cta = page.getByTestId("current-target-cta");
+          // Poll for exactly one before touching it. A strict locator throws
+          // the instant a second CTA exists, and during this page group's
+          // streamed hydration a transient duplicate has been observed twice
+          // (2026-09-05 on e81666d, 2026-09-07 on d8483f8). toHaveCount
+          // retries until the DOM settles, and still fails if two persist —
+          // the invariant is unchanged, only the timing is honest.
+          await expect(cta, `${path} should render exactly one next-step CTA`).toHaveCount(1, {
+            timeout: 20_000,
+          });
           await expect(cta, `${path} should show the next step`).toBeVisible();
           await expect(cta, `${path} should name the next step`).toContainText(/Next:/);
 
