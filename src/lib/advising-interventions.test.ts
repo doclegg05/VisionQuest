@@ -93,44 +93,62 @@ const TEACHERS = [
 // teacher-1 instructs the class student-1 is enrolled in; teacher-2 does not.
 // The same instructor is linked twice (two enrolled classes) so the dedupe is
 // exercised rather than assumed.
-const ENROLLMENTS_WITH_ASSIGNED_INSTRUCTOR = [
-  {
-    class: {
-      instructors: [
-        {
-          instructor: {
-            id: "teacher-1",
-            email: "one@example.test",
-            displayName: "Teacher One",
-            isActive: true,
-          },
-        },
-      ],
+function instructorLink(overrides: Record<string, unknown>) {
+  return {
+    instructor: {
+      id: "teacher-1",
+      email: "one@example.test",
+      displayName: "Teacher One",
+      isActive: true,
+      role: "teacher",
+      ...overrides,
     },
-  },
+  };
+}
+
+const ENROLLMENTS_WITH_ASSIGNED_INSTRUCTOR = [
+  { class: { status: "active", instructors: [instructorLink({})] } },
   {
     class: {
+      status: "active",
       instructors: [
-        {
-          instructor: {
-            id: "teacher-1",
-            email: "one@example.test",
-            displayName: "Teacher One",
-            isActive: true,
-          },
-        },
-        {
-          instructor: {
-            id: "teacher-3",
-            email: "three@example.test",
-            displayName: "Teacher Three",
-            isActive: false,
-          },
-        },
+        instructorLink({}),
+        instructorLink({
+          id: "teacher-3",
+          email: "three@example.test",
+          displayName: "Teacher Three",
+          isActive: false,
+        }),
       ],
     },
   },
 ];
+
+// W2 (2026-09-07 audit): a non-teacher staff account linked as an instructor.
+// assertStaffRecipient in notifications.ts refuses `coordinator` on the admin
+// client, so a nudge addressed to them throws — and the email loop, which had
+// no staff check of its own, would still have mailed the student-naming body.
+const COORDINATOR_AS_INSTRUCTOR = instructorLink({
+  id: "coord-1",
+  email: "coord@example.test",
+  displayName: "Coordinator One",
+  role: "coordinator",
+});
+
+// S1: an instructor whose only link to this student is through an archived
+// class. region-rollup.ts and classroom.ts both exclude archived classes.
+const ARCHIVED_CLASS_ENROLLMENT = {
+  class: {
+    status: "archived",
+    instructors: [
+      instructorLink({
+        id: "teacher-7",
+        email: "seven@example.test",
+        displayName: "Teacher Seven",
+      }),
+    ],
+  },
+};
 
 type Module = typeof import("./advising-interventions");
 let syncInterventionNotifications: Module["syncInterventionNotifications"];
@@ -390,3 +408,190 @@ function assertNoStudentIdentifier(payload: Record<string, unknown>): void {
     assert.equal(payload[key], undefined, `${key} must not appear in a nudge scoping log`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// W2 + S1 (2026-09-07 security audit). Two holes in the D8 scoping:
+//
+//   1. findAssignedInstructors filtered isActive but not role, so a
+//      coordinator or student-role account linked as an instructor resolved
+//      as a recipient. The admin-client notification then THREW
+//      (assertStaffRecipient) into Promise.allSettled and vanished, while the
+//      email loop — which had no staff check at all — still mailed a body
+//      naming the student.
+//   2. The fallback keyed on RESOLVED recipients, so a student whose only
+//      assigned instructors were non-teacher staff got no nudge anywhere: the
+//      assigned branch "succeeded" with zero deliveries and the program-wide
+//      fallback never ran.
+//
+// The fix is in two places and both are pinned below: the module filters to
+// staff roles and to non-archived classes, and this file counts DELIVERED
+// recipients — a send that threw is not a delivery — when deciding the
+// fallback, the emails, and the alarm.
+// ---------------------------------------------------------------------------
+describe("syncInterventionNotifications delivery accounting (W2)", () => {
+  beforeEach(() => {
+    for (const m of [
+      mockAdminStudentFindMany,
+      mockAdminEnrollmentFindMany,
+      mockAppStudentFindMany,
+      mockAppEnrollmentFindMany,
+      mockSendNotification,
+      mockEnqueueJob,
+      mockLogWarn,
+      mockLogError,
+      mockLogDebug,
+    ]) {
+      m.mock.resetCalls();
+    }
+    mockAdminStudentFindMany.mock.mockImplementation(async () => TEACHERS);
+    mockAdminEnrollmentFindMany.mock.mockImplementation(
+      async () => ENROLLMENTS_WITH_ASSIGNED_INSTRUCTOR,
+    );
+    mockAppStudentFindMany.mock.mockImplementation(async () => []);
+    mockAppEnrollmentFindMany.mock.mockImplementation(async () => []);
+    mockSendNotification.mock.mockImplementation(async () => true);
+    mockEnqueueJob.mock.mockImplementation(async () => null);
+    for (const m of [mockLogWarn, mockLogError, mockLogDebug]) {
+      m.mock.mockImplementation(() => undefined);
+    }
+    mockEmailEnabled = false;
+  });
+
+  function teacherEmailRecipients(): string[] {
+    return mockEnqueueJob.mock.calls
+      .filter((call: any) => String(call.arguments[0].dedupeKey).startsWith("teacher-nudge:"))
+      .map((call: any) => call.arguments[0].payload.to);
+  }
+
+  it("never resolves a coordinator linked as an instructor", async () => {
+    mockAdminEnrollmentFindMany.mock.mockImplementation(async () => [
+      { class: { status: "active", instructors: [COORDINATOR_AS_INSTRUCTOR] } },
+      ENROLLMENTS_WITH_ASSIGNED_INSTRUCTOR[0],
+    ]);
+
+    await runSync();
+
+    assert.equal(callsFor("coord-1").length, 0, "a coordinator is not a nudge recipient");
+    assert.equal(callsFor("teacher-1").length, 1, "the teacher on the same roster still is");
+  });
+
+  it("never emails a coordinator linked as an instructor", async () => {
+    mockEmailEnabled = true;
+    mockAdminEnrollmentFindMany.mock.mockImplementation(async () => [
+      { class: { status: "active", instructors: [COORDINATOR_AS_INSTRUCTOR] } },
+      ENROLLMENTS_WITH_ASSIGNED_INSTRUCTOR[0],
+    ]);
+
+    await runSync();
+
+    assert.deepEqual(
+      teacherEmailRecipients(),
+      ["one@example.test"],
+      "the student-naming email body reaches staff who may receive it, and nobody else",
+    );
+  });
+
+  it("excludes an instructor whose only link is an archived class", async () => {
+    mockAdminEnrollmentFindMany.mock.mockImplementation(async () => [
+      ARCHIVED_CLASS_ENROLLMENT,
+      ENROLLMENTS_WITH_ASSIGNED_INSTRUCTOR[0],
+    ]);
+
+    await runSync();
+
+    assert.equal(callsFor("teacher-7").length, 0, "archived-class instructors are not recipients");
+    assert.equal(callsFor("teacher-1").length, 1);
+  });
+
+  it("falls back program-wide when every assigned instructor is refused at the write", async () => {
+    // Defence in depth for the case the role filter cannot see: a recipient
+    // whose role changed between the read and the write. The admin client
+    // refuses them, so nothing was delivered, so the fallback must still run.
+    mockSendNotification.mock.mockImplementation(async (recipientId: string) => {
+      if (recipientId === "teacher-1") {
+        throw new Error("Admin-client notifications are limited to staff recipients.");
+      }
+      return true;
+    });
+
+    await runSync();
+
+    for (const teacher of TEACHERS.filter((t) => t.id !== "teacher-1")) {
+      assert.equal(
+        callsFor(teacher.id).length,
+        1,
+        `${teacher.id} receives the nudge the assigned instructor could not`,
+      );
+    }
+    const warnCalls = mockLogWarn.mock.calls.filter(
+      (call: any) => call.arguments[1]?.alert === "intervention_nudge_fallback_program_wide",
+    );
+    assert.equal(warnCalls.length, 1, "the fallback branch is recorded");
+  });
+
+  it("does not email a recipient whose notification was refused", async () => {
+    mockEmailEnabled = true;
+    mockSendNotification.mock.mockImplementation(async (recipientId: string) => {
+      if (recipientId === "teacher-1") {
+        throw new Error("Admin-client notifications are limited to staff recipients.");
+      }
+      return true;
+    });
+
+    await runSync();
+
+    assert.equal(
+      teacherEmailRecipients().includes("one@example.test"),
+      false,
+      "a refused in-app write must not be followed by a student-naming email",
+    );
+  });
+
+  it("treats a cooldown-suppressed nudge as delivered, not as a reason to widen", async () => {
+    // sendNotificationWithCooldown returns false when the same nudge already
+    // sits in the recipient's cooldown window. That recipient HAS the nudge —
+    // reading it as "nothing delivered" would spam every teacher in the
+    // program every time an assigned instructor was already notified.
+    mockSendNotification.mock.mockImplementation(async () => false);
+
+    await runSync();
+
+    assert.equal(
+      mockAdminStudentFindMany.mock.callCount(),
+      0,
+      "no program-wide query: the assigned instructor already holds this nudge",
+    );
+    assert.equal(
+      mockLogWarn.mock.calls.filter(
+        (call: any) => call.arguments[1]?.alert === "intervention_nudge_fallback_program_wide",
+      ).length,
+      0,
+    );
+  });
+
+  it("alarms intervention_nudge_no_recipients when nothing at all was delivered", async () => {
+    mockSendNotification.mock.mockImplementation(async () => {
+      throw new Error("Admin-client notifications are limited to staff recipients.");
+    });
+
+    await runSync();
+
+    const alarms = mockLogError.mock.calls.filter(
+      (call: any) => call.arguments[1]?.alert === "intervention_nudge_no_recipients",
+    );
+    assert.equal(alarms.length, 1, "a nudge nobody received must never be quiet");
+    assert.equal(alarms[0].arguments[1].attemptedCount, TEACHERS.length);
+    assertNoStudentIdentifier(alarms[0].arguments[1]);
+  });
+
+  it("stays quiet when a nudge was delivered", async () => {
+    await runSync();
+
+    assert.equal(
+      mockLogError.mock.calls.filter(
+        (call: any) => call.arguments[1]?.alert === "intervention_nudge_no_recipients",
+      ).length,
+      0,
+    );
+  });
+});
