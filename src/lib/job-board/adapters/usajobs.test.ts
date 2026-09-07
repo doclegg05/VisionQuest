@@ -127,6 +127,92 @@ describe("usajobs adapter", () => {
     },
   );
 
+  // Before this, every RateIntervalCode other than "PA" was treated as
+  // hourly ("hr"), so a per-week, per-day, per-month, or bi-weekly federal
+  // listing had its raw range parsed as if it were an hourly wage —
+  // off by one to two orders of magnitude in the min-pay filter and match
+  // scoring. FB (fee basis) and PY/SY (school year) have no fixed-hours
+  // convention at all and must resolve to no hourly rate while still
+  // showing the raw range to the student.
+  describe("RateIntervalCode → hourly rate", () => {
+    function jobWithRemuneration(minimumRange: string, maximumRange: string, rateIntervalCode: string) {
+      return {
+        MatchedObjectId: `code-${rateIntervalCode}`,
+        MatchedObjectDescriptor: {
+          PositionTitle: "Test Position",
+          OrganizationName: "Test Agency",
+          PositionLocationDisplay: "Beckley, WV",
+          PositionRemuneration: [{ MinimumRange: minimumRange, MaximumRange: maximumRange, RateIntervalCode: rateIntervalCode }],
+          QualificationSummary: "Summary.",
+          PositionURI: "https://usajobs.gov/job/x",
+        },
+      };
+    }
+
+    async function fetchOneWith(minimumRange: string, maximumRange: string, rateIntervalCode: string) {
+      globalThis.fetch = async () =>
+        mockSearchResponse([jobWithRemuneration(minimumRange, maximumRange, rateIntervalCode)]);
+      const jobs = await usajobsAdapter.fetchJobs("WV", 25);
+      assert.equal(jobs.length, 1);
+      return jobs[0];
+    }
+
+    it("PA (per annum) resolves via the yearly period", async () => {
+      const job = await fetchOneWith("41600", "45000", "PA");
+      assert.equal(job.salaryMin, 20); // 41600 / 2080
+      assert.match(job.salary ?? "", /41600/);
+    });
+
+    it("PH (per hour) resolves via the hourly period", async () => {
+      const job = await fetchOneWith("15", "18", "PH");
+      assert.equal(job.salaryMin, 15);
+    });
+
+    it("PD (per day) resolves via the daily period, not hourly", async () => {
+      const job = await fetchOneWith("160", "200", "PD");
+      assert.equal(job.salaryMin, 20); // 160 / 8, not 160
+    });
+
+    it("PW (per week) resolves via the weekly period, not hourly", async () => {
+      const job = await fetchOneWith("600", "800", "PW");
+      assert.equal(job.salaryMin, 15); // 600 / 40, not 600
+    });
+
+    it("PM (per month) resolves via the monthly period, not hourly", async () => {
+      const job = await fetchOneWith("3000", "3500", "PM");
+      assert.equal(job.salaryMin, 17.31); // 3000 / (2080/12), not 3000
+    });
+
+    it("BW (bi-weekly) resolves via the biweekly period, not hourly", async () => {
+      const job = await fetchOneWith("2000", "2400", "BW");
+      assert.equal(job.salaryMin, 25); // 2000 / 80, not 2000
+    });
+
+    it("FB (fee basis) has no fixed period — salaryMin is null, the raw amount is kept", async () => {
+      const job = await fetchOneWith("500", "700", "FB");
+      assert.equal(job.salaryMin, null);
+      assert.match(job.salary ?? "", /500/);
+    });
+
+    it("PY (school year) has no fixed-hours convention — salaryMin is null, the raw amount is kept", async () => {
+      const job = await fetchOneWith("41600", "45000", "PY");
+      assert.equal(job.salaryMin, null);
+      assert.match(job.salary ?? "", /41600/);
+    });
+
+    it("SY (school year) has no fixed-hours convention — salaryMin is null, the raw amount is kept", async () => {
+      const job = await fetchOneWith("41600", "45000", "SY");
+      assert.equal(job.salaryMin, null);
+      assert.match(job.salary ?? "", /41600/);
+    });
+
+    it("an unrecognized RateIntervalCode is unknown, not assumed hourly", async () => {
+      const job = await fetchOneWith("41600", "45000", "ZZ");
+      assert.equal(job.salaryMin, null);
+      assert.match(job.salary ?? "", /41600/);
+    });
+  });
+
   it(
     "VQ-R-019: returns [] rather than hanging forever when the request's own timeout fires",
     { timeout: 2000 },
