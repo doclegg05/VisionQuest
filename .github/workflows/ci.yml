@@ -249,14 +249,12 @@ jobs:
   #     .spec.ts: both hard-read DATABASE_URL from .env.local (absent in CI)
   #     and expect `npm run db:seed` data — dev-DB-coupled; porting them to
   #     the env-first helper in e2e/helpers/db.ts is a follow-up.
-  #   - e2e/a11y-authenticated.spec.ts runs in the SOAK step below instead:
-  #     authenticated pages do not meet the zero-violation bar yet (known
-  #     findings: color-contrast on /learning, /teacher, and student detail;
-  #     link-name + nested-interactive on /teacher; select-name on student
-  #     detail). The step fails honestly on every run — the red baseline for
-  #     the page-fixing phase — but does not block the job. Promote it into
-  #     the gating step once the pages are fixed. House rule: violations are
-  #     fixed in the page, never by filtering axe rules.
+  #   - e2e/a11y-authenticated.spec.ts moved INTO the gating step below
+  #     (D4, 2026-09-07): the `axe-authenticated` benchmark (gate tier,
+  #     config/benchmarks/axe-authenticated.json) measures 0 violations —
+  #     the standalone continue-on-error soak step it used to run in was
+  #     redundant with a gate that already reads 0. House rule stands:
+  #     violations are fixed in the page, never by filtering axe rules.
   e2e:
     runs-on: ubuntu-latest
     services:
@@ -361,6 +359,7 @@ jobs:
         run: >-
           npx playwright test
           e2e/a11y.spec.ts
+          e2e/a11y-authenticated.spec.ts
           e2e/public-routes.spec.ts
           e2e/student-login-chat.spec.ts
           e2e/teacher-dashboard.spec.ts
@@ -490,10 +489,3 @@ jobs:
           name: benchmark-results-e2e
           path: reports/benchmarks/latest/
           if-no-files-found: ignore
-
-      - name: Authenticated a11y scans (soak — red baseline, non-blocking)
-        # Zero-violation bar per route; fails today by design (see the job
-        # comment). continue-on-error keeps CI green while making the full
-        # violation inventory visible on every run.
-        continue-on-error: true
-        run: npx playwright test e2e/a11y-authenticated.spec.ts --reporter=line --timeout=180000
