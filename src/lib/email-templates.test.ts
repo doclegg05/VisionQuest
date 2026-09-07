@@ -1,6 +1,19 @@
-import { test } from "node:test";
+import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { buildNotificationEmail } from "./email-templates";
+
+// The template prefers APP_BASE_URL over the action URL's origin. CI sets
+// APP_BASE_URL=http://localhost:3000 for the e2e server, which made these
+// assertions on the onrender host fail there while passing locally; pin the
+// variable for the file's duration so the expected origin is the one used.
+const savedBaseUrl = process.env.APP_BASE_URL;
+before(() => {
+  process.env.APP_BASE_URL = "https://visionquest.onrender.com";
+});
+after(() => {
+  if (savedBaseUrl === undefined) delete process.env.APP_BASE_URL;
+  else process.env.APP_BASE_URL = savedBaseUrl;
+});
 
 test("buildNotificationEmail: default (no role) links to the student settings page", () => {
   const html = buildNotificationEmail("Title", "Body", "https://visionquest.onrender.com");
