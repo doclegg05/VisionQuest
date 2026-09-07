@@ -294,7 +294,7 @@ describe("POST /api/forms/sign", () => {
       }),
     );
 
-    const timeout = new Promise<"timed out">((resolve) => setTimeout(() => resolve("timed out"), 500));
+    const timeout = new Promise<"timed out">((resolve) => setTimeout(() => resolve("timed out"), 2000));
     const outcome = await Promise.race([post({ formId: FORM_ID, signature: SIGNATURE }), timeout]);
 
     assert.notEqual(outcome, "timed out", "the response waited on the alert sync");

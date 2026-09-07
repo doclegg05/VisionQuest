@@ -1,4 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { after } from "next/server";
+import { redactContactInfo } from "./log-redaction";
+import { logger } from "./logger";
 
 /**
  * Run a best-effort side effect AFTER the response has been sent.
@@ -16,22 +19,36 @@ import { after } from "next/server";
  *
  * `after()` is Next's primitive for exactly this: the callback runs once the
  * response has finished streaming, and the server keeps the process alive
- * until it completes. It is bound with `AsyncLocalStorage.bind`, so the
- * caller's RLS context (`withRlsContext`) is still in place when the effect
- * runs — the deferred queries see the same actor the route did.
+ * until it completes.
+ *
+ * The effect is bound to the CURRENT async context here, with
+ * `AsyncLocalStorage.bind`, before it is handed over. Next does the same
+ * internally today, but the RLS actor (`withRlsContext`, read by the Prisma
+ * extension on every query) is the one thing the deferred sync must not
+ * lose, so this module does not rely on another library's private
+ * behaviour for it. `after-response.test.ts` pins it by invoking the task
+ * from outside the scope.
  *
  * `after()` throws when there is no request scope (unit tests calling a
  * route handler directly, scripts). In that case the effect runs at once,
  * un-awaited, so the caller's contract — "this returns without waiting" —
  * holds on both paths and tests can still observe the effect being invoked.
  *
- * The effect must never reject: wrap it in `afterWrite` (or catch inside)
- * so a failure is logged rather than surfacing as an unhandled rejection.
+ * Callers should wrap the effect in `afterWrite` so a failure is logged
+ * with its surface and a correlation key. The catch below is the backstop
+ * for an effect that rejects anyway: logged, never an unhandled rejection.
  */
 export function deferAfterResponse(effect: () => Promise<void>): void {
+  const guarded = AsyncLocalStorage.bind(() =>
+    effect().catch((error: unknown) => {
+      logger.error("Deferred effect rejected after the response was sent", {
+        error: redactContactInfo(String(error)),
+      });
+    }),
+  );
   try {
-    after(effect);
+    after(guarded);
   } catch {
-    void effect();
+    void guarded();
   }
 }

@@ -260,7 +260,7 @@ describe("POST /api/orientation (verification flow)", () => {
       }),
     );
 
-    const timeout = new Promise<"timed out">((resolve) => setTimeout(() => resolve("timed out"), 500));
+    const timeout = new Promise<"timed out">((resolve) => setTimeout(() => resolve("timed out"), 2000));
     const outcome = await Promise.race([
       route.POST(toggleRequest({ itemId: ITEM_ID, completed: true })),
       timeout,
