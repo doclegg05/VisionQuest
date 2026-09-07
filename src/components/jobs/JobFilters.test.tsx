@@ -58,4 +58,17 @@ describe("JobFilters", () => {
     assert.ok(html.includes("3 local jobs"));
     assert.ok(html.includes("2 remote jobs"));
   });
+
+  it("proximity tab buttons meet the 44px touch-target floor (D3)", () => {
+    // The tabs only had `min-w-20` — no min-height — so at their py-1.5
+    // text-sm sizing the collector measured them at 32px tall (80/87/106
+    // wide x 32 tall across the Local/Remote/All labels). `min-h-11` is the
+    // 44px Tailwind floor this design system uses everywhere else.
+    const html = renderFilters();
+    const tabButtonMatches = [...html.matchAll(/<button[^>]*role="tab"[^>]*class="([^"]*)"/g)];
+    assert.equal(tabButtonMatches.length, 3, "expected Local/Remote/All tab buttons");
+    for (const match of tabButtonMatches) {
+      assert.ok(match[1].includes("min-h-11"), `tab button class missing min-h-11: ${match[1]}`);
+    }
+  });
 });

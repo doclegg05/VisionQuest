@@ -254,7 +254,8 @@ export function JobCard({
               <select
                 value={draftStatus}
                 onChange={(event) => setDraftStatus(event.target.value as SavedJobStatus)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                aria-label="Application status"
+                className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
               >
                 {TRACKING_STATUSES.map((status) => (
                   <option key={status.value} value={status.value}>
@@ -274,7 +275,7 @@ export function JobCard({
                 type="button"
                 onClick={() => void persistTracking({ status: draftStatus, notes: draftNotes })}
                 disabled={saving}
-                className="rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:self-start"
+                className="min-h-11 rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:self-start"
               >
                 {saving ? "Saving..." : "Update"}
               </button>

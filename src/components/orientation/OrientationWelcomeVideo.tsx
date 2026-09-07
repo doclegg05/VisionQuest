@@ -102,7 +102,7 @@ export default function OrientationWelcomeVideo() {
         <a
           href="/media/sage-welcome-orientation.mp4"
           download
-          className="font-semibold text-[var(--accent-secondary)] hover:underline"
+          className="inline-flex min-h-11 items-center font-semibold text-[var(--accent-secondary)] hover:underline"
         >
           Download the welcome video
         </a>

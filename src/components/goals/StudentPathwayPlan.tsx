@@ -129,7 +129,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
           <Link
             href="/chat"
             prefetch={false}
-            className="mt-3 inline-flex text-sm font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
           >
             Talk to Sage about your goals →
           </Link>

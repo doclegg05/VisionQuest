@@ -112,7 +112,7 @@ export function JobFilters({
               role="tab"
               aria-selected={isSelected}
               onClick={() => onProximityChange(tab.value)}
-              className={`flex min-w-20 items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
+              className={`flex min-h-11 min-w-20 items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
                 isSelected
                   ? "bg-[var(--primary)] text-white"
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
