@@ -12,14 +12,20 @@
  * to put a student identifier in a log payload in the first place.
  */
 
-const EMAIL_PATTERN =
+/**
+ * Exported (2026-09-07) so src/lib/ai/deidentify.ts can reuse the same
+ * definition instead of carrying a second copy. Global regexes carry
+ * `lastIndex` between calls: consumers that do anything other than a single
+ * `String.prototype.replace` must construct their own instance from `.source`.
+ */
+export const EMAIL_PATTERN =
   /[^\s<>()[\]:;,"]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/g;
 
 /**
  * Matches E.164 numbers and separator-formatted ones only. A bare run of digits
  * is left alone so timestamps, byte counts, and provider error codes survive.
  */
-const PHONE_PATTERN = /\+\d[\d\s().-]{6,18}\d|\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g;
+export const PHONE_PATTERN = /\+\d[\d\s().-]{6,18}\d|\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g;
 
 export const REDACTED_EMAIL = "[email redacted]";
 export const REDACTED_PHONE = "[phone redacted]";

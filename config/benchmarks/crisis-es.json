@@ -29,5 +29,5 @@
       "tolerance": 0.005
     }
   ],
-  "notes": "Owner step: native-speaker review of the Spanish corpus. Until it happens every row carries reviewed:false and this suite stays at watch tier (benchmark plan, owner-decision default 3). The same missing means families as crisis-en (firearms, hanging, jumping) also apply here, so recall measures ~0.75 against the 0.98 design floor. Correct the corpus, never the floor."
+  "notes": "Owner step, unchanged: native-speaker review of the Spanish corpus. Until it happens every row carries reviewed:false and this suite stays at watch tier (benchmark plan, owner-decision default 3) \u2014 B1's 37 new rows carry reviewed:false too. B1 added the three means families: details.recallByFamily now reports means_firearm 14/14, means_hanging 11/11 and means_jumping 12/12 against 0/11, 0/10 and 0/9 before, with fp_rate_hard_negatives still 0.0 over a corpus grown by 30 new guard rows (the load-bearing ones being 'me ahorcan los plazos', 'se me disparo la presion' and 'tengo la soga al cuello'). Headline recall moved 0.696 -> 0.88, short of the 0.98 floor. Every remaining miss is in a family this change did not touch: passive_ideation 10, explicit_intent 5, means_pills 3, selfharm_cutting 2, abuse 1. Correct the corpus and the detector, never the floor."
 }

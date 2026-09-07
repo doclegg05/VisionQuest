@@ -64,7 +64,16 @@ export async function retrieveMemories(
   limit: number = DEFAULT_LIMIT,
 ): Promise<RetrievedMemory[]> {
   try {
-    const vectorLiteral = toVectorLiteral(await embedQuery(query));
+    // Attribute the query embedding to the student when the subject is one, so
+    // LlmCallLog.studentId and the AI audit event carry the actor (FERPA review
+    // W5). Staff subjects keep a null id: the query is theirs, not a student's.
+    const vectorLiteral = toVectorLiteral(
+      await embedQuery(query, {
+        callSite: "sage_memory_retrieve_query",
+        studentId: subjectType === "student" ? subjectId : null,
+        sensitivity: subjectType === "student" ? "student_record" : "staff_entered",
+      }),
+    );
     const queryModel = await getActiveEmbeddingModel();
 
     const rows = await prisma.$queryRaw<MemoryRow[]>`

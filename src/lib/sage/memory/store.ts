@@ -149,9 +149,16 @@ export async function storeMemoryCandidates(
     let deduped = candidates.length - fresh.length;
     if (fresh.length === 0) return { stored: 0, deduped };
 
+    // What the embedding carries: a teacher's own memory is staff-entered;
+    // every other subject (student, class, program) is written from a
+    // student's chat and is a student record. Both are local-only
+    // sensitivities, so under ai_cloud_policy=local_only neither reaches a
+    // cloud embeddings API — declared here rather than inferred by the
+    // facade, so the write path cannot drift to "system" unnoticed.
+    const sensitivity = subjectType === "teacher" ? "staff_entered" : "student_record";
     const vectors = await embedTexts(
       fresh.map((candidate) => candidate.content),
-      { taskType: "RETRIEVAL_DOCUMENT", usage },
+      { taskType: "RETRIEVAL_DOCUMENT", usage: { ...usage, sensitivity } },
     );
     // Provenance for the memory guard: same-model invariant as embedTexts above.
     const activeModel = await getActiveEmbeddingModel();

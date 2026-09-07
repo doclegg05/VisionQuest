@@ -50,6 +50,19 @@ mock.module("@/lib/db", {
 
 // A provider that returns a plan quoting only facts the source supplies, so
 // the grounding assertions pass and the columns are what is under test.
+// The plan generation is AI-audited; this file's db mock has no prismaAdmin,
+// so the real audit writer would only warn. The events themselves are pinned
+// by src/lib/ai/audit-coverage.test.ts and the provider-level suites.
+mock.module("@/lib/ai/audit", {
+  namedExports: {
+    logAiAuditEvent: async () => undefined,
+    getProviderClass: (name?: string | null) =>
+      name === "ollama" ? "local" : name === "gemini" ? "cloud" : name ? "unknown" : "none",
+    policyDecisionForProvider: (name?: string | null) =>
+      name === "ollama" ? "local_only" : "configured_provider",
+  },
+});
+
 mock.module("@/lib/ai/provider", {
   namedExports: {
     resolveAiProvider: async () => ({

@@ -39,6 +39,21 @@ export interface GenerationOptions {
   temperature?: number;
 }
 
+/**
+ * Options for `AIProvider.describeDocument`.
+ */
+export interface DescribeDocumentOptions {
+  onUsage?: OnUsage;
+  /**
+   * "text" (default) returns free prose. "json" asks the model for a JSON
+   * reply; a provider that supports a response schema applies
+   * `responseSchema` (an OpenAPI-subset object, passed through opaquely) so
+   * the shape stays stable across calls.
+   */
+  responseFormat?: "text" | "json";
+  responseSchema?: Record<string, unknown>;
+}
+
 export interface AIProvider {
   readonly name: string;
 
@@ -82,6 +97,23 @@ export interface AIProvider {
     onToolCall: ToolCallHandler,
     options?: ToolStreamOptions,
   ): AsyncGenerator<ToolStreamEvent>;
+
+  /**
+   * Multimodal document understanding: the raw bytes of an uploaded file
+   * plus a prompt, returning the model's text. Optional and implemented by
+   * the cloud provider only — the local provider has no such method, so a
+   * caller that resolved a local provider cannot send document bytes
+   * anywhere and must fall back to deterministic extraction. That absence
+   * is the routing rule for uploaded documents: `file-gist.ts` and
+   * `classify-attachment.ts` used to post bytes to Gemini by raw fetch and
+   * bypassed `resolveAiProvider` entirely (FERPA review 2026-09-06).
+   */
+  describeDocument?(
+    buffer: Buffer,
+    mimeType: string,
+    prompt: string,
+    options?: DescribeDocumentOptions,
+  ): Promise<string>;
 }
 
 /** Provider-neutral tool declaration. Mirrors Gemini's FunctionDeclaration. */
@@ -170,7 +202,14 @@ export type AiTask =
   | "draft_endorsement"
   | "public_form_lookup"
   | "public_program_help"
-  | "chat_file_gist";
+  | "chat_file_gist"
+  /**
+   * A vector-embedding call (the raw chat message, a stored memory, a
+   * document chunk) — served by `resolveEmbeddingProvider`, not a generative
+   * provider. Declared as a task so it carries a lane (src/lib/ai/lanes.ts)
+   * and an audit event like every other model call; it has no role.
+   */
+  | "embedding";
 
 export type DataSensitivity =
   | "configured"
