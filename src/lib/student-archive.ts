@@ -466,6 +466,21 @@ export async function generateStudentArchive(
           updatedAt: true,
         },
       },
+      // Interest-assessment submissions (O*NET Mini-IP or manual entry):
+      // the student's own answers and derived Holland code, kept immutable
+      // for reprint. Adopted under RLS 2026-09-07 (F8 residual).
+      assessmentSnapshots: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          instrument: true,
+          source: true,
+          hollandCode: true,
+          riasecScoresRaw: true,
+          riasecScoresNormalized: true,
+          note: true,
+          createdAt: true,
+        },
+      },
       // Vision board and mood — student-chosen imagery/text and
       // Sage-extracted mood context.
       visionBoardItems: {
@@ -1048,6 +1063,7 @@ export async function generateStudentArchive(
   addJsonSection("career/discovery.json", "career_discovery", student.careerDiscovery);
   addJsonSection("career/campaigns.json", "career_campaign", student.careerCampaigns);
   addJsonSection("career/coaching-arcs.json", "coaching_arc", student.coachingArcs);
+  addJsonSection("career/assessment-snapshots.json", "career_assessment_snapshot", student.assessmentSnapshots);
 
   // 12. Vision board and mood.
   addJsonSection("vision-board.json", "vision_board_item", student.visionBoardItems);

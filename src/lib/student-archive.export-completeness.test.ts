@@ -206,6 +206,17 @@ function fullStudentRow() {
         updatedAt: new Date("2026-01-08T00:00:00.000Z"),
       },
     ],
+    assessmentSnapshots: [
+      {
+        instrument: "onet_mini_ip_30",
+        source: "manual_entry",
+        hollandCode: "RIC",
+        riasecScoresRaw: '{"R":28,"I":22,"A":9,"S":12,"E":15,"C":20}',
+        riasecScoresNormalized: '{"R":0.93,"I":0.73,"A":0.3,"S":0.4,"E":0.5,"C":0.67}',
+        note: null,
+        createdAt: new Date("2026-01-08T12:00:00.000Z"),
+      },
+    ],
     visionBoardItems: [
       {
         type: "text",
@@ -444,6 +455,7 @@ function emptyStudentRow() {
     careerDiscovery: null,
     careerCampaigns: [],
     coachingArcs: [],
+    assessmentSnapshots: [],
     visionBoardItems: [],
     moodEntries: [],
     resumeVersions: [],
@@ -500,6 +512,7 @@ describe("generateStudentArchive — export completeness (ticket D5)", () => {
       ["career/discovery.json", (data) => assert.equal(data.status, "complete")],
       ["career/campaigns.json", (data) => assert.equal(data.length, 1)],
       ["career/coaching-arcs.json", (data) => assert.equal(data.length, 1)],
+      ["career/assessment-snapshots.json", (data) => assert.equal(data[0].hollandCode, "RIC")],
       ["vision-board.json", (data) => assert.equal(data.length, 1)],
       ["mood-entries.json", (data) => assert.equal(data.length, 1)],
       ["resume/resume-versions.json", (data) => assert.equal(data.length, 1)],
@@ -543,6 +556,7 @@ describe("generateStudentArchive — export completeness (ticket D5)", () => {
       "career/discovery.json",
       "career/campaigns.json",
       "career/coaching-arcs.json",
+      "career/assessment-snapshots.json",
       "vision-board.json",
       "mood-entries.json",
       "resume/resume-versions.json",

@@ -114,6 +114,7 @@ function baseRow(overrides: Record<string, unknown> = {}) {
     careerDiscovery: null,
     careerCampaigns: [],
     coachingArcs: [],
+    assessmentSnapshots: [],
     visionBoardItems: [],
     moodEntries: [],
     resumeVersions: [],
