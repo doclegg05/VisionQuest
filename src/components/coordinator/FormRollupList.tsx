@@ -5,26 +5,54 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
 interface TemplateRow {
-  id: string;
+  templateId: string;
   title: string;
-  status: "active" | "archived";
   isOfficial: boolean;
-  responseCount: number;
-  assignmentCount: number;
+  /** True when this region has too few students to show per-form counts. */
+  suppressed: boolean;
+  assignmentCount: number | null;
+  responseCount: number | null;
+  completionRate: number | null;
 }
 
-export default function FormRollupList() {
-  const [templates, setTemplates] = useState<TemplateRow[] | null>(null);
+interface RollupResponse {
+  rollup: {
+    regionId: string;
+    classCount: number;
+    studentCount: number;
+    templates: TemplateRow[];
+  };
+  /**
+   * Whether THIS session can actually reach /api/teacher/forms/[id]/export.
+   * Answered by the server from the export route's own gates, so the link
+   * below cannot outlive them. Coordinators get `false` — the panel used to
+   * render the link for everyone and 403 them on click (C7).
+   */
+  canExport: boolean;
+}
+
+export default function FormRollupList({ regionId }: { regionId: string }) {
+  const [data, setData] = useState<RollupResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Adjust-during-render rather than a setState inside the effect, so a
+  // region switch clears the previous region's counts in the same render pass
+  // instead of briefly showing them under the new region's name. Same pattern
+  // as CoordinatorDashboardClient's own region tracking.
+  const [trackedRegionId, setTrackedRegionId] = useState(regionId);
+  if (trackedRegionId !== regionId) {
+    setTrackedRegionId(regionId);
+    setData(null);
+    setError(null);
+  }
+
   useEffect(() => {
+    if (!regionId) return;
     let cancelled = false;
     api
-      .get<{ templates: TemplateRow[] }>("/api/teacher/forms/templates")
-      .then((data) => {
-        if (!cancelled) {
-          setTemplates(data.templates.filter((template) => template.status === "active"));
-        }
+      .get<RollupResponse>(`/api/coordinator/forms/${regionId}`)
+      .then((response) => {
+        if (!cancelled) setData(response);
       })
       .catch(() => {
         if (!cancelled) setError("Failed to load form templates.");
@@ -32,14 +60,16 @@ export default function FormRollupList() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [regionId]);
+
+  const templates = data?.rollup.templates ?? null;
 
   return (
     <section className="surface-section p-5">
       <header className="mb-4">
         <h2 className="font-display text-xl text-[var(--ink-strong)]">Forms</h2>
         <p className="mt-1 text-xs text-[var(--ink-muted)]">
-          Active templates with response counts and CSV export links for funder reporting.
+          Active templates with response counts for the classes in this region.
         </p>
       </header>
 
@@ -50,16 +80,18 @@ export default function FormRollupList() {
       )}
 
       {templates === null ? (
-        <p className="text-sm text-[var(--ink-muted)]">Loading…</p>
+        !error && <p className="text-sm text-[var(--ink-muted)]">Loading…</p>
       ) : templates.length === 0 ? (
         <p className="rounded-lg border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
-          No active templates yet.
+          {data && data.rollup.classCount === 0
+            ? "No classes in this region yet, so there are no form responses to count."
+            : "No active templates yet."}
         </p>
       ) : (
         <ul className="space-y-2">
           {templates.map((template) => (
             <li
-              key={template.id}
+              key={template.templateId}
               className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3"
             >
               <div className="min-w-0 flex-1">
@@ -71,18 +103,35 @@ export default function FormRollupList() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-[var(--ink-muted)]">
-                  {template.responseCount} response{template.responseCount === 1 ? "" : "s"} ·{" "}
-                  {template.assignmentCount} assignment{template.assignmentCount === 1 ? "" : "s"}
-                </p>
+                {template.suppressed ? (
+                  // Small-cell suppression. In a region this small, a count
+                  // for a named form is close to naming who answered it, so
+                  // the server does not send one. Say why in plain words
+                  // rather than showing a zero the reader would misread.
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    Too few students to show counts for this form.
+                  </p>
+                ) : (
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    {template.responseCount} response{template.responseCount === 1 ? "" : "s"} from{" "}
+                    {data?.rollup.studentCount ?? 0} student
+                    {data?.rollup.studentCount === 1 ? "" : "s"} in this region ·{" "}
+                    {template.assignmentCount} assignment{template.assignmentCount === 1 ? "" : "s"}
+                  </p>
+                )}
               </div>
-              <a
-                href={`/api/teacher/forms/${template.id}/export`}
-                download
-                className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)]"
-              >
-                CSV
-              </a>
+              {/* Not gated on `suppressed`: the CSV is the admin's own
+                  program-wide export, not this region's counts, so a small
+                  region is no reason to take an admin's link away. */}
+              {data?.canExport && (
+                <a
+                  href={`/api/teacher/forms/${template.templateId}/export`}
+                  download
+                  className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)]"
+                >
+                  CSV
+                </a>
+              )}
             </li>
           ))}
         </ul>

@@ -3,6 +3,7 @@
 // Type-only, so this is erased at compile time and no runtime cycle exists
 // with roles.ts (which imports AiTask from here).
 import type { AiRole } from "./roles";
+import type { IdentityInput } from "./deidentify";
 
 export interface ChatMessage {
   role: "user" | "model";
@@ -37,6 +38,21 @@ export type OnUsage = (usage: TokenUsage) => void;
  */
 export interface GenerationOptions {
   temperature?: number;
+}
+
+/**
+ * Options for `AIProvider.describeDocument`.
+ */
+export interface DescribeDocumentOptions {
+  onUsage?: OnUsage;
+  /**
+   * "text" (default) returns free prose. "json" asks the model for a JSON
+   * reply; a provider that supports a response schema applies
+   * `responseSchema` (an OpenAPI-subset object, passed through opaquely) so
+   * the shape stays stable across calls.
+   */
+  responseFormat?: "text" | "json";
+  responseSchema?: Record<string, unknown>;
 }
 
 export interface AIProvider {
@@ -82,6 +98,23 @@ export interface AIProvider {
     onToolCall: ToolCallHandler,
     options?: ToolStreamOptions,
   ): AsyncGenerator<ToolStreamEvent>;
+
+  /**
+   * Multimodal document understanding: the raw bytes of an uploaded file
+   * plus a prompt, returning the model's text. Optional and implemented by
+   * the cloud provider only — the local provider has no such method, so a
+   * caller that resolved a local provider cannot send document bytes
+   * anywhere and must fall back to deterministic extraction. That absence
+   * is the routing rule for uploaded documents: `file-gist.ts` and
+   * `classify-attachment.ts` used to post bytes to Gemini by raw fetch and
+   * bypassed `resolveAiProvider` entirely (FERPA review 2026-09-06).
+   */
+  describeDocument?(
+    buffer: Buffer,
+    mimeType: string,
+    prompt: string,
+    options?: DescribeDocumentOptions,
+  ): Promise<string>;
 }
 
 /** Provider-neutral tool declaration. Mirrors Gemini's FunctionDeclaration. */
@@ -170,7 +203,14 @@ export type AiTask =
   | "draft_endorsement"
   | "public_form_lookup"
   | "public_program_help"
-  | "chat_file_gist";
+  | "chat_file_gist"
+  /**
+   * A vector-embedding call (the raw chat message, a stored memory, a
+   * document chunk) — served by `resolveEmbeddingProvider`, not a generative
+   * provider. Declared as a task so it carries a lane (src/lib/ai/lanes.ts)
+   * and an audit event like every other model call; it has no role.
+   */
+  | "embedding";
 
 export type DataSensitivity =
   | "configured"
@@ -199,6 +239,33 @@ export interface AIProviderRequest {
    * FERPA provider decision, which keys off `sensitivity` alone.
    */
   role?: AiRole;
+  /**
+   * Extra identity material this call site knows and the shared loader
+   * cannot get to — e.g. a roster the route has already queried, or the
+   * display name of a student a staff prompt is about.
+   *
+   * MERGED with `loadIdentityInput`'s result (src/lib/ai/identity.ts), which
+   * is what actually guarantees the vault is populated; this is additive, so
+   * a call site that passes nothing is still de-identified. Never a
+   * substitute for the loader, and never a way to opt out of it.
+   *
+   * Read only on the cloud branch for a local-only sensitivity — the local
+   * provider is never wrapped and never sees this.
+   */
+  identity?: IdentityInput;
+  /**
+   * What the caller already knows about the session, handed to the identity
+   * loader so it does not re-read the row (and, for a staff session, so it
+   * takes the roster path without a row read at all).
+   *
+   * `sessionRole` is a hint, never an authorisation input: it decides WHICH
+   * identity values are loaded, and every one of those reads is still scoped
+   * by RLS and by `buildManagedStudentWhere`. A caller passing the wrong role
+   * gets a smaller or differently-shaped vault, never data it could not
+   * otherwise read.
+   */
+  sessionRole?: string | null;
+  sessionDisplayName?: string | null;
 }
 
 export interface LocalAIAuthConfig {

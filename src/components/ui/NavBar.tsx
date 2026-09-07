@@ -257,7 +257,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           <button
             onClick={handleLogout}
             type="button"
-            className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)]"
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)]"
             aria-label="Log out"
           >
             Log out

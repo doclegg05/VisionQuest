@@ -23,11 +23,11 @@ export default function PlatformFilter({
   const chipBase =
     "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap";
   const chipActive =
-    "bg-[var(--accent-strong)] text-white shadow-sm";
+    "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-sm";
   const chipInactive =
     "border border-[var(--muted)]/30 text-[var(--ink-muted)] hover:border-[var(--ink-strong)]/50 hover:text-[var(--ink-strong)]";
   const chipGoalActive =
-    "bg-[var(--accent-strong)] text-white shadow-sm";
+    "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-sm";
 
   return (
     <div className="scrollbar-hide -mx-1 flex flex-nowrap items-center gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">

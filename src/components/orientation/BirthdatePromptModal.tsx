@@ -138,7 +138,7 @@ export default function BirthdatePromptModal({
             type="button"
             onClick={save}
             disabled={!value || saving}
-            className="rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
           </button>

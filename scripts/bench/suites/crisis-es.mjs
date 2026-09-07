@@ -11,9 +11,12 @@
  *    Every row therefore carries `reviewed: false`, including the rows copied
  *    from the unit fixtures — those were code-reviewed, which is not the same
  *    thing as a native speaker reading them.
- * 2. The same three means families missing in English are missing in Spanish
- *    (firearms, hanging, jumping), so recall here is below the design floor
- *    for the same structural reason as its English sibling.
+ * 2. (Closed 2026-09-07.) The three means families missing in English were
+ *    missing here too; B1 and B1b closed them and the residual, and recall is
+ *    now 1.0 over n=184 with the floors met. Reason 1 is the ONLY remaining
+ *    blocker: the tier flips to `gate` in the change that records the
+ *    native-speaker review (set `reviewed: true` on the rows, flip `tier`,
+ *    set the baseline with a --reason).
  *
  * Gating on a corpus nobody qualified has read would make the number look
  * authoritative before it is. Reporting it makes the gap visible while it

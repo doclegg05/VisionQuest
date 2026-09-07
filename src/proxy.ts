@@ -19,7 +19,31 @@ const SESSION_COOKIE_NAME = "vq-session";
 //   3. Per-request CSP nonce generation (replaces static unsafe-inline)
 //   4. X-API-Version response header on /api/* responses
 //   5. RLS context headers derived from the session JWT (Slice B).
+//   6. X-Robots-Tag on the two public per-student pages (crawlerHeadersFor).
 // The static CSP in next.config.ts has been removed — this proxy is the single source of truth.
+// Referrer-Policy and X-Content-Type-Options are NOT set here: next.config.ts
+// `headers()` already applies both (plus HSTS and X-Frame-Options) to `/(.*)`.
+
+/**
+ * Prefixes under which every response renders ONE student's data behind an
+ * opaque identifier with no login: the public credential page and the
+ * employer response page (plus the packet PDF it links). FERPA review W7
+ * (2026-09-06): neither carried `noindex`, and the repo has no robots.txt, so
+ * a search engine could index a TANF recipient's name against a credential.
+ * The pages also export `robots` metadata; the header is the layer that
+ * covers non-HTML responses and any renderer that forgets the metadata.
+ *
+ * `/teacher/connect` is the staff console and is not a prefix match here.
+ */
+const NOINDEX_PREFIXES = ["/credentials", "/connect"] as const;
+
+/** Pure: response headers a path earns from its prefix alone. */
+export function crawlerHeadersFor(pathname: string): Record<string, string> {
+  const noindex = NOINDEX_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix + "/"),
+  );
+  return noindex ? { "X-Robots-Tag": "noindex, nofollow" } : {};
+}
 
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -137,15 +161,48 @@ export function proxy(request: NextRequest) {
     response.headers.set("X-API-Version", "1");
   }
 
+  for (const [name, value] of Object.entries(crawlerHeadersFor(pathname))) {
+    response.headers.set(name, value);
+  }
+
   return response;
 }
+
+/**
+ * Every path the proxy runs on, exported so a test can exercise the negative
+ * lookahead directly (`config.matcher` is read by the build, not by any code
+ * a unit test can call).
+ *
+ * The pattern used to carry a fourth exclusion, `.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$`.
+ * A matcher exclusion does not skip a rule inside the proxy — it skips the
+ * proxy — so any path ending in one of those extensions got no CSRF Origin
+ * check and no `x-vq-*` stripping (2026-09-06 hunt, follow-up 3). Nothing
+ * routes there today; the day a catch-all or a dynamic segment can end in
+ * `.png`, `POST /api/anything.png` is an unauthenticated write and a
+ * client-supplied `x-vq-role: admin` reaches the handler looking exactly like
+ * one this proxy derived from a verified session JWT. An exclusion whose only
+ * purpose is to save work on assets is not worth holding open a hole in two
+ * security controls.
+ *
+ * Cost of dropping it: the seven image files in `public/` now run the proxy,
+ * which adds a CSP header and — only when a session cookie is present — one JWT
+ * verification. Nothing else changes, and this is not a guess: the other three
+ * files in `public/` are `.mp4`/`.vtt`, extensions the clause never listed, so
+ * public assets have always been served through this proxy. `_next/static` and
+ * `_next/image`, where the built and optimized assets actually live, are still
+ * excluded by name, so the hot path is untouched. No path under `public/`
+ * matches a gated prefix, so none of them can be redirected.
+ */
+export const PROXY_MATCHER = "/((?!_next/static|_next/image|favicon.ico).*)";
 
 export const config = {
   // Next.js 16 proxy (renamed from middleware) always runs on Node.js runtime —
   // no `runtime` key allowed here. `jsonwebtoken`'s Node-crypto dependency
   // works out of the box.
-  matcher: [
-    // Match all paths except static files and _next internals
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
-  ],
+  //
+  // The matcher MUST be a string literal here: Next parses `config` statically
+  // at build time and rejects an identifier ("Entry `matcher[0]` need to be
+  // static strings"). `PROXY_MATCHER` above is the SAME string exported for the
+  // tests; `proxy.test.ts` pins that the two never drift apart.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

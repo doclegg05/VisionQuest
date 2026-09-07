@@ -158,7 +158,9 @@ If you do not use the blueprint:
 | `NODE_ENV` | `production` |
 | `DATABASE_URL` | Supabase Session pooler string |
 | `DIRECT_URL` | Session pooler on Render unless direct host is reachable |
-| `JWT_SECRET` | Hex secret |
+| `JWT_SECRET` | Hex secret, at least 32 characters (the boot probe refuses shorter) |
+| `ADMIN_DATABASE_URL` | Connection string for the RLS-bypassing `postgres` role, used by `prismaAdmin` (crisis notifications, nudges, SMS webhook). **Required since 2026-09-07: a production boot without it is refused by `src/lib/boot-probes.ts`**, so a deploy fails to start rather than running with the admin client silently demoted to `vq_app`. |
+| `RLS_CONTEXT_INJECTION` | Must be the exact string `true`. **Required since 2026-09-07 (same boot probe)**: anything else runs every query with no session context, and the staff-scoping policies enforce nothing. |
 | `TEACHER_KEY` | Gate for `/teacher-register` |
 | `API_KEY_ENCRYPTION_KEY` | Base64-encoded 32-byte key |
 | `APP_BASE_URL` | Public Render URL |

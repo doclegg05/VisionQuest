@@ -31,6 +31,7 @@ const transitions: any[] = [];
 const events: any[] = [];
 const alertSyncCalls: string[] = [];
 const rlsContexts: string[] = [];
+const chatInvalidations: string[] = [];
 
 const mockApplicationUpsert = mock.fn(async (args: any) => {
   const existing = created.applications.find(
@@ -130,6 +131,42 @@ mock.module("@/lib/rls-context", {
   },
 });
 
+// The only `@/lib/cache` import anywhere in this dependency graph is
+// employer-actions' own `invalidateChatContext`, so mocking the module to these
+// two names cannot starve anything else of an export.
+mock.module("@/lib/cache", {
+  namedExports: {
+    invalidateChatContext: (studentId: string) => {
+      chatInvalidations.push(studentId);
+    },
+    invalidateAllChatContext: () => {
+      chatInvalidations.push("*");
+    },
+  },
+});
+
+// Slot construction is `buildBookableAdvisorSlots`' job and is tested where it
+// lives; here it is pinned to one open slot so the booking path can be reached
+// deterministically, with no dependence on today's weekday or clock.
+mock.module("@/lib/advising-scheduling", {
+  namedExports: {
+    buildBookableAdvisorSlots: () => [
+      {
+        advisorId: "teacher-1",
+        slots: [
+          {
+            startsAt: "2026-09-15T14:00:00.000Z",
+            endsAt: "2026-09-15T14:30:00.000Z",
+            locationType: "virtual",
+            locationLabel: null,
+            meetingUrl: "https://meet.example/abc",
+          },
+        ],
+      },
+    ],
+  },
+});
+
 mock.module("@/lib/audit", { namedExports: { logAuditEvent: async () => undefined } });
 mock.module("@/lib/notifications", { namedExports: { sendNotification: async () => undefined } });
 mock.module("@/lib/logger", {
@@ -137,11 +174,13 @@ mock.module("@/lib/logger", {
 });
 
 let recordHired: typeof import("./employer-actions").recordHired;
+let recordInterested: typeof import("./employer-actions").recordInterested;
 let OPPORTUNITY_MIRROR_MARKER: typeof import("./employer-actions").OPPORTUNITY_MIRROR_MARKER;
 
 before(async () => {
   const mod = await import("./employer-actions");
   recordHired = mod.recordHired;
+  recordInterested = mod.recordInterested;
   OPPORTUNITY_MIRROR_MARKER = mod.OPPORTUNITY_MIRROR_MARKER;
 });
 
@@ -173,6 +212,7 @@ beforeEach(() => {
   events.length = 0;
   alertSyncCalls.length = 0;
   rlsContexts.length = 0;
+  chatInvalidations.length = 0;
 });
 
 describe("recordHired — the outcome capture", () => {
@@ -321,5 +361,47 @@ describe("recordHired — the outcome capture", () => {
     );
     assert.equal(created.applications.length, 0);
     assert.equal(transitions.length, 0);
+  });
+});
+
+describe("recordInterested — the booking, and the cache it must not leave stale", () => {
+  const input = {
+    connectionId: "conn-1",
+    currentStatus: "interested" as const,
+    startsAt: "2026-09-15T14:00:00.000Z",
+    contactName: "Dana Employer",
+    contactEmail: "dana@mountainmetal.example",
+  };
+
+  it("books the interview", async () => {
+    await recordInterested(input);
+    assert.equal(created.appointments.length, 1);
+    assert.equal(created.appointments[0].studentId, "student-1");
+    assert.equal(created.appointments[0].bookingSource, "employer");
+  });
+
+  it("invalidates the student's chat context, because the Appointment write bypasses the write-through", async () => {
+    // Appointment is a WATCHED model in src/lib/chat-context-write-through.ts,
+    // and this booking writes it through `prismaAdmin`, which src/lib/db.ts
+    // deliberately does NOT extend with the write-through. Nothing invalidates
+    // for us, so without the explicit call Sage answers "you have nothing
+    // scheduled" for up to the cache TTL after an employer has booked a real
+    // interview. This case fails on the pre-fix code, where the array is empty.
+    await recordInterested(input);
+    assert.deepEqual(
+      chatInvalidations,
+      ["student-1"],
+      "the booked student's chat context must be invalidated exactly once",
+    );
+  });
+
+  it("does not invalidate when no slot matched and nothing was written", async () => {
+    // The guard is about writes. A refused booking wrote no Appointment, so
+    // blanket-invalidating there would be cache churn dressed up as safety.
+    await assert.rejects(
+      () => recordInterested({ ...input, startsAt: "2026-09-15T09:00:00.000Z" }),
+      /no longer open/i,
+    );
+    assert.deepEqual(chatInvalidations, []);
   });
 });

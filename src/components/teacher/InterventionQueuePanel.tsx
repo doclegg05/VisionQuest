@@ -411,10 +411,15 @@ function StudentRow({
   return (
     <div className="flex flex-col gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)] lg:flex-row lg:items-center">
       {/* Avatar placeholder */}
-      <Link href={`/teacher/students/${student.studentId}`} className="shrink-0">
+      <Link
+        href={`/teacher/students/${student.studentId}`}
+        className="shrink-0"
+        aria-label={`Open ${student.name}'s student profile`}
+      >
         <UserCircle
           size={32}
           weight="light"
+          aria-hidden="true"
           className="text-[var(--ink-muted)]"
         />
       </Link>
@@ -488,14 +493,14 @@ function StudentRow({
               e.preventDefault();
               onPrimaryAction(student);
             }}
-            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90"
+            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
           >
             {student.recommendedAction.label}
           </button>
         ) : (
           <Link
             href={student.recommendedAction.href}
-            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90"
+            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
           >
             {student.recommendedAction.label}
           </Link>

@@ -91,7 +91,7 @@ test.describe("Benchmark data: authenticated axe scan (report only, no assertion
           const detailPath = `/teacher/students/${seeded.studentId}`;
           const detailRouteShape = "/teacher/students/:id";
           await page.goto(detailPath);
-          await page.getByRole("button", { name: "Coach" }).waitFor({ timeout: 20_000 }).catch(() => {});
+          await page.getByRole("tab", { name: "Coach" }).waitFor({ timeout: 20_000 }).catch(() => {});
           await page.waitForTimeout(500);
           const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
           routeResults.push({

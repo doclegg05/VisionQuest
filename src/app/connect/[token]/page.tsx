@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   EmployerResponseActions,
   type EmployerSlot,
@@ -29,6 +30,12 @@ export const dynamic = "force-dynamic";
 // One candidate's packet behind a capability URL — never cached by a proxy or
 // a shared browser, and never indexed.
 export const revalidate = 0;
+// "Never indexed" made explicit (FERPA review W7, 2026-09-06): page-level
+// robots metadata here, and an `X-Robots-Tag` header from src/proxy.ts on
+// every `/connect/*` response, the packet PDF included.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 function formatSlot(startsAt: string): string {
   return new Date(startsAt).toLocaleString("en-US", {

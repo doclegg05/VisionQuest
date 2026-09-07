@@ -46,9 +46,12 @@ describe("embeddings facade", () => {
     });
 
     assert.equal(mockResolveEmbeddingProvider.mock.callCount(), 1);
+    // A known student with no declared sensitivity is a student_record call:
+    // the facade never lets an undeclared student embedding look like system data.
     assert.deepEqual(mockResolveEmbeddingProvider.mock.calls[0].arguments[0], {
       studentId: "student-1",
       callSite: "sage_test",
+      sensitivity: "student_record",
     });
 
     assert.equal(mockEmbed.mock.callCount(), 1);
@@ -59,11 +62,21 @@ describe("embeddings facade", () => {
     assert.equal(opts.studentId, "student-1");
   });
 
-  it("embedTexts defaults studentId to null when usage is omitted", async () => {
+  it("embedTexts defaults studentId to null and sensitivity to system when usage is omitted", async () => {
     await embedTexts(["alpha"], { taskType: "RETRIEVAL_DOCUMENT" });
 
     assert.equal(mockResolveEmbeddingProvider.mock.calls[0].arguments[0].studentId, null);
+    assert.equal(mockResolveEmbeddingProvider.mock.calls[0].arguments[0].sensitivity, "system");
     assert.equal(mockEmbed.mock.calls[0].arguments[1].studentId, null);
+  });
+
+  it("embedTexts passes an explicit sensitivity through unchanged", async () => {
+    await embedTexts(["alpha"], {
+      taskType: "RETRIEVAL_DOCUMENT",
+      usage: { studentId: null, callSite: "sage_form_search_query", sensitivity: "student_record" },
+    });
+
+    assert.equal(mockResolveEmbeddingProvider.mock.calls[0].arguments[0].sensitivity, "student_record");
   });
 
   it("embedQuery uses RETRIEVAL_QUERY task type and returns a single vector", async () => {
@@ -76,10 +89,13 @@ describe("embeddings facade", () => {
     assert.equal(vec[5], 1);
   });
 
-  it("embedQuery defaults callSite to sage_embedding_query", async () => {
+  it("embedQuery defaults callSite to sage_embedding_query and sensitivity to student_record", async () => {
+    // A retrieval query is someone's message, never system data.
     await embedQuery("hello");
 
-    assert.equal(mockResolveEmbeddingProvider.mock.calls[0].arguments[0].callSite, "sage_embedding_query");
+    const opts = mockResolveEmbeddingProvider.mock.calls[0].arguments[0];
+    assert.equal(opts.callSite, "sage_embedding_query");
+    assert.equal(opts.sensitivity, "student_record");
   });
 });
 

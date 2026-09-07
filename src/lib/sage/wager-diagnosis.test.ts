@@ -3,6 +3,7 @@ import { before, describe, it, mock } from "node:test";
 
 const insightWrites: unknown[] = [];
 const verdictUpdates: unknown[] = [];
+const aiAuditEvents: Record<string, unknown>[] = [];
 const generateCalls: {
   system: string;
   messages: { role: string; content: string }[];
@@ -61,6 +62,20 @@ before(async () => {
     },
   });
 
+  // Recorded so the attribution can be asserted, and so no test here reaches
+  // a real AuditLog write.
+  mock.module("@/lib/ai/audit", {
+    namedExports: {
+      logAiAuditEvent: async (event: Record<string, unknown>) => {
+        aiAuditEvents.push(event);
+      },
+      getProviderClass: (name?: string | null) =>
+        name === "ollama" ? "local" : name === "gemini" ? "cloud" : name ? "unknown" : "none",
+      policyDecisionForProvider: (name?: string | null) =>
+        name === "ollama" ? "local_only" : "configured_provider",
+    },
+  });
+
   mock.module("@/lib/ai/provider", {
     namedExports: {
       resolveAiProvider: async () => ({
@@ -84,6 +99,21 @@ describe("diagnoseWager", () => {
     await diagnoseWager("w1");
     assert.equal(insightWrites.length, 1, "expected one SageInsight write");
     assert.equal(verdictUpdates.length, 1, "expected one WagerVerdict update");
+  });
+
+  it("writes routed then completed AI audit events as a system actor", async () => {
+    aiAuditEvents.length = 0;
+    await diagnoseWager("w1");
+    assert.deepEqual(aiAuditEvents.map((event) => event.status), ["routed", "completed"]);
+    for (const event of aiAuditEvents) {
+      assert.equal(event.task, "sage_post_response");
+      assert.equal(event.sensitivity, "student_record");
+      assert.equal(event.actorId, null);
+      assert.equal(event.actorRole, "system");
+      assert.equal(event.targetId, "s1");
+      assert.equal(event.providerName, "gemini");
+      assert.equal(event.allowCloud, true);
+    }
   });
 
   it("does nothing when SAGE_WAGER_DIAGNOSIS_ENABLED is not set", async () => {

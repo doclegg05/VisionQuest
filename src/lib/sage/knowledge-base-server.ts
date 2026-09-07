@@ -279,13 +279,14 @@ export async function getDocumentContext(
   callerRole: CallerRole = "student",
   maxResults: number = 3,
   tokenBudgetChars: number = TOKEN_BUDGET_CHARS,
+  subject?: { studentId?: string | null },
 ): Promise<string> {
   if (!isSageRagEnabled()) return "";
 
   const messageLower = userMessage.toLowerCase();
 
   if (getSageRagMode() === "hybrid") {
-    const hybridDocs = await hybridSearchDocuments(userMessage, callerRole, maxResults);
+    const hybridDocs = await hybridSearchDocuments(userMessage, callerRole, maxResults, subject);
     if (hybridDocs !== null) {
       const snippets = await loadSageSnippets();
 

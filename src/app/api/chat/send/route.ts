@@ -28,6 +28,7 @@ import { isStaffRole } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody, chatSendSchema } from "@/lib/schemas";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
+import { transcriptWindowFor } from "@/lib/chat/transcript-window";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
 import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
@@ -381,6 +382,19 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       studentId: session.id,
       task: chatTask,
       sensitivity: chatSensitivity,
+      // Handed to the de-identification vault's identity loader
+      // (src/lib/ai/identity.ts) so it does not re-read the session row. For a
+      // staff turn this is what routes it to the managed roster instead of the
+      // student branch, so the other students a staff prompt may name are
+      // tokenized too.
+      //
+      // The roster ITSELF is not passed: `buildStaffStudentContext` runs
+      // further down this handler, after provider resolution, so the route has
+      // nothing loaded yet. Both paths read the same capped query
+      // (`listManagedRosterNames` / MANAGED_ROSTER_CAP), so the vault can
+      // never know fewer names than the prompt may mention.
+      sessionRole: session.role,
+      sessionDisplayName: session.displayName,
     });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
@@ -700,13 +714,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Parallelize conversation history loading with RAG/form/memory loads.
   // Previously this happened sequentially after context assembly (line 719),
   // adding ~100-200ms to first-token latency. Now it runs in parallel.
-  const maxRecentMessages =
-    promptTier === "compact"
-      ? conversationStage === "discovery" ||
-        conversationStage === "career_profile_review"
-        ? 12
-        : 6
-      : 20;
+  // Transcript window by provider CLASS, not tier: the cloud number is a
+  // disclosure decision (FERPA review W9) and lives in transcript-window.ts.
+  const maxRecentMessages = transcriptWindowFor({
+    providerClass,
+    stage: conversationStage,
+  });
   const conversationContextPromise = getConversationContext(
     conversation.id,
     maxRecentMessages,
@@ -727,6 +740,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         isStaffChat ? "staff" : "student",
         3,
         promptTier === "compact" ? 2000 : 6000,
+        // Attribution for the query embedding's LlmCallLog row and audit event
+        // (FERPA review W5). Staff chat has no student subject here.
+        { studentId: isStaffChat ? null : session.id },
       ),
       Promise.resolve(getFormContext(userMessage)),
       memoryEnabled

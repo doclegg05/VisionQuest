@@ -381,68 +381,57 @@ describe("GET /api/auth/google/callback", () => {
     auditEvent("auth.google_login");
   });
 
-  it("creates a new student bound to the Google sub when nothing matches by sub or email", async () => {
+  // --- (f) no self-provisioning -------------------------------------------
+  //
+  // 2026-09-06 hunt, follow-up (2). `createStudentFromGoogle` made a Student
+  // row for ANY address Google had verified, with `role: "student"`. There is
+  // no invite, no domain allowlist and no staff step in front of it, so the
+  // day GOOGLE_CLIENT_ID is set in production, anyone on the internet with a
+  // Google account can mint themselves an account inside a FERPA-covered
+  // portal. Enrolment is the program's decision, not Google's.
+
+  it("refuses a verified Google address with no matching account: no row is created", async () => {
     seedLookup({});
 
     const res = await route.GET(callbackRequest() as never);
 
-    assert.equal(mockCreate.mock.callCount(), 1);
-    const [createArgs] = mockCreate.mock.calls[0].arguments as [{ data: Record<string, unknown> }];
-    assert.equal(createArgs.data.googleId, GOOGLE_SUB);
-    assert.equal(createArgs.data.authProvider, "google");
-    assert.equal(createArgs.data.role, "student");
-    assert.equal(createArgs.data.email, "teacher@example.com");
-    assert.equal(mockUpdate.mock.callCount(), 0);
-
-    assert.equal(redirectTarget(res), "/chat");
-    assert.equal(cookieSets.length, 1);
-    assert.equal(cookieSets[0].studentId, "stu-new");
+    assert.equal(mockCreate.mock.callCount(), 0, "an unknown Google identity must never create a Student");
+    assert.equal(mockUpdate.mock.callCount(), 0, "and must not write to any existing row either");
+    assert.equal(cookieSets.length, 0, "no session for an account that does not exist");
+    assert.equal(mfaCookieSets.length, 0);
+    assert.equal(res.status, 307);
+    assert.equal(redirectTarget(res), "/?error=oauth_failed");
   });
 
-  it("signs in the row a concurrent callback created when create hits the googleId or email unique index", async () => {
-    const raced = student({ id: "stu-raced", role: "student", authProvider: "google", passwordHash: null, googleId: GOOGLE_SUB });
-    let subLookups = 0;
-    mockFindUnique.mock.mockImplementation(async ({ where }: { where: Record<string, unknown> }) => {
-      if (where.googleId !== undefined) {
-        subLookups += 1;
-        // First lookup misses; by the second, the racing insert has landed.
-        return subLookups === 1 ? null : raced;
-      }
-      return null;
-    });
-    mockCreate.mock.mockImplementation(async () => {
-      throw Object.assign(new Error("Unique constraint failed"), { code: "P2002", meta: { target: ["googleId"] } });
-    });
+  it("audits and logs the refusal without carrying the Google identity", async () => {
+    seedLookup({});
 
-    const res = await route.GET(callbackRequest() as never);
+    await route.GET(callbackRequest() as never);
 
-    assert.equal(mockCreate.mock.callCount(), 1, "a googleId or email collision must not be retried as a studentId collision");
-    assert.equal(redirectTarget(res), "/chat");
-    assert.deepEqual(cookieSets, [{ studentId: "stu-raced", role: "student", sessionVersion: 3 }]);
-    assert.equal(mockLoggerError.mock.callCount(), 0, "the race is not an error");
-    auditEvent("auth.google_login");
-  });
+    const event = auditEvent("auth.google_login_refused_unknown_account");
+    assert.equal(event.actorId ?? null, null, "there is no actor — nobody signed in");
+    assert.equal(event.targetId ?? null, null, "and no target row exists to name");
+    assertNoGoogleIdentityIn(event, "unknown-account audit event");
 
-  it("retries with a suffixed studentId only when the studentId unique index is the one violated", async () => {
-    let attempts = 0;
-    mockCreate.mock.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
-      attempts += 1;
-      if (attempts === 1) {
-        throw Object.assign(new Error("Unique constraint failed"), { code: "P2002", meta: { target: ["studentId"] } });
-      }
-      return student({ id: "stu-new", role: "student", authProvider: "google", passwordHash: null, ...data });
-    });
-
-    const res = await route.GET(callbackRequest() as never);
-
-    assert.equal(mockCreate.mock.callCount(), 2);
-    const [first, second] = mockCreate.mock.calls.map(
-      (c: { arguments: [{ data: { studentId: string } }] }) => c.arguments[0].data.studentId,
+    const warnCall = mockLoggerWarn.mock.calls.find(
+      (c: { arguments: [string] }) => /no visionquest account/i.test(c.arguments[0]),
     );
-    assert.equal(first, "teacher");
-    assert.match(second, /^teacher\d{4}$/);
-    assert.equal(redirectTarget(res), "/chat");
-    assert.equal(cookieSets.length, 1);
+    assert.ok(warnCall, `expected a warn line for the refusal; saw ${JSON.stringify(mockLoggerWarn.mock.calls.map((c: { arguments: [string] }) => c.arguments[0]))}`);
+    assertNoGoogleIdentityIn(warnCall.arguments, "unknown-account log line");
+  });
+
+  it("refuses identically whichever way the unknown identity arrives", async () => {
+    // A brand-new sub with a brand-new address, and a brand-new sub with an
+    // address that merely looks plausible, are the same non-answer.
+    seedLookup({});
+    const first = await route.GET(callbackRequest() as never);
+
+    mockCreate.mock.resetCalls();
+    tokenPayload = verifiedPayload({ sub: OTHER_GOOGLE_SUB, email: "someone.else@example.org" });
+    const second = await route.GET(callbackRequest() as never);
+
+    assert.equal(redirectTarget(first), redirectTarget(second));
+    assert.equal(mockCreate.mock.callCount(), 0);
   });
 
   it("still refuses a deactivated account before any cookie is set", async () => {
@@ -450,7 +439,7 @@ describe("GET /api/auth/google/callback", () => {
 
     const res = await route.GET(callbackRequest() as never);
 
-    assert.equal(redirectTarget(res), "/?error=account_deactivated");
+    assert.equal(redirectTarget(res), "/?error=oauth_failed");
     assert.equal(cookieSets.length, 0);
     assert.equal(mfaCookieSets.length, 0, "a deactivated account gets no MFA challenge either");
   });
@@ -460,7 +449,7 @@ describe("GET /api/auth/google/callback", () => {
 
     const res = await route.GET(callbackRequest() as never);
 
-    assert.equal(redirectTarget(res), "/?error=account_deactivated");
+    assert.equal(redirectTarget(res), "/?error=oauth_failed");
     assert.equal(mockUpdate.mock.callCount(), 0);
     assert.equal(mockCreate.mock.callCount(), 0);
     assert.equal(cookieSets.length + mfaCookieSets.length, 0);

@@ -41,7 +41,7 @@ export function SegmentError({
       <div className="flex gap-3">
         <button
           onClick={reset}
-          className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-[var(--on-accent)] transition-opacity hover:opacity-90"
         >
           Try again
         </button>

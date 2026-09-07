@@ -1,3 +1,27 @@
+/**
+ * The certType every Certification row was hardcoded to before D7
+ * (2026-09-07, src/app/api/certifications/route.ts) — still the default
+ * when the create path is given no catalog certId.
+ */
+export const READY_TO_WORK_CERT_TYPE = "ready-to-work";
+
+/**
+ * The Ready-to-Work credential family: the legacy default certType plus
+ * every catalog id (src/lib/spokes/certifications.ts) that goal links use
+ * to reference the same underlying "Ready to Work" certification, so a
+ * Certification row created under ANY of these ids is still found by a
+ * reader looking for "the student's Ready-to-Work certification."
+ *
+ * "workkeys-ncrc" (ACT WorkKeys NCRC) is the only catalog entry that has
+ * denoted this certificate track — see the soft-match fallback comment in
+ * src/lib/goal-evidence.ts, which this constant now backs, for the legacy
+ * (pre-D7) rows it still needs to cover.
+ */
+export const READY_TO_WORK_FAMILY_CERT_TYPES: readonly string[] = [
+  READY_TO_WORK_CERT_TYPE,
+  "workkeys-ncrc",
+];
+
 export interface CertificationTemplateRule {
   id: string;
   required: boolean;

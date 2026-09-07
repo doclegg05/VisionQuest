@@ -32,7 +32,7 @@ Read when deciding what to build, cut, simplify, or automate.
 | Benchmark suite (numeric quality, safety, performance floors) — **PROPOSED** | [docs/superpowers/specs/2026-09-05-benchmark-suite-design.md](./docs/superpowers/specs/2026-09-05-benchmark-suite-design.md) |
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
 | Developer setup & scripts | [README.md](./README.md) |
-| SPOKES content reference | [content/_INDEX.md](./content/_INDEX.md) |
+| SPOKES content reference | [catalog/index.md](./catalog/index.md) |
 | Recursive self-improving loop (Ouroboros) — **DRAFT** | [docs/plans/self-improving-loop-architecture.md](./docs/plans/self-improving-loop-architecture.md) |
 | Org-knowledge catalog (OKF) + the two agent memory systems | [docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md](./docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md) |
 | `<gate>-pipeline` command contracts (CI-enforced) | [docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md](./docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md) |

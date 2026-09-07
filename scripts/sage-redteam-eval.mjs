@@ -43,7 +43,7 @@
 
 import { readFileSync } from "node:fs";
 import { loadEnvFile, parseArgs } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
+import { resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 import { isRefusalOrRedirect, normalizeForMatch } from "./lib/sage-eval-text.mjs";
 
 loadEnvFile();
@@ -282,7 +282,4 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main().catch(reportEvalFailure);

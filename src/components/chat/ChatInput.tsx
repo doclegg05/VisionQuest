@@ -329,7 +329,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
               className={[
                 "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors",
                 canSend && !disabled
-                  ? "bg-[var(--accent-strong)] text-white shadow-[0_8px_18px_rgba(42,138,60,0.28)] hover:opacity-95"
+                  ? "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-[0_8px_18px_rgba(42,138,60,0.28)] hover:opacity-95"
                   : "cursor-not-allowed bg-[var(--surface-interactive)] text-[var(--ink-muted)] shadow-none",
               ].join(" ")}
             >

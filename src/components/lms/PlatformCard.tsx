@@ -48,7 +48,7 @@ export default function PlatformCard({
         {/* Goal match badge */}
         {goalMatch && (
           <div className="mb-3">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[var(--accent-strong)] text-white">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[var(--accent-strong)] text-[var(--on-accent)]">
               Matches your goals
             </span>
           </div>
@@ -86,7 +86,7 @@ export default function PlatformCard({
         {/* Actions */}
         <div className="mt-4 flex items-center gap-3">
           {platform.loginUrl ? (
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white shadow-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] shadow-sm">
               Open Platform &rarr;
             </span>
           ) : (

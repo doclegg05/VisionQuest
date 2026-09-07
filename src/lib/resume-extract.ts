@@ -92,14 +92,20 @@ export interface ResumeExtractResult {
   notes: string;
 }
 
+/**
+ * FERPA review §2.c.3 (2026-09-06). The raw résumé text IS the payload — it
+ * carries the student's name, phone, email and address by nature, and
+ * stripping them would strip the body the parser exists to read. So this task
+ * is lane `batch`: the `resume_extract` audit events carry `lane: "batch"`,
+ * and Ticket 1A's policy switch decides whether a cloud provider may run it
+ * (under `lanes` it refuses). What this call site no longer does is prefix
+ * the display name — the parser never needed it.
+ */
 export async function extractResumeFromText(
   provider: AIProvider,
   rawText: string,
-  studentName: string,
 ): Promise<ResumeExtractResult> {
   const userMessage = [
-    `Student name: ${studentName}`,
-    "",
     "Raw resume text extracted from uploaded document:",
     "---",
     rawText.slice(0, 15000),

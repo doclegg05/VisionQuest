@@ -275,7 +275,7 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
         <button
           type="button"
           onClick={() => void loadData()}
-          className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] hover:opacity-90"
         >
           Try Again
         </button>

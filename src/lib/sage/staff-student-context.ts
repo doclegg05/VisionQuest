@@ -1,6 +1,7 @@
 import "server-only";
 
 import { buildManagedStudentWhere, assertStaffCanManageStudent } from "@/lib/classroom";
+import { MANAGED_ROSTER_CAP } from "@/lib/ai/identity";
 import { prisma } from "@/lib/db";
 import { type Session } from "@/lib/api-error";
 import { parseState } from "@/lib/progression/engine";
@@ -11,7 +12,14 @@ import { normalizeProgramType } from "@/lib/program-type";
 export interface StaffStudentCandidate {
   id: string;
   displayName: string;
+  /**
+   * The login username. Used to MATCH what the instructor typed (they may
+   * refer to a student by it) and never rendered back into the prompt — it
+   * is an identifier (FERPA review W7, 2026-09-06). See `describeCandidate`.
+   */
   studentId: string;
+  /** Account creation; the disambiguator the ambiguous-name branch renders. */
+  createdAt?: Date | null;
 }
 
 interface StudentMentionResolution {
@@ -189,6 +197,25 @@ function formatDate(value: Date | null | undefined): string {
   return value ? value.toISOString().slice(0, 10) : "not recorded";
 }
 
+function formatMonthYear(value: Date): string {
+  return value.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+/**
+ * How a candidate is named in the ambiguous-name prompt. Before W7 this was
+ * `displayName (studentId)`, which put up to eight login usernames into one
+ * cloud prompt. The instructor still needs SOME way to tell two "Karissa"s
+ * apart, and the roster query already carries `createdAt`, so the
+ * disambiguator is the enrollment month — a fact about the record, not a
+ * credential. The instructor is asked to reply with the full name or the
+ * username; the username is matched on the way IN and never echoed.
+ */
+function describeCandidate(candidate: StaffStudentCandidate): string {
+  return candidate.createdAt
+    ? `${candidate.displayName} (enrolled ${formatMonthYear(candidate.createdAt)})`
+    : candidate.displayName;
+}
+
 function truncate(value: string | null | undefined, maxLength = 260): string {
   if (!value) return "";
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -215,7 +242,6 @@ async function buildVerifiedStudentRecordContext(studentId: string): Promise<str
       where: { id: studentId },
       select: {
         id: true,
-        studentId: true,
         displayName: true,
         isActive: true,
         createdAt: true,
@@ -455,7 +481,9 @@ async function buildVerifiedStudentRecordContext(studentId: string): Promise<str
 
   const lines = [
     "VERIFIED VISIONQUEST STUDENT RECORD CONTEXT",
-    `Student: ${student.displayName} (${student.studentId}); account ${student.isActive ? "active" : "inactive"}; enrolled record created ${formatDate(student.createdAt)}.`,
+    // Display name only. The login username is an identifier (W7) and is
+    // not fetched here, let alone rendered.
+    `Student: ${student.displayName}; account ${student.isActive ? "active" : "inactive"}; enrolled record created ${formatDate(student.createdAt)}.`,
     `Class/program: ${activeEnrollment ? `${activeEnrollment.class.name} (${activeEnrollment.class.code}); enrollment ${activeEnrollment.status}; program ${programType}` : `No class enrollment recorded; program ${programType}`}.`,
     `Readiness: ${readinessData.readiness.score}/100. Breakdown: ${formatReadinessBreakdown(readinessData.readiness.breakdown)}.`,
     `Progression: level ${progression.level}; ${progression.xp} XP; current streak ${progression.currentStreak}; longest streak ${progression.longestStreak}; completed goal levels: ${progression.completedGoalLevels.join(", ") || "none recorded"}.`,
@@ -503,9 +531,15 @@ export async function buildStaffStudentContext(
 
   const candidates = await prisma.student.findMany({
     where: buildManagedStudentWhere(session, { includeInactiveAccounts: false }),
-    select: { id: true, displayName: true, studentId: true },
+    // studentId is matching input only (see describeCandidate); createdAt is
+    // the disambiguator the ambiguous branch renders instead of it.
+    select: { id: true, displayName: true, studentId: true, createdAt: true },
     orderBy: { displayName: "asc" },
-    take: 500,
+    // Shared with the de-identification vault's roster loader
+    // (`listManagedRosterNames`, src/lib/ai/identity.ts): the set of names the
+    // vault can tokenize must never be smaller than the set this branch may
+    // put in the prompt, so both read the same cap.
+    take: MANAGED_ROSTER_CAP,
   });
 
   const resolution = resolveStudentMention(
@@ -526,7 +560,7 @@ export async function buildStaffStudentContext(
   if (resolution.status === "ambiguous") {
     const matches = (resolution.matches ?? [])
       .slice(0, 8)
-      .map((student) => `${student.displayName} (${student.studentId})`)
+      .map(describeCandidate)
       .join(", ");
     return {
       context: `STUDENT RECORD LOOKUP: Multiple managed students matched the instructor's message: ${matches}. Ask the instructor to clarify by full name or student username before giving a student-specific progress report.`,

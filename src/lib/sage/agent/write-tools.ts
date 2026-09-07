@@ -16,6 +16,7 @@
 
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { describeSaveError } from "@/lib/job-board/save-error";
 import { redactContactInfo } from "@/lib/log-redaction";
 import {
   sageWorkProfileInputSchema,
@@ -434,7 +435,12 @@ const saveJob: AgentTool = {
       where: { id: jobListingId, classConfig: { classId: enrollment.classId } },
       select: { id: true, title: true, company: true },
     });
-    if (!listing) return { status: "error", summary: "That job listing was not found." };
+    // S4: same code POST /api/jobs/save uses for the same ambiguity (the id
+    // may be a JobBrowseListing row, or a different class's board) — a
+    // student asking Sage to save a job gets the same plain-language
+    // explanation the Career tab's Save button now gives, instead of a
+    // bare "not found" that doesn't say what to do about it.
+    if (!listing) return { status: "error", summary: describeSaveError("not_your_class_board") };
 
     return executeAndLedger("save_job", { jobListingId }, ctx, async () => {
       await prisma.studentSavedJob.upsert({

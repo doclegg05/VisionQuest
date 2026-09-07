@@ -131,7 +131,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                         href={event.virtualUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+                        className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                       >
                         Open link
                       </a>
@@ -141,7 +141,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                         type="button"
                         onClick={() => void toggleRegistration(event.id, isRegistered)}
                         disabled={busyId === event.id}
-                        className={`rounded-full px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
+                        className={`min-h-11 rounded-full px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
                           isRegistered
                             ? "border border-[var(--border)] text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
                             : "primary-button"

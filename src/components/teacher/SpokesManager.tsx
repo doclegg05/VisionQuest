@@ -514,7 +514,7 @@ export default function SpokesManager() {
                 type="button"
                 onClick={() => void createReferral()}
                 disabled={creatingReferral}
-                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
               >
                 {creatingReferral ? "Saving..." : "Add Referral"}
               </button>
@@ -719,7 +719,7 @@ export default function SpokesManager() {
                 <button
                   type="button"
                   onClick={() => void saveChecklistTemplate()}
-                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110"
                 >
                   {editingChecklistId ? "Save Changes" : "Add Item"}
                 </button>
@@ -853,7 +853,7 @@ export default function SpokesManager() {
                 <button
                   type="button"
                   onClick={() => void saveModuleTemplate()}
-                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110"
                 >
                   {editingModuleId ? "Save Changes" : "Add Module"}
                 </button>

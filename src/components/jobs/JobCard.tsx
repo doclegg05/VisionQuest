@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } from "@phosphor-icons/react";
+import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut, X } from "@phosphor-icons/react";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
@@ -11,6 +11,7 @@ import {
   isWorkForceWvPosting,
 } from "@/lib/job-board/wv-employer";
 import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
+import { describeSaveError, SaveJobError } from "@/lib/job-board/save-error";
 
 export interface JobTrackingUpdate {
   status?: SavedJobStatus;
@@ -67,6 +68,51 @@ const TRACKING_STATUSES: Array<{ value: SavedJobStatus; label: string }> = [
   { value: "offered", label: "Offered" },
   { value: "withdrawn", label: "Withdrawn" },
 ];
+
+/**
+ * VQ-R-016: the pure decision behind the Save/Update error banner, exported
+ * so the mapping from "what onSave did" to "what the student sees" is
+ * testable without a DOM (see JobCard.save-error.test.ts). Returns the
+ * plain-language message to show, or null when there is nothing to show.
+ */
+export async function runSaveAndDescribeError(
+  onSave: JobCardProps["onSave"],
+  id: string,
+  update: JobTrackingUpdate,
+): Promise<string | null> {
+  if (!onSave) return null;
+  try {
+    await onSave(id, update);
+    return null;
+  } catch (err) {
+    // Only a SaveJobError's message is student-facing copy we authored
+    // ourselves (see save-error.ts); anything else (a network failure, a
+    // thrown non-Error) falls back to the generic message rather than
+    // leaking a raw error string onto the page.
+    return err instanceof SaveJobError ? err.message : describeSaveError();
+  }
+}
+
+/**
+ * UX review WARNING (2026-09-07): the save-error message had no dismiss
+ * control. Icon-only 44px button (p-2.5 padding around a 24px X) clears the
+ * error; the message itself reads at text-sm rather than text-xs.
+ */
+export function SaveErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div role="alert" className="flex items-start justify-between gap-2">
+      <p className="text-sm leading-5 text-[var(--error)]">{message}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss error"
+        className="min-h-11 min-w-11 shrink-0 rounded-lg p-2.5 text-[var(--error)] transition-colors hover:bg-[var(--surface-elevated)]"
+      >
+        <X size={24} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
 
 const WORK_MODE_STYLES: Record<JobWorkMode, string> = {
   onsite: "bg-emerald-500/15 text-emerald-700",
@@ -128,6 +174,7 @@ export function JobCard({
   const [draftStatus, setDraftStatus] = useState<SavedJobStatus>(savedStatus ?? "saved");
   const [draftNotes, setDraftNotes] = useState(savedNotes ?? "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Adjust-during-render: keep the drafts in sync with the saved* props
   // without an effect (React's documented pattern for resetting state when
@@ -144,11 +191,10 @@ export function JobCard({
   async function persistTracking(update: JobTrackingUpdate) {
     if (!onSave) return;
     setSaving(true);
-    try {
-      await onSave(id, update);
-    } finally {
-      setSaving(false);
-    }
+    setSaveError(null);
+    const message = await runSaveAndDescribeError(onSave, id, update);
+    setSaveError(message);
+    setSaving(false);
   }
 
   return (
@@ -249,12 +295,14 @@ export function JobCard({
       {/* Actions */}
       {!compact && (
         <div className="mt-3 space-y-3">
+          {saveError && <SaveErrorBanner message={saveError} onDismiss={() => setSaveError(null)} />}
           {savedStatus ? (
             <div className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
               <select
                 value={draftStatus}
                 onChange={(event) => setDraftStatus(event.target.value as SavedJobStatus)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                aria-label="Application status"
+                className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
               >
                 {TRACKING_STATUSES.map((status) => (
                   <option key={status.value} value={status.value}>
@@ -274,7 +322,7 @@ export function JobCard({
                 type="button"
                 onClick={() => void persistTracking({ status: draftStatus, notes: draftNotes })}
                 disabled={saving}
-                className="rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:self-start"
+                className="min-h-11 rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:self-start"
               >
                 {saving ? "Saving..." : "Update"}
               </button>

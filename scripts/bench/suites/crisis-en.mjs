@@ -1,23 +1,19 @@
 /**
  * crisis-en — English crisis-detector precision and recall.
  *
- * TIER IS `watch`, NOT `gate`, AND THAT IS A MEASURED FINDING, NOT A DEFAULT.
+ * TIER IS `gate` SINCE 2026-09-07 (branch claude/project-todo-review-jf4ery).
  * ---------------------------------------------------------------------------
  * The design (docs/superpowers/specs/2026-09-05-benchmark-suite-design.md §4.1)
- * proposes this suite as a gate at recall >= 0.98. The detector as shipped
- * cannot meet that, because three means families named in .claude/MEMORY.md as
- * "the largest remaining coverage gap" have NO patterns at all in either
- * language: firearms, hanging, and jumping. The corpus includes them anyway —
- * measuring honestly is the point of a benchmark — so the headline recall sits
- * below the floor and the suite reports instead of failing. Per-family recall
- * is in `details.recallByFamily` so the dashboard shows exactly which families
- * are at zero rather than one averaged number that hides them.
- *
- * The floors stay in config/benchmarks/crisis-en.json at their design values.
- * They are the target, and lowering them to make today's number pass is
- * exactly what the frozen-grader rule (PR #137) forbids. The tier flips to
- * `gate` in the PR that adds those pattern families and shows the floor being
- * met — not before, and never by relaxing the number.
+ * proposes this suite as a gate at recall >= 0.98. It shipped at `watch`
+ * because three means families named in .claude/MEMORY.md as "the largest
+ * remaining coverage gap" — firearms, hanging, jumping — had no patterns in
+ * either language, and the honest number was 0.71. Two changes closed it:
+ * the means families (B1, recall 0.95) and then the passive-ideation,
+ * explicit-intent, pills-preparation, burning and abuse residual (B1b,
+ * recall 1.0 over n=295 with the floors UNMOVED at 0.98 / 0.02 / 0.0). The
+ * tier flipped in the PR that showed the floor met, never by relaxing it —
+ * the frozen-grader rule (PR #137). Per-family recall stays in
+ * `details.recallByFamily` so a future regression names its family.
  *
  * MEASURED at the commit that introduced this suite:
  *   recall_must_detect       0.7087 over n=206   (floor 0.98)

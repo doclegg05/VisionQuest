@@ -364,7 +364,7 @@ export default function ClassOverview({
             <button
               onClick={() => setViewMode("table")}
               className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
-                viewMode === "table" ? "bg-[var(--accent-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
+                viewMode === "table" ? "bg-[var(--accent-strong)] text-[var(--on-accent)]" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >
               Table
@@ -372,7 +372,7 @@ export default function ClassOverview({
             <button
               onClick={() => setViewMode("cards")}
               className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
-                viewMode === "cards" ? "bg-[var(--accent-strong)] text-white" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
+                viewMode === "cards" ? "bg-[var(--accent-strong)] text-[var(--on-accent)]" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >
               Cards

@@ -4079,6 +4079,565 @@
       "bucket": "hard_negative",
       "source": "pinned-test",
       "reviewed": false
+    },
+    {
+      "text": "me voy a volar los sesos",
+      "label": "detect",
+      "family": "means_firearm",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false,
+      "category": "self_harm"
+    },
+    {
+      "text": "quiero volarme la cabeza",
+      "label": "detect",
+      "family": "means_firearm",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false,
+      "category": "self_harm"
+    },
+    {
+      "text": "me puse la pistola en la boca anoche",
+      "label": "detect",
+      "family": "means_firearm",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false,
+      "category": "self_harm"
+    },
+    {
+      "text": "me amarre una soga al cuello anoche",
+      "label": "detect",
+      "family": "means_hanging",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false,
+      "category": "self_harm"
+    },
+    {
+      "text": "quiero tirarme al tren",
+      "label": "detect",
+      "family": "means_jumping",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false,
+      "category": "self_harm"
+    },
+    {
+      "text": "me voy a tirar a las vias",
+      "label": "detect",
+      "family": "means_jumping",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false,
+      "category": "self_harm"
+    },
+    {
+      "text": "me voy a estrellar con el carro a proposito",
+      "label": "detect",
+      "family": "means_jumping",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false,
+      "category": "self_harm"
+    },
+    {
+      "text": "la clase de arma es el sabado",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "le compre una pistola de agua a mi hijo",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "necesito una pistola de silicon para el proyecto",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "le compre una pistola de agua para mi hijo",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "se disparo el precio de la gasolina otra vez",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "dispararon la alarma en la escuela",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "se me disparo la presion con el estres",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "fallo el tiro libre al final del partido",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "practicamos tiro al blanco en el rancho",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "lo termine todo de un tiro",
+      "label": "silent",
+      "family": "arma_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "compramos soga en la ferreteria para el remolque",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "voy a colgar la ropa antes de que llueva",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "colgue el cuadro en la pared de la cocina",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "te cuelgo ahora, me estan hablando",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me ahorcan los plazos de la escuela",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me ahorcan las cuentas cada mes",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "el trabajo me ahorcaba todos los dias",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "con las cuentas tengo la soga al cuello",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me puse la soga al cuello con ese contrato",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "se me cuelga la computadora todo el tiempo",
+      "label": "silent",
+      "family": "soga_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "el fin de semana puente vamos a salir",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "vamos a hacer puente el viernes",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me tiro a la piscina cuando hace calor",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me tiro a la cama apenas llego del turno",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me tire al agua sin pensarlo",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero tirarme un clavado en el rio",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "ya quiero tirar la toalla con esta clase",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me voy a lanzar a buscar trabajo esta semana",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me lance a estudiar de nuevo el año pasado",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero aventarme a pedir el aumento",
+      "label": "silent",
+      "family": "puente_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "todo sería mejor sin mí",
+      "label": "detect",
+      "family": "passive_ideation",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "ojalá no despierte mañana",
+      "label": "detect",
+      "family": "passive_ideation",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero desaparecer para siempre",
+      "label": "detect",
+      "family": "passive_ideation",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "prefiero estar muerto de una vez",
+      "label": "detect",
+      "family": "passive_ideation",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "ya deje una nota de despedida",
+      "label": "detect",
+      "family": "explicit_intent",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "junté las medicinas para tomármelas todas",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "conte mis pastillas anoche para ver si son suficientes",
+      "label": "detect",
+      "family": "means_pills",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me queme a proposito otra vez",
+      "label": "detect",
+      "family": "selfharm_cutting",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me golpean en casa y nadie sabe",
+      "label": "detect",
+      "family": "abuse",
+      "bucket": "must_detect",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "no puedo llegar sin mi carro",
+      "label": "silent",
+      "family": "ausencia_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "estarian mejor sin mi ayuda en ese proyecto",
+      "label": "silent",
+      "family": "ausencia_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero desaparecer un rato y descansar",
+      "label": "silent",
+      "family": "ausencia_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "hay que hacer desaparecer el error del sistema",
+      "label": "silent",
+      "family": "ausencia_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "el equipo trabajaría mejor sin mi turno de noche",
+      "label": "silent",
+      "family": "ausencia_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "no le veo sentido a esta tarea",
+      "label": "silent",
+      "family": "sentido_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "no le veo sentido a este formulario tan largo",
+      "label": "silent",
+      "family": "sentido_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "no le encuentro sentido a esta actividad del curso",
+      "label": "silent",
+      "family": "sentido_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero irme de la clase temprano hoy",
+      "label": "silent",
+      "family": "irse_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero irme a casa ya",
+      "label": "silent",
+      "family": "irse_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me quiero ir del trabajo antes de las cinco",
+      "label": "silent",
+      "family": "irse_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero acabar con todo el trabajo hoy",
+      "label": "silent",
+      "family": "acabar_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero terminar con toda la tarea esta noche",
+      "label": "silent",
+      "family": "acabar_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "quiero terminar con esto del papeleo de una vez",
+      "label": "silent",
+      "family": "acabar_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "necesito acabar con todo este desorden de la casa",
+      "label": "silent",
+      "family": "acabar_benigno",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "ya escribí mi carta de renuncia",
+      "label": "silent",
+      "family": "carta_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "dejé una nota de agradecimiento para mi maestra",
+      "label": "silent",
+      "family": "carta_benigna",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me quemé cocinando anoche",
+      "label": "silent",
+      "family": "quemadura_accidente",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me queme con la plancha otra vez",
+      "label": "silent",
+      "family": "quemadura_accidente",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "guardo mis pastillas para el viaje",
+      "label": "silent",
+      "family": "medication_adherence",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "conté mis pastillas para el pastillero de la semana",
+      "label": "silent",
+      "family": "medication_adherence",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me lastimé la espalda en la casa moviendo muebles",
+      "label": "silent",
+      "family": "lesion_accidente",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
+    },
+    {
+      "text": "me lastime la mano en el trabajo",
+      "label": "silent",
+      "family": "lesion_accidente",
+      "bucket": "hard_negative",
+      "source": "authored",
+      "reviewed": false
     }
   ]
 }

@@ -655,7 +655,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             aria-label={showSidebar ? "Hide conversations" : "Show conversations"}
             aria-controls="sage-conversations"
             aria-expanded={showSidebar}
-            className="rounded-xl border border-[var(--chat-panel-border)] px-2.5 py-2 text-[var(--ink-muted)] hover:bg-[var(--chat-sidebar-hover)] hover:text-[var(--ink-strong)] md:hidden"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[var(--chat-panel-border)] text-[var(--ink-muted)] hover:bg-[var(--chat-sidebar-hover)] hover:text-[var(--ink-strong)] md:hidden"
           >
             <List aria-hidden="true" size={20} weight="bold" />
           </button>

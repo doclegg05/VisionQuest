@@ -28,7 +28,7 @@ export default function AskSageLink({
     <Link
       href={`/chat?prompt=${encodeURIComponent(prompt)}`}
       prefetch={false}
-      className={`inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap font-semibold transition ${variantStyles[variant]} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap font-semibold transition ${variantStyles[variant]} ${className}`}
     >
       <ChatCircle size={17} weight="bold" />
       {label}

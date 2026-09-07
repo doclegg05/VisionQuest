@@ -363,5 +363,26 @@
       "analyze_job_match"
     ],
     "note": "explain_job requires a jobListingId, so the case supplies saved-job context to draw one from — the same shape as career-tailor-application-cna. analyze_job_match is the near neighbour: it also reads one real posting, but answers 'does this fit me' rather than 'what does this actually say'."
+  },
+  {
+    "id": "connect-propose-specific-lead",
+    "watch": true,
+    "message": "I really want that cashier job at ValleyMart — can you ask my teacher to connect me with them?",
+    "context": "STUDENT'S CLASS JOB LEADS:\n- jobLeadId lead-valleymart-cashier: Cashier at ValleyMart (Beckley, WV)",
+    "expectedTool": "propose_connection",
+    "acceptableTools": [
+      "search_jobs"
+    ],
+    "note": "Match & Connect Task 4.3 (design spec §6 step 1). propose_connection is requiredRoles: [\"student\"] — the student's own 'I want that one', not a staff tool; the instructor only ever reviews and sends after the student approves the resulting confirm card. Modelled on jobs-search-fit/job-match-cna: context supplies the jobLeadId the tool requires, since without one the model can only guess or search first, which acceptableTools allows."
+  },
+  {
+    "id": "connect-propose-without-lead",
+    "watch": true,
+    "message": "Can you connect me with an employer? I want a job.",
+    "expectedTool": "search_jobs",
+    "forbiddenTools": [
+      "propose_connection"
+    ],
+    "note": "propose_connection requires a jobLeadId (job-search-tools.ts / connect-tools.ts) and nothing here names a specific opening, so Sage must search first rather than invent or guess one to call it with. Modelled on jobs-search-fit."
   }
 ]

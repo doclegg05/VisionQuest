@@ -1877,3 +1877,112 @@ describe("POST /api/chat/send — 988 resources on the form-lookup exits (F60, R
     assert.doesNotMatch(onBody, /988/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// AC3 — de-identification through the real route.
+//
+// Every other suite here mocks `resolveAiProvider` and hands back a plain
+// double. These cases hand back the REAL decorator wrapped around that double,
+// which is what the resolver now returns for a cloud student_record call. The
+// point is the round trip through the actual streaming code path: the model
+// only ever sees tokens, and the student only ever sees their name.
+// ---------------------------------------------------------------------------
+describe("POST /api/chat/send — de-identification round trip (AC3)", () => {
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+  });
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  /** Chunks split mid-token, the way a real cloud stream splits them. */
+  const SPLIT_CHUNKS = ["Hey [STU", "DENT_FIRST_NA", "ME], nice work. Mail [STUDENT_EM", "AIL] when you can."];
+
+  async function withWrappedProvider(chunks: string[], prompt = "Coaching Test Student.") {
+    const { TokenVault } = await import("@/lib/ai/deidentify");
+    const { withDeidentification } = await import("@/lib/ai/with-deidentification");
+    const vault = TokenVault.fromIdentity({
+      studentName: "Test Student",
+      studentEmail: "test.student@example.org",
+    });
+    const inner = makeFakeProvider("gemini", chunks);
+    const seen: string[] = [];
+    const recording = {
+      ...inner,
+      async *streamResponse(systemPrompt: string, messages: unknown) {
+        seen.push(systemPrompt);
+        yield* inner.streamResponse(systemPrompt, messages as never);
+      },
+    };
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      withDeidentification(recording as never, vault),
+    );
+    mockBuildSystemPrompt.mock.mockImplementation(() => prompt);
+    return { seen };
+  }
+
+  it("streams the student's real name to the client from a token split across chunks", async () => {
+    await withWrappedProvider(SPLIT_CHUNKS);
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "hi, it's Test Student" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    const streamed = [...body.matchAll(/"text":"((?:[^"\\]|\\.)*)"/g)]
+      .map((m) => JSON.parse(`"${m[1]}"`))
+      .join("");
+    assert.equal(streamed, "Hey Test, nice work. Mail test.student@example.org when you can.");
+    assert.doesNotMatch(streamed, /STUDENT_FIRST_NAME|STUDENT_EMAIL/);
+  });
+
+  it("saves an assistant message identical to what the client was streamed", async () => {
+    await withWrappedProvider(SPLIT_CHUNKS);
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "hi, it's Test Student" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    const streamed = [...body.matchAll(/"text":"((?:[^"\\]|\\.)*)"/g)]
+      .map((m) => JSON.parse(`"${m[1]}"`))
+      .join("");
+    const assistantCall = mockSaveMessage.mock.calls.find((call) => call.arguments[2] === "assistant");
+    assert.ok(assistantCall, "expected an assistant saveMessage call");
+    assert.equal(String(assistantCall!.arguments[3]), streamed);
+  });
+
+  it("hands the model tokens, never the student's name or email", async () => {
+    const { seen } = await withWrappedProvider(SPLIT_CHUNKS);
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "I'm Test Student, mail me at test.student@example.org" },
+    });
+    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0], "Coaching [STUDENT_NAME].");
+    assert.doesNotMatch(seen[0], /Test Student/);
+  });
+
+  it("passes the session role and display name to the resolver so the vault can be built", async () => {
+    await withWrappedProvider(["ok"]);
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "hi, it's Test Student" },
+    });
+    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const request = mockResolveAiProvider.mock.calls[0].arguments[0] as {
+      sessionRole?: string;
+      sessionDisplayName?: string;
+    };
+    assert.equal(request.sessionRole, session.role);
+    assert.equal(request.sessionDisplayName, session.displayName);
+  });
+});

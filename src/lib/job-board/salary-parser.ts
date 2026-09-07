@@ -44,11 +44,20 @@ export const MAX_PLAUSIBLE_HOURLY = 200;
 const PERIOD_PATTERNS: ReadonlyArray<readonly [PayPeriod, RegExp]> = [
   ["biweekly", /\bbi[\s-]?weekly\b|\bevery two weeks\b|\bfortnight/],
   ["hourly", /\bhourly\b|(?:\/|\bper\s+|\ban?\s+)(?:hour|hr)s?\b/],
-  ["daily", /\bdaily\b|(?:\/|\bper\s+|\ba\s+)days?\b/],
+  ["daily", /\bdaily\b|\bper diem\b|(?:\/|\bper\s+|\ba\s+)days?\b/],
   ["weekly", /\bweekly\b|(?:\/|\bper\s+|\ba\s+)(?:week|wk)s?\b/],
   ["monthly", /\bmonthly\b|(?:\/|\bper\s+|\ba\s+)(?:month|mo)s?\b/],
   ["yearly", /\byearly\b|\bannual(?:ly)?\b|(?:\/|\bper\s+|\ba\s+)(?:year|yr|annum)s?\b/],
 ];
+
+/**
+ * A school year (~9-10 months of instructional hours) has no fixed hours
+ * convention the way a calendar year does — treating it as an ordinary
+ * annual figure (PERIOD_HOURS.yearly's 2080 hours) invents a rate rather
+ * than reading one. Checked before the bare-amount magnitude fallback so a
+ * figure with no other period marker doesn't silently fall through to it.
+ */
+const SCHOOL_YEAR_PATTERN = /\bschool\s+year\b/;
 
 /** Unit words a stated period may legitimately use. */
 const KNOWN_UNIT_WORDS = new Set([
@@ -90,11 +99,31 @@ export function hourlyFromAmount(
   return hourly;
 }
 
-function detectPeriod(text: string): PayPeriod | null {
+/**
+ * Resolves the pay period by proximity to the given amount index rather
+ * than pattern-array priority: a posting stating both an annual figure and
+ * a parenthetical hourly equivalent ("$85,000 a year (about $41 per
+ * hour)") must pick the marker next to the amount actually being parsed,
+ * not whichever period pattern happens to be checked first. Ties (a
+ * pattern whose own match spans a higher-priority one, e.g. "weekly"
+ * matching inside "bi-weekly") keep PERIOD_PATTERNS' order since a
+ * strictly-smaller distance is required to replace the current best.
+ */
+function detectPeriod(text: string, amountIndex: number): PayPeriod | null {
+  let best: { period: PayPeriod; distance: number } | null = null;
   for (const [period, pattern] of PERIOD_PATTERNS) {
-    if (pattern.test(text)) return period;
+    const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+    const globalPattern = new RegExp(pattern.source, flags);
+    let nearest: number | null = null;
+    for (const match of text.matchAll(globalPattern)) {
+      const distance = Math.abs((match.index ?? 0) - amountIndex);
+      if (nearest === null || distance < nearest) nearest = distance;
+    }
+    if (nearest !== null && (best === null || nearest < best.distance)) {
+      best = { period, distance: nearest };
+    }
   }
-  return null;
+  return best?.period ?? null;
 }
 
 export function parseSalaryToHourly(raw: string | null | undefined): number | null {
@@ -103,15 +132,20 @@ export function parseSalaryToHourly(raw: string | null | undefined): number | nu
   const text = raw.toLowerCase().replace(/,/g, "").replace(/\s+/g, " ").trim();
 
   const amounts = [...text.matchAll(/\$?(\d+(?:\.\d+)?)/g)]
-    .map((match) => parseFloat(match[1]))
-    .filter((value) => Number.isFinite(value) && value > 0);
+    .map((match) => ({ value: parseFloat(match[1]), index: match.index ?? 0 }))
+    .filter((amount) => Number.isFinite(amount.value) && amount.value > 0);
   if (amounts.length === 0) return null;
 
   // The floor of a range is the conservative figure to filter and score on.
-  const amount = amounts[0];
+  const amount = amounts[0].value;
 
-  const period = detectPeriod(text);
+  const period = detectPeriod(text, amounts[0].index);
   if (period) return hourlyFromAmount(amount, period);
+
+  // A school-year figure has no stated period pattern to match but must
+  // not fall through to the bare-amount magnitude heuristic below, which
+  // would misread it as a full calendar year.
+  if (SCHOOL_YEAR_PATTERN.test(text)) return null;
 
   // A unit was stated but is not a pay period ("per point", "/visit"). That is
   // an unknown, not an hourly rate.

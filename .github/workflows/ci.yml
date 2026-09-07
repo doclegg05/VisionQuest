@@ -181,6 +181,19 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           RATE_LIMIT_DB_TEST_ENABLED: "true"
 
+      - name: Run JobListing class-scoped uniqueness integration test
+        # VQ-R-018: the constraint that stops one class's scrape from
+        # silently overwriting another class's row (see migration
+        # 20260907160000) is a Postgres CONSTRAINT behavior, so it only
+        # reproduces against a real database — same reasoning, and the same
+        # hermetic Postgres migrated for the RLS step above, as the
+        # rate-limiter step directly above this one.
+        run: npm run test:joblisting
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          JOB_LISTING_UNIQUE_TEST_ENABLED: "true"
+
       # --- Gate-tier benchmarks ------------------------------------------
       # Numbers, not pass/fail: each suite writes reports/benchmarks/latest/
       # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric
@@ -232,6 +245,14 @@ jobs:
         run: npm run test:smoke
         env:
           SMOKE_SERVER_SCRIPT: start
+          # Boot probes (src/lib/boot-probes.ts) stop a production-mode boot
+          # when ADMIN_DATABASE_URL is unset, and `start` is production mode.
+          # Presence is all the config probe checks (the privilege probe is
+          # advisory), so a fake URL like DATABASE_URL's is enough. Step-scoped
+          # on purpose: at job level it reached the rate-limiter and RLS
+          # integration steps, whose prismaAdmin must fall back to the real
+          # container URL those steps set.
+          ADMIN_DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
 
   # --- Browser-level workflow gate: Playwright E2E + a11y ------------------
   # Runs the journey-critical specs against a REAL built server and a
@@ -241,14 +262,12 @@ jobs:
   #     .spec.ts: both hard-read DATABASE_URL from .env.local (absent in CI)
   #     and expect `npm run db:seed` data — dev-DB-coupled; porting them to
   #     the env-first helper in e2e/helpers/db.ts is a follow-up.
-  #   - e2e/a11y-authenticated.spec.ts runs in the SOAK step below instead:
-  #     authenticated pages do not meet the zero-violation bar yet (known
-  #     findings: color-contrast on /learning, /teacher, and student detail;
-  #     link-name + nested-interactive on /teacher; select-name on student
-  #     detail). The step fails honestly on every run — the red baseline for
-  #     the page-fixing phase — but does not block the job. Promote it into
-  #     the gating step once the pages are fixed. House rule: violations are
-  #     fixed in the page, never by filtering axe rules.
+  #   - e2e/a11y-authenticated.spec.ts moved INTO the gating step below
+  #     (D4, 2026-09-07): the `axe-authenticated` benchmark (gate tier,
+  #     config/benchmarks/axe-authenticated.json) measures 0 violations —
+  #     the standalone continue-on-error soak step it used to run in was
+  #     redundant with a gate that already reads 0. House rule stands:
+  #     violations are fixed in the page, never by filtering axe rules.
   e2e:
     runs-on: ubuntu-latest
     services:
@@ -272,6 +291,13 @@ jobs:
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
       BASE_URL: "http://localhost:3000"
+      # The standalone server is production mode, and the boot probes
+      # (src/lib/boot-probes.ts) refuse to start it without these two — the
+      # same two Render must carry. The hermetic Postgres is a superuser, so
+      # the admin URL is simply the same connection; RLS context injection on
+      # is production parity (the verify job already runs the RLS suite with it).
+      RLS_CONTEXT_INJECTION: "true"
+      ADMIN_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_e2e"
       # playwright.config.ts webServer honors this: boot the built standalone
       # server (scripts/start-production.mjs), matching the smoke-test boot
       # path, instead of `next dev`.
@@ -353,6 +379,17 @@ jobs:
           e2e/teacher-loop.spec.ts
           e2e/theme-variant.spec.ts
           --reporter=line --timeout=120000
+
+      # Gating, in its own Playwright invocation with the seed re-run first:
+      # the seed clears the login rate-limit buckets, and the per-IP budget
+      # (10 logins / 15 min) is already spent by the specs above once their
+      # retries are counted — the first gated run of this spec 429'd on
+      # e2e-a11y-teacher for exactly that reason (2026-09-07). Same pattern
+      # as the benchmark collectors below.
+      - name: E2E gate — authenticated a11y (own login budget)
+        run: |
+          npx tsx scripts/seed-e2e-users.ts >/dev/null
+          npx playwright test e2e/a11y-authenticated.spec.ts --workers=1 --reporter=line --timeout=180000
 
       # --- Browser-collected benchmarks -----------------------------------
       - name: Collect browser benchmark data (non-blocking)
@@ -475,10 +512,3 @@ jobs:
           name: benchmark-results-e2e
           path: reports/benchmarks/latest/
           if-no-files-found: ignore
-
-      - name: Authenticated a11y scans (soak — red baseline, non-blocking)
-        # Zero-violation bar per route; fails today by design (see the job
-        # comment). continue-on-error keeps CI green while making the full
-        # violation inventory visible on every run.
-        continue-on-error: true
-        run: npx playwright test e2e/a11y-authenticated.spec.ts --reporter=line --timeout=180000

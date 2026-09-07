@@ -224,7 +224,7 @@ export default function LibraryBrowser() {
             onClick={() => setCategory(null)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               category === null
-                ? "bg-[var(--accent-strong)] text-white"
+                ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
             }`}
             aria-pressed={category === null}
@@ -238,7 +238,7 @@ export default function LibraryBrowser() {
               onClick={() => setCategory(cat)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 category === cat
-                  ? "bg-[var(--accent-strong)] text-white"
+                  ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                   : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
               aria-pressed={category === cat}
@@ -439,7 +439,7 @@ function PreviewModal({ doc, onClose }: { doc: Document; onClose: () => void }) 
                 </p>
                 <a
                   href={`/api/documents/download?id=${doc.id}&mode=download`}
-                  className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                  className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] hover:opacity-90"
                 >
                   <Download weight="bold" className="size-4" /> Download {mimeToLabel(doc.mimeType)}
                 </a>

@@ -35,7 +35,6 @@ mock.module("@/lib/chat/api-key", {
 });
 
 let resolveAiProvider: Awaited<typeof import("../provider")>["resolveAiProvider"];
-let getProvider: Awaited<typeof import("../provider")>["getProvider"];
 let OllamaProvider: Awaited<typeof import("../ollama-provider")>["OllamaProvider"];
 let GeminiProvider: Awaited<typeof import("../gemini-provider")>["GeminiProvider"];
 
@@ -44,7 +43,6 @@ before(async () => {
   const ollamaMod = await import("../ollama-provider");
   const geminiMod = await import("../gemini-provider");
   resolveAiProvider = providerMod.resolveAiProvider;
-  getProvider = providerMod.getProvider;
   OllamaProvider = ollamaMod.OllamaProvider;
   GeminiProvider = geminiMod.GeminiProvider;
 });
@@ -211,12 +209,12 @@ describe("per-role local model selection", () => {
     }
   });
 
-  it("passes the role through getProvider for non-sensitive local calls", async () => {
+  it("passes an explicit role through resolveAiProvider for non-sensitive local calls", async () => {
     mockGetPlain.mock.mockImplementation(
       localConfig({ ai_provider_model_document: "gemma4:12b" }),
     );
 
-    const provider = await withoutRoleEnv(() => getProvider("student-123", "document"));
+    const provider = await withoutRoleEnv(() => resolveAiProvider({ studentId: "student-123", task: "legacy", sensitivity: "configured", role: "document" }));
     assert.equal(modelOf(provider), "gemma4:12b");
   });
 });

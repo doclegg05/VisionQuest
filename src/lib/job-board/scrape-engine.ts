@@ -268,7 +268,19 @@ export async function runScrapeForConfig(
       const clusters = matchJobToClusters(job);
 
       await prisma.jobListing.upsert({
-        where: { sourceId: job.sourceId },
+        // VQ-R-018: was `{ sourceId: job.sourceId }` alone — a bare,
+        // program-wide key whose loose match let one class's scrape
+        // overwrite another class's row in place with its own content
+        // (see the migration header for the corrected mechanism). Scoped
+        // to match the (classConfigId, source, sourceId) compound unique —
+        // a true mirror of JobBrowseListing's own (source, sourceId) key.
+        where: {
+          classConfigId_source_sourceId: {
+            classConfigId: configId,
+            source: job.source,
+            sourceId: job.sourceId,
+          },
+        },
         create: {
           title: job.title,
           company: job.company,

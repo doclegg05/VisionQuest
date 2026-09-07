@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { CaretDown } from "@phosphor-icons/react";
+
 const CLUSTER_OPTIONS = [
   { value: "", label: "All Clusters" },
   { value: "office-admin", label: "Office & Admin" },
@@ -40,6 +43,8 @@ const JOB_TYPE_OPTIONS = [
 
 const CONTROL_CLASSES =
   "min-h-11 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm";
+
+const VISIBLE_LABEL_CLASSES = "text-sm font-medium text-[var(--text-secondary)]";
 
 export type JobProximityFilter = "local" | "remote" | "all";
 
@@ -95,6 +100,17 @@ export function JobFilters({
     return local + remote;
   };
 
+  // UX finding #4 (2026-09-07 fluidity memo): 9 controls in one flex-wrap
+  // row, every select labeled sr-only-only, wrapped into 4-5 look-alike
+  // rows at 375px. Proximity + search stay always visible; the four
+  // secondary filters collapse behind this disclosure. Seeded open when a
+  // secondary filter already has a value (UX review WARNING) so an applied
+  // filter is never hidden from the student who set it on first paint.
+  const [filtersOpen, setFiltersOpen] = useState(
+    () => [postedWithinDays, minPay, jobType, cluster].some(Boolean),
+  );
+  const activeSecondaryCount = [postedWithinDays, minPay, jobType, cluster].filter(Boolean).length;
+
   return (
     <div className="flex flex-wrap items-center gap-3">
       <div
@@ -112,7 +128,7 @@ export function JobFilters({
               role="tab"
               aria-selected={isSelected}
               onClick={() => onProximityChange(tab.value)}
-              className={`flex min-w-20 items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
+              className={`flex min-h-11 min-w-20 items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
                 isSelected
                   ? "bg-[var(--primary)] text-white"
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -147,85 +163,116 @@ export function JobFilters({
         className={`${CONTROL_CLASSES} w-full sm:w-auto sm:min-w-44`}
       />
 
-      <label className="sr-only" htmlFor="job-posted">
-        Filter jobs by date posted
-      </label>
-      <select
-        id="job-posted"
-        value={postedWithinDays}
-        onChange={(e) => onPostedChange(e.target.value)}
-        className={CONTROL_CLASSES}
-      >
-        {POSTED_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      <div className="flex flex-col gap-1">
+        <label className={VISIBLE_LABEL_CLASSES} htmlFor="job-sort">
+          Sort by
+        </label>
+        <select
+          id="job-sort"
+          value={sort}
+          onChange={(e) => onSortChange(e.target.value)}
+          className={CONTROL_CLASSES}
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <label className="sr-only" htmlFor="job-pay">
-        Filter jobs by minimum pay
-      </label>
-      <select
-        id="job-pay"
-        value={minPay}
-        onChange={(e) => onMinPayChange(e.target.value)}
-        className={CONTROL_CLASSES}
+      <button
+        type="button"
+        aria-expanded={filtersOpen}
+        aria-controls="job-filters-panel"
+        onClick={() => setFiltersOpen((current) => !current)}
+        className="flex min-h-11 items-center gap-1.5 self-end rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:text-[var(--primary)]"
       >
-        {MIN_PAY_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        Filters{activeSecondaryCount > 0 ? ` (${activeSecondaryCount})` : ""}
+        <CaretDown
+          size={14}
+          aria-hidden="true"
+          className={`transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+        />
+      </button>
 
-      <label className="sr-only" htmlFor="job-type">
-        Filter jobs by job type
-      </label>
-      <select
-        id="job-type"
-        value={jobType}
-        onChange={(e) => onJobTypeChange(e.target.value)}
-        className={CONTROL_CLASSES}
+      <div
+        id="job-filters-panel"
+        hidden={!filtersOpen}
+        className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4"
       >
-        {JOB_TYPE_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        <div className="flex flex-col gap-1">
+          <label className={VISIBLE_LABEL_CLASSES} htmlFor="job-posted">
+            Posted
+          </label>
+          <select
+            id="job-posted"
+            value={postedWithinDays}
+            onChange={(e) => onPostedChange(e.target.value)}
+            className={CONTROL_CLASSES}
+          >
+            {POSTED_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <label className="sr-only" htmlFor="job-cluster">
-        Filter jobs by career cluster
-      </label>
-      <select
-        id="job-cluster"
-        value={cluster}
-        onChange={(e) => onClusterChange(e.target.value)}
-        className={CONTROL_CLASSES}
-      >
-        {CLUSTER_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        <div className="flex flex-col gap-1">
+          <label className={VISIBLE_LABEL_CLASSES} htmlFor="job-pay">
+            Pay
+          </label>
+          <select
+            id="job-pay"
+            value={minPay}
+            onChange={(e) => onMinPayChange(e.target.value)}
+            className={CONTROL_CLASSES}
+          >
+            {MIN_PAY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <label className="sr-only" htmlFor="job-sort">
-        Sort jobs
-      </label>
-      <select
-        id="job-sort"
-        value={sort}
-        onChange={(e) => onSortChange(e.target.value)}
-        className={CONTROL_CLASSES}
-      >
-        {SORT_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        <div className="flex flex-col gap-1">
+          <label className={VISIBLE_LABEL_CLASSES} htmlFor="job-type">
+            Job type
+          </label>
+          <select
+            id="job-type"
+            value={jobType}
+            onChange={(e) => onJobTypeChange(e.target.value)}
+            className={CONTROL_CLASSES}
+          >
+            {JOB_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className={VISIBLE_LABEL_CLASSES} htmlFor="job-cluster">
+            Career area
+          </label>
+          <select
+            id="job-cluster"
+            value={cluster}
+            onChange={(e) => onClusterChange(e.target.value)}
+            className={CONTROL_CLASSES}
+          >
+            {CLUSTER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
     </div>
   );
 }

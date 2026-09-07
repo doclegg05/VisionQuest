@@ -1,4 +1,15 @@
 {
+  "axe-authenticated": {
+    "violations_total": {
+      "value": 0,
+      "commit": "4acc6f9",
+      "measuredAt": "2026-09-07T02:34:44.941Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.6 GB · v22.22.2",
+      "reason": "Ticket D3: named fixes for all 7 authenticated axe violations — light-theme contrast tokens (--ink-faint 0.25->0.55 alpha, --badge-warning-text/--urgency-high-text/--toast-celebration-text #8a6d05->#7a5f04, --program-ietp-text #c2410c->#a53509, each measured against WCAG 4.5:1) for the color-contrast nodes on /learning, /teacher, /teacher/students/:id; aria-label on JobCard's status select and OperationsTab's note-category select for select-name; aria-label on InterventionQueuePanel's icon-only avatar Link for link-name; and a structural fix in InterventionQueue.tsx (StudentAccordion) removing a <button> nested inside a <button> plus a <Link> nested inside a <button> for nested-interactive. Declared at 0 from the source fixes; not yet re-measured by the browser collector in this container — CI is the real measurement per the ticket."
+    }
+  },
   "connection-walks": {
     "illegal_accepted": {
       "value": 0,
@@ -17,6 +28,35 @@
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
       "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+    }
+  },
+  "crisis-en": {
+    "recall_must_detect": {
+      "value": 1,
+      "commit": "e2a5e01c",
+      "measuredAt": "2026-09-07T02:03:04.825Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "B1b closed the 14 residual English misses (passive ideation, explicit intent, pills preparation, burning, abuse); recall 0.9498 -> 1.0 with fp_rate_hard_negatives 0.0055 -> 0.005 over 34 new guard rows, so crisis-en flips watch -> gate with its floors unmoved. Deterministic in-process suite, measured on the build container."
+    },
+    "fp_rate_hard_negatives": {
+      "value": 0.005,
+      "commit": "e2a5e01c",
+      "measuredAt": "2026-09-07T02:03:04.825Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "B1b closed the 14 residual English misses (passive ideation, explicit intent, pills preparation, burning, abuse); recall 0.9498 -> 1.0 with fp_rate_hard_negatives 0.0055 -> 0.005 over 34 new guard rows, so crisis-en flips watch -> gate with its floors unmoved. Deterministic in-process suite, measured on the build container."
+    },
+    "fp_rate_neutral": {
+      "value": 0,
+      "commit": "e2a5e01c",
+      "measuredAt": "2026-09-07T02:03:04.825Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "B1b closed the 14 residual English misses (passive ideation, explicit intent, pills preparation, burning, abuse); recall 0.9498 -> 1.0 with fp_rate_hard_negatives 0.0055 -> 0.005 over 34 new guard rows, so crisis-en flips watch -> gate with its floors unmoved. Deterministic in-process suite, measured on the build container."
     }
   },
   "explain-faithfulness-check": {
@@ -269,33 +309,44 @@
       "reason": "initial: deterministic in-process suites, measured on the build container at 220e541; timing and DB/browser suites deferred to the first nightly CI run"
     }
   },
-  "orientation-readiness": {
-    "consumer_disagreements": {
-      "value": 116,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:58:54.009Z",
+  "offboarding-completeness": {
+    "student_linked_models_not_exported": {
+      "value": 0,
+      "commit": "7097c66",
+      "measuredAt": "2026-09-07T01:41:15.861Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "Ticket D5: export covers all 42 student-linked models (37 exported + 5 exempted); tier gate, floor 0"
+    }
+  },
+  "orientation-readiness": {
+    "consumer_disagreements": {
+      "value": 0,
+      "commit": "3d4f2724",
+      "measuredAt": "2026-09-07T02:08:24.191Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
+      "reason": "Ticket D1 (2026-09-07, owner-approved): live rows win everywhere — progressionStateReadiness and rosterReadiness are now thin wrappers around reconciledReadiness, and the roster/class-progress panel read live certification/portfolio/resume/shared-page facts via the new batched fetchReadinessDataForStudents loader instead of trusting stored Progression.state alone. consumer_disagreements moves from 116 (info, floor null) to 0 (gate, floor 0)."
     },
     "denominator_is_all_items": {
       "value": 1,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:58:54.009Z",
+      "commit": "3d4f2724",
+      "measuredAt": "2026-09-07T02:08:24.191Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "Ticket D1 (2026-09-07, owner-approved): live rows win everywhere — progressionStateReadiness and rosterReadiness are now thin wrappers around reconciledReadiness, and the roster/class-progress panel read live certification/portfolio/resume/shared-page facts via the new batched fetchReadinessDataForStudents loader instead of trusting stored Progression.state alone. consumer_disagreements moves from 116 (info, floor null) to 0 (gate, floor 0)."
     },
     "score_decreases_on_completion": {
       "value": 0,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:58:54.009Z",
+      "commit": "3d4f2724",
+      "measuredAt": "2026-09-07T02:08:24.191Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "Ticket D1 (2026-09-07, owner-approved): live rows win everywhere — progressionStateReadiness and rosterReadiness are now thin wrappers around reconciledReadiness, and the roster/class-progress panel read live certification/portfolio/resume/shared-page facts via the new batched fetchReadinessDataForStudents loader instead of trusting stored Progression.state alone. consumer_disagreements moves from 116 (info, floor null) to 0 (gate, floor 0)."
     }
   },
   "pii-log-grep": {
@@ -407,13 +458,13 @@
   },
   "rls-coverage": {
     "coverage_ratio": {
-      "value": 0.1956521739130435,
-      "commit": "a006429",
-      "measuredAt": "2026-09-05T18:58:54.091Z",
+      "value": 1,
+      "commit": "e32b65fd",
+      "measuredAt": "2026-09-07T03:38:58.747Z",
       "provider": null,
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
-      "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+      "reason": "D6: RLS suite extended from 19 to 93 of 93 policy-bearing tables (one positive + one negative case each, written against the installed pg_policies); floor raised from 0.15 to 1.00 so a new policy-bearing table with no case reds the gate"
     }
   },
   "scheduled-layer-drift": {
@@ -463,6 +514,17 @@
       "model": null,
       "host": "linux x64 · 4 cpu · 15.7 GB · v22.22.2",
       "reason": "initial: deterministic in-process suites, measured on the build container at a006429; timing and DB/browser suites deferred to the first nightly CI run"
+    }
+  },
+  "touch-targets": {
+    "undersized_targets": {
+      "value": 0,
+      "commit": "4acc6f9",
+      "measuredAt": "2026-09-07T02:34:44.941Z",
+      "provider": null,
+      "model": null,
+      "host": "linux x64 · 4 cpu · 15.6 GB · v22.22.2",
+      "reason": "Ticket D3: every element in the 51-row touch-targets violation list (config/benchmarks/fixtures/touch-targets.json-adjacent measurement, CI run 34072983383) has a named source-level fix — min-h-11/min-w-11 on shared shell controls (NotificationBell, NavBar log-out, ChatWindow sidebar toggle), job filter tabs, JobCard select/button, StudentAdvisingHub booking select/select/input, OrientationWelcomeVideo link, StudentPathwayPlan link, the universal AskSageLink min-h-10->min-h-11, OpportunitiesHub/EventsHub controls, and an sr-only+peer custom-control pattern for the 6 settings checkboxes/radios (the collector measures the raw <input>, which a wrapping label alone cannot fix). Declared at 0 from the source fixes; not yet re-measured by the browser collector in this container (no Playwright/BENCH_BASE_URL here) — CI is the real measurement per the ticket, and the orchestrator routes any residual back."
     }
   }
 }

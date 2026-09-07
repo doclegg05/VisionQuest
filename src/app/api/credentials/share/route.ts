@@ -3,6 +3,7 @@ import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
 import { parseBody, shareCredentialSchema } from "@/lib/schemas";
+import { READY_TO_WORK_FAMILY_CERT_TYPES } from "@/lib/certifications";
 
 function slugify(value: string) {
   return value
@@ -32,12 +33,14 @@ export const GET = withAuth(async (session, req: Request) => {
     prisma.publicCredentialPage.findUnique({
       where: { studentId: session.id },
     }),
-    prisma.certification.findUnique({
+    // D7 (2026-09-07): the Ready-to-Work FAMILY, not an exact
+    // "ready-to-work" match — a Certification row created under a catalog
+    // certId (e.g. "workkeys-ncrc") is still the student's Ready-to-Work
+    // credential.
+    prisma.certification.findFirst({
       where: {
-        studentId_certType: {
-          studentId: session.id,
-          certType: "ready-to-work",
-        },
+        studentId: session.id,
+        certType: { in: [...READY_TO_WORK_FAMILY_CERT_TYPES] },
       },
       select: {
         id: true,
@@ -60,12 +63,11 @@ export const GET = withAuth(async (session, req: Request) => {
 export const POST = withAuth(async (session, req: Request) => {
   const { isPublic, headline, summary } = await parseBody(req, shareCredentialSchema);
 
-  const certification = await prisma.certification.findUnique({
+  // D7 (2026-09-07): same family lookup as GET, above.
+  const certification = await prisma.certification.findFirst({
     where: {
-      studentId_certType: {
-        studentId: session.id,
-        certType: "ready-to-work",
-      },
+      studentId: session.id,
+      certType: { in: [...READY_TO_WORK_FAMILY_CERT_TYPES] },
     },
     select: {
       id: true,

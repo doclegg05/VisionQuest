@@ -129,6 +129,7 @@ const presentForm: AgentTool = {
         query,
         role: ctx.session.role,
         limit: 1,
+        studentId: ctx.session.role === "student" ? ctx.session.id : null,
       });
       match = candidates[0]?.form;
     }
@@ -211,6 +212,7 @@ const searchFormsTool: AgentTool = {
       query,
       role: ctx.session.role,
       limit,
+      studentId: ctx.session.role === "student" ? ctx.session.id : null,
     });
 
     if (candidates.length === 0) {

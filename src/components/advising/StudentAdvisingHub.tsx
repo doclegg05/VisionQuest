@@ -198,7 +198,7 @@ export default function StudentAdvisingHub({
                       startsAt: nextAdvisor?.slots[0]?.startsAt || "",
                     }));
                   }}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                  className="min-h-11 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   {bookableAdvisors.map((advisor) => (
                     <option key={advisor.advisorId} value={advisor.advisorId}>
@@ -215,7 +215,7 @@ export default function StudentAdvisingHub({
                 <select
                   value={selectedSlot?.startsAt || ""}
                   onChange={(event) => setBookingForm((current) => ({ ...current, startsAt: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                  className="min-h-11 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   {(selectedAdvisor?.slots || []).map((slot) => (
                     <option key={slot.key} value={slot.startsAt}>
@@ -230,7 +230,7 @@ export default function StudentAdvisingHub({
                 value={bookingForm.title}
                 onChange={(event) => setBookingForm((current) => ({ ...current, title: event.target.value }))}
                 placeholder="Appointment title (optional)"
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                className="min-h-11 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               />
 
               <textarea
@@ -488,7 +488,7 @@ export default function StudentAdvisingHub({
                         className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                           isCompleted
                             ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
-                            : "bg-[var(--accent-strong)] text-white hover:bg-[var(--accent-green)]/90"
+                            : "bg-[var(--accent-strong)] text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         {isPending && updatingTaskId === task.id

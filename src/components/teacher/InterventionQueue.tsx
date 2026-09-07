@@ -290,67 +290,78 @@ function StudentAccordion({
 
   return (
     <div className={`overflow-hidden rounded-[1.15rem] border ${borderColor} ${bgColor} transition-colors`}>
-      {/* Collapsed header — always visible */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-black/[0.02]"
-        aria-expanded={isOpen}
-      >
-        {/* Chevron */}
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={[
-            "shrink-0 text-[var(--ink-muted)] transition-transform",
-            isOpen ? "rotate-90" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+      {/*
+        Collapsed header — always visible. Split across a toggle <button> and
+        a sibling actions <div> rather than one <button> wrapping everything:
+        the "Ask Sage" <button> and "View student" <Link> used to be nested
+        INSIDE this row's own <button>, which axe's nested-interactive rule
+        (and the HTML spec — a <button> cannot contain interactive content)
+        correctly rejects. Splitting them into siblings inside one flex row
+        keeps the same visual layout and click targets with no nesting.
+      */}
+      <div className="flex w-full items-center gap-3 px-4 py-3.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg py-1 text-left transition-colors hover:bg-black/[0.02]"
+          aria-expanded={isOpen}
         >
-          <path d="m9 18 6-6-6-6" />
-        </svg>
+          {/* Chevron */}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={[
+              "shrink-0 text-[var(--ink-muted)] transition-transform",
+              isOpen ? "rotate-90" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-[var(--ink-strong)]">
-              {group.student.displayName}
-            </span>
-            {group.highCount > 0 && (
-              <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-800">
-                {group.highCount} urgent
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-[var(--ink-strong)]">
+                {group.student.displayName}
               </span>
-            )}
-            <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
-              {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
-            </span>
+              {group.highCount > 0 && (
+                <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-800">
+                  {group.highCount} urgent
+                </span>
+              )}
+              <span className="rounded-full bg-[var(--surface-strong)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
+                {group.totalCount} item{group.totalCount !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">{preview}</p>
           </div>
-          <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">{preview}</p>
-        </div>
+        </button>
 
-        {/* Quick actions on the collapsed row */}
-        <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        {/* Quick actions on the collapsed row — siblings of the toggle
+            button, not children of it */}
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => openSageWithMessage(buildSageMessage(group))}
-            className="rounded-full border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:brightness-110"
+            className="inline-flex min-h-11 items-center rounded-full border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:brightness-110"
           >
             Ask Sage
           </button>
           <Link
             href={`/teacher/students/${group.student.id}`}
-            className="rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
+            className="inline-flex min-h-11 items-center rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
           >
             View student
           </Link>
         </div>
-      </button>
+      </div>
 
       {/* Expanded — consolidated items grouped by category */}
       {isOpen && (
@@ -394,7 +405,7 @@ function StudentAccordion({
                   {c.primaryAction && (
                     <Link
                       href={c.primaryAction.href}
-                      className="rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)]"
+                      className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)]"
                     >
                       {c.primaryAction.label}
                     </Link>
@@ -405,7 +416,7 @@ function StudentAccordion({
                       const first = c.items[0];
                       onAction({ type: first.type, studentId: first.student.id, alertId: first.id, studentName: first.student.displayName });
                     }}
-                    className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+                    className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
                   >
                     Actions
                   </button>
@@ -475,14 +486,14 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
           <button
             type="button"
             onClick={() => openSageWithMessage(buildSageAllMessage(studentGroups, totalCount))}
-            className="rounded-full bg-[var(--accent-strong)] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-105 hover:shadow-md hover:brightness-110"
+            className="inline-flex min-h-11 items-center rounded-full bg-[var(--accent-strong)] px-4 py-2 text-xs font-semibold text-[var(--on-accent)] shadow-sm transition-all hover:scale-105 hover:shadow-md hover:brightness-110"
           >
             Ask Sage to prioritize
           </button>
           <button
             type="button"
             onClick={openStudents.size === studentGroups.length ? collapseAll : expandAll}
-            className="rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
+            className="inline-flex min-h-11 items-center rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
           >
             {openStudents.size === studentGroups.length ? "Collapse all" : "Expand all"}
           </button>

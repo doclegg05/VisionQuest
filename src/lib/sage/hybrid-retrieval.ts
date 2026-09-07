@@ -138,10 +138,30 @@ export function buildWebsearchQuery(userMessage: string): string {
   return tokens.join(" OR ");
 }
 
-export async function getQueryEmbedding(userMessage: string): Promise<number[]> {
+/**
+ * Who the message belongs to, for the embedding call's audit event and
+ * LlmCallLog attribution. Optional because the current caller
+ * (`getDocumentContext` in knowledge-base-server.ts) does not yet thread the
+ * student through; the sensitivity does not depend on it.
+ */
+export interface QueryEmbeddingSubject {
+  studentId?: string | null;
+}
+
+export async function getQueryEmbedding(
+  userMessage: string,
+  subject?: QueryEmbeddingSubject,
+): Promise<number[]> {
   const digest = createHash("sha1").update(userMessage).digest("hex");
+  // The query IS the student's raw chat message — student_record whether or
+  // not the caller knows which student. Declared explicitly so this call
+  // never depends on the facade's inference.
   return cached(`sage:qe:${digest}`, QUERY_EMBED_CACHE_TTL_SECONDS, () =>
-    embedQuery(userMessage),
+    embedQuery(userMessage, {
+      callSite: "sage_embedding_query",
+      studentId: subject?.studentId ?? null,
+      sensitivity: "student_record",
+    }),
   );
 }
 
@@ -154,10 +174,11 @@ export async function hybridSearchDocuments(
   userMessage: string,
   callerRole: "student" | "staff",
   limit: number,
+  subject?: QueryEmbeddingSubject,
 ): Promise<HybridDocResult[] | null> {
   let vectorLiteral: string;
   try {
-    vectorLiteral = toVectorLiteral(await getQueryEmbedding(userMessage));
+    vectorLiteral = toVectorLiteral(await getQueryEmbedding(userMessage, subject));
   } catch (error) {
     logger.warn("Hybrid retrieval: query embedding failed, falling back to keyword scoring", {
       error: String(error),

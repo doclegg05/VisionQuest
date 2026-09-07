@@ -70,11 +70,18 @@ useful than a row filed under a family it does not belong to.
 
 Two families carry decisions rather than descriptions:
 
-- **`means_firearm` / `means_hanging` / `means_jumping`** — the detector has no
-  patterns for these at all. The rows are here so the gap is a number instead
-  of a memory. Most are written as PURE means disclosures (no "kill myself"
+- **`means_firearm` / `means_hanging` / `means_jumping`** — these rows existed
+  before the detector did: they were written so the gap would be a number
+  instead of a memory, and they read 0/16, 0/13 and 0/12 until B1 added the
+  patterns. Most are written as PURE means disclosures (no "kill myself"
   alongside), because a row that also trips a covered pattern would report the
-  family as partly working when it is not.
+  family as partly working when it is not. Keep writing them that way — a
+  "pure" row is the only kind that can ever report the family honestly.
+- **`means_mixed_idiom`** — the opposite case, and it has its own family for
+  exactly that reason: an idiom and a disclosure in the same message ("gonna
+  hang out then probably hang myself"). These prove the guards do not swallow
+  the sentence they sit next to. They are deliberately NOT filed under the
+  three means families, so those families keep meaning "pure means".
 - **`documented_hyperbole`** — "I want to die laughing at this meme" and
   "quiero morir de risa con este video" are labelled `detect`, because
   `crisis-detection.test.ts` explicitly pins that they alert. The module errs

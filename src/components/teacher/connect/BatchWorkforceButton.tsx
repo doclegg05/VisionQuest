@@ -208,7 +208,7 @@ export function BatchWorkforceButton({ classes }: BatchWorkforceButtonProps) {
               type="button"
               onClick={() => void confirmDownload()}
               disabled={downloading}
-              className="mt-4 min-h-[44px] w-full rounded-lg bg-[var(--accent-green)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+              className="mt-4 min-h-[44px] w-full rounded-lg bg-[var(--accent-green)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] disabled:opacity-60 sm:w-auto"
             >
               {downloading ? "Making the file..." : "Yes, download the file"}
             </button>

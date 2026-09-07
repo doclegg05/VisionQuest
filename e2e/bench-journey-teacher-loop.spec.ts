@@ -121,7 +121,7 @@ test("Teacher loop: queue → student → one recorded action → back to the qu
       // The tab bar is the loaded-state marker; Coach is the default tab, and
       // Case Notes lives in its OperationsTab render (scope="coaching"), so
       // no tab tap is needed and none is counted.
-      await expect(page.getByRole("button", { name: "Coach" })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("tab", { name: "Coach" })).toBeVisible({ timeout: 30_000 });
     });
 
     // ── 3. One recorded action ───────────────────────────────────────────

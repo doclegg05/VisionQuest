@@ -328,7 +328,7 @@ export default function OperationsTab({
             <button
               type="submit"
               disabled={savingAppointment}
-              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {savingAppointment ? "Scheduling..." : "Schedule Appointment"}
             </button>
@@ -492,7 +492,7 @@ export default function OperationsTab({
             <button
               type="submit"
               disabled={savingTask}
-              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {savingTask ? "Saving..." : "Create Task"}
             </button>
@@ -540,7 +540,7 @@ export default function OperationsTab({
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-60 ${
                         task.status === "completed"
                           ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
-                          : "bg-[var(--accent-strong)] text-white hover:bg-[var(--accent-green)]/90"
+                          : "bg-[var(--accent-strong)] text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90"
                       }`}
                     >
                       {updatingTaskId === task.id
@@ -577,7 +577,8 @@ export default function OperationsTab({
           <select
             value={noteForm.category}
             onChange={(event) => onNoteFormChange((current) => ({ ...current, category: event.target.value }))}
-            className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Note category"
+            className="min-h-11 theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {NOTE_CATEGORIES.map((category) => (
               <option key={category.value} value={category.value}>
@@ -595,7 +596,7 @@ export default function OperationsTab({
           <button
             type="submit"
             disabled={savingNote}
-            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {savingNote ? "Saving..." : "Add Note"}
           </button>
