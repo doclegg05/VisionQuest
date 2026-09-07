@@ -31,7 +31,7 @@
  */
 
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
+import { resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 
 loadEnvFile();
 
@@ -366,8 +366,5 @@ async function main() {
 // must not trigger the live DB/model pipeline.
 const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  main().catch(reportEvalFailure);
 }
