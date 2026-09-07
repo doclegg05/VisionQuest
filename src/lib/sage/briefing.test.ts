@@ -63,6 +63,21 @@ mock.module("@/lib/llm-usage", {
   namedExports: { withUsageLogging: (provider: unknown) => provider },
 });
 
+// Every resolution now writes AI audit events; recorded so the attribution
+// can be asserted, and so no test here reaches a real AuditLog write.
+const aiAuditEvents: Record<string, unknown>[] = [];
+mock.module("@/lib/ai/audit", {
+  namedExports: {
+    logAiAuditEvent: async (event: Record<string, unknown>) => {
+      aiAuditEvents.push(event);
+    },
+    getProviderClass: (name?: string | null) =>
+      name === "ollama" ? "local" : name === "gemini" ? "cloud" : name ? "unknown" : "none",
+    policyDecisionForProvider: (name?: string | null) =>
+      name === "ollama" ? "local_only" : "configured_provider",
+  },
+});
+
 const agentModeMock = mock.fn<() => string>(() => "readonly");
 mock.module("@/lib/sage/agent/flags", { namedExports: { agentMode: agentModeMock } });
 
@@ -201,6 +216,20 @@ describe("runDailyBriefing", () => {
     panelFindUnique.mock.mockImplementation(async () => ({ id: "panel-1", status: "dismissed" }));
     await briefing.runDailyBriefing("student-a", { force: true });
     assert.equal(panelUpsert.mock.callCount(), 1);
+  });
+
+  it("writes routed then completed AI audit events, attributed to the system sentinel", async () => {
+    aiAuditEvents.length = 0;
+    await briefing.runDailyBriefing("student-a");
+    assert.deepEqual(aiAuditEvents.map((event) => event.status), ["routed", "completed"]);
+    for (const event of aiAuditEvents) {
+      assert.equal(event.task, "sage_briefing");
+      assert.equal(event.sensitivity, "student_record");
+      assert.equal(event.actorRole, "system");
+      assert.equal(event.actorId, "system:sage-autopilot");
+      assert.equal(event.targetId, "student-a");
+      assert.equal(event.providerName, "mock-model");
+    }
   });
 
   it("attributes autonomous runs to the system sentinel, never the student", async () => {

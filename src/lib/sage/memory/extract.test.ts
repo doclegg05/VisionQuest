@@ -53,6 +53,21 @@ mock.module("@/lib/llm-usage", {
   namedExports: { logLlmCall: mockLogLlmCall },
 });
 
+// The extraction's model call is now AI-audited; recorded so the attribution
+// can be asserted, and so no test here reaches a real AuditLog write.
+const aiAuditEvents: Record<string, unknown>[] = [];
+mock.module("@/lib/ai/audit", {
+  namedExports: {
+    logAiAuditEvent: async (event: Record<string, unknown>) => {
+      aiAuditEvents.push(event);
+    },
+    getProviderClass: (name?: string | null) =>
+      name === "ollama" ? "local" : name === "gemini" ? "cloud" : name ? "unknown" : "none",
+    policyDecisionForProvider: (name?: string | null) =>
+      name === "ollama" ? "local_only" : "configured_provider",
+  },
+});
+
 mock.module("@/lib/ai/embedding-provider", {
   namedExports: {
     getActiveEmbeddingModel: async () => "gemini-embedding-001",
@@ -106,6 +121,24 @@ describe("extractAndStoreMemories", () => {
         return vector;
       }),
     );
+  });
+
+  it("writes routed then completed AI audit events for the extraction call", async () => {
+    aiAuditEvents.length = 0;
+    await extractAndStoreMemories({
+      provider: providerReturning(VALID_JSON),
+      studentId: "stu-1",
+      conversationId: "conv-1",
+      messages: MESSAGES,
+    });
+    assert.deepEqual(aiAuditEvents.map((event) => event.status), ["routed", "completed"]);
+    for (const event of aiAuditEvents) {
+      assert.equal(event.task, "sage_post_response");
+      assert.equal(event.sensitivity, "student_record");
+      assert.equal(event.actorId, "stu-1");
+      assert.equal(event.actorRole, "student");
+      assert.equal(event.route, "sage.memory_extract");
+    }
   });
 
   it("stores validated candidates with server-pinned subject and provenance", async () => {

@@ -1,6 +1,13 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { resolveAiProvider } from "@/lib/ai/provider";
+import { AiCloudRefusedError } from "@/lib/ai/lanes";
+import {
+  getProviderClass,
+  logAiAuditEvent,
+  policyDecisionForProvider,
+} from "@/lib/ai/audit";
+import type { AIProvider } from "@/lib/ai/types";
 import { prisma } from "@/lib/db";
 import { withUsageLogging } from "@/lib/llm-usage";
 import type {
@@ -266,31 +273,81 @@ async function generateGroundedPlan(
   studentId: string,
   source: TailoringSource,
 ): Promise<TailoringPlan> {
-  const baseProvider = await resolveAiProvider({
-    studentId,
-    task: "tailor_application",
-    sensitivity: "student_record",
-  });
+  // AI audit: the student asked Sage to tailor their own application, so
+  // they are both actor and target.
+  const aiAudit = {
+    actorId: studentId,
+    actorRole: "student",
+    targetId: studentId,
+    route: "sage_agent.tailor_application",
+    task: "tailor_application" as const,
+    sensitivity: "student_record" as const,
+  };
+  let baseProvider: AIProvider;
+  try {
+    baseProvider = await resolveAiProvider({
+      studentId,
+      task: aiAudit.task,
+      sensitivity: aiAudit.sensitivity,
+    });
+  } catch (error) {
+    // A policy refusal is audited by the resolver; anything else here.
+    if (!(error instanceof AiCloudRefusedError)) {
+      await logAiAuditEvent({
+        ...aiAudit,
+        policyDecision: "blocked",
+        status: "blocked",
+        providerName: null,
+        providerClass: "none",
+        allowCloud: false,
+        reason: error instanceof Error ? error.message : String(error),
+        errorCode: "LOCAL_AI_UNAVAILABLE",
+      });
+    }
+    throw error;
+  }
+  const providerClass = getProviderClass(baseProvider.name);
+  const providerAudit = {
+    ...aiAudit,
+    policyDecision: policyDecisionForProvider(baseProvider.name),
+    providerName: baseProvider.name,
+    providerClass,
+    allowCloud: providerClass === "cloud",
+  };
+  const grounding =
+    `[GROUNDING_DATA_START]\n${sanitizeForPrompt(source.grounding)}\n[GROUNDING_DATA_END]\n\n` +
+    "Select the strongest exact facts for this application.";
+  await logAiAuditEvent({ ...providerAudit, status: "routed", inputChars: grounding.length });
+
   const provider = withUsageLogging(baseProvider, {
     studentId,
     callSite: "sage_agent.tailor_application",
   });
-  const raw = await provider.generateStructuredResponse(
-    TAILORING_SYSTEM_PROMPT,
-    [
-      {
-        role: "user",
-        content:
-          `[GROUNDING_DATA_START]\n${sanitizeForPrompt(source.grounding)}\n[GROUNDING_DATA_END]\n\n` +
-          "Select the strongest exact facts for this application.",
-      },
-    ],
-    undefined,
-    { temperature: 0 },
-  );
-  const plan = tailoringPlanSchema.parse(JSON.parse(raw));
-  assertTailoringPlanGrounded(plan, source);
-  return plan;
+  try {
+    const raw = await provider.generateStructuredResponse(
+      TAILORING_SYSTEM_PROMPT,
+      [{ role: "user", content: grounding }],
+      undefined,
+      { temperature: 0 },
+    );
+    const plan = tailoringPlanSchema.parse(JSON.parse(raw));
+    assertTailoringPlanGrounded(plan, source);
+    await logAiAuditEvent({
+      ...providerAudit,
+      status: "completed",
+      inputChars: grounding.length,
+      outputChars: raw.length,
+    });
+    return plan;
+  } catch (error) {
+    await logAiAuditEvent({
+      ...providerAudit,
+      status: "failed",
+      errorCode: error instanceof GroundingViolationError ? "ungrounded_plan" : "provider_error",
+      reason: String(error).slice(0, 200),
+    });
+    throw error;
+  }
 }
 
 /**
