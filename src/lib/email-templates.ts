@@ -3,6 +3,21 @@
  * Uses inline styles for maximum email client compatibility.
  */
 
+export interface NotificationEmailOptions {
+  /**
+   * The recipient's role (Student.role: "student" | "teacher" | "admin").
+   * Determines which settings page the footer link sends them to — the
+   * (student) route group's layout redirects any staff role away from
+   * /settings, so a staff recipient must land on /teacher/settings instead.
+   * Omit (or pass "student") to keep the historical /settings link.
+   */
+  role?: string;
+}
+
+function isStaffRole(role: string | undefined): boolean {
+  return role === "teacher" || role === "admin";
+}
+
 /**
  * Build an HTML email for coaching notifications.
  * All styles are inline — no external CSS dependencies.
@@ -11,9 +26,11 @@ export function buildNotificationEmail(
   title: string,
   body: string,
   actionUrl: string,
+  options: NotificationEmailOptions = {},
 ): string {
   const appBaseUrl = process.env.APP_BASE_URL ?? actionUrl;
-  const settingsUrl = `${appBaseUrl}/settings`;
+  const settingsPath = isStaffRole(options.role) ? "/teacher/settings" : "/settings";
+  const settingsUrl = `${appBaseUrl}${settingsPath}`;
 
   return `<!DOCTYPE html>
 <html lang="en">

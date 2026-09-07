@@ -210,7 +210,7 @@ export async function sendMultiChannelNotification(
   const [student, preferences] = await Promise.all([
     prisma.student.findUnique({
       where: { id: studentId },
-      select: { email: true },
+      select: { email: true, role: true },
     }),
     prisma.notificationPreference.findMany({
       where: { studentId, enabled: true },
@@ -233,7 +233,9 @@ export async function sendMultiChannelNotification(
             to: destination,
             subject: payload.title,
             text: `${payload.title}\n\n${payload.body}\n\n${actionUrl}`,
-            html: buildNotificationEmail(payload.title, payload.body, actionUrl),
+            html: buildNotificationEmail(payload.title, payload.body, actionUrl, {
+              role: student?.role,
+            }),
           });
           logger.info("Notification email sent", { channel: "email", type: payload.type });
         } catch (err) {
