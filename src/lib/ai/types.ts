@@ -170,7 +170,14 @@ export type AiTask =
   | "draft_endorsement"
   | "public_form_lookup"
   | "public_program_help"
-  | "chat_file_gist";
+  | "chat_file_gist"
+  /**
+   * A vector-embedding call (the raw chat message, a stored memory, a
+   * document chunk) — served by `resolveEmbeddingProvider`, not a generative
+   * provider. Declared as a task so it carries a lane (src/lib/ai/lanes.ts)
+   * and an audit event like every other model call; it has no role.
+   */
+  | "embedding";
 
 export type DataSensitivity =
   | "configured"

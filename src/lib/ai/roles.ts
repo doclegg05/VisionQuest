@@ -130,6 +130,10 @@ const TASK_ROLES: Record<AiTask, AiRole | null> = {
   // provider (policyDecision "direct_no_model" in /api/chat/send). Listed
   // for totality; the value is unreachable.
   public_form_lookup: null,
+  // Vector embeddings are served by the embedding resolver, which has its own
+  // model config (`ai_provider_embedding_model`) and never consults a role.
+  // Listed for totality; the value is unreachable.
+  embedding: null,
 
   sage_student_chat: "chat",
   sage_staff_chat: "chat",
