@@ -1030,6 +1030,188 @@ if (!SHOULD_RUN) {
       });
     });
 
+    describe("CareerAssessmentSnapshot (career_assessment_snapshot_access)", () => {
+      // Adopted from prod drift by migration
+      // 20260907150000_adopt_career_assessment_snapshot (F8). The table existed
+      // in production for six weeks with NO row-level security at all, holding
+      // one student's formal interest-profiler results per row. These cases are
+      // the proof that the adoption actually scoped it, not just that the
+      // migration ran: every one of them passes trivially on a table with RLS
+      // disabled ONLY for the "sees own" read, and fails outright for the rest.
+      before(async () => {
+        await db.careerAssessmentSnapshot.createMany({
+          data: [
+            {
+              id: `${fixtures.suffix}-snapA`,
+              studentId: fixtures.studentA,
+              instrument: "onet_mini_ip_30",
+              source: "onet_mini_ip",
+              riasecScoresRaw: "{}",
+              riasecScoresNormalized: "{}",
+            },
+            {
+              id: `${fixtures.suffix}-snapC`,
+              studentId: fixtures.studentC,
+              instrument: "onet_mini_ip_30",
+              source: "manual_entry",
+              riasecScoresRaw: "{}",
+              riasecScoresNormalized: "{}",
+            },
+          ],
+        });
+      });
+
+      it("student sees only own snapshots", async () => {
+        const rows = await asRole("student", fixtures.studentA, (tx) =>
+          tx.careerAssessmentSnapshot.findMany({
+            where: { studentId: { in: [fixtures.studentA, fixtures.studentC] } },
+            select: { studentId: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.studentId), [fixtures.studentA]);
+      });
+
+      it("student cannot insert a snapshot for another student", async () => {
+        // `createMany`, not `create`, and that is load-bearing. Prisma's
+        // `create` ends in RETURNING, which Postgres filters through the USING
+        // clause — so a `create` is refused even when WITH CHECK would have
+        // admitted the row, and the case would pass for the wrong reason if the
+        // WITH CHECK student branch were ever widened. `createMany` returns no
+        // rows, so only WITH CHECK can refuse it. (Verified by mutation: with
+        // the student branch of WITH CHECK widened to a bare role check, the
+        // `create` form still passed and this form goes red.)
+        await assert.rejects(
+          () =>
+            asRole("student", fixtures.studentA, (tx) =>
+              tx.careerAssessmentSnapshot.createMany({
+                data: [
+                  {
+                    id: `${fixtures.suffix}-snapEvil`,
+                    studentId: fixtures.studentB,
+                    instrument: "onet_mini_ip_30",
+                    source: "manual_entry",
+                    riasecScoresRaw: "{}",
+                    riasecScoresNormalized: "{}",
+                  },
+                ],
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("student cannot delete another student's snapshot", async () => {
+        // A USING-clause exclusion on DELETE reports zero rows rather than
+        // throwing (see the two shapes documented in .claude/MEMORY.md), so
+        // this asserts the count, not a rejection.
+        const removed = await asRole("student", fixtures.studentA, (tx) =>
+          tx.careerAssessmentSnapshot.deleteMany({
+            where: { id: `${fixtures.suffix}-snapC` },
+          }),
+        );
+        assert.equal(removed.count, 0, "Student C's snapshot is not Student A's to delete");
+      });
+
+      it("teacher sees managed students' snapshots only", async () => {
+        const rows = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.careerAssessmentSnapshot.findMany({
+            where: { studentId: { in: [fixtures.studentA, fixtures.studentC] } },
+            select: { studentId: true },
+          }),
+        );
+        assert.deepEqual(rows.map((r) => r.studentId), [fixtures.studentA], "Student C is Teacher B's");
+      });
+
+      it("admin sees every snapshot", async () => {
+        // Pins the `app.current_role = 'admin'` branch of the USING clause.
+        // Without this case that branch can be deleted with every other case in
+        // this block still green — admins would simply see nothing, silently,
+        // and the offboarding export and any future staff review surface would
+        // come back empty rather than refused.
+        const rows = await asRole("admin", fixtures.admin, (tx) =>
+          tx.careerAssessmentSnapshot.findMany({
+            where: { studentId: { in: [fixtures.studentA, fixtures.studentC] } },
+            select: { studentId: true },
+            orderBy: { studentId: "asc" },
+          }),
+        );
+        // Compared as a set, so a later case adding another of Student A's
+        // snapshots cannot turn this red for the wrong reason.
+        assert.deepEqual(
+          [...new Set(rows.map((r) => r.studentId))].sort(),
+          [fixtures.studentA, fixtures.studentC].sort(),
+          "admin must see both students' snapshots",
+        );
+      });
+
+      it("teacher can insert a snapshot for a managed student", async () => {
+        // `source: "manual_entry"` is a staff-entered result, so the teacher
+        // branch of the WITH CHECK clause is load-bearing, not incidental.
+        // Deleting it would break instructor entry; this is the case that
+        // notices.
+        const created = await asRole("teacher", fixtures.teacher, (tx) =>
+          tx.careerAssessmentSnapshot.create({
+            data: {
+              id: `${fixtures.suffix}-snapByTeacher`,
+              studentId: fixtures.studentA,
+              instrument: "onet_mini_ip_30",
+              source: "manual_entry",
+              riasecScoresRaw: "{}",
+              riasecScoresNormalized: "{}",
+            },
+            select: { studentId: true },
+          }),
+        );
+        assert.equal(created.studentId, fixtures.studentA);
+      });
+
+      it("teacher cannot insert a snapshot for an unmanaged student", async () => {
+        // And this is the case that notices if that same branch is WIDENED to a
+        // bare role check: a teacher would be able to write assessment results
+        // onto any student in the program. Student C is Teacher B's.
+        //
+        // `createMany` for the reason spelled out on the student case above —
+        // this exact case was first written with `create` and stayed GREEN
+        // against a deliberately widened WITH CHECK, because the USING clause
+        // refused the RETURNING. It was pinning the read side and reporting the
+        // write side.
+        await assert.rejects(
+          () =>
+            asRole("teacher", fixtures.teacher, (tx) =>
+              tx.careerAssessmentSnapshot.createMany({
+                data: [
+                  {
+                    id: `${fixtures.suffix}-snapCrossClass`,
+                    studentId: fixtures.studentC,
+                    instrument: "onet_mini_ip_30",
+                    source: "manual_entry",
+                    riasecScoresRaw: "{}",
+                    riasecScoresNormalized: "{}",
+                  },
+                ],
+              }),
+            ),
+          /row-level security/i,
+        );
+      });
+
+      it("coordinator sees nothing (the policy names no coordinator branch)", async () => {
+        const rows = await asRole("coordinator" as Role, fixtures.teacher, (tx) =>
+          tx.careerAssessmentSnapshot.findMany({ select: { studentId: true } }),
+        );
+        assert.deepEqual(rows, [], "coordinator must fail closed until the role is region-scoped");
+      });
+
+      it("returns zero rows with no RLS context", async () => {
+        // Unfiltered on purpose: one row is a leak. This is the case that was
+        // false for this table in production before the adoption migration.
+        const rows = await asRole(null, null, (tx) =>
+          tx.careerAssessmentSnapshot.findMany({ select: { studentId: true } }),
+        );
+        assert.deepEqual(rows, [], "CareerAssessmentSnapshot must be empty with no context");
+      });
+    });
+
     describe("Employer / EmployerContact / JobLead (Match & Connect Phase 3)", () => {
       // Employer and EmployerContact are staff-only: no student branch exists
       // in either policy. JobLead is the one table in the group a student may

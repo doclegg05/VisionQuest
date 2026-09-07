@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { logAuditEvent } from "@/lib/audit";
+import { invalidateChatContext } from "@/lib/cache";
 import { prismaAdmin } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
@@ -222,6 +223,19 @@ export async function recordInterested(input: InterestedInput) {
     }
     throw error;
   }
+
+  // Appointment is a chat-context WATCHED model and this write went through
+  // `prismaAdmin`, which is deliberately NOT extended with the chat-context
+  // write-through (see the doc block on `prismaAdmin` in src/lib/db.ts). So
+  // nothing invalidates the student's cached `chat:*` context for us: without
+  // this line Sage keeps telling the student they have nothing scheduled for up
+  // to the cache TTL (180-600s) after an employer has booked a real interview
+  // with them. Invalidated right after the write resolves and OUTSIDE the try,
+  // so a cache failure can never be mistaken for a slot conflict — the same
+  // shape POST /api/internal/memory/consolidate uses for its raw SageMemory
+  // update. Pinned by src/lib/db.admin-write-through.test.ts, which found this
+  // call site, and by the booking case in ./employer-actions.test.ts.
+  invalidateChatContext(connection.studentId);
 
   await transitionConnection({
     connectionId: input.connectionId,
