@@ -541,7 +541,7 @@ export default function DashboardActionPanel({
                               type="button"
                               onClick={() => handleAssign(selectedGoal.goal.id, recommendation)}
                               disabled={alreadyLinked || assigningKey === draftKey}
-                              className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
+                              className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
                             >
                               {alreadyLinked ? "Assigned" : assigningKey === draftKey ? "Assigning..." : "Assign"}
                             </button>
@@ -637,7 +637,7 @@ export default function DashboardActionPanel({
           <button
             type="submit"
             disabled={savingTask}
-            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2 xl:col-span-1 xl:self-end"
+            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2 xl:col-span-1 xl:self-end"
           >
             {savingTask ? "Saving..." : "Create task"}
           </button>

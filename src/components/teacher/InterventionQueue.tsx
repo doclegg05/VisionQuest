@@ -486,7 +486,7 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
           <button
             type="button"
             onClick={() => openSageWithMessage(buildSageAllMessage(studentGroups, totalCount))}
-            className="inline-flex min-h-11 items-center rounded-full bg-[var(--accent-strong)] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-105 hover:shadow-md hover:brightness-110"
+            className="inline-flex min-h-11 items-center rounded-full bg-[var(--accent-strong)] px-4 py-2 text-xs font-semibold text-[var(--on-accent)] shadow-sm transition-all hover:scale-105 hover:shadow-md hover:brightness-110"
           >
             Ask Sage to prioritize
           </button>

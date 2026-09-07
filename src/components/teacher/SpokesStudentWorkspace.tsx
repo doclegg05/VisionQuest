@@ -634,7 +634,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             type="button"
             onClick={() => void handleSaveProfile()}
             disabled={savingProfile}
-            className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+            className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
           >
             {savingProfile ? "Saving..." : "Save Record"}
           </button>
@@ -733,7 +733,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                       employerName: current.employerName || suggestion.company || "",
                     }));
                   }}
-                  className="mt-2 min-h-11 rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                  className="mt-2 min-h-11 rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110"
                 >
                   {placementLink ? "Employer filled in — add the start date, then save" : "Use this job"}
                 </button>
@@ -872,7 +872,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                                   type="button"
                                   onClick={() => void saveModule(template.id)}
                                   disabled={savingModuleId === template.id}
-                                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+                                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
                                 >
                                   {progress ? "Update completion" : "Mark complete"}
                                 </button>
@@ -1009,7 +1009,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                 type="button"
                 onClick={() => void saveFollowUp()}
                 disabled={savingFollowUp}
-                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
               >
                 {savingFollowUp ? "Saving..." : "Save Follow-Up"}
               </button>

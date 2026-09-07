@@ -488,7 +488,7 @@ export default function StudentAdvisingHub({
                         className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                           isCompleted
                             ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
-                            : "bg-[var(--accent-strong)] text-white hover:bg-[var(--accent-green)]/90"
+                            : "bg-[var(--accent-strong)] text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         {isPending && updatingTaskId === task.id

@@ -493,14 +493,14 @@ function StudentRow({
               e.preventDefault();
               onPrimaryAction(student);
             }}
-            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90"
+            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
           >
             {student.recommendedAction.label}
           </button>
         ) : (
           <Link
             href={student.recommendedAction.href}
-            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90"
+            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
           >
             {student.recommendedAction.label}
           </Link>

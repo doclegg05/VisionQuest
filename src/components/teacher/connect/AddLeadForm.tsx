@@ -359,7 +359,7 @@ export function AddLeadForm({ employers, classes, certifications }: AddLeadFormP
         <button
           type="submit"
           disabled={pending}
-          className="min-h-[44px] w-full rounded-lg bg-[var(--accent-green)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+          className="min-h-[44px] w-full rounded-lg bg-[var(--accent-green)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] disabled:opacity-60 sm:w-auto"
         >
           {pending ? "Saving..." : "Add lead"}
         </button>

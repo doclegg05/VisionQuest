@@ -495,7 +495,7 @@ export default function ResumeBuilder() {
               type="button"
               onClick={() => uploadInputRef.current?.click()}
               disabled={uploading}
-              className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {uploading ? "Sage is reading..." : "Upload Resume"}
             </button>
@@ -540,7 +540,7 @@ export default function ResumeBuilder() {
             type="button"
             onClick={() => void handleAssist()}
             disabled={assistantLoading}
-            className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {assistantLoading ? "Sage is drafting..." : "Draft with Sage"}
           </button>

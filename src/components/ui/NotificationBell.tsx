@@ -83,7 +83,7 @@ export default function NotificationBell() {
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unreadCount > 0 && (
-          <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--accent-strong)] px-1 text-xs font-bold text-white">
+          <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--accent-strong)] px-1 text-xs font-bold text-[var(--on-accent)]">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}

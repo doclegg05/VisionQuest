@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -258,5 +259,55 @@ describe("D3 axe-authenticated — color-contrast (light-theme tokens)", () => {
     const css = read("src/app/globals.css");
     assert.ok(css.includes("--program-ietp-text: #a53509;"));
     assert.ok(!css.includes(": #c2410c;"), "the old just-failing hex must be gone as a declared value");
+  });
+});
+
+describe("D3 axe-authenticated — color-contrast on accent fills (both themes; CI residual 2026-09-07: 78 nodes, all white-on-green)", () => {
+  // WCAG relative luminance + contrast ratio, so the assertion is on the
+  // number the collector measures rather than on a hex someone remembers.
+  function luminance(hex: string): number {
+    const h = hex.replace("#", "");
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+    const f = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  }
+  function contrast(a: string, b: string): number {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+  function token(css: string, name: string, nth: number): string {
+    const matches = [...css.matchAll(new RegExp(`^\\s*${name}: (#[0-9a-fA-F]{6});`, "gm"))];
+    assert.ok(matches.length > nth, `${name} declared fewer than ${nth + 1} times`);
+    return matches[nth][1];
+  }
+
+  it("light theme: --on-accent on --accent-green clears 4.5:1 (was #ffffff on #2a8a3c, 4.38:1)", () => {
+    const css = read("src/app/globals.css");
+    const ratio = contrast(token(css, "--on-accent", 0), token(css, "--accent-green", 0));
+    assert.ok(ratio >= 4.5, `light --on-accent on --accent-green is ${ratio.toFixed(2)}:1`);
+    assert.ok(!css.includes("--accent-green: #2a8a3c;"), "the old 4.38:1 light green must be gone as a declared value");
+  });
+
+  it("dark theme: --on-accent on --accent-green clears 4.5:1 (was #ffffff on #3fcf5e, 2.04:1)", () => {
+    const css = read("src/app/globals.css");
+    const ratio = contrast(token(css, "--on-accent", 1), token(css, "--accent-green", 1));
+    assert.ok(ratio >= 4.5, `dark --on-accent on --accent-green is ${ratio.toFixed(2)}:1`);
+  });
+
+  it("no component pairs an accent fill with literal text-white (the token carries the per-theme ink)", () => {
+    const files = execSync("grep -rl --include=*.tsx -E 'bg-\\[var\\(--accent(-strong|-green)?\\)\\]' src", { encoding: "utf8" })
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+    const offenders: string[] = [];
+    for (const file of files) {
+      const lines = read(file).split("\n");
+      lines.forEach((line, i) => {
+        if (/bg-\[var\(--accent(-strong|-green)?\)\]/.test(line) && /(?<![\w:-])text-white(?![\w-])/.test(line)) {
+          offenders.push(`${file}:${i + 1}`);
+        }
+      });
+    }
+    assert.deepEqual(offenders, [], `accent fills with text-white (use text-[var(--on-accent)]):\n${offenders.join("\n")}`);
   });
 });

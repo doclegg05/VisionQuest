@@ -105,7 +105,7 @@ export default function CredlyBadges() {
           ].map((item) => (
             <div key={item.step} className="theme-card rounded-xl/60 p-4">
               <div className="mb-2 flex items-center gap-2">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent-strong)] text-xs font-bold text-white">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent-strong)] text-xs font-bold text-[var(--on-accent)]">
                   {item.step}
                 </span>
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">{item.title}</p>

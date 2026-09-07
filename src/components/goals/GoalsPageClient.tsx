@@ -1109,7 +1109,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 type="button"
                                 onClick={() => handleSaveLinkStatus(monthly.id, link.id)}
                                 disabled={isSaving || draftStatus === link.status}
-                                className="px-2 py-0.5 bg-[var(--accent-strong)] text-white font-semibold rounded text-3xs hover:bg-[var(--accent)] transition-colors disabled:opacity-50"
+                                className="px-2 py-0.5 bg-[var(--accent-strong)] text-[var(--on-accent)] font-semibold rounded text-3xs hover:bg-[var(--accent)] transition-colors disabled:opacity-50"
                               >
                                 {isSaving ? "Saving..." : "Update"}
                               </button>

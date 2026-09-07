@@ -219,7 +219,7 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
               : "border-[var(--border)]"
         } ${saving ? "opacity-70" : ""}`}
       >
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-white">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--accent-strong)] text-2xl text-[var(--on-accent)]">
           {choice.icon}
         </span>
         <div>
@@ -289,7 +289,7 @@ export function QuickWinCard({ item, done, saving, hasError, onComplete }: Quick
             type="button"
             onClick={() => onComplete(item.id)}
             disabled={saving}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent-strong)] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent)] disabled:opacity-60"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent-strong)] px-4 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent)] disabled:opacity-60"
           >
             {saving ? "Saving..." : hasError ? "Try again" : "I've read this"}
           </button>

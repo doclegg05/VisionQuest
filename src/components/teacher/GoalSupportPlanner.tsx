@@ -328,7 +328,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                             type="button"
                             onClick={() => handleAssign(goal.id, recommendation)}
                             disabled={alreadyLinked || assigningKey === assignKey}
-                            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
+                            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
                           >
                             {alreadyLinked ? "Assigned" : assigningKey === assignKey ? "Assigning..." : "Assign"}
                           </button>

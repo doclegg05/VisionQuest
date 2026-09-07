@@ -179,7 +179,7 @@ export default function DocumentBrowser({
             onClick={() => setSelectedCategory("all")}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === "all"
-                ? "bg-[var(--accent-strong)] text-white"
+                ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
             }`}
           >
@@ -196,7 +196,7 @@ export default function DocumentBrowser({
                 onClick={() => setSelectedCategory(cat)}
                 className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   selectedCategory === cat
-                    ? "bg-[var(--accent-strong)] text-white"
+                    ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                     : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
                 }`}
               >
@@ -292,7 +292,7 @@ function CategorySection({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-lg text-[var(--ink-strong)]">{label}</h2>
-            <span className="rounded-full bg-[var(--accent-strong)] px-2.5 py-0.5 text-xs font-semibold text-white">
+            <span className="rounded-full bg-[var(--accent-strong)] px-2.5 py-0.5 text-xs font-semibold text-[var(--on-accent)]">
               {count}
             </span>
           </div>

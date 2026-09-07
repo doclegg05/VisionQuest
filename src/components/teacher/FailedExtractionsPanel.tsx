@@ -108,7 +108,7 @@ function FailureRow({
             type="button"
             disabled={busy}
             onClick={() => onAction(row.id, "replay")}
-            className="flex items-center gap-1.5 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--accent-green)]/90 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:opacity-50"
           >
             <ArrowClockwise size={14} weight="bold" aria-hidden />
             {busy ? "Replaying..." : "Replay"}

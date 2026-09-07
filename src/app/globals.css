@@ -57,7 +57,12 @@
   --border: rgba(18, 38, 63, 0.12);
   --border-strong: rgba(0, 64, 113, 0.15);
   --border-luminous: rgba(255, 255, 255, 0.82);
-  --accent-green: #2a8a3c;
+  --accent-green: #237a35;
+  /* Text on an accent-green fill: white in light (5.38:1 on #237a35), navy in
+     dark (8.89:1 on #3fcf5e) — white on the dark-theme green is 2.04:1, which
+     was every one of the 78 authenticated axe color-contrast nodes on
+     2026-09-07. Use text-[var(--on-accent)] with any bg-[var(--accent*)]. */
+  --on-accent: #ffffff;
   --accent-blue: #005d8a;
   --accent-gold: #ad8806;
   --accent-red: #c43c3c;
@@ -182,6 +187,7 @@
   --border-strong: rgba(255, 255, 255, 0.16);
   --border-luminous: rgba(255, 255, 255, 0.18);
   --accent-green: #3fcf5e;
+  --on-accent: #0a1628;
   --accent-blue: #38a8d8;
   --accent-gold: #e0c06a;
   --accent-red: #f06b6b;
