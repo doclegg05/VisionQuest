@@ -8,6 +8,7 @@ import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/li
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
 import { afterWrite } from "@/lib/after-write";
+import { deferAfterResponse } from "@/lib/after-response";
 import { parseBody } from "@/lib/schemas";
 
 // Signature is a base64 PNG data URL — body length capped to keep upstream
@@ -129,12 +130,18 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     });
 
     // The submission is saved. The alert sync is best-effort from here:
-    // a failure is logged, never reported as a failed signature.
-    await afterWrite(() => syncStudentAlerts(targetStudentId), {
-      surface: "forms/sign",
-      effect: "syncStudentAlerts",
-      studentId: targetStudentId,
-    });
+    // a failure is logged, never reported as a failed signature — and it
+    // runs AFTER the response is sent. Awaiting it here is what held the
+    // student's "Submitting..." for ~45 s on 2026-09-07 (see
+    // src/lib/after-response.ts); the teacher queue can catch up a moment
+    // later.
+    deferAfterResponse(() =>
+      afterWrite(() => syncStudentAlerts(targetStudentId), {
+        surface: "forms/sign",
+        effect: "syncStudentAlerts",
+        studentId: targetStudentId,
+      }),
+    );
 
     return NextResponse.json({
       submission,

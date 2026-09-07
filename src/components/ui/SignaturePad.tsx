@@ -7,24 +7,32 @@ type SignatureMode = "draw" | "type";
 interface SignaturePadProps {
   onSign: (dataUrl: string) => void;
   onCancel: () => void;
+  /**
+   * True while the parent is sending the signature. Every button is disabled
+   * and Sign & Submit reads "Saving..." so the student can see the tap took
+   * and cannot send it again. Without this a student in prod tapped 14 times
+   * during one slow submit (2026-09-07), uploading 14 signature files.
+   */
+  submitting?: boolean;
 }
 
 const CANVAS_HEIGHT = 150;
 const STROKE_COLOR = "#1a2a3a";
 const STROKE_WIDTH = 2;
 
-export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
+export default function SignaturePad({ onSign, onCancel, submitting = false }: SignaturePadProps) {
   const [mode, setMode] = useState<SignatureMode>("draw");
   const [typedName, setTypedName] = useState("");
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-busy={submitting || undefined}>
       {/* Mode toggle */}
       <div className="flex overflow-hidden rounded-lg border border-[var(--border)]">
         <button
           type="button"
           onClick={() => setMode("draw")}
-          className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
+          disabled={submitting}
+          className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
             mode === "draw"
               ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -35,7 +43,8 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
         <button
           type="button"
           onClick={() => setMode("type")}
-          className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
+          disabled={submitting}
+          className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
             mode === "type"
               ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -46,13 +55,14 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
       </div>
 
       {mode === "draw" ? (
-        <DrawPad onSign={onSign} onCancel={onCancel} />
+        <DrawPad onSign={onSign} onCancel={onCancel} submitting={submitting} />
       ) : (
         <TypePad
           typedName={typedName}
           onTypedNameChange={setTypedName}
           onSign={onSign}
           onCancel={onCancel}
+          submitting={submitting}
         />
       )}
     </div>
@@ -66,9 +76,11 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
 function DrawPad({
   onSign,
   onCancel,
+  submitting,
 }: {
   onSign: (dataUrl: string) => void;
   onCancel: () => void;
+  submitting: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -205,7 +217,7 @@ function DrawPad({
 
   function handleSubmit() {
     const canvas = canvasRef.current;
-    if (!canvas || !hasStrokes) return;
+    if (!canvas || !hasStrokes || submitting) return;
     const width = containerWidthRef.current;
     const exportCanvas = document.createElement("canvas");
     exportCanvas.width = width;
@@ -248,6 +260,7 @@ function DrawPad({
         onSubmit={handleSubmit}
         canClear={hasStrokes}
         canSubmit={hasStrokes}
+        submitting={submitting}
       />
     </>
   );
@@ -262,17 +275,19 @@ function TypePad({
   onTypedNameChange,
   onSign,
   onCancel,
+  submitting,
 }: {
   typedName: string;
   onTypedNameChange: (name: string) => void;
   onSign: (dataUrl: string) => void;
   onCancel: () => void;
+  submitting: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const trimmed = typedName.trim();
 
   function handleSubmit() {
-    if (!trimmed) return;
+    if (!trimmed || submitting) return;
     const width = containerRef.current?.clientWidth || 500;
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -308,6 +323,7 @@ function TypePad({
             placeholder="Your full legal name"
             className="w-full border-b-2 border-[var(--border-strong)] bg-transparent pb-1 text-lg text-[var(--ink-strong)] placeholder:text-[var(--ink-faint)] outline-none focus:border-[var(--accent-secondary)]"
             autoComplete="name"
+            disabled={submitting}
           />
           {trimmed && (
             <div className="mt-4 border-t border-[var(--border)] pt-3">
@@ -323,6 +339,7 @@ function TypePad({
         onSubmit={handleSubmit}
         canClear={!!trimmed}
         canSubmit={!!trimmed}
+        submitting={submitting}
       />
     </>
   );
@@ -338,19 +355,21 @@ function SignatureButtons({
   onSubmit,
   canClear,
   canSubmit,
+  submitting,
 }: {
   onClear: () => void;
   onCancel: () => void;
   onSubmit: () => void;
   canClear: boolean;
   canSubmit: boolean;
+  submitting: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <button
         type="button"
         onClick={onClear}
-        disabled={!canClear}
+        disabled={!canClear || submitting}
         className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:opacity-40"
       >
         Clear
@@ -359,17 +378,18 @@ function SignatureButtons({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+          disabled={submitting}
+          className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={onSubmit}
-          disabled={!canSubmit}
+          disabled={!canSubmit || submitting}
           className="primary-button px-5 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Sign & Submit
+          {submitting ? "Saving..." : "Sign & Submit"}
         </button>
       </div>
     </div>

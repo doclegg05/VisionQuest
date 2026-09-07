@@ -248,6 +248,33 @@ describe("POST /api/orientation (verification flow)", () => {
     assert.equal(mockSyncStudentAlerts.mock.callCount(), 1);
   });
 
+  // Prod, 2026-09-07: the wizard's Sign & Submit calls this route right
+  // after /api/forms/sign, and both awaited syncStudentAlerts before
+  // answering — tens of seconds under a pile of duplicate taps. Progress is
+  // saved before the sync starts; the response must not wait on the sync.
+  it("answers as soon as progress is saved, without waiting for the alert sync", async () => {
+    let releaseSync: () => void = () => undefined;
+    mockSyncStudentAlerts.mock.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        releaseSync = resolve;
+      }),
+    );
+
+    const timeout = new Promise<"timed out">((resolve) => setTimeout(() => resolve("timed out"), 2000));
+    const outcome = await Promise.race([
+      route.POST(toggleRequest({ itemId: ITEM_ID, completed: true })),
+      timeout,
+    ]);
+
+    assert.notEqual(outcome, "timed out", "the response waited on the alert sync");
+    const res = outcome as Response;
+    assert.equal(res.status, 200);
+    assert.equal(mockProgressUpsert.mock.callCount(), 1, "progress was saved first");
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 1, "the sync is still started");
+
+    releaseSync();
+  });
+
   it("release packet: signatures on file still route through pending (paper ai-data-consent step)", async () => {
     mockItemFindUnique.mock.mockImplementation(async () => ({
       label: "Sign Authorization for Release of Information",

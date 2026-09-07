@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { getOrientationStepDetail } from "@/lib/orientation-step-resources";
 import {
@@ -262,9 +262,15 @@ export default function OrientationWizard() {
     advanceStep(form, pendingCount);
   }
 
+  // A second tap that lands before React has re-rendered with
+  // `submitting=true` would start a second submit; the ref closes that gap.
+  const signInFlightRef = useRef(false);
+
   async function handleSign(dataUrl: string) {
     const step = steps[currentStep];
     if (!step) return;
+    if (signInFlightRef.current) return;
+    signInFlightRef.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -282,6 +288,7 @@ export default function OrientationWizard() {
     } catch {
       setError("Submission failed. Please try again.");
     } finally {
+      signInFlightRef.current = false;
       setSubmitting(false);
     }
   }
@@ -558,12 +565,13 @@ export default function OrientationWizard() {
         {step.type === "sign" && hasRead && (
           showSignature ? (
             <div>
-              {submitting && (
-                <p className="mb-2 text-xs text-[var(--ink-muted)]">Submitting...</p>
-              )}
+              <p role="status" aria-live="polite" className="mb-2 text-sm text-[var(--ink-muted)]">
+                {submitting ? "Saving your signature. This can take a few seconds." : ""}
+              </p>
               <SignaturePad
                 onSign={handleSign}
                 onCancel={() => setShowSignature(false)}
+                submitting={submitting}
               />
             </div>
           ) : (

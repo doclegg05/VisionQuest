@@ -271,6 +271,8 @@ describe("POST /api/forms/sign", () => {
     assert.equal(body.submission.id, "submission-1");
     assert.equal(body.signatureFileId, "sig-file-1");
 
+    // The sync now runs off the response path; let its rejection settle.
+    await new Promise((resolve) => setImmediate(resolve));
     assert.equal(mockWarn.mock.callCount(), 1, "the sync failure is logged, not surfaced");
     assert.equal(mockError.mock.callCount(), 0);
     const payload = mockWarn.mock.calls[0].arguments[1] ?? {};
@@ -278,5 +280,30 @@ describe("POST /api/forms/sign", () => {
     assert.equal(payload.student, studentLogKey(student.id));
     const serialized = JSON.stringify(mockWarn.mock.calls[0].arguments);
     assert.ok(!serialized.includes(student.id), `log line leaked the student id: ${serialized}`);
+  });
+
+  // Prod, 2026-09-07: the route awaited syncStudentAlerts before answering,
+  // so one student's "Submitting..." sat for ~45 s while the alert sync ran
+  // (and re-ran, once per extra tap). The signature had saved in under a
+  // second. A sync that never resolves must not hold the response.
+  it("answers as soon as the submission is saved, without waiting for the alert sync", async () => {
+    let releaseSync: () => void = () => undefined;
+    mockSyncStudentAlerts.mock.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        releaseSync = resolve;
+      }),
+    );
+
+    const timeout = new Promise<"timed out">((resolve) => setTimeout(() => resolve("timed out"), 2000));
+    const outcome = await Promise.race([post({ formId: FORM_ID, signature: SIGNATURE }), timeout]);
+
+    assert.notEqual(outcome, "timed out", "the response waited on the alert sync");
+    const res = outcome as Response;
+    assert.equal(res.status, 200);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 1, "the submission was saved first");
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 1, "the sync is still started");
+    assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [student.id]);
+
+    releaseSync();
   });
 });
