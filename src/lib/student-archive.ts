@@ -40,6 +40,60 @@ const MAX_ENTRY_NAME_LENGTH = 120;
 const ARCHIVE_SIZE_WARNING_BYTES = 25 * 1024 * 1024; // 25 MB
 
 /**
+ * Ticket D5b — the 25 MB warning above measures a buffer already resident;
+ * this is the fix upstream of it. Six relations had no `take:` at all
+ * (`conversations.messages`, `notifications`, `alerts`, `moodEntries`,
+ * `failedExtractions`, and `connections[].events` — the last two are the
+ * append-only "grows on every status change / every SMS nudge" shape a
+ * `ConnectionEvent` list has, same as the platform's other event ledgers), so
+ * a student with a long-enough history — or years of nudge/status events on
+ * one connection — could make `generateStudentArchive` load an unboundedly
+ * large row set into memory before archiver ever sees a byte, in a route
+ * that calls it fire-and-forget (`teacher/students/[id]/status/route.ts`).
+ *
+ * `MESSAGE_CAP` is larger than `EVENT_LIST_CAP` because one Sage conversation
+ * genuinely can run for years without being a bug — a chat message is the
+ * unit this whole product is built around. The other five relations are much
+ * shorter-lived per-row, appended by automated systems (nudges, alerts,
+ * extraction retries) rather than the student's own typing, so the smaller
+ * cap is a truer "this is unusual" line for them.
+ */
+const MESSAGE_CAP = 20_000;
+const EVENT_LIST_CAP = 5_000;
+
+/**
+ * Keep the newest `cap` of `rows` and return them in this file's oldest-first
+ * export convention.
+ *
+ * Sorts explicitly rather than trusting the caller's order: the real Prisma
+ * query below asks for `take: cap + 1` ordered newest-first (so Postgres
+ * never returns more than one row past the cap — the actual memory bound),
+ * but this function does not assume that ordering survived intact, because
+ * this file's own tests hand it fixtures in whatever order is convenient to
+ * write. Correctness comes from `getTime`, not from array position.
+ *
+ * `rows.length` past `cap` is exactly how a truncation is detected — a
+ * relation with precisely `cap` rows and a relation with `cap + 1` must not
+ * look the same, which is also why the query below asks for one row more
+ * than the cap rather than exactly the cap.
+ *
+ * Tolerates a missing `rows` (treated as empty) rather than requiring every
+ * caller to guard it first — Prisma's own select always returns an array for
+ * a list relation, but this file's own narrower test fixtures (predating
+ * this ticket) omit fields they do not exercise.
+ */
+function capNewestFirst<T>(
+  rows: readonly T[] | null | undefined,
+  cap: number,
+  getTime: (row: T) => number,
+): { rows: T[]; truncated: boolean } {
+  const input = rows ?? [];
+  const truncated = input.length > cap;
+  const kept = truncated ? [...input].sort((a, b) => getTime(b) - getTime(a)).slice(0, cap) : input;
+  return { rows: [...kept].sort((a, b) => getTime(a) - getTime(b)), truncated };
+}
+
+/**
  * Names Windows reserves for devices, matched on the STEM and case-insensitively.
  *
  * Windows refuses to create a file called `CON`, and refuses it just as
@@ -109,6 +163,18 @@ interface ArchiveManifestEntry {
   reviewedBy?: string | null;
 }
 
+/**
+ * One capped relation that actually hit its cap. `kept` and `cap` are always
+ * equal today (a truncated relation is always sliced down to exactly its
+ * cap) — both are recorded anyway so the manifest is self-describing without
+ * a reader needing to know this file's constants.
+ */
+interface ArchiveTruncationEntry {
+  model: string;
+  kept: number;
+  cap: number;
+}
+
 interface ArchiveManifest {
   studentId: string;
   displayName: string;
@@ -116,6 +182,21 @@ interface ArchiveManifest {
   archivedBy: string;
   fileCount: number;
   entries: ArchiveManifestEntry[];
+  /**
+   * Ticket D5b — one entry per capped relation that was actually truncated
+   * (deduplicated by model name: a second conversation hitting the same
+   * message cap does not add a second entry). Empty for any export under
+   * every cap, which today is every student — an export must never claim
+   * completeness it cannot back up, and it must never look incomplete when
+   * it isn't either.
+   */
+  truncated: ArchiveTruncationEntry[];
+}
+
+/** Record one capped relation as truncated, once per model. */
+function recordTruncation(manifest: ArchiveManifest, model: string, kept: number, cap: number): void {
+  if (manifest.truncated.some((entry) => entry.model === model)) return;
+  manifest.truncated.push({ model, kept, cap });
 }
 
 /**
@@ -228,8 +309,14 @@ export async function generateStudentArchive(
           createdAt: true,
           employer: { select: { name: true } },
           jobLead: { select: { title: true } },
+          // Ticket D5b — capped per connection (same nested-`take`-is-per-
+          // parent behavior as conversations.messages above). A connection's
+          // event ledger grows on every status change and every SMS nudge
+          // attempt, so a long-lived placement is the realistic way this
+          // list gets large.
           events: {
-            orderBy: { at: "asc" },
+            orderBy: { at: "desc" },
+            take: EVENT_LIST_CAP + 1,
             select: {
               fromStatus: true,
               toStatus: true,
@@ -261,8 +348,14 @@ export async function generateStudentArchive(
           active: true,
           createdAt: true,
           updatedAt: true,
+          // Ticket D5b — one conversation's history is capped independently
+          // of every other conversation's (Prisma's nested `take` applies
+          // per parent row), newest-first with one row past MESSAGE_CAP so
+          // the code below can tell "hit the cap" apart from "had exactly
+          // MESSAGE_CAP messages and no more" — see capNewestFirst.
           messages: {
-            orderBy: { createdAt: "asc" },
+            orderBy: { createdAt: "desc" },
+            take: MESSAGE_CAP + 1,
             select: { role: true, content: true, createdAt: true },
           },
         },
@@ -385,8 +478,11 @@ export async function generateStudentArchive(
           createdAt: true,
         },
       },
+      // Ticket D5b — capped, newest-first, one row past EVENT_LIST_CAP so
+      // capNewestFirst can tell a truncation apart from an exact fit.
       moodEntries: {
-        orderBy: { extractedAt: "asc" },
+        orderBy: { extractedAt: "desc" },
+        take: EVENT_LIST_CAP + 1,
         select: {
           score: true,
           context: true,
@@ -587,8 +683,10 @@ export async function generateStudentArchive(
           createdAt: true,
         },
       },
+      // Ticket D5b — capped, newest-first, one row past EVENT_LIST_CAP.
       notifications: {
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
+        take: EVENT_LIST_CAP + 1,
         select: {
           type: true,
           title: true,
@@ -618,8 +716,10 @@ export async function generateStudentArchive(
           author: { select: { displayName: true } },
         },
       },
+      // Ticket D5b — capped, newest-first, one row past EVENT_LIST_CAP.
       alerts: {
-        orderBy: { detectedAt: "asc" },
+        orderBy: { detectedAt: "desc" },
+        take: EVENT_LIST_CAP + 1,
         select: {
           type: true,
           severity: true,
@@ -635,8 +735,10 @@ export async function generateStudentArchive(
       // from — a transcript excerpt, not a new class of data — so this leans
       // include per the ticket's guidance rather than joining the fixture's
       // exemptions.
+      // Ticket D5b — capped, newest-first, one row past EVENT_LIST_CAP.
       failedExtractions: {
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
+        take: EVENT_LIST_CAP + 1,
         select: {
           extractorKey: true,
           payload: true,
@@ -661,7 +763,56 @@ export async function generateStudentArchive(
     archivedBy: archivedByTeacherId,
     fileCount: 0,
     entries: [],
+    truncated: [],
   };
+
+  // Ticket D5b — resolve every capped relation's actual export list, once,
+  // before any section below reads it. Each cap was already enforced at the
+  // query above (`take: cap + 1`); this is what decides whether the cap was
+  // actually hit and produces the manifest entry when it was.
+  const cappedNotifications = capNewestFirst(
+    student.notifications,
+    EVENT_LIST_CAP,
+    (row) => row.createdAt.getTime(),
+  );
+  if (cappedNotifications.truncated) {
+    recordTruncation(manifest, "Notification", EVENT_LIST_CAP, EVENT_LIST_CAP);
+  }
+
+  const cappedAlerts = capNewestFirst(student.alerts, EVENT_LIST_CAP, (row) => row.detectedAt.getTime());
+  if (cappedAlerts.truncated) recordTruncation(manifest, "StudentAlert", EVENT_LIST_CAP, EVENT_LIST_CAP);
+
+  const cappedMoodEntries = capNewestFirst(
+    student.moodEntries,
+    EVENT_LIST_CAP,
+    (row) => row.extractedAt.getTime(),
+  );
+  if (cappedMoodEntries.truncated) recordTruncation(manifest, "MoodEntry", EVENT_LIST_CAP, EVENT_LIST_CAP);
+
+  const cappedFailedExtractions = capNewestFirst(
+    student.failedExtractions,
+    EVENT_LIST_CAP,
+    (row) => row.createdAt.getTime(),
+  );
+  if (cappedFailedExtractions.truncated) {
+    recordTruncation(manifest, "FailedExtraction", EVENT_LIST_CAP, EVENT_LIST_CAP);
+  }
+
+  // Nested caps: one conversation's messages, or one connection's events,
+  // truncating does not affect any sibling conversation/connection — but the
+  // manifest records the MODEL once, not once per parent that happened to
+  // hit it (see recordTruncation).
+  const cappedConversations = (student.conversations ?? []).map((conversation) => {
+    const capped = capNewestFirst(conversation.messages, MESSAGE_CAP, (row) => row.createdAt.getTime());
+    if (capped.truncated) recordTruncation(manifest, "Message", MESSAGE_CAP, MESSAGE_CAP);
+    return { ...conversation, messages: capped.rows };
+  });
+
+  const cappedConnections = (student.connections ?? []).map((connection) => {
+    const capped = capNewestFirst(connection.events, EVENT_LIST_CAP, (row) => row.at.getTime());
+    if (capped.truncated) recordTruncation(manifest, "ConnectionEvent", EVENT_LIST_CAP, EVENT_LIST_CAP);
+    return { ...connection, events: capped.rows };
+  });
 
   // Create ZIP in memory
   const chunks: Buffer[] = [];
@@ -830,12 +981,12 @@ export async function generateStudentArchive(
   }
 
   // 7. Employer introductions as JSON (the disclosure record)
-  if (student.connections.length > 0) {
+  if (cappedConnections.length > 0) {
     // The frozen packet's `includedFields` is what the student approved and
     // what the employer page actually rendered, so it is the honest answer to
     // "what was shared". The rest of the packet is not repeated here — the
     // resume and cover letter are already in the archive as their own files.
-    const disclosures = student.connections.map((connection) => {
+    const disclosures = cappedConnections.map((connection) => {
       const packet = connection.packet as { includedFields?: unknown } | null;
       const sharedFields = Array.isArray(packet?.includedFields)
         ? packet.includedFields.filter((field): field is string => typeof field === "string")
@@ -868,7 +1019,7 @@ export async function generateStudentArchive(
   // 8. Sage transcripts — conversations with their messages nested, both
   // ordered oldest-first by the Prisma query above. The single biggest gap
   // this ticket closes.
-  addJsonSection("sage/conversations.json", "sage_conversation", student.conversations);
+  addJsonSection("sage/conversations.json", "sage_conversation", cappedConversations);
 
   // 9. Sage's own observations and daily/weekly panels.
   addJsonSection("sage/insights.json", "sage_insight", student.sageInsights);
@@ -900,7 +1051,7 @@ export async function generateStudentArchive(
 
   // 12. Vision board and mood.
   addJsonSection("vision-board.json", "vision_board_item", student.visionBoardItems);
-  addJsonSection("mood-entries.json", "mood_entry", student.moodEntries);
+  addJsonSection("mood-entries.json", "mood_entry", cappedMoodEntries.rows);
 
   // 13. Every resume/cover-letter draft (distinct from resume/resume-data.json,
   // the Portfolio's current one, exported above).
@@ -935,16 +1086,16 @@ export async function generateStudentArchive(
     "notification_preference",
     student.notificationPreferences,
   );
-  addJsonSection("notifications.json", "notification", student.notifications);
+  addJsonSection("notifications.json", "notification", cappedNotifications.rows);
 
   // 19. Staff-authored content about the student. See the select block above
   // for the CaseNote-category confidentiality decision.
   addJsonSection("case-notes.json", "case_note", student.caseNotes);
-  addJsonSection("alerts.json", "student_alert", student.alerts);
+  addJsonSection("alerts.json", "student_alert", cappedAlerts.rows);
 
   // 20. Dead-letter copies of failed Sage extractions — a capped snapshot of
   // the student's own message, not a new class of data.
-  addJsonSection("failed-extractions.json", "failed_extraction", student.failedExtractions);
+  addJsonSection("failed-extractions.json", "failed_extraction", cappedFailedExtractions.rows);
 
   // 21. Add manifest
   archive.append(JSON.stringify(manifest, null, 2), { name: "manifest.json" });
