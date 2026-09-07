@@ -8,26 +8,38 @@
  * (add_portfolio_item, file_document as cert_evidence) with concrete values
  * instead of guessing from the gist.
  *
- * Routing mirrors file-gist and honors the recorded-consent decision
- * (2026-06-09), plus a local structured-classification step inserted between
- * the cloud path and the keyword heuristics (Task B):
- * - WITH active cloud_file_processing consent: document bytes go to Gemini for
- *   native document understanding (inline_data transport — same cloud boundary
- *   as the gist path).
- * - WITHOUT consent (or cloud classification failed): if a local AI provider
- *   is configured, extracted text is classified with generateStructuredResponse
- *   against the same schema shape as cloudClassify.
+ * Routing mirrors file-gist: the recorded-consent decision (2026-06-09)
+ * first, then the AI routing rules, then a local structured step, then
+ * keyword heuristics (Task B):
+ * - WITH active cloud_file_processing consent: the provider is resolved
+ *   through `resolveAiProvider` (`chat_file_gist`, `student_record`) and only
+ *   a provider that implements `describeDocument` (Gemini) receives the bytes
+ *   (inline_data transport — same cloud boundary as the gist path). A local
+ *   provider has no such method, so the cloud pass declines.
+ * - WITHOUT consent (or the cloud pass declined/failed): if the resolved
+ *   provider is the local one, extracted text is classified with
+ *   generateStructuredResponse against the same schema shape as the cloud
+ *   pass. Text never goes to a cloud provider from this step.
  * - Otherwise (no local provider, or the local pass didn't parse): keyword
  *   heuristics. Image-only files with no readable text fall through to
  *   method "none".
+ * Every routing decision writes an AI audit event (routed / completed /
+ * failed / blocked); until 2026-09 this file wrote none and posted the bytes
+ * to Gemini by raw fetch, bypassing the resolver (FERPA review, Known Issues).
  */
 
 import { z } from "zod";
 import { extractTextFromBuffer } from "./extract";
 import { logger } from "@/lib/logger";
 import { logLlmCall } from "@/lib/llm-usage";
-import { GEMINI_MODEL } from "@/lib/gemini";
 import { resolveAiProvider } from "@/lib/ai";
+import { AiCloudRefusedError } from "@/lib/ai/lanes";
+import {
+  getProviderClass,
+  logAiAuditEvent,
+  policyDecisionForProvider,
+} from "@/lib/ai/audit";
+import type { AIProvider, TokenUsage } from "@/lib/ai/types";
 
 const INLINE_CLOUD_LIMIT_BYTES = 15 * 1024 * 1024; // inline_data request ceiling
 const SUMMARY_MAX_CHARS = 400;
@@ -161,65 +173,141 @@ export function normalizeClassification(raw: unknown): AttachmentClassification 
   };
 }
 
+type ClassifyAuditBase = {
+  actorId: string;
+  actorRole: string;
+  targetId: string;
+  route: string;
+  task: "chat_file_gist";
+  sensitivity: "student_record";
+  policyDecision: ReturnType<typeof policyDecisionForProvider>;
+  providerName: string;
+  providerClass: ReturnType<typeof getProviderClass>;
+};
+
+function auditBaseFor(provider: AIProvider, studentId: string): ClassifyAuditBase {
+  return {
+    actorId: studentId,
+    actorRole: "student",
+    targetId: studentId,
+    route: "sage.classify_attachment",
+    task: "chat_file_gist",
+    sensitivity: "student_record",
+    policyDecision: policyDecisionForProvider(provider.name),
+    providerName: provider.name,
+    providerClass: getProviderClass(provider.name),
+  };
+}
+
+function providerModel(provider: AIProvider): string {
+  return (provider as { model?: string }).model?.trim() || provider.name;
+}
+
+/**
+ * Resolve the provider for this student's chat_file_gist task once per
+ * call. Returns null (never throws) when the policy refuses the cloud — the
+ * resolver already wrote the blocked audit event — or when resolution fails
+ * for any other reason, so the caller can fall through to keyword heuristics.
+ */
+async function resolveClassifier(studentId: string): Promise<AIProvider | null> {
+  try {
+    return await resolveAiProvider({
+      studentId,
+      task: "chat_file_gist",
+      sensitivity: "student_record",
+    });
+  } catch (error) {
+    if (error instanceof AiCloudRefusedError) return null;
+    logger.warn("Classification provider resolution failed; falling back", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * Cloud document understanding over the raw bytes. Only a provider that
+ * implements `describeDocument` is eligible; a local provider declines here
+ * (audited as blocked) and the caller runs the local pass on the same
+ * provider instead. Throws only when the provider call itself fails.
+ */
 async function cloudClassify(
+  provider: AIProvider,
   buffer: Buffer,
   mimeType: string,
   studentId: string,
 ): Promise<AttachmentClassification | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || buffer.length > INLINE_CLOUD_LIMIT_BYTES) return null;
+  if (buffer.length > INLINE_CLOUD_LIMIT_BYTES) return null;
+  const auditBase = auditBaseFor(provider, studentId);
 
-  const startedAt = Date.now();
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { inlineData: { mimeType, data: buffer.toString("base64") } },
-              { text: CLOUD_PROMPT },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }),
-    },
-  );
-  if (!response.ok) {
-    logger.warn("Cloud attachment classification failed", { status: response.status });
+  if (!provider.describeDocument) {
+    await logAiAuditEvent({
+      ...auditBase,
+      status: "blocked",
+      allowCloud: false,
+      reason: "The resolved provider cannot read document bytes; local classification only.",
+      errorCode: "NO_DOCUMENT_CAPABILITY",
+    });
     return null;
   }
 
-  const json = (await response.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
-  };
-  const text = json.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+  const allowCloud = auditBase.providerClass === "cloud";
+  await logAiAuditEvent({ ...auditBase, status: "routed", allowCloud, inputChars: buffer.length });
 
+  const startedAt = Date.now();
+  // Collected rather than assigned — see the same note in file-gist.ts.
+  const usages: TokenUsage[] = [];
+  let text: string;
+  try {
+    text = await provider.describeDocument(buffer, mimeType, CLOUD_PROMPT, {
+      responseFormat: "json",
+      responseSchema: RESPONSE_SCHEMA,
+      onUsage: (reported) => {
+        usages.push(reported);
+      },
+    });
+  } catch (error) {
+    await logAiAuditEvent({
+      ...auditBase,
+      status: "failed",
+      allowCloud,
+      errorCode: "provider_error",
+      reason: String(error).slice(0, 200),
+    });
+    throw error;
+  }
+
+  const reported = usages[0];
   await logLlmCall({
     studentId,
     callSite: "chat_file_gist",
-    model: GEMINI_MODEL,
-    inputTokens: json.usageMetadata?.promptTokenCount ?? 0,
-    outputTokens: json.usageMetadata?.candidatesTokenCount ?? 0,
-    totalTokens: json.usageMetadata?.totalTokenCount ?? 0,
+    model: providerModel(provider),
+    inputTokens: reported?.inputTokens ?? 0,
+    outputTokens: reported?.outputTokens ?? 0,
+    totalTokens: reported?.totalTokens ?? 0,
     durationMs: Date.now() - startedAt,
   });
 
-  if (!text.trim()) return null;
+  if (!text.trim()) {
+    await logAiAuditEvent({ ...auditBase, status: "failed", allowCloud, errorCode: "empty_reply" });
+    return null;
+  }
   try {
-    return normalizeClassification(JSON.parse(text));
+    const classification = normalizeClassification(JSON.parse(text));
+    await logAiAuditEvent({
+      ...auditBase,
+      status: classification ? "completed" : "failed",
+      allowCloud,
+      inputChars: buffer.length,
+      outputChars: classification?.summary.length,
+      ...(classification ? {} : { errorCode: "unparseable_classification" }),
+    });
+    return classification;
   } catch (error) {
     logger.warn("Cloud classification returned non-JSON", {
       error: error instanceof Error ? error.message : String(error),
     });
+    await logAiAuditEvent({ ...auditBase, status: "failed", allowCloud, errorCode: "non_json_reply" });
     return null;
   }
 }
@@ -255,56 +343,78 @@ const LOCAL_CLASSIFY_PROMPT =
   'Respond with a single JSON object only, e.g. {"kind":"form","title":null,"issuer":null,"dateOn":null,"isCompleted":null,"identifiers":[],"summary":"...","confidence":"low"}';
 
 /**
- * Local structured classification from extracted document text, using
- * whatever local AI provider is configured for this student's chat_file_gist
- * task. Only proceeds when the resolved provider is the local ("ollama")
- * provider — never sends text to a cloud provider from this path, since that
- * would bypass the consent gate that `cloudClassify` already enforces.
- * Returns null (never throws) on any resolution, request, or validation
- * failure so the caller can fall through to keyword heuristics.
+ * Local structured classification from extracted document text, using the
+ * provider already resolved for this student's chat_file_gist task. Only
+ * proceeds when that provider is the local ("ollama") one — never sends text
+ * to a cloud provider from this path, since that would bypass the consent
+ * gate that the cloud pass enforces; the refusal is audited as blocked
+ * rather than silent. Returns null (never throws) on any request or
+ * validation failure so the caller can fall through to keyword heuristics.
  */
 async function localClassify(
+  provider: AIProvider,
   text: string,
   studentId: string,
 ): Promise<AttachmentClassification | null> {
   if (!text.trim()) return null;
+  const auditBase = auditBaseFor(provider, studentId);
 
-  let provider;
-  try {
-    provider = await resolveAiProvider({
-      studentId,
-      task: "chat_file_gist",
-      sensitivity: "student_record",
-    });
-  } catch (error) {
-    logger.warn("Local classification provider resolution failed; falling back", {
-      error: error instanceof Error ? error.message : String(error),
+  // Only a configured local provider is eligible — never route this
+  // extracted text through a cloud provider outside the consent gate.
+  if (provider.name !== "ollama") {
+    await logAiAuditEvent({
+      ...auditBase,
+      status: "blocked",
+      allowCloud: false,
+      reason: "Local structured classification is local-only; the resolved provider was not local.",
     });
     return null;
   }
 
-  // Only a configured local provider is eligible — never route this
-  // extracted text through a cloud provider outside the consent gate above.
-  if (provider.name !== "ollama") return null;
+  await logAiAuditEvent({ ...auditBase, status: "routed", allowCloud: false, inputChars: text.length });
 
   try {
     const raw = await provider.generateStructuredResponse(LOCAL_CLASSIFY_PROMPT, [
       { role: "user", content: truncate(text, LOCAL_CLASSIFY_MAX_CHARS) },
     ]);
-    if (!raw.trim()) return null;
+    if (!raw.trim()) {
+      await logAiAuditEvent({ ...auditBase, status: "failed", allowCloud: false, errorCode: "empty_reply" });
+      return null;
+    }
 
     const parsed = LOCAL_CLASSIFICATION_SCHEMA.safeParse(JSON.parse(raw));
     if (!parsed.success) {
       logger.warn("Local classification failed schema validation; falling back", {
         error: parsed.error.message,
       });
+      await logAiAuditEvent({
+        ...auditBase,
+        status: "failed",
+        allowCloud: false,
+        errorCode: "schema_validation",
+      });
       return null;
     }
 
-    return normalizeClassification(parsed.data);
+    const classification = normalizeClassification(parsed.data);
+    await logAiAuditEvent({
+      ...auditBase,
+      status: "completed",
+      allowCloud: false,
+      inputChars: text.length,
+      outputChars: classification?.summary.length,
+    });
+    return classification;
   } catch (error) {
     logger.warn("Local classification threw; falling back to keyword heuristics", {
       error: error instanceof Error ? error.message : String(error),
+    });
+    await logAiAuditEvent({
+      ...auditBase,
+      status: "failed",
+      allowCloud: false,
+      errorCode: "provider_error",
+      reason: String(error).slice(0, 200),
     });
     return null;
   }
@@ -357,14 +467,21 @@ export async function classifyAttachment(params: {
 }): Promise<ClassifyAttachmentResult> {
   const { buffer, filename, mimeType, studentId, cloudAllowed } = params;
 
+  // One resolution per call. `undefined` = not attempted yet; `null` = the
+  // resolver refused or failed, so no model pass runs at all.
+  let provider: AIProvider | null | undefined;
+
   if (cloudAllowed) {
-    try {
-      const classification = await cloudClassify(buffer, mimeType, studentId);
-      if (classification) return { classification, method: "cloud" };
-    } catch (error) {
-      logger.warn("Cloud classification threw; falling back to local extraction", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+    provider = await resolveClassifier(studentId);
+    if (provider) {
+      try {
+        const classification = await cloudClassify(provider, buffer, mimeType, studentId);
+        if (classification) return { classification, method: "cloud" };
+      } catch (error) {
+        logger.warn("Cloud classification threw; falling back to local extraction", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 
@@ -374,7 +491,10 @@ export async function classifyAttachment(params: {
   });
 
   if (extraction?.text?.trim()) {
-    const localStructured = await localClassify(extraction.text, studentId);
+    if (provider === undefined) provider = await resolveClassifier(studentId);
+    const localStructured = provider
+      ? await localClassify(provider, extraction.text, studentId)
+      : null;
     if (localStructured) {
       return { classification: localStructured, method: "local_structured" };
     }
