@@ -4,8 +4,10 @@
  *
  * Runs fire-and-forget after the SSE stream completes (wired in
  * src/lib/chat/post-response.ts). The provider is resolved by the caller via
- * resolveAiProvider(), so FERPA routing (student_record → local-only policy)
- * is inherited from the chat pipeline, never re-decided here.
+ * resolveAiProvider(), so FERPA routing (student_record, ai_cloud_policy)
+ * is inherited from the chat pipeline, never re-decided here. The model call
+ * itself is audited HERE (routed / completed / failed), because the caller's
+ * event covers its own turn, not this extraction of the transcript.
  *
  * The write path (locking, dedupe, embeddings) lives in ./store.ts and is
  * shared with the staff-chat extractor (./staff-extract.ts) and the
@@ -17,6 +19,11 @@
 
 import { logLlmCall } from "@/lib/llm-usage";
 import { logger } from "@/lib/logger";
+import {
+  getProviderClass,
+  logAiAuditEvent,
+  policyDecisionForProvider,
+} from "@/lib/ai/audit";
 import type { AIProvider } from "@/lib/ai/types";
 import {
   memoryCandidateSchema,
@@ -112,11 +119,47 @@ export async function extractAndStoreMemories({
 }: ExtractMemoriesParams): Promise<ExtractMemoriesResult> {
   const empty: ExtractMemoriesResult = { stored: 0, deduped: 0, rejected: 0 };
 
+  // The student whose transcript this is: actor and target.
+  const providerClass = getProviderClass(provider.name);
+  const providerAudit = {
+    actorId: studentId,
+    actorRole: "student",
+    targetId: studentId,
+    route: "sage.memory_extract",
+    task: "sage_post_response" as const,
+    sensitivity: "student_record" as const,
+    policyDecision: policyDecisionForProvider(provider.name),
+    providerName: provider.name,
+    providerClass,
+    allowCloud: providerClass === "cloud",
+  };
+
   try {
     const recent = messages.slice(-12);
     if (recent.length === 0) return empty;
 
-    const raw = await provider.generateStructuredResponse(EXTRACTION_PROMPT, recent);
+    const inputChars =
+      EXTRACTION_PROMPT.length + recent.reduce((sum, m) => sum + m.content.length, 0);
+    await logAiAuditEvent({ ...providerAudit, status: "routed", inputChars });
+
+    let raw: string;
+    try {
+      raw = await provider.generateStructuredResponse(EXTRACTION_PROMPT, recent);
+    } catch (error) {
+      await logAiAuditEvent({
+        ...providerAudit,
+        status: "failed",
+        errorCode: "provider_error",
+        reason: String(error).slice(0, 200),
+      });
+      throw error;
+    }
+    await logAiAuditEvent({
+      ...providerAudit,
+      status: "completed",
+      inputChars,
+      outputChars: raw.length,
+    });
 
     await logEstimatedExtractionCost({
       subjectId: studentId,

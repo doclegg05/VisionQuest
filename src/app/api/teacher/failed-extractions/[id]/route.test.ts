@@ -32,6 +32,21 @@ mock.module("@/lib/audit", {
 mock.module("@/lib/ai", {
   namedExports: { resolveAiProvider: mockResolveAiProvider },
 });
+// The replay's provider resolution is AI-audited on its own events, separate
+// from the teacher.failed_extraction.* rows asserted below. Recorded here so
+// those assertions keep reading index 0 of logAuditEvent.
+const aiAuditEvents: Record<string, unknown>[] = [];
+mock.module("@/lib/ai/audit", {
+  namedExports: {
+    logAiAuditEvent: async (event: Record<string, unknown>) => {
+      aiAuditEvents.push(event);
+    },
+    getProviderClass: (name?: string | null) =>
+      name === "ollama" ? "local" : name === "gemini" ? "cloud" : name ? "unknown" : "none",
+    policyDecisionForProvider: (name?: string | null) =>
+      name === "ollama" ? "local_only" : "configured_provider",
+  },
+});
 mock.module("@/lib/sage/goal-extractor", {
   namedExports: { extractGoals: mockExtractGoals },
 });
@@ -136,6 +151,21 @@ describe("POST /api/teacher/failed-extractions/[id] — dismiss", () => {
 });
 
 describe("POST /api/teacher/failed-extractions/[id] — replay", () => {
+  it("writes routed then completed AI audit events with the teacher as actor and the student as target", async () => {
+    aiAuditEvents.length = 0;
+    const res = (await POST(makeRequest("replay"), { params })) as Response;
+    assert.equal(res.status, 200);
+    assert.deepEqual(aiAuditEvents.map((event) => event.status), ["routed", "completed"]);
+    for (const event of aiAuditEvents) {
+      assert.equal(event.task, "sage_post_response");
+      assert.equal(event.sensitivity, "student_record");
+      assert.equal(event.actorId, "teacher-1");
+      assert.equal(event.actorRole, "teacher");
+      assert.equal(event.targetId, "stu-1");
+      assert.equal(event.providerName, "fake");
+    }
+  });
+
   it("re-runs extractGoals on the stored snapshot and proposes via proposeGoal", async () => {
     const res = (await POST(makeRequest("replay"), { params })) as Response;
     const body = await res.json();

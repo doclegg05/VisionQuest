@@ -19,6 +19,13 @@ import { prismaAdmin } from "@/lib/db";
 import { withRlsContext } from "@/lib/rls-context";
 import { withUsageLogging } from "@/lib/llm-usage";
 import { resolveAiProvider } from "@/lib/ai/provider";
+import { AiCloudRefusedError } from "@/lib/ai/lanes";
+import {
+  getProviderClass,
+  logAiAuditEvent,
+  policyDecisionForProvider,
+} from "@/lib/ai/audit";
+import type { AIProvider } from "@/lib/ai/types";
 import { logger } from "@/lib/logger";
 import { assembleStudentContextBundle } from "@/lib/sage/context-bundle";
 import { sanitizeForPrompt } from "@/lib/sage/system-prompts";
@@ -190,11 +197,55 @@ export async function runDailyBriefing(
   // check, and both of them were doing the opposite.
   const sanitizedBundle = sanitizeForPrompt(JSON.stringify(bundle).slice(0, 4000));
 
-  const baseProvider = await resolveAiProvider({
-    studentId,
-    task: "sage_briefing",
-    sensitivity: "student_record",
+  // AI audit: the run is autonomous, so the actor is the autopilot sentinel
+  // with role "system" (same reasoning as AUTOPILOT_ACTOR above — nobody
+  // human asked) and the student is the target.
+  const aiAudit = {
+    actorId: AUTOPILOT_ACTOR,
+    actorRole: "system",
+    targetId: studentId,
+    route: "sage.briefing",
+    task: "sage_briefing" as const,
+    sensitivity: "student_record" as const,
+  };
+  let baseProvider: AIProvider;
+  try {
+    baseProvider = await resolveAiProvider({
+      studentId,
+      task: aiAudit.task,
+      sensitivity: aiAudit.sensitivity,
+    });
+  } catch (error) {
+    // A policy refusal is audited by the resolver; anything else is recorded
+    // here before the job retries.
+    if (!(error instanceof AiCloudRefusedError)) {
+      await logAiAuditEvent({
+        ...aiAudit,
+        policyDecision: "blocked",
+        status: "blocked",
+        providerName: null,
+        providerClass: "none",
+        allowCloud: false,
+        reason: error instanceof Error ? error.message : String(error),
+        errorCode: "LOCAL_AI_UNAVAILABLE",
+      });
+    }
+    throw error;
+  }
+  const providerClass = getProviderClass(baseProvider.name);
+  const providerAudit = {
+    ...aiAudit,
+    policyDecision: policyDecisionForProvider(baseProvider.name),
+    providerName: baseProvider.name,
+    providerClass,
+    allowCloud: providerClass === "cloud",
+  };
+  await logAiAuditEvent({
+    ...providerAudit,
+    status: "routed",
+    inputChars: sanitizedBundle.length,
   });
+
   const provider = withUsageLogging(baseProvider, {
     studentId,
     callSite: "sage_auto.briefing",
@@ -223,6 +274,7 @@ export async function runDailyBriefing(
   if (turn.violation) {
     // Anomalous model behavior — fail permanently (no retry) and leave a trail.
     await markFailed(panel.id, `tool_violation:${turn.violation}`, baseMeta);
+    await logAiAuditEvent({ ...providerAudit, status: "failed", errorCode: "tool_violation" });
     await logSageAction({
       studentId,
       invokedBy: AUTOPILOT_ACTOR,
@@ -236,6 +288,7 @@ export async function runDailyBriefing(
   }
   if (turn.stopReason === "error" || !turn.finalText.trim()) {
     await markFailed(panel.id, "agent_turn_failed", baseMeta);
+    await logAiAuditEvent({ ...providerAudit, status: "failed", errorCode: "agent_turn_failed" });
     // Log key, not the id: this message lands in BackgroundJob.error and the
     // job runner's log line (review F59, 2026-09-01).
     throw new Error(`briefing: agent turn failed for student ${studentLogKey(studentId)}`); // job retries
@@ -279,6 +332,7 @@ export async function runDailyBriefing(
 
   if (!attempt.spec) {
     await markFailed(panel.id, `invalid_spec:${attempt.zodError ?? "unknown"}`, meta);
+    await logAiAuditEvent({ ...providerAudit, status: "failed", errorCode: "invalid_spec" });
     return; // dashboard falls back to static panels; no retry (2 strikes)
   }
 
@@ -293,6 +347,13 @@ export async function runDailyBriefing(
       model: baseProvider.name,
       meta,
     },
+  });
+  await logAiAuditEvent({
+    ...providerAudit,
+    status: "completed",
+    inputChars: sanitizedBundle.length,
+    outputChars: attempt.raw.length,
+    metadata: { toolCalls: turn.toolCallCount, retries },
   });
 
   await logSageAction({

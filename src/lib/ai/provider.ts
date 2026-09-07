@@ -9,6 +9,7 @@ import {
   toLocalAiAuthConfig,
 } from "./local-config";
 import { isSameModelTag, roleForTask, type AiRole } from "./roles";
+import { enforceCloudPolicy, isLocalOnlySensitivity } from "./lanes";
 import { OllamaProvider } from "./ollama-provider";
 import { GeminiProvider } from "./gemini-provider";
 import type {
@@ -24,8 +25,20 @@ async function getConfiguredProviderType(): Promise<AIProviderType> {
   return providerType === "local" ? "local" : "cloud";
 }
 
-async function getCloudProvider(studentId: string): Promise<AIProvider> {
-  const apiKey = await resolveApiKey(studentId);
+/**
+ * A student's personal Gemini key may serve ONLY public-program prompts. A
+ * consumer key is outside any program-level agreement with the vendor, so a
+ * student_record or staff_entered prompt sent under it would leave every
+ * contractual protection behind (FERPA review, report C2). Those calls use
+ * the platform key whatever the student has entered in Settings.
+ */
+async function getCloudProvider(
+  studentId: string,
+  sensitivity: DataSensitivity,
+): Promise<AIProvider> {
+  const apiKey = await resolveApiKey(studentId, {
+    allowPersonalKey: !isLocalOnlySensitivity(sensitivity),
+  });
   return new GeminiProvider(apiKey);
 }
 
@@ -140,10 +153,6 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
   );
 }
 
-function isLocalOnlySensitivity(sensitivity: DataSensitivity): boolean {
-  return sensitivity === "student_record" || sensitivity === "staff_entered";
-}
-
 /**
  * Resolve the active AI provider based on SystemConfig.
  *
@@ -160,39 +169,64 @@ export async function getProvider(
   const providerType = await getConfiguredProviderType();
   return providerType === "local"
     ? getLocalProvider(role)
-    : getCloudProvider(studentId);
+    : getCloudProvider(studentId, "configured");
 }
 
 /**
- * Resolve a provider for a specific task. Student-record and staff-entered
- * prompts are FERPA-sensitive and route to a local model when one is
- * configured (`ai_provider = "local"`). During alpha/pre-hardware testing
- * the operator can flip `ai_provider = "cloud"` to honor the configured
- * cloud provider for these prompts too — every request is still recorded
- * in the AI audit log so the data path remains auditable.
+ * Resolve a provider for a specific task.
+ *
+ * Two settings decide the outcome, in this order:
+ *
+ *  1. `ai_provider` decides WHICH provider is configured. `"local"` serves
+ *     every call from the local model and never consults the policy below;
+ *     `"cloud"` or unset serves every call from Gemini. `preferCloud` lifts a
+ *     `public_program` call to Gemini even on a local deployment.
+ *  2. `ai_cloud_policy` decides WHETHER a cloud resolution is allowed for
+ *     this task and sensitivity (src/lib/ai/lanes.ts):
+ *       - `permissive` (default): always. This is exactly the routing that
+ *         shipped before the switch existed — student_record and
+ *         staff_entered prompts reach Gemini whenever `ai_provider` is
+ *         cloud or unset. Production runs here today.
+ *       - `lanes`: the `batch` and `emotional` lanes (document bytes, résumé
+ *         extraction, endorsements) refuse; `coaching` may go cloud.
+ *       - `local_only`: everything `lanes` refuses, plus every
+ *         student_record / staff_entered prompt.
+ *
+ * A refusal writes a `blocked` AI audit event and throws
+ * `AiCloudRefusedError`; there is no fallback. Callers must fail closed —
+ * the chat route maps a resolver throw to a 503 with the 988 block, which
+ * is the intended failure mode. Every allowed cloud call is recorded by its
+ * caller's own audit event, so the data path stays auditable either way.
+ *
+ * `.claude/rules/sage-ai.md` states this same rule; keep the two in step.
  */
 export async function resolveAiProvider(
   request: AIProviderRequest,
 ): Promise<AIProvider> {
-  // The role decides WHICH local model serves the call; sensitivity still
-  // decides WHETHER a local model serves it at all. Roles never widen the
-  // FERPA routing rule below, and the cloud provider ignores roles entirely
+  // The role decides WHICH local model serves the call; `ai_provider` and the
+  // cloud policy decide WHETHER a local model serves it at all. Roles never
+  // widen the routing rule, and the cloud provider ignores roles entirely
   // (Gemini is one model for every job).
   const role = request.role ?? roleForTask(request.task);
 
-  if (isLocalOnlySensitivity(request.sensitivity)) {
-    const providerType = await getConfiguredProviderType();
-    if (providerType === "local") {
-      return getLocalProvider(role);
-    }
-    return getCloudProvider(request.studentId);
+  const providerType = await getConfiguredProviderType();
+  const cloudRequested =
+    providerType === "cloud" ||
+    (request.preferCloud === true && request.sensitivity === "public_program");
+
+  if (!cloudRequested) {
+    return getLocalProvider(role);
   }
 
-  if (request.preferCloud && request.sensitivity === "public_program") {
-    return getCloudProvider(request.studentId);
-  }
+  // Throws AiCloudRefusedError (after the blocked audit event) when the
+  // policy refuses this task/sensitivity on a cloud model.
+  await enforceCloudPolicy({
+    studentId: request.studentId,
+    task: request.task,
+    sensitivity: request.sensitivity,
+  });
 
-  return getProvider(request.studentId, role);
+  return getCloudProvider(request.studentId, request.sensitivity);
 }
 
 export function getPromptTier(provider: AIProvider): PromptTier {

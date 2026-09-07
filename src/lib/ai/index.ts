@@ -24,6 +24,18 @@ export {
   roleForTask,
 } from "./roles";
 export type { AiRole, AiRoleProfile } from "./roles";
+export {
+  AI_CLOUD_POLICIES,
+  AiCloudRefusedError,
+  DEFAULT_AI_CLOUD_POLICY,
+  TASK_LANES,
+  cloudRefusalReason,
+  isLocalOnlySensitivity,
+  laneForTask,
+  parseAiCloudPolicy,
+  readAiCloudPolicy,
+} from "./lanes";
+export type { AiCloudPolicy, AiLane } from "./lanes";
 export { DEFAULT_LOCAL_AI_AUTH_MODE, resolveLocalAiAuthMode } from "./local-auth";
 export { resolveEmbeddingProvider, getActiveEmbeddingModel } from "./embedding-provider";
 export { EMBEDDING_DIMENSIONS } from "./embedding-types";

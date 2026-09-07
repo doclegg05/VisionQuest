@@ -21,6 +21,19 @@ mock.module("@/lib/llm-usage", {
   },
 });
 
+// The routing decisions are now audited; the event shapes are pinned in
+// classify-attachment.routing.test.ts. A no-op here keeps these tests about
+// precedence.
+mock.module("@/lib/ai/audit", {
+  namedExports: {
+    logAiAuditEvent: async () => undefined,
+    getProviderClass: (name?: string | null) =>
+      name === "ollama" ? "local" : name === "gemini" ? "cloud" : name ? "unknown" : "none",
+    policyDecisionForProvider: (name?: string | null) =>
+      name === "ollama" ? "local_only" : "configured_provider",
+  },
+});
+
 let ATTACHMENT_KINDS: typeof import("./classify-attachment").ATTACHMENT_KINDS;
 let classifyFromText: typeof import("./classify-attachment").classifyFromText;
 let normalizeClassification: typeof import("./classify-attachment").normalizeClassification;
@@ -262,35 +275,34 @@ describe("classifyAttachment — precedence: cloud -> local structured -> keywor
     assert.equal(result.classification.kind, "resume");
   });
 
-  it("cloud consent path is unchanged: with consent + a working cloud call, method is 'cloud' and local/keywords are skipped", async () => {
+  it("cloud consent path goes through the resolver: with consent + a provider that reads documents, method is 'cloud' and local/keywords are skipped", async () => {
+    // An env key plus a live fetch must never be enough on their own — the
+    // raw-fetch bypass the FERPA review found is gone.
     process.env.GEMINI_API_KEY = "test-key";
-    global.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              content: {
-                parts: [
-                  {
-                    text: JSON.stringify({
-                      kind: "transcript",
-                      title: "Fall Semester Transcript",
-                      issuer: null,
-                      dateOn: null,
-                      isCompleted: null,
-                      identifiers: [],
-                      summary: "A transcript.",
-                      confidence: "high",
-                    }),
-                  },
-                ],
-              },
-            },
-          ],
-          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
-        }),
-        { status: 200 },
-      )) as unknown as typeof fetch;
+    let fetchCalls = 0;
+    global.fetch = (async () => {
+      fetchCalls += 1;
+      throw new Error("classify-attachment must not call fetch directly");
+    }) as unknown as typeof fetch;
+
+    const describeDocument = mock.fn(async () =>
+      JSON.stringify({
+        kind: "transcript",
+        title: "Fall Semester Transcript",
+        issuer: null,
+        dateOn: null,
+        isCompleted: null,
+        identifiers: [],
+        summary: "A transcript.",
+        confidence: "high",
+      }),
+    );
+    mockResolveAiProvider.mock.mockImplementation(async () => ({
+      name: "gemini",
+      model: "gemini-test",
+      describeDocument,
+      generateStructuredResponse: async () => "{}",
+    }));
 
     const result = await classifyAttachment({
       buffer: txtBuffer("irrelevant text — cloud path should win before extraction even matters"),
@@ -302,12 +314,18 @@ describe("classifyAttachment — precedence: cloud -> local structured -> keywor
 
     assert.equal(result.method, "cloud");
     assert.equal(result.classification.kind, "transcript");
-    // Cloud success short-circuits before local resolution is ever attempted.
-    assert.equal(mockResolveAiProvider.mock.callCount(), 0);
+    assert.equal(fetchCalls, 0);
+    // One resolution serves the whole call; cloud success short-circuits
+    // before the local structured pass.
+    assert.equal(mockResolveAiProvider.mock.callCount(), 1);
+    assert.equal(describeDocument.mock.callCount(), 1);
+    const options = (describeDocument.mock.calls[0].arguments as unknown[])[3] as { responseFormat?: string };
+    assert.equal(options?.responseFormat, "json");
   });
 
-  it("cloud consent path is unchanged: cloud failure (no API key) still falls through to local/keywords", async () => {
-    // GEMINI_API_KEY intentionally left unset (cloudClassify returns null immediately).
+  it("cloud consent path: a resolved provider that cannot read documents (ai_provider=local) still falls through to local/keywords", async () => {
+    // The resolver returns the local provider, which has no describeDocument
+    // — the cloud path declines and the same provider serves the local pass.
     mockResolveAiProvider.mock.mockImplementation(async () => ({
       name: "ollama",
       generateStructuredResponse: async () =>

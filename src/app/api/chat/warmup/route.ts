@@ -4,7 +4,13 @@ import { getBaseStudentPromptContext } from "@/lib/chat/context";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-import { resolveAiProvider } from "@/lib/ai";
+import { resolveAiProvider, type AIProvider } from "@/lib/ai";
+import { AiCloudRefusedError } from "@/lib/ai/lanes";
+import {
+  getProviderClass,
+  logAiAuditEvent,
+  policyDecisionForProvider,
+} from "@/lib/ai/audit";
 import { logger } from "@/lib/logger";
 
 /**
@@ -64,13 +70,72 @@ export const GET = withRegistry("sage.warmup", async (session, _req, _ctx, _tool
 
 const WARMUP_PING_TIMEOUT_MS = 30_000;
 
+const WARMUP_AUDIT = {
+  route: "/api/chat/warmup",
+  task: "sage_student_chat" as const,
+  sensitivity: "student_record" as const,
+};
+
 async function pingLocalModelIfApplicable(studentId: string): Promise<void> {
-  const provider = await resolveAiProvider({
-    studentId,
-    task: "sage_student_chat",
-    sensitivity: "student_record",
+  let provider: AIProvider;
+  try {
+    provider = await resolveAiProvider({
+      studentId,
+      ...WARMUP_AUDIT,
+    });
+  } catch (error) {
+    // A policy refusal is audited by the resolver itself; anything else
+    // (an unconfigured local server) is recorded here so the accountability
+    // report can see a warmup that resolved nothing.
+    if (!(error instanceof AiCloudRefusedError)) {
+      await logAiAuditEvent({
+        actorId: studentId,
+        actorRole: "student",
+        ...WARMUP_AUDIT,
+        policyDecision: "blocked",
+        status: "blocked",
+        targetId: studentId,
+        providerName: null,
+        providerClass: "none",
+        allowCloud: false,
+        reason: error instanceof Error ? error.message : String(error),
+        errorCode: "LOCAL_AI_UNAVAILABLE",
+      });
+    }
+    throw error;
+  }
+
+  const providerClass = getProviderClass(provider.name);
+  if (provider.name !== "ollama") {
+    // Nothing is sent: the ping exists to keep a LOCAL model resident. Recorded
+    // as "direct" — the existing vocabulary for "no model received a request".
+    await logAiAuditEvent({
+      actorId: studentId,
+      actorRole: "student",
+      ...WARMUP_AUDIT,
+      policyDecision: "direct_no_model",
+      status: "direct",
+      targetId: studentId,
+      providerName: provider.name,
+      providerClass,
+      allowCloud: false,
+      reason: "Warmup ping skipped: the resolved provider is not the local model; no request sent.",
+    });
+    return;
+  }
+
+  await logAiAuditEvent({
+    actorId: studentId,
+    actorRole: "student",
+    ...WARMUP_AUDIT,
+    policyDecision: policyDecisionForProvider(provider.name),
+    status: "routed",
+    targetId: studentId,
+    providerName: provider.name,
+    providerClass,
+    allowCloud: false,
+    reason: "Warmup ping keeps the local model resident; carries no student content.",
   });
-  if (provider.name !== "ollama") return;
 
   // Tiny one-token request. Cost is dominated by the model-load step on
   // cold start; once warm, generation is sub-100ms.
