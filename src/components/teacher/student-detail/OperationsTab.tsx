@@ -577,7 +577,8 @@ export default function OperationsTab({
           <select
             value={noteForm.category}
             onChange={(event) => onNoteFormChange((current) => ({ ...current, category: event.target.value }))}
-            className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Note category"
+            className="min-h-11 theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {NOTE_CATEGORIES.map((category) => (
               <option key={category.value} value={category.value}>
