@@ -48,6 +48,24 @@ export interface DeidentifyOptions {
    * reused when it recurs, and is reversible within this request.
    */
   freeText?: boolean;
+  /**
+   * Values that must never be tokenized, wherever they appear: the 988 crisis
+   * line and its 1-800 alias, the program office's own contact details, the
+   * program's own name. Two reasons they are an allowlist rather than an
+   * accident of the patterns:
+   *
+   *  - The system prompt carries them and the student must be able to read
+   *    them back out of Sage's reply. A tokenized crisis number that fails to
+   *    re-hydrate is a safety regression, not a privacy win.
+   *  - They are not anybody's personal data, so vaulting them buys nothing.
+   *
+   * Matching is word-boundary anchored and case-insensitive, and a
+   * NANP-shaped entry also protects its other common formattings. A DIFFERENT
+   * value of the same shape (a student's own phone) is untouched by this and
+   * is still tokenized — see the resolver's constant list in
+   * ./deidentify-allowlist.ts.
+   */
+  allowlist?: readonly string[];
 }
 
 // ─── Word boundaries ─────────────────────────────────────────────────────────
@@ -116,16 +134,26 @@ interface StructuredEntry {
 
 type NameKind = "student" | "other";
 
+type NameCandidate = Omit<StructuredEntry, "token"> & {
+  key: string;
+  /**
+   * True for the FIRST word of a multi-word name (skipping honorifics). The
+   * student's own first name gets its own token so a first-name-only mention
+   * re-hydrates to the first name — see `[STUDENT_FIRST_NAME]` below.
+   */
+  isGivenName: boolean;
+};
+
 /**
  * Candidate entries for one name. A multi-word name matches as a whole (any
  * case) AND each part of 3+ characters under the capitalisation rule; a
  * single-word name matches only itself.
  */
-function nameEntries(value: string, kind: NameKind): Array<Omit<StructuredEntry, "token"> & { key: string }> {
+function nameEntries(value: string, kind: NameKind): NameCandidate[] {
   const words = nameWords(value);
   if (words.length === 0) return [];
 
-  const out: Array<Omit<StructuredEntry, "token"> & { key: string }> = [];
+  const out: NameCandidate[] = [];
   const minSingle = kind === "student" ? STUDENT_NAME_MIN_LENGTH : OTHER_NAME_MIN_LENGTH;
 
   if (words.length === 1) {
@@ -137,6 +165,9 @@ function nameEntries(value: string, kind: NameKind): Array<Omit<StructuredEntry,
         source: escapeRegExp(word),
         length: word.length,
         requireCapital: word.length < CASE_INSENSITIVE_MIN_LENGTH,
+        // A one-word display name IS the whole name: splitting it would issue
+        // two tokens for one value with nothing to distinguish them.
+        isGivenName: false,
       },
     ];
   }
@@ -147,18 +178,40 @@ function nameEntries(value: string, kind: NameKind): Array<Omit<StructuredEntry,
     source: words.map(escapeRegExp).join(NAME_SEPARATOR),
     length: whole.length,
     requireCapital: false,
+    isGivenName: false,
   });
+  let seenGivenName = false;
   for (const word of words) {
     if (word.length < NAME_PART_MIN_LENGTH) continue;
     if (HONORIFICS.has(word.toLowerCase())) continue;
+    const isGivenName = !seenGivenName;
+    seenGivenName = true;
     out.push({
       key: word.toLowerCase(),
       source: escapeRegExp(word),
       length: word.length,
       requireCapital: word.length < CASE_INSENSITIVE_MIN_LENGTH,
+      isGivenName,
     });
   }
   return out;
+}
+
+/**
+ * The word `nameEntries` would mark as the given name, in its ORIGINAL casing
+ * — the value `[STUDENT_FIRST_NAME]` re-hydrates to. Null when the display
+ * name is one word (the whole name already covers it) or when no word
+ * qualifies.
+ */
+function givenNameWord(value: string): string | null {
+  const words = nameWords(value);
+  if (words.length < 2) return null;
+  for (const word of words) {
+    if (word.length < NAME_PART_MIN_LENGTH) continue;
+    if (HONORIFICS.has(word.toLowerCase())) continue;
+    return word;
+  }
+  return null;
 }
 
 function literalEntry(value: string, minLength: number): { key: string; source: string; length: number } | null {
@@ -182,6 +235,30 @@ function phoneEntry(value: string): { key: string; source: string; length: numbe
     source: `(?:\\+?1[\\s.\\-]?)?\\(?${digits.slice(0, 3)}\\)?${sep}${digits.slice(3, 6)}${sep}${digits.slice(6)}`,
     length: digits.length,
   };
+}
+
+/**
+ * One regex source protecting every allowlisted value, longest first, word
+ * boundary anchored. A NANP-shaped entry reuses `phoneEntry` so
+ * "1-800-273-8255" also protects "(800) 273-8255"; everything else is a
+ * literal. Returns null for an empty allowlist so the hot path skips the
+ * segmentation entirely.
+ */
+function allowlistPattern(values: readonly string[]): RegExp | null {
+  const sources: Array<{ source: string; length: number }> = [];
+  for (const raw of values) {
+    const value = raw?.trim();
+    if (!value) continue;
+    const entry = /\d/.test(value) ? phoneEntry(value) : literalEntry(value, 1);
+    if (entry) sources.push({ source: entry.source, length: value.length });
+    else sources.push({ source: escapeRegExp(value), length: value.length });
+  }
+  if (sources.length === 0) return null;
+  sources.sort((a, b) => b.length - a.length);
+  return new RegExp(
+    `${NOT_AFTER_WORD}(?:${sources.map((s) => s.source).join("|")})${NOT_BEFORE_WORD}`,
+    "giu",
+  );
 }
 
 // ─── Free-text families ──────────────────────────────────────────────────────
@@ -271,6 +348,8 @@ export class TokenVault {
   private readonly structuredEntries: StructuredEntry[];
   private readonly structuredPattern: RegExp | null;
   private readonly families: FreeTextFamily[];
+  /** Values never tokenized; null when the allowlist is empty. */
+  private readonly allowlist: RegExp | null;
   /** family prefix + normalised value → token (free-text reuse). */
   private readonly freeTextTokens = new Map<string, string>();
   private readonly freeTextCounters = new Map<string, number>();
@@ -282,7 +361,13 @@ export class TokenVault {
     maxLength: 0,
   };
 
-  private constructor(entries: StructuredEntry[], values: Map<string, string>, families: FreeTextFamily[]) {
+  private constructor(
+    entries: StructuredEntry[],
+    values: Map<string, string>,
+    families: FreeTextFamily[],
+    allowlist: RegExp | null,
+  ) {
+    this.allowlist = allowlist;
     this.structuredEntries = [...entries].sort((a, b) => b.length - a.length);
     this.structuredPattern =
       this.structuredEntries.length === 0
@@ -320,7 +405,28 @@ export class TokenVault {
     };
 
     if (input.studentName?.trim()) {
-      add("[STUDENT_NAME]", nameEntries(input.studentName, "student"), input.studentName);
+      // [STUDENT_NAME] takes the whole display name and every part except the
+      // given name; [STUDENT_FIRST_NAME] takes the given name and re-hydrates
+      // to it alone. Without the split, Sage's scripted "Hey [name]" echo came
+      // back as "Hey Jordan Lee" — one token cannot carry two values, and the
+      // full name is the wrong one for the greeting.
+      //
+      // Order matters: the full-name entries claim their keys first, so the
+      // whole name (longest) is always tried before the given name.
+      const candidates = nameEntries(input.studentName, "student");
+      add(
+        "[STUDENT_NAME]",
+        candidates.filter((candidate) => !candidate.isGivenName),
+        input.studentName,
+      );
+      const given = givenNameWord(input.studentName);
+      if (given) {
+        add(
+          "[STUDENT_FIRST_NAME]",
+          candidates.filter((candidate) => candidate.isGivenName),
+          given,
+        );
+      }
     }
     if (input.studentEmail?.trim()) {
       const entry = literalEntry(input.studentEmail, 3);
@@ -347,7 +453,12 @@ export class TokenVault {
       if (add(token, nameEntries(name, "other"), name)) personIndex += 1;
     }
 
-    return new TokenVault(entries, values, freeText ? freeTextFamilies() : []);
+    return new TokenVault(
+      entries,
+      values,
+      freeText ? freeTextFamilies() : [],
+      allowlistPattern(options.allowlist ?? []),
+    );
   }
 
   /** True when the vault holds no token at all — callers skip wrapping then. */
@@ -371,6 +482,23 @@ export class TokenVault {
    * same output, and a free-text value seen again reuses its token.
    */
   pseudonymize(text: string): string {
+    if (!this.allowlist) return this.pseudonymizeSegment(text);
+    // Split around allowlisted values and transform only what is between
+    // them, so an allowlisted value is returned byte-for-byte and never
+    // issues a token. Anchored on the whole text, not per family, so one
+    // pass protects structured substitution and free-text detection alike.
+    let out = "";
+    let last = 0;
+    this.allowlist.lastIndex = 0;
+    for (const match of text.matchAll(this.allowlist)) {
+      const index = match.index ?? 0;
+      out += this.pseudonymizeSegment(text.slice(last, index)) + match[0];
+      last = index + match[0].length;
+    }
+    return out + this.pseudonymizeSegment(text.slice(last));
+  }
+
+  private pseudonymizeSegment(text: string): string {
     let out = text;
     if (this.structuredPattern) {
       const entries = this.structuredEntries;
