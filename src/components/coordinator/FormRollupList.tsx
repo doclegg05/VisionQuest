@@ -8,8 +8,10 @@ interface TemplateRow {
   templateId: string;
   title: string;
   isOfficial: boolean;
-  assignmentCount: number;
-  responseCount: number;
+  /** True when this region has too few students to show per-form counts. */
+  suppressed: boolean;
+  assignmentCount: number | null;
+  responseCount: number | null;
   completionRate: number | null;
 }
 
@@ -101,13 +103,26 @@ export default function FormRollupList({ regionId }: { regionId: string }) {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-[var(--ink-muted)]">
-                  {template.responseCount} response{template.responseCount === 1 ? "" : "s"} from{" "}
-                  {data?.rollup.studentCount ?? 0} student
-                  {data?.rollup.studentCount === 1 ? "" : "s"} in this region ·{" "}
-                  {template.assignmentCount} assignment{template.assignmentCount === 1 ? "" : "s"}
-                </p>
+                {template.suppressed ? (
+                  // Small-cell suppression. In a region this small, a count
+                  // for a named form is close to naming who answered it, so
+                  // the server does not send one. Say why in plain words
+                  // rather than showing a zero the reader would misread.
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    Too few students to show counts for this form.
+                  </p>
+                ) : (
+                  <p className="text-xs text-[var(--ink-muted)]">
+                    {template.responseCount} response{template.responseCount === 1 ? "" : "s"} from{" "}
+                    {data?.rollup.studentCount ?? 0} student
+                    {data?.rollup.studentCount === 1 ? "" : "s"} in this region ·{" "}
+                    {template.assignmentCount} assignment{template.assignmentCount === 1 ? "" : "s"}
+                  </p>
+                )}
               </div>
+              {/* Not gated on `suppressed`: the CSV is the admin's own
+                  program-wide export, not this region's counts, so a small
+                  region is no reason to take an admin's link away. */}
               {data?.canExport && (
                 <a
                   href={`/api/teacher/forms/${template.templateId}/export`}
