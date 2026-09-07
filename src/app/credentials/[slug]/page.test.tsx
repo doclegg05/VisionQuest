@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
+import { READY_TO_WORK_FAMILY_CERT_TYPES } from "@/lib/certifications";
 
 /**
  * FERPA review W7 (2026-09-06). The public credential page is one of two
@@ -22,10 +23,12 @@ const state = {
   page: null as any,
 };
 
+const mockFindUnique = mock.fn(async () => state.page) as any;
+
 mock.module("@/lib/db", {
   namedExports: {
     prismaAdmin: {
-      publicCredentialPage: { findUnique: async () => state.page },
+      publicCredentialPage: { findUnique: mockFindUnique },
     },
   },
 });
@@ -90,6 +93,7 @@ async function render(slug = "tanesha-rivers") {
 
 beforeEach(() => {
   state.page = publishedPage();
+  mockFindUnique.mock.resetCalls();
 });
 
 describe("/credentials/[slug] — the public credential page", () => {
@@ -117,6 +121,15 @@ describe("/credentials/[slug] — the public credential page", () => {
 
   it("tells crawlers not to index or follow", () => {
     assert.deepEqual(credentialsMetadata?.robots, { index: false, follow: false });
+  });
+
+  it("reads the Ready-to-Work family, not an exact 'ready-to-work' match, so a family-member certification (D7) still publishes here", async () => {
+    await render();
+
+    assert.equal(mockFindUnique.mock.callCount(), 1);
+    const args = mockFindUnique.mock.calls[0].arguments[0] as any;
+    const certWhere = args.include.student.select.certifications.where;
+    assert.deepEqual(certWhere.certType.in, [...READY_TO_WORK_FAMILY_CERT_TYPES]);
   });
 });
 

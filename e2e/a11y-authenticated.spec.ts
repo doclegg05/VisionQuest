@@ -12,12 +12,14 @@ import { loginContext } from "./helpers/auth";
  *   npx tsx scripts/seed-e2e-users.ts
  *
  * The bar is the same as the public suite — zero violations against the
- * WCAG 2.0/2.1 A+AA rulesets, fix the page, never filter the rule. Until
- * today's authenticated pages actually meet that bar, this spec lives in the
- * CI soak lane (`continue-on-error` step in .github/workflows/ci.yml, and
- * it is NOT part of `npm run test:a11y`): it runs on every push and fails
- * honestly, producing the red baseline for the page-fixing phase, without
- * blocking merges. Promote it to the gating step once the scans pass.
+ * WCAG 2.0/2.1 A+AA rulesets, fix the page, never filter the rule.
+ *
+ * D4 (2026-09-07): promoted into the gating "E2E gate" step in
+ * .github/workflows/ci.yml and into `npm run test:a11y` — the companion
+ * `axe-authenticated` benchmark (gate tier, config/benchmarks/
+ * axe-authenticated.json) already measures 0 violations here, which made
+ * the standalone continue-on-error soak step this spec used to run in
+ * redundant. A regression on any authenticated route now fails CI.
  *
  * Soft assertions: every route is scanned and reported even after the first
  * failure, so one CI run yields the full violation inventory.

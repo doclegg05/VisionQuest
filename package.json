@@ -17,7 +17,7 @@
     "test:smoke": "node scripts/run-smoke-public-routes.mjs",
     "test:smoke:api": "python scripts/smoke_api_routes.py",
     "test:e2e": "playwright test",
-    "test:a11y": "playwright test e2e/a11y.spec.ts",
+    "test:a11y": "playwright test e2e/a11y.spec.ts e2e/a11y-authenticated.spec.ts",
     "prisma:generate": "prisma generate",
     "prisma:validate": "node --env-file=.env.local node_modules/prisma/build/index.js validate",
     "prisma:migrate:deploy": "prisma migrate deploy",
