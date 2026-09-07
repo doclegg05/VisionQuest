@@ -1,5 +1,17 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prismaAdmin as prisma } from "@/lib/db";
+
+/**
+ * Public, no login, one student's data behind an opaque slug. FERPA review
+ * W7 (2026-09-06): this page printed the student's LOGIN USERNAME and carried
+ * no `noindex`, in a repo with no robots.txt. The username is gone from the
+ * query and the markup, and crawlers are told to stay out here and in the
+ * `X-Robots-Tag` header src/proxy.ts sets on every `/credentials/*` response.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function PublicCredentialPage({
   params,
@@ -14,7 +26,6 @@ export default async function PublicCredentialPage({
       student: {
         select: {
           displayName: true,
-          studentId: true,
           portfolioItems: {
             select: { id: true },
           },
@@ -65,7 +76,7 @@ export default async function PublicCredentialPage({
           <div className="surface-section p-5">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Learner</p>
             <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{page.student.displayName}</p>
-            <p className="mt-1 text-sm text-[var(--ink-muted)]">Student ID {page.student.studentId}</p>
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">SPOKES program participant</p>
           </div>
           <div className="surface-section p-5">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Verified on</p>
