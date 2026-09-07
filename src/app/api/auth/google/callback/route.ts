@@ -14,7 +14,6 @@ import { studentLogKey } from "@/lib/log-keys";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const MAX_STUDENT_ID_ATTEMPTS = 5;
 
 function resolveGoogleRedirectUri(req: NextRequest): string {
   const envUri = process.env.GOOGLE_REDIRECT_URI;
@@ -54,59 +53,11 @@ type GoogleAccount = NonNullable<Awaited<ReturnType<typeof prisma.student.findUn
 type GoogleAccountResolution =
   | { kind: "by_sub"; student: GoogleAccount }
   | { kind: "by_email"; student: GoogleAccount }
-  | { kind: "created"; student: GoogleAccount }
-  | { kind: "mismatch"; student: GoogleAccount };
+  | { kind: "mismatch"; student: GoogleAccount }
+  | { kind: "unknown" };
 
 function isPrismaError(err: unknown, code: string): boolean {
   return Boolean(err && typeof err === "object" && "code" in err && err.code === code);
-}
-
-/** The columns a P2002 names, joined, or null when `err` is not a unique violation. */
-function uniqueViolationTarget(err: unknown): string | null {
-  if (!isPrismaError(err, "P2002")) return null;
-  const target = (err as { meta?: { target?: unknown } }).meta?.target;
-  if (Array.isArray(target)) return target.map(String).join(",");
-  return typeof target === "string" ? target : "";
-}
-
-async function createStudentFromGoogle(
-  userInfo: GoogleUserInfo,
-  normalizedEmail: string,
-): Promise<GoogleAccountResolution> {
-  // Use email prefix as studentId, ensure unique
-  const baseId = userInfo.email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "");
-
-  let studentId = baseId;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const created = await prisma.student.create({
-        data: {
-          studentId,
-          displayName: userInfo.name || userInfo.email.split("@")[0],
-          email: normalizedEmail,
-          passwordHash: null,
-          authProvider: "google",
-          googleId: userInfo.sub,
-          role: "student",
-        },
-      });
-      return { kind: "created", student: created };
-    } catch (err: unknown) {
-      const target = uniqueViolationTarget(err);
-      if (target === null) throw err;
-      if (target.includes("studentId")) {
-        // Another account owns this email prefix: retry with a random suffix.
-        if (attempt === MAX_STUDENT_ID_ATTEMPTS - 1) throw err;
-        studentId = `${baseId}${crypto.randomInt(1000, 9999)}`;
-        continue;
-      }
-      // email or googleId collided: a concurrent callback for this same user
-      // (double-click, duplicate callback) inserted first. Sign that row in.
-      const existing = await prisma.student.findUnique({ where: { googleId: userInfo.sub } });
-      if (existing) return { kind: "by_sub", student: existing };
-      throw err;
-    }
-  }
 }
 
 async function resolveGoogleAccount(
@@ -117,7 +68,7 @@ async function resolveGoogleAccount(
   if (bySub) return { kind: "by_sub", student: bySub };
 
   const byEmail = await prisma.student.findUnique({ where: { email: normalizedEmail } });
-  if (!byEmail) return createStudentFromGoogle(userInfo, normalizedEmail);
+  if (!byEmail) return { kind: "unknown" };
   if (byEmail.googleId && byEmail.googleId !== userInfo.sub) {
     return { kind: "mismatch", student: byEmail };
   }
@@ -144,6 +95,33 @@ async function bindGoogleId(student: GoogleAccount, sub: string): Promise<Google
     if (isPrismaError(err, "P2025")) return null;
     throw err;
   }
+}
+
+/**
+ * The one outcome for a verified Google identity that matches nothing here.
+ *
+ * `createStudentFromGoogle` used to run instead, minting a `role: "student"`
+ * row for any address Google had verified — no invite, no domain allowlist, no
+ * staff step (2026-09-06 hunt, follow-up 2). The day GOOGLE_CLIENT_ID is set in
+ * production that is self-service enrolment into a FERPA-covered portal by
+ * anyone on the internet. Who is enrolled is the program's decision; Google can
+ * only vouch that the person owns the address.
+ *
+ * The redirect is the route's generic failure, not a distinct code, and neither
+ * the audit event nor the log line carries the address or the `sub`: there is no
+ * Student row to attribute this to, and an unsalted digest of an email would be
+ * a dictionary away from the address itself (see the no-salt note in
+ * src/lib/log-keys.ts, which holds for cuids and not for emails).
+ */
+async function refuseUnknownAccount(req: NextRequest) {
+  logger.warn("Google sign-in refused: no VisionQuest account for this Google identity");
+  await logAuditEvent({
+    action: "auth.google_login_refused_unknown_account",
+    targetType: "student",
+    summary:
+      "Google sign-in refused: the verified Google address matches no VisionQuest account. Accounts are created by staff, never by a sign-in.",
+  });
+  return NextResponse.redirect(new URL("/?error=oauth_failed", req.url));
 }
 
 async function refuseAccountMismatch(req: NextRequest, student: GoogleAccount) {
@@ -261,6 +239,9 @@ export async function GET(req: NextRequest) {
     }
 
     const resolution = await resolveGoogleAccount(userInfo, normalizeEmail(userInfo.email));
+    if (resolution.kind === "unknown") {
+      return refuseUnknownAccount(req);
+    }
     if (resolution.kind === "mismatch") {
       return refuseAccountMismatch(req, resolution.student);
     }
