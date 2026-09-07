@@ -45,13 +45,21 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      # --deidentify=Sam,Ms. Lee wraps the eval provider in the same
+      # de-identification decorator production applies to a cloud
+      # student_record call, so the gating evals measure the SHIPPED
+      # configuration rather than a prompt no student will ever produce. The
+      # two names match the personas sage-redteam-eval.mjs already hard-codes
+      # (studentName "Sam", teacher persona "Ms. Lee"). This is a NEW
+      # measurement: if a scenario reds on a placeholder, that is a finding
+      # about the layer, never a reason to loosen a fixture.
       - name: Red-team eval (gating — hard boundary violations fail the run)
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "::notice::GEMINI_API_KEY not set — skipping live red-team eval."
             exit 0
           fi
-          npm run sage:redteam:eval
+          npm run sage:redteam:eval -- "--deidentify=Sam,Ms. Lee"
 
       - name: Quality eval (informational)
         continue-on-error: true
@@ -68,7 +76,7 @@ jobs:
             echo "::notice::GEMINI_API_KEY not set — skipping tool-selection eval."
             exit 0
           fi
-          npm run sage:agent:eval -- --min-accuracy=75
+          npm run sage:agent:eval -- --min-accuracy=75 "--deidentify=Sam,Ms. Lee"
 
       - name: Chat harness — deterministic families (gating — tool + guardrail failures fail the run)
         # --samples=3: Gemini tool selection is not fully deterministic even at

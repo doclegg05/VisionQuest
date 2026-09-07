@@ -3,6 +3,7 @@
 // Type-only, so this is erased at compile time and no runtime cycle exists
 // with roles.ts (which imports AiTask from here).
 import type { AiRole } from "./roles";
+import type { IdentityInput } from "./deidentify";
 
 export interface ChatMessage {
   role: "user" | "model";
@@ -238,6 +239,33 @@ export interface AIProviderRequest {
    * FERPA provider decision, which keys off `sensitivity` alone.
    */
   role?: AiRole;
+  /**
+   * Extra identity material this call site knows and the shared loader
+   * cannot get to — e.g. a roster the route has already queried, or the
+   * display name of a student a staff prompt is about.
+   *
+   * MERGED with `loadIdentityInput`'s result (src/lib/ai/identity.ts), which
+   * is what actually guarantees the vault is populated; this is additive, so
+   * a call site that passes nothing is still de-identified. Never a
+   * substitute for the loader, and never a way to opt out of it.
+   *
+   * Read only on the cloud branch for a local-only sensitivity — the local
+   * provider is never wrapped and never sees this.
+   */
+  identity?: IdentityInput;
+  /**
+   * What the caller already knows about the session, handed to the identity
+   * loader so it does not re-read the row (and, for a staff session, so it
+   * takes the roster path without a row read at all).
+   *
+   * `sessionRole` is a hint, never an authorisation input: it decides WHICH
+   * identity values are loaded, and every one of those reads is still scoped
+   * by RLS and by `buildManagedStudentWhere`. A caller passing the wrong role
+   * gets a smaller or differently-shaped vault, never data it could not
+   * otherwise read.
+   */
+  sessionRole?: string | null;
+  sessionDisplayName?: string | null;
 }
 
 export interface LocalAIAuthConfig {

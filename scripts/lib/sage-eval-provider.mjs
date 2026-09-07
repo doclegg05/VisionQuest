@@ -16,6 +16,13 @@
  * chokepoint every model-driving eval resolves through, so a model flag added
  * here reaches all of them — which is what makes a per-model bake-off possible
  * without mutating global configuration between arms.
+ *
+ * `--deidentify=<name>[,<name>…]` wraps the resolved provider in the SAME
+ * de-identification decorator production applies inside `resolveAiProvider`
+ * for a cloud `student_record` call (src/lib/ai/with-deidentification.ts).
+ * Without it an eval measures a prompt no student will ever produce. The
+ * first name is the student, the rest are staff; the arm is named in the
+ * label so a run's provenance records which one it was.
  */
 
 export async function resolveEvalProvider(argvOrEnv = process.argv.slice(2)) {
@@ -24,14 +31,64 @@ export async function resolveEvalProvider(argvOrEnv = process.argv.slice(2)) {
     .trim()
     .toLowerCase();
   const modelOverride = readModelOverride(argvOrEnv);
+  const deidentifyNames = readDeidentifyNames(argvOrEnv);
 
-  if (requested === "ollama") {
-    return resolveOllamaProvider(modelOverride);
-  }
-  if (requested !== "gemini") {
+  if (requested !== "ollama" && requested !== "gemini") {
     throw new Error(`Unknown --provider "${requested}" — expected "gemini" or "ollama".`);
   }
-  return resolveGeminiProvider(modelOverride);
+  const resolved =
+    requested === "ollama"
+      ? await resolveOllamaProvider(modelOverride)
+      : await resolveGeminiProvider(modelOverride);
+
+  if (!deidentifyNames) return resolved;
+  return {
+    ...resolved,
+    provider: await wrapWithDeidentification(resolved.provider, deidentifyNames),
+    deidentify: deidentifyNames,
+    label: `${resolved.label} + ${describeDeidentify(deidentifyNames)}`,
+  };
+}
+
+/**
+ * `--deidentify=Sam,Ms. Lee`. Returns null when absent (the unwrapped arm);
+ * throws on an empty or all-blank value, because a typo must not silently
+ * run the arm the operator did not ask for.
+ */
+export function readDeidentifyNames(argvOrEnv = process.argv.slice(2)) {
+  const flag = argvOrEnv.find((arg) => arg.startsWith("--deidentify="));
+  if (!flag) return null;
+  const names = flag
+    .slice("--deidentify=".length)
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  if (names.length === 0) throw new Error("--deidentify= was passed with no names.");
+  return names;
+}
+
+/** Label fragment recording the arm. Empty string when unwrapped. */
+export function describeDeidentify(names) {
+  return names && names.length > 0 ? `deidentify(${names.join(", ")})` : "";
+}
+
+/**
+ * Wrap `provider` exactly as production does: first name is the student, the
+ * rest are staff. Imported dynamically so a run that does not pass the flag
+ * never loads the TS modules.
+ */
+export async function wrapWithDeidentification(provider, names) {
+  if (!names || names.length === 0) return provider;
+  const [{ TokenVault }, { withDeidentification }, { DEIDENTIFY_ALLOWLIST }] = await Promise.all([
+    import("../../src/lib/ai/deidentify.ts"),
+    import("../../src/lib/ai/with-deidentification.ts"),
+    import("../../src/lib/ai/deidentify-allowlist.ts"),
+  ]);
+  const vault = TokenVault.fromIdentity(
+    { studentName: names[0], staffNames: names.slice(1) },
+    { allowlist: DEIDENTIFY_ALLOWLIST },
+  );
+  return withDeidentification(provider, vault);
 }
 
 /**

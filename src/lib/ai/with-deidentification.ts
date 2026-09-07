@@ -4,10 +4,24 @@
  * the way out and re-hydrates everything on the way back in, using one
  * per-request `TokenVault` (./deidentify.ts).
  *
- * Outbound: the system prompt and every message are `pseudonymize`d; messages
- * with `role: "user"` first pass through `neutralizeTokenShapes` so a token the
- * student typed can never be mistaken for one the vault issued. The system
- * prompt is never neutralised — the app authors it.
+ * Outbound: EVERYTHING the model is shown first passes through
+ * `neutralizeTokenShapes`, then `pseudonymize`. That includes the system
+ * prompt and the results a tool hands back, not only `role: "user"` messages.
+ *
+ * The original version neutralised user messages alone, on the reasoning that
+ * the app authors the system prompt. That premise is false and the 2026-09-07
+ * security audit executed it: the system prompt INTERPOLATES student-authored
+ * free text — goal titles, memories, case-note bodies, recent-activity lines —
+ * and `streamWithTools` hands the same student data back through the tool
+ * result. A student who named a goal `[PERSON_1]` had forged a re-hydration
+ * site, and the model's echo came back as a classmate's real name. The rule is
+ * therefore about PROVENANCE, not about which parameter carries the string:
+ * any text that can contain something a person typed is neutralised, and only
+ * tokens this vault issued after that survive to be restored.
+ *
+ * `neutralizeTokenShapes` deliberately exempts `_START`/`_END` fences, which
+ * the app's own grounding blocks use (`briefing.ts`, `tailor-application.ts`),
+ * so applying it to the system prompt does not disturb them.
  *
  * Inbound: `generateResponse` re-hydrates the reply; `streamResponse` runs the
  * chunks through the vault's carry buffer so a token split across chunks is
@@ -45,13 +59,17 @@ type ToolHandlerResult = Awaited<ReturnType<ToolCallHandler>>;
 export function withDeidentification(provider: AIProvider, vault: TokenVault): AIProvider {
   if (vault.isEmpty) return provider;
 
+  /**
+   * The one outbound transform: neutralise any token shape already in the
+   * text, then substitute. Applied to every string the model is shown.
+   */
+  const outbound = (text: string): string => vault.pseudonymize(neutralizeTokenShapes(text));
+
+  /** Same rule, over the string leaves of a JSON-ish tool result, one pass. */
+  const outboundValue = (value: unknown): unknown => vault.mapStrings(value, outbound);
+
   const outboundMessages = (messages: ChatMessage[]): ChatMessage[] =>
-    messages.map((message) => ({
-      ...message,
-      content: vault.pseudonymize(
-        message.role === "user" ? neutralizeTokenShapes(message.content) : message.content,
-      ),
-    }));
+    messages.map((message) => ({ ...message, content: outbound(message.content) }));
 
   const wrapped: AIProvider = {
     name: provider.name,
@@ -63,7 +81,7 @@ export function withDeidentification(provider: AIProvider, vault: TokenVault): A
       options?: GenerationOptions,
     ): Promise<string> {
       const reply = await provider.generateResponse(
-        vault.pseudonymize(systemPrompt),
+        outbound(systemPrompt),
         outboundMessages(messages),
         onUsage,
         options,
@@ -79,7 +97,7 @@ export function withDeidentification(provider: AIProvider, vault: TokenVault): A
     ): AsyncGenerator<string> {
       const carry = vault.createStreamRehydrator();
       for await (const chunk of provider.streamResponse(
-        vault.pseudonymize(systemPrompt),
+        outbound(systemPrompt),
         outboundMessages(messages),
         onUsage,
         options,
@@ -100,7 +118,7 @@ export function withDeidentification(provider: AIProvider, vault: TokenVault): A
       options?: GenerationOptions,
     ): Promise<string> {
       const raw = await provider.generateStructuredResponse(
-        vault.pseudonymize(systemPrompt),
+        outbound(systemPrompt),
         outboundMessages(messages),
         onUsage,
         options,
@@ -129,16 +147,18 @@ export function withDeidentification(provider: AIProvider, vault: TokenVault): A
           args: vault.rehydrateValue(call.args) as Record<string, unknown>,
         });
         handlerResults.set(call.callId, result);
+        // A tool result is student data by another route: a goal titled
+        // "[PERSON_1]" reaches the model here, not through a user message.
         return {
           ...result,
-          response: vault.pseudonymizeValue(result.response),
-          summary: vault.pseudonymize(result.summary),
+          response: outboundValue(result.response),
+          summary: outbound(result.summary),
         };
       };
 
       const carry = vault.createStreamRehydrator();
       const stream = innerStreamWithTools(
-        vault.pseudonymize(systemPrompt),
+        outbound(systemPrompt),
         outboundMessages(messages),
         tools,
         guardedToolCall,

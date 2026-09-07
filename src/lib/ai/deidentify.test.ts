@@ -44,6 +44,7 @@ describe("TokenVault placeholder grammar (rule 1)", () => {
       "[PERSON_1]",
       "[PERSON_2]",
       "[STUDENT_EMAIL]",
+      "[STUDENT_FIRST_NAME]",
       "[STUDENT_LOGIN]",
       "[STUDENT_NAME]",
       "[STUDENT_PHONE]",
@@ -60,6 +61,7 @@ describe("TokenVault placeholder grammar (rule 1)", () => {
       "[DOB_1]",
       "[EMAIL_1]",
       "[PHONE_1]",
+      "[STUDENT_FIRST_NAME]",
       "[STUDENT_NAME]",
     ]);
   });
@@ -78,17 +80,20 @@ describe("TokenVault.pseudonymize structured substitution (rule 2)", () => {
 
   it("matches the student's own first name typed lowercase when it is 5+ chars", () => {
     const vault = fullVault();
-    assert.equal(vault.pseudonymize("hey jordan"), "hey [STUDENT_NAME]");
-    assert.equal(vault.pseudonymize("JORDAN!"), "[STUDENT_NAME]!");
+    assert.equal(vault.pseudonymize("hey jordan"), "hey [STUDENT_FIRST_NAME]");
+    assert.equal(vault.pseudonymize("JORDAN!"), "[STUDENT_FIRST_NAME]!");
   });
 
-  it("re-hydrates a first-name-only mention to the FULL display name (documented, loud, not a leak)", () => {
-    // One token, one value: a partial mention carries no information about
-    // which part was written, so re-hydration restores the whole name. The
-    // model sees [STUDENT_NAME] either way. A [STUDENT_FIRST_NAME] token would
-    // change this; that is a Wave 2 / owner call, not something this layer decides.
+  it("re-hydrates a first-name-only mention to the FIRST name (Wave 2: [STUDENT_FIRST_NAME])", () => {
+    // Superseded 1C behaviour: one token restored the whole display name, so
+    // Sage's scripted "Hey [name], good to see you." came back as
+    // "Hey Jordan Lee". The given name now carries its own token and its own
+    // value; a NON-given part still restores the full name, which is loud
+    // over-restoration rather than a wrong name. Cases in
+    // deidentify.wave2.test.ts.
     const vault = fullVault();
-    assert.equal(vault.rehydrate(vault.pseudonymize("hey jordan")), "hey Jordan Lee");
+    assert.equal(vault.rehydrate(vault.pseudonymize("hey jordan")), "hey Jordan");
+    assert.equal(vault.rehydrate(vault.pseudonymize("Lee is here")), "Jordan Lee is here");
   });
 
   it("matches a multi-word display name as a whole even when typed lowercase", () => {
@@ -100,7 +105,7 @@ describe("TokenVault.pseudonymize structured substitution (rule 2)", () => {
   it("requires capitalisation for a name part shorter than 5 characters", () => {
     const will = TokenVault.fromIdentity({ studentName: "Will Smith" });
     assert.equal(will.pseudonymize("I will go"), "I will go");
-    assert.equal(will.pseudonymize("Will said hi"), "[STUDENT_NAME] said hi");
+    assert.equal(will.pseudonymize("Will said hi"), "[STUDENT_FIRST_NAME] said hi");
     assert.equal(will.pseudonymize("Willa"), "Willa");
 
     const art = TokenVault.fromIdentity({ studentName: "Art" });
@@ -116,7 +121,7 @@ describe("TokenVault.pseudonymize structured substitution (rule 2)", () => {
 
   it("is word-boundary anchored with Unicode letters and digits as word characters", () => {
     const vault = TokenVault.fromIdentity({ studentName: "María O'Brien" });
-    assert.equal(vault.pseudonymize("maría wrote"), "[STUDENT_NAME] wrote");
+    assert.equal(vault.pseudonymize("maría wrote"), "[STUDENT_FIRST_NAME] wrote");
     assert.equal(vault.pseudonymize("O'Brien's essay"), "[STUDENT_NAME]'s essay");
     assert.equal(vault.pseudonymize("Marías"), "Marías");
     assert.equal(vault.pseudonymize("O'Brien2"), "O'Brien2");
@@ -147,7 +152,7 @@ describe("TokenVault.pseudonymize structured substitution (rule 2)", () => {
       rosterNames: ["Jordan Lee", "Sam Okafor"],
     });
     assert.equal(vault.pseudonymize("Jordan Lee and Sam Okafor"), "[STUDENT_NAME] and [PERSON_1]");
-    assert.deepEqual(vault.tokenNames(), ["[PERSON_1]", "[STUDENT_NAME]"]);
+    assert.deepEqual(vault.tokenNames(), ["[PERSON_1]", "[STUDENT_FIRST_NAME]", "[STUDENT_NAME]"]);
   });
 
   it("ignores blank identity values", () => {
@@ -235,7 +240,7 @@ describe("TokenVault free-text detection (rule 3)", () => {
     const vault = TokenVault.fromIdentity({ studentName: "Jordan Lee" }, { freeText: false });
     const text = "a@x.org, (304) 555-9876, 3/14/1987, 123 Main Street";
     assert.equal(vault.pseudonymize(text), text);
-    assert.deepEqual(vault.tokenNames(), ["[STUDENT_NAME]"]);
+    assert.deepEqual(vault.tokenNames(), ["[STUDENT_FIRST_NAME]", "[STUDENT_NAME]"]);
   });
 
   it("round-trips every free-text token through rehydrate", () => {
@@ -433,9 +438,14 @@ describe("TokenVault.pseudonymizeValue / rehydrateValue", () => {
     assert.equal(input.who, "Jordan Lee");
   });
 
-  it("passes non-plain objects through untouched", () => {
+  it("replaces a non-plain object on the way OUT and passes it through on the way IN", () => {
+    // Superseded 1C behaviour: both directions passed it through, so a Map or
+    // a class instance carrying a name reached the model unread (2026-09-07
+    // audit). Outbound now fails closed; inbound still passes through, since
+    // there is nothing to protect on the way back and destroying a caller's
+    // value would be the worse failure. Cases in deidentify.wave2.test.ts.
     const when = new Date("2026-09-07T00:00:00Z");
-    assert.equal(vault.pseudonymizeValue(when), when);
+    assert.equal(vault.pseudonymizeValue(when), "[UNSUPPORTED]");
     assert.equal(vault.rehydrateValue(when), when);
   });
 });
@@ -484,7 +494,7 @@ describe("TokenVault audit surface (rules 8 and 10)", () => {
 // ─── Timing sanity ───────────────────────────────────────────────────────────
 
 describe("TokenVault timing", () => {
-  it("pseudonymizes a 30 kB prompt with 20 tokens in under 50 ms", (t) => {
+  it("pseudonymizes a 30 kB prompt with 21 tokens in under 50 ms", (t) => {
     const staffNames = Array.from({ length: 8 }, (_, i) => `Teacher${i} Surname${i}`);
     const rosterNames = Array.from({ length: 8 }, (_, i) => `Roster${i} Family${i}`);
     const buildStart = performance.now();
@@ -497,7 +507,7 @@ describe("TokenVault timing", () => {
       rosterNames,
     });
     const buildMs = performance.now() - buildStart;
-    assert.equal(vault.tokenNames().length, 20);
+    assert.equal(vault.tokenNames().length, 21);
 
     const paragraph =
       "Jordan Lee is working with Teacher3 Surname3 and Roster5 Family5 on the résumé. " +

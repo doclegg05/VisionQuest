@@ -10,6 +10,11 @@ import {
 } from "./local-config";
 import { isSameModelTag, roleForTask, type AiRole } from "./roles";
 import { enforceCloudPolicy, isLocalOnlySensitivity } from "./lanes";
+import { getProviderClass, logAiAuditEvent } from "./audit";
+import { TokenVault, type IdentityInput } from "./deidentify";
+import { DEIDENTIFY_ALLOWLIST } from "./deidentify-allowlist";
+import { withDeidentification } from "./with-deidentification";
+import { loadIdentityInput } from "./identity";
 import { OllamaProvider } from "./ollama-provider";
 import { GeminiProvider } from "./gemini-provider";
 import type {
@@ -17,6 +22,7 @@ import type {
   AIProviderRequest,
   AIProviderType,
   DataSensitivity,
+  DescribeDocumentOptions,
   PromptTier,
 } from "./types";
 
@@ -31,13 +37,20 @@ async function getConfiguredProviderType(): Promise<AIProviderType> {
  * student_record or staff_entered prompt sent under it would leave every
  * contractual protection behind (FERPA review, report C2). Those calls use
  * the platform key whatever the student has entered in Settings.
+ *
+ * The predicate is an ALLOWLIST (`=== "public_program"`), not the negation of
+ * `isLocalOnlySensitivity`. The negation admitted `configured` and `system`
+ * too — sensitivities no production call site declares, so the hole was
+ * latent, but the next caller to declare one would have got a personal key on
+ * student content with nothing failing (2026-09-07 security audit, W3). An
+ * allowlist means a sensitivity added later is refused by default.
  */
 async function getCloudProvider(
   studentId: string,
   sensitivity: DataSensitivity,
 ): Promise<AIProvider> {
   const apiKey = await resolveApiKey(studentId, {
-    allowPersonalKey: !isLocalOnlySensitivity(sensitivity),
+    allowPersonalKey: sensitivity === "public_program",
   });
   return new GeminiProvider(apiKey);
 }
@@ -153,24 +166,15 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
   );
 }
 
-/**
- * Resolve the active AI provider based on SystemConfig.
- *
- * - "local" -> OllamaProvider (reads ai_provider_url, ai_provider_model)
- * - "cloud" or unset -> GeminiProvider (uses existing API key resolution)
- *
- * Prefer resolveAiProvider() for new call sites so the task's data
- * sensitivity is explicit.
- */
-export async function getProvider(
-  studentId: string,
-  role: AiRole | null = null,
-): Promise<AIProvider> {
-  const providerType = await getConfiguredProviderType();
-  return providerType === "local"
-    ? getLocalProvider(role)
-    : getCloudProvider(studentId, "configured");
-}
+// `getProvider(studentId, role)` was removed on 2026-09-07. It resolved a
+// provider with sensitivity "configured" and consulted NEITHER the cloud
+// policy nor the de-identification layer, so on a `local_only` deployment it
+// returned Gemini with no audit event and a personal key permitted — a
+// complete bypass of both controls, exported from the barrel for anyone to
+// reach (security audit W3). It had no production caller; its coverage of the
+// local-provider config path moved to `resolveAiProvider` in
+// `__tests__/provider.test.ts`. Do not reintroduce a resolver that takes no
+// sensitivity: the sensitivity is what both controls key off.
 
 /**
  * Resolve a provider for a specific task.
@@ -226,7 +230,141 @@ export async function resolveAiProvider(
     sensitivity: request.sensitivity,
   });
 
-  return getCloudProvider(request.studentId, request.sensitivity);
+  const provider = await getCloudProvider(request.studentId, request.sensitivity);
+
+  // AFTER the refusal, never before: a refused call must not be
+  // de-identified and sent anyway.
+  return maybeDeidentify(provider, request);
+}
+
+// ---------------------------------------------------------------------------
+// De-identification (FERPA review Sprint 3, memo B §2.0)
+// ---------------------------------------------------------------------------
+
+/**
+ * Kill switch for the de-identification decorator. `"off"` disables it;
+ * anything else, INCLUDING unset, leaves it on.
+ *
+ * The default is deliberately the opposite of `ai_cloud_policy`'s: that
+ * switch defaults to today's behaviour because turning it on can refuse a
+ * student's chat turn, while this one only changes what leaves the process
+ * and never refuses anything. An operator who needs the raw prompt back (a
+ * model behaving oddly with placeholders, say) sets it to `"off"`, and the
+ * `routed` audit events stop appearing, which is how the change is visible.
+ */
+export const AI_DEIDENTIFY_CONFIG_KEY = "ai_deidentify_cloud";
+export const AI_DEIDENTIFY_ENV = "AI_DEIDENTIFY_CLOUD";
+
+async function isDeidentifyEnabled(): Promise<boolean> {
+  const configured = await getPlainConfigValue(AI_DEIDENTIFY_CONFIG_KEY);
+  const raw = configured?.trim() ? configured : process.env[AI_DEIDENTIFY_ENV] ?? "";
+  return raw.trim().toLowerCase() !== "off";
+}
+
+/** Later fields win only when they carry something; arrays concatenate. */
+function mergeIdentity(base: IdentityInput, extra?: IdentityInput): IdentityInput {
+  if (!extra) return base;
+  const names = (a?: readonly string[], b?: readonly string[]): string[] | undefined => {
+    const merged = [...new Set([...(a ?? []), ...(b ?? [])].filter((name) => name?.trim()))];
+    return merged.length > 0 ? merged : undefined;
+  };
+  return {
+    studentName: extra.studentName?.trim() || base.studentName,
+    studentEmail: extra.studentEmail?.trim() || base.studentEmail,
+    studentLoginId: extra.studentLoginId?.trim() || base.studentLoginId,
+    studentPhone: extra.studentPhone?.trim() || base.studentPhone,
+    staffNames: names(base.staffNames, extra.staffNames),
+    rosterNames: names(base.rosterNames, extra.rosterNames),
+  };
+}
+
+/**
+ * Carry across the two things `withDeidentification` cannot know about,
+ * because they are not part of the `AIProvider` contract it copies:
+ *
+ *  - `model`: `withUsageLogging` reads `provider.model` to stamp the real
+ *    model tag on every `LlmCallLog` row. A wrapper without it would record
+ *    the class name and make a per-role model split unmeasurable — the exact
+ *    regression the 2026-08-21 decision log warns about.
+ *  - `describeDocument`: the cloud-only multimodal method Wave 1 routes
+ *    uploaded document bytes through. A wrapper that dropped it would make
+ *    `file-gist` silently fall back to deterministic extraction the day this
+ *    shipped. The BYTES are not de-identified (nothing here can read a PDF),
+ *    which is a documented limit; the prompt and the reply are.
+ *
+ * Both belong in `with-deidentification.ts` eventually — they are properties
+ * of the decorator, not of the resolver. They live here because that file is
+ * outside this change's fence.
+ */
+function preserveProviderExtras(raw: AIProvider, wrapped: AIProvider, vault: TokenVault): AIProvider {
+  const model = (raw as { model?: string }).model;
+  if (typeof model === "string") {
+    Object.defineProperty(wrapped, "model", { value: model, enumerable: true });
+  }
+  if (raw.describeDocument) {
+    const describe = raw.describeDocument.bind(raw);
+    wrapped.describeDocument = async (
+      buffer: Buffer,
+      mimeType: string,
+      prompt: string,
+      options?: DescribeDocumentOptions,
+    ): Promise<string> => vault.rehydrate(await describe(buffer, mimeType, vault.pseudonymize(prompt), options));
+  }
+  return wrapped;
+}
+
+/**
+ * Wrap a resolved CLOUD provider so identifiers are substituted on the way
+ * out and restored on the way back in. Applied here rather than at the call
+ * sites so a call site that forgets cannot exist (memo B §2.0).
+ *
+ * Fail-OPEN by design: an identity that cannot be loaded yields an empty
+ * vault and the raw provider, which is exactly today's behaviour for that
+ * call. The fail-CLOSED contract belongs to the policy refusal, which has
+ * already run by the time we get here.
+ */
+async function maybeDeidentify(
+  provider: AIProvider,
+  request: AIProviderRequest,
+): Promise<AIProvider> {
+  if (getProviderClass(provider.name) !== "cloud") return provider;
+  if (!isLocalOnlySensitivity(request.sensitivity)) return provider;
+  if (!(await isDeidentifyEnabled())) return provider;
+
+  const loaded = await (async () => {
+    try {
+      return await loadIdentityInput({
+        studentId: request.studentId,
+        sessionRole: request.sessionRole,
+        sessionDisplayName: request.sessionDisplayName,
+      });
+    } catch {
+      return {} as IdentityInput;
+    }
+  })();
+  const vault = TokenVault.fromIdentity(mergeIdentity(loaded, request.identity), {
+    allowlist: DEIDENTIFY_ALLOWLIST,
+  });
+  if (vault.isEmpty) return provider;
+
+  const wrapped = preserveProviderExtras(provider, withDeidentification(provider, vault), vault);
+  await logAiAuditEvent({
+    actorId: request.studentId,
+    actorRole: null,
+    route: "ai.resolve",
+    task: request.task,
+    sensitivity: request.sensitivity,
+    policyDecision: "configured_provider",
+    status: "routed",
+    targetId: request.studentId,
+    providerName: provider.name,
+    providerClass: "cloud",
+    allowCloud: true,
+    // Token NAMES only. A vault VALUE in the audit log would put the very
+    // identifiers this layer removes into a table staff can read.
+    metadata: { deidentified: true, tokens: vault.tokenNames() },
+  });
+  return wrapped;
 }
 
 export function getPromptTier(provider: AIProvider): PromptTier {

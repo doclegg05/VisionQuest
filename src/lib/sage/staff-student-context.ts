@@ -1,6 +1,7 @@
 import "server-only";
 
 import { buildManagedStudentWhere, assertStaffCanManageStudent } from "@/lib/classroom";
+import { MANAGED_ROSTER_CAP } from "@/lib/ai/identity";
 import { prisma } from "@/lib/db";
 import { type Session } from "@/lib/api-error";
 import { parseState } from "@/lib/progression/engine";
@@ -534,7 +535,11 @@ export async function buildStaffStudentContext(
     // the disambiguator the ambiguous branch renders instead of it.
     select: { id: true, displayName: true, studentId: true, createdAt: true },
     orderBy: { displayName: "asc" },
-    take: 500,
+    // Shared with the de-identification vault's roster loader
+    // (`listManagedRosterNames`, src/lib/ai/identity.ts): the set of names the
+    // vault can tokenize must never be smaller than the set this branch may
+    // put in the prompt, so both read the same cap.
+    take: MANAGED_ROSTER_CAP,
   });
 
   const resolution = resolveStudentMention(

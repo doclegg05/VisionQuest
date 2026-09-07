@@ -48,6 +48,24 @@ export interface DeidentifyOptions {
    * reused when it recurs, and is reversible within this request.
    */
   freeText?: boolean;
+  /**
+   * Values that must never be tokenized, wherever they appear: the 988 crisis
+   * line and its 1-800 alias, the program office's own contact details, the
+   * program's own name. Two reasons they are an allowlist rather than an
+   * accident of the patterns:
+   *
+   *  - The system prompt carries them and the student must be able to read
+   *    them back out of Sage's reply. A tokenized crisis number that fails to
+   *    re-hydrate is a safety regression, not a privacy win.
+   *  - They are not anybody's personal data, so vaulting them buys nothing.
+   *
+   * Matching is word-boundary anchored and case-insensitive, and a
+   * NANP-shaped entry also protects its other common formattings. A DIFFERENT
+   * value of the same shape (a student's own phone) is untouched by this and
+   * is still tokenized — see the resolver's constant list in
+   * ./deidentify-allowlist.ts.
+   */
+  allowlist?: readonly string[];
 }
 
 // ─── Word boundaries ─────────────────────────────────────────────────────────
@@ -112,20 +130,36 @@ interface StructuredEntry {
   length: number;
   /** Match only when the source text has the value capitalised. */
   requireCapital: boolean;
+  /**
+   * A literal contact value (email, login id, phone) rather than a person's
+   * name. Contact values are substituted BEFORE the free-text families and
+   * names AFTER — see `pseudonymizeSegment` for why the order matters.
+   */
+  contact: boolean;
 }
 
 type NameKind = "student" | "other";
+
+type NameCandidate = Omit<StructuredEntry, "token" | "contact"> & {
+  key: string;
+  /**
+   * True for the FIRST word of a multi-word name (skipping honorifics). The
+   * student's own first name gets its own token so a first-name-only mention
+   * re-hydrates to the first name — see `[STUDENT_FIRST_NAME]` below.
+   */
+  isGivenName: boolean;
+};
 
 /**
  * Candidate entries for one name. A multi-word name matches as a whole (any
  * case) AND each part of 3+ characters under the capitalisation rule; a
  * single-word name matches only itself.
  */
-function nameEntries(value: string, kind: NameKind): Array<Omit<StructuredEntry, "token"> & { key: string }> {
+function nameEntries(value: string, kind: NameKind): NameCandidate[] {
   const words = nameWords(value);
   if (words.length === 0) return [];
 
-  const out: Array<Omit<StructuredEntry, "token"> & { key: string }> = [];
+  const out: NameCandidate[] = [];
   const minSingle = kind === "student" ? STUDENT_NAME_MIN_LENGTH : OTHER_NAME_MIN_LENGTH;
 
   if (words.length === 1) {
@@ -137,6 +171,9 @@ function nameEntries(value: string, kind: NameKind): Array<Omit<StructuredEntry,
         source: escapeRegExp(word),
         length: word.length,
         requireCapital: word.length < CASE_INSENSITIVE_MIN_LENGTH,
+        // A one-word display name IS the whole name: splitting it would issue
+        // two tokens for one value with nothing to distinguish them.
+        isGivenName: false,
       },
     ];
   }
@@ -147,18 +184,40 @@ function nameEntries(value: string, kind: NameKind): Array<Omit<StructuredEntry,
     source: words.map(escapeRegExp).join(NAME_SEPARATOR),
     length: whole.length,
     requireCapital: false,
+    isGivenName: false,
   });
+  let seenGivenName = false;
   for (const word of words) {
     if (word.length < NAME_PART_MIN_LENGTH) continue;
     if (HONORIFICS.has(word.toLowerCase())) continue;
+    const isGivenName = !seenGivenName;
+    seenGivenName = true;
     out.push({
       key: word.toLowerCase(),
       source: escapeRegExp(word),
       length: word.length,
       requireCapital: word.length < CASE_INSENSITIVE_MIN_LENGTH,
+      isGivenName,
     });
   }
   return out;
+}
+
+/**
+ * The word `nameEntries` would mark as the given name, in its ORIGINAL casing
+ * — the value `[STUDENT_FIRST_NAME]` re-hydrates to. Null when the display
+ * name is one word (the whole name already covers it) or when no word
+ * qualifies.
+ */
+function givenNameWord(value: string): string | null {
+  const words = nameWords(value);
+  if (words.length < 2) return null;
+  for (const word of words) {
+    if (word.length < NAME_PART_MIN_LENGTH) continue;
+    if (HONORIFICS.has(word.toLowerCase())) continue;
+    return word;
+  }
+  return null;
 }
 
 function literalEntry(value: string, minLength: number): { key: string; source: string; length: number } | null {
@@ -182,6 +241,30 @@ function phoneEntry(value: string): { key: string; source: string; length: numbe
     source: `(?:\\+?1[\\s.\\-]?)?\\(?${digits.slice(0, 3)}\\)?${sep}${digits.slice(3, 6)}${sep}${digits.slice(6)}`,
     length: digits.length,
   };
+}
+
+/**
+ * One regex source protecting every allowlisted value, longest first, word
+ * boundary anchored. A NANP-shaped entry reuses `phoneEntry` so
+ * "1-800-273-8255" also protects "(800) 273-8255"; everything else is a
+ * literal. Returns null for an empty allowlist so the hot path skips the
+ * segmentation entirely.
+ */
+function allowlistPattern(values: readonly string[]): RegExp | null {
+  const sources: Array<{ source: string; length: number }> = [];
+  for (const raw of values) {
+    const value = raw?.trim();
+    if (!value) continue;
+    const entry = /\d/.test(value) ? phoneEntry(value) : literalEntry(value, 1);
+    if (entry) sources.push({ source: entry.source, length: value.length });
+    else sources.push({ source: escapeRegExp(value), length: value.length });
+  }
+  if (sources.length === 0) return null;
+  sources.sort((a, b) => b.length - a.length);
+  return new RegExp(
+    `${NOT_AFTER_WORD}(?:${sources.map((s) => s.source).join("|")})${NOT_BEFORE_WORD}`,
+    "giu",
+  );
 }
 
 // ─── Free-text families ──────────────────────────────────────────────────────
@@ -251,6 +334,14 @@ export function neutralizeTokenShapes(userText: string): string {
   );
 }
 
+function buildStructuredPattern(entries: StructuredEntry[]): RegExp | null {
+  if (entries.length === 0) return null;
+  return new RegExp(
+    `${NOT_AFTER_WORD}(?:${entries.map((e) => `(${e.source})`).join("|")})${NOT_BEFORE_WORD}`,
+    "giu",
+  );
+}
+
 // ─── The vault ───────────────────────────────────────────────────────────────
 
 export interface StreamRehydrator {
@@ -262,15 +353,32 @@ export interface StreamRehydrator {
 
 const MAX_WALK_DEPTH = 64;
 
+/**
+ * What an OUTBOUND walk substitutes for a value it cannot traverse: a Map, a
+ * Set, a class instance, or anything below the depth cap. Fail-closed —
+ * before this, such a value was returned verbatim, so a student name inside a
+ * Map or 65 levels down reached the model unsubstituted while every visible
+ * test passed (2026-09-07 security audit suggestion). Inbound re-hydration
+ * still passes them through: there is nothing to protect on the way back, and
+ * destroying a caller's value would be the worse failure.
+ */
+const UNSUPPORTED_VALUE = "[UNSUPPORTED]";
+
 export class TokenVault {
   /** token → value, for every token this vault has issued. */
   private readonly issued = new Map<string, string>();
   /** Bumped whenever `issued` changes so derived regexes rebuild lazily. */
   private version = 0;
 
-  private readonly structuredEntries: StructuredEntry[];
-  private readonly structuredPattern: RegExp | null;
+  /** Literal contact values, substituted before the free-text families. */
+  private readonly contactEntries: StructuredEntry[];
+  private readonly contactPattern: RegExp | null;
+  /** Person names, substituted after them. */
+  private readonly nameEntriesList: StructuredEntry[];
+  private readonly namePattern: RegExp | null;
   private readonly families: FreeTextFamily[];
+  /** Values never tokenized; null when the allowlist is empty. */
+  private readonly allowlist: RegExp | null;
   /** family prefix + normalised value → token (free-text reuse). */
   private readonly freeTextTokens = new Map<string, string>();
   private readonly freeTextCounters = new Map<string, number>();
@@ -282,15 +390,18 @@ export class TokenVault {
     maxLength: 0,
   };
 
-  private constructor(entries: StructuredEntry[], values: Map<string, string>, families: FreeTextFamily[]) {
-    this.structuredEntries = [...entries].sort((a, b) => b.length - a.length);
-    this.structuredPattern =
-      this.structuredEntries.length === 0
-        ? null
-        : new RegExp(
-            `${NOT_AFTER_WORD}(?:${this.structuredEntries.map((e) => `(${e.source})`).join("|")})${NOT_BEFORE_WORD}`,
-            "giu",
-          );
+  private constructor(
+    entries: StructuredEntry[],
+    values: Map<string, string>,
+    families: FreeTextFamily[],
+    allowlist: RegExp | null,
+  ) {
+    this.allowlist = allowlist;
+    const byLength = (a: StructuredEntry, b: StructuredEntry) => b.length - a.length;
+    this.contactEntries = entries.filter((entry) => entry.contact).sort(byLength);
+    this.nameEntriesList = entries.filter((entry) => !entry.contact).sort(byLength);
+    this.contactPattern = buildStructuredPattern(this.contactEntries);
+    this.namePattern = buildStructuredPattern(this.nameEntriesList);
     this.families = families;
     for (const [token, value] of values) this.issued.set(token, value);
   }
@@ -302,7 +413,12 @@ export class TokenVault {
     /** Lower-cased value keys already claimed, so a shared value keeps its first token. */
     const claimed = new Set<string>();
 
-    const add = (token: string, candidates: Array<{ key: string; source: string; length: number; requireCapital?: boolean }>, value: string): boolean => {
+    const add = (
+      token: string,
+      candidates: Array<{ key: string; source: string; length: number; requireCapital?: boolean }>,
+      value: string,
+      contact = false,
+    ): boolean => {
       let added = false;
       for (const candidate of candidates) {
         if (claimed.has(candidate.key)) continue;
@@ -312,6 +428,7 @@ export class TokenVault {
           source: candidate.source,
           length: candidate.length,
           requireCapital: candidate.requireCapital ?? false,
+          contact,
         });
         added = true;
       }
@@ -320,19 +437,40 @@ export class TokenVault {
     };
 
     if (input.studentName?.trim()) {
-      add("[STUDENT_NAME]", nameEntries(input.studentName, "student"), input.studentName);
+      // [STUDENT_NAME] takes the whole display name and every part except the
+      // given name; [STUDENT_FIRST_NAME] takes the given name and re-hydrates
+      // to it alone. Without the split, Sage's scripted "Hey [name]" echo came
+      // back as "Hey Jordan Lee" — one token cannot carry two values, and the
+      // full name is the wrong one for the greeting.
+      //
+      // Order matters: the full-name entries claim their keys first, so the
+      // whole name (longest) is always tried before the given name.
+      const candidates = nameEntries(input.studentName, "student");
+      add(
+        "[STUDENT_NAME]",
+        candidates.filter((candidate) => !candidate.isGivenName),
+        input.studentName,
+      );
+      const given = givenNameWord(input.studentName);
+      if (given) {
+        add(
+          "[STUDENT_FIRST_NAME]",
+          candidates.filter((candidate) => candidate.isGivenName),
+          given,
+        );
+      }
     }
     if (input.studentEmail?.trim()) {
       const entry = literalEntry(input.studentEmail, 3);
-      if (entry) add("[STUDENT_EMAIL]", [entry], input.studentEmail);
+      if (entry) add("[STUDENT_EMAIL]", [entry], input.studentEmail, true);
     }
     if (input.studentLoginId?.trim()) {
       const entry = literalEntry(input.studentLoginId, 3);
-      if (entry) add("[STUDENT_LOGIN]", [entry], input.studentLoginId);
+      if (entry) add("[STUDENT_LOGIN]", [entry], input.studentLoginId, true);
     }
     if (input.studentPhone?.trim()) {
       const entry = phoneEntry(input.studentPhone);
-      if (entry) add("[STUDENT_PHONE]", [entry], input.studentPhone);
+      if (entry) add("[STUDENT_PHONE]", [entry], input.studentPhone, true);
     }
     let teacherIndex = 0;
     for (const name of input.staffNames ?? []) {
@@ -347,7 +485,12 @@ export class TokenVault {
       if (add(token, nameEntries(name, "other"), name)) personIndex += 1;
     }
 
-    return new TokenVault(entries, values, freeText ? freeTextFamilies() : []);
+    return new TokenVault(
+      entries,
+      values,
+      freeText ? freeTextFamilies() : [],
+      allowlistPattern(options.allowlist ?? []),
+    );
   }
 
   /** True when the vault holds no token at all — callers skip wrapping then. */
@@ -371,27 +514,61 @@ export class TokenVault {
    * same output, and a free-text value seen again reuses its token.
    */
   pseudonymize(text: string): string {
-    let out = text;
-    if (this.structuredPattern) {
-      const entries = this.structuredEntries;
-      out = out.replace(this.structuredPattern, (match: string, ...rest: unknown[]) => {
-        let index = -1;
-        for (let i = 0; i < entries.length; i += 1) {
-          if (rest[i] !== undefined) {
-            index = i;
-            break;
-          }
-        }
-        if (index === -1) return match;
-        const entry = entries[index];
-        if (entry.requireCapital && !isCapitalised(match)) return match;
-        return entry.token;
-      });
+    if (!this.allowlist) return this.pseudonymizeSegment(text);
+    // Split around allowlisted values and transform only what is between
+    // them, so an allowlisted value is returned byte-for-byte and never
+    // issues a token. Anchored on the whole text, not per family, so one
+    // pass protects structured substitution and free-text detection alike.
+    let out = "";
+    let last = 0;
+    this.allowlist.lastIndex = 0;
+    for (const match of text.matchAll(this.allowlist)) {
+      const index = match.index ?? 0;
+      out += this.pseudonymizeSegment(text.slice(last, index)) + match[0];
+      last = index + match[0].length;
     }
+    return out + this.pseudonymizeSegment(text.slice(last));
+  }
+
+  /**
+   * Three passes, in this order, and the order is the whole point:
+   *
+   *  1. Literal contact values we already know (`[STUDENT_EMAIL]`,
+   *     `[STUDENT_LOGIN]`, `[STUDENT_PHONE]`) — the most specific tokens win.
+   *  2. The free-text families, so an email or phone we did NOT know still
+   *     becomes one token.
+   *  3. Person names.
+   *
+   * Names must come last because a multi-word name pattern matches INSIDE an
+   * address: "jordan.lee@example.org" contains `Jordan[.\s-]Lee`, so a
+   * names-first pass produced "[STUDENT_NAME]@example.org" — the local part
+   * substituted, the domain left behind, and the EMAIL family never fired
+   * because its match had already been broken up. Found by the memory
+   * write-time pass, which vaults a name without an email.
+   */
+  private pseudonymizeSegment(text: string): string {
+    let out = this.applyStructured(text, this.contactPattern, this.contactEntries);
     for (const family of this.families) {
       out = out.replace(family.pattern, (match: string) => this.issueFreeText(family, match));
     }
-    return out;
+    return this.applyStructured(out, this.namePattern, this.nameEntriesList);
+  }
+
+  private applyStructured(text: string, pattern: RegExp | null, entries: StructuredEntry[]): string {
+    if (!pattern) return text;
+    return text.replace(pattern, (match: string, ...rest: unknown[]) => {
+      let index = -1;
+      for (let i = 0; i < entries.length; i += 1) {
+        if (rest[i] !== undefined) {
+          index = i;
+          break;
+        }
+      }
+      if (index === -1) return match;
+      const entry = entries[index];
+      if (entry.requireCapital && !isCapitalised(match)) return match;
+      return entry.token;
+    });
   }
 
   /**
@@ -449,14 +626,32 @@ export class TokenVault {
     };
   }
 
-  /** Deep-walk a JSON-ish value, pseudonymizing every string leaf. */
+  /**
+   * Deep-walk a JSON-ish value, pseudonymizing every string leaf. Fails
+   * CLOSED: anything it cannot traverse becomes `[UNSUPPORTED]` rather than
+   * passing through unread.
+   */
   pseudonymizeValue(value: unknown): unknown {
-    return this.walk(value, (s) => this.pseudonymize(s), 0);
+    return this.walk(value, (s) => this.pseudonymize(s), 0, true);
   }
 
-  /** Deep-walk a JSON-ish value, re-hydrating every string leaf. */
+  /**
+   * Deep-walk a JSON-ish value applying `fn` to every string leaf, with the
+   * same depth cap, prototype rules and fail-closed behaviour as
+   * `pseudonymizeValue`. Exists so the decorator can run one composed
+   * transform (neutralise, then substitute) over a tool result in a single
+   * pass rather than traversing twice.
+   */
+  mapStrings(value: unknown, fn: (text: string) => string): unknown {
+    return this.walk(value, fn, 0, true);
+  }
+
+  /**
+   * Deep-walk a JSON-ish value, re-hydrating every string leaf. Fails OPEN on
+   * an untraversable value — see `UNSUPPORTED_VALUE`.
+   */
   rehydrateValue(value: unknown): unknown {
-    return this.walk(value, (s) => this.rehydrate(s), 0);
+    return this.walk(value, (s) => this.rehydrate(s), 0, false);
   }
 
   // ── internals ──────────────────────────────────────────────────────────────
@@ -498,20 +693,29 @@ export class TokenVault {
     return this.prefixCache;
   }
 
-  private walk(value: unknown, fn: (s: string) => string, depth: number): unknown {
+  private walk(value: unknown, fn: (s: string) => string, depth: number, failClosed: boolean): unknown {
     if (typeof value === "string") return fn(value);
-    if (depth >= MAX_WALK_DEPTH) return value;
-    if (Array.isArray(value)) return value.map((item) => this.walk(item, fn, depth + 1));
+    const unreadable = failClosed ? UNSUPPORTED_VALUE : value;
+    // The cap bounds recursion on a cyclic or pathological structure. Past it
+    // an outbound walk must destroy the value, not return it: everything
+    // below is unread, and unread is exactly what must not reach the model.
+    if (depth >= MAX_WALK_DEPTH) return unreadable;
+    if (Array.isArray(value)) return value.map((item) => this.walk(item, fn, depth + 1, failClosed));
     if (value !== null && typeof value === "object") {
       const proto = Object.getPrototypeOf(value);
       if (proto === Object.prototype || proto === null) {
         const out: Record<string, unknown> = {};
         for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-          out[key] = this.walk(item, fn, depth + 1);
+          out[key] = this.walk(item, fn, depth + 1, failClosed);
         }
         return out;
       }
+      // A Map, a Set, a Date, a class instance: `Object.entries` would not
+      // reach its contents, so it is unread.
+      return unreadable;
     }
+    // Numbers, booleans, null, undefined, bigint, symbols, functions: no
+    // string content to substitute, so they are read and safe either way.
     return value;
   }
 }

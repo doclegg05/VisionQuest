@@ -382,6 +382,19 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       studentId: session.id,
       task: chatTask,
       sensitivity: chatSensitivity,
+      // Handed to the de-identification vault's identity loader
+      // (src/lib/ai/identity.ts) so it does not re-read the session row. For a
+      // staff turn this is what routes it to the managed roster instead of the
+      // student branch, so the other students a staff prompt may name are
+      // tokenized too.
+      //
+      // The roster ITSELF is not passed: `buildStaffStudentContext` runs
+      // further down this handler, after provider resolution, so the route has
+      // nothing loaded yet. Both paths read the same capped query
+      // (`listManagedRosterNames` / MANAGED_ROSTER_CAP), so the vault can
+      // never know fewer names than the prompt may mention.
+      sessionRole: session.role,
+      sessionDisplayName: session.displayName,
     });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
