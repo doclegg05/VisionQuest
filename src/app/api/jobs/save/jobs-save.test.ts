@@ -46,7 +46,10 @@ mock.module("@/lib/api-error", {
           throw error;
         }
       },
-    badRequest: (message: string) => makeHttpError(400, message),
+    // S3: the real factory (src/lib/api-error.ts:49-51) stamps "BAD_REQUEST",
+    // not an absent code — the mock must match so a test asserting on
+    // `body.code` sees what production actually sends.
+    badRequest: (message: string) => makeHttpError(400, message, "BAD_REQUEST"),
     ApiError: MockApiError,
   },
 });
@@ -60,12 +63,20 @@ mock.module("@/lib/db", {
       jobListing: {
         findFirst: mockJobFindFirst,
       },
-      jobBrowseListing: {
-        findUnique: mockBrowseListingFindUnique,
-      },
       studentSavedJob: {
         findUnique: mockSavedJobFindUnique,
         upsert: mockSavedJobUpsert,
+      },
+    },
+    // W4: JobBrowseListing is a program-wide, actor-independent pool (no
+    // per-student ownership), read through prismaAdmin rather than the
+    // RLS-scoped app client — the day F8 puts RLS on this table, the app
+    // client would return null here for every student and silently turn
+    // every browse-pool save into the generic "not found" message instead
+    // of the distinct not_your_class_board code.
+    prismaAdmin: {
+      jobBrowseListing: {
+        findUnique: mockBrowseListingFindUnique,
       },
     },
   },
@@ -158,7 +169,7 @@ describe("POST /api/jobs/save", () => {
 
     assert.equal(res.status, 400);
     assert.match(String(body.error), /not found/i);
-    assert.equal(body.code, undefined);
+    assert.notEqual(body.code, "not_your_class_board");
     assert.equal(mockSavedJobUpsert.mock.callCount(), 0);
   });
 
@@ -215,7 +226,7 @@ describe("POST /api/jobs/save", () => {
     const body = await res.json();
 
     assert.equal(res.status, 400);
-    assert.equal(body.code, undefined);
+    assert.notEqual(body.code, "not_your_class_board");
     assert.match(String(body.error), /not found|enrollment/i);
   });
 });

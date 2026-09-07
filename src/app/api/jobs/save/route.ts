@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, badRequest, ApiError, type Session } from "@/lib/api-error";
-import { prisma } from "@/lib/db";
+import { prisma, prismaAdmin } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { MAX_LENGTHS } from "@/lib/validation";
 import { parseBody } from "@/lib/schemas";
@@ -33,8 +33,14 @@ function notYourClassBoard() {
   );
 }
 
+// W4: JobBrowseListing is a program-wide, actor-independent pool with no
+// per-student ownership — read through prismaAdmin, not the RLS-scoped
+// app client. The day F8 gives this table RLS, the app client would
+// return null here for every student regardless of whether the row
+// exists, silently downgrading every browse-pool save back to the
+// generic "not found" message instead of the distinct code below.
 async function isBrowsePoolJob(id: string): Promise<boolean> {
-  const row = await prisma.jobBrowseListing.findUnique({
+  const row = await prismaAdmin.jobBrowseListing.findUnique({
     where: { id },
     select: { id: true },
   });
