@@ -184,11 +184,14 @@ export function proxy(request: NextRequest) {
  * purpose is to save work on assets is not worth holding open a hole in two
  * security controls.
  *
- * Cost of dropping it: requests for the nine files in `public/` now run the
- * proxy, which adds a CSP header and — only when a session cookie is present —
- * one JWT verification. `_next/static` and `_next/image`, where the built and
- * optimized assets actually live, are still excluded by name, so the hot path
- * is unchanged.
+ * Cost of dropping it: the seven image files in `public/` now run the proxy,
+ * which adds a CSP header and — only when a session cookie is present — one JWT
+ * verification. Nothing else changes, and this is not a guess: the other three
+ * files in `public/` are `.mp4`/`.vtt`, extensions the clause never listed, so
+ * public assets have always been served through this proxy. `_next/static` and
+ * `_next/image`, where the built and optimized assets actually live, are still
+ * excluded by name, so the hot path is untouched. No path under `public/`
+ * matches a gated prefix, so none of them can be redirected.
  */
 export const PROXY_MATCHER = "/((?!_next/static|_next/image|favicon.ico).*)";
 
