@@ -335,7 +335,11 @@ async function maybeDeidentify(
 
   const loaded = await (async () => {
     try {
-      return await loadIdentityInput({ studentId: request.studentId });
+      return await loadIdentityInput({
+        studentId: request.studentId,
+        sessionRole: request.sessionRole,
+        sessionDisplayName: request.sessionDisplayName,
+      });
     } catch {
       return {} as IdentityInput;
     }

@@ -253,6 +253,19 @@ export interface AIProviderRequest {
    * provider is never wrapped and never sees this.
    */
   identity?: IdentityInput;
+  /**
+   * What the caller already knows about the session, handed to the identity
+   * loader so it does not re-read the row (and, for a staff session, so it
+   * takes the roster path without a row read at all).
+   *
+   * `sessionRole` is a hint, never an authorisation input: it decides WHICH
+   * identity values are loaded, and every one of those reads is still scoped
+   * by RLS and by `buildManagedStudentWhere`. A caller passing the wrong role
+   * gets a smaller or differently-shaped vault, never data it could not
+   * otherwise read.
+   */
+  sessionRole?: string | null;
+  sessionDisplayName?: string | null;
 }
 
 export interface LocalAIAuthConfig {
