@@ -11,6 +11,7 @@ import {
   type WellbeingMoodSnapshot,
 } from "./wellbeing-card";
 import { studentLogKey } from "@/lib/log-keys";
+import { findAssignedInstructors, listActiveTeachers, type StaffRecipient } from "@/lib/staff-recipients";
 
 /**
  * Wellbeing / crisis safety-net.
@@ -1039,63 +1040,9 @@ function reasonText(reason: WellbeingReason): string {
   return reason === "low_mood" ? "a very low mood score" : "something they said in chat";
 }
 
-interface StaffRecipient {
-  id: string;
-  email: string | null;
-}
-
-// Enrollment statuses under which a class instructor still "manages" the
-// student. Mirrors NON_ARCHIVED_ENROLLMENT_STATUSES in src/lib/classroom.ts —
-// kept local so this safety-critical module stays dependency-light. If the two
-// ever drift, the failure mode is resolving fewer (possibly zero) instructors,
-// which falls back to notifying ALL active teachers: the safe direction.
-const MANAGED_ENROLLMENT_STATUSES = ["active", "inactive", "completed", "withdrawn"] as const;
-
-/**
- * Resolve the unique, active instructor accounts assigned to the classes the
- * student is (non-archived) enrolled in. Returns [] when none resolve; any
- * thrown error is handled by the caller, which falls back to all active
- * teachers.
- *
- * RLS: this runs inside the STUDENT's context (chat and mood routes). Under
- * vq_app the student branch of `student_self_access` hides every teacher row,
- * so the instructor join through the app client is always empty. Staff
- * recipient reads therefore use prismaAdmin, which never injects RLS context.
- * Only staff identities are read here; the student's own rows stay on `prisma`.
- */
-async function findAssignedInstructors(studentId: string): Promise<StaffRecipient[]> {
-  const enrollments = await prismaAdmin.studentClassEnrollment.findMany({
-    where: {
-      studentId,
-      status: { in: [...MANAGED_ENROLLMENT_STATUSES] },
-    },
-    select: {
-      class: {
-        select: {
-          instructors: {
-            select: {
-              instructor: { select: { id: true, email: true, isActive: true } },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  const activeInstructors = enrollments
-    .flatMap((enrollment) => enrollment.class.instructors)
-    .map((link) => link.instructor)
-    .filter((instructor) => instructor.isActive);
-
-  return [
-    ...new Map(
-      activeInstructors.map((instructor): [string, StaffRecipient] => [
-        instructor.id,
-        { id: instructor.id, email: instructor.email },
-      ]),
-    ).values(),
-  ];
-}
+// The instructor query and its enrollment-status list live in
+// src/lib/staff-recipients.ts, shared with the intervention-nudge path
+// (D8, 2026-09-07) so the two safety-relevant recipient lookups cannot drift.
 
 /**
  * Who gets actively notified about a wellbeing concern.
@@ -1123,10 +1070,7 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
   // prismaAdmin for the same reason as findAssignedInstructors: through the
   // app client this query returns zero rows under the student's context, and
   // a silent empty fallback is exactly the failure the fallback exists to stop.
-  const everyone = await prismaAdmin.student.findMany({
-    where: { role: "teacher", isActive: true },
-    select: { id: true, email: true },
-  });
+  const everyone = await listActiveTeachers();
 
   if (everyone.length === 0) {
     // A CRITICAL alert with nobody to notify must never be quiet. This is the
