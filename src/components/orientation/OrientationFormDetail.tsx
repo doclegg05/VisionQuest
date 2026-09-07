@@ -76,12 +76,13 @@ function SignAndSubmitButton({
   if (showPad) {
     return (
       <div className="mt-2">
-        {submitting && (
-          <p className="mb-2 text-xs text-[var(--ink-muted)]">Submitting signature...</p>
-        )}
+        <p role="status" aria-live="polite" className="mb-2 text-sm text-[var(--ink-muted)]">
+          {submitting ? "Saving your signature. This can take a few seconds." : ""}
+        </p>
         <SignaturePad
           onSign={handleSign}
           onCancel={() => setShowPad(false)}
+          submitting={submitting}
         />
         {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
       </div>
