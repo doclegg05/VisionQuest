@@ -28,7 +28,12 @@ export async function loadBrowseJobs(params: {
 
   return prisma.jobBrowseListing.findMany({
     where,
-    orderBy: params.sort === "salary" ? { salaryMin: "desc" } : { postedAt: "desc" },
+    // nulls: "last" keeps unknown-pay listings (salaryMin: null) from
+    // sorting ahead of every listing that actually names a wage.
+    orderBy:
+      params.sort === "salary"
+        ? { salaryMin: { sort: "desc", nulls: "last" } }
+        : { postedAt: "desc" },
     take: params.limit ?? 100,
   });
 }

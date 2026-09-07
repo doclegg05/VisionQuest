@@ -44,3 +44,14 @@ test("loadBrowseJobs omits cluster predicate when no cluster param", async () =>
   const arg = queries[beforeCount] as { where: { clusters?: unknown } };
   assert.equal(arg.where.clusters, undefined);
 });
+
+// A DESC-only orderBy sorts unknown-pay listings (salaryMin: null) FIRST in
+// Postgres, ahead of every listing that actually names a wage — the least
+// useful rows lead a "sort by salary" result. Prisma 6 supports an explicit
+// nulls placement on the sort key.
+test("loadBrowseJobs: sort=salary orders unknown-pay listings last, not first", async () => {
+  const beforeCount = queries.length;
+  await loadBrowseJobs({ proximity: "all", sort: "salary", searchParams: new URLSearchParams() });
+  const arg = queries[beforeCount] as { orderBy: unknown };
+  assert.deepEqual(arg.orderBy, { salaryMin: { sort: "desc", nulls: "last" } });
+});

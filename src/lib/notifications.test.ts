@@ -27,6 +27,7 @@ const mockOutboundUpdate = mock.fn() as any;
 const mockAdvisoryLock = mock.fn() as any;
 const mockSendEmail = mock.fn() as any;
 const mockSendSms = mock.fn() as any;
+const mockBuildNotificationEmail = mock.fn() as any;
 
 const mockDebug = mock.fn() as any;
 const mockInfo = mock.fn() as any;
@@ -147,7 +148,9 @@ mock.module("@/lib/sms", {
 
 mock.module("@/lib/email-templates", {
   namedExports: {
-    buildNotificationEmail: () => "<p>notification</p>",
+    get buildNotificationEmail() {
+      return mockBuildNotificationEmail;
+    },
   },
 });
 
@@ -191,6 +194,7 @@ describe("sendMultiChannelNotification logging", () => {
       mockAdvisoryLock,
       mockSendEmail,
       mockSendSms,
+      mockBuildNotificationEmail,
       mockDebug,
       mockInfo,
       mockWarn,
@@ -226,6 +230,7 @@ describe("sendMultiChannelNotification logging", () => {
     mockAdvisoryLock.mock.mockImplementation(async () => 1);
     mockSendEmail.mock.mockImplementation(async () => undefined);
     mockSendSms.mock.mockImplementation(async () => true);
+    mockBuildNotificationEmail.mock.mockImplementation(() => "<p>notification</p>");
   });
 
   it("logs no student id, email address, or phone number on the success path", async () => {
@@ -262,6 +267,34 @@ describe("sendMultiChannelNotification logging", () => {
     const logged = loggedText();
     assert.ok(!logged.includes(STUDENT_EMAIL), `error log leaked the address: ${logged}`);
     assert.ok(logged.includes("550 5.1.1"), "dropped the SMTP status needed to debug the bounce");
+  });
+
+  it("threads the recipient's role into the notification email so staff land on /teacher/settings", async () => {
+    mockStudentFindUnique.mock.mockImplementation(async () => ({
+      email: STUDENT_EMAIL,
+      role: "teacher",
+    }));
+
+    await notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24);
+    await flushDelivery();
+
+    assert.equal(mockBuildNotificationEmail.mock.callCount(), 1);
+    const args = mockBuildNotificationEmail.mock.calls[0].arguments;
+    assert.deepEqual(args[3], { role: "teacher" });
+  });
+
+  it("passes the student role through unchanged for an ordinary student recipient", async () => {
+    mockStudentFindUnique.mock.mockImplementation(async () => ({
+      email: STUDENT_EMAIL,
+      role: "student",
+    }));
+
+    await notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24);
+    await flushDelivery();
+
+    assert.equal(mockBuildNotificationEmail.mock.callCount(), 1);
+    const args = mockBuildNotificationEmail.mock.calls[0].arguments;
+    assert.deepEqual(args[3], { role: "student" });
   });
 
   it("logs no student id when evicting a dead SSE connection", async () => {
