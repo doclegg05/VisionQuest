@@ -336,10 +336,12 @@ still.
    pgvector service so `postgres`/`cohort` suites meet a real migrated schema.
 
 `benchmarks.yml`: nightly at 06:00 UTC plus `workflow_dispatch`. Same service,
-migrations applied, cohort seeded, then `--tier=nightly --compare` followed by
-`--tier=watch`. Uploads `reports/benchmarks/latest/`, commits it on `main` with
-`[skip ci]`, and opens or updates the "Benchmark regression" issue on any
-failure.
+migrations applied, cohort seeded, catalog corpus seeded into
+`ProgramDocument` from `catalog/` (`scripts/bench/seed-catalog-corpus.mjs` —
+required for `sage-grounding`; without it every case reports `got: none`),
+then `--tier=nightly --compare` followed by `--tier=watch`. Uploads
+`reports/benchmarks/latest/`, commits it on `main` with `[skip ci]`, and
+opens or updates the "Benchmark regression" issue on any failure.
 
 Suites needing `GEMINI_API_KEY` never run per-PR — only nightly, and only when
 the secret exists (nightly Gemini spend is an owner decision, design §9.4).

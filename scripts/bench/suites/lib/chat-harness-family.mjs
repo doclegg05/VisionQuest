@@ -12,9 +12,10 @@ import { runScriptForJsonReport } from "./run-cli.mjs";
  * @param {string} family - "grounding" | "career" | "readability"
  * @param {object} [opts]
  * @param {string} [opts.geminiApiKey]
+ * @param {NodeJS.ProcessEnv} [opts.env]
  */
 export async function runChatHarnessFamily(family, opts = {}) {
-  const env = {};
+  const env = { ...(opts.env ?? {}) };
   if (opts.geminiApiKey) env.GEMINI_API_KEY = opts.geminiApiKey;
 
   const report = await runScriptForJsonReport(

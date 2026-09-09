@@ -107,6 +107,14 @@ jobs:
             echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort suites will report skipped."
           fi
 
+      - name: Seed the catalog corpus for Sage grounding
+        # Hermetic Postgres is empty of ProgramDocument rows. sage-grounding
+        # calls getDocumentContext against that table; without this seed every
+        # case reports `got: none` (issue #208). Notes-only from catalog/; no
+        # PDF bytes or embeddings. The scorer also seeds itself so a local
+        # `--suite=sage-grounding` run does not depend on this step.
+        run: npx tsx scripts/bench/seed-catalog-corpus.mjs
+
       - name: Nightly-tier benchmarks
         id: nightly
         # continue-on-error so the watch tier still runs and the regression
