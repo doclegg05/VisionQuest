@@ -1,7 +1,8 @@
 {
   "baseCommit": "734d49840779c3c63b8d660462d1153da58f31a8",
   "branch": "codex/sage-answer-quality-release",
-  "exclusions": "Original workspace intake changes, prototypes, dev-login route, unrelated sprint plans, and all environment files are excluded.",
+  "manifestExcludesItself": true,
+  "exclusions": "Original workspace intake changes, prototypes, dev-login route, unrelated sprint plans, environment files, and credentials.",
   "files": [
     {
       "path": ".github/workflows/benchmarks.yml",
@@ -33,7 +34,7 @@
     },
     {
       "path": "docs/audits/2026-09-10-sage-sprint-execution.md",
-      "sha256": "423aed58188e192446e67b8a53f4a58ae11fa59a7518d7953804319c1dc94936"
+      "sha256": "d8bd22a9c253d344458ef8e92668f9d361a0f52f09dde06bca3dd4b46a54a11d"
     },
     {
       "path": "docs/audits/2026-09-10-supabase-ai-retrieval.md",
@@ -41,87 +42,87 @@
     },
     {
       "path": "docs/audits/evidence/2026-09-10-ai-corpus-index.json",
-      "sha256": "19c0f94c2481546bb595a709a4dc61825edc8ffe013ec22120147b7b1585fd2d"
+      "sha256": "0d6060bc4fa280fed5c8ace30f546cccf65ebecbce9610b828970792d5102b48"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-ai-retrieval-holdout-configured.json",
-      "sha256": "820e1158fbed1c89c872152961c4cc6b2fce1929adc57b6bf78fdc9b134b236c"
+      "sha256": "e1cdea54ea0741411de42f941d04114e9b38d850a5dd963c5aac89c419858a5b"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-ai-retrieval-holdout.json",
-      "sha256": "d9d3ff4a9771234a4c1cf63ee7b00861454d144d1b7fc31eee28c1d68c15dc2d"
+      "sha256": "2eed93cfe0dd2fc0d72ab3e51fea61aec2498378b8d9f21fe81882f4bf2c9c65"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-ai-retrieval-source-language.json",
-      "sha256": "ec7c2a5607afd6d16f509a69f2f8fcbbbd46fe740c9ee53161d1042a2af7e678"
+      "sha256": "554234ed9d741cd582c7cd237f11bdf37d2f51f51a482649f25f85c4f8be48e1"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-ai-retrieval-standard-configured.json",
-      "sha256": "507d724d7284bab535ce0daf8704f5e598f567ecf616b0a099961795a7db814b"
+      "sha256": "6184143704060ccbc44ed7ab454da0b34e2841b7e150d42b2d76a37dde514760"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-ai-retrieval-standard.json",
-      "sha256": "23e489f6ecd680d65233f4bf6825b9cb18f6473aceaf47222f45c5962b98fcf9"
+      "sha256": "7270de068ec90f49270b664a6c845cd3cafcbc0c5ee40a688037735f56db307b"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-ai-summary-curation.json",
-      "sha256": "afa21711db64d7def59db29b73081ad33253b108de61c81a0be6acc30c86bda8"
+      "sha256": "d1035eae26dfb9e13e598ca2537febe413c674c4e4af03ea39b51c6c438dca96"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-answer-baseline.json",
-      "sha256": "8d2d773a81192666a53bdb9555c5cf2a105d48de7a04422370482c75af95149f"
+      "sha256": "676d20f91c713634226873d3a601a8ba9fe3c216f089a4033d9f8215ab61abde"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-answer-calibration.json",
-      "sha256": "359c5c5ee5d2ba19246a730577e5a5d937a3515dfb6a257b5715e703bb64faf8"
+      "sha256": "cd837e089fc02a7004daff97e8287cfb38859209630d6e5176d19d93867bfd7b"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-answer-final.json",
-      "sha256": "ee8ecb1a800ac16c40b139185e22298f3ec5799abad8623eba4f7ee868ddf6d8"
+      "sha256": "0acb54a6f2f81db7ed0f448733f87cbf6f76eb2afefeb95266474410eefbeb7b"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-answer-first-fix.json",
-      "sha256": "6cb501437174b1e5dbd9d618d0a6259609338fba476719babc0ffa936db6b72c"
+      "sha256": "314a9b1fa6d0ba73e5bc9bbfc1747e30b5b8a3d5ab26163574432c6d8f870049"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-answer-heldout.json",
-      "sha256": "13f07f3e014e1ee28098c21e427da0e3ada84debea5100733a85ee1302b7272d"
+      "sha256": "db7646e9e4aa8735c9f12df6cf9d10df69efea323849f3d3f7a8b4550e2e0517"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-answer-revision3.json",
-      "sha256": "ae4004a577cf9b134f573db1c970f5baf63cdf443ac6f72629d30fa34b6819eb"
+      "sha256": "44abce45ab4a4be70e947d40ef87dae46c49e9ebb963b9a2742a55f456cc7631"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-broader-corrected.json",
-      "sha256": "f078dc5bf0a193a035cc07eca7005908405685b276ce40a116164c6bb9feeba8"
+      "sha256": "6ce66b0579e726ef937b3f8374c945de2ebe73195f4593294fd62d31e2eaf29b"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-existing-gates.json",
-      "sha256": "f406a2a89b5c8d82925b637b5277dbe706c2891bced27cfa62a8ce9074a5007f"
+      "sha256": "d7d93adce7d0bd1a133aeb2deb26d0234f42bfb0cf0db2c31ac28aa743ba0791"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-route-final.json",
-      "sha256": "7da7e0c33bae8218c3d1164dfa1630c31484c32036a68a3c2873cfbde52572b3"
+      "sha256": "85e586ed58fcc0256ec854628813871e089c6f2b88630f767972dd641facec98"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-sprint-baseline.json",
-      "sha256": "18f1b1e494439e6d3ef30d9d2fde22acd26eb0ca7718b008a4ae63ce1ea431e2"
+      "sha256": "f2dd425c1eaa2973152307aafab596452b9aea64c66a7a60f32406f1005075f3"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-standard-final.json",
-      "sha256": "17891ad946fd48c63bbe49dfa3c4e6a559aad8f8e88e8d460c217123a99b0357"
+      "sha256": "cda7f293c700f5a7ca62a20fc6aa335d2df1010034493a5500a7d4c31bfb2896"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-supabase-ai-repair-queue.json",
-      "sha256": "33c40fb617164848922e272d981b4ca140552dd6d6c659109598dc6e6c12647d"
+      "sha256": "004d6617e37aee6bda9dee3b4aedf50f68084a020ac15f3879f39726fcc5106f"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-supabase-ai-validation.json",
-      "sha256": "097c5c71611a1e37f6907c52d74a3a83544c0c3b72d4796107e1eafaec2d77b0"
+      "sha256": "1d0ce42b3f86084ce8fe19abfcb29b517b4f87b080d3e04ee120267a47a6b552"
     },
     {
       "path": "docs/plans/2026-09-10-sage-answer-quality-and-release-sprint.md",
-      "sha256": "fc7d87756f0e6ed382b3db19fcbdd57bb9aac1e0697faafd51a37e7d8c52a6f4"
+      "sha256": "f723d57d765b9afe3bc6b4c33e0c18289459d815f8f7c787da02fed345c70c94"
     },
     {
       "path": "prisma/migrations/20260910124749_optimize_sage_ai_retrieval/migration.sql",

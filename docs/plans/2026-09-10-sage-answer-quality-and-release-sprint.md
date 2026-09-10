@@ -1,9 +1,9 @@
 # Sage answer quality and application release sprint
 
-Created: 2026-09-10  
-Status: In progress on `codex/sage-answer-quality-release`  
-Duration: Five working days from kickoff plus a next-working-day release check, assuming one implementing engineer/agent  
-Product and release owner: Britt  
+Created: 2026-09-10
+Status: In progress on `codex/sage-answer-quality-release`
+Duration: Five working days from kickoff plus a next-working-day release check, assuming one implementing engineer/agent
+Product and release owner: Britt
 Delivery owner: The engineer/agent executing this plan
 
 ## Outcome

@@ -18,100 +18,12 @@
   "audienceLeakage": 0,
   "noAnswerPassed": 0,
   "noAnswerTotal": 0,
-  "latency": {
-    "coldFirstCallMs": 5888,
-    "p50Ms": 2446,
-    "p95Ms": 5888,
-    "maxMs": 5888
-  },
-  "missingExpectationKeys": [],
+  "latency": {"coldFirstCallMs":5888,"p50Ms":2446,"p95Ms":5888,"maxMs":5888},
+  "missingExpectationKeys": [
+
+  ],
   "results": [
-    {
-      "id": "low-literacy-orientation-forms",
-      "question": "What papers I gotta sign when I first start?",
-      "hasContext": true,
-      "matchedExpectedTerm": true,
-      "legacyPassed": true,
-      "relevancePassed": true,
-      "strictPassed": true,
-      "strictCleanPassed": true,
-      "top1Expected": true,
-      "top3Expected": true,
-      "cleanTop3": true,
-      "unexpectedTop3": [],
-      "latencyMs": 5888,
-      "documentContextChars": 4054,
-      "matchedTitles": [
-        "SPOKES Checklist for Student Orientation"
-      ],
-      "matchedDocuments": [
-        {
-          "id": "cmmyyb8ln0038eadke643r7ht",
-          "title": "SPOKES Checklist for Student Orientation",
-          "storageKey": "orientation/SPOKES Checklist for Student Orientation.pdf",
-          "category": "ORIENTATION",
-          "audience": "STUDENT",
-          "usedBySage": true
-        }
-      ],
-      "expectedTerms": [
-        "orientation",
-        "sign"
-      ],
-      "expectedStorageKeys": [
-        "orientation/SPOKES Checklist for Student Orientation.pdf"
-      ],
-      "acceptableStorageKeys": [
-        "orientation/SPOKES Checklist for Student Orientation.pdf",
-        "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf",
-        "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
-        "orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf"
-      ],
-      "audienceLeak": 0,
-      "noAnswerOk": null
-    },
-    {
-      "id": "low-literacy-portfolio",
-      "question": "What stuff do I need to put in my work folder?",
-      "hasContext": true,
-      "matchedExpectedTerm": true,
-      "legacyPassed": true,
-      "relevancePassed": true,
-      "strictPassed": true,
-      "strictCleanPassed": true,
-      "top1Expected": true,
-      "top3Expected": true,
-      "cleanTop3": true,
-      "unexpectedTop3": [],
-      "latencyMs": 2446,
-      "documentContextChars": 1129,
-      "matchedTitles": [
-        "Employment Portfolio Checklist FY26 Fillable"
-      ],
-      "matchedDocuments": [
-        {
-          "id": "cmmyyb7tt0036eadkzpoj2ucf",
-          "title": "Employment Portfolio Checklist FY26 Fillable",
-          "storageKey": "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
-          "category": "ORIENTATION",
-          "audience": "STUDENT",
-          "usedBySage": true
-        }
-      ],
-      "expectedTerms": [
-        "portfolio",
-        "employment"
-      ],
-      "expectedStorageKeys": [
-        "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
-        "students/resources/SPOKES Life and Employability Module Rubric Record.pdf"
-      ],
-      "acceptableStorageKeys": [
-        "orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf",
-        "students/resources/SPOKES Life and Employability Module Rubric Record.pdf"
-      ],
-      "audienceLeak": 0,
-      "noAnswerOk": null
-    }
+    {"id":"low-literacy-orientation-forms","question":"What papers I gotta sign when I first start?","hasContext":true,"matchedExpectedTerm":true,"legacyPassed":true,"relevancePassed":true,"strictPassed":true,"strictCleanPassed":true,"top1Expected":true,"top3Expected":true,"cleanTop3":true,"unexpectedTop3":[],"latencyMs":5888,"documentContextChars":4054,"matchedTitles":["SPOKES Checklist for Student Orientation"],"matchedDocuments":[{"id":"cmmyyb8ln0038eadke643r7ht","title":"SPOKES Checklist for Student Orientation","storageKey":"orientation/SPOKES Checklist for Student Orientation.pdf","category":"ORIENTATION","audience":"STUDENT","usedBySage":true}],"expectedTerms":["orientation","sign"],"expectedStorageKeys":["orientation/SPOKES Checklist for Student Orientation.pdf"],"acceptableStorageKeys":["orientation/SPOKES Checklist for Student Orientation.pdf","orientation/SPOKES_Student_Profile_FY26_Fillable.pdf","orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf","orientation/SPOKES_Personal_Attendance_Contract_FY26_Fillable.pdf"],"audienceLeak":0,"noAnswerOk":null},
+    {"id":"low-literacy-portfolio","question":"What stuff do I need to put in my work folder?","hasContext":true,"matchedExpectedTerm":true,"legacyPassed":true,"relevancePassed":true,"strictPassed":true,"strictCleanPassed":true,"top1Expected":true,"top3Expected":true,"cleanTop3":true,"unexpectedTop3":[],"latencyMs":2446,"documentContextChars":1129,"matchedTitles":["Employment Portfolio Checklist FY26 Fillable"],"matchedDocuments":[{"id":"cmmyyb7tt0036eadkzpoj2ucf","title":"Employment Portfolio Checklist FY26 Fillable","storageKey":"orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf","category":"ORIENTATION","audience":"STUDENT","usedBySage":true}],"expectedTerms":["portfolio","employment"],"expectedStorageKeys":["orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf","students/resources/SPOKES Life and Employability Module Rubric Record.pdf"],"acceptableStorageKeys":["orientation/Employment_Portfolio_Checklist_FY26_Fillable.pdf","students/resources/SPOKES Life and Employability Module Rubric Record.pdf"],"audienceLeak":0,"noAnswerOk":null}
   ]
 }

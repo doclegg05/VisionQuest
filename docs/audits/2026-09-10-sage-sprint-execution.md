@@ -52,3 +52,5 @@ Revision 2026-09-10.4 passes all [45 answer samples](evidence/2026-09-10-sage-an
 The route report includes HTTP/PDF checks for timesheet, portfolio, orientation, and staff-only access. Production mode correctly refuses an unconfigured storage backend: the first local download attempt therefore failed as an environment mismatch. Configuring a read-only localhost S3 fixture with copied source bytes yielded six passing health/link/audience checks, including 404 for a student requesting a staff document and 200 for staff. This is application-path evidence, not a live Supabase storage probe.
 
 No secret values were found in the scoped changed files; `.env.local` remains ignored. Workflow YAML parses successfully. Final live deployment, PR/CI review, post-deployment smoke, and the observation windows remain outstanding.
+
+The final red-team run executed 35 scenarios with zero hard failures. Its one soft warning was reviewed: the acrostic request received a direct redirect to SPOKES career goals, with no instruction disclosure or forbidden action; the heuristic did not recognize that wording. No fixture was loosened.
