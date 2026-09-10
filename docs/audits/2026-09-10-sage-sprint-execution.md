@@ -31,7 +31,7 @@ A real production-build smoke uses local PostgreSQL with restricted `vq_app` per
 - New real PostgreSQL-to-context tests pass all three cases: actual body/page/OCR/source output, student/staff isolation, and bounded context.
 - SQL comparison covers 1,200 synthetic documents, 7,200 chunks, and 30 before/after comparisons. Median query time measured 26.098 ms before and 13.782 ms after on this local test; this is not production latency.
 - Fresh migration replay exposed missing Supabase API roles in vanilla PostgreSQL. CI now provisions inert `anon` and `authenticated` roles before replay; applied migrations remain byte-identical. A fresh local replay passes all 52 migrations.
-- CI adds the deterministic context slice and an informational, budget-guarded provider answer run against its hermetic keyword catalog. This cannot substitute for the live hybrid corpus or authenticated-route release checks.
+- CI adds the deterministic context slice and an informational, budget-guarded provider answer run against its hermetic hybrid catalog. This cannot substitute for the live hybrid corpus or authenticated-route release checks.
 
 ## Remaining release gates
 
@@ -56,3 +56,11 @@ No secret values were found in the scoped changed files; `.env.local` remains ig
 The final red-team run executed 35 scenarios with zero hard failures. Its one soft warning was reviewed: the acrostic request received a direct redirect to SPOKES career goals, with no instruction disclosure or forbidden action; the heuristic did not recognize that wording. No fixture was loosened.
 
 Release review: [PR #213](https://github.com/doclegg05/VisionQuest/pull/213). The final revision-4 held-out run passes all nine samples, and the branch is awaiting CI. Main requires the `verify` check; no approving-review count is required. No protection bypass or production change has occurred.
+
+## CI calibration checkpoint
+
+The final application revision passed required `verify` and browser CI in run 34500988669. The browser benchmark initially timed out advancing the welcome flow; the identical application had passed the preceding CI run, the exact local benchmark passed in 5.6 seconds, and one failed-job rerun passed. This is recorded as an intermittent benchmark failure rather than a product fix. Model-backed CI checks explicitly skipped because the existing budget flag was unset; they are not model pass evidence.
+
+Exercising the informational CI answer step locally exposed two missing reference documents in the 35-row catalog seed. A guarded `--answer-quality` seed now adds two test-only source summaries, covering all six required source keys without changing the default catalog or production corpus. Keyword calibration passed 14/15 cases and missed the orientation slang source. The answer step now explicitly seeds document embeddings and uses hybrid retrieval under the existing provider-budget guard. The seeder was verified against the actual local schema; no schema or production write was needed. The seven catalog tests, all 253 benchmark scorer tests, lint, and workflow YAML parsing pass.
+
+The hybrid catalog calibration also passed 14/15 cases (42/45 samples). The notes-only catalog still ranks other orientation documents above the checklist for the slang question. This remains a visible informational calibration failure; its assertion was not loosened. The full 67-document/254-passage corpus passes all 45 samples and the real route passes this case. The compact CI corpus cannot substitute for release-corpus evidence. Follow-up owner: sprint delivery owner; make the catalog representation faithful before promoting this informational check to a required gate.

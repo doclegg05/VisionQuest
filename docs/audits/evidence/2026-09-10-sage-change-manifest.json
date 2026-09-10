@@ -14,11 +14,15 @@
     },
     {
       "path": ".github/workflows/sage-evals.yml",
-      "sha256": "21fc75366e059dbc8a32fb51a43f2be27db405d5cb8d795dd1025d7510236bcf"
+      "sha256": "b47510523a2e2d3067dae3467f062c23e1c28b9e0900cb0ba99494d6c4ae0248"
     },
     {
       "path": "DEPLOY.md",
       "sha256": "04635a1ac789d1663f79916ca8068c4b408d4719c6e65cb4c7ff171d4f4df73f"
+    },
+    {
+      "path": "config/sage-answer-quality-corpus.json",
+      "sha256": "da1c4fdc1fc060aee8447bd61bf7dff35f4750a7f6b9364600fa3bbdc3853f86"
     },
     {
       "path": "config/sage-answer-quality-eval.json",
@@ -34,7 +38,7 @@
     },
     {
       "path": "docs/audits/2026-09-10-sage-sprint-execution.md",
-      "sha256": "6418b651a0b503c3033256849de9c2926f38b9d9af4e2f29bc4aa39cee70b5ea"
+      "sha256": "bda608e34cabd9c0f9c12a640957cbf6bc547e95f8428a366071d085a7ca3a2e"
     },
     {
       "path": "docs/audits/2026-09-10-supabase-ai-retrieval.md",
@@ -97,6 +101,10 @@
       "sha256": "6ce66b0579e726ef937b3f8374c945de2ebe73195f4593294fd62d31e2eaf29b"
     },
     {
+      "path": "docs/audits/evidence/2026-09-10-sage-catalog-calibration.json",
+      "sha256": "4b814b751fad15f7c8b106a4be43a2ba191bc6b5054eb056bd132a677c9607bc"
+    },
+    {
       "path": "docs/audits/evidence/2026-09-10-sage-existing-gates.json",
       "sha256": "d7d93adce7d0bd1a133aeb2deb26d0234f42bfb0cf0db2c31ac28aa743ba0791"
     },
@@ -122,7 +130,7 @@
     },
     {
       "path": "docs/plans/2026-09-10-sage-answer-quality-and-release-sprint.md",
-      "sha256": "946eaa7748d1800174e15a2c424808d50e45b4abe78dd7590001cd7c304ad281"
+      "sha256": "56f996aa7c1f5946bb23b5e9599e41386e0be7d7841be50d9ae82b0e2d26c367"
     },
     {
       "path": "prisma/migrations/20260910124749_optimize_sage_ai_retrieval/migration.sql",
@@ -139,6 +147,18 @@
     {
       "path": "prisma/schema.prisma",
       "sha256": "2215a6fb7408c1cc3d12959777bfefb38752921771a8d7b61b6464b46a148357"
+    },
+    {
+      "path": "scripts/bench/lib/catalog-corpus.mjs",
+      "sha256": "a8ccc09522714eb3d4a85db25a85671984f53baa0afb1f464dee0744aa7d10b5"
+    },
+    {
+      "path": "scripts/bench/seed-catalog-corpus.mjs",
+      "sha256": "981372cf3c4d5f37fc5f6fb999c899633f426b10ac3b03065c9e4f58a9bd3bd8"
+    },
+    {
+      "path": "scripts/bench/suites/lib/catalog-corpus.test.mjs",
+      "sha256": "495a7e07574593a11021ded38ebc7f38acdc79736230964d3a70cb11523e4b74"
     },
     {
       "path": "scripts/lib/sage-grounding-eval.mjs",

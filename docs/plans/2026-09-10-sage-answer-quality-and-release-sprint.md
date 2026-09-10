@@ -119,7 +119,7 @@ Acceptance: Deployed-commit evidence and smoke results are attached, the index r
 - [x] Nine unsupported-answer cases pass all three samples per relevant runtime path; held-out wording also passes.
 - [x] Six supported controls remain accurate and useful, with citations supported by the actual passages.
 - [x] Stale fixture expectations corrected with source evidence and isolation coverage retained.
-- [ ] CI/assertion coverage added; real-provider and real-route results distinguished from synthetic fixtures and stubs.
+- [x] CI/assertion coverage added; real-provider and real-route results distinguished from synthetic fixtures and stubs.
 - [ ] Final integrated repository checks pass, with no secret-dependent skip counted as executed validation.
 - [ ] Application released; deployed commit, smoke checks, observation, and rollback evidence recorded.
 - [x] Read-only integrity check still reports an empty repair queue; corpus activation/audience boundaries preserved.

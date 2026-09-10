@@ -216,14 +216,14 @@ jobs:
       - name: Answer quality on the hermetic catalog (informational during calibration)
         continue-on-error: true
         env:
-          SAGE_RAG_MODE: "keyword"
+          SAGE_RAG_MODE: "hybrid"
           SAGE_RAG_ABSTAIN_DISTANCE: "0.40"
         run: |
           if [ -z "$GEMINI_API_KEY" ] || [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
             echo "- **Answer quality**: SKIPPED — provider key or confirmed budget unavailable; not release evidence" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          npx tsx scripts/bench/seed-catalog-corpus.mjs
+          npx tsx scripts/bench/seed-catalog-corpus.mjs --answer-quality --embed
           mkdir -p reports/sage-answer-quality
           npx tsx scripts/sage-chat-harness.mjs --provider=gemini --model=gemini-3.1-flash-lite --deidentify=Sam --families=grounding --fixture=config/sage-answer-quality-eval.json --samples=3 --temperature=0 --strict --out=reports/sage-answer-quality/catalog.json
 

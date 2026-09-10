@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   expectedGroundingStorageKeys,
   loadCatalogCorpusRows,
+  loadAnswerQualityCorpusRows,
   mapCategory,
   missingStorageKeys,
 } from "../../lib/catalog-corpus.mjs";
@@ -97,4 +98,15 @@ test("keyword scoring of the catalog corpus ranks each grounding fixture's expec
       `${testCase.expected} not in top 3 for "${testCase.message}" (got ${top3.join(", ")})`,
     );
   }
+});
+
+test("answer-quality seed covers all six sources without changing the catalog seed", () => {
+  const expected = expectedGroundingStorageKeys("config/sage-answer-quality-eval.json");
+  const base = loadCatalogCorpusRows();
+  const augmented = loadAnswerQualityCorpusRows();
+  assert.equal(expected.length, 6);
+  assert.equal(missingStorageKeys(base, expected).length, 2);
+  assert.deepEqual(missingStorageKeys(augmented, expected), []);
+  assert.equal(new Set(augmented.map(row => row.storageKey)).size, augmented.length);
+  assert.deepEqual(loadCatalogCorpusRows(), base, "test references must not mutate the default catalog");
 });
