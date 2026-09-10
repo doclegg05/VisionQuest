@@ -1,0 +1,73 @@
+{
+  "pr": "https://github.com/doclegg05/VisionQuest/pull/214",
+  "commit": "b65567556e67d8a6324369857e044b9f8f465a61",
+  "testedHead": "cdc99386dc05fe34b68b4a0652a023c641b5b634",
+  "deployment": "dep-daheq90u01pc739aulc0",
+  "liveAt": "2026-09-10T17:50:54Z",
+  "ci": {
+    "run": 34509491566,
+    "verify": "passed",
+    "e2e": "passed",
+    "fullTests": 5981,
+    "rlsTests": 253,
+    "contextTests": 3,
+    "providerCi": "budget-skipped; executed synthetic provider probes are separate evidence"
+  },
+  "migrationStatus": "52 migrations found; none pending",
+  "health": {
+    "status": "healthy",
+    "uptime": 55.655029406,
+    "db": "connected",
+    "schema": "ready",
+    "latency_ms": 492,
+    "timestamp": "2026-09-10T17:51:37.074Z"
+  },
+  "productionProbe": {
+    "startedAt": "2026-09-10T17:51:29.773Z",
+    "syntheticOnly": true,
+    "cleanup": true,
+    "status": 200,
+    "text": "It sounds like you have a real knack for troubleshooting and hands-on work. That makes sense, as those skills are the foundation for any technical career.\n\nSince you're focused on repair and networking, you might consider starting with the **Computer Essentials Certificate**. It's a great way to build your credentials while you sharpen those problem-solving skills. \n\nWould you like to look at the certification requirements together to see how it aligns with your goals?",
+    "streamErrors": [],
+    "discovery": {
+      "interests": "[\"computer repair\",\"networking\"]",
+      "subjects": "[\"hands-on\",\"computers\",\"technical\"]",
+      "updatedAt": "2026-09-10T17:51:53.271Z"
+    },
+    "memories": [
+      {
+        "content": "The student has a career interest in computer repair and networking.",
+        "category": "goal"
+      },
+      {
+        "content": "The student prefers practical, hands-on tasks such as repairing and testing equipment.",
+        "category": "preference"
+      },
+      {
+        "content": "The student identifies as a technical problem solver who enjoys troubleshooting.",
+        "category": "skill"
+      }
+    ],
+    "pass": true,
+    "finishedAt": "2026-09-10T17:52:01.640Z"
+  },
+  "postResponseLog": {
+    "timestamp": "2026-09-10T17:51:56.054Z",
+    "stage": "discovery",
+    "discovery": "ran",
+    "memory": "ran",
+    "durationMs": 6959,
+    "visiblePostReleaseErrorEntries": 0,
+    "limit": "Immediate visible log snapshot only; observation windows remain pending."
+  },
+  "indexStrictFailures": 0,
+  "priorReleaseObservation": "Failed due to pre-existing bounded transcript role defect; fixed in this corrective release",
+  "oneHourObservation": "pending",
+  "firstHourWindow": [
+    "2026-09-10T17:50:54Z",
+    "2026-09-10T18:50:54Z"
+  ],
+  "nextWorkingDayObservation": "pending",
+  "automation": "sage-release-observations",
+  "schedule": "September 10 at 15:15 and September 11 at 09:15 America/New_York"
+}
