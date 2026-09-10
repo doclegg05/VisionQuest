@@ -10,14 +10,14 @@ import { before, beforeEach, describe, it, mock } from "node:test";
  * when the caller supplies one.
  */
 
-const mockEmbedQuery = mock.fn(async () => new Array(768).fill(0)) as any;
+const mockEmbedTextsWithModel = mock.fn(async () => ({vectors: [new Array(768).fill(0)], model: "gemini-embedding-001"})) as any;
 
 mock.module("@/lib/db", {
   namedExports: { prisma: { $queryRaw: mock.fn(async () => []) } },
 });
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
-    embedQuery: mockEmbedQuery,
+    embedTextsWithModel: mockEmbedTextsWithModel,
     toVectorLiteral: (v: number[]) => `[${v.join(",")}]`,
     EMBEDDING_DIMENSIONS: 768,
   },
@@ -34,23 +34,24 @@ mock.module("@/lib/cache", {
 });
 
 let getQueryEmbedding: typeof import("./hybrid-retrieval").getQueryEmbedding;
+let getBestChunks: typeof import("./hybrid-retrieval").getBestChunks;
 let hybridSearchDocuments: typeof import("./hybrid-retrieval").hybridSearchDocuments;
 
 before(async () => {
-  ({ getQueryEmbedding, hybridSearchDocuments } = await import("./hybrid-retrieval"));
+  ({ getQueryEmbedding, hybridSearchDocuments, getBestChunks } = await import("./hybrid-retrieval"));
 });
 
 beforeEach(() => {
-  mockEmbedQuery.mock.resetCalls();
+  mockEmbedTextsWithModel.mock.resetCalls();
 });
 
 describe("query embedding sensitivity", () => {
   it("declares the chat message as student_record and carries the student id", async () => {
     await getQueryEmbedding("where is the dress code?", { studentId: "student-1" });
 
-    assert.equal(mockEmbedQuery.mock.callCount(), 1);
-    const [text, usage] = mockEmbedQuery.mock.calls[0].arguments;
-    assert.equal(text, "where is the dress code?");
+    assert.equal(mockEmbedTextsWithModel.mock.callCount(), 1);
+    const [texts, { usage }] = mockEmbedTextsWithModel.mock.calls[0].arguments;
+    assert.deepEqual(texts, ["where is the dress code?"]);
     assert.deepEqual(usage, {
       callSite: "sage_embedding_query",
       studentId: "student-1",
@@ -61,7 +62,7 @@ describe("query embedding sensitivity", () => {
   it("stays student_record even when no student id is known (a chat message is never system data)", async () => {
     await getQueryEmbedding("where is the dress code?");
 
-    const [, usage] = mockEmbedQuery.mock.calls[0].arguments;
+    const [, { usage }] = mockEmbedTextsWithModel.mock.calls[0].arguments;
     assert.equal(usage.sensitivity, "student_record");
     assert.equal(usage.studentId, null);
   });
@@ -69,8 +70,17 @@ describe("query embedding sensitivity", () => {
   it("hybridSearchDocuments threads the subject through to the embedding call", async () => {
     await hybridSearchDocuments("where is the dress code?", "student", 3, { studentId: "student-2" });
 
-    const [, usage] = mockEmbedQuery.mock.calls[0].arguments;
+    const [, { usage }] = mockEmbedTextsWithModel.mock.calls[0].arguments;
     assert.equal(usage.studentId, "student-2");
     assert.equal(usage.sensitivity, "student_record");
   });
 });
+
+ it("chunk retrieval carries the subject and separate subjects do not share in-flight attribution", async () => {
+   await Promise.all([
+     getBestChunks(["document-1"], "identical question", 2, {studentId: "student-a"}),
+     getBestChunks(["document-1"], "identical question", 2, {studentId: "student-b"}),
+   ]);
+   const subjects = mockEmbedTextsWithModel.mock.calls.map((call: any) => call.arguments[1].usage.studentId);
+   assert.deepEqual(subjects.sort(), ["student-a", "student-b"]);
+ });

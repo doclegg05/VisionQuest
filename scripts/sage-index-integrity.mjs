@@ -54,13 +54,18 @@ function duplicateTitles(rows) {
 
 async function main() {
   const { getActiveEmbeddingModel } = await import("../src/lib/ai/embedding-provider.ts");
-  const { mapLocalPathToStorageKey } = await import("../src/lib/storage.ts");
+  const { mapLocalPathToStorageKey, isObjectStorageConfigured } = await import("../src/lib/storage.ts");
   const activeModel = await getActiveEmbeddingModel();
 
   const docs = await prisma.$queryRawUnsafe(
     `SELECT d.id, d.title, d."storageKey", d."isActive", d."usedBySage",
             (d.embedding IS NOT NULL) AS "hasEmbedding", d."embeddingModel",
             COUNT(c.id)::int AS "chunkCount",
+            COUNT(c.id) FILTER (WHERE c."tokenCount" IS NULL)::int AS "missingTokenCounts",
+            COUNT(c.id) FILTER (WHERE c."pageNumber" IS NULL AND lower(d."storageKey") LIKE '%.pdf')::int AS "missingPageNumbers",
+            COUNT(c.id) FILTER (WHERE btrim(c.content) = '')::int AS "emptyChunks",
+            COUNT(c.id) FILTER (WHERE c.content ~* '^([[:space:]]|--[[:space:]]*[0-9]+[[:space:]]+of[[:space:]]+[0-9]+[[:space:]]*--|Print|Reset|Clear Form|Submit)*$')::int AS "noiseChunks",
+            COUNT(c.id) FILTER (WHERE c."extractionMethod" = 'unknown')::int AS "unknownExtractionMethods",
             COUNT(c.id) FILTER (WHERE c.embedding IS NULL)::int AS "missingChunkEmbeddings",
             COUNT(c.id) FILTER (
               WHERE c."embeddingModel" IS DISTINCT FROM $1
@@ -77,7 +82,10 @@ async function main() {
             COUNT(*) FILTER (WHERE "validTo" IS NULL AND embedding IS NULL)::int AS "missingEmbedding",
             COUNT(*) FILTER (
               WHERE "validTo" IS NULL AND "embeddingModel" IS DISTINCT FROM $1
-            )::int AS "staleEmbedding"
+            )::int AS "staleEmbedding",
+            COUNT(*) FILTER (
+              WHERE "validTo" IS NULL AND (embedding IS NULL OR "embeddingModel" IS DISTINCT FROM $1)
+            )::int AS "embeddingRepairs"
      FROM "visionquest"."SageMemory"`,
     activeModel,
   );
@@ -85,8 +93,18 @@ async function main() {
   const retrievable = docs.filter((doc) => doc.isActive && doc.usedBySage);
   const docsMissingEmbedding = retrievable.filter((doc) => !doc.hasEmbedding);
   const docsStaleModel = retrievable.filter((doc) => doc.embeddingModel !== activeModel);
-  const docsWithStaleChunks = retrievable.filter((doc) => doc.staleChunkEmbeddings > 0);
+  const docsWithStaleChunks = retrievable.filter((doc) => doc.staleChunkEmbeddings > 0 || doc.missingChunkEmbeddings > 0);
   const docsWithNoChunks = retrievable.filter((doc) => doc.chunkCount === 0);
+
+  const duplicatePassages = await prisma.$queryRaw`
+    SELECT md5(c.content) AS fingerprint, COUNT(*)::int AS copies,
+           array_agg(DISTINCT d."storageKey" ORDER BY d."storageKey") AS "sourceKeys"
+    FROM "visionquest"."DocumentChunk" c
+    JOIN "visionquest"."ProgramDocument" d ON d.id = c."documentId"
+    WHERE d."isActive" AND d."usedBySage"
+    GROUP BY md5(c.content) HAVING COUNT(*) > 1
+    ORDER BY COUNT(*) DESC, md5(c.content)
+  `;
 
   let local = { available: false };
   const docsRoot = path.resolve(process.cwd(), "docs-upload");
@@ -117,6 +135,11 @@ async function main() {
   const report = {
     generatedAt: new Date().toISOString(),
     activeEmbeddingModel: activeModel,
+    sourceAccess: {
+      objectStorageConfigured: isObjectStorageConfigured(),
+      mode: isObjectStorageConfigured() ? "object_storage_with_bundled_fallback" : "local_and_bundled_only",
+      note: "A failed local download does not prove the remote source is missing. Verify storage access before reindexing.",
+    },
     documents: {
       total: docs.length,
       active: docs.filter((doc) => doc.isActive).length,
@@ -126,22 +149,39 @@ async function main() {
       retrievableWithStaleChunks: docsWithStaleChunks.map((doc) => ({
         storageKey: doc.storageKey,
         staleChunks: doc.staleChunkEmbeddings,
+        missingChunkEmbeddings: doc.missingChunkEmbeddings,
       })),
       retrievableWithNoChunks: docsWithNoChunks.map((doc) => doc.storageKey),
       duplicateTitles: duplicateTitles(docs),
+      duplicatePassages,
+      // Stable source keys make this a machine-actionable repair queue. Unknown
+      // page provenance requires source re-extraction, never a guessed page 1.
+      repairQueue: retrievable.flatMap((doc) => {
+        const actions = [];
+        if (!doc.hasEmbedding || doc.embeddingModel !== activeModel) actions.push("embed_document");
+        if (doc.missingChunkEmbeddings || doc.staleChunkEmbeddings) actions.push("reembed_passages");
+        if (!doc.chunkCount) actions.push("review_body_extraction");
+        if (doc.missingPageNumbers) actions.push("reextract_page_provenance");
+        if (doc.missingTokenCounts) actions.push("estimate_tokens");
+        if (doc.emptyChunks) actions.push("remove_empty_passages_at_reingestion");
+        if (doc.noiseChunks) actions.push("remove_parser_noise_at_reingestion");
+        if (doc.unknownExtractionMethods) actions.push("record_extraction_method");
+        return actions.length ? [{ sourceKey: doc.storageKey, actions }] : [];
+      }),
     },
     memories: memories[0],
     localSources: local,
   };
 
-  const documentEmbeddingRepairs = new Set([
-    ...report.documents.retrievableMissingEmbedding,
-    ...report.documents.retrievableStaleModel,
-  ]).size;
-  // staleEmbedding includes null/missing model provenance, so count it once.
-  const strictFailures = documentEmbeddingRepairs
-    + report.documents.retrievableWithStaleChunks.length
-    + report.memories.staleEmbedding
+  // Count each affected document once, including missing vectors whose model
+  // tag happens to be current. Flat text/images correctly have no PDF page.
+  const strictFailures = retrievable.filter((doc) =>
+    !doc.hasEmbedding || doc.embeddingModel !== activeModel
+    || doc.staleChunkEmbeddings || doc.missingChunkEmbeddings
+    || doc.missingTokenCounts || doc.missingPageNumbers
+    || doc.emptyChunks || doc.noiseChunks || doc.unknownExtractionMethods
+  ).length
+    + report.memories.embeddingRepairs
     + (local.available ? local.missingDatabaseRows.length : 0);
 
   if (args.json) {

@@ -1643,10 +1643,13 @@ model ProgramDocument {
 }
 
 // Chunked bodies of extractable-text ProgramDocuments (~512-token chunks,
-// 50-token overlap) embedded for semantic retrieval. Scanned/image docs have
-// no chunks — their doc-level embedding (title + sageContextNote) suffices.
+// 50-token overlap) embedded for semantic retrieval. OCR passages carry an
+// explicit extraction method so AI consumers can distinguish transcriptions.
 // Manual SQL (see migrations): HNSW index DocumentChunk_embedding_hnsw_idx,
 // RLS policies mirroring program_document_read/write.
+// AI readers can also use the security-invoker ai_knowledge_passages view
+// (20260910124749_optimize_sage_ai_retrieval). It projects approved active
+// summaries + body passages with source keys, fingerprints, and provenance.
 model DocumentChunk {
   id             String                      @id @default(cuid())
   documentId     String
@@ -1658,6 +1661,7 @@ model DocumentChunk {
   tokenCount     Int?
   pageNumber     Int?
   sectionTitle   String?
+  extractionMethod String @default("unknown")
   // fts is a GENERATED tsvector managed in raw SQL (see add_chunk_provenance
   // migration). Prisma cannot express GENERATED columns; declared Unsupported
   // so it stays out of drift detection — do NOT accept a migrate-dev drop diff.

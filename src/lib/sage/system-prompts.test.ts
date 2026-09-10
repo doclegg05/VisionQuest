@@ -555,14 +555,16 @@ describe("buildSystemPrompt", () => {
     const prompt = buildSystemPrompt("teacher_assistant", {
       userMessage: "What forms does a student need to complete?",
     });
-    assert.match(prompt, /cite the source/i);
-    assert.match(prompt, /couldn't find/i);
+    assert.match(prompt, /Markdown link using the supplied source URL/i);
+    assert.match(prompt, /could not find that information/i);
+    assert.match(prompt, /Do not infer that a policy does not exist/i);
   });
 
   it("student prompt also instructs citing provided passages", () => {
     const prompt = buildSystemPrompt("general");
-    assert.match(prompt, /cite the source/i);
-    assert.match(prompt, /couldn't find/i);
+    assert.match(prompt, /Markdown link using the supplied source URL/i);
+    assert.match(prompt, /could not find that information/i);
+    assert.match(prompt, /Do not infer that a policy does not exist/i);
   });
 });
 

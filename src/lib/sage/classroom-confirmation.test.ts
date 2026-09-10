@@ -253,3 +253,15 @@ describe("detectAndRecordClassroomConfirmation", { skip: SKIP_IN_CI }, () => {
     assert.equal(result.noSignal, true);
   });
 });
+
+it("sends the current exchange in chronological order with a user first", async () => {
+  mockAlertFindFirst.mock.mockImplementation(async () => null);
+  const provider = makeProvider("{}");
+  provider.generateStructuredResponse = async (_prompt, messages) => {
+    assert.deepEqual(messages.map(m => m.role), ["user", "model", "user"]);
+    assert.equal(messages[0].content, "My classroom is Oak");
+    assert.equal(messages[1].content, "Thanks for confirming");
+    return "{}";
+  };
+  await detectAndRecordClassroomConfirmation(provider, "student-order", "My classroom is Oak", "Thanks for confirming");
+});

@@ -9,7 +9,9 @@ const mockChunkCreate = mock.fn() as any;
 
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
-    embedTexts: mockEmbedTexts,
+    embedTextsWithModel: async (...args: any[]) => ({
+      vectors: await mockEmbedTexts(...args), model: "gemini-embedding-001",
+    }),
     toVectorLiteral: (vector: number[]) => `[${vector.join(",")}]`,
   },
 });
@@ -66,6 +68,7 @@ describe("buildChunkRows", () => {
       tokenCount: 5,
       pageNumber: 4,
       sectionTitle: "ATTENDANCE",
+      extractionMethod: "unknown",
     });
   });
 });
@@ -106,17 +109,18 @@ describe("embedProgramDocument", () => {
 
     assert.equal(result.chunkCount, 1);
     assert.equal(mockChunkDeleteMany.mock.callCount(), 1);
-    assert.equal(mockChunkCreate.mock.callCount(), 1);
-    // 1 doc UPDATE + 1 chunk UPDATE
+    assert.equal(mockChunkCreate.mock.callCount(), 0);
+    // 1 doc UPDATE + 1 batched chunk INSERT
     assert.equal(mockExecuteRaw.mock.callCount(), 2);
     // Doc update carries the doc vector literal as the first interpolated value
     assert.equal(mockExecuteRaw.mock.calls[0].arguments[1], "[1,0,0]");
     // …and the active embedding model as the second (provenance stamp).
     assert.equal(mockExecuteRaw.mock.calls[0].arguments[2], "gemini-embedding-001");
-    // Chunk update also stamps the model: [id-then?] the vector + model are bound.
-    const chunkArgs = mockExecuteRaw.mock.calls[1].arguments;
-    assert.equal(chunkArgs[1], "[2,0,0]"); // second embedded text → fakeVector(2)
-    assert.equal(chunkArgs[2], "gemini-embedding-001");
+    const insert = mockExecuteRaw.mock.calls[1].arguments[0];
+    assert.match(insert.sql, /INSERT INTO/);
+    assert.ok(insert.values.includes("[2,0,0]"));
+    assert.ok(insert.values.includes("gemini-embedding-001"));
+    assert.equal(insert.values[7], null, "flat text must not claim page 1");
   });
 
   it("clears stale chunks but writes none when no text is provided", async () => {
@@ -143,5 +147,27 @@ describe("embedProgramDocument", () => {
     );
     assert.equal(mockExecuteRaw.mock.callCount(), 0);
     assert.equal(mockChunkDeleteMany.mock.callCount(), 0);
+  });
+
+  it("rejects an incomplete embedding batch before deleting the old index", async () => {
+    mockEmbedTexts.mock.mockImplementation(async () => [fakeVector(1)]);
+    await assert.rejects(() => embedProgramDocument("doc-4", {
+      title: "Policy", sageContextNote: null, text: "Body text.",
+    }), /response count/);
+    assert.equal(mockChunkDeleteMany.mock.callCount(), 0);
+    assert.equal(mockExecuteRaw.mock.callCount(), 0);
+  });
+
+  it("writes 205 passages in three bounded batches with correct provenance", async () => {
+    const pages = Array.from({ length: 205 }, (_, i) => ({ pageNumber: i + 1, text: `Page ${i + 1} body.` }));
+    const result = await embedProgramDocument("large", { title: "Handbook", sageContextNote: null, pages });
+    assert.equal(result.chunkCount, 205);
+    assert.equal(mockExecuteRaw.mock.callCount(), 4);
+    const inserts = mockExecuteRaw.mock.calls.slice(1).map((call: any) => call.arguments[0]);
+    assert.deepEqual(inserts.map((sql: any) => sql.values.length), [1000, 1000, 50]);
+    assert.equal(inserts[2].values[2], 200);
+    assert.equal(inserts[2].values[7], 201);
+    assert.equal(inserts[2].values[9], "text");
+    assert.equal(mockChunkCreate.mock.callCount(), 0);
   });
 });

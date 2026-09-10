@@ -3,6 +3,7 @@ import path from "path";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 import { logger } from "@/lib/logger";
+import { cleanPassageText } from "./passage-text";
 
 const SSN_PATTERN = /\d{3}-\d{2}-\d{4}/;
 const CASE_NUMBER_PATTERN = /\b(case|tanf|wv\s*works)\b.*?\b\d{7,10}\b/i;
@@ -42,10 +43,14 @@ export async function extractTextFromBuffer(
     switch (normalizedExt) {
       case ".pdf": {
         const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const result = await parser.getText({ first: maxPages });
-        const text = result.text?.trim();
-        if (!text) return null;
-        return { text: text.slice(0, maxChars), pageCount: result.total };
+        try {
+          const result = await parser.getText({ first: maxPages, pageJoiner: "" });
+          const text = cleanPassageText(result.text ?? "");
+          if (!text) return null;
+          return { text: text.slice(0, maxChars), pageCount: result.total };
+        } finally {
+          await parser.destroy();
+        }
       }
       case ".docx": {
         const result = await mammoth.extractRawText({ buffer });
@@ -109,8 +114,9 @@ export function containsPII(text: string): boolean {
 // ---------------------------------------------------------------------------
 
 export interface PageExtraction {
-  pages: { pageNumber: number; text: string }[];
-  pageCount: number;
+  pages: { pageNumber: number | null; text: string }[];
+  /** Physical pages when the source has pagination; null for DOCX/TXT/MD. */
+  pageCount: number | null;
 }
 
 /**
@@ -124,7 +130,7 @@ async function collectPdfPages(
 ): Promise<{ pageNumber: number; text: string }[]> {
   return pages.map((p) => ({
     pageNumber: p.num,
-    text: p.text.slice(0, cap),
+    text: cleanPassageText(p.text).slice(0, cap),
   }));
 }
 
@@ -145,27 +151,31 @@ export async function extractPagesFromBuffer(
     switch (normalizedExt) {
       case ".pdf": {
         const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const result = await parser.getText();
-        const total: number = result.total ?? 0;
-        if (!Array.isArray(result.pages) || result.pages.length === 0) return null;
-        const pages = await collectPdfPages(
-          result.pages as { text: string; num: number }[],
-          cap,
-        );
-        const nonEmpty = pages.filter((p) => p.text.trim().length > 0);
-        return nonEmpty.length > 0 ? { pages: nonEmpty, pageCount: total } : null;
+        try {
+          const result = await parser.getText({ pageJoiner: "" });
+          const total: number = result.total ?? 0;
+          if (!Array.isArray(result.pages) || result.pages.length === 0) return null;
+          const pages = await collectPdfPages(
+            result.pages as { text: string; num: number }[],
+            cap,
+          );
+          const nonEmpty = pages.filter((p) => p.text.trim().length > 0);
+          return nonEmpty.length > 0 ? { pages: nonEmpty, pageCount: total } : null;
+        } finally {
+          await parser.destroy();
+        }
       }
       case ".docx": {
         const result = await mammoth.extractRawText({ buffer });
         const text = result.value?.trim();
         if (!text) return null;
-        return { pages: [{ pageNumber: 1, text: text.slice(0, cap) }], pageCount: 1 };
+        return { pages: [{ pageNumber: null, text: text.slice(0, cap) }], pageCount: null };
       }
       case ".txt":
       case ".md": {
         const text = buffer.toString("utf-8").trim();
         if (!text) return null;
-        return { pages: [{ pageNumber: 1, text: text.slice(0, cap) }], pageCount: 1 };
+        return { pages: [{ pageNumber: null, text: text.slice(0, cap) }], pageCount: null };
       }
       default:
         return null;

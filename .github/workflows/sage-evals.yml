@@ -210,7 +210,31 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
       - name: Apply migrations
-        run: npx prisma migrate deploy
+        run: |
+          npx prisma db execute --file scripts/test-support/supabase-roles.sql --schema prisma/schema.prisma
+          npx prisma migrate deploy
+      - name: Answer quality on the hermetic catalog (informational during calibration)
+        continue-on-error: true
+        env:
+          SAGE_RAG_MODE: "keyword"
+          SAGE_RAG_ABSTAIN_DISTANCE: "0.40"
+        run: |
+          if [ -z "$GEMINI_API_KEY" ] || [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
+            echo "- **Answer quality**: SKIPPED — provider key or confirmed budget unavailable; not release evidence" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          npx tsx scripts/bench/seed-catalog-corpus.mjs
+          mkdir -p reports/sage-answer-quality
+          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --model=gemini-3.1-flash-lite --deidentify=Sam --families=grounding --fixture=config/sage-answer-quality-eval.json --samples=3 --temperature=0 --strict --out=reports/sage-answer-quality/catalog.json
+
+      - name: Upload answer-quality calibration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sage-answer-quality-catalog
+          path: reports/sage-answer-quality/
+          if-no-files-found: ignore
+
       - name: Sage memory eval (gating when GEMINI_API_KEY is set — retrieval hit rate < 90% or duplicate rate >= 5% fails the run; skips when the secret is unset)
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
@@ -299,6 +323,8 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
       - name: Apply migrations
-        run: npx prisma migrate deploy
+        run: |
+          npx prisma db execute --file scripts/test-support/supabase-roles.sql --schema prisma/schema.prisma
+          npx prisma migrate deploy
       - name: Sage freshness eval (Group A gates the read plane; Group B reports staleness)
         run: npm run sage:freshness:eval -- --strict

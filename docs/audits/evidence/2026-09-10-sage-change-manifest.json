@@ -1,0 +1,283 @@
+{
+  "baseCommit": "734d49840779c3c63b8d660462d1153da58f31a8",
+  "branch": "codex/sage-answer-quality-release",
+  "exclusions": "Original workspace intake changes, prototypes, dev-login route, unrelated sprint plans, and all environment files are excluded.",
+  "files": [
+    {
+      "path": ".github/workflows/benchmarks.yml",
+      "sha256": "83badcecf17ac6312209b37e9f77556b005f88d778137bb2397f23d2367c6787"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "1281f410f2e4d651405e977921943c564e2b658fbb09cf6f02ed06c19f17f808"
+    },
+    {
+      "path": ".github/workflows/sage-evals.yml",
+      "sha256": "21fc75366e059dbc8a32fb51a43f2be27db405d5cb8d795dd1025d7510236bcf"
+    },
+    {
+      "path": "DEPLOY.md",
+      "sha256": "04635a1ac789d1663f79916ca8068c4b408d4719c6e65cb4c7ff171d4f4df73f"
+    },
+    {
+      "path": "config/sage-answer-quality-eval.json",
+      "sha256": "e56cafc44e3082dab26c3f57bdee960ad76b31af0750489adf489d78fcd01282"
+    },
+    {
+      "path": "config/sage-answer-quality-heldout.json",
+      "sha256": "12a73309dbd1bd40372c890f810b879d2727e0f7066febfe45d54ae362317adb"
+    },
+    {
+      "path": "config/sage-rag-eval.json",
+      "sha256": "643083f3e16d0be257db1aafe46037adb47aa4b123b1adbf0502cfd5b5c7da7e"
+    },
+    {
+      "path": "docs/audits/2026-09-10-sage-sprint-execution.md",
+      "sha256": "423aed58188e192446e67b8a53f4a58ae11fa59a7518d7953804319c1dc94936"
+    },
+    {
+      "path": "docs/audits/2026-09-10-supabase-ai-retrieval.md",
+      "sha256": "54ed0f73325262c1fd32d7cc2230a513054b2ac06fba6413f35133732e583375"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-ai-corpus-index.json",
+      "sha256": "19c0f94c2481546bb595a709a4dc61825edc8ffe013ec22120147b7b1585fd2d"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-ai-retrieval-holdout-configured.json",
+      "sha256": "820e1158fbed1c89c872152961c4cc6b2fce1929adc57b6bf78fdc9b134b236c"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-ai-retrieval-holdout.json",
+      "sha256": "d9d3ff4a9771234a4c1cf63ee7b00861454d144d1b7fc31eee28c1d68c15dc2d"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-ai-retrieval-source-language.json",
+      "sha256": "ec7c2a5607afd6d16f509a69f2f8fcbbbd46fe740c9ee53161d1042a2af7e678"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-ai-retrieval-standard-configured.json",
+      "sha256": "507d724d7284bab535ce0daf8704f5e598f567ecf616b0a099961795a7db814b"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-ai-retrieval-standard.json",
+      "sha256": "23e489f6ecd680d65233f4bf6825b9cb18f6473aceaf47222f45c5962b98fcf9"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-ai-summary-curation.json",
+      "sha256": "afa21711db64d7def59db29b73081ad33253b108de61c81a0be6acc30c86bda8"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-answer-baseline.json",
+      "sha256": "8d2d773a81192666a53bdb9555c5cf2a105d48de7a04422370482c75af95149f"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-answer-calibration.json",
+      "sha256": "359c5c5ee5d2ba19246a730577e5a5d937a3515dfb6a257b5715e703bb64faf8"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-answer-final.json",
+      "sha256": "ee8ecb1a800ac16c40b139185e22298f3ec5799abad8623eba4f7ee868ddf6d8"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-answer-first-fix.json",
+      "sha256": "6cb501437174b1e5dbd9d618d0a6259609338fba476719babc0ffa936db6b72c"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-answer-heldout.json",
+      "sha256": "13f07f3e014e1ee28098c21e427da0e3ada84debea5100733a85ee1302b7272d"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-answer-revision3.json",
+      "sha256": "ae4004a577cf9b134f573db1c970f5baf63cdf443ac6f72629d30fa34b6819eb"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-broader-corrected.json",
+      "sha256": "f078dc5bf0a193a035cc07eca7005908405685b276ce40a116164c6bb9feeba8"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-existing-gates.json",
+      "sha256": "f406a2a89b5c8d82925b637b5277dbe706c2891bced27cfa62a8ce9074a5007f"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-route-final.json",
+      "sha256": "7da7e0c33bae8218c3d1164dfa1630c31484c32036a68a3c2873cfbde52572b3"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-sprint-baseline.json",
+      "sha256": "18f1b1e494439e6d3ef30d9d2fde22acd26eb0ca7718b008a4ae63ce1ea431e2"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-sage-standard-final.json",
+      "sha256": "17891ad946fd48c63bbe49dfa3c4e6a559aad8f8e88e8d460c217123a99b0357"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-supabase-ai-repair-queue.json",
+      "sha256": "33c40fb617164848922e272d981b4ca140552dd6d6c659109598dc6e6c12647d"
+    },
+    {
+      "path": "docs/audits/evidence/2026-09-10-supabase-ai-validation.json",
+      "sha256": "097c5c71611a1e37f6907c52d74a3a83544c0c3b72d4796107e1eafaec2d77b0"
+    },
+    {
+      "path": "docs/plans/2026-09-10-sage-answer-quality-and-release-sprint.md",
+      "sha256": "fc7d87756f0e6ed382b3db19fcbdd57bb9aac1e0697faafd51a37e7d8c52a6f4"
+    },
+    {
+      "path": "prisma/migrations/20260910124749_optimize_sage_ai_retrieval/migration.sql",
+      "sha256": "6f68d9ee1d85be2d6bf7552ed580937d493c1908a8a59356504195e832f58d09"
+    },
+    {
+      "path": "prisma/migrations/20260910130409_clarify_ai_passage_timestamp/migration.sql",
+      "sha256": "830e5443aacf3cb77d3dfd2eb45b35e4e2aa67b2bb390e7946eea5dde080f433"
+    },
+    {
+      "path": "prisma/migrations/20260910135415_track_ai_passage_extraction/migration.sql",
+      "sha256": "41db377849d8a10c67e951c7c74ebb563a049a5300cc588877c352a2dd6116b0"
+    },
+    {
+      "path": "prisma/schema.prisma",
+      "sha256": "2215a6fb7408c1cc3d12959777bfefb38752921771a8d7b61b6464b46a148357"
+    },
+    {
+      "path": "scripts/lib/sage-grounding-eval.mjs",
+      "sha256": "261c025acb3f796cfa0e5f22ab5b20c04d3df0bc1e160b716fae85debe4e9d1f"
+    },
+    {
+      "path": "scripts/lib/sage-rag-utils.mjs",
+      "sha256": "0d57ab35d3adc049a97598018c725b307a6b96a494a3d2c16e38a97ef1eee53b"
+    },
+    {
+      "path": "scripts/ocr-program-source.swift",
+      "sha256": "a212ee2809c417a98a7f270d4991e25125e1e7fafbb0097b7161c8553e09db60"
+    },
+    {
+      "path": "scripts/reindex-ai-corpus.mjs",
+      "sha256": "1633ad0de42b3e3ae4735748d7b36b5174f208e8c08a1cc91934a949dc6e4dc4"
+    },
+    {
+      "path": "scripts/sage-chat-harness.mjs",
+      "sha256": "419a066ce77164285f80e87bcb8c088a1886664fd0054094dddc40dae83cec30"
+    },
+    {
+      "path": "scripts/sage-index-integrity.mjs",
+      "sha256": "a00c4e71248a324a7cba26963d259c0f83a077033b92df4fd7a8bf90e472ecd1"
+    },
+    {
+      "path": "scripts/sage-rag-harness.mjs",
+      "sha256": "271334e0771071b1def9f2c4c240c94aed48c76c65abc4bb7913698936f549bb"
+    },
+    {
+      "path": "scripts/test-support/supabase-roles.sql",
+      "sha256": "c1c88800159c8bbc200610f3e97c389920a2f9b65f4be9dcf0ba92a4a3c1af31"
+    },
+    {
+      "path": "scripts/verify-ai-retrieval.mjs",
+      "sha256": "ebc2aa600fbaeabb9a33d72944f11c55d8abb39ef7b171c1dceb3fa875805951"
+    },
+    {
+      "path": "src/lib/ai/embeddings.test.ts",
+      "sha256": "5763894f90f84b93d2e5badc994d8397079cbfcec095a08fb8a0c231f4ea6f03"
+    },
+    {
+      "path": "src/lib/ai/embeddings.ts",
+      "sha256": "169922b97757b1c923ac8a72b489d54f4c93ce0bceb25c5f5747881a0426e9cd"
+    },
+    {
+      "path": "src/lib/sage/backfill-embeddings.test.ts",
+      "sha256": "1bb8593727f7d49a50402b8640694061a6ac3fa11a12a44c57ede0517c035a9a"
+    },
+    {
+      "path": "src/lib/sage/backfill-embeddings.ts",
+      "sha256": "4c0b2ef09725410444a3098d740a9df266bf543df9ac5686f0190189d2c4778b"
+    },
+    {
+      "path": "src/lib/sage/chunking.test.ts",
+      "sha256": "b31790fe8b444a6ca7d7aca8f1f64846a6294eed3c2559d3ddc8054f63065c04"
+    },
+    {
+      "path": "src/lib/sage/chunking.ts",
+      "sha256": "09e4af09e429a55772ddd8d3334b40bf9e8a0f1468acc4af22ed6a0f5a9d8947"
+    },
+    {
+      "path": "src/lib/sage/classroom-confirmation.test.ts",
+      "sha256": "5553cd28831e394f846b75cb1d34b8a83d6bacf371906292d354cf9c4e28c6c6"
+    },
+    {
+      "path": "src/lib/sage/classroom-confirmation.ts",
+      "sha256": "cb27cdc1b57619b32666deabf387d382f057db1cb0c53045b92f72fd9a9478b2"
+    },
+    {
+      "path": "src/lib/sage/document-embedding.test.ts",
+      "sha256": "83e11fcc28f05a323142e75fcbdeabbd54af8a4633d82164f33cf90ad26ec710"
+    },
+    {
+      "path": "src/lib/sage/document-embedding.ts",
+      "sha256": "35601d35da946e4e14962dc69ebfaace64d682e001921da1b6b32a3d5c3993ef"
+    },
+    {
+      "path": "src/lib/sage/extract.test.ts",
+      "sha256": "8ce15d3dc1f6d5dd6521abce7b332c59cdd13cf70e3d8a6bf49842eacd99b2c8"
+    },
+    {
+      "path": "src/lib/sage/extract.ts",
+      "sha256": "eaeb43fc9610cf0f6a7bf66166fe60134f9671b620379c6d711c732914d0b32b"
+    },
+    {
+      "path": "src/lib/sage/grounding-answer-eval.test.ts",
+      "sha256": "c54fb3ff085064399087791b3066278d0b3601a68b08294d662ff3ef2c675e70"
+    },
+    {
+      "path": "src/lib/sage/hybrid-retrieval.embedding-subject.test.ts",
+      "sha256": "673d467f326558369101908e3ff34671db6e4b847775ebf12919662f9ec43098"
+    },
+    {
+      "path": "src/lib/sage/hybrid-retrieval.test.ts",
+      "sha256": "d14670792c6b8a923d51ed40e2e033245fef6115704106f8ef7653517ecaf5e6"
+    },
+    {
+      "path": "src/lib/sage/hybrid-retrieval.ts",
+      "sha256": "8db4626c389fc1260c0d0d77a984e40efbfa08c7f3be96717b8844c0f644f68c"
+    },
+    {
+      "path": "src/lib/sage/knowledge-base-server.test.ts",
+      "sha256": "05cf66ae8608d86aaf97796e8f1276056a461c66c69b3e3c7b5c1ee35a95ce93"
+    },
+    {
+      "path": "src/lib/sage/knowledge-base-server.ts",
+      "sha256": "e2e8006db990aee06bd0b6b0d6e7cb8687b825dc8130c381441a859145440c87"
+    },
+    {
+      "path": "src/lib/sage/passage-text.test.ts",
+      "sha256": "30c9ebcd074b7a0fcd259633fb43cf7c32e15842627d53aca24cd7decd37bb3a"
+    },
+    {
+      "path": "src/lib/sage/passage-text.ts",
+      "sha256": "4bf88fe8c5280d06e60ae602ce340b3bd2a54cedf285e4ff1c49fe009b3479d9"
+    },
+    {
+      "path": "src/lib/sage/prompt-revision.ts",
+      "sha256": "a3f8ac62aedd99c6d8c7c0f47d2a5f268d8087a4b45ac4d0c088702e5e3c31a5"
+    },
+    {
+      "path": "src/lib/sage/retrieval-context.db.test.ts",
+      "sha256": "3af264d77d92561770d8f94acbd839cda07e3db555b27d475b3b65e8789fecb7"
+    },
+    {
+      "path": "src/lib/sage/stage.test.ts",
+      "sha256": "6c50f6fd870e727b2f661bc5d8b53551a1092f54ca9ba86518cc829190c02f59"
+    },
+    {
+      "path": "src/lib/sage/stage.ts",
+      "sha256": "99ff68185bc260803a1d23d5037448a904c789afbfe0c72386ca155a8502e4a5"
+    },
+    {
+      "path": "src/lib/sage/system-prompts.test.ts",
+      "sha256": "fb97c9d70f21c62b4a3ddca4e01b11eb008b73b3457579494624ea6a13d74b68"
+    },
+    {
+      "path": "src/lib/sage/system-prompts.ts",
+      "sha256": "e405df7c5545247562aad54f94676d76ef90cb16265b1f6b937d25b85f8d2e94"
+    }
+  ]
+}

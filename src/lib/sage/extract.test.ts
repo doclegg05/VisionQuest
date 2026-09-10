@@ -8,13 +8,13 @@ before(async () => {
   extractPagesFromBuffer = mod.extractPagesFromBuffer;
 });
 
-test("extractPagesFromBuffer returns one entry per page for txt", async () => {
+test("flat text has content but no invented physical page number", async () => {
   const buf = Buffer.from("alpha\n\nbeta", "utf-8");
   const result = await extractPagesFromBuffer(buf, ".txt");
   assert.ok(result);
-  assert.equal(result.pageCount, 1);
+  assert.equal(result.pageCount, null);
   assert.equal(result.pages.length, 1);
-  assert.equal(result.pages[0].pageNumber, 1);
+  assert.equal(result.pages[0].pageNumber, null);
   assert.match(result.pages[0].text, /alpha/);
 });
 

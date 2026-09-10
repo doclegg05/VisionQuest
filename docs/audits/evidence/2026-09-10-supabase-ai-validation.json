@@ -1,0 +1,408 @@
+{
+  "observedDate": "2026-09-10",
+  "project": "erdbdpgfirfbaoswwqby",
+  "localSyntheticBenchmark": {
+    "documents": 1200,
+    "chunks": 7200,
+    "comparisons": 30,
+    "measuredRuns": 10,
+    "warmupRuns": 2,
+    "medianBeforeMs": 26.983,
+    "medianAfterMs": 14.4045
+  },
+  "liveComparisons": {
+    "cases": [
+      {
+        "query": "",
+        "role": "staff",
+        "matches": 12,
+        "fingerprintBefore": "309cd25d49e72152557b9eb44289f9d5",
+        "fingerprintAfter": "309cd25d49e72152557b9eb44289f9d5"
+      },
+      {
+        "query": "",
+        "role": "student",
+        "matches": 12,
+        "fingerprintBefore": "309cd25d49e72152557b9eb44289f9d5",
+        "fingerprintAfter": "309cd25d49e72152557b9eb44289f9d5"
+      },
+      {
+        "query": "attendance OR policy",
+        "role": "staff",
+        "matches": 12,
+        "fingerprintBefore": "d223bed92ed5b15be3ba691b0edd62db",
+        "fingerprintAfter": "d223bed92ed5b15be3ba691b0edd62db"
+      },
+      {
+        "query": "attendance OR policy",
+        "role": "student",
+        "matches": 12,
+        "fingerprintBefore": "d223bed92ed5b15be3ba691b0edd62db",
+        "fingerprintAfter": "d223bed92ed5b15be3ba691b0edd62db"
+      },
+      {
+        "query": "career OR pathways",
+        "role": "staff",
+        "matches": 12,
+        "fingerprintBefore": "7aca5a844cd900e4161c6da0a174f72b",
+        "fingerprintAfter": "7aca5a844cd900e4161c6da0a174f72b"
+      },
+      {
+        "query": "career OR pathways",
+        "role": "student",
+        "matches": 12,
+        "fingerprintBefore": "e3aed66746ec28485b027ae569980bd8",
+        "fingerprintAfter": "e3aed66746ec28485b027ae569980bd8"
+      },
+      {
+        "query": "certification OR exam",
+        "role": "staff",
+        "matches": 12,
+        "fingerprintBefore": "8c8656b0ca149628fa823d72bda94935",
+        "fingerprintAfter": "8c8656b0ca149628fa823d72bda94935"
+      },
+      {
+        "query": "certification OR exam",
+        "role": "student",
+        "matches": 12,
+        "fingerprintBefore": "8c8656b0ca149628fa823d72bda94935",
+        "fingerprintAfter": "8c8656b0ca149628fa823d72bda94935"
+      },
+      {
+        "query": "quasarxyz",
+        "role": "staff",
+        "matches": 12,
+        "fingerprintBefore": "309cd25d49e72152557b9eb44289f9d5",
+        "fingerprintAfter": "309cd25d49e72152557b9eb44289f9d5"
+      },
+      {
+        "query": "quasarxyz",
+        "role": "student",
+        "matches": 12,
+        "fingerprintBefore": "309cd25d49e72152557b9eb44289f9d5",
+        "fingerprintAfter": "309cd25d49e72152557b9eb44289f9d5"
+      },
+      {
+        "query": "release OR information",
+        "role": "staff",
+        "matches": 12,
+        "fingerprintBefore": "690a26b2f36829b709fe42fcc7b167e1",
+        "fingerprintAfter": "690a26b2f36829b709fe42fcc7b167e1"
+      },
+      {
+        "query": "release OR information",
+        "role": "student",
+        "matches": 12,
+        "fingerprintBefore": "690a26b2f36829b709fe42fcc7b167e1",
+        "fingerprintAfter": "690a26b2f36829b709fe42fcc7b167e1"
+      }
+    ],
+    "identical": true
+  },
+  "liveViewAccess": {
+    "studentRows": 312,
+    "studentTeacherRows": 0,
+    "anonRead": false,
+    "authenticatedRead": false,
+    "appRead": true
+  },
+  "validation": {
+    "testsPassed": 3383,
+    "focusedTestsPassed": 72,
+    "typecheck": "passed, incremental=false",
+    "lint": "passed with pre-existing untracked prototypes excluded",
+    "build": "passed for final application code with isolated local database URLs",
+    "databaseRegression": "passed; synthetic fixtures rolled back",
+    "testsFailed": 0,
+    "testSuites": 655,
+    "focusedTestsContext": "72 tests in earlier focused run; final full suite supersedes this count",
+    "followUp": "Harness reporting change passed ESLint and an empty-fixture smoke check confirming effective abstentionDistance=0.4; application runtime code unchanged in this follow-up."
+  },
+  "remaining": {
+    "missingDocumentEmbeddings": 0,
+    "unknownPdfChunkPageNumbers": 0,
+    "documentsWithoutBodyChunks": 0,
+    "sourceExtractionRepairs": 0,
+    "applicationDeployment": "local changes not deployed; database and corpus updates are live"
+  },
+  "documentBackfill": {
+    "observedAt": "2026-09-10T13:37:48.044Z",
+    "httpStatus": 200,
+    "total": 67,
+    "embedded": 17,
+    "skipped": 50,
+    "noText": 17,
+    "errors": 0,
+    "durationMs": 30103,
+    "mode": "missing document embeddings only; summary fallback for all 17; no memory reembedding",
+    "runStage": "historical: summary-only backfill before source recovery and full corpus rebuild"
+  },
+  "postBackfillIntegrity": {
+    "strictFailures": 0,
+    "missingEmbeddings": 0,
+    "staleModelDocuments": 0,
+    "documentsWithStaleChunks": 0,
+    "runStage": "historical: before strengthened provenance and extraction checks"
+  },
+  "postBackfillKeywordHarness": {
+    "generatedAt": "2026-09-10T13:38:58.447Z",
+    "mode": "keyword fallback only; embedding provider unavailable locally",
+    "total": 40,
+    "strictPassed": 38,
+    "strictCleanPassed": 8,
+    "top1Expected": 31,
+    "top3Expected": 38,
+    "audienceLeakage": 0,
+    "missingExpectationKeys": [],
+    "failedQuestionIds": [
+      "dfa-ssp1-form",
+      "dfa-wvw25-form"
+    ],
+    "runStage": "historical: before working local provider credentials and full corpus rebuild"
+  },
+  "completedCorpus": {
+    "documents": 67,
+    "bodyPassages": 254,
+    "ocrPassages": 91,
+    "nativePassages": 163,
+    "pdfPassagesWithoutPages": 0,
+    "unknownExtractionMethods": 0,
+    "strictIntegrityFailures": 0,
+    "repairQueueLength": 0,
+    "sourceAccessVerified": true,
+    "finalVerifiedAt": "2026-09-10T14:26:18.462Z"
+  },
+  "localSyntheticBenchmarkAfterExtractionMigration": {
+    "documents": 1200,
+    "chunks": 7200,
+    "comparisons": 30,
+    "measuredRuns": 10,
+    "warmupRuns": 2,
+    "medianBeforeMs": 31.0685,
+    "medianAfterMs": 18.063
+  },
+  "semanticRetrieval": {
+    "standard": {
+      "runStage": "corrected run after final source curation; existing abstention filter enabled",
+      "runConfiguration": {
+        "abstentionDistance": 0.4,
+        "source": "explicit SAGE_RAG_ABSTAIN_DISTANCE=0.40 command override; matches render.yaml; live Render environment not reverified"
+      },
+      "evidence": "2026-09-10-ai-retrieval-standard-configured.json",
+      "generatedAt": "2026-09-10T14:40:49.297Z",
+      "fixturePath": "config/sage-rag-top-questions.json",
+      "role": "student",
+      "maxResults": 3,
+      "tokenBudgetChars": 6000,
+      "legacyPassed": 40,
+      "strictPassed": 40,
+      "strictCleanPassed": 36,
+      "total": 40,
+      "expectedChecks": 40,
+      "passRate": 1,
+      "top1Expected": 37,
+      "top3Expected": 40,
+      "cleanTop3": 36,
+      "unexpectedTop3Docs": 4,
+      "audienceLeakage": 0,
+      "noAnswerPassed": 0,
+      "noAnswerTotal": 0,
+      "latency": {
+        "coldFirstCallMs": 6046,
+        "p50Ms": 2412,
+        "p95Ms": 3054,
+        "maxMs": 6046
+      },
+      "missingExpectationKeys": [],
+      "failedSourceQuestionIds": [],
+      "failedNoAnswerQuestionIds": []
+    },
+    "holdout": {
+      "runStage": "before final family-score fix and source-summary curation; historical diagnostic run",
+      "evidence": "2026-09-10-ai-retrieval-holdout.json",
+      "generatedAt": "2026-09-10T14:15:29.134Z",
+      "fixturePath": "config/sage-rag-eval.json",
+      "role": "student",
+      "maxResults": 3,
+      "tokenBudgetChars": 6000,
+      "legacyPassed": 19,
+      "strictPassed": 15,
+      "strictCleanPassed": 11,
+      "total": 29,
+      "expectedChecks": 20,
+      "passRate": 0.5172413793103449,
+      "top1Expected": 13,
+      "top3Expected": 15,
+      "cleanTop3": 11,
+      "unexpectedTop3Docs": 13,
+      "audienceLeakage": 0,
+      "noAnswerPassed": 0,
+      "noAnswerTotal": 9,
+      "latency": {
+        "coldFirstCallMs": 6269,
+        "p50Ms": 2432,
+        "p95Ms": 3196,
+        "maxMs": 6269
+      },
+      "missingExpectationKeys": [],
+      "failedQuestionIds": [
+        "close-confusion-prc1-vs-ssp1",
+        "no-answer-unrelated-topic",
+        "no-answer-medical-advice",
+        "no-answer-outside-program-scope",
+        "no-answer-weather",
+        "no-answer-sports-trivia",
+        "no-answer-recipe",
+        "no-answer-general-trivia",
+        "no-answer-near-miss-refund-policy",
+        "no-answer-near-miss-ged-schedule",
+        "low-literacy-orientation-forms",
+        "low-literacy-portfolio",
+        "student-role-no-teacher-sign-in-sheet",
+        "student-role-no-teacher-ecp-instructions"
+      ],
+      "runConfiguration": {
+        "abstentionDistance": 1,
+        "source": "local environment lacked override; effective code default"
+      }
+    },
+    "sourceLanguageRerun": {
+      "runStage": "after source-summary curation; targeted rerun of two genuine low-literacy recall failures",
+      "evidence": "2026-09-10-ai-retrieval-source-language.json",
+      "generatedAt": "2026-09-10T14:21:16.184Z",
+      "fixturePath": "/tmp/vq-retrieval.qmSsON/source-language-checks.json",
+      "role": "student",
+      "maxResults": 3,
+      "tokenBudgetChars": 6000,
+      "legacyPassed": 2,
+      "strictPassed": 2,
+      "strictCleanPassed": 2,
+      "total": 2,
+      "expectedChecks": 2,
+      "passRate": 1,
+      "top1Expected": 2,
+      "top3Expected": 2,
+      "cleanTop3": 2,
+      "unexpectedTop3Docs": 0,
+      "audienceLeakage": 0,
+      "noAnswerPassed": 0,
+      "noAnswerTotal": 0,
+      "latency": {
+        "coldFirstCallMs": 5888,
+        "p50Ms": 2446,
+        "p95Ms": 5888,
+        "maxMs": 5888
+      },
+      "missingExpectationKeys": [],
+      "failedQuestionIds": []
+    },
+    "standardBeforeRepair": {
+      "total": 40,
+      "strictPassed": 34,
+      "top1Expected": 34,
+      "strictCleanPassed": 34
+    },
+    "providerFallbackInFinalStandardRun": false,
+    "holdoutLimitations": [
+      "The configured full holdout passes 17/20 expected-source checks and 6/9 no-answer checks; its strict no-answer process exits 1.",
+      "The two low-literacy questions pass in the configured full rerun.",
+      "close-confusion-prc1-vs-ssp1 expects a completion form, but its expected source is the Personal Responsibility Contract and Initial Self-Sufficiency Plan.",
+      "student-role-no-teacher-sign-in-sheet and student-role-no-teacher-ecp-instructions expect disabled sources; no activation flags were changed.",
+      "The three remaining no-answer failures concern medication advice, an unsupported refund policy, and the next GED test date; source recall does not establish answer correctness."
+    ],
+    "previousStandardGateDisabled": {
+      "runStage": "final local application with live corpus and configured query-embedding provider",
+      "evidence": "2026-09-10-ai-retrieval-standard.json",
+      "generatedAt": "2026-09-10T14:23:08.092Z",
+      "fixturePath": "config/sage-rag-top-questions.json",
+      "role": "student",
+      "maxResults": 3,
+      "tokenBudgetChars": 6000,
+      "legacyPassed": 40,
+      "strictPassed": 40,
+      "strictCleanPassed": 36,
+      "total": 40,
+      "expectedChecks": 40,
+      "passRate": 1,
+      "top1Expected": 37,
+      "top3Expected": 40,
+      "cleanTop3": 36,
+      "unexpectedTop3Docs": 4,
+      "audienceLeakage": 0,
+      "noAnswerPassed": 0,
+      "noAnswerTotal": 0,
+      "latency": {
+        "coldFirstCallMs": 5770,
+        "p50Ms": 2321,
+        "p95Ms": 2874,
+        "maxMs": 5770
+      },
+      "missingExpectationKeys": [],
+      "failedQuestionIds": [],
+      "runConfiguration": {
+        "abstentionDistance": 1,
+        "source": "local environment lacked override; effective code default"
+      }
+    },
+    "configuredHoldout": {
+      "runStage": "corrected run after final source curation; existing abstention filter enabled",
+      "runConfiguration": {
+        "abstentionDistance": 0.4,
+        "source": "explicit SAGE_RAG_ABSTAIN_DISTANCE=0.40 command override; matches render.yaml; live Render environment not reverified"
+      },
+      "evidence": "2026-09-10-ai-retrieval-holdout-configured.json",
+      "generatedAt": "2026-09-10T14:40:09.325Z",
+      "fixturePath": "config/sage-rag-eval.json",
+      "role": "student",
+      "maxResults": 3,
+      "tokenBudgetChars": 6000,
+      "legacyPassed": 20,
+      "strictPassed": 17,
+      "strictCleanPassed": 13,
+      "total": 29,
+      "expectedChecks": 20,
+      "passRate": 0.5862068965517241,
+      "top1Expected": 15,
+      "top3Expected": 17,
+      "cleanTop3": 13,
+      "unexpectedTop3Docs": 10,
+      "audienceLeakage": 0,
+      "noAnswerPassed": 6,
+      "noAnswerTotal": 9,
+      "latency": {
+        "coldFirstCallMs": 6041,
+        "p50Ms": 2415,
+        "p95Ms": 3119,
+        "maxMs": 6041
+      },
+      "missingExpectationKeys": [],
+      "failedSourceQuestionIds": [
+        "close-confusion-prc1-vs-ssp1",
+        "student-role-no-teacher-sign-in-sheet",
+        "student-role-no-teacher-ecp-instructions"
+      ],
+      "failedNoAnswerQuestionIds": [
+        "no-answer-medical-advice",
+        "no-answer-near-miss-refund-policy",
+        "no-answer-near-miss-ged-schedule"
+      ]
+    },
+    "configurationCorrection": {
+      "missingLocalSetting": "SAGE_RAG_ABSTAIN_DISTANCE",
+      "trackedRenderValue": 0.4,
+      "localValueRestored": 0.4,
+      "codeFixAlreadyPresent": true,
+      "liveRenderEnvironmentReverified": false,
+      "priorClaimCorrection": "The initial 0/9 no-answer result came from the unconfigured local run and does not establish a production regression or a missing filter.",
+      "historicalCalibration": "July evidence reports 8/9 at 0.40 on an earlier corpus; current configured local run reports 6/9.",
+      "remaining": "Three related-topic no-answer cases still return references. Generated-answer correctness was not tested.",
+      "harnessReportsEffectiveThresholds": true
+    }
+  },
+  "summaryCuration": {
+    "documents": 4,
+    "evidence": "2026-09-10-ai-summary-curation.json",
+    "sourceBacked": true,
+    "bodyPassagesPreserved": true
+  }
+}

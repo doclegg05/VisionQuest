@@ -18,25 +18,40 @@ mock.module("@/lib/db", {
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
     embedQuery: mockEmbedQuery,
+    embedTextsWithModel: async () => {
+      const model = activeModel;
+      return { vectors: [await mockEmbedQuery()], model };
+    },
     toVectorLiteral: (v: number[]) => `[${v.join(",")}]`,
     EMBEDDING_DIMENSIONS: 768,
   },
 });
 
 const ACTIVE_MODEL = "gemini-embedding-001";
+let activeModel = ACTIVE_MODEL;
 mock.module("@/lib/ai/embedding-provider", {
   namedExports: {
-    getActiveEmbeddingModel: async () => ACTIVE_MODEL,
+    getActiveEmbeddingModel: async () => activeModel,
   },
 });
 
-// Cache passthrough so every test exercises the underlying embed call.
+const queryCache = new Map<string, unknown>();
 mock.module("@/lib/cache", {
   namedExports: {
-    cached: (_key: string, _ttl: number, fetcher: () => Promise<unknown>) => fetcher(),
+    cached: async (key: string, _ttl: number, fetcher: () => Promise<unknown>) => {
+      if (queryCache.has(key)) return queryCache.get(key);
+      const value = await fetcher();
+      queryCache.set(key, value);
+      return value;
+    },
     invalidate: () => undefined,
     invalidatePrefix: () => undefined,
   },
+});
+
+beforeEach(() => {
+  queryCache.clear();
+  activeModel = ACTIVE_MODEL;
 });
 
 let hybridSearchDocuments: typeof import("./hybrid-retrieval").hybridSearchDocuments;
@@ -83,11 +98,43 @@ describe("hybridSearchDocuments", () => {
       title: "SPOKES Dress Code Policy",
       storageKey: "orientation/dress-code.pdf",
       sageContextNote: "Explains the dress code.",
-      score: 0.03,
+      score: 0.04,
       semanticRank: 1,
       ftsRank: 2,
       bestDistance: 0.31,
     });
+  });
+
+  it("shares concurrent query embeddings and keeps cached vectors scoped to their model", async () => {
+    await Promise.all([
+      hybridSearchDocuments("dress code", "student", 3),
+      hybridSearchDocuments("dress code", "student", 3),
+    ]);
+    assert.equal(mockEmbedQuery.mock.callCount(), 1);
+    await hybridSearchDocuments("dress code", "student", 3);
+    assert.equal(mockEmbedQuery.mock.callCount(), 1);
+    activeModel = "different-model";
+    await hybridSearchDocuments("dress code", "student", 3);
+    assert.equal(mockEmbedQuery.mock.callCount(), 2);
+    assert.ok(mockQueryRaw.mock.calls.at(-1).arguments.includes("different-model"));
+  });
+
+  it("keeps the producing model when configuration changes during embedding", async () => {
+    mockEmbedQuery.mock.mockImplementation(async () => {
+      activeModel = "new-model";
+      return new Array(768).fill(0.1);
+    });
+    await hybridSearchDocuments("dress code", "student", 3);
+    const params = mockQueryRaw.mock.calls[0].arguments;
+    assert.ok(params.includes(ACTIVE_MODEL));
+    assert.ok(!params.includes("new-model"));
+  });
+
+  it("retries after a failed embedding instead of caching the failure", async () => {
+    mockEmbedQuery.mock.mockImplementationOnce(async () => { throw new Error("offline"); });
+    assert.equal(await hybridSearchDocuments("dress code", "student", 3), null);
+    assert.ok(await hybridSearchDocuments("dress code", "student", 3));
+    assert.equal(mockEmbedQuery.mock.callCount(), 2);
   });
 
   it("passes role, query_model, and a widened fetch limit through to the SQL call", async () => {
@@ -97,8 +144,8 @@ describe("hybridSearchDocuments", () => {
     // Tagged template: arguments[0] is the strings array, rest are params.
     const params = args.slice(1);
     assert.ok(params.includes("staff"), `expected role param, got ${JSON.stringify(params)}`);
-    // Fetches limit*2+2 candidates so dedupe/cutoff drops can backfill.
-    assert.ok(params.includes(16), `expected widened limit param, got ${JSON.stringify(params)}`);
+    // Retain enough candidates for equivalent form editions and exact titles.
+    assert.ok(params.includes(24), `expected widened limit param, got ${JSON.stringify(params)}`);
     // The active embedding model is threaded as the query_model guard arg.
     assert.ok(
       params.includes(ACTIVE_MODEL),
@@ -246,6 +293,36 @@ describe("hybridSearchDocuments", () => {
       delete process.env.SAGE_RAG_DISTANCE_MARGIN;
       delete process.env.SAGE_RAG_MIN_SCORE_RATIO;
     }
+  });
+
+  it("retains an exact named topic outside the narrow relative distance margin", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "generic", title: "SPOKES Certifications", score: 0.039, best_distance: 0.24 }),
+      dbRow({ id: "specific", title: "QuickBooks Module Descriptor", score: 0.038, best_distance: 0.29 }),
+      dbRow({ id: "noise", title: "Attendance Contract", score: 0.035, best_distance: 0.4 }),
+    ]);
+    const results = await hybridSearchDocuments("Can I work on QuickBooks certification in SPOKES?", "student", 3);
+    assert.deepEqual(results?.map((r) => r.id), ["specific", "generic"]);
+  });
+
+  it("chooses a competitive fillable edition without merging different revisions", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "print", title: "DFA TS 12 Rev 2024", score: 0.038, best_distance: 0.25 }),
+      dbRow({ id: "fillable", title: "DFA TS 12 Rev 2024 Fillable", score: 0.036, best_distance: 0.27 }),
+      dbRow({ id: "old", title: "DFA TS 12 Rev 2023", score: 0.035, best_distance: 0.28 }),
+    ]);
+    const results = await hybridSearchDocuments("Which timesheet form do I need?", "student", 3);
+    assert.deepEqual(results?.map((r) => r.id), ["fillable", "old"]);
+  });
+
+  it("preserves family relevance when the canonical edition alone falls below the score cutoff", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "loud", title: "Support Services", score: 0.038, best_distance: 0.34 }),
+      dbRow({ id: "print", title: "DFA TS 12 Rev 2024", score: 0.036, best_distance: 0.23 }),
+      dbRow({ id: "fillable", title: "DFA TS 12 Rev 2024 Fillable", score: 0.032, best_distance: 0.25 }),
+    ]);
+    const results = await hybridSearchDocuments("Which timesheet do I need?", "student", 3);
+    assert.deepEqual(results?.map((r) => r.id), ["fillable"]);
   });
 
   it("caps returned rows at the caller's limit after filtering", async () => {

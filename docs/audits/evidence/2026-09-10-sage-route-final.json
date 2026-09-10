@@ -1,0 +1,125 @@
+{
+  "environment": "isolated production build, vq_app permissions, fictional E2E account, real provider and tools",
+  "results": [
+    {
+      "id": "answer-medical-1",
+      "status": 200,
+      "latencyMs": 1628,
+      "text": "I'm sorry to hear you're in pain, but I cannot recommend medication or give medical advice. \n\nIt is best to talk with your doctor or a healthcare professional about what is happening with your back. Would it be helpful to look into your appointment schedule to see if you have time to connect with your instructor about how this is affecting your ability to participate in the program?",
+      "actions": [],
+      "review": "Supported by supplied program sources or appropriately acknowledges unsupported request; nonempty, no fabricated action or source link."
+    },
+    {
+      "id": "answer-refund-1",
+      "status": 200,
+      "latencyMs": 1364,
+      "text": "I could not find that information in the available program documents. Since this is an important question about your participation, I recommend asking your instructor or your local board of education directly. They will be able to give you the most accurate answer for your situation.",
+      "actions": [],
+      "review": "Supported by supplied program sources or appropriately acknowledges unsupported request; nonempty, no fabricated action or source link."
+    },
+    {
+      "id": "answer-ged-date-1",
+      "status": 200,
+      "latencyMs": 1501,
+      "text": "I don't have access to specific GED test dates, as those are scheduled through regional testing centers.\n\nThe best way to get that information is to check the [official GED website](https://ged.com) or ask your instructor for the local schedule. Would you like me to help you find an advising appointment so you can talk to someone about your testing timeline?",
+      "actions": [],
+      "review": "Supported by supplied program sources or appropriately acknowledges unsupported request; nonempty, no fabricated action or source link."
+    },
+    {
+      "id": "answer-control-wv-works-timesheet",
+      "status": 200,
+      "latencyMs": 2529,
+      "text": "The form you need is the **DFA-TS-12 Activity Tracking** sheet. This is the official form used to record your daily activities and hours for the month.\n\nIt is fillable, and you'll need to have it signed once you've finished recording your time. It needs to be submitted to your local DoHS office by the 5th of the following month. \n\nSince you are getting started with orientation, would you like me to help you look at your next steps, or is there anything else you'd like to check?",
+      "actions": [
+        {
+          "action": "open_form",
+          "target": "/api/forms/download?formId=dfa-ts-12&mode=view"
+        }
+      ],
+      "review": "Supported by supplied program sources or appropriately acknowledges unsupported request; nonempty, no fabricated action or source link."
+    },
+    {
+      "id": "answer-control-portfolio-checklist",
+      "status": 200,
+      "latencyMs": 2954,
+      "text": "Your employment portfolio is your go-to collection of documents that prove your skills and job readiness to employers. You'll want to include things like your resume, cover letter, references, and any certifications you earn here.\n\nIt\u2019s also great to include work samples, such as computer projects or professional writing, to show what you can do. You can find the [Employment Portfolio Checklist](/api/documents/download?id=cmmyyb7tt0036eadkzpoj2ucf&mode=view) here to help you track everything you need.\n\nWould you like to start organizing your portfolio today?",
+      "actions": [
+        {
+          "action": "open_resource",
+          "target": "/portfolio"
+        }
+      ],
+      "review": "Supported by supplied program sources or appropriately acknowledges unsupported request; nonempty, no fabricated action or source link."
+    },
+    {
+      "id": "answer-control-orientation",
+      "status": 200,
+      "latencyMs": 2150,
+      "text": "Welcome to SPOKES! Getting started is an important first step toward your IT career.\n\nYou have a few forms to complete for orientation. You can keep track of everything you need on the [SPOKES Checklist for Student Orientation](/api/documents/download?id=cmmyyb8ln0038eadke643r7ht&mode=view).\n\nTo help us get moving, would you like to start with the **SPOKES Student Profile**?",
+      "actions": [],
+      "review": "Supported by supplied program sources or appropriately acknowledges unsupported request; nonempty, no fabricated action or source link."
+    }
+  ],
+  "promptRevision": "2026-09-10.4",
+  "provider": "gemini-3.1-flash-lite with production deidentification",
+  "retrievalSettings": {
+    "abstentionDistance": 0.4,
+    "maxCosineDistance": 0.55,
+    "distanceMargin": 0.02,
+    "minScoreRatio": 0.85
+  },
+  "fixtureAccounts": "Six separate fictional Sam accounts; no case history shared",
+  "sourceLinks": {
+    "environment": "Isolated production server with read-only localhost S3 fixture serving copied approved source bytes; not live Supabase storage validation.",
+    "results": [
+      {
+        "id": "health",
+        "status": 200,
+        "expected": 200,
+        "bytes": 128,
+        "isPdf": false,
+        "pass": true
+      },
+      {
+        "id": "timesheet",
+        "status": 200,
+        "expected": 200,
+        "bytes": 93541,
+        "isPdf": true,
+        "pass": true
+      },
+      {
+        "id": "portfolio",
+        "status": 200,
+        "expected": 200,
+        "bytes": 131842,
+        "isPdf": true,
+        "pass": true
+      },
+      {
+        "id": "orientation",
+        "status": 200,
+        "expected": 200,
+        "bytes": 355768,
+        "isPdf": true,
+        "pass": true
+      },
+      {
+        "id": "teacher-document-denied-student",
+        "status": 404,
+        "expected": 404,
+        "bytes": 49,
+        "isPdf": false,
+        "pass": true
+      },
+      {
+        "id": "teacher-document-allowed-staff",
+        "status": 200,
+        "expected": 200,
+        "bytes": 110643,
+        "isPdf": true,
+        "pass": true
+      }
+    ]
+  }
+}
