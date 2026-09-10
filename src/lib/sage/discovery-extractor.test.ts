@@ -145,3 +145,13 @@ describe("extractDiscoverySignals — cluster-name normalization at the write bo
     assert.deepEqual(result.national_career_clusters, []);
   });
 });
+
+ it("keeps a model-first bounded transcript intact behind an analysis request", async () => {
+  const transcript = [{ role: "model" as const, content: "Do you prefer practical work?" }, { role: "user" as const, content: "Yes, repairing things." }, { role: "model" as const, content: "We can explore that." }];
+  let sent: typeof transcript = [];
+  const provider = { generateStructuredResponse: async (_prompt: string, messages: typeof transcript) => { sent = messages; return "{}"; } } as unknown as AIProvider;
+  await extractDiscoverySignals(provider, transcript);
+  assert.equal(sent[0].role, "user");
+  assert.equal(sent.at(-1)?.role, "user");
+  assert.deepEqual(sent.slice(1, -1), transcript);
+ });

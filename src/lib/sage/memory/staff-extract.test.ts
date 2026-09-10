@@ -243,3 +243,14 @@ describe("student chat extraction is unchanged by the staff path", () => {
     assert.equal(result.stored, 1);
   });
 });
+
+ it("preserves model-first staff transcript roles behind an extraction request", async () => {
+  resetAll();
+  const provider = providerReturning("[]");
+  const transcript = [{role: "model" as const, content: "How should I format replies?"}, {role: "user" as const, content: "Keep them brief."}, {role: "model" as const, content: "Understood."}];
+  await extractAndStoreStaffMemories({provider, staffId: "staff-1", staffRole: "teacher", conversationId: "conv-1", messages: transcript});
+  const sent = provider.generateStructuredResponse.mock.calls[0].arguments[1];
+  assert.equal(sent[0].role, "user");
+  assert.equal(sent.at(-1).role, "user");
+  assert.deepEqual(sent.slice(1, -1), transcript);
+ });

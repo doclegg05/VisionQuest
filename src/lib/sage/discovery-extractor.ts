@@ -1,4 +1,5 @@
 import type { AIProvider } from "@/lib/ai";
+import { extractionTranscript } from "./extraction-transcript";
 import { logger } from "@/lib/logger";
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
 import {
@@ -293,10 +294,7 @@ export async function extractDiscoverySignals(
     const recent = messages.slice(-10);
 
     const contextPrompt = "Analyze the career discovery conversation and extract assessment signals:";
-    const messagesWithContext = [
-      ...recent,
-      { role: "user" as const, content: contextPrompt },
-    ];
+    const messagesWithContext = extractionTranscript(recent, contextPrompt);
 
     const result = await provider.generateStructuredResponse(
       DISCOVERY_EXTRACTION_PROMPT,

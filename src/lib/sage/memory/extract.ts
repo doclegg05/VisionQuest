@@ -1,3 +1,4 @@
+import { extractionTranscript } from "../extraction-transcript";
 /**
  * Post-response memory extraction for STUDENT chat (Phase 2, Mem0 ADD-only
  * pattern).
@@ -138,13 +139,16 @@ export async function extractAndStoreMemories({
     const recent = messages.slice(-12);
     if (recent.length === 0) return empty;
 
+    const inputMessages = extractionTranscript(
+      recent, "Extract supported memories from the preceding conversation according to the system instructions.",
+    );
     const inputChars =
-      EXTRACTION_PROMPT.length + recent.reduce((sum, m) => sum + m.content.length, 0);
+      EXTRACTION_PROMPT.length + inputMessages.reduce((sum, m) => sum + m.content.length, 0);
     await logAiAuditEvent({ ...providerAudit, status: "routed", inputChars });
 
     let raw: string;
     try {
-      raw = await provider.generateStructuredResponse(EXTRACTION_PROMPT, recent);
+      raw = await provider.generateStructuredResponse(EXTRACTION_PROMPT, inputMessages);
     } catch (error) {
       await logAiAuditEvent({
         ...providerAudit,
@@ -166,7 +170,7 @@ export async function extractAndStoreMemories({
       callSite: "sage_memory_extract",
       providerName: provider.name,
       prompt: EXTRACTION_PROMPT,
-      messages: recent,
+      messages: inputMessages,
       raw,
     });
 

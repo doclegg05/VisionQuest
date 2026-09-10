@@ -1,7 +1,7 @@
 # Sage answer quality and application release sprint
 
 Created: 2026-09-10
-Status: In progress on `codex/sage-answer-quality-release`
+Status: Fixing a background-extraction failure found during release observation
 Duration: Five working days from kickoff plus a next-working-day release check, assuming one implementing engineer/agent
 Product and release owner: Britt
 Delivery owner: The engineer/agent executing this plan
