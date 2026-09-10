@@ -88,3 +88,11 @@ A bounded history can begin with Sage's model turn. Discovery and goal extractio
 Focused validation passes 46 tests, including a real Gemini SDK request test with intercepted HTTP that verifies the actual role sequence and retained content. Typecheck and focused lint pass. This is a follow-up to the released application; production still runs `46801e9` until the corrective PR passes CI and is released.
 
 Three real Gemini calls on a fictional model-first transcript returned the expected computer-repair/IT discovery interests, career goal, and memory. [Provider probe](evidence/2026-09-10-sage-extraction-provider-probe.json) records the parsed outputs and timing. No production records were used or written by this direct provider probe.
+
+## Corrective release verified; fresh observations pending
+
+[PR #214](https://github.com/doclegg05/VisionQuest/pull/214) merged as `b65567556e67d8a6324369857e044b9f8f465a61`; its tree matches tested `cdc9938`. CI passed all 5,981 tests, 253 RLS checks, three retrieval-context checks, build/smoke and browser checks. The defective calls also exist in pre-sprint `734d498`, so rolling back would have retained them.
+
+Render deployment `dep-daheq90u01pc739aulc0` went live at **17:50:54 UTC (1:50:54 PM EDT) September 10**. Startup reported 52 migrations and none pending. The health check passed. A dedicated fictional Sam conversation with 12 stored historical messages exercised the bounded windows through the real chat route: HTTP 200, a persisted computer-repair/networking discovery record, and three supported memories. The post-response log confirms discovery and memory both ran; the visible post-release snapshot contains no error entry. Exact fixture cleanup was verified. The read-only index audit again reports zero strict failures.
+
+[Corrective release evidence](evidence/2026-09-10-sage-corrective-release.json) is the current release/observation record. The earlier release's failed observation remains historical evidence. The first-hour window restarts at 17:50:54 UTC and cannot pass before 18:50:54 UTC. The heartbeat is active again, with checks scheduled for **3:15 PM EDT September 10** and **9:15 AM EDT September 11**; it must inspect the full first-hour range rather than only the last hour at execution time. Both gates remain pending, and the sprint is not complete.
