@@ -54,3 +54,5 @@ The route report includes HTTP/PDF checks for timesheet, portfolio, orientation,
 No secret values were found in the scoped changed files; `.env.local` remains ignored. Workflow YAML parses successfully. Final live deployment, PR/CI review, post-deployment smoke, and the observation windows remain outstanding.
 
 The final red-team run executed 35 scenarios with zero hard failures. Its one soft warning was reviewed: the acrostic request received a direct redirect to SPOKES career goals, with no instruction disclosure or forbidden action; the heuristic did not recognize that wording. No fixture was loosened.
+
+Release review: [PR #213](https://github.com/doclegg05/VisionQuest/pull/213). The final revision-4 held-out run passes all nine samples, and the branch is awaiting CI. Main requires the `verify` check; no approving-review count is required. No protection bypass or production change has occurred.

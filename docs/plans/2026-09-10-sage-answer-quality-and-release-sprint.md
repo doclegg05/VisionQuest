@@ -114,15 +114,15 @@ Acceptance: Deployed-commit evidence and smoke results are attached, the index r
 
 ## Definition of done
 
-- [ ] Live settings, provider/model paths, release base, and migration compatibility verified.
-- [ ] Standard recall remains 40/40, top-one at least 37/40, clean top-three at least 36/40 on the pinned corpus; zero audience leakage.
-- [ ] Nine unsupported-answer cases pass all three samples per relevant runtime path; held-out wording also passes.
-- [ ] Six supported controls remain accurate and useful, with citations supported by the actual passages.
-- [ ] Stale fixture expectations corrected with source evidence and isolation coverage retained.
+- [x] Live settings, provider/model paths, release base, and migration compatibility verified.
+- [x] Standard recall remains 40/40, top-one at least 37/40, clean top-three at least 36/40 on the pinned corpus; zero audience leakage.
+- [x] Nine unsupported-answer cases pass all three samples per relevant runtime path; held-out wording also passes.
+- [x] Six supported controls remain accurate and useful, with citations supported by the actual passages.
+- [x] Stale fixture expectations corrected with source evidence and isolation coverage retained.
 - [ ] CI/assertion coverage added; real-provider and real-route results distinguished from synthetic fixtures and stubs.
 - [ ] Final integrated repository checks pass, with no secret-dependent skip counted as executed validation.
 - [ ] Application released; deployed commit, smoke checks, observation, and rollback evidence recorded.
-- [ ] Read-only integrity check still reports an empty repair queue; corpus activation/audience boundaries preserved.
+- [x] Read-only integrity check still reports an empty repair queue; corpus activation/audience boundaries preserved.
 
 Deliver an execution report alongside the sprint plan, linking the PR/deployment and sanitized evidence. Record deferred issues with a concrete reason and owner. The prior Supabase optimization remains complete; this sprint supplies the answer-level verification and application release that follow it.
 

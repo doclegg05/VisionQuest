@@ -34,7 +34,7 @@
     },
     {
       "path": "docs/audits/2026-09-10-sage-sprint-execution.md",
-      "sha256": "d8bd22a9c253d344458ef8e92668f9d361a0f52f09dde06bca3dd4b46a54a11d"
+      "sha256": "6418b651a0b503c3033256849de9c2926f38b9d9af4e2f29bc4aa39cee70b5ea"
     },
     {
       "path": "docs/audits/2026-09-10-supabase-ai-retrieval.md",
@@ -86,7 +86,7 @@
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-answer-heldout.json",
-      "sha256": "db7646e9e4aa8735c9f12df6cf9d10df69efea323849f3d3f7a8b4550e2e0517"
+      "sha256": "1f9583e1e973c7fba0cf40e4c2c0d12574c8b95f9df27a4bdaad4f46595745f2"
     },
     {
       "path": "docs/audits/evidence/2026-09-10-sage-answer-revision3.json",
@@ -122,7 +122,7 @@
     },
     {
       "path": "docs/plans/2026-09-10-sage-answer-quality-and-release-sprint.md",
-      "sha256": "f723d57d765b9afe3bc6b4c33e0c18289459d815f8f7c787da02fed345c70c94"
+      "sha256": "946eaa7748d1800174e15a2c424808d50e45b4abe78dd7590001cd7c304ad281"
     },
     {
       "path": "prisma/migrations/20260910124749_optimize_sage_ai_retrieval/migration.sql",
