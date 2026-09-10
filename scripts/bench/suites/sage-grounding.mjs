@@ -13,7 +13,7 @@ import {
   missingStorageKeys,
   loadCatalogCorpusRows,
   seedCatalogCorpus,
-} from "../../lib/catalog-corpus.mjs";
+} from "../lib/catalog-corpus.mjs";
 
 const { isSafeE2eSeedTarget } = await import("../../../src/lib/e2e-seed-guard.ts");
 
