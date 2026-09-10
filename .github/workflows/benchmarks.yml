@@ -95,7 +95,9 @@ jobs:
         run: npm run bench:validate
 
       - name: Apply migrations to the benchmark database
-        run: npx prisma migrate deploy
+        run: |
+          npx prisma db execute --file scripts/test-support/supabase-roles.sql --schema prisma/schema.prisma
+          npx prisma migrate deploy
 
       - name: Seed the synthetic benchmark cohort
         # Owned by the Connect benchmark phase (A3); guarded so this workflow

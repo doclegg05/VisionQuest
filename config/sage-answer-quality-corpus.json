@@ -1,0 +1,20 @@
+[
+  {
+    "storageKey": "forms/Dental_Services_2025_through_WV_Works.pdf",
+    "title": "Dental Services 2025 through WV Works",
+    "description": "CI-only reference derived from the approved program document; no eligibility determination.",
+    "sageContextNote": "WV Works dental services: this reference lists covered dental procedures. Some services require pre-authorization. A caseworker can explain individual eligibility and coverage; this reference does not establish that a particular student qualifies.",
+    "audience": "BOTH",
+    "category": "DOHS_FORM",
+    "mimeType": "application/pdf"
+  },
+  {
+    "storageKey": "lms/Learning Express/Registering for a Free LearningExpress Library Account.pdf",
+    "title": "Registering for a Free LearningExpress Library Account",
+    "description": "CI-only reference derived from the approved LearningExpress registration guide.",
+    "sageContextNote": "To register for a free LearningExpress Library account, go to WVinfodepot.org, choose Databases A-Z, find LearningExpress Library, and complete the registration screen. LearningExpress provides practice tests, study materials, and skills exercises.",
+    "audience": "BOTH",
+    "category": "LMS_PLATFORM_GUIDE",
+    "mimeType": "application/pdf"
+  }
+]

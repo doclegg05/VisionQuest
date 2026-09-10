@@ -60,3 +60,8 @@ describe("promptStageForMessage", () => {
     );
   });
 });
+
+it("routes plain-language papers requests out of the goal ladder", () => {
+  assert.equal(promptStageForMessage("monthly", "What papers I gotta sign when I first start?"), "orientation");
+  assert.equal(promptStageForMessage("monthly", "I enjoy reading newspapers"), "monthly");
+});

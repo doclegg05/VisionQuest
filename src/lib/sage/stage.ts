@@ -47,7 +47,7 @@ const LOGISTICS_OVERRIDE_STAGES = new Set<ConversationStage>([
 
 /** Tool-mapped platform logistics (forms, certs, appointments, portfolio, jobs). */
 const LOGISTICS_INTENT_PATTERN =
-  /\b(form|forms|document|documents|pdf|packet|paperwork|download|fill(?:able| out| in)?|orientation|onboarding|profile|attendance|contract|release|dress code|checklist|cert(?:ification)?s?|credential|appointment|schedule|book|advisor|advising|check[- ]?in|portfolio|resume|job(?:s)?|cover letter|interview)\b/i;
+  /\b(form|forms|document|documents|pdf|packet|papers?|paperwork|download|fill(?:able| out| in)?|orientation|onboarding|profile|attendance|contract|release|dress code|checklist|cert(?:ification)?s?|credential|appointment|schedule|book|advisor|advising|check[- ]?in|portfolio|resume|job(?:s)?|cover letter|interview)\b/i;
 
 /**
  * True when the student message looks like a platform logistics / tool ask
@@ -77,7 +77,7 @@ export function promptStageForMessage(
   // Form/paperwork → orientation tour; other logistics → general act-then-coach.
   if (
     options?.hasFormMatch ||
-    /\b(form|forms|document|documents|pdf|packet|paperwork|fill(?:able| out| in)?|orientation|profile|attendance|contract|release|dress code|checklist)\b/i.test(
+    /\b(form|forms|document|documents|pdf|packet|papers?|paperwork|fill(?:able| out| in)?|orientation|profile|attendance|contract|release|dress code|checklist)\b/i.test(
       userMessage,
     )
   ) {

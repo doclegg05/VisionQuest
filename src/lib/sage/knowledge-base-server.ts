@@ -154,7 +154,7 @@ type ScoredDoc = {
   storageKey?: string;
   content: string;
   score: number;
-  passages?: { content: string; pageNumber: number | null; sectionTitle: string | null }[];
+  passages?: { content: string; pageNumber: number | null; sectionTitle: string | null; extractionMethod?: string }[];
 };
 type ScoredSnippet = { type: "snippet"; label: string; content: string; score: number };
 type ScoredEntry = ScoredDoc | ScoredSnippet;
@@ -186,10 +186,12 @@ function formatEntry(entry: ScoredEntry): string {
               : p.sectionTitle
                 ? `[${entry.label} — ${p.sectionTitle}]`
                 : `[${entry.label}]`;
-          return `${cite}\n${p.content}`;
+          const method = p.extractionMethod === "ocr" ? "\nSource method: OCR transcription; verify exact wording against the source." : "";
+          return `${cite}${method}\n${p.content}`;
         })
         .join("\n\n");
-      return `${link}${source}\n${passages}`;
+      const summary = entry.content ? `\nDocument summary: ${sanitizeForPrompt(entry.content.slice(0, 300))}` : "";
+      return `${link}${source}${summary}\n${passages}`;
     }
     return `[${entry.label}]\n${link}${source}\nSummary: ${entry.content}`;
   }
@@ -209,7 +211,7 @@ function formatEntry(entry: ScoredEntry): string {
  */
 const RRF_K = 50;
 
-/** Sort by score, cap at maxResults, drop lowest-scoring entries to fit budget. */
+/** Preserve source breadth before spending the budget on extra passages. */
 function assembleContext(
   entries: ScoredEntry[],
   maxResults: number,
@@ -220,6 +222,13 @@ function assembleContext(
   if (combined.length === 0) return "";
 
   let totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
+  while (totalChars > tokenBudgetChars) {
+    const index = combined.findLastIndex((entry) => entry.type === "doc" && (entry.passages?.length ?? 0) > 1);
+    if (index < 0) break;
+    const entry = combined[index] as ScoredDoc;
+    combined[index] = { ...entry, passages: entry.passages!.slice(0, -1) };
+    totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
+  }
   while (totalChars > tokenBudgetChars && combined.length > 1) {
     combined = combined.slice(0, -1);
     totalChars = combined.reduce((sum, e) => sum + formatEntry(e).length, 0);
@@ -291,7 +300,7 @@ export async function getDocumentContext(
       const snippets = await loadSageSnippets();
 
       const docIds = hybridDocs.map((d) => d.id);
-      const chunksByDoc = await getBestChunks(docIds, userMessage, 2);
+      const chunksByDoc = await getBestChunks(docIds, userMessage, 2, subject);
 
       const docEntries: ScoredEntry[] = hybridDocs.map((doc) => {
         const passages = chunksByDoc.get(doc.id);
@@ -308,6 +317,7 @@ export async function getDocumentContext(
                   content: p.content,
                   pageNumber: p.pageNumber,
                   sectionTitle: p.sectionTitle,
+                  extractionMethod: p.extractionMethod,
                 })),
               }
             : {}),

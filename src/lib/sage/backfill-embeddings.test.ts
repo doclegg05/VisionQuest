@@ -189,6 +189,15 @@ describe("backfillProgramDocumentEmbeddings", () => {
     assert.equal(mockEmbedProgramDocument.mock.callCount(), 2);
   });
 
+  it("preserves existing passages when a forced backfill cannot download the source", async () => {
+    mockQueryRawUnsafe.mock.mockImplementation(async () => [doc({ hasEmbedding: true, chunkCount: 3 })]);
+    mockDownloadFile.mock.mockImplementation(async () => null);
+    const tally = await backfillProgramDocumentEmbeddings({ force: true });
+    assert.equal(tally.errors, 1);
+    assert.equal(tally.embedded, 0);
+    assert.equal(mockEmbedProgramDocument.mock.callCount(), 0);
+  });
+
   it("widens to all active docs only with the all flag", async () => {
     mockQueryRawUnsafe.mock.mockImplementation(async () => []);
 

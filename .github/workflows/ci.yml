@@ -153,7 +153,9 @@ jobs:
       # above with a real, migrated schema. See
       # docs/runbooks/enable-rls-tests-in-ci.md.
       - name: Apply migrations to RLS test database
-        run: npx prisma migrate deploy
+        run: |
+          npx prisma db execute --file scripts/test-support/supabase-roles.sql --schema prisma/schema.prisma
+          npx prisma migrate deploy
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           # schema.prisma declares directUrl = env("DIRECT_URL"); migrate deploy
@@ -167,6 +169,12 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           RLS_TEST_ENABLED: "true"
+
+      - name: Verify hybrid retrieval through emitted source context
+        run: npx tsx --test --experimental-test-module-mocks src/lib/sage/retrieval-context.db.test.ts
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          AI_CONTEXT_DB_TEST_ENABLED: "true"
 
       - name: Run rate-limiter concurrency integration tests
         # Guards the 2026-08-20 bug where concurrent logins from one IP
@@ -317,7 +325,9 @@ jobs:
         run: npx prisma generate
 
       - name: Apply migrations to E2E database
-        run: npx prisma migrate deploy
+        run: |
+          npx prisma db execute --file scripts/test-support/supabase-roles.sql --schema prisma/schema.prisma
+          npx prisma migrate deploy
 
       - name: Seed E2E fixture users
         # Idempotent marker fixtures (e2e-* logins, *@test.local emails):

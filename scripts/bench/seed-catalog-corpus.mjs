@@ -10,14 +10,16 @@
  * storageKey. The same two safety gates as scripts/bench/seed-cohort.ts —
  * local/CI hosts only, and a production-shaped host is refused with no override.
  *
- * Does not download PDFs or write embeddings. Retrieval for the grounding
- * suite uses title + sageContextNote (keyword path, or hybrid FTS).
+ * Default: no PDFs or embeddings. --answer-quality adds two test-only source
+ * references. --embed explicitly calls the configured embedding provider for
+ * this local/CI corpus so the answer calibration can exercise hybrid retrieval.
  */
 
 import { createRequire } from "node:module";
 import {
   expectedGroundingStorageKeys,
   loadCatalogCorpusRows,
+  loadAnswerQualityCorpusRows,
   missingGroundingKeysInDatabase,
   missingStorageKeys,
   seedCatalogCorpus,
@@ -56,8 +58,9 @@ function assertNotProduction(databaseUrl) {
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
-  const rows = loadCatalogCorpusRows();
-  const expected = expectedGroundingStorageKeys();
+  const answerQuality = process.argv.includes("--answer-quality");
+  const rows = answerQuality ? loadAnswerQualityCorpusRows() : loadCatalogCorpusRows();
+  const expected = expectedGroundingStorageKeys(answerQuality ? "config/sage-answer-quality-eval.json" : undefined);
   const missingFromCatalog = missingStorageKeys(rows, expected);
   if (missingFromCatalog.length > 0) {
     throw new Error(
@@ -67,7 +70,7 @@ async function main() {
 
   if (dryRun) {
     console.log(
-      `[DRY RUN] would upsert ${rows.length} ProgramDocument rows; grounding keys present: ${expected.join(", ")}`,
+      `[DRY RUN] would upsert ${rows.length} ProgramDocument rows${process.argv.includes("--embed") ? " and generate document embeddings" : ""}; grounding keys present: ${expected.join(", ")}`,
     );
     return;
   }
@@ -86,6 +89,7 @@ async function main() {
 
   const result = await seedCatalogCorpus({
     databaseUrl,
+    rows,
     log: (message) => console.log(message),
   });
   const missingFromDb = await missingGroundingKeysInDatabase({ databaseUrl, expected });
@@ -93,6 +97,34 @@ async function main() {
     throw new Error(
       `Seed finished but grounding keys are still missing from ProgramDocument: ${missingFromDb.join(", ")}`,
     );
+  }
+  if (process.argv.includes("--embed")) {
+    // Bind every provider configuration/audit read to the guarded seed target
+    // before importing application modules. ADMIN_DATABASE_URL may have been
+    // the only explicit override while .env.local supplied a different URL.
+    process.env.DATABASE_URL = databaseUrl;
+    process.env.DIRECT_URL = databaseUrl;
+    process.env.ADMIN_DATABASE_URL = databaseUrl;
+    const { embedTextsWithModel, toVectorLiteral } = await import("../../src/lib/ai/embeddings.ts");
+    const { buildDocEmbeddingText } = await import("../../src/lib/sage/document-embedding.ts");
+    const { prisma, prismaAdmin } = await import("../../src/lib/db.ts");
+    try {
+      const embedded = await embedTextsWithModel(rows.map(row => buildDocEmbeddingText(row.title, row.sageContextNote)), {
+        taskType: "RETRIEVAL_DOCUMENT",
+        usage: { callSite: "sage_ci_corpus_embedding", sensitivity: "public_program", studentId: null },
+      });
+      if (embedded.vectors.length !== rows.length) throw new Error("Incomplete CI corpus embedding batch");
+      for (const [index, row] of rows.entries()) {
+        await prismaAdmin.$executeRaw`
+          UPDATE visionquest."ProgramDocument"
+          SET embedding=${toVectorLiteral(embedded.vectors[index])}::vector,
+              "embeddingModel"=${embedded.model}
+          WHERE "storageKey"=${row.storageKey}`;
+      }
+      console.log(`Embedded ${rows.length} CI references with ${embedded.model}.`);
+    } finally {
+      await Promise.all([prisma.$disconnect(), prismaAdmin.$disconnect()]);
+    }
   }
   console.log(
     `Catalog corpus ready: ${result.upserted} rows, grounding keys ${expected.length}/${expected.length}.`,

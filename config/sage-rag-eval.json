@@ -46,13 +46,20 @@
   },
   {
     "id": "close-confusion-prc1-vs-ssp1",
-    "question": "I completed the WV Works program — what's the form that records my milestones?",
-    "expectedStorageKeys": ["forms/DFA-PRC-1_Rev-1-24.pdf"],
+    "question": "Which form is my WV Works Personal Responsibility Contract and initial self-sufficiency plan?",
+    "expectedStorageKeys": [
+      "forms/DFA-PRC-1_Rev-1-24.pdf"
+    ],
     "acceptableStorageKeys": [
       "forms/DFA-PRC-1_Rev-1-24.pdf",
       "forms/DFA_-_SSP-1_1-9-24.pdf"
     ],
-    "expectedTerms": ["prc", "completion"]
+    "expectedTerms": [
+      "prc",
+      "contract",
+      "responsibility",
+      "initial"
+    ]
   },
   {
     "id": "close-confusion-student-aztec-vs-teacher-aztec",
@@ -206,33 +213,44 @@
   },
   {
     "id": "student-role-no-teacher-sign-in-sheet",
-    "question": "What form is used to record who comes to class each day?",
+    "question": "What does the orientation checklist say about the daily sign-in sheet?",
     "expectedStorageKeys": [
-      "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf"
+      "orientation/SPOKES Checklist for Student Orientation.pdf"
     ],
     "acceptableStorageKeys": [
-      "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf",
       "orientation/SPOKES Checklist for Student Orientation.pdf"
     ],
     "forbiddenStorageKeys": [
-      "teachers/Administrative_Guide_Revised_10.4.2024.pdf"
+      "teachers/Administrative_Guide_Revised_10.4.2024.pdf",
+      "teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf"
     ],
-    "expectedTerms": ["sign-in", "attendance", "class"]
+    "expectedTerms": [
+      "sign-in",
+      "attendance",
+      "class"
+    ]
   },
   {
     "id": "student-role-no-teacher-ecp-instructions",
     "question": "How do I fill out my Education and Career Plan?",
     "expectedStorageKeys": [
-      "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf"
+      "students/resources/ECP_AE_and_SPOKES_Fillable_FY25.pdf",
+      "orientation/ECP_AE_and_SPOKES_Fillable_FY25_Orientation.pdf"
     ],
     "acceptableStorageKeys": [
-      "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf",
-      "orientation/SPOKES_Student_Profile_FY26_Fillable.pdf"
+      "students/resources/ECP_AE_and_SPOKES_Fillable_FY25.pdf",
+      "orientation/ECP_AE_and_SPOKES_Fillable_FY25_Orientation.pdf"
     ],
     "forbiddenStorageKeys": [
-      "teachers/guides/Handbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf"
+      "teachers/guides/Handbook Appendix/Section 7/ECP/Instructions for Completing the ECP.pdf",
+      "teachers/guides/Handbook Appendix/Section 7/ECP/Education and Career Plan Form.pdf"
     ],
-    "expectedTerms": ["education", "career", "plan", "ecp"]
+    "expectedTerms": [
+      "education",
+      "career",
+      "plan",
+      "ecp"
+    ]
   },
   {
     "id": "platform-usa-learns-activity-report",

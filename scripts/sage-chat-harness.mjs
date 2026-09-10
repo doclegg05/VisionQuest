@@ -62,7 +62,8 @@
  *   --temperature=<n>           sampling temperature override, e.g. 0 for
  *                                deterministic runs (default: provider default)
  *   --samples=<n>               majority voting for tool-family cases (default
- *                                1). Gemini is not fully deterministic even at
+ *                                1). Grounding requires every sample to pass.
+ *                                Gemini is not fully deterministic even at
  *                                temperature=0 (tool-teacher-lookup-student
  *                                flapped in CI), so gating runs take the
  *                                majority verdict of n samples instead of
@@ -87,6 +88,7 @@ import {
 } from "./lib/sage-eval-text.mjs";
 import { CHAT_EVAL_FAMILY_NAMES } from "./lib/sage-chat-eval-families.mjs";
 import { percentile } from "./lib/percentile.mjs";
+import { evaluateGroundingAssertions, runGroundingSamples } from "./lib/sage-grounding-eval.mjs";
 import {
   CAREER_GROUNDING_TOOL_NAMES,
   buildCareerCasePrompt,
@@ -403,6 +405,8 @@ async function runGroundingCase(deps, provider, systemPrompt, testCase) {
   const refs = parseDocumentRefs(context);
   const assert = testCase.assert || {};
   const failures = [];
+  let expectedDocumentIds = [];
+  const calls = [];
 
   if (assert.expectCitationId) {
     // Fixtures cite stable storage keys (portable across environments), while
@@ -418,6 +422,7 @@ async function runGroundingCase(deps, provider, systemPrompt, testCase) {
         })
       : [];
     const storageKeyById = new Map(docs.map((doc) => [doc.id, doc.storageKey]));
+    expectedDocumentIds = refs.filter((ref) => ref.id === assert.expectCitationId || storageKeyById.get(ref.id) === assert.expectCitationId).map((ref) => ref.id);
     const cited = refs.some(
       (ref) =>
         ref.id === assert.expectCitationId ||
@@ -434,8 +439,9 @@ async function runGroundingCase(deps, provider, systemPrompt, testCase) {
   // "full" system prompt documents Sage's tools, and Gemini deterministically
   // emits MALFORMED_FUNCTION_CALL (surfacing as an empty reply) when a prompt
   // invites a tool call but none are declared — a combination production
-  // never runs (real chat always declares tools). maxHops 2 lets a
-  // tool-first turn still produce text after its no-op result.
+  // never runs (real chat always declares tools). The production agent allows eight hops; use the same limit so a
+  // search_forms -> present_form sequence has room for its final reply.
+  // Tool results remain stubs, so this is not real-route evidence.
   let reply = "";
   try {
     const textParts = [];
@@ -444,20 +450,20 @@ async function runGroundingCase(deps, provider, systemPrompt, testCase) {
       [{ role: "user", content: testCase.message }],
       declarations,
       noopToolHandler,
-      { maxHops: 2, temperature: TEMPERATURE },
+      { maxHops: 8, temperature: TEMPERATURE },
     );
     for await (const event of events) {
+      if (event.kind === "tool_call") calls.push(event.name);
       if (event.kind === "text") textParts.push(event.text);
     }
     reply = textParts.join("");
   } catch (err) {
     failures.push(`reply generation failed — ${err.message}`);
   }
-  if (assert.mustContainAny && !includesAny(reply, assert.mustContainAny)) {
-    failures.push(`reply missing one of [${assert.mustContainAny.join(", ")}]`);
-  }
-
-  return { pass: failures.length === 0, reason: failures.join("; ") || null, text: reply, matchedRefs: refs.map((r) => r.id) };
+  const graded = evaluateGroundingAssertions({ text: reply, context, calls, expectedDocumentIds, assert });
+  failures.push(...graded.failures);
+  return { pass: failures.length === 0, reason: failures.join("; ") || null, text: reply, calls,
+    matchedRefs: refs.map((r) => r.id), documentContext: context, toolExecution: "no-op harness stub" };
 }
 
 /**
@@ -711,7 +717,7 @@ async function main() {
     for (const tool of getEnabledTools(role)) tierForTool.set(tool.name, tool.riskTier);
   }
 
-  console.log(`Sage Chat Harness — provider ${label}, ${cases.length} case(s)${FAMILIES ? ` (families: ${FAMILIES.join(", ")})` : ""}${TEMPERATURE !== undefined ? ` (temperature: ${TEMPERATURE})` : ""}${SAMPLES > 1 ? ` (tool-family majority vote: ${SAMPLES} samples)` : ""}\n`);
+  console.log(`Sage Chat Harness — provider ${label}, ${cases.length} case(s)${FAMILIES ? ` (families: ${FAMILIES.join(", ")})` : ""}${TEMPERATURE !== undefined ? ` (temperature: ${TEMPERATURE})` : ""}${SAMPLES > 1 ? ` (samples: ${SAMPLES}; tool majority vote, grounding requires every sample)` : ""}\n`);
 
   const results = [];
 
@@ -731,12 +737,12 @@ async function main() {
       } else if (testCase.family === "grounding") {
         const systemPrompt = await buildPromptForCase(buildSystemPrompt, testCase);
         const { prisma } = process.env.DATABASE_URL ? await import("../src/lib/db.ts") : { prisma: null };
-        outcome = await runGroundingCase(
+        outcome = await runGroundingSamples(() => runGroundingCase(
           { getDocumentContext, prisma, declarations: declsForRole(testCase.role) },
           provider,
           systemPrompt,
           testCase,
-        );
+        ), SAMPLES);
       } else if (testCase.family === "career") {
         const base = await buildPromptForCase(buildSystemPrompt, testCase);
         const systemPrompt = buildCareerCasePrompt(base, testCase.context?.groundingFacts);
@@ -804,6 +810,9 @@ async function main() {
       grade: outcome.grade ?? null,
       judgeNote: outcome.judgeNote ?? null,
       matchedRefs: outcome.matchedRefs ?? null,
+      samples: outcome.samples ?? null,
+      documentContext: outcome.documentContext ?? null,
+      toolExecution: outcome.toolExecution ?? null,
     });
 
     const mark = skipped ? "SKIP" : pass ? "PASS" : gating ? "FAIL" : "WATCH";
@@ -833,7 +842,11 @@ async function main() {
     maxMs: latencies[latencies.length - 1] ?? 0,
   };
 
+  const { getAbstentionDistance, getMaxCosineDistance, getDistanceMargin, getMinScoreRatio } = await import("../src/lib/sage/hybrid-retrieval.ts");
+  const { SAGE_PROMPT_REVISION } = await import("../src/lib/sage/prompt-revision.ts");
   const report = {
+    promptRevision: SAGE_PROMPT_REVISION,
+    retrievalSettings: { abstentionDistance: getAbstentionDistance(), maxCosineDistance: getMaxCosineDistance(), distanceMargin: getDistanceMargin(), minScoreRatio: getMinScoreRatio() },
     generatedAt: new Date().toISOString(),
     provider: label,
     fixturePath: FIXTURE_PATH,

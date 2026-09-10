@@ -10,13 +10,14 @@
  * columns as Unsupported("vector(768)").
  */
 
+import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
-  embedTexts,
+  embedTextsWithModel,
   toVectorLiteral,
   type EmbeddingUsageContext,
 } from "@/lib/ai/embeddings";
-import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
 import { chunkText, chunkPages, type ChunkWithProvenance } from "./chunking";
 
 export interface EmbedProgramDocumentInput {
@@ -25,7 +26,7 @@ export interface EmbedProgramDocumentInput {
   /** Full extracted body text; chunk embeddings are skipped when absent. */
   text?: string | null;
   /** Page-structured input; when present, enables full provenance (tokenCount/pageNumber/sectionTitle). */
-  pages?: { pageNumber: number; text: string }[];
+  pages?: { pageNumber: number | null; text: string; extractionMethod?: "text" | "ocr" }[];
   usage?: EmbeddingUsageContext;
 }
 
@@ -40,6 +41,7 @@ export function buildChunkRows(chunks: ChunkWithProvenance[]) {
     tokenCount: c.tokenCount,
     pageNumber: c.pageNumber,
     sectionTitle: c.sectionTitle,
+    extractionMethod: c.extractionMethod ?? "unknown",
   }));
 }
 
@@ -64,51 +66,51 @@ export async function embedProgramDocument(
     : (input.text ? chunkText(input.text) : []).map((content) => ({
         content,
         tokenCount: Math.ceil(content.length / 4),
-        pageNumber: 1,
+        // Flat text has no reliable physical page location.
+        pageNumber: null,
         sectionTitle: null,
+        extractionMethod: "text" as const,
       }));
   const rows = buildChunkRows(provChunks);
   const chunkTexts = rows.map((r) => r.content);
 
-  const vectors = await embedTexts([docText, ...chunkTexts], {
+  const { vectors, model: activeModel } = await embedTextsWithModel([docText, ...chunkTexts], {
     taskType: "RETRIEVAL_DOCUMENT",
     usage: input.usage ?? { studentId: null, callSite: "sage_embedding_ingest" },
   });
   const [docVector, ...chunkVectors] = vectors;
-
-  // Resolve the active model once — invariant with the provider embedTexts()
-  // used above (same SystemConfig state) — and stamp it as provenance so
-  // sage_hybrid_search only cosine-compares same-model vectors.
-  const activeModel = await getActiveEmbeddingModel();
+  if (vectors.length !== rows.length + 1) {
+    throw new Error("Embedding response count does not match document and chunks");
+  }
+  // Validate every vector before replacing the old index.
+  const docLiteral = toVectorLiteral(docVector);
+  const chunkLiterals = chunkVectors.map(toVectorLiteral);
 
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`
       UPDATE "visionquest"."ProgramDocument"
-      SET embedding = ${toVectorLiteral(docVector)}::vector(768),
+      SET embedding = ${docLiteral}::vector(768),
           "embeddingModel" = ${activeModel}
       WHERE id = ${docId}
     `;
 
     await tx.documentChunk.deleteMany({ where: { documentId: docId } });
 
-    for (let i = 0; i < rows.length; i++) {
-      const created = await tx.documentChunk.create({
-        data: {
-          documentId: docId,
-          chunkIndex: rows[i].chunkIndex,
-          content: rows[i].content,
-          tokenCount: rows[i].tokenCount,
-          pageNumber: rows[i].pageNumber,
-          sectionTitle: rows[i].sectionTitle,
-        },
-        select: { id: true },
-      });
-      await tx.$executeRaw`
-        UPDATE "visionquest"."DocumentChunk"
-        SET embedding = ${toVectorLiteral(chunkVectors[i])}::vector(768),
-            "embeddingModel" = ${activeModel}
-        WHERE id = ${created.id}
-      `;
+    // One parameterized INSERT per bounded batch instead of an INSERT and
+    // UPDATE round trip for every chunk. Keep replacement atomic.
+    const batchSize = 100;
+    for (let start = 0; start < rows.length; start += batchSize) {
+      const values = rows.slice(start, start + batchSize).map((row, index) => Prisma.sql`(
+        ${randomUUID()}, ${docId}, ${row.chunkIndex}, ${row.content},
+        ${chunkLiterals[start + index]}::vector(768), ${activeModel},
+        ${row.tokenCount}, ${row.pageNumber}, ${row.sectionTitle}, ${row.extractionMethod}, CURRENT_TIMESTAMP
+      )`);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "visionquest"."DocumentChunk"
+          (id, "documentId", "chunkIndex", content, embedding, "embeddingModel",
+           "tokenCount", "pageNumber", "sectionTitle", "extractionMethod", "updatedAt")
+        VALUES ${Prisma.join(values)}
+      `);
     }
   });
 

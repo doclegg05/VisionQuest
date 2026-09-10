@@ -16,6 +16,7 @@ mock.module("./embedding-provider", {
 });
 
 let embedTexts: typeof import("./embeddings").embedTexts;
+let embedTextsWithModel: typeof import("./embeddings").embedTextsWithModel;
 let embedQuery: typeof import("./embeddings").embedQuery;
 let toVectorLiteral: typeof import("./embeddings").toVectorLiteral;
 let EMBEDDING_DIMENSIONS: number;
@@ -23,6 +24,7 @@ let EMBEDDING_DIMENSIONS: number;
 before(async () => {
   const mod = await import("./embeddings");
   embedTexts = mod.embedTexts;
+  embedTextsWithModel = mod.embedTextsWithModel;
   embedQuery = mod.embedQuery;
   toVectorLiteral = mod.toVectorLiteral;
   EMBEDDING_DIMENSIONS = mod.EMBEDDING_DIMENSIONS;
@@ -37,6 +39,13 @@ describe("embeddings facade", () => {
 
   it("re-exports EMBEDDING_DIMENSIONS as 768", () => {
     assert.equal(EMBEDDING_DIMENSIONS, 768);
+  });
+
+  it("returns model provenance from the same provider that produced the vectors", async () => {
+    const result = await embedTextsWithModel(["policy"], { taskType: "RETRIEVAL_DOCUMENT" });
+    assert.equal(result.model, "mock-model");
+    assert.equal(result.vectors.length, 1);
+    assert.equal(mockResolveEmbeddingProvider.mock.callCount(), 1);
   });
 
   it("embedTexts resolves a provider and delegates to provider.embed", async () => {

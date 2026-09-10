@@ -6,6 +6,8 @@
  * Splits prefer paragraph breaks, then sentence ends, then hard cuts.
  */
 
+import { cleanPassageText } from "./passage-text";
+
 export interface ChunkOptions {
   /** Maximum characters per chunk. Default 2048 (≈512 tokens). */
   maxChars?: number;
@@ -50,8 +52,9 @@ function splitIntoSegments(text: string, maxChars: number): string[] {
 export interface ChunkWithProvenance {
   content: string;
   tokenCount: number;
-  pageNumber: number;
+  pageNumber: number | null;
   sectionTitle: string | null;
+  extractionMethod?: "text" | "ocr" | "unknown";
 }
 
 const HEADING_RE =
@@ -69,27 +72,37 @@ function detectHeading(line: string): string | null {
  * flush) so the page citation is exact.
  */
 export function chunkPages(
-  pages: { pageNumber: number; text: string }[],
+  pages: { pageNumber: number | null; text: string; extractionMethod?: "text" | "ocr" }[],
   options: ChunkOptions = {},
 ): ChunkWithProvenance[] {
   const out: ChunkWithProvenance[] = [];
   let currentSection: string | null = null;
 
   for (const page of pages) {
-    // Track the latest heading seen on this page (carries forward across pages).
+    // Flush at each heading so earlier text never inherits a later section.
+    // A section can continue onto the next page, but chunks cannot span pages.
+    let sectionLines: string[] = [];
+    const flushSection = () => {
+      for (const content of chunkText(sectionLines.join("\n"), options)) {
+        out.push({
+          content,
+          tokenCount: Math.ceil(content.length / 4),
+          pageNumber: page.pageNumber,
+          sectionTitle: currentSection,
+          extractionMethod: page.extractionMethod ?? "text",
+        });
+      }
+      sectionLines = [];
+    };
     for (const line of page.text.split("\n")) {
       const heading = detectHeading(line);
-      if (heading) currentSection = heading;
+      if (heading) {
+        flushSection();
+        currentSection = heading;
+      }
+      sectionLines.push(line);
     }
-    // chunkText already does boundary-aware ~512-token splitting; reuse it per page.
-    for (const content of chunkText(page.text, options)) {
-      out.push({
-        content,
-        tokenCount: Math.ceil(content.length / 4),
-        pageNumber: page.pageNumber,
-        sectionTitle: currentSection,
-      });
-    }
+    flushSection();
   }
   return out;
 }
@@ -106,7 +119,7 @@ export function chunkText(text: string, options: ChunkOptions = {}): string[] {
     Math.floor(maxChars / 2),
   );
 
-  const normalized = text.trim();
+  const normalized = cleanPassageText(text);
   if (normalized.length === 0) return [];
   if (normalized.length <= maxChars) return [normalized];
 

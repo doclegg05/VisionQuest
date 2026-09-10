@@ -158,9 +158,25 @@ export function missingStorageKeys(rows, expected) {
   return expected.filter((key) => !have.has(key));
 }
 
+/** Supplemental references exist only for the guarded CI answer-quality seed. */
+export function loadAnswerQualityCorpusRows(repoRoot = process.cwd()) {
+  const rows = loadCatalogCorpusRows(repoRoot);
+  const extra = JSON.parse(readFileSync(join(repoRoot, "config/sage-answer-quality-corpus.json"), "utf8"));
+  const keys = new Set(rows.map(row => row.storageKey));
+  for (const row of extra) {
+    if (keys.has(row.storageKey)) throw new Error(`Duplicate CI reference: ${row.storageKey}`);
+    if (!PROGRAM_DOC_CATEGORIES.has(row.category) || !PROGRAM_DOC_AUDIENCES.has(row.audience) || !row.sageContextNote?.trim()) {
+      throw new Error(`Invalid CI reference: ${row.storageKey}`);
+    }
+    rows.push(row);
+    keys.add(row.storageKey);
+  }
+  return rows;
+}
+
 export async function seedCatalogCorpus(options) {
   const { databaseUrl, repoRoot = process.cwd(), log = () => undefined } = options;
-  const rows = loadCatalogCorpusRows(repoRoot);
+  const rows = options.rows ?? loadCatalogCorpusRows(repoRoot);
   if (rows.length === 0) {
     throw new Error("catalog/ produced zero ProgramDocument rows — check catalog/forms and catalog/documents.");
   }
@@ -185,7 +201,7 @@ export async function seedCatalogCorpus(options) {
         update: data,
       });
     }
-    log(`Seeded ${rows.length} ProgramDocument rows from catalog/.`);
+    log(`Seeded ${rows.length} ProgramDocument rows from the selected test corpus.`);
     return { upserted: rows.length, keys: rows.map((row) => row.storageKey) };
   } finally {
     await prisma.$disconnect();

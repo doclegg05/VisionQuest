@@ -143,8 +143,8 @@ async function extractSignal(
   sageReply: string,
 ): Promise<ClassroomConfirmationSignal> {
   const transcript = [
-    { role: "model" as const, content: sageReply },
     { role: "user" as const, content: userMessage },
+    { role: "model" as const, content: sageReply },
     {
       role: "user" as const,
       content: "Analyze only the student's most recent message.",

@@ -93,7 +93,7 @@ test("doc entry with passages renders page citation", () => {
   });
   assert.match(out, /Administrative Guide, p\.12/);
   assert.match(out, /Students must attend 80%/);
-  assert.doesNotMatch(out, /fallback summary/);
+  assert.match(out, /Document summary: fallback summary/);
 });
 
 test("doc entry includes the stable storage path to disambiguate similar titles", () => {
@@ -121,7 +121,7 @@ test("doc entry with section-only passage renders section citation", () => {
   });
   assert.match(out, /Dress Code Policy — ATTIRE/);
   assert.match(out, /Business casual required/);
-  assert.doesNotMatch(out, /fallback summary/);
+  assert.match(out, /Document summary: fallback summary/);
 });
 
 test("doc entry with no passages renders legacy summary format", () => {
@@ -229,6 +229,21 @@ describe("getDocumentContext", () => {
     assert.ok(!context.includes("Doc B"), "lowest-scoring entry should be dropped for budget");
   });
 
+  it("keeps one passage from each source before including extra passages", async () => {
+    mockHybridSearch.mock.mockImplementation(async () => [
+      hybridDoc({ id: "doc-a", title: "Doc A", score: 0.04 }),
+      hybridDoc({ id: "doc-b", title: "Doc B", score: 0.03 }),
+    ]);
+    mockGetBestChunks.mock.mockImplementation(async () => new Map(["doc-a", "doc-b"].map((id) => [id, [
+      { documentId: id, content: "a".repeat(1100), pageNumber: 1, sectionTitle: null, distance: 0.2 },
+      { documentId: id, content: "extra passage ".repeat(90), pageNumber: 2, sectionTitle: null, distance: 0.3 },
+    ]])));
+    const context = await getDocumentContext("compare guides", "student", 3, 3000);
+    assert.match(context, /Doc A, p\.1/);
+    assert.match(context, /Doc B, p\.1/);
+    assert.doesNotMatch(context, /extra passage/);
+  });
+
   it("fuses keyword-matched snippets with hybrid docs", async () => {
     mockSnippetFindMany.mock.mockImplementation(async () => [
       {
@@ -266,6 +281,7 @@ describe("getDocumentContext", () => {
             content: "Students must wear business casual.",
             pageNumber: 5,
             sectionTitle: "ATTIRE",
+            extractionMethod: "ocr",
             distance: 0.2,
           },
         ],
@@ -275,6 +291,7 @@ describe("getDocumentContext", () => {
     const context = await getDocumentContext("what is the dress code?", "student");
     assert.match(context, /SPOKES Dress Code Policy FY26 Fillable, p\.5/);
     assert.match(context, /Students must wear business casual/);
+    assert.match(context, /Source method: OCR transcription/);
     assert.ok(!context.includes("Summary: Explains what students can wear"), "passage present — no fallback summary");
   });
 

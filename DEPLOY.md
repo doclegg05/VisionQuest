@@ -14,20 +14,20 @@ This runbook covers the supported production path: Render for app hosting plus S
 
 ## Production Topology
 
-[`render.yaml`](/Users/brittlegg/visionquest/render.yaml) provisions:
+[`render.yaml`](./render.yaml) declares one Starter web service. Scheduled work runs in Supabase `pg_cron`/`pg_net`; use the [cron runbook](./docs/plans/pg-cron-setup-runbook.md) to verify registrations and HTTP outcomes. The scripts in `scripts/run-*-*.mjs` are diagnostic helpers, not separate Render cron services.
 
-- 1 web service named `visionquest`
-- 3 cron services
+The existing service was inspected on September 10, 2026:
 
-  - `visionquest-appointment-reminders`
-  - `visionquest-job-processor`
-  - `visionquest-daily-coaching`
+| Setting | Render dashboard | Tracked blueprint |
+| --- | --- | --- |
+| Branch | `main` | Repository selected at creation |
+| Build | `npm install; npm run build` | `npm ci && npx prisma generate && npm run build` |
+| Start | `npm run prisma:migrate:deploy && npm start` | `npm run prisma:migrate:deploy && node .next/standalone/server.js` |
+| Health check | Unset | `/api/health` |
+| Retrieval abstention | Environment override absent; code defaults to 1 | `SAGE_RAG_ABSTAIN_DISTANCE=0.40` |
+| Agent mode | Both mode/legacy overrides absent; current code resolves to `full` | `readonly` |
 
-The web service runs:
-
-```bash
-npm run prisma:migrate:deploy && node .next/standalone/server.js
-```
+These are observed differences, not instructions to change agent permissions. A repository YAML value is not proof that the existing service uses it. Record actual values during release verification and update this snapshot after applying reviewed configuration changes. `npm start` uses `scripts/start-production.mjs`, which selects the standalone server when present.
 
 ## 1. Provision Supabase
 
@@ -46,7 +46,7 @@ CREATE SCHEMA IF NOT EXISTS visionquest;
 ### Storage
 
 1. Open `Storage`.
-2. Create a private bucket named `uploads`.
+2. Use the existing private bucket named `Uploads` (case-sensitive). For a new project, create that bucket and set `STORAGE_BUCKET` to its exact name.
 3. Open the S3 connection settings.
 4. Record:
 
@@ -123,11 +123,11 @@ This is the preferred path.
 
 1. In Render, create a new Blueprint.
 2. Connect the GitHub repository.
-3. Let Render read [`render.yaml`](/Users/brittlegg/visionquest/render.yaml).
+3. Let Render read [`render.yaml`](./render.yaml).
 4. Provide the required environment variables.
-5. Confirm that all four services are created.
+5. Confirm that the web service is created and its effective settings match the intended blueprint. Verify Supabase schedules separately using the cron runbook.
 
-### Option B: Manual Web Service Plus Cron Jobs
+### Option B: Manual Web Service
 
 If you do not use the blueprint:
 
@@ -138,16 +138,8 @@ If you do not use the blueprint:
    - Start command: `npm run prisma:migrate:deploy && node .next/standalone/server.js`
    - Health check path: `/api/health`
 
-3. Create three cron jobs:
-
-   - `node scripts/run-appointment-reminders.mjs`
-   - `node scripts/run-job-processor.mjs`
-   - `node scripts/run-daily-coaching.mjs`
-
-4. Each cron service needs:
-
-   - `APP_BASE_URL`
-   - `CRON_SECRET`
+3. Configure Supabase schedules through the [cron runbook](./docs/plans/pg-cron-setup-runbook.md), including its URL/secret prerequisites and outcome checks. Do not add duplicate Render cron services.
+4. Set the intended non-secret runtime flags explicitly, including `SAGE_RAG_ABSTAIN_DISTANCE=0.40`. Preserve the authorized agent mode; changing retrieval configuration does not authorize additional tools.
 
 ## 5. Set Environment Variables
 
@@ -168,7 +160,7 @@ If you do not use the blueprint:
 | `GEMINI_API_KEY` | Gemini credential |
 | `STORAGE_ENDPOINT` | Supabase S3 endpoint |
 | `STORAGE_REGION` | Usually `us-east-1` |
-| `STORAGE_BUCKET` | `uploads` |
+| `STORAGE_BUCKET` | `Uploads` (existing private bucket; case-sensitive) |
 | `STORAGE_ACCESS_KEY` | Supabase storage access key |
 | `STORAGE_SECRET_KEY` | Supabase storage secret key |
 
@@ -295,14 +287,15 @@ psql "DIRECT_URL" < backup.sql
 ### Rollback
 
 1. Roll back the service in Render to the last healthy deploy.
-2. If the problem is a migration, restore the database from backup because Prisma migrations are not automatically reversed.
+2. Verify whether the prior application is compatible with the current schema. Additive retrieval changes normally need only an application/configuration rollback. Investigate migration failures before selecting a database recovery procedure; a wholesale restore can discard unrelated live writes.
 
 ## Chat-First Rebuild (June 2026) — operational notes
 
 - **Kill switches** (env vars, all default ON): `SAGE_AGENT_ENABLED=false` (agent tools),
   `SAGE_MEMORY_ENABLED=false` (memory extraction/retrieval), `SAGE_RAG_MODE=keyword`
-  (revert to legacy retrieval). Retrieval tuning: `SAGE_RAG_DISTANCE_MARGIN` (0.04),
-  `SAGE_RAG_MAX_DISTANCE` (0.55), `SAGE_MEMORY_DUP_DISTANCE` (0.08).
+  (revert to legacy retrieval). Retrieval tuning: `SAGE_RAG_DISTANCE_MARGIN` (0.02),
+  `SAGE_RAG_MAX_DISTANCE` (0.55), `SAGE_RAG_MIN_SCORE_RATIO` (0.85),
+  `SAGE_RAG_ABSTAIN_DISTANCE` (release setting 0.40; code default 1 leaves the filter effectively off), and `SAGE_MEMORY_DUP_DISTANCE` (0.08).
 - **One-time after first deploy**: trigger the embedding backfill with one curl
   (idempotent; until then Sage uses keyword fallback):
   `curl -X POST https://visionquest.onrender.com/api/internal/rag/backfill -H "Authorization: Bearer $CRON_SECRET"`
