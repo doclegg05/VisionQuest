@@ -12,7 +12,7 @@
   "previousCommit": "734d49840779c3c63b8d660462d1153da58f31a8",
   "abstainDistance": 0.4,
   "healthPath": "/api/health",
-  "oneHourObservation": "pending",
+  "oneHourObservation": "failed: background extraction transcript errors",
   "nextWorkingDayObservation": "pending",
   "renderDeployWithHealth": "dep-dahe0tbv6pms738r381g",
   "liveAt": "2026-09-10T16:57:00Z",
@@ -107,5 +107,17 @@
     }
   ],
   "latencyLimit": "12.7-17.1 second measured scenario durations include chat and source download checks. No comparable pre-release production scenario baseline was captured, so these do not establish a latency improvement or regression. Render percentile metrics are unavailable on the current plan.",
-  "evidenceLimit": "Immediate post-release verification only; first-hour and next-working-day observations remain pending. No errors appeared in the visible post-release log snapshot; this is not full-window evidence."
+  "evidenceLimit": "Immediate post-release verification only; first-hour and next-working-day observations remain pending. No errors appeared in the visible post-release log snapshot; this is not full-window evidence.",
+  "observationIncident": {
+    "loggedAt": "2026-09-10T17:02:26Z",
+    "observedAt": "2026-09-10T17:31:39Z",
+    "messages": [
+      "Discovery extraction failed",
+      "Memory extraction failed (non-fatal)"
+    ],
+    "error": "First content should be with role user, got model",
+    "fixBranch": "codex/sage-extraction-transcript",
+    "automationStatus": "PAUSED",
+    "nextAction": "Validate and release transcript fix, then restart observation windows"
+  }
 }

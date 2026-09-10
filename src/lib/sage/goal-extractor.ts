@@ -1,3 +1,4 @@
+import { extractionTranscript } from "./extraction-transcript";
 import type { AIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
@@ -146,10 +147,7 @@ export async function extractGoals(
   const recent = messages.slice(-10);
 
   const contextPrompt = `Current goal-setting stage: ${currentStage}\n\nAnalyze the conversation and extract goals:`;
-  const messagesWithContext = [
-    ...recent,
-    { role: "user" as const, content: contextPrompt },
-  ];
+  const messagesWithContext = extractionTranscript(recent, contextPrompt);
 
   const extractionPrompt = buildExtractionPrompt(
     normalizeProgramType(typeof programType === "string" ? programType : null),

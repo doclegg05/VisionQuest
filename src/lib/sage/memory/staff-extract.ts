@@ -1,3 +1,4 @@
+import { extractionTranscript } from "../extraction-transcript";
 /**
  * Durable memory for STAFF chat turns.
  *
@@ -106,6 +107,7 @@ export async function extractAndStoreStaffMemories({
 
     const recent = messages.slice(-12);
     if (recent.length === 0) return empty;
+    const inputMessages = extractionTranscript(recent, "Extract supported staff memories from the preceding conversation according to the system instructions.");
 
     // Independent daily ceiling, separate from the student extractor's. Staff
     // turns are cheap and infrequent; this is a runaway guard, not a limiter.
@@ -135,18 +137,18 @@ export async function extractAndStoreStaffMemories({
       providerName: provider.name,
       providerClass,
       allowCloud: providerClass === "cloud",
-      inputChars: recent.reduce((sum, m) => sum + m.content.length, 0),
+      inputChars: STAFF_EXTRACTION_PROMPT.length + inputMessages.reduce((sum, m) => sum + m.content.length, 0),
       reason: "Staff-chat memory extraction; teacher-subject facts only, no student content stored.",
     });
 
-    const raw = await provider.generateStructuredResponse(STAFF_EXTRACTION_PROMPT, recent);
+    const raw = await provider.generateStructuredResponse(STAFF_EXTRACTION_PROMPT, inputMessages);
 
     await logEstimatedExtractionCost({
       subjectId: staffId,
       callSite: "sage_staff_memory_extract",
       providerName: provider.name,
       prompt: STAFF_EXTRACTION_PROMPT,
-      messages: recent,
+      messages: inputMessages,
       raw,
     });
 

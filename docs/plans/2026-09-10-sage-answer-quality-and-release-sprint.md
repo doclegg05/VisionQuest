@@ -1,7 +1,7 @@
 # Sage answer quality and application release sprint
 
 Created: 2026-09-10
-Status: Released as `46801e9`; first-hour and next-working-day observations pending
+Status: Fixing a background-extraction failure found during release observation
 Duration: Five working days from kickoff plus a next-working-day release check, assuming one implementing engineer/agent
 Product and release owner: Britt
 Delivery owner: The engineer/agent executing this plan
@@ -120,7 +120,7 @@ Acceptance: Deployed-commit evidence and smoke results are attached, the index r
 - [x] Six supported controls remain accurate and useful, with citations supported by the actual passages.
 - [x] Stale fixture expectations corrected with source evidence and isolation coverage retained.
 - [x] CI/assertion coverage added; real-provider and real-route results distinguished from synthetic fixtures and stubs.
-- [x] Final integrated repository checks pass, with no secret-dependent skip counted as executed validation.
+- [ ] Final integrated repository checks pass, with no secret-dependent skip counted as executed validation.
 - [ ] Application released; deployed commit, smoke checks, observation, and rollback evidence recorded.
 - [x] Read-only integrity check still reports an empty repair queue; corpus activation/audience boundaries preserved.
 

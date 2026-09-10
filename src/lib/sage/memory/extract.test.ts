@@ -368,3 +368,13 @@ describe("extractAndStoreMemories", () => {
     assert.equal(lockCalls.length, 2, "both concurrent calls for the same student must acquire the advisory lock");
   });
 });
+
+ it("preserves model-first transcript roles and ends with an extraction request", async () => {
+  const provider = providerReturning("[]");
+  const transcript = [{ role: "model" as const, content: "How do you travel?" }, { role: "user" as const, content: "By bus." }, { role: "model" as const, content: "Let's plan around that." }];
+  await extractAndStoreMemories({provider, studentId: "student-1", conversationId: "conv-1", messages: transcript});
+  const sent = provider.generateStructuredResponse.mock.calls[0].arguments[1];
+  assert.equal(sent[0].role, "user");
+  assert.equal(sent.at(-1).role, "user");
+  assert.deepEqual(sent.slice(1, -1), transcript);
+ });
