@@ -96,3 +96,25 @@ Three real Gemini calls on a fictional model-first transcript returned the expec
 Render deployment `dep-daheq90u01pc739aulc0` went live at **17:50:54 UTC (1:50:54 PM EDT) September 10**. Startup reported 52 migrations and none pending. The health check passed. A dedicated fictional Sam conversation with 12 stored historical messages exercised the bounded windows through the real chat route: HTTP 200, a persisted computer-repair/networking discovery record, and three supported memories. The post-response log confirms discovery and memory both ran; the visible post-release snapshot contains no error entry. Exact fixture cleanup was verified. The read-only index audit again reports zero strict failures.
 
 [Corrective release evidence](evidence/2026-09-10-sage-corrective-release.json) is the current release/observation record. The earlier release's failed observation remains historical evidence. The first-hour window restarts at 17:50:54 UTC and cannot pass before 18:50:54 UTC. The heartbeat is active again, with checks scheduled for **3:15 PM EDT September 10** and **9:15 AM EDT September 11**; it must inspect the full first-hour range rather than only the last hour at execution time. Both gates remain pending, and the sprint is not complete.
+
+
+## First-hour observation recorded
+
+The corrected first hour, **17:50:54–18:50:54 UTC September 10**, passed the operational stability gate with noncritical warnings. Review at approximately 19:20 UTC used Render's four-hour application-log range and separate `error` and `failed` searches, covering the complete window; custom time inputs did not persist. Both searches returned only the two historical 17:02:26 errors. Six post-response entries in the corrected window completed extraction; no new error or failed-operation entry was found. This is log-based evidence, not proof that every request or answer succeeded.
+
+Four plain-language warnings reported estimated grades 8.3, 13.1, 10.9 and 8.6 against a maximum of 8. One `/career` CSP warning at 18:01:51 UTC reported blocked `eval`. These remain follow-up quality/compatibility findings; no real conversation text was read, and neither user impact nor regression status was established. Keep the CSP intact. No new critical error was observed.
+
+Documentation-only PR #215 deployed as `af6a6e0` through `dep-dahfb4ou01pc739bmd3g`, with the application log recording **18:26:54 UTC** as live. It changes no application or migration tree, so the observation spans that restart. Startup found 52 migrations and none pending. At 19:16:56 UTC, health was healthy, database connected, schema ready (640 ms). Render showed 323 requests across its broader four-hour metric range and no 5xx entry in the status selector; this is not an exact first-hour error-rate measurement. Percentile latency is unavailable on the plan, and CPU/memory chart values were not extracted.
+
+The next-working-day check remains scheduled for **September 11 at 9:15 AM EDT**. The sprint remains incomplete until that observation is recorded. Evidence is staged as local documentation on `codex/sage-release-observations`; do not merge it automatically.
+
+
+## Next-working-day observation passed; sprint complete
+
+September 11 review at approximately **13:20 UTC (9:20 AM EDT)** passed the remaining operational observation gate. Health at 13:16:58 UTC was healthy, database connected and schema ready (534 ms). The read-only integrity audit at 13:17:31 UTC reported 67 retrievable documents, 57 active memories, no missing/stale memory vectors and zero strict failures.
+
+Render now runs `44ec49ac89d7642b557dcf4ee9a9ed18b0bbf877` via live deployment `dep-dahtstuk1f9s73fac730`. This later PR #216 updates only CI workflow and documentation; a fetched-main diff confirms no application or migration changes from `af6a6e0`. It is recorded separately from the Sage rollout.
+
+Separate error/failed searches over **Last 24 hours** returned no post-correction failures. The 19 historical failed entries comprise 17 PDF-worker failures at 13:36–13:37 UTC September 10 and two transcript-role failures at 17:02 UTC, all before correction. Historical PDF-worker failures are not claimed fixed merely because they did not recur. No additional warning entry was found after yesterday's review. Prior readability and career-page CSP findings remain follow-ups.
+
+The broader 24-hour metric view showed 517 requests and no 5xx entry in its status selector. This does not establish an exact error rate; percentile latency remains unavailable and no performance improvement is inferred. No new real-provider scenarios or student-content inspection were performed. Both required observation gates are now recorded, completing this sprint. This documentation is committed/pushed on the observation branch only, without merging or deploying. The goal tool returned no existing goal, so there is no active goal record to mark complete.
