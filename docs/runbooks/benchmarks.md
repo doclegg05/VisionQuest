@@ -340,7 +340,9 @@ migrations applied, cohort seeded, catalog corpus seeded into
 `ProgramDocument` from `catalog/` (`scripts/bench/seed-catalog-corpus.mjs` —
 required for `sage-grounding`; without it every case reports `got: none`),
 then `--tier=nightly --compare` followed by `--tier=watch`. Uploads
-`reports/benchmarks/latest/`, commits it on `main` with `[skip ci]`, and
+`reports/benchmarks/latest/`, pushes `chore/nightly-benchmark-results` and
+opens or updates one results PR (protected `main` rejects a direct push —
+GH006) with `[skip ci]` so the merge does not re-trigger full CI, and
 opens or updates the "Benchmark regression" issue on any failure.
 
 Suites needing `GEMINI_API_KEY` never run per-PR — only nightly, and only when

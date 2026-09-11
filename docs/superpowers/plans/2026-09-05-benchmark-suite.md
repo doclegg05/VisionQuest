@@ -76,7 +76,7 @@ Updated only via `npm run bench -- --suite=<s> --update-baseline --reason="…"`
 
 ### Workflows
 - `ci.yml`: `npm run bench:validate`, then `npm run bench -- --tier=gate --compare` (suites needing only the hermetic Postgres run here too, seeded via `scripts/bench/seed-cohort.ts` when `requires` includes `cohort`).
-- `benchmarks.yml`: nightly + `workflow_dispatch`; runs `--tier=nightly --compare` and `--tier=watch`; uploads `reports/benchmarks/latest/`; commits the results to the branch's `reports/benchmarks/latest/` on `main` runs; opens/updates one issue titled "Benchmark regression" on any `fail`.
+- `benchmarks.yml`: nightly + `workflow_dispatch`; runs `--tier=nightly --compare` and `--tier=watch`; uploads `reports/benchmarks/latest/`; on `main` runs, pushes `chore/nightly-benchmark-results` and opens/updates one results PR (protected `main` rejects a direct push); opens/updates one issue titled "Benchmark regression" on any `fail`.
 
 ## Work split (parallel)
 | Agent | Scope | Owns files |
