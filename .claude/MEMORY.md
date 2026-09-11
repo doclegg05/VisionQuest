@@ -63,7 +63,7 @@ Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#1
 - **Date**: 2026-09-11 (nightly Benchmarks `commit-results` fire drill)
 - **What we worked on**: Scheduled Benchmarks on `main` was red with a green `benchmarks` job. Root cause is GH006: `commit-results` pushed directly to protected `main`. Changed that job to force-push `chore/nightly-benchmark-results`, open/update one PR, post a path-gated `verify` check, and squash-merge with `[skip ci]`. The `benchmarks` job, suites, and floors are untouched.
 - **What we decided**: Do not weaken branch protection. Results still land on `main` so the dashboard and 90-day trend keep reading committed files; the PR is the vehicle. A `verify` check is posted only after `git diff-tree` shows every path is under `reports/benchmarks/latest/`. If auto-merge is refused, the job stays green and the PR stays open. Enabling "Allow GitHub Actions to create and approve pull requests" is an Actions permission, not a protection change.
-- **Where we left off**: PR open against `main` on `cursor/bench-commit-results-pr-2f48`. First proof is the next scheduled/dispatched Benchmarks run after merge.
+- **Where we left off**: PR #216 open against `main` (`https://github.com/doclegg05/VisionQuest/pull/216`, branch `cursor/bench-commit-results-pr-2f48`). First proof is the next scheduled/dispatched Benchmarks run after merge.
 
 ## Prior Session (2026-09-09, sage-grounding nightly fire drill)
 - **Date**: 2026-09-09 (sage-grounding nightly fire drill, issue #208)

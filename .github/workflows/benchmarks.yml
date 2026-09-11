@@ -388,25 +388,25 @@ jobs:
             }
 
             const headSha = process.env.HEAD_SHA || pr.head.sha;
-            await github.rest.checks.create({
-              owner,
-              repo,
-              name: "verify",
-              head_sha: headSha,
-              status: "completed",
-              conclusion: "success",
-              details_url: runUrl,
-              output: {
-                title: "Result-only nightly commit",
-                summary:
-                  "Diff is confined to reports/benchmarks/latest/. Full CI is skipped to avoid a nightly loop.",
-              },
-            });
-
-            // Give GitHub a moment to index the check before merge.
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-
             try {
+              await github.rest.checks.create({
+                owner,
+                repo,
+                name: "verify",
+                head_sha: headSha,
+                status: "completed",
+                conclusion: "success",
+                details_url: runUrl,
+                output: {
+                  title: "Result-only nightly commit",
+                  summary:
+                    "Diff is confined to reports/benchmarks/latest/. Full CI is skipped to avoid a nightly loop.",
+                },
+              });
+
+              // Give GitHub a moment to index the check before merge.
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
               await github.rest.pulls.merge({
                 owner,
                 repo,
