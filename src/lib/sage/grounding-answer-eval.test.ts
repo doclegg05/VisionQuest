@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { evaluateGroundingAssertions, runGroundingSamples } from "../../../scripts/lib/sage-grounding-eval.mjs";
+import { evaluateGroundingAssertions, groundingFormToolResult, runGroundingSamples } from "../../../scripts/lib/sage-grounding-eval.mjs";
 
 import { passesRetrievalCase } from "../../../scripts/lib/sage-rag-utils.mjs";
 
@@ -40,6 +40,35 @@ describe("grounded answer evaluation", () => {
     assert.equal(result.pass, false);
     assert.equal(result.samples.length, 3);
     assert.match(result.reason!, /sample 2: invented date/);
+  });
+});
+
+describe("groundingFormToolResult", () => {
+  const forms = [
+    { id: "rights-responsibilities", title: "Rights and Responsibilities" },
+    { id: "dress-code", title: "Dress Code Policy" },
+  ];
+  it("names the catalog form for an exact title query", () => {
+    const result = groundingFormToolResult(
+      { name: "present_form", args: { query: "rights and responsibilities" } },
+      forms,
+    );
+    assert.equal(result.summary, 'Found "Rights and Responsibilities".');
+    assert.match(JSON.stringify(result.response), /Rights and Responsibilities/);
+  });
+  it("names the catalog form for a query that contains the title", () => {
+    const result = groundingFormToolResult(
+      { name: "search_forms", args: { query: "SPOKES rights and responsibilities form" } },
+      forms,
+    );
+    assert.equal(result.summary, 'Found "Rights and Responsibilities".');
+  });
+  it("falls back to the raw query when no catalog form matches", () => {
+    const result = groundingFormToolResult(
+      { name: "present_form", args: { query: "unknown packet" } },
+      forms,
+    );
+    assert.equal(result.summary, 'Found "unknown packet".');
   });
 });
 

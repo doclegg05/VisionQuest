@@ -979,6 +979,7 @@ const RAG_GROUNDING_INSTRUCTION =
   "When document passages are provided below, answer only what they establish about the question. " +
   "Include a Markdown link using the supplied source URL for each document-based answer, with a page number when supplied. " +
   "A related topic, title, or program description does not establish a specific policy, benefit, fee, refund rule, or current date. " +
+  "A supplied document title and source link do establish which program document to open and where to find it — name that document by its title. " +
   "Public funding or a no-tuition description does not establish what a participant paid or whether a refund is available. " +
   "Without an explicit refund rule, do not claim there is no money to refund. " +
   "Do not infer that a policy does not exist merely because it is absent from the passages. " +

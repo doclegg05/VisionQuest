@@ -88,7 +88,8 @@ import {
 } from "./lib/sage-eval-text.mjs";
 import { CHAT_EVAL_FAMILY_NAMES } from "./lib/sage-chat-eval-families.mjs";
 import { percentile } from "./lib/percentile.mjs";
-import { evaluateGroundingAssertions, runGroundingSamples } from "./lib/sage-grounding-eval.mjs";
+import { evaluateGroundingAssertions, groundingFormToolResult, runGroundingSamples } from "./lib/sage-grounding-eval.mjs";
+const { FORMS } = await import("../src/lib/spokes/forms.ts");
 import {
   CAREER_GROUNDING_TOOL_NAMES,
   buildCareerCasePrompt,
@@ -130,6 +131,14 @@ const SENTINEL_MEMORY_STUDENT_ID = "sage-chat-harness-student";
 /** No-op tool handler: canned success stub. Never executes a real tool or touches the DB. */
 async function noopToolHandler() {
   return { response: { ok: true }, summary: "(eval stub — not executed)", status: "success" };
+}
+
+/** Grounding turns still stub writes, but form lookups must name the form. */
+async function groundingToolHandler(call) {
+  if (call.name === "present_form" || call.name === "search_forms") {
+    return groundingFormToolResult(call, FORMS);
+  }
+  return noopToolHandler();
 }
 
 // Mirrors scripts/sage-rag-harness.mjs parseDocumentRefs — see that file for
@@ -449,7 +458,7 @@ async function runGroundingCase(deps, provider, systemPrompt, testCase) {
       systemPrompt + context,
       [{ role: "user", content: testCase.message }],
       declarations,
-      noopToolHandler,
+      groundingToolHandler,
       { maxHops: 8, temperature: TEMPERATURE },
     );
     for await (const event of events) {
