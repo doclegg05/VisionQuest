@@ -47,7 +47,7 @@ function unique(values) {
 
 function parseDocumentRefs(context) {
   // formatEntry() emits a doc entry in one of two shapes (see knowledge-base-server.ts):
-  //   no passages:  "[Title]\nLink: /api/documents/download?id=ID&mode=view\nSummary: …"
+  //   notes-only:   "Link: /api/documents/download?id=ID&mode=view\n[Title]\nTitle. …"
   //   chunk path:   "Link: /api/documents/download?id=ID&mode=view\n[Title, p.N]\n…"
   // The chunk-citation path (live hybrid retrieval) puts Link FIRST with no leading
   // [Title], so the old `^\[Title\]\nLink:` anchor silently missed every chunk-retrieved
