@@ -1,0 +1,45 @@
+{
+  "suite": "cost-per-student",
+  "tier": "nightly",
+  "startedAt": "2026-09-12T10:01:54.077Z",
+  "durationMs": 0,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "usd_per_active_student_month",
+      "value": null,
+      "unit": "count",
+      "displayUnit": "usd",
+      "reason": "config/sage-budget.json.monthlyBudgetUsd ships null on purpose (a guessed ceiling would let a real overrun read as 'under budget'), and even once Britt sets it the floor is budget/activeStudents — a number that moves with enrollment, not a fixed value this config can hold. The scorer computes the would-be floor and VisionQuest's existing budgetCheck verdict (ok/warning/no_price/no_budget) into metrics[0].details on every run regardless.",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "cloud_calls_total",
+      "value": null,
+      "unit": "count",
+      "reason": "A raw descriptive count with no correctness bar of its own — the thing that should be floored is the FERPA routing RATIO, which the sibling ferpa-routing suite already covers. This number exists so a reader can see the denominator behind that ratio.",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "local_calls_total",
+      "value": null,
+      "unit": "count",
+      "reason": "Same as cloud_calls_total: a descriptive count, not a metric with its own floor.",
+      "direction": "lower",
+      "status": "skipped"
+    }
+  ],
+  "status": "skipped",
+  "skipped": "requires prod-readonly (BENCH_PROD_READONLY_URL is not set)"
+}

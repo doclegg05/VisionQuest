@@ -1,0 +1,46 @@
+{
+  "suite": "sage-latency",
+  "tier": "nightly",
+  "startedAt": "2026-09-12T10:05:38.259Z",
+  "durationMs": 19018,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "p95_ms",
+      "value": 1942,
+      "unit": "ms",
+      "direction": "lower",
+      "n": 20,
+      "floor": 6000,
+      "tolerance": 500,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "sloBarMs": 6000,
+        "errors": []
+      }
+    },
+    {
+      "id": "p50_ms",
+      "value": 752,
+      "unit": "ms",
+      "reason": "informational alongside the gated p95_ms — config/sage-slo.json only publishes a p95 bar for sage_chat.gemini, and p50 exists purely for trend/debugging context",
+      "direction": "lower",
+      "n": 20,
+      "floor": null,
+      "tolerance": null,
+      "baseline": null,
+      "status": "info"
+    }
+  ],
+  "status": "pass"
+}

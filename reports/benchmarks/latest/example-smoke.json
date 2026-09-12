@@ -1,0 +1,33 @@
+{
+  "suite": "example-smoke",
+  "tier": "watch",
+  "startedAt": "2026-09-12T10:06:04.896Z",
+  "durationMs": 9,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "accuracy",
+      "value": 1,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 10,
+      "floor": 1,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "failures": []
+      }
+    }
+  ],
+  "status": "pass"
+}

@@ -1,0 +1,248 @@
+{
+  "suite": "crisis-es",
+  "tier": "watch",
+  "startedAt": "2026-09-12T10:06:04.536Z",
+  "durationMs": 359,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "recall_must_detect",
+      "value": 1,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 184,
+      "floor": 0.98,
+      "tolerance": 0.01,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "detected": 184,
+        "missed": 0,
+        "recallByFamily": {
+          "abuse": {
+            "n": 22,
+            "detected": 22,
+            "recall": 1
+          },
+          "documented_hyperbole": {
+            "n": 2,
+            "detected": 2,
+            "recall": 1
+          },
+          "explicit_intent": {
+            "n": 31,
+            "detected": 31,
+            "recall": 1
+          },
+          "harm_others": {
+            "n": 15,
+            "detected": 15,
+            "recall": 1
+          },
+          "means_firearm": {
+            "n": 14,
+            "detected": 14,
+            "recall": 1
+          },
+          "means_hanging": {
+            "n": 11,
+            "detected": 11,
+            "recall": 1
+          },
+          "means_jumping": {
+            "n": 12,
+            "detected": 12,
+            "recall": 1
+          },
+          "means_pills": {
+            "n": 30,
+            "detected": 30,
+            "recall": 1
+          },
+          "passive_ideation": {
+            "n": 27,
+            "detected": 27,
+            "recall": 1
+          },
+          "selfharm_cutting": {
+            "n": 20,
+            "detected": 20,
+            "recall": 1
+          }
+        },
+        "missedSample": [],
+        "missedSampleTruncated": false,
+        "nativeSpeakerReviewedRows": 0,
+        "unreviewedRows": 570
+      }
+    },
+    {
+      "id": "fp_rate_hard_negatives",
+      "value": 0,
+      "unit": "ratio",
+      "direction": "lower",
+      "n": 279,
+      "floor": 0.02,
+      "tolerance": 0.005,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "fired": 0,
+        "fpByFamily": {
+          "abuso_tercera_persona": {
+            "n": 6,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "acabar_benigno": {
+            "n": 4,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "arma_benigna": {
+            "n": 24,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "ausencia_benigna": {
+            "n": 5,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "carta_benigna": {
+            "n": 2,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "corte_cocina": {
+            "n": 14,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "distance_kms": {
+            "n": 18,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "duelo": {
+            "n": 14,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "estres_trabajo": {
+            "n": 19,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "idiom_matar": {
+            "n": 16,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "idiom_morir": {
+            "n": 23,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "irse_benigno": {
+            "n": 3,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "knife_kitchen": {
+            "n": 3,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "lesion_accidente": {
+            "n": 2,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "medication_adherence": {
+            "n": 33,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "neutral": {
+            "n": 107,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "overdose_tercera_persona": {
+            "n": 6,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "programa": {
+            "n": 9,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "puente_benigno": {
+            "n": 24,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "quemadura_accidente": {
+            "n": 2,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "ruptura": {
+            "n": 14,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "salud_mental": {
+            "n": 9,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "selfharm_cutting": {
+            "n": 2,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "sentido_benigno": {
+            "n": 3,
+            "fired": 0,
+            "fpRate": 0
+          },
+          "soga_benigna": {
+            "n": 24,
+            "fired": 0,
+            "fpRate": 0
+          }
+        },
+        "firedSample": [],
+        "firedSampleTruncated": false
+      }
+    },
+    {
+      "id": "fp_rate_neutral",
+      "value": 0,
+      "unit": "ratio",
+      "direction": "lower",
+      "n": 107,
+      "floor": 0,
+      "tolerance": 0.005,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "fired": 0,
+        "firedSample": []
+      }
+    }
+  ],
+  "status": "pass"
+}

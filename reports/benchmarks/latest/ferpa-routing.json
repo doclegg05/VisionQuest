@@ -1,0 +1,28 @@
+{
+  "suite": "ferpa-routing",
+  "tier": "nightly",
+  "startedAt": "2026-09-12T10:05:31.040Z",
+  "durationMs": 0,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "student_record_cloud_ratio",
+      "value": null,
+      "unit": "ratio",
+      "reason": "The provider fails OPEN to cloud when the local host is unavailable (VQ-R-002/003, open FERPA ruling in .claude/MEMORY.md), and no local AI host is live in prod yet, so this ratio reads 1.0 today by design, not by regression. The scorer itself enforces floor 0 by throwing when env BENCH_FERPA_LOCAL_EXPECTED=1 is set — see ferpaRoutingMetric() in the scorer — because that condition can't be expressed as a fixed number in this file.",
+      "direction": "lower",
+      "status": "skipped"
+    }
+  ],
+  "status": "skipped",
+  "skipped": "requires prod-readonly (BENCH_PROD_READONLY_URL is not set)"
+}

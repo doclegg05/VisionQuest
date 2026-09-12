@@ -1,0 +1,35 @@
+{
+  "suite": "rag-abstention",
+  "tier": "nightly",
+  "startedAt": "2026-09-12T10:05:31.041Z",
+  "durationMs": 0,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "false_abstain_rate",
+      "value": null,
+      "unit": "ratio",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "offtopic_abstain_rate",
+      "value": null,
+      "unit": "ratio",
+      "reason": "reported per the design table (§4.3: 'abstain rate on off-topic reported') deliberately without a floor — a distance-based gate cannot separate every off-topic lure from a legitimate near-miss without costing false-abstain recall (see scripts/sage-rag-calibrate-abstention.mjs's own overlap-uncatchable accounting), so this is a trend signal, not a pass/fail one",
+      "direction": "higher",
+      "status": "skipped"
+    }
+  ],
+  "status": "skipped",
+  "skipped": "requires prod-readonly (BENCH_PROD_READONLY_URL is not set)"
+}

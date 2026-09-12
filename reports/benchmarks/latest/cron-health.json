@@ -1,0 +1,35 @@
+{
+  "suite": "cron-health",
+  "tier": "nightly",
+  "startedAt": "2026-09-12T10:05:23.677Z",
+  "durationMs": 0,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "expected_jobs_healthy",
+      "value": null,
+      "unit": "ratio",
+      "direction": "higher",
+      "status": "skipped"
+    },
+    {
+      "id": "pending_background_jobs",
+      "value": null,
+      "unit": "count",
+      "reason": "See D4 in .claude/MEMORY.md: the disposition of the pending BackgroundJob backlog (drain vs. expire-stale) is an owner call, not a benchmark floor — a fixed ceiling here would be this suite silently making that call instead of Britt.",
+      "direction": "lower",
+      "status": "skipped"
+    }
+  ],
+  "status": "skipped",
+  "skipped": "requires prod-readonly (BENCH_PROD_READONLY_URL is not set)"
+}

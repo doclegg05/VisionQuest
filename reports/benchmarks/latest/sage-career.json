@@ -1,0 +1,38 @@
+{
+  "suite": "sage-career",
+  "tier": "watch",
+  "startedAt": "2026-09-12T10:06:04.906Z",
+  "durationMs": 8689,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "pass_rate",
+      "value": 0.8,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 5,
+      "floor": null,
+      "tolerance": null,
+      "baseline": null,
+      "status": "info",
+      "details": {
+        "failing": [
+          {
+            "id": "career-grounded-pathway-medical-assistant",
+            "reason": "empty reply after calling lookup_program_info, lookup_program_info, career_occupation_profile — the student sees nothing"
+          }
+        ]
+      }
+    }
+  ],
+  "status": "info"
+}

@@ -1,0 +1,50 @@
+{
+  "suite": "rag-retrieval",
+  "tier": "nightly",
+  "startedAt": "2026-09-12T10:05:31.041Z",
+  "durationMs": 0,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "top3",
+      "value": null,
+      "unit": "ratio",
+      "direction": "higher",
+      "status": "skipped"
+    },
+    {
+      "id": "clean_top3",
+      "value": null,
+      "unit": "ratio",
+      "direction": "higher",
+      "status": "skipped"
+    },
+    {
+      "id": "top1",
+      "value": null,
+      "unit": "ratio",
+      "reason": "informational alongside the gated top3/clean_top3 — the design table (§4.3) floors only top-3 and clean-top-3 for this instrument; top1 is the harness's own extra breakdown, reported for trend visibility",
+      "direction": "higher",
+      "status": "skipped"
+    },
+    {
+      "id": "p95_latency_ms",
+      "value": null,
+      "unit": "ms",
+      "reason": "retrieval latency has no committed SLO bar of its own yet (unlike sage-latency's cloud-chat bar from config/sage-slo.json) — reported so a regression is visible before a bar is set, per the owner-decision default to measure before floor-setting",
+      "direction": "lower",
+      "status": "skipped"
+    }
+  ],
+  "status": "skipped",
+  "skipped": "requires prod-readonly (BENCH_PROD_READONLY_URL is not set)"
+}

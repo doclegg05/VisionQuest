@@ -1,0 +1,45 @@
+{
+  "suite": "sage-readability",
+  "tier": "nightly",
+  "startedAt": "2026-09-12T10:05:57.277Z",
+  "durationMs": 6893,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "pass_rate",
+      "value": 1,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 3,
+      "floor": 1,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "pass",
+      "details": {
+        "failing": []
+      }
+    },
+    {
+      "id": "median_grade",
+      "value": 6.4,
+      "unit": "grade",
+      "reason": "informational alongside the gated pass_rate — each case already asserts its own maxGrade via assessReadability(), so median_grade is a distribution stat over only 3 cases today, not an independent gate",
+      "direction": "lower",
+      "n": 3,
+      "floor": null,
+      "tolerance": null,
+      "baseline": null,
+      "status": "info"
+    }
+  ],
+  "status": "pass"
+}

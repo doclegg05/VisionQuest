@@ -1,0 +1,76 @@
+{
+  "suite": "page-timing",
+  "tier": "watch",
+  "startedAt": "2026-09-12T10:06:04.905Z",
+  "durationMs": 0,
+  "commit": "44ec49a",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.20.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "p95_ttfb_ms_dashboard",
+      "value": null,
+      "unit": "ms",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "p95_dcl_ms_dashboard",
+      "value": null,
+      "unit": "ms",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "p95_ttfb_ms_career",
+      "value": null,
+      "unit": "ms",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "p95_dcl_ms_career",
+      "value": null,
+      "unit": "ms",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "p95_ttfb_ms_teacher",
+      "value": null,
+      "unit": "ms",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "p95_dcl_ms_teacher",
+      "value": null,
+      "unit": "ms",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "p95_ttfb_ms_teacher_connect",
+      "value": null,
+      "unit": "ms",
+      "direction": "lower",
+      "status": "skipped"
+    },
+    {
+      "id": "p95_dcl_ms_teacher_connect",
+      "value": null,
+      "unit": "ms",
+      "direction": "lower",
+      "status": "skipped"
+    }
+  ],
+  "status": "skipped",
+  "skipped": "requires browser (PLAYWRIGHT is not set); requires server (BENCH_BASE_URL is not set)"
+}
