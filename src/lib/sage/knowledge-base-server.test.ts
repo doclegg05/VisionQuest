@@ -44,11 +44,13 @@ mock.module("./hybrid-retrieval", {
 
 let getDocumentContext: typeof import("./knowledge-base-server").getDocumentContext;
 let formatDocEntryForTest: typeof import("./knowledge-base-server").formatDocEntryForTest;
+let documentIdentityPassage: typeof import("./knowledge-base-server").documentIdentityPassage;
 
 before(async () => {
   const mod = await import("./knowledge-base-server");
   getDocumentContext = mod.getDocumentContext;
   formatDocEntryForTest = mod.formatDocEntryForTest;
+  documentIdentityPassage = mod.documentIdentityPassage;
 });
 
 function hybridDoc(overrides: Record<string, unknown> = {}) {
@@ -124,7 +126,7 @@ test("doc entry with section-only passage renders section citation", () => {
   assert.match(out, /Document summary: fallback summary/);
 });
 
-test("doc entry with no passages renders legacy summary format", () => {
+test("doc entry with no passages renders the title as an identity passage", () => {
   const out = formatDocEntryForTest({
     type: "doc",
     id: "d3",
@@ -132,8 +134,28 @@ test("doc entry with no passages renders legacy summary format", () => {
     score: 1,
     content: "Overview of the SPOKES program.",
   });
-  assert.match(out, /Summary: Overview of the SPOKES program/);
-  assert.match(out, /Orientation Guide/);
+  assert.match(out, /Document summary: Overview of the SPOKES program/);
+  assert.match(out, /\[Orientation Guide\]\nOrientation Guide\. Overview of the SPOKES program/);
+});
+
+test("documentIdentityPassage prefixes the title when the note omits it", () => {
+  const passage = documentIdentityPassage(
+    "Rights and Responsibilities",
+    "The orientation form that explains what students can expect.",
+  );
+  assert.match(passage.content, /Rights and Responsibilities/);
+  assert.match(passage.content, /orientation form/);
+});
+
+test("documentIdentityPassage does not double the title when the note already names it", () => {
+  const passage = documentIdentityPassage(
+    "Rights and Responsibilities",
+    "Rights and Responsibilities. Read this during orientation.",
+  );
+  assert.equal(
+    passage.content,
+    "Rights and Responsibilities. Read this during orientation.",
+  );
 });
 
 // ── Integration tests ──────────────────────────────────────────────────────────
@@ -172,11 +194,11 @@ describe("getDocumentContext", () => {
   it("formats hybrid results with a stable source path", async () => {
     const context = await getDocumentContext("what is the dress code?", "student");
     assert.match(context, /PROGRAM DOCUMENT REFERENCE/);
-    assert.ok(
-      context.includes(
-        "[SPOKES Dress Code Policy FY26 Fillable]\nLink: /api/documents/download?id=doc-dress&mode=view\nSource file: orientation/SPOKES_Dress_Code_Policy_FY26_Fillable.pdf\nSummary: Explains what students can wear at SPOKES.",
-      ),
-      `unexpected format:\n${context}`,
+    assert.match(context, /Source file: orientation\/SPOKES_Dress_Code_Policy_FY26_Fillable\.pdf/);
+    assert.match(context, /Document summary: Explains what students can wear at SPOKES/);
+    assert.match(
+      context,
+      /\[SPOKES Dress Code Policy FY26 Fillable\]\nSPOKES Dress Code Policy FY26 Fillable\. Explains what students can wear at SPOKES/,
     );
   });
 
@@ -199,6 +221,26 @@ describe("getDocumentContext", () => {
     const context = await getDocumentContext("what is the dress code?", "student");
     assert.equal(mockHybridSearch.mock.callCount(), 0);
     assert.match(context, /Dress Code Policy/);
+  });
+
+  it("keyword mode attaches title words for the rights-responsibilities fixture query", async () => {
+    process.env.SAGE_RAG_MODE = "keyword";
+    mockDocFindMany.mock.mockImplementation(async () => [
+      keywordDoc({
+        id: "doc-rights",
+        title: "Rights and Responsibilities",
+        storageKey: "orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf",
+        sageContextNote:
+          "The orientation form that explains what rights students have in the SPOKES program.",
+      }),
+    ]);
+    const context = await getDocumentContext(
+      "Where can I find my SPOKES rights and responsibilities?",
+      "student",
+    );
+    assert.match(context, /Rights and Responsibilities/);
+    assert.match(context, /responsibilit/i);
+    assert.match(context, /orientation\/SPOKES_Rights_and_Responsibilities_FY26_Fillable\.pdf/);
   });
 
   it("returns empty string when hybrid yields nothing and keywords match nothing", async () => {
@@ -298,6 +340,7 @@ describe("getDocumentContext", () => {
   it("falls back to summary when getBestChunks returns empty map", async () => {
     mockGetBestChunks.mock.mockImplementation(async () => new Map());
     const context = await getDocumentContext("what is the dress code?", "student");
-    assert.match(context, /Summary: Explains what students can wear at SPOKES/);
+    assert.match(context, /Document summary: Explains what students can wear at SPOKES/);
+    assert.match(context, /\[SPOKES Dress Code Policy FY26 Fillable\]\nSPOKES Dress Code Policy FY26 Fillable/);
   });
 });

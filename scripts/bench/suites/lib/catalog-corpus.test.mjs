@@ -42,6 +42,8 @@ test("loadCatalogCorpusRows includes every grounding fixture storage key", () =>
   const byKey = new Map(rows.map((row) => [row.storageKey, row]));
   assert.match(byKey.get(GROUNDING_KEYS[0]).title, /dress code/i);
   assert.match(byKey.get(GROUNDING_KEYS[1]).title, /rights/i);
+  assert.match(byKey.get(GROUNDING_KEYS[1]).sageContextNote, /rights/i);
+  assert.match(byKey.get(GROUNDING_KEYS[1]).sageContextNote, /responsibilit/i);
   assert.match(byKey.get(GROUNDING_KEYS[2]).title, /orientation/i);
   for (const key of GROUNDING_KEYS) {
     assert.ok(byKey.get(key).sageContextNote.length > 0);
@@ -97,6 +99,13 @@ test("keyword scoring of the catalog corpus ranks each grounding fixture's expec
       top3.includes(testCase.expected),
       `${testCase.expected} not in top 3 for "${testCase.message}" (got ${top3.join(", ")})`,
     );
+    if (testCase.expected === GROUNDING_KEYS[1]) {
+      assert.equal(
+        top3[0],
+        testCase.expected,
+        `rights fixture must rank first, not merely top-3 (got ${top3.join(", ")})`,
+      );
+    }
   }
 });
 

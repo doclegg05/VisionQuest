@@ -27,11 +27,20 @@ describe("buildFormRoutingOverlay", () => {
 });
 
 describe("buildDocNote", () => {
-  it("combines description + when-to-use, excluding when-NOT (this note feeds the doc embedding — negation would pollute it)", () => {
+  it("combines title + description + when-to-use, excluding when-NOT (this note feeds the doc embedding — negation would pollute it)", () => {
     const note = buildDocNote(n({ description:"RTW." }));
+    assert.match(note, /^T /);
     assert.match(note, /RTW\./);
     assert.match(note, /Use it weekly/);
     assert.doesNotMatch(note, /Not for X/);
+  });
+  it("keeps distinctive title tokens such as responsibilities in the seeded note", () => {
+    const note = buildDocNote(n({
+      title: "Rights and Responsibilities",
+      description: "The orientation form that explains program expectations.",
+    }));
+    assert.match(note, /Rights and Responsibilities/);
+    assert.match(note, /responsibilities/i);
   });
 });
 

@@ -19,7 +19,7 @@ describe("findNoteDrift", () => {
     assert.equal(f[0].storageKey, "rtw/RTW.pdf");
   });
   it("is silent when they match", () => {
-    const f = findNoteDrift([n()], [{ id:"d1", storageKey:"rtw/RTW.pdf", sageContextNote:"RTW. Use at completion." }]);
+    const f = findNoteDrift([n()], [{ id:"d1", storageKey:"rtw/RTW.pdf", sageContextNote:"T RTW. Use at completion." }]);
     assert.deepEqual(f, []);
   });
 });

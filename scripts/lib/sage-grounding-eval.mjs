@@ -31,6 +31,39 @@ export function evaluateGroundingAssertions({ text, context = "", calls = [], ex
   return graded;
 }
 
+/**
+ * Production present_form returns `Found "<title>"` plus a modelHint that
+ * names the form. The grounding harness used a blank success stub, so a
+ * "where can I find …" turn became "I've opened that" with none of the
+ * fixture terms. Resolve the static catalog title the same way production
+ * does for an exact id/title hit.
+ *
+ * @param {{ name?: string, args?: Record<string, unknown> }} call
+ * @param {Array<{ id: string, title: string }>} forms
+ */
+export function groundingFormToolResult(call, forms) {
+  const query = String(call?.args?.query ?? "").trim();
+  const needle = query.toLowerCase();
+  const match =
+    forms.find((form) => form.id.toLowerCase() === needle || form.title.toLowerCase() === needle) ??
+    forms.find(
+      (form) =>
+        needle.length > 0 &&
+        (needle.includes(form.title.toLowerCase()) || form.title.toLowerCase().includes(needle)),
+    );
+  const title = match?.title ?? (query || "the form");
+  return {
+    response: {
+      ok: true,
+      title,
+      formId: match?.id ?? null,
+      modelHint: `Surfaced form "${title}". Briefly tell them what the form is for and any next step.`,
+    },
+    summary: `Found "${title}".`,
+    status: "success",
+  };
+}
+
 /** Every answer sample must pass; one unsafe reply cannot be majority-voted away. */
 export async function runGroundingSamples(run, count) {
   if (!Number.isInteger(count) || count < 1 || count > 9) throw new Error("grounding samples must be 1–9");

@@ -1083,6 +1083,11 @@ describe("eval canary freshness", () => {
     assert.ok(checked > 0, "expected at least one neverContain canary in sage-redteam-eval.json");
   });
 
+  it("tells Sage a supplied document title establishes which form to open", () => {
+    const prompt = buildSystemPrompt("general", { studentName: "Sam", programType: "spokes" }, "full");
+    assert.match(prompt, /name that document by its title/i);
+  });
+
   it("keeps every chat-eval neverContain canary verbatim in its role's prompt", () => {
     const cases = JSON.parse(readFileSync("config/sage-chat-eval.json", "utf8"));
     let checked = 0;
