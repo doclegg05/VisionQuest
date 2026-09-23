@@ -25,8 +25,8 @@ mock.module("@/lib/auth", {
 
 mock.module("@/lib/db", {
   namedExports: {
-    prismaAdmin: { student: { findUnique: mockFindUnique, update: mockUpdate } },
-    prisma: { student: { findUnique: mockFindUnique, update: mockUpdate } },
+    prismaAdmin: { student: { findUnique: mockFindUnique, updateMany: mockUpdate } },
+    prisma: { student: { findUnique: mockFindUnique, updateMany: mockUpdate } },
   },
 });
 
@@ -85,7 +85,7 @@ describe("POST /api/auth/mfa/backup-codes", () => {
 
     mockGetSession.mock.mockImplementation(async () => teacher);
     mockFindUnique.mock.mockImplementation(async () => accountRow());
-    mockUpdate.mock.mockImplementation(async () => undefined);
+    mockUpdate.mock.mockImplementation(async () => ({ count: 1 }));
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
     mockRateLimit.mock.mockImplementation(async () => ({
       success: true,
@@ -151,6 +151,25 @@ describe("POST /api/auth/mfa/backup-codes", () => {
     assert.deepEqual(auditActions(), ["mfa.backup_codes_regeneration_failed"]);
   });
 
+  it("returns recovery codes to only one concurrent request using the same TOTP", async () => {
+    let counter = 41;
+    mockUpdate.mock.mockImplementation(async ({ where, data }: any) => {
+      assert.equal(where.mfaEnabled, true);
+      assert.equal(where.mfaSecret, "enc:secret");
+      if (where.mfaLastUsedCounter !== counter) return { count: 0 };
+      counter = data.mfaLastUsedCounter;
+      return { count: 1 };
+    });
+    const responses = await Promise.all([
+      backupCodesRoute.POST(regenerateRequest("123456") as never),
+      backupCodesRoute.POST(regenerateRequest("123456") as never),
+    ]);
+    assert.deepEqual(responses.map((res) => res.status).sort(), [200, 401]);
+    const refused = responses.find((res) => res.status === 401)!;
+    assert.equal((await refused.json()).backupCodes, undefined);
+    assert.deepEqual(auditActions(), ["mfa.backup_codes_regenerated"]);
+  });
+
   it("replaces the stored hashes, advances the replay counter, and returns the new codes once", async () => {
     const res = await backupCodesRoute.POST(regenerateRequest("123456") as never);
     const body = (await res.json()) as { backupCodes: string[]; backupCodesRemaining: number };
@@ -160,7 +179,7 @@ describe("POST /api/auth/mfa/backup-codes", () => {
     assert.equal(body.backupCodesRemaining, 2);
     assert.deepEqual(mockVerifyTotp.mock.calls[0]?.arguments, ["enc:secret", "123456", 41]);
     assert.deepEqual(mockUpdate.mock.calls[0]?.arguments[0], {
-      where: { id: teacher.id },
+      where: { id: teacher.id, mfaEnabled: true, mfaSecret: "enc:secret", mfaLastUsedCounter: 41 },
       data: { mfaBackupCodes: ["hash:deadbeef", "hash:cafebabe"], mfaLastUsedCounter: 42 },
     });
     assert.deepEqual(auditActions(), ["mfa.backup_codes_regenerated"]);

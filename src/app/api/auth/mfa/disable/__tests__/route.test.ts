@@ -25,8 +25,8 @@ mock.module("@/lib/auth", {
 
 mock.module("@/lib/db", {
   namedExports: {
-    prismaAdmin: { student: { findUnique: mockFindUnique, update: mockUpdate } },
-    prisma: { student: { findUnique: mockFindUnique, update: mockUpdate } },
+    prismaAdmin: { student: { findUnique: mockFindUnique, updateMany: mockUpdate } },
+    prisma: { student: { findUnique: mockFindUnique, updateMany: mockUpdate } },
   },
 });
 
@@ -81,7 +81,7 @@ describe("POST /api/auth/mfa/disable", () => {
 
     mockGetSession.mock.mockImplementation(async () => teacher);
     mockFindUnique.mock.mockImplementation(async () => accountRow());
-    mockUpdate.mock.mockImplementation(async () => undefined);
+    mockUpdate.mock.mockImplementation(async () => ({ count: 1 }));
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
     mockRateLimit.mock.mockImplementation(async () => ({
       success: true,
@@ -147,6 +147,16 @@ describe("POST /api/auth/mfa/disable", () => {
     assert.deepEqual(auditActions(), ["mfa.disable_failed"]);
   });
 
+  it("refuses to disable a changed factor or reuse a concurrently spent counter", async () => {
+    mockUpdate.mock.mockImplementation(async ({ where }: any) => {
+      assert.deepEqual(where, { id: teacher.id, mfaEnabled: true, mfaSecret: "enc:secret", mfaLastUsedCounter: 41 });
+      return { count: 0 };
+    });
+    const res = await disableRoute.POST(disableRequest("123456") as never);
+    assert.equal(res.status, 401);
+    assert.deepEqual(auditActions(), []);
+  });
+
   it("checks the token against the replay counter and clears every MFA field on success", async () => {
     const res = await disableRoute.POST(disableRequest("123456") as never);
     const body = (await res.json()) as { disabled: boolean };
@@ -155,7 +165,7 @@ describe("POST /api/auth/mfa/disable", () => {
     assert.equal(body.disabled, true);
     assert.deepEqual(mockVerifyTotp.mock.calls[0]?.arguments, ["enc:secret", "123456", 41]);
     assert.deepEqual(mockUpdate.mock.calls[0]?.arguments[0], {
-      where: { id: teacher.id },
+      where: { id: teacher.id, mfaEnabled: true, mfaSecret: "enc:secret", mfaLastUsedCounter: 41 },
       data: {
         mfaSecret: null,
         mfaEnabled: false,

@@ -71,8 +71,8 @@ export const GET = withTeacherAuth(async (
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id } = await params;
-  await assertStaffCanManageStudent(session, id);
+  const { id: identifier } = await params;
+  const { id } = await assertStaffCanManageStudent(session, identifier);
   const student = await prisma.student.findUnique({
     where: { id },
     select: {
@@ -157,8 +157,8 @@ export const PUT = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id } = await params;
-  await assertStaffCanManageStudent(session, id);
+  const { id: identifier } = await params;
+  const { id } = await assertStaffCanManageStudent(session, identifier);
   const existingRecord = await ensureSpokesRecordForStudent(id);
   const body = await req.json();
 

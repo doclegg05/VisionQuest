@@ -9,8 +9,8 @@ interface RouteContext {
 }
 
 export const GET = withTeacherAuth(async (session, _req: Request, ctx: RouteContext) => {
-  const { id } = await ctx.params;
-  await assertStaffCanManageStudent(session, id);
+  const { id: identifier } = await ctx.params;
+  const { id } = await assertStaffCanManageStudent(session, identifier);
 
   const responses = await prisma.formResponse.findMany({
     where: { studentId: id },

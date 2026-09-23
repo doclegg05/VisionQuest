@@ -10,8 +10,9 @@ export function isValidUrl(url: string): boolean {
 }
 
 /**
- * Block URLs targeting internal/private network destinations.
- * Prevents SSRF via admin-configured webhooks or similar features.
+ * Lexical screening for URLs targeting internal/private network destinations.
+ * This does NOT resolve DNS or prevent rebinding/redirect SSRF. Webhook delivery
+ * must use safeOutboundPost, which validates the actual connection lookup.
  *
  * Covers IPv4 (including decimal/octal/hex encodings), IPv4-mapped IPv6,
  * and IPv6 loopback / unique-local / link-local / site-local ranges.

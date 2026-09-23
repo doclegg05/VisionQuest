@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, validateFile } from "@/lib/storage";
+import { validateUploadContent } from "@/lib/file-security";
 import { logger } from "@/lib/logger";
 import { ApiError, withAuth, badRequest, rateLimited } from "@/lib/api-error";
 import { hasActiveConsent } from "@/lib/consent";
@@ -27,12 +28,14 @@ export const POST = withAuth(async (session, req: Request) => {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
 
-  if (!file) throw badRequest("No file provided");
+  if (!(file instanceof File)) throw badRequest("No file provided");
 
   const validationError = validateFile({ size: file.size, type: file.type });
   if (validationError) throw badRequest(validationError);
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const contentError = validateUploadContent(buffer, file.type);
+  if (contentError) throw badRequest(contentError);
   // `File.name` is student-controlled and undici preserves it verbatim, so the
   // stored name must be a name and not a path — the retention archive turns
   // this column into a ZIP entry path. The gist sees the same sanitized name,

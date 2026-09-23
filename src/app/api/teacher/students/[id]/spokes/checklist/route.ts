@@ -10,8 +10,8 @@ export const POST = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id } = await params;
-  await assertStaffCanManageStudent(session, id);
+  const { id: identifier } = await params;
+  const { id } = await assertStaffCanManageStudent(session, identifier);
   const body = await req.json();
 
   if (typeof body.templateId !== "string" || !body.templateId) {

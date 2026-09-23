@@ -12,8 +12,8 @@ export const PATCH = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string; goalId: string }> },
 ) => {
-  const { id: studentId, goalId } = await params;
-  await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier, goalId } = await params;
+  const { id: studentId } = await assertStaffCanManageStudent(session, identifier);
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) {

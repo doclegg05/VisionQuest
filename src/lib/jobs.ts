@@ -105,6 +105,9 @@ interface ClaimedJob {
  *     re-check it — just decide failed vs pending based on the post-increment.
  */
 export async function claimPendingJobs(limit: number): Promise<ClaimedJob[]> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error("Job claim limit must be an integer between 1 and 100");
+  }
   return prisma.$queryRaw<ClaimedJob[]>(Prisma.sql`
     UPDATE visionquest."BackgroundJob"
     SET status = 'processing',
@@ -202,14 +205,26 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
  * Process pending jobs. Call this from a cron endpoint or inline after enqueuing.
  * Returns the number of jobs processed successfully.
  */
+// Inline requests and cron share capacity. Excess work stays durable in the DB,
+// rather than accumulating promises or claiming rows that cannot run yet.
+let activeWorkers = 0;
+const MAX_WORKERS = 4;
+async function runWorker(claim: () => Promise<ClaimedJob[]>): Promise<number> {
+  if (activeWorkers >= MAX_WORKERS) return 0;
+  activeWorkers++;
+  try {
+    return await processClaimedJobs(await claim());
+  } finally {
+    activeWorkers--;
+  }
+}
+
 export async function processJobs(limit = 10): Promise<number> {
-  const claimed = await claimPendingJobs(limit);
-  return processClaimedJobs(claimed);
+  return runWorker(() => claimPendingJobs(limit));
 }
 
 export async function processJobById(jobId: string): Promise<number> {
-  const claimed = await claimPendingJobById(jobId);
-  return processClaimedJobs(claimed);
+  return runWorker(() => claimPendingJobById(jobId));
 }
 
 // ─── Job handler registry ───────────────────────────────────────────────────

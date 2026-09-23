@@ -8,7 +8,8 @@
 import { randomUUID } from "crypto";
 import { logger } from "@/lib/logger";
 import { logAuditEvent } from "@/lib/audit";
-import type { Session } from "@/lib/api-error";
+import { isStaffRole, type Session } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { getToolByName, findToolBySlashCommand } from "./tools";
 import { validateToolArgs } from "./validation";
 import { checkToolRateLimit, rateLimitMessage } from "./rate-limit";
@@ -85,6 +86,22 @@ export async function executeAgentTool(
     );
   }
 
+  // Confirmation tokens bind a target, but do not grant lasting access to it.
+  // Re-check at execution (including delayed confirmations), not just when
+  // assembling the chat context. Never trust a student's supplied target.
+  if (targetStudentId) {
+    try {
+      if (!isStaffRole(session.role)) throw new Error("Invalid target");
+      const student = await assertStaffCanManageStudent(session, targetStudentId);
+      // This boundary accepts canonical IDs only. The shared UI guard also
+      // resolves usernames; accepting an alias here could authorize one student
+      // while a tool (or confirmation token) addresses another by primary key.
+      if (student.id !== targetStudentId) throw new Error("Invalid target");
+    } catch {
+      return errorRecord(callId, toolName, args, startedAt, "You don't have access to this student.");
+    }
+  }
+
   // Per-student per-tool rate limit — enforced BEFORE execute so a runaway
   // loop can't hammer a tool. Composes with (does not replace) the token/cost
   // quota checked upstream in the chat route. Blocked → friendly, audited
@@ -141,10 +158,9 @@ export async function executeAgentTool(
       action: `sage.tool.${toolName}`,
       targetType: "sage_conversation",
       targetId: conversationId,
-      summary: `Sage tool "${toolName}" → ${result.status}: ${result.summary}`,
+      summary: `Sage tool "${toolName}" → ${result.status}.`,
       metadata: {
         callId,
-        args: validation.args,
         status: result.status,
         targetStudentId: targetStudentId ?? null,
         actionKind: result.action?.action ?? null,
@@ -154,17 +170,16 @@ export async function executeAgentTool(
     });
 
     return { callId, tool: toolName, args: validation.args, result, startedAt, finishedAt };
-  } catch (err) {
-    logger.error("agent.executor: tool threw", {
-      toolName,
-      err: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
+    // Provider/Prisma errors can contain student records or secrets. Neither
+    // the model-visible result nor ordinary logs should receive that payload.
+    logger.error("agent.executor: tool threw", { toolName });
     return errorRecord(
       callId,
       toolName,
       args,
       startedAt,
-      err instanceof Error ? err.message : "Tool failed unexpectedly.",
+      "Tool failed unexpectedly.",
     );
   }
 }

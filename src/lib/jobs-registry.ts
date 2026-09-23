@@ -5,6 +5,7 @@
 import { registerJobHandler } from "./jobs";
 import { handlePostResponse } from "./chat/post-response";
 import { isEmailDeliveryConfigured, sendEmail } from "./email";
+import { deliverNotificationChannel } from "./notification-channel-delivery";
 import { logger } from "./logger";
 import { withStudentRlsContext } from "./rls-context";
 
@@ -48,20 +49,22 @@ registerJobHandler("send_email", async (payload) => {
     // monitoring. Throwing lets the job queue record a visible failure (and
     // surfaces the misconfiguration) instead of a phantom success.
     logger.error("Email job failed: SMTP is not configured", {
-      to,
-      subject,
       alert: "email_delivery_unconfigured",
     });
     throw new Error("Email delivery is not configured (SMTP_* env vars missing).");
   }
 
-  await sendEmail({
-    to,
-    subject,
-    text,
-    html,
-  });
+  // Transactional mail is distinct from preference-controlled notifications.
+  try {
+    await sendEmail({ to, subject, text, html });
+  } catch {
+    throw new Error("Notification channel delivery failed.");
+  }
 });
+
+// Overflow waits for the existing processor; generic errors trigger its retry
+// policy without persisting recipient, content or raw provider errors in logs.
+registerJobHandler("notification_channel_delivery", deliverNotificationChannel);
 
 registerJobHandler("sync_student_alerts", async (payload) => {
   const studentId = requireStudentId(payload, "sync_student_alerts");

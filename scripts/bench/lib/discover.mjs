@@ -314,7 +314,9 @@ export function discoverSuites(options) {
 
   let entries = [];
   try {
-    entries = readdirSync(dir, { withFileTypes: true });
+    // Runtime configs are explicitly staged by prepare-standalone-assets.mjs.
+    // A caller-provided test/root path must not trace the entire repository.
+    entries = readdirSync(/* turbopackIgnore: true */ dir, { withFileTypes: true });
   } catch {
     return { suites, errors }; // no benchmarks directory yet is not an error
   }

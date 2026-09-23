@@ -502,6 +502,19 @@ if (!SHOULD_RUN) {
     });
 
     describe("teacher role", () => {
+      it("can read fellow staff but cannot delete them through the broad read policy", async () => {
+        await asRole("teacher", fixtures.teacher, async (tx) => {
+          const staffIds = [fixtures.teacherB, fixtures.admin];
+          const visible = await tx.student.findMany({
+            where: { id: { in: staffIds } }, select: { id: true },
+          });
+          assert.equal(visible.length, 2, "advisor/staff read access must remain intact");
+          const removed = await tx.student.deleteMany({ where: { id: { in: staffIds } } });
+          // Assert within the transaction: a failed regression rolls deletion back.
+          assert.equal(removed.count, 0, "staff-readable USING must not grant DELETE access");
+        });
+      });
+
       it("sees managed students' Conversations", async () => {
         const rows = await asRole("teacher", fixtures.teacher, (tx) =>
           tx.conversation.findMany({

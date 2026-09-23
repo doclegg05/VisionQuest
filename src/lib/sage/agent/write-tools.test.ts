@@ -20,6 +20,10 @@ const mockRecordOperation = mock.fn(async () => undefined) as any;
 const mockProgressUpsert = mock.fn(async () => ({})) as any;
 const mockSubmissionFindMany = mock.fn(async () => [{ formId: "dress-code" }]) as any;
 
+mock.module("@/lib/classroom", {
+  namedExports: { assertStaffCanManageStudent: async (_session: unknown, id: string) => ({ id }) },
+});
+
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
