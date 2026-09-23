@@ -118,13 +118,13 @@ function qualifyingApplication() {
   };
 }
 
-function putSpokes(body: Record<string, unknown>) {
+function putSpokes(body: Record<string, unknown>, identifier = STUDENT_ID) {
   const req = mockRequest(`/api/teacher/students/${STUDENT_ID}/spokes`, {
     method: "PUT",
     body,
   });
   return route.PUT(req as never, {
-    params: Promise.resolve({ id: STUDENT_ID }),
+    params: Promise.resolve({ id: identifier }),
   } as never);
 }
 
@@ -143,7 +143,7 @@ describe("PUT /api/teacher/students/[id]/spokes", () => {
     mockLogAuditEvent.mock.resetCalls();
 
     mockGetSession.mock.mockImplementation(async () => session);
-    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => undefined);
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => ({ id: STUDENT_ID }));
     mockEnsureSpokesRecordForStudent.mock.mockImplementation(async () => existingRecord());
     mockApplicationFindFirst.mock.mockImplementation(async () => qualifyingApplication());
     mockSpokesRecordUpdate.mock.mockImplementation(async (args: any) => ({
@@ -161,6 +161,17 @@ describe("PUT /api/teacher/students/[id]/spokes", () => {
     const body = (await res.json()) as { error: string };
     assert.equal(body.error, "Invalid application ID.");
     assert.equal(mockSpokesRecordUpdate.mock.calls.length, 0);
+  });
+
+  it("uses the authorized row ID rather than a username that collides with another account", async () => {
+    const res = await putSpokes({
+      placementApplicationId: APPLICATION_ID,
+      unsubsidizedEmploymentAt: "2026-07-15",
+    }, "other-account-id");
+    assert.equal(res.status, 200);
+    assert.equal(mockEnsureSpokesRecordForStudent.mock.calls[0].arguments[0], STUDENT_ID);
+    assert.equal(mockApplicationFindFirst.mock.calls[0].arguments[0].where.studentId, STUDENT_ID);
+    assert.equal(mockSyncStudentAlerts.mock.calls[0].arguments[0], STUDENT_ID);
   });
 
   it("sets the link when a cuid arrives, via a student-scoped lookup", async () => {

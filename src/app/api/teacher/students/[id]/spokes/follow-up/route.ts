@@ -21,8 +21,8 @@ export const POST = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id } = await params;
-  await assertStaffCanManageStudent(session, id);
+  const { id: identifier } = await params;
+  const { id } = await assertStaffCanManageStudent(session, identifier);
   const body = await req.json();
   const checkpointMonths = parseCheckpoint(body.checkpointMonths);
   const checkedAt = parseRequiredDate(body.checkedAt);
@@ -84,8 +84,8 @@ export const DELETE = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id } = await params;
-  await assertStaffCanManageStudent(session, id);
+  const { id: identifier } = await params;
+  const { id } = await assertStaffCanManageStudent(session, identifier);
   const body = await req.json();
   const checkpointMonths = parseCheckpoint(body.checkpointMonths);
 

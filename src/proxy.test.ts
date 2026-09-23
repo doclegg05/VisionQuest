@@ -1,5 +1,8 @@
+// Match Next's server bootstrap before importing its matcher test helper.
+import "next/dist/server/node-environment-baseline";
+import { unstable_doesMiddlewareMatch as unstable_doesProxyMatch } from "next/experimental/testing/server";
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, test } from "node:test";
 import { NextRequest } from "next/server";
 import { config as proxyConfig, crawlerHeadersFor, proxy, PROXY_MATCHER } from "./proxy";
 
@@ -147,4 +150,67 @@ describe("next.config.ts security headers", () => {
     assert.equal(headers.get("X-Content-Type-Options"), "nosniff");
     assert.equal(headers.get("Referrer-Policy"), "strict-origin-when-cross-origin");
   });
+});
+
+const perimeter = { proxy, config: proxyConfig };
+
+function request(path: string, headers: Record<string, string> = {}, method = "POST") {
+  return new NextRequest(`https://vq.example${path}`, {
+    method,
+    headers: { host: "vq.example", ...headers },
+  });
+}
+
+test("dynamic file-looking paths cannot bypass the proxy", () => {
+  for (const url of ["/api/files/hostile.png", "/api/files/hostile.svg", "/teacher/hostile.jpg", "/api/favicon.ico", "/faviconXico", "/_next/image-suffix"]) {
+    assert.equal(unstable_doesProxyMatch({ config: perimeter.config, nextConfig: {}, url }), true, url);
+  }
+  for (const url of ["/_next/static/chunks/main.js", "/_next/image", "/favicon.ico"]) {
+    assert.equal(unstable_doesProxyMatch({ config: perimeter.config, nextConfig: {}, url }), false, url);
+  }
+});
+
+test("cross-origin API writes with image suffixes are rejected", () => {
+  assert.equal(perimeter.proxy(request("/api/files/hostile.png", { origin: "https://evil.example" })).status, 403);
+});
+
+test("Origin cannot be overridden by a same-host Referer", () => {
+  for (const origin of ["https://evil.example", "null", ""]) {
+    assert.equal(perimeter.proxy(request("/api/files", { origin, referer: "https://vq.example/files" })).status, 403);
+  }
+});
+
+test("same-host Origin and absent-Origin Referer fallback remain supported", () => {
+  const cases: Record<string, string>[] = [{ origin: "https://vq.example" }, { referer: "https://vq.example/files" }];
+  for (const headers of cases) {
+    assert.equal(perimeter.proxy(request("/api/files", headers)).status, 200);
+  }
+  assert.equal(perimeter.proxy(request("/api/files")).status, 403);
+});
+
+test("anonymous API reads strip forged RLS headers, even for image-looking parameters", () => {
+  const response = perimeter.proxy(request("/api/files/hostile.png", {
+    "x-vq-user-id": "victim",
+    "x-vq-role": "admin",
+    "x-vq-student-id": "victim",
+  }, "GET"));
+  for (const name of ["x-vq-user-id", "x-vq-role", "x-vq-student-id"]) {
+    assert.equal(response.headers.get(`x-middleware-request-${name}`), null);
+    assert.ok(!response.headers.get("x-middleware-override-headers")?.split(",").includes(name));
+  }
+  assert.equal(response.headers.get("X-API-Version"), "1");
+  assert.match(response.headers.get("Content-Security-Policy") ?? "", /nonce-/);
+});
+
+test("signed SMS webhook keeps its exact-path Origin exemption", () => {
+  assert.equal(proxy(request("/api/sms/inbound")).status, 200);
+  for (const path of ["/api/sms/inbound/extra", "/api/sms/inbound.png", "/api/sms/other"]) {
+    assert.equal(proxy(request(path)).status, 403, path);
+  }
+});
+
+test("file-looking gated pages still redirect unauthenticated requests", () => {
+  const response = perimeter.proxy(request("/teacher/hostile.jpg", {}, "GET"));
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get("location"), "https://vq.example/");
 });

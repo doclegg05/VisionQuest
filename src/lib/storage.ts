@@ -76,7 +76,18 @@ function shouldUseLocalDisk(): boolean {
   return IS_DEV && !s3Client;
 }
 
+function isValidStorageKey(storageKey: string): boolean {
+  return Boolean(storageKey) && !/[\\\x00-\x1f\x7f]/.test(storageKey)
+    && !path.posix.isAbsolute(storageKey) && !path.win32.isAbsolute(storageKey)
+    && storageKey.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+}
+
+function assertStorageKey(storageKey: string): void {
+  if (!isValidStorageKey(storageKey)) throw new Error("Invalid storage path");
+}
+
 function resolveStoragePath(baseDir: string, storageKey: string): string {
+  assertStorageKey(storageKey);
   const filePath = path.join(baseDir, storageKey);
   const resolved = path.resolve(filePath);
   const relative = path.relative(path.resolve(baseDir), resolved);
@@ -163,6 +174,8 @@ export function bundledCandidatePaths(storageKey: string): string[] {
 export async function downloadBundledFile(
   storageKey: string,
 ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  // Reject before fallback: basename lookup must not rescue a traversal key.
+  if (!isValidStorageKey(storageKey)) return null;
   for (const candidate of bundledCandidatePaths(storageKey)) {
     try {
       const resolved = resolveStoragePath(BUNDLED_UPLOAD_DIR, candidate);
@@ -209,6 +222,8 @@ async function findInContentDir(
       if (entry.isDirectory()) {
         const found = await search(full);
         if (found) return found;
+      } else if (!entry.isFile()) {
+        continue; // Never follow symlinks in the content fallback.
       } else if (entry.name === targetName) {
         return full; // Exact match — return immediately
       } else {
@@ -222,7 +237,9 @@ async function findInContentDir(
   const exactMatch = await search(CONTENT_DIR);
   if (exactMatch) {
     try {
-      const buffer = await fs.readFile(exactMatch);
+      // Runtime content fallback, deliberately outside automatic tracing just
+      // like CONTENT_DIR; tracing a recursive result pulls in the whole repo.
+      const buffer = await fs.readFile(/* turbopackIgnore: true */ exactMatch);
       return { buffer, mimeType: inferMimeType(exactMatch) };
     } catch {
       return null;
@@ -239,7 +256,7 @@ async function findInContentDir(
       normalizedCandidate.includes(normalizedTarget)
     ) {
       try {
-        const buffer = await fs.readFile(filePath);
+        const buffer = await fs.readFile(/* turbopackIgnore: true */ filePath);
         return { buffer, mimeType: inferMimeType(filePath) };
       } catch {
         continue;
@@ -277,7 +294,10 @@ async function readBodyToBuffer(body: unknown): Promise<Buffer> {
  * Generate a unique storage key for a file.
  */
 export function generateStorageKey(studentId: string, filename: string): string {
-  const ext = path.extname(filename);
+  assertStorageKey(studentId);
+  if (studentId.includes("/")) throw new Error("Invalid student storage namespace");
+  const rawExt = path.extname(filename).toLowerCase();
+  const ext = /^\.[a-z0-9]{1,10}$/.test(rawExt) ? rawExt : "";
   const uuid = randomUUID();
   return `${studentId}/${uuid}${ext}`;
 }
@@ -292,6 +312,7 @@ export async function uploadFile(
   buffer: Buffer,
   mimeType: string
 ): Promise<void> {
+  assertStorageKey(storageKey);
   if (shouldUseLocalDisk()) {
     const resolved = resolveStoragePath(LOCAL_UPLOAD_DIR, storageKey);
     await fs.mkdir(path.dirname(resolved), { recursive: true });
@@ -313,6 +334,7 @@ export async function uploadFile(
  * Download a file from storage.
  */
 export async function downloadFile(storageKey: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  if (!isValidStorageKey(storageKey)) return null;
   if (shouldUseLocalDisk()) {
     try {
       const resolved = resolveStoragePath(LOCAL_UPLOAD_DIR, storageKey);
@@ -375,6 +397,7 @@ export async function getPresignedDownloadUrl(
   storageKey: string,
   options: PresignedDownloadOptions = {},
 ): Promise<string | null> {
+  assertStorageKey(storageKey);
   if (process.env.USE_PRESIGNED_URLS !== "true") return null;
   if (!s3Client || !BUCKET) return null;
 
@@ -394,6 +417,7 @@ export async function getPresignedDownloadUrl(
  * Delete a file from storage.
  */
 export async function deleteFile(storageKey: string): Promise<void> {
+  assertStorageKey(storageKey);
   if (shouldUseLocalDisk()) {
     try {
       const resolved = resolveStoragePath(LOCAL_UPLOAD_DIR, storageKey);
@@ -423,6 +447,7 @@ export function isObjectStorageConfigured(): boolean {
  * guarantee (e.g. Sage ingest) must fail fast rather than guess.
  */
 export async function storageObjectExists(storageKey: string): Promise<boolean> {
+  assertStorageKey(storageKey);
   try {
     await getS3Client().send(
       new HeadObjectCommand({ Bucket: BUCKET, Key: storageKey })
@@ -447,6 +472,7 @@ const ALLOWED_TYPES = [
 ];
 
 export function validateFile(file: { size: number; type: string }): string | null {
+  if (!Number.isFinite(file.size) || file.size <= 0) return "File is empty or invalid";
   if (file.size > MAX_FILE_SIZE) return "File too large (max 10MB)";
   if (!ALLOWED_TYPES.includes(file.type)) return "File type not allowed (PDF, JPG, PNG, GIF only)";
   return null;

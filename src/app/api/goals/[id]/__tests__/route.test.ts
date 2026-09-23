@@ -26,7 +26,7 @@ const mockPathwayFindUnique = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockInvalidatePrefix = mock.fn<(prefix: string) => void>();
 const mockEnsureGoalLevelProgression = mock.fn<(...args: unknown[]) => Promise<void>>(async () => {});
 const mockUpdateProgression = mock.fn<(...args: unknown[]) => Promise<void>>(async () => {});
-const mockAssertStaffCanManageStudent = mock.fn<(...args: unknown[]) => Promise<void>>(async () => {});
+const mockAssertStaffCanManageStudent = mock.fn(async (_session: unknown, id: string) => ({ id }));
 
 function apiError(statusCode: number, message: string): Error & { statusCode: number } {
   const err = new Error(message) as Error & { statusCode: number };

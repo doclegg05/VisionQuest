@@ -5,7 +5,7 @@ import { logger } from "./logger";
 // Cache adapter interface
 //
 // The app uses InMemoryCacheAdapter by default (single-instance Render).
-// When REDIS_URL is set, swap to RedisCacheAdapter for multi-instance support.
+// Multi-instance support requires implementing a shared adapter (see below).
 // ---------------------------------------------------------------------------
 
 interface CacheAdapter {
@@ -19,6 +19,8 @@ interface CacheAdapter {
 // In-memory adapter (default) — uses node-cache
 // ---------------------------------------------------------------------------
 
+const MAX_KEYS = 10_000;
+
 class InMemoryCacheAdapter implements CacheAdapter {
   private cache: NodeCache;
 
@@ -27,7 +29,7 @@ class InMemoryCacheAdapter implements CacheAdapter {
       stdTTL: 60,
       checkperiod: 120,
       useClones: true,
-      maxKeys: 10_000,
+      maxKeys: MAX_KEYS,
     });
   }
 
@@ -36,6 +38,10 @@ class InMemoryCacheAdapter implements CacheAdapter {
   }
 
   set(key: string, value: unknown, ttlSeconds: number): void {
+    // Cache admission is optional: a full cache must not fail a successful read.
+    // node-cache checks capacity even for replacements, so remove those first.
+    this.cache.del(key);
+    if (this.cache.getStats().keys >= MAX_KEYS) return;
     this.cache.set(key, value, ttlSeconds);
   }
 
@@ -74,6 +80,9 @@ class InMemoryCacheAdapter implements CacheAdapter {
 // ---------------------------------------------------------------------------
 
 const adapter: CacheAdapter = new InMemoryCacheAdapter();
+// Promise identity acts as the generation token; invalidation detaches old work.
+// No permanent per-key generation counters (which would grow without bound).
+const inFlight = new Map<string, Promise<() => unknown>>();
 
 // ---------------------------------------------------------------------------
 // Public API — unchanged signatures, backed by adapter
@@ -143,13 +152,44 @@ export async function cached<T>(
   }
   if (hit !== undefined) return hit;
 
-  const value = await fetcher();
-  try {
-    adapter.set(key, value, ttlSeconds);
-  } catch (error) {
-    noteCacheFailure("set", error);
+  let pending = inFlight.get(key);
+  if (!pending) {
+    // Bound retained pending work too. Overflow reads bypass caching entirely.
+    if (inFlight.size >= MAX_KEYS) return fetcher();
+    pending = Promise.resolve().then(async () => {
+      const value = await fetcher();
+      if (inFlight.get(key) === pending) {
+        try {
+          adapter.set(key, value, ttlSeconds);
+        } catch (error) {
+          noteCacheFailure("set", error);
+        }
+      }
+      // Give coalesced callers independent copies using the same cloning
+      // semantics as cache hits, even if invalidation or capacity skips storage.
+      try {
+        const snapshot = new NodeCache({ checkperiod: 0, useClones: true });
+        snapshot.set("value", value);
+        return () => {
+          try {
+            return snapshot.get<T>("value");
+          } catch (error) {
+            noteCacheFailure("snapshotGet", error);
+            return value;
+          }
+        };
+      } catch (error) {
+        noteCacheFailure("snapshotSet", error);
+        return () => value;
+      }
+    }).finally(() => {
+      // An obsolete completion must not remove a newer generation's promise.
+      if (inFlight.get(key) === pending) inFlight.delete(key);
+    });
+    inFlight.set(key, pending);
   }
-  return value;
+  const readSnapshot = await pending;
+  return readSnapshot() as T;
 }
 
 /**
@@ -157,6 +197,7 @@ export async function cached<T>(
  * logged and the stale entry is left to expire on its TTL.
  */
 export function invalidate(key: string): void {
+  inFlight.delete(key);
   try {
     adapter.del(key);
   } catch (error) {
@@ -169,6 +210,9 @@ export function invalidate(key: string): void {
  * Useful for busting all of a user's cached data on writes.
  */
 export function invalidatePrefix(prefix: string): void {
+  for (const key of inFlight.keys()) {
+    if (key.startsWith(prefix)) inFlight.delete(key);
+  }
   try {
     adapter.delPrefix(prefix);
   } catch (error) {

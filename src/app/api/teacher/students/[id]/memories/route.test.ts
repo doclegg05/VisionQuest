@@ -42,6 +42,16 @@ describe("PATCH /api/teacher/students/[id]/memories", () => {
     mockLogAuditEvent.mock.resetCalls();
   });
 
+  it("scopes corrections to the resolved student rather than the raw identifier", async () => {
+    const response = await PATCH(new Request("http://localhost", {
+      method: "PATCH",
+      body: JSON.stringify({ memoryId: "cktest0000000000000000000", confidence: 0.4 }),
+    }), { params: Promise.resolve({ id: "other-account-id" }) });
+    assert.equal(response.status, 200);
+    assert.equal(mockUpdateMany.mock.calls[0].arguments[0].where.subjectId, "stu-1");
+    assert.equal(mockInvalidate.mock.calls[0].arguments[0], "chat:profile:stu-1");
+  });
+
   it("invalidates the cached student profile after a confidence correction", async () => {
     const req = new Request("http://localhost", {
       method: "PATCH",
@@ -68,6 +78,16 @@ describe("DELETE /api/teacher/students/[id]/memories", () => {
     mockUpdateMany.mock.resetCalls();
     mockInvalidate.mock.resetCalls();
     mockLogAuditEvent.mock.resetCalls();
+  });
+
+  it("scopes removals to the resolved student rather than the raw identifier", async () => {
+    const response = await DELETE(new Request("http://localhost", {
+      method: "DELETE",
+      body: JSON.stringify({ memoryId: "cktest0000000000000000000" }),
+    }), { params: Promise.resolve({ id: "other-account-id" }) });
+    assert.equal(response.status, 200);
+    assert.equal(mockUpdateMany.mock.calls[0].arguments[0].where.subjectId, "stu-1");
+    assert.equal(mockLogAuditEvent.mock.calls[0].arguments[0].metadata.studentId, "stu-1");
   });
 
   it("invalidates the cached student profile after a removal", async () => {

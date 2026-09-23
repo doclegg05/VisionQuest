@@ -85,6 +85,19 @@ describe("recordOperation", () => {
     assert.equal(auditArgs.targetId, "op-1-file-document");
   });
 
+  it("keeps private summaries and payloads out of ordinary audit logs", async () => {
+    const privateText = "Private student goal and resume details";
+    await recordOperation({
+      id: "op-private", actorType: "student", actorId: "stu-1", actorRole: "student",
+      toolName: "update_goal_status", status: "executed",
+      payload: { content: privateText }, resultSummary: privateText,
+    });
+    assert.equal(mockUpsert.mock.calls[0].arguments[0].create.resultSummary, privateText);
+    const audit = mockAudit.mock.calls[0].arguments[0];
+    assert.equal(audit.summary, "update_goal_status executed");
+    assert.ok(!JSON.stringify(audit).includes(privateText));
+  });
+
   it("persists the acted-on student when targetStudentId is provided", async () => {
     await recordOperation({
       id: "op-2-submit-form",

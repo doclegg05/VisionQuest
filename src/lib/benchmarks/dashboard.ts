@@ -421,7 +421,8 @@ export interface LoadBenchmarkDashboardOptions {
 export function loadBenchmarkDashboard(
   options: LoadBenchmarkDashboardOptions = {},
 ): BenchmarkDashboardData {
-  const repoRoot = resolve(options.repoRoot ?? process.cwd());
+  // Configs/results are explicitly staged; avoid tracing arbitrary test roots.
+  const repoRoot = resolve(/* turbopackIgnore: true */ options.repoRoot ?? process.cwd());
   const problems: string[] = [];
 
   let discovered: { suites: { name: string; path: string; config: unknown }[]; errors: string[] };

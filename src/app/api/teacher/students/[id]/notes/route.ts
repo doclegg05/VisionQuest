@@ -14,7 +14,7 @@ export const POST = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id: studentId } = await params;
+  const { id: identifier } = await params;
   const body = await req.json();
 
   const category = typeof body.category === "string" ? body.category.trim() : "general";
@@ -35,7 +35,8 @@ export const POST = withTeacherAuth(async (
     return NextResponse.json({ error: "Invalid note category." }, { status: 400 });
   }
 
-  const student = await assertStaffCanManageStudent(session, studentId);
+  const student = await assertStaffCanManageStudent(session, identifier);
+  const studentId = student.id;
 
   if (!student) {
     return NextResponse.json({ error: "Student not found." }, { status: 404 });
@@ -77,9 +78,8 @@ export const GET = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id: studentId } = await params;
-
-  await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier } = await params;
+  const { id: studentId } = await assertStaffCanManageStudent(session, identifier);
 
   const url = new URL(req.url);
   const categoryParam = url.searchParams.get("category");
@@ -122,9 +122,8 @@ export const PATCH = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id: studentId } = await params;
-
-  await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier } = await params;
+  const { id: studentId } = await assertStaffCanManageStudent(session, identifier);
 
   const body = await req.json();
 
@@ -206,9 +205,8 @@ export const DELETE = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id: studentId } = await params;
-
-  await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier } = await params;
+  const { id: studentId } = await assertStaffCanManageStudent(session, identifier);
 
   const url = new URL(req.url);
   let noteId = url.searchParams.get("noteId") ?? "";

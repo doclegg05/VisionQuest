@@ -64,7 +64,7 @@ before(async () => {
 
 function uploadRequest(filename: string) {
   const form = new FormData();
-  form.set("file", new File([new Uint8Array([1, 2, 3])], filename, { type: "application/pdf" }));
+  form.set("file", new File(["%PDF-1.7\n"], filename, { type: "application/pdf" }));
   return new Request("http://localhost:3000/api/files", { method: "POST", body: form });
 }
 

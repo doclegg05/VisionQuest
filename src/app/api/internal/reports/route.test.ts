@@ -120,6 +120,39 @@ describe("POST /api/internal/reports", () => {
     assert.equal(notification.type, "monthly_readiness_report");
   });
 
+  it("bounds readiness fanout and rejects overlapping report runs", async () => {
+    classFindManyMock.mock.mockImplementation(async () => [{
+      id: "large-class", name: "Large", enrollments: Array.from({ length: 13 }, (_, i) => ({ student: { id: `student-${i}` } })),
+    }]);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let active = 0;
+    let peak = 0;
+    fetchReadinessMock.mock.mockImplementation(async () => {
+      active++;
+      peak = Math.max(peak, active);
+      await gate;
+      active--;
+      return { readiness: { score: 50 } };
+    });
+    const pending = route.POST(request("Bearer test-cron-secret"));
+    await new Promise((resolve) => setImmediate(resolve));
+    try {
+      assert.equal(active, 4);
+      assert.equal((await route.POST(request("Bearer test-cron-secret"))).status, 409);
+    } finally { release(); }
+    assert.equal((await pending).status, 200);
+    assert.equal(peak, 4);
+    assert.equal(fetchReadinessMock.mock.callCount(), 13);
+  });
+
+  it("releases report capacity after a failed query", async () => {
+    classFindManyMock.mock.mockImplementation(async () => { throw new Error("query failed"); });
+    await assert.rejects(route.POST(request("Bearer test-cron-secret")), /query failed/);
+    classFindManyMock.mock.mockImplementation(async () => []);
+    assert.equal((await route.POST(request("Bearer test-cron-secret"))).status, 200);
+  });
+
   it("skips a class with no active students", async () => {
     classFindManyMock.mock.mockImplementation(async () => [
       { id: "class-empty", name: "Empty", enrollments: [] },

@@ -57,13 +57,13 @@ mock.module("@/lib/db", {
     prismaAdmin: {
       student: {
         findUnique: mockFindUnique,
-        update: mockUpdate,
+        updateMany: mockUpdate,
       },
     },
     prisma: {
       student: {
         findUnique: mockFindUnique,
-        update: mockUpdate,
+        updateMany: mockUpdate,
       },
     },
   },
@@ -103,7 +103,7 @@ describe("POST /api/auth/login", () => {
       resetTime: Date.now() + 60_000,
     }));
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
-    mockUpdate.mock.mockImplementation(async () => undefined);
+    mockUpdate.mock.mockImplementation(async () => ({ count: 1 }));
     mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({
       valid: true,
       needsRehash: false,
@@ -146,6 +146,28 @@ describe("POST /api/auth/login", () => {
     assert.equal(cookie.flags.httpOnly, true);
     assert.equal(cookie.flags.sameSite, "strict");
     assert.equal(cookie.flags.path, "/");
+  });
+
+  it("does not restore a legacy password over a concurrent password reset", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      id: "stu-1", studentId: "alice", role: "student", passwordHash: "old:hash",
+      isActive: true, mfaEnabled: false, sessionVersion: 1,
+    }));
+    mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({ valid: true, needsRehash: true }));
+    let storedHash = "scrypt$reset$password";
+    mockUpdate.mock.mockImplementation(async ({ where, data }: any) => {
+      assert.deepEqual(where, { id: "stu-1", passwordHash: "old:hash" });
+      if (where.passwordHash !== storedHash) return { count: 0 };
+      storedHash = data.passwordHash;
+      return { count: 1 };
+    });
+    const res = await loginRoute.POST(mockRequest("/api/auth/login", {
+      method: "POST", body: { studentId: "alice", password: "old-password" },
+    }) as never);
+    assert.equal(res.status, 401);
+    assert.equal(storedHash, "scrypt$reset$password");
+    assert.equal(cookieSets.length, 0);
+    assert.equal(mfaCookieSets.length, 0);
   });
 
   it("returns 401 with no cookie set when password is wrong", async () => {

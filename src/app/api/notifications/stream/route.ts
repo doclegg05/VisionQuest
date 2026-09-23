@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { addConnection } from "@/lib/notifications";
+import { addConnection, writeConnection } from "@/lib/notifications";
 import { withAuth } from "@/lib/api-error";
 
 const HEARTBEAT_INTERVAL = 30_000; // 30 seconds
@@ -20,6 +20,12 @@ const MAX_CONNECTS_PER_MINUTE = 10;
 export const GET = withAuth(async (session, req: Request) => {
   // Rate limit connection attempts per user
   const now = Date.now();
+  for (const [id, entry] of connectionAttempts) {
+    if (entry.resetAt <= now) connectionAttempts.delete(id);
+  }
+  if (!connectionAttempts.has(session.id) && connectionAttempts.size >= 5_000) {
+    return new Response(null, { status: 503 });
+  }
   const bucket = connectionAttempts.get(session.id);
   if (bucket && now < bucket.resetAt) {
     if (bucket.count >= MAX_CONNECTS_PER_MINUTE) {
@@ -38,11 +44,20 @@ export const GET = withAuth(async (session, req: Request) => {
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
 
-  // Register this connection
-  const cleanup = addConnection(session.id, writer);
+  const finalize = () => {
+    clearInterval(heartbeat);
+    req.signal.removeEventListener("abort", cleanup);
+  };
+  let cleanup: () => void;
+  try {
+    cleanup = addConnection(session.id, writer, finalize);
+  } catch {
+    void writer.abort().catch(() => {});
+    return new Response(null, { status: 503 });
+  }
 
-  // Send initial connected event
-  writer.write(encoder.encode(`data: ${JSON.stringify({ connected: true })}\n\n`)).catch(() => {});
+  // Send initial connected event through the same bounded writer as replay.
+  void writeConnection(writer, encoder.encode(`data: ${JSON.stringify({ connected: true })}\n\n`));
 
   // Replay missed notifications on reconnect
   if (lastId) {
@@ -51,23 +66,11 @@ export const GET = withAuth(async (session, req: Request) => {
 
   // Heartbeat to keep connection alive — also serves as disconnect detection
   const heartbeat = setInterval(() => {
-    writer.write(encoder.encode(": heartbeat\n\n")).catch(() => {
-      clearInterval(heartbeat);
-      cleanup();
-    });
+    void writeConnection(writer, encoder.encode(": heartbeat\n\n"));
   }, HEARTBEAT_INTERVAL);
 
-  const finalize = () => {
-    clearInterval(heartbeat);
-    cleanup();
-  };
-
-  req.signal.addEventListener("abort", () => {
-    writer.close().catch(() => {});
-    finalize();
-  }, { once: true });
-
-  writer.closed.catch(() => {}).finally(finalize);
+  req.signal.addEventListener("abort", cleanup, { once: true });
+  if (req.signal.aborted) cleanup();
 
   return new Response(readable, {
     headers: {
@@ -90,7 +93,7 @@ async function replayMissedNotifications(
 ): Promise<void> {
   // Find the timestamp of the last-seen notification
   const lastSeen = await prisma.notification.findUnique({
-    where: { id: lastId },
+    where: { id: lastId, studentId: userId },
     select: { createdAt: true },
   });
 
@@ -122,6 +125,6 @@ async function replayMissedNotifications(
       createdAt: n.createdAt.toISOString(),
       replayed: true,
     });
-    await writer.write(encoder.encode(`data: ${data}\n\n`));
+    if (!await writeConnection(writer, encoder.encode(`data: ${data}\n\n`))) break;
   }
 }

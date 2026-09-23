@@ -25,8 +25,8 @@ mock.module("@/lib/auth", {
 
 mock.module("@/lib/db", {
   namedExports: {
-    prismaAdmin: { student: { findUnique: mockFindUnique, update: mockUpdate } },
-    prisma: { student: { findUnique: mockFindUnique, update: mockUpdate } },
+    prismaAdmin: { student: { findUnique: mockFindUnique, updateMany: mockUpdate } },
+    prisma: { student: { findUnique: mockFindUnique, updateMany: mockUpdate } },
   },
 });
 
@@ -84,7 +84,7 @@ describe("POST /api/auth/mfa/verify", () => {
 
     mockGetSession.mock.mockImplementation(async () => teacher);
     mockFindUnique.mock.mockImplementation(async () => accountRow());
-    mockUpdate.mock.mockImplementation(async () => undefined);
+    mockUpdate.mock.mockImplementation(async () => ({ count: 1 }));
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
     mockRateLimit.mock.mockImplementation(async () => ({
       success: true,
@@ -164,6 +164,17 @@ describe("POST /api/auth/mfa/verify", () => {
     assert.equal(res.status, 401);
     assert.equal(mockUpdate.mock.callCount(), 0);
     assert.deepEqual(auditActions(), ["mfa.setup_verify_failed"]);
+  });
+
+  it("refuses verification when setup changed or another verification won", async () => {
+    mockUpdate.mock.mockImplementation(async ({ where }: any) => {
+      assert.deepEqual(where, { id: teacher.id, mfaEnabled: false, mfaSecret: "enc:secret" });
+      return { count: 0 };
+    });
+    const res = await verifyRoute.POST(verifyRequest("123456") as never);
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).backupCodes, undefined);
+    assert.deepEqual(auditActions(), []);
   });
 
   it("enables MFA, stores hashed backup codes with the counter, and returns the plaintext codes once", async () => {

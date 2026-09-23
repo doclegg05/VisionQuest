@@ -322,10 +322,11 @@ export async function getDocumentContext(
   if (getSageRagMode() === "hybrid") {
     const hybridDocs = await hybridSearchDocuments(userMessage, callerRole, maxResults, subject);
     if (hybridDocs !== null) {
-      const snippets = await loadSageSnippets();
-
       const docIds = hybridDocs.map((d) => d.id);
-      const chunksByDoc = await getBestChunks(docIds, userMessage, 2, subject);
+      const [snippets, chunksByDoc] = await Promise.all([
+        loadSageSnippets(),
+        getBestChunks(docIds, userMessage, 2, subject),
+      ]);
 
       const docEntries: ScoredEntry[] = hybridDocs.map((doc) => {
         const passages = chunksByDoc.get(doc.id);

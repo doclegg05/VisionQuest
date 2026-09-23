@@ -66,7 +66,9 @@ export async function recordOperation(params: RecordOperationParams): Promise<vo
     action: `sage_tool.${params.toolName}.${params.status}`,
     targetType: "sage_operation",
     targetId: params.id,
-    summary: params.resultSummary ?? `${params.toolName} ${params.status}`,
+    // Free-text summaries stay in the access-controlled operation ledger.
+    // Ordinary audit logs must not copy student-authored content.
+    summary: `${params.toolName} ${params.status}`,
   });
 }
 

@@ -12,7 +12,7 @@ export const POST = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id: studentId } = await params;
+  const { id: identifier } = await params;
   const body = await req.json();
 
   const title = typeof body.title === "string" ? body.title.trim() : "";
@@ -39,7 +39,8 @@ export const POST = withTeacherAuth(async (
     return NextResponse.json({ error: "Task priority is invalid." }, { status: 400 });
   }
 
-  const student = await assertStaffCanManageStudent(session, studentId);
+  const student = await assertStaffCanManageStudent(session, identifier);
+  const studentId = student.id;
 
   if (!student) {
     return NextResponse.json({ error: "Student not found." }, { status: 404 });

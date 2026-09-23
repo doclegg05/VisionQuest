@@ -13,6 +13,10 @@ const mockCertFindMany = mock.fn(async () => []) as any;
 const mockDiscoveryFindUnique = mock.fn(async () => null) as any;
 const mockRecordOperation = mock.fn(async () => undefined) as any;
 
+mock.module("@/lib/classroom", {
+  namedExports: { assertStaffCanManageStudent: async (_session: unknown, id: string) => ({ id }) },
+});
+
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
@@ -118,13 +122,15 @@ describe("propose_resume_edit", () => {
     // student-only and only staff sessions get a target threaded), so this
     // pins the invariant rather than a live flow — it is what breaks first if
     // the tool ever becomes staff-capable.
-    const record = await executeAgentTool({
+    // Test token serialization at the tool seam, not via the executor:
+    // the executor correctly rejects student-supplied targets.
+    const { getToolByName } = await import("./tools");
+    const result = await getToolByName("propose_resume_edit")!.execute(EDIT_ARGS, {
       session,
       conversationId: "conv-1",
-      toolName: "propose_resume_edit",
-      args: EDIT_ARGS,
       targetStudentId: "stu-target-1",
     });
+    const record = { result };
 
     const meta = (record.result.action?.meta ?? {}) as Record<string, unknown>;
     assert.equal(

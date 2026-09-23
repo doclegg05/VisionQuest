@@ -34,10 +34,14 @@ export const POST = withTeacherAuth(async (session) => {
   const totpUri = generateTotpUri(secret, email);
 
   // Store the encrypted secret provisionally (mfaEnabled stays false until verified)
-  await prisma.student.update({
-    where: { id: student.id },
+  const changed = await prisma.student.updateMany({
+    where: { id: student.id, mfaEnabled: false },
     data: { mfaSecret: encrypted },
   });
+
+  if (changed.count !== 1) {
+    return NextResponse.json({ error: "MFA configuration changed. Please try again." }, { status: 409 });
+  }
 
   await logAuditEvent({
     actorId: student.id,

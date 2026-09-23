@@ -164,6 +164,9 @@ const eslintConfig = defineConfig([
     // Agent worktrees (harness-managed checkouts) — repo-wide lint must not
     // walk them; they appear and vanish mid-run.
     ".claude/**",
+    // Third-party prebuilt bundles are not application source. Parsing these
+    // multi-megabyte files slows lint and reports unfixable upstream rules.
+    "prototypes/**/vendor/**",
   ]),
 ]);
 

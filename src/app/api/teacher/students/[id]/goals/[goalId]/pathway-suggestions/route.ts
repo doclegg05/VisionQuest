@@ -9,8 +9,8 @@ export const GET = withTeacherAuth(async (
   _req: Request,
   { params }: { params: Promise<{ id: string; goalId: string }> },
 ) => {
-  const { id: studentId, goalId } = await params;
-  await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier, goalId } = await params;
+  const { id: studentId } = await assertStaffCanManageStudent(session, identifier);
 
   const goal = await prisma.goal.findFirst({
     where: { id: goalId, studentId },

@@ -21,6 +21,7 @@ import { resolveSendError, resolveStreamOutcome } from "@/lib/chat/send-outcome"
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
 import { determineStage } from "@/lib/sage/stage";
+import { startGoalPolling } from "./goal-polling";
 
 interface Message {
   id: string;
@@ -214,11 +215,26 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
    */
   const [optimisticGreeting, setOptimisticGreeting] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const latestPollIdRef = useRef(0);
+  const cancelGoalPollRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(false);
   const greetingGenerationRef = useRef(0);
   const sidebarRef = useRef<HTMLDivElement>(null);
   /** Tracks whether the warmup fetch has fired this session. */
   const warmupFiredRef = useRef(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cancelGoalPollRef.current?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!goalToast) return;
+    const timer = setTimeout(() => setGoalToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [goalToast]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -325,47 +341,19 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   };
 
   const pollForGoals = useCallback((prevGoalCount: number) => {
-    const pollId = ++latestPollIdRef.current;
-    let attempts = 0;
-    const interval = setInterval(async () => {
-      if (latestPollIdRef.current !== pollId) {
-        clearInterval(interval);
-        return;
-      }
-
-      attempts++;
-      if (attempts > 5) {
-        clearInterval(interval);
-        return;
-      }
-
-      try {
-        const res = await apiFetch("/api/goals");
-        if (!res.ok) return;
-
-        if (latestPollIdRef.current !== pollId) {
-          clearInterval(interval);
-          return;
-        }
-
-        const data = await res.json();
-        if (data.goals.length > prevGoalCount) {
-          const newGoal = data.goals[data.goals.length - 1];
-          const levelLabels: Record<string, string> = {
-            bhag: "Big Hairy Audacious Goal",
-            monthly: "Monthly Goal",
-            weekly: "Weekly Goal",
-            daily: "Daily Goal",
-            task: "Action Task",
-          };
-          setGoalToast(`${levelLabels[newGoal.level] || newGoal.level} captured!`);
-          setTimeout(() => setGoalToast(null), 4000);
-          clearInterval(interval);
-        }
-      } catch {
-        // Ignore polling errors.
-      }
-    }, 3000);
+    cancelGoalPollRef.current?.();
+    // A chat response may finish after navigation has already unmounted us.
+    if (!mountedRef.current) return;
+    cancelGoalPollRef.current = startGoalPolling(prevGoalCount, (level) => {
+      const levelLabels: Record<string, string> = {
+        bhag: "Big Hairy Audacious Goal",
+        monthly: "Monthly Goal",
+        weekly: "Weekly Goal",
+        daily: "Daily Goal",
+        task: "Action Task",
+      };
+      setGoalToast(`${levelLabels[level] || level} captured!`);
+    });
   }, []);
 
   const handleSend = useCallback(
