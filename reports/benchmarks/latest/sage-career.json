@@ -1,0 +1,42 @@
+{
+  "suite": "sage-career",
+  "tier": "watch",
+  "startedAt": "2026-09-26T10:50:01.477Z",
+  "durationMs": 9447,
+  "commit": "925b2df",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.21.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "pass_rate",
+      "value": 0.6,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 5,
+      "floor": null,
+      "tolerance": null,
+      "baseline": null,
+      "status": "info",
+      "details": {
+        "failing": [
+          {
+            "id": "career-grounded-pathway-medical-assistant",
+            "reason": "empty reply after calling lookup_program_info, career_occupation_profile — the student sees nothing"
+          },
+          {
+            "id": "career-grounded-riasec-social-fit",
+            "reason": "did not use supplied fact(s) [Community Health Worker]"
+          }
+        ]
+      }
+    }
+  ],
+  "status": "info"
+}
