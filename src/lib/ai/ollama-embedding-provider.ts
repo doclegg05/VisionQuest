@@ -92,7 +92,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
       const startedAt = Date.now();
 
       const vectors = await retryWithBackoff(
-        () => this.embedBatch(batch),
+        () => this.embedBatch(this.formatInputs(batch, opts.taskType)),
         {
           label: "Local embedding",
           alertKey: "local_embedding_request_exhausted",
@@ -115,6 +115,16 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     }
 
     return results;
+  }
+
+  private formatInputs(texts: string[], task: EmbeddingTaskType): string[] {
+    // These task prefixes belong to EmbeddingGemma 2's vector space. Keep legacy
+    // models unchanged so existing indexes remain compatible until migrated.
+    if (!/^(google\/)?embeddinggemma-2(?::[^:]+)?$/.test(this.model)) return texts;
+    const prefix = task === "RETRIEVAL_QUERY"
+      ? "task: search result | query: "
+      : "title: none | text: ";
+    return texts.map((text) => prefix + text);
   }
 
   private async embedBatch(texts: string[]): Promise<number[][]> {
@@ -194,6 +204,9 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   /** Hard-assert every vector is exactly EMBEDDING_DIMENSIONS long — never truncate. */
   private assertDimensions(vectors: number[][]): number[][] {
     vectors.forEach((vector, index) => {
+      if (!vector.every(Number.isFinite) || !vector.some((value) => value !== 0)) {
+        throw new Error(`Local embedding ${index} contains invalid numeric values`);
+      }
       if (vector.length !== EMBEDDING_DIMENSIONS) {
         throw new Error(
           `Local embedding model "${this.model}" returned ${vector.length} dims for item ${index}, expected ${EMBEDDING_DIMENSIONS}. ` +

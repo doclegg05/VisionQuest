@@ -167,9 +167,9 @@ describe("admin AI provider routes", () => {
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
     mockCheckOllamaHealth.mock.mockImplementation(async () => ({
       healthy: true,
-      models: ["gemma4:26b"],
+      models: ["gemma4:12b"],
       chatValidated: true,
-      modelUsed: "gemma4:26b",
+      modelUsed: "gemma4:12b",
     }));
     mockDetectModelCapabilities.mock.mockImplementation(async () => ({
       reachable: true,
@@ -179,7 +179,7 @@ describe("admin AI provider routes", () => {
       supportsJsonOutput: true,
       contextLength: 32768,
       embedding: { reachable: true, model: "nomic-embed-text", dims: 768, matches768: true },
-      installedModels: [{ name: "gemma4:26b", likelyEmbedding: false }],
+      installedModels: [{ name: "gemma4:12b", likelyEmbedding: false }],
       warnings: [],
     }));
     mockReadLocalAiProviderConfig.mock.mockImplementation(async () => {
@@ -223,7 +223,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://10.0.0.8:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
       },
     });
 
@@ -241,7 +241,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         authMode: "none",
       },
     });
@@ -258,7 +258,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         embeddingModel: "embeddinggemma",
         authMode: "none",
       },
@@ -276,29 +276,21 @@ describe("admin AI provider routes", () => {
     );
   });
 
-  it("persists a per-role model override", async () => {
-    const req = mockRequest("/api/admin/ai-provider", {
-      method: "PUT",
-      body: {
-        provider: "local",
-        url: "http://localhost:11434",
-        model: "gemma4:26b",
-        roleModels: { extract: "gemma4:e4b" },
-        authMode: "none",
-      },
-    });
-
+  it("rejects alternate role models before writing any settings", async () => {
+    const req = mockRequest("/api/admin/ai-provider", { method: "PUT", body: {
+      provider: "local", model: "gemma4:12b", roleModels: { extract: "gemma4:26b" },
+    } });
     const res = await configRoute.PUT(req as never);
+    assert.equal(res.status, 400);
+    assert.equal(mockSetPlainConfigValue.mock.callCount(), 0);
+  });
 
-    assert.equal(res.status, 200);
-    assert.ok(
-      mockSetPlainConfigValue.mock.calls.some(
-        (call: { arguments: unknown[] }) =>
-          call.arguments[0] === "ai_provider_model_extract" &&
-          call.arguments[1] === "gemma4:e4b",
-      ),
-      "the extract role model was never written",
-    );
+  it("rejects an alternate global model before writing settings", async () => {
+    const req = mockRequest("/api/admin/ai-provider", { method: "PUT", body: {
+      provider: "local", model: "qwen3.6:latest",
+    } });
+    assert.equal((await configRoute.PUT(req as never)).status, 400);
+    assert.equal(mockSetPlainConfigValue.mock.callCount(), 0);
   });
 
   it("DELETES a role override when its field is cleared, rather than storing an empty model", async () => {
@@ -309,7 +301,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         roleModels: { extract: "" },
         authMode: "none",
       },
@@ -338,7 +330,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         authMode: "none",
       },
     });
@@ -360,7 +352,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         roleMaxOutputTokens: { document: 2048 },
         authMode: "none",
       },
@@ -385,7 +377,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         roleMaxOutputTokens: { document: null },
         authMode: "none",
       },
@@ -407,7 +399,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         roleMaxOutputTokens: { document: 999999 },
         authMode: "none",
       },
@@ -423,7 +415,7 @@ describe("admin AI provider routes", () => {
     );
     mockReadLocalAiProviderConfig.mock.mockImplementation(async () => ({
       url: "http://localhost:11434",
-      model: "gemma4:26b",
+      model: "gemma4:12b",
       embeddingModel: "nomic-embed-text",
       authMode: "none" as const,
       apiStyle: "ollama" as const,
@@ -444,24 +436,24 @@ describe("admin AI provider routes", () => {
       roleProfiles: Array<{ role: string; effectiveModel: string; label: string }>;
     };
 
-    assert.equal(body.roleModels.extract, "gemma4:e4b");
-    assert.equal(body.roleModels.chat, null);
+    assert.equal(body.roleModels.extract, "gemma4:12b");
+    assert.equal(body.roleModels.chat, "gemma4:12b");
 
     const byRole = Object.fromEntries(body.roleProfiles.map((p) => [p.role, p]));
     // The panel shows what a role will ACTUALLY use, so an unset role must
     // resolve to the main model rather than rendering blank.
-    assert.equal(byRole.extract.effectiveModel, "gemma4:e4b");
-    assert.equal(byRole.chat.effectiveModel, "gemma4:26b");
+    assert.equal(byRole.extract.effectiveModel, "gemma4:12b");
+    assert.equal(byRole.chat.effectiveModel, "gemma4:12b");
     assert.ok(byRole.chat.label.length > 0);
   });
 
-  it("reports a role model the server does not have from the connection test", async () => {
+  it("ignores a stale role override when checking installed models", async () => {
     // The typo-catch is only useful if it is actually wired into the response
     // the panel reads; deleting it from the payload previously left this suite
     // green and the operator back to discovering a bad tag hours later.
     mockGetPlainConfigValue.mock.mockImplementation(async (key: string) => {
       if (key === "ai_provider_url") return "http://localhost:11434";
-      if (key === "ai_provider_model") return "gemma4:26b";
+      if (key === "ai_provider_model") return "gemma4:12b";
       if (key === "ai_provider_model_extract") return "gemma4:e4";
       return null;
     });
@@ -471,14 +463,14 @@ describe("admin AI provider routes", () => {
       missingRoleModels?: Array<{ role: string; model: string }>;
     };
 
-    assert.deepEqual(body.missingRoleModels, [{ role: "extract", model: "gemma4:e4" }]);
+    assert.deepEqual(body.missingRoleModels, []);
   });
 
   it("reports no missing role models when every override is installed", async () => {
     mockGetPlainConfigValue.mock.mockImplementation(async (key: string) => {
       if (key === "ai_provider_url") return "http://localhost:11434";
-      if (key === "ai_provider_model") return "gemma4:26b";
-      if (key === "ai_provider_model_extract") return "gemma4:26b";
+      if (key === "ai_provider_model") return "gemma4:12b";
+      if (key === "ai_provider_model_extract") return "gemma4:12b";
       return null;
     });
 
@@ -496,7 +488,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:1234",
-        model: "local-model",
+        model: "gemma4:12b",
         authMode: "none",
         apiStyle: "openai",
       },
@@ -520,7 +512,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         authMode: "none",
       },
     });
@@ -543,7 +535,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "http://localhost:11434",
-        model: "gemma4:26b",
+        model: "gemma4:12b",
         authMode: "none",
         apiStyle: "lmstudio",
       },
@@ -559,7 +551,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "https://llm.example.com",
-        model: "gemma4:latest",
+        model: "gemma4:12b",
         authMode: "cloudflare_service_token",
         cloudflareAccessClientId: "client-id",
         cloudflareAccessClientSecret: "client-secret",
@@ -616,7 +608,7 @@ describe("admin AI provider routes", () => {
       body: {
         provider: "local",
         url: "https://llm.example.com",
-        model: "gemma4:latest",
+        model: "gemma4:12b",
         authMode: "cloudflare_service_token",
       },
     });
@@ -646,7 +638,7 @@ describe("admin AI provider routes", () => {
   it("passes auth config and model into the local AI connection test", async () => {
     mockGetPlainConfigValue.mock.mockImplementation(async (key: string) => {
       if (key === "ai_provider_url") return "https://llm.example.com";
-      if (key === "ai_provider_model") return "gemma4:latest";
+      if (key === "ai_provider_model") return "gemma4:12b";
       if (key === "ai_provider_auth_mode") return "cloudflare_service_token";
       return null;
     });
@@ -671,13 +663,13 @@ describe("admin AI provider routes", () => {
       cloudflareAccessClientId: "client-id",
       cloudflareAccessClientSecret: "client-secret",
     });
-    assert.equal((call.arguments[1] as { model?: string }).model, "gemma4:latest");
+    assert.equal((call.arguments[1] as { model?: string }).model, "gemma4:12b");
   });
 
   it("returns model capabilities alongside the existing health-check fields", async () => {
     mockGetPlainConfigValue.mock.mockImplementation(async (key: string) => {
       if (key === "ai_provider_url") return "https://llm.example.com";
-      if (key === "ai_provider_model") return "gemma4:latest";
+      if (key === "ai_provider_model") return "gemma4:12b";
       if (key === "ai_provider_embedding_model") return "nomic-embed-text";
       return null;
     });
@@ -689,7 +681,7 @@ describe("admin AI provider routes", () => {
       supportsJsonOutput: true,
       contextLength: 8192,
       embedding: { reachable: true, model: "nomic-embed-text", dims: 768, matches768: true },
-      installedModels: [{ name: "gemma4:latest", likelyEmbedding: false }],
+      installedModels: [{ name: "gemma4:12b", likelyEmbedding: false }],
       warnings: ["Tool calling not supported (/api/chat with tools returned 404)."],
     }));
 
@@ -699,9 +691,9 @@ describe("admin AI provider routes", () => {
     assert.equal(res.status, 200);
     assert.equal(mockDetectModelCapabilities.mock.callCount(), 1);
     // Existing response fields must remain intact alongside the new capabilities field.
-    assert.deepEqual(body.models, ["gemma4:26b"]);
+    assert.deepEqual(body.models, ["gemma4:12b"]);
     assert.equal(body.chatValidated, true);
-    assert.equal(body.modelUsed, "gemma4:26b");
+    assert.equal(body.modelUsed, "gemma4:12b");
     assert.ok(body.capabilities);
     assert.equal(body.capabilities.reachable, true);
     assert.equal(body.capabilities.supportsTools, false);
@@ -713,7 +705,7 @@ describe("admin AI provider routes", () => {
     const call = mockDetectModelCapabilities.mock.calls[0];
     assert.deepEqual(call.arguments[0], {
       url: "https://llm.example.com",
-      model: "gemma4:latest",
+      model: "gemma4:12b",
       embeddingModel: "nomic-embed-text",
       authConfig: {
         authMode: "none",

@@ -5,10 +5,9 @@ import {
   DEFAULT_OLLAMA_MODEL,
   readLocalAiProviderConfig,
   readLocalAiRoleMaxOutputTokensRaw,
-  readLocalAiRoleModel,
   toLocalAiAuthConfig,
 } from "./local-config";
-import { isSameModelTag, roleForTask, type AiRole } from "./roles";
+import { roleForTask, type AiRole } from "./roles";
 import { enforceCloudPolicy, isLocalOnlySensitivity } from "./lanes";
 import { getProviderClass, logAiAuditEvent } from "./audit";
 import { TokenVault, neutralizeTokenShapes, type IdentityInput } from "./deidentify";
@@ -94,44 +93,16 @@ function parseReasoningOverride(raw: string | null): boolean {
   return normalized === "on" || normalized === "true" || normalized === "1";
 }
 
-/**
- * Resolve the local model for `role` and decide how long it may stay resident.
- *
- * Two rules, both fail-safe:
- *  - An unset role override falls back to `ai_provider_model`, so a role
- *    nobody has tuned behaves exactly as it did before roles existed.
- *  - Only the model serving interactive chat gets the workday-length
- *    keep-alive. Any role resolving to a *different* model is background
- *    weight and gets the short one, so it cannot hold unified memory against
- *    the model students are waiting on. A role that resolves to the same
- *    model as chat shares chat's residency and keeps the long keep-alive —
- *    the single-model deployment is unchanged in every respect.
- */
+/** One local generative model; preserve per-job output budgets. */
 async function resolveLocalModelForRole(
   role: AiRole | null,
-  globalModel: string,
 ): Promise<{ model: string; keepAlive?: string; maxOutputTokens?: number }> {
-  if (!role) return { model: globalModel };
-
-  const [roleModel, roleMaxOutputRaw] = await Promise.all([
-    readLocalAiRoleModel(role),
-    readLocalAiRoleMaxOutputTokensRaw(role),
-  ]);
-  const model = roleModel?.trim() || globalModel;
-  // Bounded by the same parser the global cap uses, so an out-of-range or
-  // non-numeric role value falls back to the global cap rather than throwing.
-  const maxOutputTokens = parseMaxOutputTokensOverride(roleMaxOutputRaw);
-
-  if (role === "chat") return { model, maxOutputTokens };
-
-  const chatModel = (await readLocalAiRoleModel("chat"))?.trim() || globalModel;
-  // Tag equality is not string equality: Ollama resolves a bare name to its
-  // `:latest` tag, and keep_alive is applied by the server per MODEL. Treating
-  // an alias of the chat model as "different" would attach the short
-  // keep-alive to the model students are waiting on.
-  return isSameModelTag(model, chatModel)
-    ? { model, maxOutputTokens }
-    : { model, maxOutputTokens, keepAlive: OllamaProvider.SECONDARY_KEEP_ALIVE };
+  return {
+    model: DEFAULT_OLLAMA_MODEL,
+    maxOutputTokens: role
+      ? parseMaxOutputTokensOverride(await readLocalAiRoleMaxOutputTokensRaw(role))
+      : undefined,
+  };
 }
 
 async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider> {
@@ -148,7 +119,6 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
   }
   const { model, keepAlive, maxOutputTokens } = await resolveLocalModelForRole(
     role,
-    config.model || DEFAULT_OLLAMA_MODEL,
   );
   return new OllamaProvider(
     config.url,

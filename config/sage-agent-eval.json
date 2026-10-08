@@ -116,7 +116,13 @@
       "filename": "signed-dress-code.pdf",
       "gist": "SPOKES Dress Code Policy FY26, filled out and signed by the student, dated this week."
     },
-    "expectedTool": "submit_form"
+    "expectedTool": "submit_form",
+    "context": "ORIENTATION CHECKLIST:\n- orientationItemId orientation-dress-code: Signed Dress Code Policy",
+    "expectedArgs": {
+      "fileUploadId": "file-attach-1",
+      "orientationItemId": "orientation-dress-code"
+    },
+    "note": "The first-action test supplies the required record identifiers and checks them exactly; the model must not invent database IDs."
   },
   {
     "id": "submit-signed-rights",
@@ -126,7 +132,13 @@
       "filename": "rights-responsibilities-signed.pdf",
       "gist": "SPOKES Rights and Responsibilities FY26 form with student signature on the final page."
     },
-    "expectedTool": "submit_form"
+    "expectedTool": "submit_form",
+    "context": "ORIENTATION CHECKLIST:\n- orientationItemId orientation-rights-responsibilities: Signed Rights and Responsibilities",
+    "expectedArgs": {
+      "fileUploadId": "file-attach-2",
+      "orientationItemId": "orientation-rights-responsibilities"
+    },
+    "note": "The first-action test supplies the required record identifiers and checks them exactly; the model must not invent database IDs."
   },
   {
     "id": "file-cert-evidence",
@@ -163,12 +175,22 @@
   {
     "id": "job-save",
     "message": "Save that CNA job at the Beckley hospital to my list",
-    "expectedTool": "save_job"
+    "expectedTool": "save_job",
+    "context": "PREVIOUS SEARCH RESULT:\n- jobListingId job-cna-1: CNA at Beckley hospital",
+    "expectedArgs": {
+      "jobListingId": "job-cna-1"
+    },
+    "note": "The first-action test supplies the required record identifiers and checks them exactly; the model must not invent database IDs."
   },
   {
     "id": "job-save-2",
     "message": "I like the warehouse lead position you showed me \u2014 keep it for me",
-    "expectedTool": "save_job"
+    "expectedTool": "save_job",
+    "context": "PREVIOUS SEARCH RESULT:\n- jobListingId job-wh-2: Warehouse Lead at Mountaineer Distribution",
+    "expectedArgs": {
+      "jobListingId": "job-wh-2"
+    },
+    "note": "The first-action test supplies the required record identifiers and checks them exactly; the model must not invent database IDs."
   },
   {
     "id": "portfolio-add",
