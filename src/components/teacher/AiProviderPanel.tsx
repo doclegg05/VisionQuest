@@ -52,7 +52,7 @@ export default function AiProviderPanel() {
   const router = useRouter();
   const [provider, setProvider] = useState<ProviderType>("cloud");
   const [url, setUrl] = useState("");
-  const [model, setModel] = useState("gemma4:26b");
+  const model = "gemma4:12b";
   const [embeddingModel, setEmbeddingModel] = useState("nomic-embed-text");
   const [authMode, setAuthMode] = useState<LocalAuthMode>("none");
   const [apiStyle, setApiStyle] = useState<LocalApiStyle>("ollama");
@@ -141,7 +141,6 @@ export default function AiProviderPanel() {
         if (cancelled || !data) return;
         setProvider(data.provider ?? "cloud");
         setUrl(data.url ?? "");
-        setModel(data.model ?? "gemma4:26b");
         setEmbeddingModel(data.embeddingModel ?? "nomic-embed-text");
         setAuthMode(data.authMode || "none");
         setApiStyle(data.apiStyle || "ollama");
@@ -379,7 +378,6 @@ export default function AiProviderPanel() {
   const cloudflarePartial =
     (hasCloudflareClientId || hasCloudflareClientSecret) && !cloudflareConfigured;
   const installedModels = capabilities?.installedModels ?? [];
-  const chatModelOptions = installedModels.filter((m) => !m.likelyEmbedding);
   const embeddingModelOptions = installedModels.filter((m) => m.likelyEmbedding);
 
   return (
@@ -457,45 +455,22 @@ export default function AiProviderPanel() {
             <input
               id="ollama-model"
               type="text"
-              list="ollama-chat-model-options"
-              value={model}
-              onChange={(e) => {
-                setModel(e.target.value);
-                resetMessages();
-              }}
-              placeholder="gemma4:26b"
+              value="gemma4:12b"
+              readOnly
+              placeholder="gemma4:12b"
               className="field w-full px-4 py-3 text-sm"
             />
-            {chatModelOptions.length > 0 && (
-              <datalist id="ollama-chat-model-options">
-                {chatModelOptions.map((m) => (
-                  <option key={m.name} value={m.name} />
-                ))}
-              </datalist>
-            )}
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              {chatModelOptions.length > 0
-                ? "Suggestions come from models installed on your local AI server. You can still type any model name, even one not yet pulled."
-                : "Run Test Connection to see installed models as suggestions. Free text is always allowed."}
+              VisionQuest uses Gemma 4 12B for all local AI jobs.
             </p>
           </div>
 
           <details className="rounded-lg border border-[var(--line)] p-4">
             <summary className="cursor-pointer text-sm font-medium text-[var(--ink-strong)]">
-              Model per job (optional)
+              Answer length per job
             </summary>
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              Sage asks the local AI to do four different jobs. Leave a job blank to use
-              the main model above — that is the default, and often the right answer.
-              Every extra model you name stays loaded in memory alongside the others, so
-              add one only when a bake-off shows it earns its place.
-            </p>
-            <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              Compare models with{" "}
-              <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5">
-                npm run sage:model:bakeoff -- --models=a,b,c
-              </code>
-              .
+              All jobs use Gemma 4 12B. Adjust answer length below when needed.
             </p>
             <div className="mt-4 space-y-4">
               {AI_ROLES.map((role) => (
@@ -509,12 +484,8 @@ export default function AiProviderPanel() {
                   <input
                     id={`role-model-${role}`}
                     type="text"
-                    list="ollama-chat-model-options"
-                    value={roleModels[role]}
-                    onChange={(e) => {
-                      setRoleModels((prev) => ({ ...prev, [role]: e.target.value }));
-                      resetMessages();
-                    }}
+                    value="gemma4:12b"
+                    readOnly
                     placeholder={model || "Same as the main model"}
                     className="field w-full px-4 py-3 text-sm"
                   />
@@ -608,8 +579,9 @@ export default function AiProviderPanel() {
               </datalist>
             )}
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              Must return {EMBEDDING_DIMENSIONS}-dim vectors (e.g. nomic-embed-text, embeddinggemma).
-              1024-dim models like mxbai-embed-large are not supported.
+              Must return {EMBEDDING_DIMENSIONS}-dim vectors. For EmbeddingGemma 2, use
+              google/embeddinggemma-2 with the local bridge endpoint. Changing models
+              requires reindexing existing documents and memories before activating search.
             </p>
           </div>
 

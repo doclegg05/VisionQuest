@@ -40,7 +40,7 @@ mock.module("@/lib/db", {
 
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
-    embedTexts: mockEmbedTexts,
+    embedTextsWithModel: async (...args: unknown[]) => ({ vectors: await mockEmbedTexts(...args), model: "gemini-embedding-001" }),
     toVectorLiteral: (vector: number[]) => `[${vector.join(",")}]`,
   },
 });

@@ -1,21 +1,7 @@
 import { describe, it, beforeEach, before, mock } from "node:test";
 import assert from "node:assert/strict";
 
-/**
- * Per-role local model selection.
- *
- * Before roles existed, every generative call — a student's coaching turn, a
- * background goal extraction, a resume parse — was served by the single model
- * named in `ai_provider_model`. These tests pin the four properties that make
- * the per-role layer safe to turn on:
- *
- *  1. An unconfigured role behaves exactly as it did before (global model).
- *  2. A configured role gets its own model.
- *  3. FERPA routing is untouched — a role can never move a student_record
- *     call to the cloud, nor keep a public call off it.
- *  4. A background role running a SECOND model gets a short keep-alive, so it
- *     cannot hold unified memory against the model students are waiting on.
- */
+/** Local jobs are pinned to Gemma 4 12B; role output caps and cloud policy remain active. */
 
 const mockGetPlain = mock.fn<(key: string) => Promise<string | null>>();
 const mockGetConfig = mock.fn<(key: string) => Promise<string | null>>();
@@ -107,7 +93,7 @@ describe("per-role local model selection", () => {
     mockGetConfig.mock.mockImplementation(async () => null);
   });
 
-  it("uses the global model when the role has no override", async () => {
+  it("pins unconfigured roles to Gemma 4 12B", async () => {
     mockGetPlain.mock.mockImplementation(localConfig());
 
     const provider = await withoutRoleEnv(() =>
@@ -119,10 +105,10 @@ describe("per-role local model selection", () => {
     );
 
     assert.ok(provider instanceof OllamaProvider);
-    assert.equal(modelOf(provider), "gemma4:26b");
+    assert.equal(modelOf(provider), "gemma4:12b");
   });
 
-  it("uses the role's model when one is configured", async () => {
+  it("ignores a stale role model selection", async () => {
     mockGetPlain.mock.mockImplementation(
       localConfig({ ai_provider_model_extract: "gemma4:e4b" }),
     );
@@ -135,7 +121,7 @@ describe("per-role local model selection", () => {
       }),
     );
 
-    assert.equal(modelOf(provider), "gemma4:e4b");
+    assert.equal(modelOf(provider), "gemma4:12b");
   });
 
   it("leaves other roles on the global model when only one role is overridden", async () => {
@@ -151,7 +137,7 @@ describe("per-role local model selection", () => {
       }),
     );
 
-    assert.equal(modelOf(chat), "gemma4:26b");
+    assert.equal(modelOf(chat), "gemma4:12b");
   });
 
   it("honors an explicit role override on the request", async () => {
@@ -189,10 +175,10 @@ describe("per-role local model selection", () => {
       }),
     );
 
-    assert.equal(modelOf(provider), "gemma4:26b");
+    assert.equal(modelOf(provider), "gemma4:12b");
   });
 
-  it("reads the role model from the environment when SystemConfig is unset", async () => {
+  it("ignores alternate model environment overrides", async () => {
     mockGetPlain.mock.mockImplementation(localConfig());
     const previous = process.env.AI_PROVIDER_MODEL_EXTRACT;
     process.env.AI_PROVIDER_MODEL_EXTRACT = "gemma4:e2b";
@@ -202,7 +188,7 @@ describe("per-role local model selection", () => {
         task: "sage_post_response",
         sensitivity: "student_record",
       });
-      assert.equal(modelOf(provider), "gemma4:e2b");
+      assert.equal(modelOf(provider), "gemma4:12b");
     } finally {
       if (previous === undefined) delete process.env.AI_PROVIDER_MODEL_EXTRACT;
       else process.env.AI_PROVIDER_MODEL_EXTRACT = previous;
@@ -242,7 +228,7 @@ describe("per-role keep-alive (memory residency)", () => {
     assert.equal(keepAliveOf(provider), "8h");
   });
 
-  it("gives a background role on a DIFFERENT model the short keep-alive", async () => {
+  it("keeps background jobs on the same 12B model despite stale overrides", async () => {
     mockGetPlain.mock.mockImplementation(
       localConfig({
         ai_provider_model_chat: "gemma4:31b",
@@ -258,8 +244,8 @@ describe("per-role keep-alive (memory residency)", () => {
       }),
     );
 
-    assert.equal(modelOf(provider), "gemma4:e4b");
-    assert.equal(keepAliveOf(provider), OllamaProvider.SECONDARY_KEEP_ALIVE);
+    assert.equal(modelOf(provider), "gemma4:12b");
+    assert.equal(keepAliveOf(provider), "8h");
     assert.notEqual(OllamaProvider.SECONDARY_KEEP_ALIVE, "8h");
   });
 
@@ -276,7 +262,7 @@ describe("per-role keep-alive (memory residency)", () => {
       }),
     );
 
-    assert.equal(modelOf(provider), "gemma4:26b");
+    assert.equal(modelOf(provider), "gemma4:12b");
     assert.equal(keepAliveOf(provider), "8h");
   });
 
@@ -299,11 +285,11 @@ describe("per-role keep-alive (memory residency)", () => {
       }),
     );
 
-    assert.equal(modelOf(provider), "gemma4");
+    assert.equal(modelOf(provider), "gemma4:12b");
     assert.equal(keepAliveOf(provider), "8h");
   });
 
-  it("compares against the chat role's model, not the global default", async () => {
+  it("pins both global and chat overrides to 12B", async () => {
     // chat is overridden and extract is not: extract resolves to the GLOBAL
     // model, which differs from chat's — so it is secondary weight.
     mockGetPlain.mock.mockImplementation(
@@ -318,8 +304,8 @@ describe("per-role keep-alive (memory residency)", () => {
       }),
     );
 
-    assert.equal(modelOf(provider), "gemma4:26b");
-    assert.equal(keepAliveOf(provider), OllamaProvider.SECONDARY_KEEP_ALIVE);
+    assert.equal(modelOf(provider), "gemma4:12b");
+    assert.equal(keepAliveOf(provider), "8h");
   });
 });
 

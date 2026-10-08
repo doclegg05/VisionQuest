@@ -18,7 +18,7 @@
 
 import { FORMS, FORM_CATEGORIES, canViewForm, hasDownloadableFormDocument } from "@/lib/spokes/forms";
 import type { SpokesForm } from "@/lib/spokes/forms";
-import { embedQuery, embedTexts } from "@/lib/ai/embeddings";
+import { embedTextsWithModel } from "@/lib/ai/embeddings";
 import { logger } from "@/lib/logger";
 import { siblingScoreDelta } from "@/lib/spokes/form-sibling-rules";
 
@@ -123,35 +123,32 @@ export function keywordScore(query: string, form: SpokesForm): number {
   return Math.min(1, base + titleBoost);
 }
 
-// ---- Form embedding cache (one batch call per process) ----------------------
+// ---- Cache is keyed by the model that actually generated the query. ----
+const formEmbeddingCache = new Map<string, Promise<Map<string, number[]> | null>>();
 
-let formEmbeddingCache: Map<string, number[]> | null = null;
-let formEmbeddingInit: Promise<Map<string, number[]> | null> | null = null;
-
-async function getFormEmbeddings(): Promise<Map<string, number[]> | null> {
-  if (formEmbeddingCache) return formEmbeddingCache;
-  if (!formEmbeddingInit) {
-    formEmbeddingInit = (async () => {
-      try {
-        const vectors = await embedTexts(
-          FORMS.map(embeddingTextFor),
-          { taskType: "RETRIEVAL_DOCUMENT", usage: { callSite: "sage_form_search_index" } },
-        );
-        const map = new Map<string, number[]>();
-        FORMS.forEach((form, i) => map.set(form.id, vectors[i]));
-        formEmbeddingCache = map;
-        return map;
-      } catch (error) {
-        logger.warn("Form embedding index unavailable; keyword-only search", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Reset so a later call can retry (e.g. transient API outage).
-        formEmbeddingInit = null;
-        return null;
-      }
-    })();
-  }
-  return formEmbeddingInit;
+async function getFormEmbeddings(queryModel: string): Promise<Map<string, number[]> | null> {
+  const cached = formEmbeddingCache.get(queryModel);
+  if (cached) return cached;
+  const pending = (async () => {
+    try {
+      const { vectors, model } = await embedTextsWithModel(
+        FORMS.map(embeddingTextFor),
+        { taskType: "RETRIEVAL_DOCUMENT", usage: { callSite: "sage_form_search_index" } },
+      );
+      if (model !== queryModel) throw new Error("Embedding model changed during form indexing");
+      return new Map(FORMS.map((form, i) => [form.id, vectors[i]]));
+    } catch (error) {
+      formEmbeddingCache.delete(queryModel);
+      logger.warn("Form embedding index unavailable; keyword-only search", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  })();
+  // Retain only the current generation, including its in-flight initialization.
+  formEmbeddingCache.clear();
+  formEmbeddingCache.set(queryModel, pending);
+  return pending;
 }
 
 /** Cosine similarity for already-L2-normalized vectors == dot product. */
@@ -186,26 +183,27 @@ export async function searchForms(params: {
   for (const form of visible) keyword.set(form.id, keywordScore(query, form));
 
   let semantic: Map<string, number> | null = null;
-  const formEmbeddings = await getFormEmbeddings();
-  if (formEmbeddings) {
-    try {
-      const queryVec = await embedQuery(query, {
+  try {
+    const { vectors: [queryVec], model } = await embedTextsWithModel([query], {
+      taskType: "RETRIEVAL_QUERY",
+      usage: {
         callSite: "sage_form_search_query",
         studentId: params.studentId ?? null,
         sensitivity: params.studentId ? "student_record" : "staff_entered",
-      });
+      },
+    });
+    const formEmbeddings = await getFormEmbeddings(model);
+    if (formEmbeddings) {
       semantic = new Map<string, number>();
       for (const form of visible) {
         const vec = formEmbeddings.get(form.id);
-        // Cosine is in [-1,1]; clamp the negative tail to 0 for blending.
         semantic.set(form.id, vec ? Math.max(0, dot(queryVec, vec)) : 0);
       }
-    } catch (error) {
-      logger.warn("Form query embedding failed; keyword-only ranking", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      semantic = null;
     }
+  } catch (error) {
+    logger.warn("Form query embedding failed; keyword-only ranking", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   const method: FormSearchResult["method"] = semantic ? "hybrid" : "keyword";
@@ -227,6 +225,5 @@ export async function searchForms(params: {
 
 /** Test seam: reset the in-process embedding cache. */
 export function __resetFormEmbeddingCache(): void {
-  formEmbeddingCache = null;
-  formEmbeddingInit = null;
+  formEmbeddingCache.clear();
 }
