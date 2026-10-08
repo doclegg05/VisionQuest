@@ -812,7 +812,7 @@ const lookupProgramInfo: AgentTool = {
 const classifyAttachment: AgentTool = {
   name: "classify_attachment",
   description:
-    "Inspect a file the user uploaded in chat (image or PDF) and identify what it is — certificate, form, resume, receipt, etc. — plus extracted fields like the credential/form title, issuer, date, and whether it looks completed. Use the fileUploadId from the attached-files context.",
+    "Inspect an uploaded image or PDF when the user asks what it is, or its kind or needed fields are unknown. Extract the credential/form title, issuer, date, and whether it looks completed. Use the fileUploadId from the attached-files context. This is not a prerequisite for filing: when the user explicitly asks to submit a signed orientation form, file a document or certification evidence, or add a known item to their portfolio, call submit_form, file_document, or add_portfolio_item directly using the supplied identifiers. Those tools enforce their own validation and confirmation requirements.",
   parameters: {
     type: "object",
     properties: {
