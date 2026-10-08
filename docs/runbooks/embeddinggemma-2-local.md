@@ -157,3 +157,19 @@ consistency, matches three of three synthetic retrieval cases, checks the restri
 model list, and rejects a 26B chat request. The bridge also returned `Ready` from a
 real Gemma 4 12B chat request. These are synthetic integration checks, not a production
 Sage quality benchmark or an end-to-end authenticated UI test.
+
+### Tool-evaluation context correction
+
+The original first-tool benchmark scored 33/45 (73.3%) after the routing-guidance
+fix, below its 75% floor. Four cases expected `submit_form` or `save_job` without
+providing required database identifiers. Controlled paired runs selected lookups
+without those IDs and the correct action with exact IDs when context was supplied.
+The runner also overwrote scenario context whenever an attachment was present.
+
+The corrected protocol retains all 45 gating cases and the 75% floor. It supplies
+the missing checklist/search-result IDs for those four cases, preserves context
+alongside attachments, and requires exact identifier arguments as well as the tool
+name. It executes no real handlers. Results from this corrected protocol must be
+labeled separately from the original benchmark; a score increase after the fixture
+repair is not solely a model or prompt improvement. Fresh production-prompt checks
+and the original failures remain part of the acceptance evidence.
