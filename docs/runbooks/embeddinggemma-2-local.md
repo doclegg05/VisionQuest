@@ -62,11 +62,13 @@ Hosted activation needs deployment of these changes, an explicitly approved secu
 route to this bridge, and corpus migration. The bridge deliberately binds only to
 127.0.0.1 and has no public authentication layer. No tunnel or production config was changed.
 
-Use a separate VisionQuest destination approved by the owner. Historical local-AI
-settings and scripts point at LeggAI infrastructure; they are not authorization to
-reuse that hostname, tunnel, or credentials. The separate domain/hostname decision
-is still pending. Do not migrate a domain's nameservers or select a paid plan as an
-incidental step in this activation.
+Keep the public app at `https://visionquest.onrender.com`. Render's assigned app
+hostname does not itself provide connectivity to the Mac, and we do not control
+`onrender.com` DNS. A separate persistent backend transport is still pending a
+decision. It must work without purchasing a domain. Historical local-AI settings
+and scripts point at LeggAI infrastructure; they are not authorization to reuse
+that hostname, tunnel, or credentials. Do not migrate a domain's nameservers,
+create a new networking service, or select a paid plan as an incidental step.
 
 ## Existing-index compatibility
 
