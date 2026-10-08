@@ -62,6 +62,12 @@ Hosted activation needs deployment of these changes, an explicitly approved secu
 route to this bridge, and corpus migration. The bridge deliberately binds only to
 127.0.0.1 and has no public authentication layer. No tunnel or production config was changed.
 
+Use a separate VisionQuest destination approved by the owner. Historical local-AI
+settings and scripts point at LeggAI infrastructure; they are not authorization to
+reuse that hostname, tunnel, or credentials. The separate domain/hostname decision
+is still pending. Do not migrate a domain's nameservers or select a paid plan as an
+incidental step in this activation.
+
 ## Existing-index compatibility
 
 768 dimensions match the database column width, but **do not make different models'

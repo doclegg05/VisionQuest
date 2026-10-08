@@ -71,7 +71,7 @@ function applyEdit(
 const proposeResumeEdit: AgentTool = {
   name: "propose_resume_edit",
   description:
-    "Propose an edit to one section of the student's resume (headline, objective, skills, or references). The student sees exactly what would change and must confirm before anything is saved.",
+    "Propose an edit to one section of the student's resume (headline, objective, skills, or references). Use directly when the student supplies the text or skills to append or replace. This tool loads the current resume; a portfolio review is not required first. The student sees exactly what would change and must confirm before anything is saved.",
   parameters: {
     type: "object",
     properties: {
@@ -313,7 +313,7 @@ const analyzeJobMatch: AgentTool = {
 const lookupSavedJobs: AgentTool = {
   name: "lookup_saved_jobs",
   description:
-    "List the jobs the student has saved and their pipeline status. Call this to find the jobListingId for analyze_job_match, prepare_for_interview, generate_cover_letter, or update_application_status, or when the student asks about jobs they're tracking.",
+    "List the jobs the student has saved and their pipeline status. Call when the student asks about jobs they're tracking, or when a job action needs a jobListingId that is missing from the conversation context. When the matching jobListingId is already supplied, call the requested job action directly.",
   parameters: { type: "object", properties: {} },
   slashCommand: {
     command: "/myjobs",
