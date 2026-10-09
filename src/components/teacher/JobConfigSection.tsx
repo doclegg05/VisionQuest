@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { Briefcase, ArrowClockwise } from "@phosphor-icons/react";
 import { DEFAULT_JOB_SOURCES, JOB_SOURCE_OPTIONS, getJobSourceMode } from "@/lib/job-board/source-options";
 import type { JobScrapeRunStatusResult, JobSourceHealthResult } from "@/lib/job-board/types";
@@ -121,6 +121,9 @@ export function JobConfigSection() {
   const [sources, setSources] = useState<string[]>([...DEFAULT_JOB_SOURCES]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [localJobPriority, setLocalJobPriority] = useState<LocalJobPriority>("prefer_local");
+  const classSelectId = useId();
+  const regionId = useId();
+  const radiusId = useId();
   const scrapeInProgress = scrapeRun?.status === "queued" || scrapeRun?.status === "processing";
   const failedSources = scrapeRun?.sourceResults
     .filter((source) => source.status === "failed")
@@ -278,8 +281,9 @@ export function JobConfigSection() {
     <div className="space-y-6">
       {/* Class selector */}
       <div>
-        <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">Class</label>
+        <label htmlFor={classSelectId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">Class</label>
         <select
+          id={classSelectId}
           value={selectedClassId}
           onChange={(e) => setSelectedClassId(e.target.value)}
           className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-xs"
@@ -470,10 +474,11 @@ export function JobConfigSection() {
           {/* Config form */}
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
+              <label htmlFor={regionId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
                 Region
               </label>
               <input
+                id={regionId}
                 type="text"
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
@@ -483,10 +488,11 @@ export function JobConfigSection() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
+              <label htmlFor={radiusId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
                 Search Radius
               </label>
               <select
+                id={radiusId}
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value))}
                 className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm"
@@ -559,7 +565,7 @@ export function JobConfigSection() {
                             <button
                               type="button"
                               onClick={() => toggleSource(opt.value)}
-                              className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                              className={`inline-flex items-center pointer-coarse:min-h-11 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
                                 sources.includes(opt.value)
                                   ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
                                   : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-muted)]"

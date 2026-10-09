@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 interface MfaStatusResponse {
   enabled: boolean;
@@ -39,6 +39,8 @@ export default function StaffMfaPanel() {
   const [pendingAction, setPendingAction] = useState<ConfirmAction>(null);
   const [revealedBackupCodes, setRevealedBackupCodes] = useState<string[]>([]);
   const [busyAction, setBusyAction] = useState<"setup" | "verify" | "disable" | "regenerate" | "copy" | null>(null);
+  const setupCodeId = useId();
+  const confirmCodeId = useId();
 
   const backupCodeText = useMemo(
     () => formatBackupCodeText(revealedBackupCodes),
@@ -291,13 +293,17 @@ export default function StaffMfaPanel() {
                 </p>
                 <textarea
                   readOnly
+                  aria-label="Setup link"
                   value={setupUri}
                   className="mt-3 min-h-24 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-xs text-[var(--ink-muted)]"
                 />
               </div>
               <div>
-                <p className="text-sm font-semibold text-[var(--ink-strong)]">Step 2: Enter the 6-digit code</p>
+                <label htmlFor={setupCodeId} className="block text-sm font-semibold text-[var(--ink-strong)]">
+                  Step 2: Enter the 6-digit code
+                </label>
                 <input
+                  id={setupCodeId}
                   type="text"
                   inputMode="numeric"
                   value={verificationToken}
@@ -363,12 +369,13 @@ export default function StaffMfaPanel() {
 
         {enabled && pendingAction && (
           <div className="mt-5 rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
-            <p className="text-sm font-semibold text-[var(--ink-strong)]">
+            <label htmlFor={confirmCodeId} className="block text-sm font-semibold text-[var(--ink-strong)]">
               {pendingAction === "disable"
                 ? "Enter a current 6-digit code to disable MFA"
                 : "Enter a current 6-digit code to generate a fresh set of backup codes"}
-            </p>
+            </label>
             <input
+              id={confirmCodeId}
               type="text"
               inputMode="numeric"
               value={confirmToken}

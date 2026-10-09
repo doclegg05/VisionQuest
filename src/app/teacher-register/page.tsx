@@ -218,7 +218,7 @@ export default function StaffRegisterPage() {
           <div className="mt-6 text-center">
             <Link
               href="/"
-              className="text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+              className="inline-flex items-center pointer-coarse:min-h-11 text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
             >
               Back to student sign-in
             </Link>

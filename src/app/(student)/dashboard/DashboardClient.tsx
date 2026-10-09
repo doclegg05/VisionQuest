@@ -386,7 +386,7 @@ export default function DashboardClient({
                 Appointments and follow-ups.
               </p>
             </div>
-            <Link href="/appointments" prefetch={false} className="text-sm font-semibold text-[var(--accent-green)]">
+            <Link href="/appointments" prefetch={false} className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-green)]">
               Open
             </Link>
           </div>
