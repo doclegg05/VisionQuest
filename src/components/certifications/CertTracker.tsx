@@ -238,9 +238,9 @@ export default function CertTracker() {
                   {req.needsVerify && (
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       req.verifiedBy
-                        ? "bg-green-50 text-green-700"
+                        ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
                         : req.completed
-                          ? "bg-yellow-50 text-yellow-600"
+                          ? "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"
                           : "bg-[var(--surface-soft)] text-[var(--ink-faint)]"
                     }`}>
                       {req.verifiedBy ? "Verified" : req.completed ? "Pending verification" : "Needs verification"}
@@ -253,7 +253,7 @@ export default function CertTracker() {
                           href={`/api/files/download?id=${req.fileId}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex min-h-11 items-center text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100"
+                          className="inline-flex min-h-11 items-center text-xs px-2 py-0.5 rounded-full bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] hover:bg-[var(--badge-info-bg)]/70"
                         >
                           View file
                         </a>
