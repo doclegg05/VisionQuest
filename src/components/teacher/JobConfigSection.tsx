@@ -124,6 +124,7 @@ export function JobConfigSection() {
   const classSelectId = useId();
   const regionId = useId();
   const radiusId = useId();
+  const sourcesId = useId();
   const scrapeInProgress = scrapeRun?.status === "queued" || scrapeRun?.status === "processing";
   const failedSources = scrapeRun?.sourceResults
     .filter((source) => source.status === "failed")
@@ -520,7 +521,7 @@ export function JobConfigSection() {
                     htmlFor={`localJobPriority-${opt.value}`}
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                       localJobPriority === opt.value
-                        ? "border-[var(--primary)] bg-[var(--primary)]/10"
+                        ? "border-[var(--accent-blue)] bg-[var(--badge-info-bg)]"
                         : "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--ink-muted)]"
                     }`}
                   >
@@ -547,11 +548,11 @@ export function JobConfigSection() {
             </fieldset>
 
             <div>
-              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-2">
+              <p id={sourcesId} className="text-sm font-medium text-[var(--ink-strong)] block mb-2">
                 Job Sources
-              </label>
+              </p>
               <CareerOneStopUnconfiguredNotice sources={sources} sourceHealth={sourceHealth} />
-              <div className="mt-2 grid gap-3 lg:grid-cols-3">
+              <div role="group" aria-labelledby={sourcesId} className="mt-2 grid gap-3 lg:grid-cols-3">
                 {SOURCE_GROUPS.map((group) => (
                   <div key={group.mode} className="rounded-lg border border-[var(--border)] p-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
@@ -565,9 +566,10 @@ export function JobConfigSection() {
                             <button
                               type="button"
                               onClick={() => toggleSource(opt.value)}
+                              aria-pressed={sources.includes(opt.value)}
                               className={`inline-flex items-center pointer-coarse:min-h-11 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
                                 sources.includes(opt.value)
-                                  ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
+                                  ? "bg-[var(--badge-info-bg)] border-[var(--accent-blue)] text-[var(--badge-info-text)]"
                                   : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-muted)]"
                               }`}
                             >
