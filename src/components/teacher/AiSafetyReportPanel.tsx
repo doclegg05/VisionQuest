@@ -41,9 +41,9 @@ function escapeHtml(value: string) {
 }
 
 function statusClass(status: ControlStatus) {
-  if (status === "pass") return "bg-emerald-100 text-emerald-700";
-  if (status === "warn") return "bg-amber-100 text-amber-800";
-  return "bg-sky-100 text-sky-800";
+  if (status === "pass") return "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]";
+  if (status === "warn") return "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]";
+  return "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]";
 }
 
 function statusLabel(status: ControlStatus) {
@@ -121,7 +121,7 @@ export default function AiSafetyReportPanel() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-text)]">
           {error}
         </div>
       )}

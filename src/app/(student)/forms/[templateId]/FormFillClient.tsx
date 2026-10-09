@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -64,7 +64,7 @@ export default function FormFillClient({ templateId }: { templateId: string }) {
     return (
       <div className="page-shell space-y-3">
         <p className="text-sm text-[var(--error)]">{error}</p>
-        <Link href="/forms" className="text-sm text-[var(--accent-green)]">
+        <Link href="/forms" className="inline-flex min-h-11 items-center text-sm text-[var(--accent-green)]">
           ← Back to forms
         </Link>
       </div>
@@ -143,7 +143,7 @@ export default function FormFillClient({ templateId }: { templateId: string }) {
   return (
     <div className="page-shell space-y-5">
       <div>
-        <Link href="/forms" className="text-sm text-[var(--accent-green)]">
+        <Link href="/forms" className="inline-flex min-h-11 items-center text-sm text-[var(--accent-green)]">
           ← Back to forms
         </Link>
         <h1 className="mt-2 font-display text-3xl text-[var(--ink-strong)]">{template.title}</h1>
@@ -254,30 +254,40 @@ interface FieldInputProps {
   disabled: boolean;
 }
 
+interface FieldWidgetProps extends FieldInputProps {
+  /** The control the field's visible label points at. */
+  inputId: string;
+  /** The visible label's id, for widgets that are a group of controls. */
+  labelId: string;
+}
+
 function FieldInput({ field, value, onChange, disabled }: FieldInputProps) {
+  const inputId = useId();
+  const labelId = `${inputId}-label`;
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 space-y-2">
-      <label className="block">
-        <span className="text-sm font-semibold text-[var(--ink-strong)]">
+      <div>
+        <label id={labelId} htmlFor={inputId} className="block text-sm font-semibold text-[var(--ink-strong)]">
           {field.label}
           {field.required && <span className="ml-1 text-[var(--accent-red)]">*</span>}
-        </span>
+        </label>
         {field.helpText && (
           <span className="mt-0.5 block text-xs text-[var(--ink-muted)]">{field.helpText}</span>
         )}
         <div className="mt-2">
-          <FieldWidget field={field} value={value} onChange={onChange} disabled={disabled} />
+          <FieldWidget field={field} value={value} onChange={onChange} disabled={disabled} inputId={inputId} labelId={labelId} />
         </div>
-      </label>
+      </div>
     </div>
   );
 }
 
-function FieldWidget({ field, value, onChange, disabled }: FieldInputProps) {
+function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: FieldWidgetProps) {
   switch (field.type) {
     case "text":
       return (
         <input
+          id={inputId}
           type="text"
           value={typeof value === "string" ? value : ""}
           maxLength={field.maxLength}
@@ -289,6 +299,7 @@ function FieldWidget({ field, value, onChange, disabled }: FieldInputProps) {
     case "longText":
       return (
         <textarea
+          id={inputId}
           value={typeof value === "string" ? value : ""}
           maxLength={field.maxLength}
           disabled={disabled}
@@ -300,6 +311,7 @@ function FieldWidget({ field, value, onChange, disabled }: FieldInputProps) {
     case "number":
       return (
         <input
+          id={inputId}
           type="number"
           value={typeof value === "number" ? value : ""}
           min={field.min}
@@ -314,6 +326,7 @@ function FieldWidget({ field, value, onChange, disabled }: FieldInputProps) {
     case "date":
       return (
         <input
+          id={inputId}
           type="date"
           value={typeof value === "string" ? value : ""}
           disabled={disabled}
@@ -324,6 +337,7 @@ function FieldWidget({ field, value, onChange, disabled }: FieldInputProps) {
     case "select":
       return (
         <select
+          id={inputId}
           value={typeof value === "string" ? value : ""}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value || undefined)}
@@ -340,7 +354,7 @@ function FieldWidget({ field, value, onChange, disabled }: FieldInputProps) {
     case "multiselect": {
       const selected = Array.isArray(value) ? value : [];
       return (
-        <div className="flex flex-wrap gap-3">
+        <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-3">
           {field.options.map((option) => (
             <label key={option} className="inline-flex items-center gap-2 text-sm">
               <input
@@ -364,6 +378,7 @@ function FieldWidget({ field, value, onChange, disabled }: FieldInputProps) {
       return (
         <label className="inline-flex items-center gap-2 text-sm">
           <input
+            id={inputId}
             type="checkbox"
             checked={Boolean(value)}
             disabled={disabled}
@@ -374,16 +389,18 @@ function FieldWidget({ field, value, onChange, disabled }: FieldInputProps) {
       );
     case "attachment":
       return (
-        <AttachmentField value={value} disabled={disabled} onChange={onChange} />
+        <AttachmentField inputId={inputId} value={value} disabled={disabled} onChange={onChange} />
       );
   }
 }
 
 function AttachmentField({
+  inputId,
   value,
   disabled,
   onChange,
 }: {
+  inputId: string;
   value: Answers[string] | undefined;
   disabled: boolean;
   onChange: (value: Answers[string] | undefined) => void;
@@ -423,6 +440,7 @@ function AttachmentField({
       )}
       {!disabled && (
         <input
+          id={inputId}
           type="file"
           onChange={(event) => {
             const file = event.target.files?.[0];

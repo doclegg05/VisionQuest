@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CERTIFICATIONS } from "@/lib/spokes/certifications";
 import { PLATFORMS } from "@/lib/spokes/platforms";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface PathwayView {
   id: string;
@@ -35,6 +36,7 @@ export default function PathwayManager() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const fetchPathways = useCallback(async () => {
     try {
@@ -116,10 +118,16 @@ export default function PathwayManager() {
   }
 
   async function handleDelete(p: PathwayView) {
-    const msg = p.goalCount > 0
-      ? `This pathway is linked to ${p.goalCount} goal(s). It will be deactivated instead of deleted. Continue?`
-      : "Delete this pathway? This cannot be undone.";
-    if (!confirm(msg)) return;
+    // A linked pathway is only deactivated, which the Activate button undoes.
+    const confirmed = p.goalCount > 0
+      ? await confirm({
+          title: "Deactivate this pathway?",
+          message: `This pathway is linked to ${p.goalCount} goal(s). It will be deactivated instead of deleted.`,
+          confirmLabel: "Deactivate",
+          destructive: false,
+        })
+      : await confirm({ title: "Delete this pathway?", message: "This cannot be undone.", confirmLabel: "Delete" });
+    if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/teacher/pathways/${p.id}`, { method: "DELETE" });
@@ -151,8 +159,8 @@ export default function PathwayManager() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
-        <button onClick={fetchPathways} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
+        <button onClick={fetchPathways} className="primary-button px-4 py-2 rounded-lg">
           Try Again
         </button>
       </div>
@@ -187,35 +195,35 @@ export default function PathwayManager() {
                 )}
                 <div className="flex flex-wrap gap-2 mt-2">
                   {p.certifications.length > 0 && (
-                    <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">
+                    <span className="text-xs bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-1.5 py-0.5 rounded">
                       {p.certifications.length} cert{p.certifications.length !== 1 ? "s" : ""}
                     </span>
                   )}
                   {p.platforms.length > 0 && (
-                    <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                    <span className="text-xs bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-1.5 py-0.5 rounded">
                       {p.platforms.length} platform{p.platforms.length !== 1 ? "s" : ""}
                     </span>
                   )}
                   {p.estimatedWeeks > 0 && (
-                    <span className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded">
+                    <span className="text-xs bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-1.5 py-0.5 rounded">
                       ~{p.estimatedWeeks} week{p.estimatedWeeks !== 1 ? "s" : ""}
                     </span>
                   )}
                   {p.goalCount > 0 && (
-                    <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">
+                    <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">
                       {p.goalCount} goal{p.goalCount !== 1 ? "s" : ""} linked
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex gap-1.5 shrink-0">
-                <button onClick={() => handleToggleActive(p)} className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] px-2 py-1">
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => handleToggleActive(p)} className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] px-2 py-1">
                   {p.active ? "Deactivate" : "Activate"}
                 </button>
-                <button onClick={() => startEdit(p)} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1">
+                <button onClick={() => startEdit(p)} className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-info-text)] hover:underline px-2 py-1">
                   Edit
                 </button>
-                <button onClick={() => handleDelete(p)} className="text-xs text-red-500 hover:text-red-700 px-2 py-1">
+                <button onClick={() => handleDelete(p)} className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-error-text)] hover:underline px-2 py-1">
                   Delete
                 </button>
               </div>
@@ -231,37 +239,43 @@ export default function PathwayManager() {
           </h3>
 
           {formError && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{formError}</p>
+            <p className="text-sm text-[var(--badge-error-text)] bg-[var(--badge-error-bg)] rounded-lg px-3 py-2">{formError}</p>
           )}
 
-          <input
-            type="text"
-            placeholder="Pathway name (e.g., 'Office Administration')"
-            value={form.label}
-            onChange={(e) => setForm({ ...form, label: e.target.value })}
-            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-[var(--ink-muted)]">Pathway name</span>
+            <input
+              type="text"
+              placeholder="e.g. Office Administration"
+              value={form.label}
+              onChange={(e) => setForm({ ...form, label: e.target.value })}
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+            />
+          </label>
 
-          <textarea
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            rows={2}
-            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          />
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-[var(--ink-muted)]">Description (optional)</span>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows={2}
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] resize-none"
+            />
+          </label>
 
           <div>
             <p className="text-xs font-medium text-[var(--ink-muted)] mb-2">Certifications</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {CERT_OPTIONS.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => setForm({ ...form, certifications: toggleItem(form.certifications, c.id) })}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  aria-pressed={form.certifications.includes(c.id)}
+                  className={`inline-flex items-center pointer-coarse:min-h-11 text-xs px-2.5 py-1 rounded-full border transition-colors ${
                     form.certifications.includes(c.id)
-                      ? "bg-purple-100 border-purple-300 text-purple-800"
-                      : "bg-[var(--surface-soft)] border-[var(--border)] text-[var(--ink-muted)] hover:border-purple-300"
+                      ? "bg-[var(--badge-info-bg)] border-[var(--badge-info-text)] text-[var(--badge-info-text)]"
+                      : "bg-[var(--surface-soft)] border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-interactive-hover)]"
                   }`}
                 >
                   {c.label}
@@ -272,16 +286,17 @@ export default function PathwayManager() {
 
           <div>
             <p className="text-xs font-medium text-[var(--ink-muted)] mb-2">Learning Platforms</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {PLATFORM_OPTIONS.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => setForm({ ...form, platforms: toggleItem(form.platforms, p.id) })}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  aria-pressed={form.platforms.includes(p.id)}
+                  className={`inline-flex items-center pointer-coarse:min-h-11 text-xs px-2.5 py-1 rounded-full border transition-colors ${
                     form.platforms.includes(p.id)
-                      ? "bg-blue-100 border-blue-300 text-blue-800"
-                      : "bg-[var(--surface-soft)] border-[var(--border)] text-[var(--ink-muted)] hover:border-blue-300"
+                      ? "bg-[var(--badge-info-bg)] border-[var(--badge-info-text)] text-[var(--badge-info-text)]"
+                      : "bg-[var(--surface-soft)] border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-interactive-hover)]"
                   }`}
                 >
                   {p.label}
@@ -290,25 +305,25 @@ export default function PathwayManager() {
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-[var(--ink-muted)]">
+          <label className="block">
+            <span className="text-xs font-medium text-[var(--ink-muted)]">
               Estimated duration (weeks)
-            </label>
+            </span>
             <input
               type="number"
               min={0}
               max={104}
               value={form.estimatedWeeks}
               onChange={(e) => setForm({ ...form, estimatedWeeks: Math.max(0, parseInt(e.target.value) || 0) })}
-              className="ml-2 w-20 text-sm theme-input rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="ml-2 w-20 text-sm theme-input rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
             />
-          </div>
+          </label>
 
           <div className="flex gap-2">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="primary-button text-sm px-4 py-2 rounded-lg disabled:opacity-50"
             >
               {saving ? "Saving..." : editingId ? "Save Changes" : "Create Pathway"}
             </button>
@@ -320,11 +335,12 @@ export default function PathwayManager() {
       ) : (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-[var(--badge-info-text)] hover:text-[var(--badge-info-text)] transition-colors"
         >
           + Add Pathway
         </button>
       )}
+      {confirmDialog}
     </div>
   );
 }

@@ -286,7 +286,7 @@ export default function PortfolioGrid() {
 
   return (
     <div className="space-y-6">
-      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png" className="hidden" />
+      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png" className="hidden" aria-label="Attach file" />
 
       {items.length === 0 && !showForm ? (
         <div className="surface-section px-5 py-10 text-center">
@@ -333,17 +333,17 @@ export default function PortfolioGrid() {
                       <div className="flex gap-2 mt-2">
                         {item.fileId && (
                           <a href={`/api/files/download?id=${item.fileId}`} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:text-blue-800">View file</a>
+                            className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800">View file</a>
                         )}
                         {item.url && (
                           <a href={item.url} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:text-blue-800">Open link ↗</a>
+                            className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800">Open link ↗</a>
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => startEdit(item)} className="text-xs text-blue-600 hover:text-blue-800 px-1">Edit</button>
-                      <button onClick={() => handleDelete(item.id)} className="text-xs text-red-500 hover:text-red-700 px-1">Del</button>
+                    <div className="flex gap-2">
+                      <button onClick={() => startEdit(item)} className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800 px-1">Edit</button>
+                      <button onClick={() => handleDelete(item.id)} className="inline-flex min-h-11 items-center text-xs text-red-500 hover:text-red-700 px-1">Del</button>
                     </div>
                   </div>
                 </div>
@@ -447,7 +447,7 @@ export default function PortfolioGrid() {
                       setForm({ ...form, fileId: "" });
                       setCertificationRequirementId("");
                     }}
-                    className="text-xs font-medium text-red-500 hover:text-red-700"
+                    className="inline-flex min-h-11 items-center text-xs font-medium text-red-500 hover:text-red-700"
                   >
                     Remove
                   </button>
@@ -529,7 +529,7 @@ export default function PortfolioGrid() {
                   <Link
                     href="/learning"
                     prefetch={false}
-                    className="inline-flex items-center gap-1 font-semibold text-[var(--accent-secondary)] hover:underline"
+                    className="inline-flex min-h-11 items-center gap-1 font-semibold text-[var(--accent-secondary)] hover:underline"
                   >
                     Review steps
                     <ArrowSquareOut size={14} weight="bold" aria-hidden />
@@ -540,7 +540,7 @@ export default function PortfolioGrid() {
                   <button
                     type="button"
                     onClick={fetchCertificationData}
-                    className="mt-3 text-xs font-semibold text-[var(--accent-secondary)] hover:underline"
+                    className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-[var(--accent-secondary)] hover:underline"
                   >
                     Try loading Ready to Work steps again
                   </button>
@@ -562,7 +562,7 @@ export default function PortfolioGrid() {
             <button
               type="button"
               onClick={resetForm}
-              className="text-sm font-medium text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             >
               Cancel
             </button>
