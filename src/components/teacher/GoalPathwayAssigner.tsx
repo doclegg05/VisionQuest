@@ -110,7 +110,7 @@ export default function GoalPathwayAssigner({
           </p>
         </div>
         {unmatchedGoals.length > 0 && (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+          <span className="rounded-full bg-[var(--badge-warning-bg)] px-3 py-1 text-xs font-semibold text-[var(--badge-warning-text)]">
             {unmatchedGoals.length} unmatched
           </span>
         )}
@@ -133,7 +133,7 @@ export default function GoalPathwayAssigner({
               </div>
               <button
                 onClick={() => setExpandedGoalId(expandedGoalId === goal.id ? null : goal.id)}
-                className="min-h-11 shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:text-blue-900"
+                className="min-h-11 shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-[var(--badge-info-text)] hover:bg-[var(--badge-info-bg)]"
               >
                 {expandedGoalId === goal.id ? "Close" : "Assign"}
               </button>
@@ -162,7 +162,7 @@ export default function GoalPathwayAssigner({
                 <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
                   {goalLevelLabel(goal.level)} &middot; Status: {goalStatusLabel(goal.status)}
                   {goal.pathway && (
-                    <span className="ml-1.5 inline-flex items-center rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-sm text-green-800">
+                    <span className="ml-1.5 inline-flex items-center rounded-full border border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)] px-2 py-0.5 text-sm text-[var(--badge-success-text)]">
                       Pathway: {goal.pathway.label}
                     </span>
                   )}
@@ -236,7 +236,7 @@ function PathwaySuggestionPanel({
                 <button
                   onClick={() => onAssign(s.pathwayId)}
                   disabled={assigning || s.pathwayId === currentPathwayId}
-                  className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-50 hover:text-green-900 disabled:opacity-40"
+                  className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-[var(--badge-success-text)] hover:bg-[var(--badge-success-bg)] disabled:opacity-40"
                 >
                   {s.pathwayId === currentPathwayId ? "Current" : "Assign"}
                 </button>
@@ -249,7 +249,7 @@ function PathwaySuggestionPanel({
       {!showAll && suggestions.allPathways.length > suggestions.suggestions.length && (
         <button
           onClick={() => setShowAll(true)}
-          className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:text-blue-900"
+          className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-[var(--badge-info-text)] hover:bg-[var(--badge-info-bg)]"
         >
           Show all {suggestions.allPathways.length} pathways
         </button>
@@ -270,7 +270,7 @@ function PathwaySuggestionPanel({
                   <button
                     onClick={() => onAssign(p.id)}
                     disabled={assigning || p.id === currentPathwayId}
-                    className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 hover:text-blue-900 disabled:opacity-40"
+                    className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-[var(--badge-info-text)] hover:bg-[var(--badge-info-bg)] disabled:opacity-40"
                   >
                     {p.id === currentPathwayId ? "Current" : "Assign"}
                   </button>
@@ -284,7 +284,7 @@ function PathwaySuggestionPanel({
         <button
           onClick={onClear}
           disabled={assigning}
-          className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-800 disabled:opacity-40"
+          className="min-h-11 rounded-lg px-3 py-2 text-sm font-medium text-[var(--badge-error-text)] hover:bg-[var(--badge-error-bg)] disabled:opacity-40"
         >
           Remove pathway assignment
         </button>

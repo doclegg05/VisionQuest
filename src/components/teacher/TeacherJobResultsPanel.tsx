@@ -74,9 +74,9 @@ const SORT_OPTIONS = [
 ];
 
 const WORK_MODE_STYLES: Record<JobWorkMode, string> = {
-  onsite: "bg-emerald-500/15 text-emerald-700",
-  remote: "bg-sky-500/15 text-sky-700",
-  hybrid: "bg-amber-500/15 text-amber-700",
+  onsite: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
+  remote: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
+  hybrid: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
 };
 
 function clusterLabel(cluster: string): string {
@@ -189,6 +189,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           />
         </label>
         <select
+          aria-label="Source"
           value={source}
           onChange={(event) => {
             setSource(event.target.value);
@@ -204,6 +205,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           ))}
         </select>
         <select
+          aria-label="Career cluster"
           value={cluster}
           onChange={(event) => {
             setCluster(event.target.value);
@@ -218,6 +220,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           ))}
         </select>
         <select
+          aria-label="Work mode"
           value={workMode}
           onChange={(event) => {
             setWorkMode(event.target.value);
@@ -233,6 +236,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           ))}
         </select>
         <select
+          aria-label="Sort by"
           value={sort}
           onChange={(event) => {
             setSort(event.target.value);
@@ -287,7 +291,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
                   href={job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--surface-raised)] px-3 py-1.5 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--primary)]"
+                  className="inline-flex items-center gap-1 pointer-coarse:min-h-11 rounded-lg bg-[var(--surface-raised)] px-3 py-1.5 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--primary)]"
                 >
                   <ArrowSquareOut size={14} />
                   View

@@ -161,6 +161,7 @@ export default function CertTracker() {
         ref={fileInputRef}
         onChange={handleFileUpload}
         accept=".pdf,.jpg,.jpeg,.png"
+        aria-label="Attach file"
         className="hidden"
       />
 
@@ -208,6 +209,7 @@ export default function CertTracker() {
                 checked={req.completed}
                 disabled={toggling === req.id || !req.id || (req.needsFile && !req.fileId && !req.completed)}
                 onChange={() => req.id && toggleRequirement(req.id, !req.completed)}
+                aria-label={req.label}
                 className="mt-0.5 h-4 w-4 rounded border-[var(--border-strong)] text-green-600 focus:ring-green-500"
               />
               <div className="flex-1 min-w-0">
@@ -225,7 +227,7 @@ export default function CertTracker() {
                     href={req.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-1"
+                    className="inline-flex min-h-11 items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-1"
                   >
                     Open lesson ↗
                   </a>
@@ -251,7 +253,7 @@ export default function CertTracker() {
                           href={`/api/files/download?id=${req.fileId}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100"
+                          className="inline-flex min-h-11 items-center text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100"
                         >
                           View file
                         </a>
@@ -259,7 +261,7 @@ export default function CertTracker() {
                         <button
                           onClick={() => req.id && triggerUpload(req.id)}
                           disabled={uploading === req.id}
-                          className="text-xs px-2 py-0.5 rounded-full bg-[var(--surface-soft)] text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)]"
+                          className="inline-flex min-h-11 items-center text-xs px-2 py-0.5 rounded-full bg-[var(--surface-soft)] text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)]"
                         >
                           {uploading === req.id ? "Uploading..." : "Attach file"}
                         </button>

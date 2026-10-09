@@ -192,7 +192,7 @@ export default function TeacherOrientationWorkspace() {
   if (error && classes.length === 0) {
     return (
       <div className="surface-section px-6 py-10 text-center">
-        <p className="mb-4 text-sm text-red-600">{error}</p>
+        <p className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
       </div>
     );
   }
@@ -278,7 +278,7 @@ export default function TeacherOrientationWorkspace() {
           </div>
         ) : null}
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="mt-3 text-sm text-[var(--badge-error-text)]">{error}</p> : null}
       </div>
 
       {!selectedStudent ? (

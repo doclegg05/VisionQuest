@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface Opportunity {
   id: string;
@@ -33,8 +34,10 @@ type CareerTab = "opportunities" | "events";
 const OPPORTUNITY_TYPES = ["job", "internship", "apprenticeship", "fellowship", "event"];
 const APPLICATION_STATUSES = ["open", "closed", "archived"];
 const EVENT_STATUSES = ["scheduled", "completed", "cancelled", "archived"];
+const FIELD_LABEL = "block text-sm font-medium text-[var(--ink-strong)]";
 
 export default function CareerManager() {
+  const { confirm, confirmDialog } = useConfirm();
   const [tab, setTab] = useState<CareerTab>("opportunities");
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [events, setEvents] = useState<CareerEvent[]>([]);
@@ -179,7 +182,15 @@ export default function CareerManager() {
   }
 
   async function deleteOpportunity(id: string) {
-    if (!confirm("Delete this opportunity?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this opportunity?",
+        message: "Student applications tracked for it are also removed.",
+        confirmLabel: "Delete",
+      }))
+    ) {
+      return;
+    }
     setStatusMessage(null);
 
     try {
@@ -201,7 +212,15 @@ export default function CareerManager() {
   }
 
   async function deleteEvent(id: string) {
-    if (!confirm("Delete this event?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this event?",
+        message: "Student registrations for it are also removed.",
+        confirmLabel: "Delete",
+      }))
+    ) {
+      return;
+    }
     setStatusMessage(null);
 
     try {
@@ -258,8 +277,8 @@ export default function CareerManager() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
-        <button onClick={() => void loadData()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
+        <button onClick={() => void loadData()} className="primary-button px-4 py-2 rounded-lg">
           Try Again
         </button>
       </div>
@@ -268,6 +287,7 @@ export default function CareerManager() {
 
   return (
     <div className="space-y-4">
+      {confirmDialog}
       <div className="flex gap-1 bg-[var(--surface-interactive)] rounded-xl p-1">
         {[
           { key: "opportunities", label: "Opportunities" },
@@ -299,79 +319,98 @@ export default function CareerManager() {
               {editingOpportunityId ? "Edit Opportunity" : "New Opportunity"}
             </h3>
             <div className="grid gap-3 md:grid-cols-2">
-              <input
-                type="text"
-                placeholder="Title"
-                value={opportunityForm.title}
-                onChange={(event) => setOpportunityForm((current) => ({ ...current, title: event.target.value }))}
-                className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <input
-                type="text"
-                placeholder="Company"
-                value={opportunityForm.company}
-                onChange={(event) => setOpportunityForm((current) => ({ ...current, company: event.target.value }))}
-                className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Title</span>
+                <input
+                  type="text"
+                  value={opportunityForm.title}
+                  onChange={(event) => setOpportunityForm((current) => ({ ...current, title: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Company</span>
+                <input
+                  type="text"
+                  value={opportunityForm.company}
+                  onChange={(event) => setOpportunityForm((current) => ({ ...current, company: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
-              <select
-                value={opportunityForm.type}
-                onChange={(event) => setOpportunityForm((current) => ({ ...current, type: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {OPPORTUNITY_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Location"
-                value={opportunityForm.location}
-                onChange={(event) => setOpportunityForm((current) => ({ ...current, location: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <input
-                type="datetime-local"
-                value={opportunityForm.deadline}
-                onChange={(event) => setOpportunityForm((current) => ({ ...current, deadline: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Type</span>
+                <select
+                  value={opportunityForm.type}
+                  onChange={(event) => setOpportunityForm((current) => ({ ...current, type: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                >
+                  {OPPORTUNITY_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Location</span>
+                <input
+                  type="text"
+                  value={opportunityForm.location}
+                  onChange={(event) => setOpportunityForm((current) => ({ ...current, location: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Deadline</span>
+                <input
+                  type="datetime-local"
+                  value={opportunityForm.deadline}
+                  onChange={(event) => setOpportunityForm((current) => ({ ...current, deadline: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
             </div>
-            <input
-              type="url"
-              placeholder="External link"
-              value={opportunityForm.url}
-              onChange={(event) => setOpportunityForm((current) => ({ ...current, url: event.target.value }))}
-              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <textarea
-              placeholder="Description"
-              value={opportunityForm.description}
-              onChange={(event) => setOpportunityForm((current) => ({ ...current, description: event.target.value }))}
-              rows={4}
-              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block space-y-1.5">
+              <span className={FIELD_LABEL}>External link</span>
+              <input
+                type="url"
+                value={opportunityForm.url}
+                onChange={(event) => setOpportunityForm((current) => ({ ...current, url: event.target.value }))}
+                className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className={FIELD_LABEL}>Description</span>
+              <textarea
+                value={opportunityForm.description}
+                onChange={(event) => setOpportunityForm((current) => ({ ...current, description: event.target.value }))}
+                rows={4}
+                className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+              />
+            </label>
             {editingOpportunityId ? (
-              <select
-                value={opportunityForm.status}
-                onChange={(event) => setOpportunityForm((current) => ({ ...current, status: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {APPLICATION_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Status</span>
+                <select
+                  value={opportunityForm.status}
+                  onChange={(event) => setOpportunityForm((current) => ({ ...current, status: event.target.value }))}
+                  className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                >
+                  {APPLICATION_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ) : null}
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => void saveOpportunity()}
-                className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="primary-button text-sm px-4 py-2 rounded-lg"
               >
                 {editingOpportunityId ? "Save Changes" : "Add Opportunity"}
               </button>
@@ -405,19 +444,19 @@ export default function CareerManager() {
                       <p className="text-xs text-[var(--ink-muted)] mt-2">{opportunity.description}</p>
                     ) : null}
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">{opportunity.status}</span>
+                      <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-[var(--badge-info-text)]">{opportunity.status}</span>
                       {opportunity.deadline ? (
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">
+                        <span className="rounded-full bg-[var(--badge-warning-bg)] px-2 py-0.5 text-[var(--badge-warning-text)]">
                           Deadline {new Date(opportunity.deadline).toLocaleDateString()}
                         </span>
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <button onClick={() => startEditOpportunity(opportunity)} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1">
+                  <div className="flex gap-2">
+                    <button onClick={() => startEditOpportunity(opportunity)} className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-info-text)] hover:underline px-2 py-1">
                       Edit
                     </button>
-                    <button onClick={() => void deleteOpportunity(opportunity.id)} className="text-xs text-red-500 hover:text-red-700 px-2 py-1">
+                    <button onClick={() => void deleteOpportunity(opportunity.id)} className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-error-text)] hover:underline px-2 py-1">
                       Delete
                     </button>
                   </div>
@@ -432,57 +471,73 @@ export default function CareerManager() {
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
               {editingEventId ? "Edit Event" : "New Event"}
             </h3>
-            <input
-              type="text"
-              placeholder="Title"
-              value={eventForm.title}
-              onChange={(event) => setEventForm((current) => ({ ...current, title: event.target.value }))}
-              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <textarea
-              placeholder="Description"
-              value={eventForm.description}
-              onChange={(event) => setEventForm((current) => ({ ...current, description: event.target.value }))}
-              rows={4}
-              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="grid gap-3 md:grid-cols-2">
-              <input
-                type="datetime-local"
-                value={eventForm.startsAt}
-                onChange={(event) => setEventForm((current) => ({ ...current, startsAt: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <input
-                type="datetime-local"
-                value={eventForm.endsAt}
-                onChange={(event) => setEventForm((current) => ({ ...current, endsAt: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <label className="block space-y-1.5">
+              <span className={FIELD_LABEL}>Title</span>
               <input
                 type="text"
-                placeholder="Location"
-                value={eventForm.location}
-                onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={eventForm.title}
+                onChange={(event) => setEventForm((current) => ({ ...current, title: event.target.value }))}
+                className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
               />
-              <input
-                type="url"
-                placeholder="Virtual URL"
-                value={eventForm.virtualUrl}
-                onChange={(event) => setEventForm((current) => ({ ...current, virtualUrl: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            </label>
+            <label className="block space-y-1.5">
+              <span className={FIELD_LABEL}>Description</span>
+              <textarea
+                value={eventForm.description}
+                onChange={(event) => setEventForm((current) => ({ ...current, description: event.target.value }))}
+                rows={4}
+                className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
               />
-              <input
-                type="number"
-                min="1"
-                placeholder="Capacity"
-                value={eventForm.capacity}
-                onChange={(event) => setEventForm((current) => ({ ...current, capacity: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            </label>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Start time</span>
+                <input
+                  type="datetime-local"
+                  value={eventForm.startsAt}
+                  onChange={(event) => setEventForm((current) => ({ ...current, startsAt: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>End time</span>
+                <input
+                  type="datetime-local"
+                  value={eventForm.endsAt}
+                  onChange={(event) => setEventForm((current) => ({ ...current, endsAt: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Location</span>
+                <input
+                  type="text"
+                  value={eventForm.location}
+                  onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Virtual URL</span>
+                <input
+                  type="url"
+                  value={eventForm.virtualUrl}
+                  onChange={(event) => setEventForm((current) => ({ ...current, virtualUrl: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Capacity</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={eventForm.capacity}
+                  onChange={(event) => setEventForm((current) => ({ ...current, capacity: event.target.value }))}
+                  className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                />
+              </label>
             </div>
             <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <input
@@ -493,23 +548,26 @@ export default function CareerManager() {
               Students should RSVP for this event
             </label>
             {editingEventId ? (
-              <select
-                value={eventForm.status}
-                onChange={(event) => setEventForm((current) => ({ ...current, status: event.target.value }))}
-                className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {EVENT_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
+              <label className="block space-y-1.5">
+                <span className={FIELD_LABEL}>Status</span>
+                <select
+                  value={eventForm.status}
+                  onChange={(event) => setEventForm((current) => ({ ...current, status: event.target.value }))}
+                  className="text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                >
+                  {EVENT_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ) : null}
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => void saveEvent()}
-                className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="primary-button text-sm px-4 py-2 rounded-lg"
               >
                 {editingEventId ? "Save Changes" : "Add Event"}
               </button>
@@ -545,11 +603,11 @@ export default function CareerManager() {
                       <p className="text-xs text-[var(--ink-muted)] mt-2">{event.description}</p>
                     ) : null}
                   </div>
-                  <div className="flex gap-1.5">
-                    <button onClick={() => startEditEvent(event)} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1">
+                  <div className="flex gap-2">
+                    <button onClick={() => startEditEvent(event)} className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-info-text)] hover:underline px-2 py-1">
                       Edit
                     </button>
-                    <button onClick={() => void deleteEvent(event.id)} className="text-xs text-red-500 hover:text-red-700 px-2 py-1">
+                    <button onClick={() => void deleteEvent(event.id)} className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-error-text)] hover:underline px-2 py-1">
                       Delete
                     </button>
                   </div>
