@@ -22,19 +22,33 @@ function hasSpread(node: ts.JsxOpeningLikeElement): boolean {
   return node.attributes.properties.some(ts.isJsxSpreadAttribute);
 }
 
-/** `const NAME = "classes"` declarations in the file, so `${NAME}` in a className can be read. */
+/**
+ * `const NAME = "classes"` declarations in the file, so `${NAME}` in a className
+ * can be read. A template literal built only from earlier constants counts too
+ * (`const ROW_DELETE = \`${ROW} text-red\``).
+ */
 function stringConstants(source: ts.SourceFile): Map<string, string> {
   const constants = new Map<string, string>();
+  const valueOf = (init: ts.Expression): string | null => {
+    if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) return init.text;
+    if (ts.isTemplateExpression(init)) {
+      const spans = init.templateSpans.map((s) =>
+        ts.isIdentifier(s.expression) && constants.has(s.expression.text) ? `${constants.get(s.expression.text)}${s.literal.text}` : null,
+      );
+      return spans.every((x) => x !== null) ? init.head.text + spans.join("") : null;
+    }
+    return null;
+  };
   const visit = (n: ts.Node) => {
     if (
       ts.isVariableDeclaration(n) &&
       ts.isIdentifier(n.name) &&
       n.initializer &&
-      (ts.isStringLiteral(n.initializer) || ts.isNoSubstitutionTemplateLiteral(n.initializer)) &&
       ts.isVariableDeclarationList(n.parent) &&
       (n.parent.flags & ts.NodeFlags.Const) !== 0
     ) {
-      constants.set(n.name.text, n.initializer.text);
+      const value = valueOf(n.initializer);
+      if (value !== null) constants.set(n.name.text, value);
     }
     n.forEachChild(visit);
   };
@@ -42,24 +56,81 @@ function stringConstants(source: ts.SourceFile): Map<string, string> {
   return constants;
 }
 
-/** Every string inside a className expression, joined: literals and same-file constants. Other dynamic parts are ignored. */
-function classText(node: ts.JsxOpeningLikeElement, constants: Map<string, string>): string | null {
-  const attr = attribute(node, "className");
-  if (!attr?.initializer) return null;
-  const parts: string[] = [];
-  const visit = (n: ts.Node) => {
-    if (ts.isIdentifier(n) && constants.has(n.text)) parts.push(constants.get(n.text) ?? "");
-    else if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) parts.push(n.text);
-    else if (ts.isTemplateExpression(n)) {
-      parts.push(n.head.text, ...n.templateSpans.map((s) => s.literal.text));
-      n.templateSpans.forEach((s) => visit(s.expression));
-      return;
-    }
-    n.forEachChild(visit);
+const MAX_VARIANTS = 64;
+
+function product(parts: string[][]): string[] {
+  return parts.reduce<string[]>((acc, options) => acc.flatMap((a) => options.map((o) => `${a} ${o}`)), [""]);
+}
+
+/**
+ * Every class string an expression can produce: each side of `?:`, the right
+ * side of `&&` or nothing, both sides of `||`/`??`, and the combinations
+ * across template spans, `+`, `[...].join()`, and `cn()`/`clsx()` arguments.
+ * Unknown parts contribute nothing. Returns null past MAX_VARIANTS.
+ */
+function expressionVariants(n: ts.Expression, constants: Map<string, string>): string[] | null {
+  if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) return [n.text];
+  if (ts.isIdentifier(n)) return [constants.get(n.text) ?? ""];
+  if (ts.isParenthesizedExpression(n)) return expressionVariants(n.expression, constants);
+  if (ts.isConditionalExpression(n)) {
+    const a = expressionVariants(n.whenTrue, constants);
+    const b = expressionVariants(n.whenFalse, constants);
+    return a && b ? [...a, ...b] : null;
+  }
+  const combine = (exprs: readonly ts.Expression[], literals: string[] = []): string[] | null => {
+    const parts = exprs.map((e) => expressionVariants(e, constants));
+    if (parts.some((p) => p === null)) return null;
+    const size = (parts as string[][]).reduce((acc, p) => acc * p.length, 1);
+    if (size > MAX_VARIANTS) return null;
+    return product([...literals.map((l) => [l]), ...(parts as string[][])]);
   };
-  visit(attr.initializer);
-  // No literal at all means the classes are computed elsewhere; we cannot judge them.
-  return parts.length === 0 ? null : parts.join(" ");
+  if (ts.isBinaryExpression(n)) {
+    const op = n.operatorToken.kind;
+    if (op === ts.SyntaxKind.AmpersandAmpersandToken) {
+      const right = expressionVariants(n.right, constants);
+      return right ? [...right, ""] : null;
+    }
+    if (op === ts.SyntaxKind.BarBarToken || op === ts.SyntaxKind.QuestionQuestionToken) {
+      const a = expressionVariants(n.left, constants);
+      const b = expressionVariants(n.right, constants);
+      return a && b ? [...a, ...b] : null;
+    }
+    if (op === ts.SyntaxKind.PlusToken) return combine([n.left, n.right]);
+    return [""];
+  }
+  if (ts.isTemplateExpression(n)) {
+    const literals = [n.head.text, ...n.templateSpans.map((s) => s.literal.text)];
+    return combine(n.templateSpans.map((s) => s.expression), literals);
+  }
+  if (ts.isCallExpression(n)) {
+    const callee = n.expression;
+    if (ts.isPropertyAccessExpression(callee) && callee.name.text === "join" && ts.isArrayLiteralExpression(callee.expression)) {
+      return combine(callee.expression.elements.filter((e): e is ts.Expression => !ts.isSpreadElement(e)));
+    }
+    return combine(n.arguments);
+  }
+  if (ts.isArrayLiteralExpression(n)) return combine(n.elements.filter((e): e is ts.Expression => !ts.isSpreadElement(e)));
+  return [""];
+}
+
+/** The class strings an element can render with, or null when they cannot be read statically. */
+function classVariants(node: ts.JsxOpeningLikeElement, constants: Map<string, string>): string[] | null {
+  const init = attribute(node, "className")?.initializer;
+  if (!init) return null;
+  const variants = ts.isStringLiteral(init)
+    ? [init.text]
+    : ts.isJsxExpression(init) && init.expression
+      ? expressionVariants(init.expression, constants)
+      : null;
+  // Nothing literal in any variant means the classes are computed elsewhere.
+  if (!variants || variants.every((v) => v.trim() === "")) return null;
+  return variants.map((v) => v.replace(/\s+/g, " ").trim());
+}
+
+/** Every string inside a className expression, joined: literals and same-file constants. */
+function classText(node: ts.JsxOpeningLikeElement, constants: Map<string, string>): string | null {
+  const variants = classVariants(node, constants);
+  return variants ? variants.join(" ") : null;
 }
 
 function staticAttr(node: ts.JsxOpeningLikeElement, name: string): string | undefined {
@@ -85,6 +156,10 @@ function parse(fileName: string, text: string): ts.SourceFile {
 }
 
 const TALL_ENOUGH = /(?:^|\s)(?:pointer-coarse:)?(?:min-h|h|size)-(?:1[1-9]|[2-9]\d|\[(?:4[4-9]|[5-9]\d)px\])(?=\s|$)/;
+// A fixed height under 44px sets the height, whatever the padding (border-box).
+const FIXED_SMALL = /^(?:h|size)-(?:[1-9]|10|\[(?:[1-3]?\d|4[0-3])px\])$/;
+// min-height does nothing on an inline element, which <a> is by default.
+const BOX_DISPLAY = /^(?:block|flex|inline-flex|grid|inline-grid|inline-block|table)$/;
 
 // Tailwind 4 type scale: font size and line height in px. The body inherits 16px / 24px.
 const TYPE_SCALE: Record<string, [number, number]> = {
@@ -112,12 +187,24 @@ export function estimatedHeight(classes: string): number {
   return top + bottom + line + border;
 }
 
+function tooSmall(classes: string, tag: string): boolean {
+  const tokens = classes.split(" ").filter((c) => !c.includes(":"));
+  if (tokens.includes("sr-only")) return false;
+  const boxed = tag === "button" || tokens.some((c) => BOX_DISPLAY.test(c));
+  if (TALL_ENOUGH.test(classes) && boxed) return false;
+  if (tokens.some((c) => FIXED_SMALL.test(c))) return true;
+  return estimatedHeight(classes) < 44;
+}
+
 /**
  * Buttons and links that would render under 44pt on a touch screen: no height
  * class of 44px or more, and an estimated height (vertical padding + line
  * height of their text size + border) under 44px. `pointer-coarse:min-h-11`
- * counts, which keeps the compact look for a mouse. Visually hidden elements,
- * fully dynamic classNames, and links marked `data-inline-link` (a link inside
+ * counts, which keeps the compact look for a mouse; on a link it counts only
+ * with a box display, since min-height does nothing inline. A fixed h-/size-
+ * under 44px fails whatever the padding. Each class combination a conditional
+ * className can produce is judged on its own. Visually hidden elements, fully
+ * dynamic classNames, and links marked `data-inline-link` (a link inside
  * running text, exempt under WCAG 2.5.8) are skipped.
  */
 export function undersizedTargets(fileName: string, text: string): JsxViolation[] {
@@ -128,10 +215,11 @@ export function undersizedTargets(fileName: string, text: string): JsxViolation[
     if (!["button", "a", "Link"].includes(tag)) return;
     // WCAG 2.5.8 exempts links inside a sentence; the marker makes the exemption explicit.
     if (tag !== "button" && attribute(node, "data-inline-link")) return;
-    const classes = classText(node, constants);
-    if (classes === null || /(?:^|\s)sr-only(?=\s|$)/.test(classes)) return;
-    if (TALL_ENOUGH.test(classes)) return;
-    if (estimatedHeight(classes) < 44) {
+    const hasClassName = attribute(node, "className") !== undefined;
+    if (!hasClassName && hasSpread(node)) return;
+    const variants = hasClassName ? classVariants(node, constants) : [""];
+    if (variants === null) return;
+    if (variants.some((classes) => tooSmall(classes, tag))) {
       out.push({ line: line(source, node), element: tag, detail: "under 44pt on touch; add min-h-11 or pointer-coarse:min-h-11" });
     }
   });
@@ -175,7 +263,8 @@ export function unlabelledFields(fileName: string, text: string): JsxViolation[]
 }
 
 const INLINE_TAGS = new Set(["span", "a", "strong", "em", "small", "b", "i", "abbr", "label"]);
-const DISPLAY_CLASS = /(?:^|\s)(?:block|flex|inline-flex|grid|inline-grid|inline-block|table|contents|hidden|sr-only)(?=\s|$)/;
+// Not `contents`: an element with display: contents takes no margin either.
+const DISPLAY_CLASS = /(?:^|\s)(?:block|flex|inline-flex|grid|inline-grid|inline-block|table|hidden|sr-only)(?=\s|$)/;
 
 /**
  * Inline children of a `space-y-*` parent. Tailwind 4 spaces a stack with a

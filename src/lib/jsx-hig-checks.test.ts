@@ -80,6 +80,46 @@ describe("undersizedTargets", () => {
     assert.equal(undersizedTargets("f.tsx", src).length, 1);
   });
 
+  it("judges each conditional branch on its own, whatever the order", () => {
+    const src = [
+      "<button className={compact ? \"py-1 text-sm\" : \"py-3 text-sm\"}>A</button>",
+      "<button className={compact ? \"py-3 text-sm\" : \"py-1 text-sm\"}>B</button>",
+      "<button className={`rounded ${open ? \"min-h-11 px-4\" : \"px-2 py-1 text-xs\"}`}>C</button>",
+      "<button className={`px-4 ${big && \"py-3\"} py-1 text-sm`}>D</button>",
+      "<button className={compact ? \"min-h-11 py-1\" : \"py-3 text-sm\"}>E</button>",
+    ].join("\n");
+    assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1, 2, 3, 4]);
+  });
+
+  it("does not credit min-height on an inline link, where the browser ignores it", () => {
+    const src = [
+      `<a href="/x" className="min-h-11 text-sm">Inline</a>`,
+      `<Link href="/x" className="inline-flex min-h-11 items-center text-sm">Box</Link>`,
+      `<button className="min-h-11 text-sm">Button</button>`,
+    ].join("\n");
+    assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1]);
+  });
+
+  it("treats a fixed height under 44px as the height, whatever the padding", () => {
+    const src = [`<button className="h-8 px-3 py-3 text-sm">Fixed</button>`, `<button className="size-10 p-3">Icon</button>`].join("\n");
+    assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1, 2]);
+  });
+
+  it("reads a class constant built from other constants in a template literal", () => {
+    const src = [
+      'const ROW = "inline-flex items-center pointer-coarse:min-h-11 px-2 py-1 text-xs";',
+      'const SMALL = "px-2 py-1 text-xs";',
+      "const ROW_DELETE = `${ROW} text-red`;",
+      "const SMALL_DELETE = `${SMALL} text-red`;",
+      "export function A() { return <><button className={ROW_DELETE}>Ok</button><button className={SMALL_DELETE}>No</button></>; }",
+    ].join("\n");
+    assert.equal(undersizedTargets("f.tsx", src).length, 1);
+  });
+
+  it("flags a button with no className at all", () => {
+    assert.deepEqual(lines(undersizedTargets("f.tsx", `<button onClick={go}>Save</button>`)), [1]);
+  });
+
   it("skips visually hidden and fully dynamic elements", () => {
     const src = [`<a href="#main" className="sr-only focus:not-sr-only">Skip</a>`, `<button className={styles}>D</button>`].join("\n");
     assert.deepEqual(undersizedTargets("f.tsx", src), []);
@@ -131,6 +171,11 @@ describe("inlineSpacedChildren", () => {
       `<div className="space-y-2"><p>D</p><span>last</span></div>`,
     ].join("\n");
     assert.deepEqual(inlineSpacedChildren("f.tsx", src), []);
+  });
+
+  it("does not count display: contents as a fix, since such an element takes no margin", () => {
+    const src = `<div className="space-y-2"><span className="contents">A</span><p>B</p></div>`;
+    assert.deepEqual(lines(inlineSpacedChildren("f.tsx", src)), [1]);
   });
 
   it("ignores parents without space-y", () => {
