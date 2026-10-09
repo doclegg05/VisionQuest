@@ -67,6 +67,9 @@
   --accent-gold: #ad8806;
   --accent-red: #c43c3c;
   --error: #c43c3c;
+  /* Ink on an --error fill (Delete, Remove, Discard): white 5.2:1 here, navy 6.1:1
+     on the dark theme's #f06b6b. Use text-[var(--on-error)] with bg-[var(--error)]. */
+  --on-error: #ffffff;
   --success: #2a8a3c;
   --glow-green: rgba(55, 181, 80, 0.15);
   --glow-gold: rgba(211, 178, 87, 0.1);
@@ -192,6 +195,7 @@
   --accent-gold: #e0c06a;
   --accent-red: #f06b6b;
   --error: #f06b6b;
+  --on-error: #0a1628;
   --success: #3fcf5e;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
