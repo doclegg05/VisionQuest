@@ -685,7 +685,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       </div>
 
       {/* Grid of Note Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         {monthlyGoals.map((monthly) => {
           const isMEditing = editingGoalId === monthly.id;
           const isMProposed = monthly.status === "proposed";
@@ -727,7 +727,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 {/* flex-wrap: the edit form below wraps onto its own full-width line. Beside
                     the read-aloud and Ask Sage column it was 18px wide on a phone. */}
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-dashed border-[var(--border)] pb-2">
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 grow basis-44">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)]">
                         Monthly Plan
@@ -761,7 +761,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="ml-auto flex flex-col items-end gap-1.5 shrink-0">
                     <span className="text-xs text-[var(--ink-muted)]">
                       {formatCreatedAt(monthly.createdAt)}
                     </span>
