@@ -480,7 +480,7 @@ export default function AiProviderPanel() {
             </p>
           </div>
 
-          <details className="rounded-lg border border-[var(--line)] p-4">
+          <details className="rounded-lg border border-[var(--border)] p-4">
             <summary className="cursor-pointer text-sm font-medium text-[var(--ink-strong)]">
               Model per job (optional)
             </summary>
@@ -492,7 +492,7 @@ export default function AiProviderPanel() {
             </p>
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
               Compare models with{" "}
-              <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5">
+              <code className="rounded bg-[var(--surface-muted)] px-1 py-0.5">
                 npm run sage:model:bakeoff -- --models=a,b,c
               </code>
               .

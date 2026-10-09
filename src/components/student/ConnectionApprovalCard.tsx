@@ -220,7 +220,7 @@ export function ConnectionApprovalCard({
           type="button"
           onClick={approve}
           disabled={saving}
-          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-[var(--accent-primary)] px-4 py-2 text-base font-semibold text-white disabled:opacity-50 sm:w-auto"
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-[var(--accent-green)] px-4 py-2 text-base font-semibold text-[var(--on-accent)] disabled:opacity-50 sm:w-auto"
         >
           {saving ? "Saving…" : "OK, send it"}
         </button>

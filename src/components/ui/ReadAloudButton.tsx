@@ -125,7 +125,7 @@ export function ReadAloudButton({
       type="button"
       onClick={toggle}
       aria-pressed={speaking}
-      className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--text-secondary)] ${className}`}
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-muted)] ${className}`}
     >
       {speaking ? <Stop size={16} weight="fill" /> : <SpeakerHigh size={16} />}
       {speaking ? "Stop" : label}

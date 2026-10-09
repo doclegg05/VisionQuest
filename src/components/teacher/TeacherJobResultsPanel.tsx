@@ -147,9 +147,9 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Briefcase size={18} className="text-[var(--primary)]" />
-            <p className="text-sm font-medium text-[var(--text-primary)]">Job results</p>
+            <p className="text-sm font-medium text-[var(--ink-strong)]">Job results</p>
           </div>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+          <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">
             {data
               ? `${data.totalUnique} unique roles from ${data.totalListings} active listings`
               : "Active jobs found for this class."}
@@ -158,16 +158,16 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
         </div>
         <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[20rem]">
           <div className="rounded-lg border border-[var(--border)] px-2 py-2">
-            <p className="text-base font-semibold text-[var(--text-primary)]">{data?.totalUnique ?? 0}</p>
-            <p className="text-[0.68rem] text-[var(--text-secondary)]">roles</p>
+            <p className="text-base font-semibold text-[var(--ink-strong)]">{data?.totalUnique ?? 0}</p>
+            <p className="text-[0.68rem] text-[var(--ink-muted)]">roles</p>
           </div>
           <div className="rounded-lg border border-[var(--border)] px-2 py-2">
-            <p className="text-base font-semibold text-[var(--text-primary)]">{data?.duplicateGroups ?? 0}</p>
-            <p className="text-[0.68rem] text-[var(--text-secondary)]">merged</p>
+            <p className="text-base font-semibold text-[var(--ink-strong)]">{data?.duplicateGroups ?? 0}</p>
+            <p className="text-[0.68rem] text-[var(--ink-muted)]">merged</p>
           </div>
           <div className="rounded-lg border border-[var(--border)] px-2 py-2">
-            <p className="text-base font-semibold text-[var(--text-primary)]">{data?.filteredUnique ?? 0}</p>
-            <p className="text-[0.68rem] text-[var(--text-secondary)]">shown</p>
+            <p className="text-base font-semibold text-[var(--ink-strong)]">{data?.filteredUnique ?? 0}</p>
+            <p className="text-[0.68rem] text-[var(--ink-muted)]">shown</p>
           </div>
         </div>
       </div>
@@ -176,7 +176,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
         <label className="relative block">
           <MagnifyingGlass
             size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-muted)]"
           />
           <input
             value={query}
@@ -185,7 +185,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
               setPage(1);
             }}
             placeholder="Search title, company, location"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] py-2 pl-9 pr-3 text-sm text-[var(--text-primary)]"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] py-2 pl-9 pr-3 text-sm text-[var(--ink-strong)]"
           />
         </label>
         <select
@@ -194,7 +194,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             setSource(event.target.value);
             setPage(1);
           }}
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-strong)]"
         >
           <option value="">All sources</option>
           {(data?.sourceOptions ?? []).map((option) => (
@@ -209,7 +209,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             setCluster(event.target.value);
             setPage(1);
           }}
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-strong)]"
         >
           {CLUSTER_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -223,7 +223,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             setWorkMode(event.target.value);
             setPage(1);
           }}
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-strong)]"
         >
           <option value="">All work modes</option>
           {(data?.workModeOptions ?? []).map((option) => (
@@ -238,7 +238,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             setSort(event.target.value);
             setPage(1);
           }}
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-strong)]"
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -256,13 +256,13 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
 
       <div className="mt-4 space-y-2">
         {loading && (
-          <div className="rounded-lg border border-[var(--border)] px-3 py-6 text-center text-sm text-[var(--text-secondary)]">
+          <div className="rounded-lg border border-[var(--border)] px-3 py-6 text-center text-sm text-[var(--ink-muted)]">
             Loading job results...
           </div>
         )}
 
         {!loading && data?.jobs.length === 0 && (
-          <div className="rounded-lg border border-[var(--border)] px-3 py-6 text-center text-sm text-[var(--text-secondary)]">
+          <div className="rounded-lg border border-[var(--border)] px-3 py-6 text-center text-sm text-[var(--ink-muted)]">
             No jobs match the current filters.
           </div>
         )}
@@ -271,15 +271,15 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           <div key={job.id} className="rounded-lg border border-[var(--border)] px-3 py-3">
             <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
               <div className="min-w-0">
-                <p className="break-words text-sm font-semibold text-[var(--text-primary)]">{job.title}</p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{job.title}</p>
+                <p className="mt-1 text-xs text-[var(--ink-muted)]">
                   {job.company} · {job.location}
                   {job.salary ? ` · ${job.salary}` : ""}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {job.savedCount > 0 && (
-                  <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-1 text-xs text-[var(--text-secondary)]">
+                  <span className="rounded-full bg-[var(--surface-raised)] px-2 py-1 text-xs text-[var(--ink-muted)]">
                     {job.savedCount} saved
                   </span>
                 )}
@@ -287,20 +287,20 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
                   href={job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--surface-elevated)] px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--primary)]"
+                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--surface-raised)] px-3 py-1.5 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--primary)]"
                 >
                   <ArrowSquareOut size={14} />
                   View
                 </a>
               </div>
             </div>
-            <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">{job.description}</p>
+            <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--ink-muted)]">{job.description}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {job.workModes.slice(0, 3).map((mode) => (
                 <span
                   key={mode}
                   className={`rounded-full px-2 py-0.5 text-xs ${
-                    WORK_MODE_STYLES[mode] ?? "bg-[var(--surface-elevated)] text-[var(--text-secondary)]"
+                    WORK_MODE_STYLES[mode] ?? "bg-[var(--surface-raised)] text-[var(--ink-muted)]"
                   }`}
                 >
                   {formatJobWorkMode(mode)}
@@ -309,13 +309,13 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
               {job.sources.slice(0, 4).map((item) => (
                 <span
                   key={item.value}
-                  className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+                  className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--ink-muted)]"
                 >
                   {item.label}
                 </span>
               ))}
               {job.sourceCount > 4 && (
-                <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+                <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--ink-muted)]">
                   +{job.sourceCount - 4} sources
                 </span>
               )}
@@ -327,12 +327,12 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
               {job.clusters.slice(0, 3).map((item) => (
                 <span
                   key={item}
-                  className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+                  className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink-muted)]"
                 >
                   {clusterLabel(item)}
                 </span>
               ))}
-              <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+              <span className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink-muted)]">
                 Updated {formatDate(job.updatedAt)}
               </span>
             </div>
@@ -346,19 +346,19 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             type="button"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={data.page <= 1}
-            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--text-primary)] disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
           >
             <CaretLeft size={14} />
             Previous
           </button>
-          <p className="text-xs text-[var(--text-secondary)]">
+          <p className="text-xs text-[var(--ink-muted)]">
             Page {data.page} of {data.totalPages}
           </p>
           <button
             type="button"
             onClick={() => setPage((current) => Math.min(data.totalPages, current + 1))}
             disabled={data.page >= data.totalPages}
-            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--text-primary)] disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
           >
             Next
             <CaretRight size={14} />
