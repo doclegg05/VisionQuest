@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { FormDialog } from "@/components/ui/FormDialog";
 import { api, apiFetch } from "@/lib/api";
 import { FIELD_TYPES, type FieldDef, type FieldType } from "@/lib/forms/schema";
+import { PROGRAM_FULL_NAMES, PROGRAM_TYPES } from "@/lib/program-type";
 
 interface FormBuilderProps {
   mode: "new" | "edit";
@@ -96,6 +97,7 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const programsHintId = useId();
 
   const dirty = builderDirty(initial, { title, description, isOfficial, programTypes, fields });
 
@@ -225,10 +227,10 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
                   className="field w-full px-3 py-2 text-sm"
                 />
               </label>
-              <label className="space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Programs</span>
+              <fieldset className="space-y-1" aria-describedby={programsHintId}>
+                <legend className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Programs</legend>
                 <div className="flex flex-wrap gap-3 py-1">
-                  {(["spokes", "adult_ed", "ietp"] as const).map((value) => (
+                  {PROGRAM_TYPES.map((value) => (
                     <label key={value} className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-strong)]">
                       <input
                         type="checkbox"
@@ -241,12 +243,12 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
                           )
                         }
                       />
-                      {value}
+                      {PROGRAM_FULL_NAMES[value]}
                     </label>
                   ))}
                 </div>
-                <p className="text-xs text-[var(--ink-faint)]">Leave empty to show to all programs.</p>
-              </label>
+                <p id={programsHintId} className="text-xs text-[var(--ink-faint)]">Leave empty to show to all programs.</p>
+              </fieldset>
               <label className="inline-flex items-center gap-2 self-end text-sm text-[var(--ink-strong)]">
                 <input
                   type="checkbox"

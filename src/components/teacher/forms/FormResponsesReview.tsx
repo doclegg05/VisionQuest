@@ -40,6 +40,8 @@ interface ResponseDetail {
   };
 }
 
+type ReviewStatus = "reviewed" | "needs_changes";
+
 const STATUS_LABEL: Record<ResponseRow["status"], string> = {
   draft: "Draft",
   submitted: "Submitted",
@@ -99,22 +101,20 @@ export default function FormResponsesReview() {
     }
   }
 
-  async function handleReview(id: string, status: "reviewed" | "needs_changes", reviewerNotes: string | undefined) {
-    try {
-      const res = await apiFetch(`/api/teacher/forms/responses/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, reviewerNotes }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error ?? "Review failed");
-      }
-      setDetail(null);
-      if (selectedTemplateId) await fetchResponses(selectedTemplateId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Review failed.");
+  // Rejects on failure: the review dialog is modal, so the page-level alert
+  // below is inert while it is open. ReviewDrawer shows the message instead.
+  async function handleReview(id: string, status: ReviewStatus, reviewerNotes: string | undefined) {
+    const res = await apiFetch(`/api/teacher/forms/responses/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, reviewerNotes }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error ?? "Review failed.");
     }
+    setDetail(null);
+    if (selectedTemplateId) await fetchResponses(selectedTemplateId);
   }
 
   const activeTemplates = useMemo(
@@ -196,14 +196,37 @@ export default function FormResponsesReview() {
 interface ReviewDrawerProps {
   response: ResponseDetail;
   onClose: () => void;
-  onReview: (id: string, status: "reviewed" | "needs_changes", notes: string | undefined) => Promise<void>;
+  /** Rejects with an Error whose message the dialog shows to the teacher. */
+  onReview: (id: string, status: ReviewStatus, notes: string | undefined) => Promise<void>;
+}
+
+/**
+ * Runs a review and returns the message to show inside the review dialog,
+ * or null when it succeeded.
+ */
+export async function runReview(review: () => Promise<void>): Promise<string | null> {
+  try {
+    await review();
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : "Review failed.";
+  }
 }
 
 export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps) {
   const initialNotes = response.reviewerNotes ?? "";
   const [notes, setNotes] = useState(initialNotes);
   const [submitting, setSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const canReview = response.status === "submitted" || response.status === "needs_changes" || response.status === "reviewed";
+
+  async function submitReview(status: ReviewStatus, reviewerNotes: string | undefined) {
+    setSubmitting(true);
+    setReviewError(null);
+    const failure = await runReview(() => onReview(response.id, status, reviewerNotes));
+    setReviewError(failure);
+    setSubmitting(false);
+  }
 
   return (
     <FormDialog
@@ -239,6 +262,12 @@ export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps)
           </label>
         </section>
 
+        {reviewError && (
+          <p role="alert" className="text-sm text-[var(--badge-error-text)]">
+            {reviewError}
+          </p>
+        )}
+
         <footer className="flex flex-wrap justify-end gap-2 border-t border-[var(--border)] pt-4">
           <button
             type="button"
@@ -250,11 +279,7 @@ export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps)
           <button
             type="button"
             disabled={submitting || !canReview || !notes.trim()}
-            onClick={async () => {
-              setSubmitting(true);
-              await onReview(response.id, "needs_changes", notes.trim());
-              setSubmitting(false);
-            }}
+            onClick={() => void submitReview("needs_changes", notes.trim())}
             className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-red)] disabled:opacity-50"
           >
             Needs changes
@@ -262,11 +287,7 @@ export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps)
           <button
             type="button"
             disabled={submitting || !canReview}
-            onClick={async () => {
-              setSubmitting(true);
-              await onReview(response.id, "reviewed", notes.trim() || undefined);
-              setSubmitting(false);
-            }}
+            onClick={() => void submitReview("reviewed", notes.trim() || undefined)}
             className="primary-button px-5 py-2 text-sm disabled:opacity-50"
           >
             Mark reviewed
