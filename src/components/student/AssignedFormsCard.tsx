@@ -82,7 +82,7 @@ export default function AssignedFormsCard() {
         <Link
           href="/forms"
           prefetch={false}
-          className="text-sm font-semibold text-[var(--accent-green)]"
+          className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-green)]"
         >
           See all
         </Link>
@@ -122,7 +122,7 @@ export default function AssignedFormsCard() {
       {hasMore && (
         <p className="mt-2 text-xs text-[var(--ink-faint)]">
           +{forms.length - visible.length} more on{" "}
-          <Link href="/forms" prefetch={false} className="underline">
+          <Link href="/forms" prefetch={false} className="inline-flex min-h-11 items-center underline">
             /forms
           </Link>
         </p>

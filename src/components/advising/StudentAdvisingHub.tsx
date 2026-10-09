@@ -225,21 +225,29 @@ export default function StudentAdvisingHub({
                 </select>
               </label>
 
-              <input
-                type="text"
-                value={bookingForm.title}
-                onChange={(event) => setBookingForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Appointment title (optional)"
-                className="min-h-11 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-              />
+              <label className="block text-sm text-[var(--ink-muted)]">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                  Appointment title (optional)
+                </span>
+                <input
+                  type="text"
+                  value={bookingForm.title}
+                  onChange={(event) => setBookingForm((current) => ({ ...current, title: event.target.value }))}
+                  className="min-h-11 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                />
+              </label>
 
-              <textarea
-                value={bookingForm.description}
-                onChange={(event) => setBookingForm((current) => ({ ...current, description: event.target.value }))}
-                placeholder="What would you like help with?"
-                rows={4}
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-              />
+              <label className="block text-sm text-[var(--ink-muted)]">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                  What would you like help with? (optional)
+                </span>
+                <textarea
+                  value={bookingForm.description}
+                  onChange={(event) => setBookingForm((current) => ({ ...current, description: event.target.value }))}
+                  rows={4}
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                />
+              </label>
 
               <button
                 type="button"
@@ -338,7 +346,7 @@ export default function StudentAdvisingHub({
                         href={appointment.meetingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-semibold text-[var(--accent-strong)]"
+                        className="inline-flex min-h-11 items-center font-semibold text-[var(--accent-strong)]"
                       >
                         Join meeting
                       </a>

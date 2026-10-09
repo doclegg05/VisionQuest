@@ -9,6 +9,7 @@ import {
   type GoalPlanEntry,
 } from "@/lib/goal-resource-links";
 import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface DashboardActionStudent {
   id: string;
@@ -129,6 +130,7 @@ export default function DashboardActionPanel({
   const [assigningKey, setAssigningKey] = useState<string | null>(null);
   const [taskForm, setTaskForm] = useState(() => buildTaskDraft(intent));
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { dueAt: string; notes: string }>>({});
+  const { prompt, confirmDialog } = useConfirm();
 
   const loadContext = useCallback(async () => {
     if (intent.kind === "create_task") {
@@ -204,9 +206,13 @@ export default function DashboardActionPanel({
 
   async function handleReviewForm(submissionId: string, status: "approved" | "rejected") {
     const notes = status === "rejected"
-      ? window.prompt("Optional note for the student:", "")
+      ? await prompt({
+          title: "Return this form to the student?",
+          label: "Note for the student (optional)",
+          confirmLabel: "Return form",
+        })
       : "";
-    if (status === "rejected" && notes === null) {
+    if (notes === null) {
       return;
     }
 
@@ -369,8 +375,8 @@ export default function DashboardActionPanel({
                       <span
                         className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                           submission.status === "pending"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-rose-100 text-rose-800"
+                            ? "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"
+                            : "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]"
                         }`}
                       >
                         {submission.status === "pending" ? "Awaiting review" : "Needs revision"}
@@ -393,7 +399,7 @@ export default function DashboardActionPanel({
                         href={`/api/files/download?id=${submission.file.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                       >
                         View file
                       </a>
@@ -404,7 +410,7 @@ export default function DashboardActionPanel({
                           type="button"
                           onClick={() => handleReviewForm(submission.id, "approved")}
                           disabled={reviewingFormId === submission.id}
-                          className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="primary-button pointer-coarse:min-h-11 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {reviewingFormId === submission.id ? "Saving..." : "Approve"}
                         </button>
@@ -412,7 +418,7 @@ export default function DashboardActionPanel({
                           type="button"
                           onClick={() => handleReviewForm(submission.id, "rejected")}
                           disabled={reviewingFormId === submission.id}
-                          className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center pointer-coarse:min-h-11 rounded-full bg-[var(--error)] px-3 py-1.5 text-xs font-semibold text-[var(--on-error)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {reviewingFormId === submission.id ? "Saving..." : "Return"}
                         </button>
@@ -481,7 +487,7 @@ export default function DashboardActionPanel({
                             href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                            className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                           >
                             Open
                           </a>
@@ -532,7 +538,7 @@ export default function DashboardActionPanel({
                                 href={recommendation.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                                className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                               >
                                 View
                               </a>
@@ -541,7 +547,7 @@ export default function DashboardActionPanel({
                               type="button"
                               onClick={() => handleAssign(selectedGoal.goal.id, recommendation)}
                               disabled={alreadyLinked || assigningKey === draftKey}
-                              className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
+                              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
                             >
                               {alreadyLinked ? "Assigned" : assigningKey === draftKey ? "Assigning..." : "Assign"}
                             </button>
@@ -655,6 +661,7 @@ export default function DashboardActionPanel({
           </label>
         </form>
       ) : null}
+      {confirmDialog}
     </div>
   );
 }

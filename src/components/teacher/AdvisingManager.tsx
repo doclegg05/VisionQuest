@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { WEEKDAY_OPTIONS, formatMinutesLabel } from "@/lib/advising-ui";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface AvailabilityBlock {
   id: string;
@@ -34,6 +35,7 @@ export default function AdvisingManager() {
     locationLabel: "Zoom",
     meetingUrl: "",
   });
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     void fetchAvailability();
@@ -94,7 +96,15 @@ export default function AdvisingManager() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Remove this availability block?")) return;
+    if (
+      !(await confirm({
+        title: "Remove this availability block?",
+        message: "Students can no longer book times from it.",
+        confirmLabel: "Remove",
+      }))
+    ) {
+      return;
+    }
 
     setStatusMessage(null);
     try {
@@ -138,8 +148,8 @@ export default function AdvisingManager() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
-        <button onClick={() => void fetchAvailability()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
+        <button onClick={() => void fetchAvailability()} className="primary-button px-4 py-2 rounded-lg">
           Try Again
         </button>
       </div>
@@ -161,7 +171,7 @@ export default function AdvisingManager() {
         </div>
         <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Scheduled</p>
-          <p className="mt-2 text-2xl font-bold text-teal-700">{scheduledAppointments}</p>
+          <p className="mt-2 text-2xl font-bold text-[var(--badge-success-text)]">{scheduledAppointments}</p>
           <p className="text-sm text-[var(--ink-muted)]">Upcoming advising appointments on your calendar</p>
         </div>
         <div className="theme-card rounded-xl p-4">
@@ -206,13 +216,13 @@ export default function AdvisingManager() {
                         {block.slotMinutes}-minute slots • {block.locationLabel || block.locationType.replace("_", " ")}
                       </p>
                       {block.meetingUrl ? (
-                        <p className="mt-1 text-xs text-blue-600">{block.meetingUrl}</p>
+                        <p className="mt-1 text-xs text-[var(--badge-info-text)]">{block.meetingUrl}</p>
                       ) : null}
                     </div>
                     <button
                       type="button"
                       onClick={() => void handleDelete(block.id)}
-                      className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
+                      className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-error-text)] hover:underline px-2 py-1"
                     >
                       Remove
                     </button>
@@ -233,7 +243,7 @@ export default function AdvisingManager() {
               <select
                 value={form.weekday}
                 onChange={(event) => setForm((current) => ({ ...current, weekday: event.target.value }))}
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               >
                 {WEEKDAY_OPTIONS.map((weekday) => (
                   <option key={weekday.value} value={weekday.value}>
@@ -249,7 +259,7 @@ export default function AdvisingManager() {
                 type="time"
                 value={form.startTime}
                 onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))}
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               />
             </label>
 
@@ -259,7 +269,7 @@ export default function AdvisingManager() {
                 type="time"
                 value={form.endTime}
                 onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))}
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               />
             </label>
 
@@ -268,7 +278,7 @@ export default function AdvisingManager() {
               <select
                 value={form.slotMinutes}
                 onChange={(event) => setForm((current) => ({ ...current, slotMinutes: event.target.value }))}
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               >
                 {[15, 30, 45, 60].map((minutes) => (
                   <option key={minutes} value={minutes}>
@@ -285,7 +295,7 @@ export default function AdvisingManager() {
               <select
                 value={form.locationType}
                 onChange={(event) => setForm((current) => ({ ...current, locationType: event.target.value }))}
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               >
                 <option value="virtual">Virtual</option>
                 <option value="in_person">In person</option>
@@ -300,24 +310,26 @@ export default function AdvisingManager() {
                 value={form.locationLabel}
                 onChange={(event) => setForm((current) => ({ ...current, locationLabel: event.target.value }))}
                 placeholder="Zoom, Room 201, Phone"
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               />
             </label>
           </div>
 
-          <input
-            type="url"
-            value={form.meetingUrl}
-            onChange={(event) => setForm((current) => ({ ...current, meetingUrl: event.target.value }))}
-            placeholder="Optional meeting link"
-            className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <label className="block text-sm text-[var(--ink-muted)]">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">Meeting link (optional)</span>
+            <input
+              type="url"
+              value={form.meetingUrl}
+              onChange={(event) => setForm((current) => ({ ...current, meetingUrl: event.target.value }))}
+              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+            />
+          </label>
 
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => void handleSave()}
-              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="primary-button text-sm px-4 py-2 rounded-lg"
             >
               Add Availability
             </button>
@@ -334,11 +346,12 @@ export default function AdvisingManager() {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-[var(--accent-blue)] hover:text-[var(--badge-info-text)] transition-colors"
         >
           + Add Office Hours
         </button>
       )}
+      {confirmDialog}
     </div>
   );
 }

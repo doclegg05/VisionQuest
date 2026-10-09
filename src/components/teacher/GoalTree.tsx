@@ -18,20 +18,20 @@ interface GoalTreeProps {
 
 // Level config
 const LEVEL_CONFIG: Record<string, { label: string; icon: string; color: string; indent: number }> = {
-  bhag: { label: "Big Vision", icon: GOAL_LEVEL_META.bhag.icon, color: "from-amber-100 to-orange-50 border-amber-200", indent: 0 },
-  monthly: { label: "Monthly Goal", icon: GOAL_LEVEL_META.monthly.icon, color: "from-sky-50 to-cyan-50 border-sky-200", indent: 1 },
-  weekly: { label: "Weekly Goal", icon: "📋", color: "from-violet-50 to-purple-50 border-violet-200", indent: 2 },
-  daily: { label: "Daily Goal", icon: "⚡", color: "from-emerald-50 to-green-50 border-emerald-200", indent: 3 },
+  bhag: { label: "Big Vision", icon: GOAL_LEVEL_META.bhag.icon, color: "from-[var(--badge-warning-bg)] to-[var(--badge-warning-bg)]/40 border-[var(--badge-warning-bg)]", indent: 0 },
+  monthly: { label: "Monthly Goal", icon: GOAL_LEVEL_META.monthly.icon, color: "from-[var(--badge-info-bg)] to-[var(--badge-info-bg)]/40 border-[var(--badge-info-bg)]", indent: 1 },
+  weekly: { label: "Weekly Goal", icon: "📋", color: "from-[var(--surface-muted)] to-[var(--surface-muted)] border-[var(--border)]", indent: 2 },
+  daily: { label: "Daily Goal", icon: "⚡", color: "from-[var(--badge-success-bg)] to-[var(--badge-success-bg)]/40 border-[var(--badge-success-bg)]", indent: 3 },
   task: { label: "Action Task", icon: GOAL_LEVEL_META.task.icon, color: "from-[var(--surface-soft)] to-[var(--surface-soft)] border-[var(--border)]", indent: 4 },
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  proposed: { label: "Proposed", className: "bg-indigo-100 text-indigo-700" },
-  active: { label: "Active", className: "bg-emerald-100 text-emerald-700" },
-  in_progress: { label: "In Progress", className: "bg-sky-100 text-sky-700" },
-  confirmed: { label: "Confirmed", className: "bg-teal-100 text-teal-700" },
-  blocked: { label: "Blocked", className: "bg-amber-100 text-amber-800" },
-  completed: { label: "Done", className: "bg-violet-100 text-violet-700" },
+  proposed: { label: "Proposed", className: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]" },
+  active: { label: "Active", className: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]" },
+  in_progress: { label: "In Progress", className: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]" },
+  confirmed: { label: "Confirmed", className: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]" },
+  blocked: { label: "Blocked", className: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]" },
+  completed: { label: "Done", className: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]" },
   abandoned: { label: "Dropped", className: "bg-[var(--surface-interactive)] text-[var(--ink-muted)]" },
 };
 
@@ -82,12 +82,6 @@ export default function GoalTree({ goals }: GoalTreeProps) {
     };
     const isCollapsed = collapsed.has(goal.id);
     const hasChildren = goal.children.length > 0;
-    const isLightTintedRow = goal.level !== "task";
-    const eyebrowTextClass = isLightTintedRow ? "text-slate-700" : "text-[var(--ink-muted)]";
-    const bodyTextClass = isLightTintedRow ? "text-slate-900" : "text-[var(--ink-strong)]";
-    const toggleTextClass = isLightTintedRow
-      ? "text-slate-700 hover:text-slate-900"
-      : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]";
 
     return (
       <div key={goal.id} style={{ marginLeft: `${depth * 1.5}rem` }}>
@@ -97,14 +91,16 @@ export default function GoalTree({ goals }: GoalTreeProps) {
               {hasChildren && (
                 <button
                   onClick={() => toggleCollapse(goal.id)}
-                  className={`shrink-0 text-xs transition-colors ${toggleTextClass}`}
+                  aria-label="Steps under this goal"
+                  aria-expanded={!isCollapsed}
+                  className="inline-flex size-8 shrink-0 items-center justify-center pointer-coarse:size-11 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
                 >
-                  <span className={`inline-block transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▶</span>
+                  <span aria-hidden="true" className={`inline-block transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▶</span>
                 </button>
               )}
               <span className="shrink-0">{config.icon}</span>
-              <span className={`text-xs font-semibold uppercase tracking-wider shrink-0 ${eyebrowTextClass}`}>{config.label}</span>
-              <p className={`text-sm ${bodyTextClass}`}>{goal.content}</p>
+              <span className="text-xs font-semibold uppercase tracking-wider shrink-0 text-[var(--ink-muted)]">{config.label}</span>
+              <p className="text-sm text-[var(--ink-strong)]">{goal.content}</p>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
               {status.label}
