@@ -305,7 +305,7 @@ export default function GrantKpiReport() {
         <p className="text-[var(--badge-error-text)] mb-4">{error || "Could not load grant KPI report."}</p>
         <button
           onClick={() => void loadData()}
-          className="primary-button px-4 py-2"
+          className="primary-button px-4 py-2 pointer-coarse:min-h-11"
         >
           Try Again
         </button>
@@ -430,7 +430,7 @@ export default function GrantKpiReport() {
         <button
           type="button"
           onClick={handleExportCsv}
-          className="rounded-lg border border-[var(--border-strong)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)]"
+          className="inline-flex items-center rounded-lg border border-[var(--border-strong)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-soft)] pointer-coarse:min-h-11"
         >
           Export CSV
         </button>

@@ -502,7 +502,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
         <button
           onClick={() => void loadData()}
-          className="primary-button px-4 py-2"
+          className="primary-button px-4 py-2 pointer-coarse:min-h-11"
         >
           Try Again
         </button>
@@ -634,7 +634,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             type="button"
             onClick={() => void handleSaveProfile()}
             disabled={savingProfile}
-            className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
+            className="inline-flex items-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
           >
             {savingProfile ? "Saving..." : "Save Record"}
           </button>
@@ -965,7 +965,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                                   type="button"
                                   onClick={() => void saveModule(template.id)}
                                   disabled={savingModuleId === template.id}
-                                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
+                                  className="inline-flex items-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
                                 >
                                   {progress ? "Update completion" : "Mark complete"}
                                 </button>
@@ -974,7 +974,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                                     type="button"
                                     onClick={() => void removeModule(template.id)}
                                     disabled={savingModuleId === template.id}
-                                    className="rounded-xl border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] px-4 py-2 text-sm text-[var(--urgency-critical-text)] transition hover:brightness-110 disabled:opacity-60"
+                                    className="inline-flex items-center rounded-xl border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] px-4 py-2 text-sm text-[var(--urgency-critical-text)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
                                   >
                                     Remove
                                   </button>
@@ -1113,7 +1113,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                 type="button"
                 onClick={() => void saveFollowUp()}
                 disabled={savingFollowUp}
-                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
               >
                 {savingFollowUp ? "Saving..." : "Save Follow-Up"}
               </button>

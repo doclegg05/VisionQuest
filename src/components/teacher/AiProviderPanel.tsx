@@ -680,7 +680,7 @@ export default function AiProviderPanel() {
                       setBearerToken("");
                       resetMessages();
                     }}
-                    className="rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
+                    className="inline-flex items-center rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)] pointer-coarse:min-h-11"
                   >
                     Clear Saved Token
                   </button>
@@ -729,7 +729,7 @@ export default function AiProviderPanel() {
                         setCloudflareClientSecret("");
                         resetMessages();
                       }}
-                      className="rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
+                      className="inline-flex items-center rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)] pointer-coarse:min-h-11"
                     >
                       Clear Saved Credentials
                     </button>
@@ -780,7 +780,7 @@ export default function AiProviderPanel() {
             type="button"
             onClick={() => void handleTest()}
             disabled={testing || !url}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
           >
             {testing ? "Testing..." : "Test Connection"}
           </button>

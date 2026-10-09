@@ -160,7 +160,7 @@ export default function PathwayManager() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
-        <button onClick={fetchPathways} className="primary-button px-4 py-2 rounded-lg">
+        <button onClick={fetchPathways} className="primary-button px-4 py-2 rounded-lg pointer-coarse:min-h-11">
           Try Again
         </button>
       </div>
@@ -323,11 +323,11 @@ export default function PathwayManager() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="primary-button text-sm px-4 py-2 rounded-lg disabled:opacity-50"
+              className="primary-button text-sm px-4 py-2 rounded-lg disabled:opacity-50 pointer-coarse:min-h-11"
             >
               {saving ? "Saving..." : editingId ? "Save Changes" : "Create Pathway"}
             </button>
-            <button onClick={resetForm} className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]">
+            <button onClick={resetForm} className="inline-flex items-center text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)] pointer-coarse:min-h-11">
               Cancel
             </button>
           </div>

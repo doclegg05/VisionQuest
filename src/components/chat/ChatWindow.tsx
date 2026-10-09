@@ -142,7 +142,7 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
               href={event.target}
               target={newTab ? "_blank" : undefined}
               rel={newTab ? "noopener noreferrer" : undefined}
-              className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-3 py-2 text-sm font-semibold text-[var(--chat-sage-action)] shadow-sm transition-colors hover:bg-[var(--chat-sage-mark-bg)]"
+              className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-3 py-2 text-sm font-semibold text-[var(--chat-sage-action)] shadow-sm transition-colors hover:bg-[var(--chat-sage-mark-bg)]"
             >
               <ArrowSquareOut size={17} weight="bold" className="shrink-0" />
               <span className="truncate">{event.label || "Open"}</span>
