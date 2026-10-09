@@ -118,7 +118,7 @@ export default function NotificationBell() {
                 const href = n.type.startsWith("nudge.")
                   ? studentInterventionHref(n.type)
                   : n.type.startsWith("teacher_nudge.")
-                    ? "/teacher-dashboard"
+                    ? "/teacher"
                     : n.type === "sage_daily_prompt"
                       ? "/chat"
                       : null;
