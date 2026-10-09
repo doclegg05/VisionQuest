@@ -55,6 +55,16 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+/** Width change, in percent of the board, for one arrow-key press on the resize handle. */
+const RESIZE_KEY_STEPS: Partial<Record<string, number>> = { ArrowLeft: -2, ArrowRight: 2 };
+
+/** New pin width for a key press on the resize handle, or null when the key does not resize. */
+export function resizeWidthForKey(key: string, width: number, bounds: { min: number; max: number }): number | null {
+  const step = RESIZE_KEY_STEPS[key];
+  if (step === undefined) return null;
+  return clamp(width + step, bounds.min, bounds.max);
+}
+
 const LABEL_PREVIEW_CHARS = 40;
 
 /** Accessible name for a pin's remove button, so a screen reader says which pin goes. */
@@ -186,6 +196,14 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
     setIsResizing(true);
   }, [item.width]);
 
+  const handleResizeKey = useCallback((e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const width = resizeWidthForKey(e.key, item.width, widthBounds);
+    if (width === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dispatchResize(width);
+  }, [dispatchResize, item.width, widthBounds]);
+
   useEffect(() => {
     if (!isResizing) return;
 
@@ -251,24 +269,23 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         <div className="absolute left-1/2 top-3 h-1 w-2 -translate-x-1/2 rounded-full bg-black/10 blur-[1px]" />
       </div>
 
-      {hovering ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(item.id);
-          }}
-          className="group/remove absolute -right-4.5 -top-5.5 z-20 inline-flex size-11 items-center justify-center rounded-full"
-          aria-label={removePinLabel(item)}
+      {/* Always in the page so keyboard and VoiceOver can reach it; shown on pin hover, focus, or touch. */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(item.id);
+        }}
+        className="group/remove absolute -right-4.5 -top-5.5 z-20 inline-flex size-11 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+        aria-label={removePinLabel(item)}
+      >
+        <span
+          aria-hidden="true"
+          className="grid size-6 place-items-center rounded-full bg-red-500 text-white shadow-md transition-colors group-hover/remove:bg-red-600"
         >
-          <span
-            aria-hidden="true"
-            className="grid size-6 place-items-center rounded-full bg-red-500 text-white shadow-md transition-colors group-hover/remove:bg-red-600"
-          >
-            <X size={12} weight="bold" />
-          </span>
-        </button>
-      ) : null}
+          <X size={12} weight="bold" />
+        </span>
+      </button>
 
       {item.type === "note" ? (
         <div
@@ -325,6 +342,8 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         type="button"
         data-resize-handle="true"
         onPointerDown={handleResizeStart}
+        onKeyDown={handleResizeKey}
+        aria-keyshortcuts="ArrowLeft ArrowRight"
         className="group/resize absolute -bottom-1 -right-1 z-20 inline-flex size-11 items-center justify-center rounded-full"
         aria-label="Resize pin"
       >

@@ -81,9 +81,9 @@ function MetricCard({
       onClick={() => metricKey && onDrillDown?.(metricKey)}
       className={`rounded-xl border p-4 text-left transition-shadow hover:shadow-md ${statusColor}`}
     >
-      <p className="text-xs uppercase tracking-[0.16em] opacity-70">{m.label}</p>
+      <p className="text-xs uppercase tracking-[0.16em]">{m.label}</p>
       <p className="mt-2 text-3xl font-bold">{m.value}%</p>
-      <p className="mt-1 text-xs opacity-70">
+      <p className="mt-1 text-xs">
         {m.numerator} of {m.denominator}
         {m.target !== null && (
           <span className="ml-2">
@@ -92,7 +92,7 @@ function MetricCard({
         )}
       </p>
       {metricKey && (
-        <p className="mt-2 text-xs opacity-50">Click to view students</p>
+        <p className="mt-2 text-xs">Click to view students</p>
       )}
     </button>
   );
