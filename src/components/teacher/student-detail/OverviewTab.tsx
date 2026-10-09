@@ -315,7 +315,7 @@ export default function OverviewTab({
             </div>
             {(progression.streaks?.daily?.current ?? 0) > 0 && (
               <div>
-                <p className="text-lg font-bold text-[var(--badge-warning-text)]">{"\uD83D\uDD25"} {progression.streaks?.daily?.current ?? 0}</p>
+                <p className="text-lg font-bold text-[var(--badge-success-text)]">{"\uD83D\uDD25"} {progression.streaks?.daily?.current ?? 0}</p>
                 <p className="text-xs text-[var(--ink-faint)]">Day Streak</p>
               </div>
             )}
@@ -324,7 +324,7 @@ export default function OverviewTab({
               <p className="text-xs text-[var(--ink-faint)]">Appointments</p>
             </div>
             <div>
-              <p className="text-lg font-bold text-[var(--badge-warning-text)]">{openTasks.length}</p>
+              <p className="text-lg font-bold text-[var(--badge-info-text)]">{openTasks.length}</p>
               <p className="text-xs text-[var(--ink-faint)]">Open Tasks</p>
             </div>
             <div>

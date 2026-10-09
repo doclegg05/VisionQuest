@@ -199,8 +199,17 @@ describe("D3 axe-authenticated — select-name", () => {
     const src = read("src/components/teacher/student-detail/OperationsTab.tsx");
     const idx = src.indexOf("noteForm.category");
     assert.ok(idx > -1, "could not find the case-notes category select");
-    const block = src.slice(idx, idx + 300);
-    assert.ok(block.includes('aria-label="Note category"'), "case-notes select missing an accessible name");
+    // The name now comes from a visible wrapping <label> ("Category"), so
+    // the select must sit inside that label with no closing tag between.
+    const selectStart = src.lastIndexOf("<select", idx);
+    const labelStart = src.lastIndexOf("<label", selectStart);
+    assert.ok(labelStart > -1 && selectStart > labelStart, "case-notes select must sit inside a <label>");
+    const labelHead = src.slice(labelStart, selectStart);
+    assert.ok(!labelHead.includes("</label>"), "case-notes select must sit inside a <label>");
+    assert.ok(/>\s*Category\s*</.test(labelHead), "case-notes select label must read 'Category'");
+    const selectEnd = src.indexOf("</select>", idx);
+    const labelEnd = src.indexOf("</label>", idx);
+    assert.ok(selectEnd > -1 && labelEnd > selectEnd, "case-notes select's label must close after the select");
   });
 });
 

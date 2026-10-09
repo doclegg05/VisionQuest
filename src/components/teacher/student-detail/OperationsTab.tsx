@@ -600,18 +600,22 @@ export default function OperationsTab({
         </p>
 
         <form onSubmit={onCreateNote} className="mt-4 grid gap-3 lg:grid-cols-[12rem_1fr_auto] lg:items-end">
-          <select
-            value={noteForm.category}
-            onChange={(event) => onNoteFormChange((current) => ({ ...current, category: event.target.value }))}
-            aria-label="Note category"
-            className="min-h-11 theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-          >
-            {NOTE_CATEGORIES.map((category) => (
-              <option key={category.value} value={category.value}>
-                {category.label}
-              </option>
-            ))}
-          </select>
+          <label className="block text-sm text-[var(--ink-muted)]">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+              Category
+            </span>
+            <select
+              value={noteForm.category}
+              onChange={(event) => onNoteFormChange((current) => ({ ...current, category: event.target.value }))}
+              className="block w-full min-h-11 theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+            >
+              {NOTE_CATEGORIES.map((category) => (
+                <option key={category.value} value={category.value}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="block text-sm text-[var(--ink-muted)]">
             <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
               Note
