@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Manrope, Sora } from "next/font/google";
 import { MotionProvider } from "@/components/ui/MotionProvider";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
-import { getThemeFromCookie, THEME_COOKIE } from "@/lib/theme";
+import { getThemePreferenceFromCookie, THEME_BOOT_SCRIPT, THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -28,7 +28,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#10253e",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f3f7f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a1628" },
+  ],
 };
 
 export default async function RootLayout({
@@ -37,10 +40,14 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const theme = getThemeFromCookie(cookieStore.get(THEME_COOKIE)?.value);
+  const preference = getThemePreferenceFromCookie(cookieStore.get(THEME_COOKIE)?.value);
+  const nonce = (await headers()).get("x-csp-nonce") ?? undefined;
 
   return (
-    <html lang="en" data-theme={theme}>
+    <html lang="en" data-theme={preference === "system" ? undefined : preference} suppressHydrationWarning>
+      <head>
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className={`${manrope.variable} ${sora.variable} antialiased`}>
         <a
           href="#main-content"
@@ -50,7 +57,7 @@ export default async function RootLayout({
         >
           Skip to main content
         </a>
-        <ThemeProvider initialTheme={theme}>
+        <ThemeProvider initialPreference={preference}>
           <MotionProvider>
             {children}
           </MotionProvider>

@@ -20,9 +20,17 @@ const PUBLIC_ROUTES = [
   { path: "/forgot-password", name: "forgot password" },
 ] as const;
 
+/**
+ * Both themes, set explicitly. The default follows the device, so an unset
+ * cookie would scan whichever appearance the runner happens to report.
+ */
+const THEMES = ["light", "dark"] as const;
+
 test.describe("Accessibility — public routes (WCAG 2.x A/AA)", () => {
-  for (const route of PUBLIC_ROUTES) {
-    test(`${route.name} (${route.path}) has no axe violations`, async ({ page }) => {
+  for (const theme of THEMES) for (const route of PUBLIC_ROUTES) {
+    test(`${route.name} (${route.path}, ${theme}) has no axe violations`, async ({ page, context }) => {
+      const { origin } = new URL(test.info().project.use.baseURL ?? "http://localhost:3000");
+      await context.addCookies([{ name: "vq-theme", value: theme, url: origin }]);
       await page.goto(route.path);
 
       const results = await new AxeBuilder({ page })
