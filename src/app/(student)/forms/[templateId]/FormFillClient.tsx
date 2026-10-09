@@ -259,11 +259,15 @@ interface FieldWidgetProps extends FieldInputProps {
   inputId: string;
   /** The visible label's id, for widgets that are a group of controls. */
   labelId: string;
+  /** The help text's id, when the field has help text. */
+  describedBy: string | undefined;
 }
 
-function FieldInput({ field, value, onChange, disabled }: FieldInputProps) {
+export function FieldInput({ field, value, onChange, disabled }: FieldInputProps) {
   const inputId = useId();
   const labelId = `${inputId}-label`;
+  const helpId = `${inputId}-help`;
+  const describedBy = field.helpText ? helpId : undefined;
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 space-y-2">
       <div>
@@ -272,22 +276,23 @@ function FieldInput({ field, value, onChange, disabled }: FieldInputProps) {
           {field.required && <span className="ml-1 text-[var(--accent-red)]">*</span>}
         </label>
         {field.helpText && (
-          <span className="mt-0.5 block text-xs text-[var(--ink-muted)]">{field.helpText}</span>
+          <span id={helpId} className="mt-0.5 block text-xs text-[var(--ink-muted)]">{field.helpText}</span>
         )}
         <div className="mt-2">
-          <FieldWidget field={field} value={value} onChange={onChange} disabled={disabled} inputId={inputId} labelId={labelId} />
+          <FieldWidget field={field} value={value} onChange={onChange} disabled={disabled} inputId={inputId} labelId={labelId} describedBy={describedBy} />
         </div>
       </div>
     </div>
   );
 }
 
-function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: FieldWidgetProps) {
+function FieldWidget({ field, value, onChange, disabled, inputId, labelId, describedBy }: FieldWidgetProps) {
   switch (field.type) {
     case "text":
       return (
         <input
           id={inputId}
+          aria-describedby={describedBy}
           type="text"
           value={typeof value === "string" ? value : ""}
           maxLength={field.maxLength}
@@ -300,6 +305,7 @@ function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: Fie
       return (
         <textarea
           id={inputId}
+          aria-describedby={describedBy}
           value={typeof value === "string" ? value : ""}
           maxLength={field.maxLength}
           disabled={disabled}
@@ -312,6 +318,7 @@ function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: Fie
       return (
         <input
           id={inputId}
+          aria-describedby={describedBy}
           type="number"
           value={typeof value === "number" ? value : ""}
           min={field.min}
@@ -327,6 +334,7 @@ function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: Fie
       return (
         <input
           id={inputId}
+          aria-describedby={describedBy}
           type="date"
           value={typeof value === "string" ? value : ""}
           disabled={disabled}
@@ -338,6 +346,7 @@ function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: Fie
       return (
         <select
           id={inputId}
+          aria-describedby={describedBy}
           value={typeof value === "string" ? value : ""}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value || undefined)}
@@ -354,7 +363,7 @@ function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: Fie
     case "multiselect": {
       const selected = Array.isArray(value) ? value : [];
       return (
-        <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-3">
+        <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="flex flex-wrap gap-3">
           {field.options.map((option) => (
             <label key={option} className="inline-flex items-center gap-2 text-sm">
               <input
@@ -379,6 +388,7 @@ function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: Fie
         <label className="inline-flex items-center gap-2 text-sm">
           <input
             id={inputId}
+            aria-describedby={describedBy}
             type="checkbox"
             checked={Boolean(value)}
             disabled={disabled}
@@ -389,18 +399,20 @@ function FieldWidget({ field, value, onChange, disabled, inputId, labelId }: Fie
       );
     case "attachment":
       return (
-        <AttachmentField inputId={inputId} value={value} disabled={disabled} onChange={onChange} />
+        <AttachmentField inputId={inputId} describedBy={describedBy} value={value} disabled={disabled} onChange={onChange} />
       );
   }
 }
 
 function AttachmentField({
   inputId,
+  describedBy,
   value,
   disabled,
   onChange,
 }: {
   inputId: string;
+  describedBy: string | undefined;
   value: Answers[string] | undefined;
   disabled: boolean;
   onChange: (value: Answers[string] | undefined) => void;
@@ -441,6 +453,7 @@ function AttachmentField({
       {!disabled && (
         <input
           id={inputId}
+          aria-describedby={describedBy}
           type="file"
           onChange={(event) => {
             const file = event.target.files?.[0];

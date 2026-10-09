@@ -21,10 +21,11 @@ interface GoalSupportPlannerProps {
   onChanged: () => Promise<void>;
 }
 
-// By meaning: proposed waits on the instructor, blocked is at risk, confirmed and completed are settled.
+// Same status map as GoalTree, which renders beside this planner: proposed and in progress are info,
+// active, confirmed and completed are success, blocked is a warning.
 const GOAL_STATUS_STYLES: Record<string, string> = {
-  proposed: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
-  active: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
+  proposed: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
+  active: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
   in_progress: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
   confirmed: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
   blocked: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
