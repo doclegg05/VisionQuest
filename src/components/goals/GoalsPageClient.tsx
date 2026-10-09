@@ -363,8 +363,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
     });
   }
 
-  // Remove with undo (B-32): hide now, send the PATCH after the undo window,
-  // put the goal back on Undo or when the request fails.
+  // Remove with undo (B-32): hide now, send the PATCH when the notice is
+  // dismissed, another removal follows, or the page is left; put the goal back
+  // on Undo or when the request fails.
   async function handleRemoveGoal(goalId: string) {
     const target = goalsById.get(goalId);
     if (!target) return;
@@ -376,6 +377,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
     setGoalHidden(goalId, true);
     scheduleRemoval({
       label: "Goal removed.",
+      restoredLabel: "Goal restored.",
+      focusAfterRestore: () =>
+        document.querySelector<HTMLElement>(`[data-goal-id="${CSS.escape(goalId)}"] button[aria-label^="Remove"]`),
       commit: async () => {
         const updatedGoal = await sendGoalRemoval(goalId);
         setGoals((current) => current.map((item) => (item.id === goalId ? updatedGoal : item)));
@@ -520,6 +524,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 {item.content}
               </span>
               <GoalRowActions
+                goalId={item.id}
                 label={label}
                 iconSize={12}
                 onEdit={() => {
@@ -750,6 +755,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                           {monthly.content}
                         </h3>
                         <GoalRowActions
+                          goalId={monthly.id}
                           label="Monthly"
                           iconSize={16}
                           onEdit={() => {
@@ -907,6 +913,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 {weekly.content}
                               </span>
                               <GoalRowActions
+                                goalId={weekly.id}
                                 label="Weekly"
                                 iconSize={14}
                                 onEdit={() => {
@@ -968,6 +975,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                       {task.content}
                                     </span>
                                     <GoalRowActions
+                                      goalId={task.id}
                                       label="Task"
                                       iconSize={12}
                                       onEdit={() => {
@@ -1072,6 +1080,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               {item.content}
                             </span>
                             <GoalRowActions
+                              goalId={item.id}
                               label="Item"
                               iconSize={12}
                               onEdit={() => {

@@ -5,6 +5,8 @@ import { PencilSimple, Trash } from "@phosphor-icons/react";
 interface GoalRowActionsProps {
   /** Row kind, used in the accessible names: "Edit Weekly", "Remove Weekly". */
   label: string;
+  /** The goal's id, so Undo can return focus to this row's controls. */
+  goalId?: string;
   onEdit: () => void;
   /** Removes the goal. The caller hides it and offers Undo before the request is sent (B-32). */
   onDismiss: () => void;
@@ -20,9 +22,9 @@ const BUTTON_BASE =
  * emphasis, it never reveals (F45 / UX-06). The negative vertical margin keeps
  * the row's layout height near the text line while the hit area stays 44px.
  */
-export function GoalRowActions({ label, onEdit, onDismiss, iconSize = 14 }: GoalRowActionsProps) {
+export function GoalRowActions({ label, goalId, onEdit, onDismiss, iconSize = 14 }: GoalRowActionsProps) {
   return (
-    <div className="-my-1.5 ml-2 flex shrink-0 gap-1">
+    <div data-goal-id={goalId} className="-my-1.5 ml-2 flex shrink-0 gap-1">
       <button
         type="button"
         onClick={onEdit}

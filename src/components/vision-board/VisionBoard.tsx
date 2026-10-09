@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import CorkboardCanvas from "./CorkboardCanvas";
 import VisionBoardToolbar from "./VisionBoardToolbar";
+import { removePinLabel } from "./VisionBoardPin";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { useUndo } from "@/components/ui/useUndo";
 
@@ -143,6 +144,12 @@ export default function VisionBoard() {
     setItems((prev) => prev.filter((entry) => entry.id !== id));
     scheduleRemoval({
       label: "Pin removed.",
+      restoredLabel: "Pin restored.",
+      // The board and the phone list each render the pin; focus whichever Remove is on screen.
+      focusAfterRestore: () =>
+        [...document.querySelectorAll<HTMLElement>("button[aria-label]")].find(
+          (button) => button.getAttribute("aria-label") === removePinLabel(pin) && button.offsetParent !== null,
+        ) ?? null,
       commit: async () => {
         try {
           await deletePin(id);

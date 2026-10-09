@@ -93,3 +93,17 @@ for (const width of [768, 834]) {
     expect(box?.width ?? 0, "a student must be able to see what they type").toBeGreaterThan(150);
   });
 }
+
+test("removing a goal by keyboard keeps focus useful: Undo, then back on the restored goal", async ({ page }) => {
+  await open(page, 1024);
+  const row = page.locator('[data-goal-id="t1"]');
+  await row.getByRole("button", { name: "Remove Task" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("List my last three jobs")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Undo" })).toBeFocused();
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("List my last three jobs")).toBeVisible();
+  await expect(page.locator('[role="status"][aria-live="polite"]').last()).toContainText("Goal restored.");
+  await expect(row.getByRole("button", { name: "Remove Task" })).toBeFocused();
+});
