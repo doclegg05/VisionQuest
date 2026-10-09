@@ -118,14 +118,14 @@ test.describe("FormDialog", () => {
     await expect(page.locator("#form-state")).toHaveText("closed");
   });
 
-  test("a dirty form asks before discarding, and Keep editing keeps it", async ({ page }) => {
+  test("a dirty form asks before discarding, and Cancel keeps it", async ({ page }) => {
     await openHarness(page);
     await page.click("#open-form");
     await page.getByLabel("What needs to be done?").fill("Call about the GED test");
     await page.keyboard.press("Escape");
     const ask = page.getByRole("alertdialog", { name: "Discard changes?" });
     await expect(ask).toBeVisible();
-    await ask.getByRole("button", { name: "Keep editing" }).click();
+    await ask.getByRole("button", { name: "Cancel" }).click();
     await expect(page.locator("#form-state")).toHaveText("open");
     await expect(page.getByLabel("What needs to be done?")).toHaveValue("Call about the GED test");
 
@@ -148,27 +148,50 @@ test.describe("FormDialog", () => {
     await expect(page.getByLabel("What needs to be done?")).toHaveValue("abc");
   });
 
-  test("repeated Escape never leaves the page locked behind a closed dialog", async ({ page }) => {
+  test("typed text survives any number of Escapes, and the page never locks", async ({ page }) => {
     await openHarness(page);
     await page.click("#open-form");
     await page.getByLabel("What needs to be done?").fill("abc");
-    // Escape is not user activation, so Chromium's close watcher stops letting
-    // cancel be prevented and force-closes the dialog; WebKit keeps asking.
-    // Either way the page must never end up behind a closed-but-mounted dialog.
-    for (let i = 0; i < 4; i++) await page.keyboard.press("Escape");
-    const state = await page.locator("#form-state").textContent();
-    const modals = await page.evaluate(() => document.querySelectorAll("dialog:modal").length);
-    if (state === "open") {
-      // Still open: the form itself must be the visible, usable modal.
-      await expect(page.getByRole("dialog", { name: "Quick task for Sam" })).toBeVisible();
-      await page.getByLabel("What needs to be done?").fill("still usable");
-      expect(modals).toBe(1);
-    } else {
-      // Closed: React followed the browser and nothing modal is left behind.
-      expect(modals).toBe(0);
-      await page.click("#open-prompt");
-      await expect(page.getByRole("alertdialog", { name: "Return this form?" })).toBeVisible();
-    }
+    // Escape is not user activation, so Chromium's close watcher eventually
+    // force-closes the dialog without a cancelable event. A dirty form must
+    // come back and ask instead of losing what was typed.
+    for (let i = 0; i < 8; i++) await page.keyboard.press("Escape");
+    const ask = page.getByRole("alertdialog", { name: "Discard changes?" });
+    if (await ask.isVisible()) await ask.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.locator("#form-state")).toHaveText("open");
+    await expect(page.getByRole("dialog", { name: "Quick task for Sam" })).toBeVisible();
+    await expect(page.getByLabel("What needs to be done?")).toHaveValue("abc");
+    await page.getByLabel("What needs to be done?").fill("abc still usable");
+  });
+
+  test("focus returns to the opener after Escape and after Save", async ({ page }) => {
+    // Opened from the keyboard: Safari does not focus a button on mouse click,
+    // and keyboard users are the ones a lost focus position strands.
+    await openHarness(page);
+    await page.focus("#open-form");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog", { name: "Quick task for Sam" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#form-state")).toHaveText("closed");
+    await expect(page.locator("#open-form")).toBeFocused();
+
+    await page.focus("#open-form");
+    await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: "Save task" }).click();
+    await expect(page.locator("#form-state")).toHaveText("closed");
+    await expect(page.locator("#open-form")).toBeFocused();
+  });
+
+  test("a text selection that ends on the backdrop does not close the form", async ({ page }) => {
+    await openHarness(page);
+    await page.click("#open-form");
+    const heading = await page.getByRole("heading", { name: "Quick task for Sam" }).boundingBox();
+    if (!heading) throw new Error("heading not found");
+    await page.mouse.move(heading.x + 4, heading.y + heading.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(5, 5, { steps: 5 });
+    await page.mouse.up();
+    await expect(page.locator("#form-state")).toHaveText("open");
   });
 
   test("the first field has focus when the dialog opens", async ({ page }) => {

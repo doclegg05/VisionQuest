@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef } from "react";
 import { useConfirm } from "./useConfirm";
 
 /** What a close request should do: close now, or ask before discarding input. */
@@ -22,10 +22,12 @@ interface FormDialogProps {
  * Modal form on a native <dialog>: showModal() supplies focus containment,
  * Escape, and inertness for the page behind. Escape and a backdrop tap both
  * request a close; a dirty form asks "Discard changes?" first. Mount it only
- * while the form should be open.
+ * while the form should be open; unmounting closes it and returns focus to
+ * the control that opened it.
  */
 export function FormDialog({ title, dirty, onClose, widthClass = "max-w-md", children }: FormDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const pressStartedOnBackdrop = useRef(false);
   const titleId = useId();
   const { confirm, confirmDialog } = useConfirm();
 
@@ -34,40 +36,67 @@ export function FormDialog({ title, dirty, onClose, widthClass = "max-w-md", chi
     if (dialog && !dialog.open) dialog.showModal();
   }, []);
 
+  // Close before React removes the node, so the browser runs its close steps
+  // and returns focus to the opener instead of leaving it on <body>.
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    return () => {
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
+
   const requestClose = useCallback(async () => {
     if (closeIntent(dirty) === "confirm-discard") {
       const discard = await confirm({
         title: "Discard changes?",
         message: "What you typed in this form will be lost.",
         confirmLabel: "Discard",
-        cancelLabel: "Keep editing",
+        cancelLabel: "Cancel",
       });
       if (!discard) return;
     }
     onClose();
   }, [confirm, dirty, onClose]);
 
+  const handleCancel = (event: React.SyntheticEvent<HTMLDialogElement>) => {
+    // React bubbles the nested "Discard changes?" dialog's cancel up to here;
+    // that one is useConfirm's to handle.
+    if (event.target !== event.currentTarget) return;
+    if (event.cancelable) {
+      event.preventDefault();
+      void requestClose();
+      return;
+    }
+    // Escape is not user activation, so the browser's close watcher may close
+    // the dialog without letting us prevent it. Follow a clean form; bring a
+    // dirty one back and ask, so typed text is never lost without a question.
+    if (!dirty) {
+      onClose();
+      return;
+    }
+    event.currentTarget.addEventListener(
+      "close",
+      (closed) => {
+        const dialog = closed.currentTarget as HTMLDialogElement;
+        dialog.showModal();
+        void requestClose();
+      },
+      { once: true },
+    );
+  };
+
   return (
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      onCancel={(event) => {
-        // React bubbles the nested "Discard changes?" dialog's cancel up to here;
-        // that one is useConfirm's to handle.
-        if (event.target !== event.currentTarget) return;
-        // Escape is not user activation, so after one prevented cancel the
-        // browser's close watcher force-closes the dialog. Follow it, or the
-        // closed dialog stays mounted and the page is left unclickable.
-        if (!event.cancelable) {
-          onClose();
-          return;
-        }
-        event.preventDefault();
-        void requestClose();
+      onCancel={handleCancel}
+      onPointerDown={(event) => {
+        pressStartedOnBackdrop.current = event.target === event.currentTarget;
       }}
       onClick={(event) => {
-        // A click on the <dialog> itself, not its panel, is a backdrop tap.
-        if (event.target === event.currentTarget) void requestClose();
+        // A click on the <dialog> itself, not its panel, is a backdrop tap. A
+        // text selection that only ends there started inside, so it is not.
+        if (event.target === event.currentTarget && pressStartedOnBackdrop.current) void requestClose();
       }}
       className={`m-auto w-[calc(100vw-2rem)] ${widthClass} max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-0 text-[var(--ink-strong)] shadow-2xl backdrop:bg-black/40`}
     >

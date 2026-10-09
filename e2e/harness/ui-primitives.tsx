@@ -82,6 +82,15 @@ function FormDialogCase() {
         >
           <label htmlFor="task-title">What needs to be done?</label>
           <input id="task-title" value={text} onChange={(e) => setText(e.target.value)} />
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setText("");
+            }}
+          >
+            Save task
+          </button>
         </FormDialog>
       )}
     </section>
