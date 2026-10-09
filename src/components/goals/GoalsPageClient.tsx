@@ -497,7 +497,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 aria-label={item.level === "weekly" ? "Weekly goal" : "Item"}
                 value={editingGoalContent}
                 onChange={(e) => setEditingGoalContent(e.target.value)}
-                className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                 autoFocus
               />
               <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
@@ -538,6 +538,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
       {message ? (
         <div
+          role={message.tone === "error" ? "alert" : "status"}
           className={`surface-section p-4 text-sm ${
             message.tone === "success"
               ? "border border-[var(--border-strong)] bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
@@ -742,7 +743,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                           aria-label="Monthly goal"
                           value={editingGoalContent}
                           onChange={(e) => setEditingGoalContent(e.target.value)}
-                          className="flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                          className="min-w-0 flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                           autoFocus
                         />
                         <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
@@ -879,7 +880,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 aria-label="Weekly goal"
                                 value={editingGoalContent}
                                 onChange={(e) => setEditingGoalContent(e.target.value)}
-                                className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                                className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                 autoFocus
                               />
                               <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
@@ -940,7 +941,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                       aria-label="Task"
                                       value={editingGoalContent}
                                       onChange={(e) => setEditingGoalContent(e.target.value)}
-                                      className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                                      className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                       autoFocus
                                     />
                                     <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
@@ -985,7 +986,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 placeholder="Type a task and press Enter..."
                                 value={addingTaskContent}
                                 onChange={(e) => setAddingTaskContent(e.target.value)}
-                                className="flex-1 px-2 py-0.5 text-xs border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                                className="min-w-0 flex-1 px-2 py-0.5 text-xs border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                 autoFocus
                               />
                               <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Add</button>
@@ -1044,7 +1045,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               aria-label="Item"
                               value={editingGoalContent}
                               onChange={(e) => setEditingGoalContent(e.target.value)}
-                              className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                              className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                               autoFocus
                             />
                             <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
@@ -1089,7 +1090,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         placeholder="Type a weekly goal and press Enter..."
                         value={addingWeeklyContent}
                         onChange={(e) => setAddingWeeklyContent(e.target.value)}
-                        className="flex-1 px-2.5 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                        className="min-w-0 flex-1 px-2.5 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                         autoFocus
                       />
                       <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Add</button>

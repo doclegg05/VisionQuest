@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import { FORMS, FORM_CATEGORIES, FormCategory } from "@/lib/spokes/forms";
 import ResourceCard from "./ResourceCard";
 
@@ -79,14 +80,18 @@ export default function ResourceLibrary({
   return (
     <div className="space-y-8">
       {/* Search */}
-      <div>
+      <div className="relative">
+        <MagnifyingGlass
+          className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-muted)]"
+          aria-hidden="true"
+        />
         <input
-          type="text"
+          type="search"
           aria-label="Search forms"
           placeholder="Search forms by title or description..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-3 text-sm text-[var(--ink-strong)] placeholder:text-[var(--muted)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
+          className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] py-3 pl-11 pr-5 text-sm text-[var(--ink-strong)] placeholder:text-[var(--ink-muted)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
         />
       </div>
 
