@@ -278,7 +278,7 @@ export default function CareerManager() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
-        <button onClick={() => void loadData()} className="primary-button px-4 py-2 rounded-lg">
+        <button onClick={() => void loadData()} className="primary-button px-4 py-2 rounded-lg pointer-coarse:min-h-11">
           Try Again
         </button>
       </div>
@@ -297,7 +297,7 @@ export default function CareerManager() {
             key={item.key}
             type="button"
             onClick={() => setTab(item.key as CareerTab)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex-1 inline-flex items-center justify-center py-2 text-sm font-medium rounded-lg transition-colors pointer-coarse:min-h-11 ${
               tab === item.key ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-sm" : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             }`}
           >
@@ -410,7 +410,7 @@ export default function CareerManager() {
               <button
                 type="button"
                 onClick={() => void saveOpportunity()}
-                className="primary-button text-sm px-4 py-2 rounded-lg"
+                className="primary-button text-sm px-4 py-2 rounded-lg pointer-coarse:min-h-11"
               >
                 {editingOpportunityId ? "Save Changes" : "Add Opportunity"}
               </button>
@@ -418,7 +418,7 @@ export default function CareerManager() {
                 <button
                   type="button"
                   onClick={resetOpportunityForm}
-                  className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
+                  className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
                 >
                   Cancel
                 </button>
@@ -567,7 +567,7 @@ export default function CareerManager() {
               <button
                 type="button"
                 onClick={() => void saveEvent()}
-                className="primary-button text-sm px-4 py-2 rounded-lg"
+                className="primary-button text-sm px-4 py-2 rounded-lg pointer-coarse:min-h-11"
               >
                 {editingEventId ? "Save Changes" : "Add Event"}
               </button>
@@ -575,7 +575,7 @@ export default function CareerManager() {
                 <button
                   type="button"
                   onClick={resetEventForm}
-                  className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
+                  className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
                 >
                   Cancel
                 </button>

@@ -174,13 +174,13 @@ function InlineEditForm({
         <button
           onClick={() => form.label.trim() && onSave(form)}
           disabled={!form.label.trim()}
-          className="primary-button text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+          className="primary-button text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
         >
           Save
         </button>
         <button
           onClick={onCancel}
-          className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
+          className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
         >
           Cancel
         </button>
@@ -319,7 +319,7 @@ export default function OrientationManager() {
   if (error) return (
     <div className="text-center py-12">
       <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
-      <button onClick={fetchItems} className="primary-button px-4 py-2 rounded-lg">
+      <button onClick={fetchItems} className="primary-button px-4 py-2 rounded-lg pointer-coarse:min-h-11">
         Try Again
       </button>
     </div>

@@ -101,7 +101,7 @@ export default function ResourceLibrary({
           <button
             type="button"
             onClick={() => setSelectedCategory("all")}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === "all"
                 ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -114,7 +114,7 @@ export default function ResourceLibrary({
               key={key}
               type="button"
               onClick={() => setSelectedCategory(key)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                 selectedCategory === key
                   ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                   : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"

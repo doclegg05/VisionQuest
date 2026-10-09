@@ -328,7 +328,7 @@ export default function StaffMfaPanel() {
                       setVerificationToken("");
                       setMessage("");
                     }}
-                    className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
+                    className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
                   >
                     Cancel
                   </button>
@@ -360,7 +360,7 @@ export default function StaffMfaPanel() {
                 setError("");
                 setMessage("");
               }}
-              className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50"
+              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50"
             >
               Disable MFA
             </button>
@@ -404,7 +404,7 @@ export default function StaffMfaPanel() {
                   setPendingAction(null);
                   setConfirmToken("");
                 }}
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
+                className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
               >
                 Cancel
               </button>
@@ -439,14 +439,14 @@ export default function StaffMfaPanel() {
             <button
               type="button"
               onClick={handlePrintCodes}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
+              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
             >
               Print
             </button>
             <button
               type="button"
               onClick={dismissBackupCodes}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
+              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)]"
             >
               I saved them
             </button>

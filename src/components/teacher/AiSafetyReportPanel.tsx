@@ -188,7 +188,7 @@ export default function AiSafetyReportPanel() {
               <button
                 type="button"
                 onClick={() => downloadHtmlReport(report)}
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Download Again
               </button>
