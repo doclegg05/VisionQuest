@@ -29,7 +29,9 @@ const files = walk(SRC)
   .filter((f) => /\.(tsx?|css)$/.test(f) && !/\.(test|spec)\.tsx?$/.test(f))
   .map((f) => ({ file: relative(process.cwd(), f), text: readFileSync(f, "utf8") }));
 
-const allText = files.map((f) => f.text).join("\n");
+// Definitions count only outside comments, so a token mentioned in prose is not "defined".
+const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const allText = files.map((f) => stripComments(f.text)).join("\n");
 const defined = new Set([
   ...[...allText.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1]),
   // next/font exposes its families as CSS variables: `variable: "--font-body"`.

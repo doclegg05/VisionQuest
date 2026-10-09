@@ -8,7 +8,7 @@ import { join } from "node:path";
  * omit data-theme on the server and set it from prefers-color-scheme before
  * first paint. The script carries the CSP nonce, or the browser drops it and
  * every system-preference visitor gets light whatever their device says.
- * e2e/theme-variant.spec.ts proves the same end to end.
+ * e2e/theme-default.spec.ts proves the same end to end.
  */
 
 const layout = readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8");

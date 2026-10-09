@@ -764,6 +764,8 @@ select.theme-input::placeholder {
   position: relative;
   overflow: hidden;
   border-radius: 999px;
+  /* Plain fill first, for any browser that drops the color-mix() gradient. */
+  background-color: var(--accent-green);
   background: linear-gradient(135deg, var(--accent-green), color-mix(in srgb, var(--accent-green) 82%, black) 50%, var(--accent-green));
   background-size: 220% 100%;
   color: var(--on-accent);
