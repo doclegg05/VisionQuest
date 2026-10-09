@@ -764,9 +764,9 @@ select.theme-input::placeholder {
   position: relative;
   overflow: hidden;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--accent-strong), var(--accent) 42%, #62c977 54%, var(--accent));
+  background: linear-gradient(135deg, var(--accent-green), color-mix(in srgb, var(--accent-green) 82%, black) 50%, var(--accent-green));
   background-size: 220% 100%;
-  color: white;
+  color: var(--on-accent);
   font-weight: 700;
   cursor: pointer;
   box-shadow:
