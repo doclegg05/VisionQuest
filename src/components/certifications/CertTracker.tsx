@@ -134,8 +134,8 @@ export default function CertTracker() {
 
   if (error) return (
     <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchCert} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+      <p role="alert" className="mb-4 text-[var(--badge-error-text)]">{error}</p>
+      <button onClick={fetchCert} className="primary-button min-h-11 px-4 py-2 text-sm">
         Try Again
       </button>
     </div>
@@ -170,7 +170,7 @@ export default function CertTracker() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-[var(--ink-strong)]">SPOKES Ready to Work Certification</h3>
           {isComplete && (
-            <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-1 rounded-full">
+            <span className="text-xs font-medium bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] px-2 py-1 rounded-full">
               Completed
             </span>
           )}
@@ -184,8 +184,8 @@ export default function CertTracker() {
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 isComplete
-                  ? "bg-gradient-to-r from-green-400 to-green-500"
-                  : "bg-gradient-to-r from-amber-400 to-amber-500"
+                  ? "bg-[var(--accent-green)]"
+                  : "bg-[var(--accent-gold)]"
               }`}
               style={{ width: `${pct}%` }}
             />
@@ -200,7 +200,7 @@ export default function CertTracker() {
             key={req.templateId}
             className={[
               "bg-[var(--surface-raised)] rounded-xl border p-4",
-              req.completed ? "border-green-200" : "border-[var(--border)]",
+              req.completed ? "border-[var(--badge-success-bg)]" : "border-[var(--border)]",
             ].join(" ")}
           >
             <div className="flex items-start gap-3">
@@ -210,14 +210,14 @@ export default function CertTracker() {
                 disabled={toggling === req.id || !req.id || (req.needsFile && !req.fileId && !req.completed)}
                 onChange={() => req.id && toggleRequirement(req.id, !req.completed)}
                 aria-label={req.label}
-                className="mt-0.5 h-4 w-4 rounded border-[var(--border-strong)] text-green-600 focus:ring-green-500"
+                className="mt-0.5 h-4 w-4 rounded border-[var(--border-strong)] accent-[var(--accent-green)] focus:ring-[var(--accent-green)]"
               />
               <div className="flex-1 min-w-0">
                 <p
-                  className={["text-sm font-medium", req.completed ? "text-green-800" : "text-[var(--ink-strong)]"].join(" ")}
+                  className={["text-sm font-medium", req.completed ? "text-[var(--badge-success-text)]" : "text-[var(--ink-strong)]"].join(" ")}
                 >
                   {req.label}
-                  {req.required && <span className="ml-1 text-xs text-red-400 font-normal">*</span>}
+                  {req.required && <span className="ml-1 text-xs text-[var(--badge-error-text)] font-normal">*</span>}
                 </p>
                 {req.description && (
                   <p className="text-xs text-[var(--ink-muted)] mt-0.5">{req.description}</p>
@@ -227,7 +227,7 @@ export default function CertTracker() {
                     href={req.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-1"
+                    className="inline-flex min-h-11 items-center gap-1 text-xs text-[var(--badge-info-text)] hover:underline mt-1"
                   >
                     Open lesson ↗
                   </a>
@@ -281,9 +281,9 @@ export default function CertTracker() {
       </div>
 
       {isComplete && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center space-y-3">
+        <div className="bg-[var(--badge-success-bg)] border border-[var(--badge-success-bg)] rounded-xl p-4 text-center space-y-3">
           <p className="text-2xl mb-1">🎉🏆</p>
-          <p className="text-sm font-medium text-green-800">
+          <p className="text-sm font-medium text-[var(--badge-success-text)]">
             Congratulations! You&apos;ve completed all certification requirements!
           </p>
           <CertificateDownload

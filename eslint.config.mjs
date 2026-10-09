@@ -194,6 +194,16 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, studentAlertDirectRead],
     },
   },
+  // Student files already moved onto theme tokens: no raw palette colors, so
+  // they stay clean. This block must come after the student-surfaces block,
+  // whose no-restricted-syntax entry would otherwise replace it, and so it
+  // repeats that block's rules. Add a file here once it is converted.
+  {
+    files: ["src/components/certifications/CertTracker.tsx"],
+    rules: {
+      "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, studentAlertDirectRead, ...rawPaletteSyntax],
+    },
+  },
   appPrismaImportWithoutSession,
   // Override default ignores of eslint-config-next.
   globalIgnores([
