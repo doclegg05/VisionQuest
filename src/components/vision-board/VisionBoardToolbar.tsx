@@ -135,7 +135,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="inline-flex items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
         >
           📷 {uploading ? "Uploading..." : "Add Image"}
         </button>
@@ -151,7 +151,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
         {/* Add Note */}
         <button
           onClick={() => { setShowNoteForm(!showNoteForm); setShowGoalPicker(false); }}
-          className="inline-flex items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+          className="inline-flex min-h-11 items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
           📝 Add Note
         </button>
@@ -163,7 +163,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
             setShowNoteForm(false);
             if (!showGoalPicker) loadGoals();
           }}
-          className="inline-flex items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+          className="inline-flex min-h-11 items-center gap-2 theme-card rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--ink-strong)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
           🎯 Link Goal
         </button>
@@ -211,13 +211,13 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
             <button
               onClick={handleAddNote}
               disabled={!noteText.trim()}
-              className="primary-button px-4 py-2 text-xs disabled:opacity-50"
+              className="primary-button min-h-11 px-4 py-2 text-xs disabled:opacity-50"
             >
               Pin it
             </button>
             <button
               onClick={() => setShowNoteForm(false)}
-              className="theme-card-subtle rounded-lg px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-[var(--surface-soft)]"
+              className="theme-card-subtle inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-[var(--surface-soft)]"
             >
               Cancel
             </button>
@@ -239,7 +239,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
                 <button
                   key={goal.id}
                   onClick={() => handleLinkGoal(goal)}
-                  className="w-full theme-card-subtle rounded-lg p-2.5 text-left text-xs transition-colors hover:bg-[rgba(15,154,146,0.06)] hover:border-[rgba(15,154,146,0.2)]"
+                  className="min-h-11 w-full theme-card-subtle rounded-lg p-2.5 text-left text-xs transition-colors hover:bg-[rgba(15,154,146,0.06)] hover:border-[rgba(15,154,146,0.2)]"
                 >
                   <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-[9px] font-semibold text-[var(--accent-secondary)]">
                     {GOAL_LEVEL_META[goal.level as keyof typeof GOAL_LEVEL_META]?.label || goal.level}
@@ -251,7 +251,7 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
           )}
           <button
             onClick={() => setShowGoalPicker(false)}
-            className="mt-3 theme-card-subtle rounded-lg px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] w-full"
+            className="mt-3 flex min-h-11 items-center justify-center theme-card-subtle rounded-lg px-4 py-2 text-xs text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] w-full"
           >
             Cancel
           </button>

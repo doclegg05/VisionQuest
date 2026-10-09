@@ -493,7 +493,7 @@ export default function StudentAdvisingHub({
                         type="button"
                         disabled={isPending && updatingTaskId === task.id}
                         onClick={() => updateTaskStatus(task.id, isCompleted ? "open" : "completed")}
-                        className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                        className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                           isCompleted
                             ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
                             : "bg-[var(--accent-strong)] text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90"

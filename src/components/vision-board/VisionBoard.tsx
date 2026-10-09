@@ -170,7 +170,7 @@ export default function VisionBoard() {
   if (error) return (
     <div className="text-center py-12">
       <p role="alert" className="mb-4 text-[var(--badge-error-text)]">{error}</p>
-      <button onClick={fetchItems} className="primary-button px-4 py-2 text-sm">Try Again</button>
+      <button onClick={fetchItems} className="primary-button min-h-11 px-4 py-2 text-sm">Try Again</button>
     </div>
   );
 

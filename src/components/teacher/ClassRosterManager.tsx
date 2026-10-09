@@ -573,7 +573,7 @@ export default function ClassRosterManager() {
                         type="button"
                         onClick={() => void saveClassSettings()}
                         disabled={saving}
-                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Save Settings
                       </button>
@@ -581,7 +581,7 @@ export default function ClassRosterManager() {
                         type="button"
                         onClick={() => void updateClassStatus(classDetail.status === "archived" ? "active" : "archived")}
                         disabled={saving}
-                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {classDetail.status === "archived" ? "Reactivate Class" : "Archive Class"}
                       </button>

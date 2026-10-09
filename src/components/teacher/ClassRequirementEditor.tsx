@@ -221,7 +221,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
                     key={`${item.itemType}:${item.itemId}`}
                     type="button"
                     onClick={() => addFromCatalog(item)}
-                    className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-[var(--surface-soft)] transition-colors"
+                    className="flex w-full items-center pointer-coarse:min-h-11 text-left text-sm px-3 py-2 rounded-lg hover:bg-[var(--surface-soft)] transition-colors"
                   >
                     <span className="font-medium text-[var(--ink-strong)]">{item.title}</span>
                     <span className="ml-2 text-xs text-[var(--ink-faint)]">
@@ -236,7 +236,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
           <button
             type="button"
             onClick={() => setShowCatalog(true)}
-            className="border-2 border-dashed border-[var(--border-strong)] rounded-xl px-4 py-2 text-sm text-[var(--ink-muted)] hover:border-[var(--accent-blue)] hover:text-[var(--badge-info-text)] transition-colors"
+            className="inline-flex items-center pointer-coarse:min-h-11 border-2 border-dashed border-[var(--border-strong)] rounded-xl px-4 py-2 text-sm text-[var(--ink-muted)] hover:border-[var(--accent-blue)] hover:text-[var(--badge-info-text)] transition-colors"
           >
             + Add Requirement
           </button>
@@ -247,7 +247,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="primary-button text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ml-auto"
+            className="primary-button pointer-coarse:min-h-11 text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ml-auto"
           >
             {saving ? "Saving..." : "Save Changes"}
           </button>

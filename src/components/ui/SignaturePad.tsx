@@ -35,7 +35,7 @@ export default function SignaturePad({ onSign, onCancel, submitting = false }: S
           type="button"
           onClick={() => setMode("draw")}
           disabled={submitting}
-          className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
+          className={`inline-flex min-h-11 flex-1 items-center justify-center px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
             mode === "draw"
               ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -47,7 +47,7 @@ export default function SignaturePad({ onSign, onCancel, submitting = false }: S
           type="button"
           onClick={() => setMode("type")}
           disabled={submitting}
-          className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
+          className={`inline-flex min-h-11 flex-1 items-center justify-center px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
             mode === "type"
               ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -375,7 +375,7 @@ function SignatureButtons({
         type="button"
         onClick={onClear}
         disabled={!canClear || submitting}
-        className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:opacity-40"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:opacity-40"
       >
         Clear
       </button>
@@ -384,7 +384,7 @@ function SignatureButtons({
           type="button"
           onClick={onCancel}
           disabled={submitting}
-          className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Cancel
         </button>
@@ -392,7 +392,7 @@ function SignatureButtons({
           type="button"
           onClick={onSubmit}
           disabled={!canSubmit || submitting}
-          className="primary-button px-5 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+          className="primary-button min-h-11 px-5 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Saving..." : "Sign & Submit"}
         </button>

@@ -208,14 +208,14 @@ export default function FormFillClient({ templateId }: { templateId: string }) {
               type="button"
               onClick={() => void saveDraft()}
               disabled={savingDraft || submitting}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:opacity-50"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:opacity-50"
             >
               {savingDraft ? "Saving…" : "Save draft"}
             </button>
             <button
               type="submit"
               disabled={submitting || savingDraft}
-              className="primary-button px-5 py-2 text-sm disabled:opacity-50"
+              className="primary-button min-h-11 px-5 py-2 text-sm disabled:opacity-50"
             >
               {submitting ? "Submitting…" : "Submit"}
             </button>
