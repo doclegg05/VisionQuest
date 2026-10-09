@@ -47,13 +47,13 @@ export default function ResourceCard({
                 href={buildFormDownloadUrl(form, "view")}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+                className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
               >
                 Open PDF
               </a>
               <a
                 href={buildFormDownloadUrl(form, "download")}
-                className="text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+                className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
               >
                 Download
               </a>
@@ -101,7 +101,7 @@ export default function ResourceCard({
           <Link
             href={helperHref}
             prefetch={false}
-            className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
           >
             {helperLabel}
           </Link>
@@ -117,7 +117,7 @@ export default function ResourceCard({
           <Link
             href={helperHref}
             prefetch={false}
-            className="text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
           >
             {helperLabel}
           </Link>

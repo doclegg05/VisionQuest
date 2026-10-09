@@ -82,6 +82,7 @@ export default function ResourceLibrary({
       <div>
         <input
           type="text"
+          aria-label="Search forms"
           placeholder="Search forms by title or description..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -181,7 +182,7 @@ function CategorySection({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 text-left"
+        className="flex min-h-11 w-full items-center gap-3 text-left"
       >
         <span className="text-2xl">{icon}</span>
         <div className="flex-1">

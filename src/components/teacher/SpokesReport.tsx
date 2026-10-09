@@ -41,11 +41,11 @@ interface ReportPayload {
 
 const SUMMARY_KEYS: Array<{ key: keyof ReportSummary; label: string; tone: string }> = [
   { key: "totalRecords", label: "Records", tone: "text-[var(--ink-strong)]" },
-  { key: "enrolled", label: "Enrolled", tone: "text-emerald-700" },
-  { key: "orientationComplete", label: "Orientation complete", tone: "text-sky-700" },
-  { key: "filesComplete", label: "Files complete", tone: "text-teal-700" },
-  { key: "modulesComplete", label: "Modules complete", tone: "text-violet-700" },
-  { key: "followUpsDue", label: "Follow-ups due", tone: "text-amber-800" },
+  { key: "enrolled", label: "Enrolled", tone: "text-[var(--badge-success-text)]" },
+  { key: "orientationComplete", label: "Orientation complete", tone: "text-[var(--badge-info-text)]" },
+  { key: "filesComplete", label: "Files complete", tone: "text-[var(--badge-success-text)]" },
+  { key: "modulesComplete", label: "Modules complete", tone: "text-[var(--badge-info-text)]" },
+  { key: "followUpsDue", label: "Follow-ups due", tone: "text-[var(--badge-warning-text)]" },
 ];
 
 function getErrorMessage(payload: unknown, fallback: string) {
@@ -96,8 +96,8 @@ export default function SpokesReport() {
   if (error || !data) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error || "Could not load the SPOKES report."}</p>
-        <button onClick={() => void loadData()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <p className="text-[var(--badge-error-text)] mb-4">{error || "Could not load the SPOKES report."}</p>
+        <button onClick={() => void loadData()} className="primary-button px-4 py-2 rounded-lg">
           Try Again
         </button>
       </div>
@@ -182,7 +182,7 @@ export default function SpokesReport() {
                       </p>
                     </div>
                     {item.employmentFollowUpsDue > 0 ? (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                      <span className="rounded-full bg-[var(--badge-warning-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--badge-warning-text)]">
                         {item.employmentFollowUpsDue} follow-up due
                       </span>
                     ) : null}

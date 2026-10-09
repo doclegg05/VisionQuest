@@ -562,7 +562,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           <button
             onClick={() => setShowTutorial(!showTutorial)}
             type="button"
-            className="flex items-center gap-3 text-left"
+            className="flex min-h-11 items-center gap-3 text-left"
           >
             <span
               className={[
