@@ -85,12 +85,37 @@ function parse(fileName: string, text: string): ts.SourceFile {
 }
 
 const TALL_ENOUGH = /(?:^|\s)(?:pointer-coarse:)?(?:min-h|h|size)-(?:1[1-9]|[2-9]\d|\[(?:4[4-9]|[5-9]\d)px\])(?=\s|$)/;
-const SMALL_PADDING = /(?:^|\s)(?:py-(?:0|0\.5|1|1\.5)|p-(?:0\.5|1|1\.5))(?=\s|$)/;
-const ANY_PADDING = /(?:^|\s)(?:p|py|px|pt|pb)-/;
+
+// Tailwind 4 type scale: font size and line height in px. The body inherits 16px / 24px.
+const TYPE_SCALE: Record<string, [number, number]> = {
+  xs: [12, 16], sm: [14, 20], base: [16, 24], lg: [18, 28], xl: [20, 28], "2xl": [24, 32], "3xl": [30, 36],
+};
+const NAMED_LEADING: Record<string, number> = { none: 1, tight: 1.25, snug: 1.375, normal: 1.5, relaxed: 1.625, loose: 2 };
+
+/** Last unprefixed class matching `re` (variants such as `md:` or `hover:` do not apply at rest on a phone). */
+function lastClass(classes: string, re: RegExp): RegExpMatchArray | null {
+  return classes.split(/\s+/).filter((c) => !c.includes(":")).map((c) => c.match(re)).filter((m): m is RegExpMatchArray => m !== null).pop() ?? null;
+}
+
+/** Rendered height of a one-line control: vertical padding + line height + border, in px. */
+export function estimatedHeight(classes: string): number {
+  const size = lastClass(classes, /^text-(xs|sm|base|lg|xl|2xl|3xl)$/);
+  const [fontPx, linePx] = TYPE_SCALE[size?.[1] ?? "base"];
+  const leading = lastClass(classes, /^leading-(\d+|none|tight|snug|normal|relaxed|loose)$/);
+  const line = leading ? (/^\d+$/.test(leading[1]) ? Number(leading[1]) * 4 : fontPx * NAMED_LEADING[leading[1]]) : linePx;
+  const spacing = (re: RegExp) => { const m = lastClass(classes, re); return m ? Number(m[1]) * 4 : null; };
+  const p = spacing(/^p-(\d+(?:\.5)?)$/);
+  const py = spacing(/^py-(\d+(?:\.5)?)$/);
+  const top = spacing(/^pt-(\d+(?:\.5)?)$/) ?? py ?? p ?? 0;
+  const bottom = spacing(/^pb-(\d+(?:\.5)?)$/) ?? py ?? p ?? 0;
+  const border = lastClass(classes, /^border-2$/) ? 4 : lastClass(classes, /^border$/) ? 2 : 0;
+  return top + bottom + line + border;
+}
 
 /**
- * Buttons and links that would render under 44pt on a touch screen: small or
- * no padding, and no height class of 44px or more. `pointer-coarse:min-h-11`
+ * Buttons and links that would render under 44pt on a touch screen: no height
+ * class of 44px or more, and an estimated height (vertical padding + line
+ * height of their text size + border) under 44px. `pointer-coarse:min-h-11`
  * counts, which keeps the compact look for a mouse. Visually hidden elements,
  * fully dynamic classNames, and links marked `data-inline-link` (a link inside
  * running text, exempt under WCAG 2.5.8) are skipped.
@@ -106,7 +131,7 @@ export function undersizedTargets(fileName: string, text: string): JsxViolation[
     const classes = classText(node, constants);
     if (classes === null || /(?:^|\s)sr-only(?=\s|$)/.test(classes)) return;
     if (TALL_ENOUGH.test(classes)) return;
-    if (SMALL_PADDING.test(classes) || !ANY_PADDING.test(classes)) {
+    if (estimatedHeight(classes) < 44) {
       out.push({ line: line(source, node), element: tag, detail: "under 44pt on touch; add min-h-11 or pointer-coarse:min-h-11" });
     }
   });

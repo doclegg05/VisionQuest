@@ -30,6 +30,27 @@ describe("undersizedTargets", () => {
     assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1]);
   });
 
+  it("estimates height from padding, line height, and border, and flags under 44px", () => {
+    const src = [
+      `<button className="px-4 py-2 text-sm">Save</button>`,
+      `<button className="py-3 text-xs">Tiny</button>`,
+      `<button className="px-4 py-2 text-sm border">Bordered</button>`,
+      `<button className="leading-none text-sm py-3">Tight</button>`,
+      `<button className="px-6 text-sm">Wide only</button>`,
+    ].join("\n");
+    assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1, 2, 3, 4, 5]);
+  });
+
+  it("accepts controls whose estimated height reaches 44px", () => {
+    const src = [
+      `<button className="px-4 py-2.5 text-base">A</button>`,
+      `<button className="px-4 py-2.5 text-sm border-2">B</button>`,
+      `<button className="leading-6 py-2.5">C</button>`,
+      `<button className="px-3 py-3 text-sm">D</button>`,
+    ].join("\n");
+    assert.deepEqual(undersizedTargets("f.tsx", src), []);
+  });
+
   it("accepts generous padding without a height class", () => {
     assert.deepEqual(undersizedTargets("f.tsx", `<button className="px-5 py-3">Save</button>`), []);
   });
