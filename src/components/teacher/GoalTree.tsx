@@ -16,13 +16,15 @@ interface GoalTreeProps {
   goals: GoalData[];
 }
 
-// Level config
+// Level config. Level is identity, not status: rows stay on a neutral surface
+// and only the left rule carries the level color, so the status pill is the
+// one place status color appears (and its badge pair sits on a plain surface).
 const LEVEL_CONFIG: Record<string, { label: string; icon: string; color: string; indent: number }> = {
-  bhag: { label: "Big Vision", icon: GOAL_LEVEL_META.bhag.icon, color: "from-[var(--badge-warning-bg)] to-[var(--badge-warning-bg)]/40 border-[var(--badge-warning-bg)]", indent: 0 },
-  monthly: { label: "Monthly Goal", icon: GOAL_LEVEL_META.monthly.icon, color: "from-[var(--badge-info-bg)] to-[var(--badge-info-bg)]/40 border-[var(--badge-info-bg)]", indent: 1 },
-  weekly: { label: "Weekly Goal", icon: "📋", color: "from-[var(--surface-muted)] to-[var(--surface-muted)] border-[var(--border)]", indent: 2 },
-  daily: { label: "Daily Goal", icon: "⚡", color: "from-[var(--badge-success-bg)] to-[var(--badge-success-bg)]/40 border-[var(--badge-success-bg)]", indent: 3 },
-  task: { label: "Action Task", icon: GOAL_LEVEL_META.task.icon, color: "from-[var(--surface-soft)] to-[var(--surface-soft)] border-[var(--border)]", indent: 4 },
+  bhag: { label: "Big Vision", icon: GOAL_LEVEL_META.bhag.icon, color: "border-l-[var(--accent-gold)]", indent: 0 },
+  monthly: { label: "Monthly Goal", icon: GOAL_LEVEL_META.monthly.icon, color: "border-l-[var(--accent-blue)]", indent: 1 },
+  weekly: { label: "Weekly Goal", icon: "📋", color: "border-l-[var(--border-strong)]", indent: 2 },
+  daily: { label: "Daily Goal", icon: "⚡", color: "border-l-[var(--accent-green)]", indent: 3 },
+  task: { label: "Action Task", icon: GOAL_LEVEL_META.task.icon, color: "border-l-[var(--border)]", indent: 4 },
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -75,7 +77,7 @@ export default function GoalTree({ goals }: GoalTreeProps) {
   };
 
   function renderGoalNode(goal: GoalData & { children: GoalData[] }, depth: number) {
-    const config = LEVEL_CONFIG[goal.level] || { label: goal.level, icon: "📌", color: "from-[var(--surface-soft)] to-white border-[var(--border)]", indent: 0 };
+    const config = LEVEL_CONFIG[goal.level] || { label: goal.level, icon: "📌", color: "border-l-[var(--border)]", indent: 0 };
     const status = STATUS_BADGE[goal.status] || {
       label: goalStatusLabel(goal.status),
       className: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
@@ -85,7 +87,7 @@ export default function GoalTree({ goals }: GoalTreeProps) {
 
     return (
       <div key={goal.id} style={{ marginLeft: `${depth * 1.5}rem` }}>
-        <div className={`rounded-xl border bg-gradient-to-r ${config.color} p-3`}>
+        <div className={`rounded-xl border border-l-4 border-[var(--border)] bg-[var(--surface-raised)] ${config.color} p-3`}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               {hasChildren && (

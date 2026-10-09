@@ -122,7 +122,7 @@ export default function AssignedFormsCard() {
       {hasMore && (
         <p className="mt-2 text-xs text-[var(--ink-faint)]">
           +{forms.length - visible.length} more on{" "}
-          <Link href="/forms" prefetch={false} className="inline-flex min-h-11 items-center underline">
+          <Link href="/forms" prefetch={false} data-inline-link className="underline">
             /forms
           </Link>
         </p>

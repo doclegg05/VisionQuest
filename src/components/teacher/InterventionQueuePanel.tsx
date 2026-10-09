@@ -254,6 +254,19 @@ export function QuickNoteModal({
     <FormDialog title={`Quick note for ${studentName}`} dirty={dirty} onClose={onClose} widthClass="max-w-md">
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && <p className="text-sm text-[var(--error)]">{error}</p>}
+        {/* Note comes first: showModal() focuses the dialog's first focusable
+            field, and React's autoFocus cannot reach a field inside a dialog
+            that is still closed at commit time. */}
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium text-[var(--ink-strong)]">Note</span>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            autoFocus
+            rows={3}
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] resize-none"
+          />
+        </label>
         <label className="block space-y-1.5">
           <span className="text-sm font-medium text-[var(--ink-strong)]">Category</span>
           <select
@@ -267,16 +280,6 @@ export function QuickNoteModal({
               </option>
             ))}
           </select>
-        </label>
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-[var(--ink-strong)]">Note</span>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            autoFocus
-            rows={3}
-            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] resize-none"
-          />
         </label>
         <div className="flex gap-2 justify-end">
           <button

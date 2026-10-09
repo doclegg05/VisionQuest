@@ -332,7 +332,7 @@ function StudentAccordion({
                 {group.student.displayName}
               </span>
               {group.highCount > 0 && (
-                <span className="rounded-full bg-[var(--urgency-critical-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--urgency-critical-text)]">
+                <span className="rounded-full bg-[var(--error)] px-2 py-0.5 text-xs font-semibold text-[var(--on-error)]">
                   {group.highCount} urgent
                 </span>
               )}
@@ -381,7 +381,7 @@ function StudentAccordion({
                       {c.groupCategory}
                     </span>
                     {isHigh && (
-                      <span className="rounded-full bg-[var(--urgency-critical-bg)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--urgency-critical-text)]">
+                      <span className="rounded-full bg-[var(--error)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--on-error)]">
                         HIGH
                       </span>
                     )}
