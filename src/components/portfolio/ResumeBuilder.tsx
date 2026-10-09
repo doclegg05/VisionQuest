@@ -11,6 +11,7 @@ import {
   type ResumeEducation,
   type ResumeExperience,
 } from "@/lib/resume";
+import { openPrintWindow } from "@/lib/resume-print";
 
 interface ResumeAssistResponse {
   resume: ResumeContent;
@@ -286,14 +287,14 @@ export default function ResumeBuilder() {
     setPrinting(true);
 
     try {
-      const printWindow = window.open("", "_blank", "noopener,noreferrer");
+      const printWindow = openPrintWindow(
+        buildResumePrintHtml(displayName || "Resume", resume),
+        window.open.bind(window),
+      );
       if (!printWindow) {
         throw new Error("Pop-up blocked.");
       }
 
-      printWindow.document.open();
-      printWindow.document.write(buildResumePrintHtml(displayName || "Resume", resume));
-      printWindow.document.close();
       printWindow.focus();
 
       setTimeout(() => {
