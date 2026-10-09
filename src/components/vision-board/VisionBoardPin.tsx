@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { X } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VisionBoardItemData } from "./VisionBoard";
 
@@ -52,6 +53,16 @@ const WIDTH_BOUNDS: Record<VisionBoardItemData["type"], { min: number; max: numb
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+const LABEL_PREVIEW_CHARS = 40;
+
+/** Accessible name for a pin's remove button, so a screen reader says which pin goes. */
+export function removePinLabel({ type, content }: Pick<VisionBoardItemData, "type" | "content">): string {
+  const text = content?.replace(/\s+/g, " ").trim() ?? "";
+  if (!text) return `Remove ${type} pin`;
+  const preview = text.length > LABEL_PREVIEW_CHARS ? `${text.slice(0, LABEL_PREVIEW_CHARS).trimEnd()}…` : text;
+  return `Remove ${type} pin: ${preview}`;
 }
 
 export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) {
@@ -247,10 +258,15 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
             e.stopPropagation();
             onDelete(item.id);
           }}
-          className="absolute -right-2 -top-3 z-20 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-xs text-white shadow-md transition-colors hover:bg-red-600"
-          aria-label="Delete pin"
+          className="group/remove absolute -right-4.5 -top-5.5 z-20 inline-flex size-11 items-center justify-center rounded-full"
+          aria-label={removePinLabel(item)}
         >
-          ×
+          <span
+            aria-hidden="true"
+            className="grid size-6 place-items-center rounded-full bg-red-500 text-white shadow-md transition-colors group-hover/remove:bg-red-600"
+          >
+            <X size={12} weight="bold" />
+          </span>
         </button>
       ) : null}
 
@@ -309,14 +325,19 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         type="button"
         data-resize-handle="true"
         onPointerDown={handleResizeStart}
-        className="absolute bottom-1.5 right-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/70 bg-[var(--surface-raised)]/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,0,0,0.12)] transition-opacity hover:opacity-100"
+        className="group/resize absolute -bottom-1 -right-1 z-20 inline-flex size-11 items-center justify-center rounded-full"
         aria-label="Resize pin"
       >
         <span
-          // Decorative hatch pattern inside resize handle — intentional raw rgba.
-          // eslint-disable-next-line no-restricted-syntax
-          className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]"
-        />
+          aria-hidden="true"
+          className="flex size-6 items-center justify-center rounded-full border border-white/70 bg-[var(--surface-raised)]/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,0,0,0.12)] transition-opacity group-hover/resize:opacity-100"
+        >
+          <span
+            // Decorative hatch pattern inside resize handle — intentional raw rgba.
+            // eslint-disable-next-line no-restricted-syntax
+            className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]"
+          />
+        </span>
       </button>
     </div>
   );

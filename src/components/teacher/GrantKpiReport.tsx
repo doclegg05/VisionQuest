@@ -68,9 +68,9 @@ function MetricCard({
 }) {
   const statusColor =
     m.meetsTarget === true
-      ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+      ? "text-[var(--badge-success-text)] bg-[var(--badge-success-bg)] border-[var(--badge-success-bg)]"
       : m.meetsTarget === false
-        ? "text-amber-800 bg-amber-50 border-amber-200"
+        ? "text-[var(--badge-warning-text)] bg-[var(--badge-warning-bg)] border-[var(--badge-warning-bg)]"
         : "text-[var(--ink-strong)] bg-[var(--surface-raised)] border-[var(--border)]";
 
   const metricKey = METRIC_KEY_MAP[m.label];
@@ -113,7 +113,7 @@ function ProgramOfTheYearBadge({
     <div
       className={`rounded-xl border p-5 ${
         qualified
-          ? "border-emerald-300 bg-emerald-50"
+          ? "border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)]"
           : "border-[var(--border)] bg-[var(--surface-raised)]"
       }`}
     >
@@ -132,7 +132,7 @@ function ProgramOfTheYearBadge({
       <div className="mt-4 space-y-2">
         {criteria.map((c) => (
           <div key={c.label} className="flex items-center gap-2 text-sm">
-            <span className={c.met ? "text-emerald-600" : "text-amber-600"}>
+            <span className={c.met ? "text-[var(--badge-success-text)]" : "text-[var(--badge-warning-text)]"}>
               {c.met ? "\u2713" : "\u2717"}
             </span>
             <span className="text-[var(--ink-strong)]">{c.label}</span>
@@ -185,10 +185,10 @@ function Sparkline({ values, color = "#0ea5e9" }: { values: number[]; color?: st
 function CountsSummary({ counts }: { counts: GrantKpiPayload["counts"] }) {
   const items = [
     { label: "Referred", value: counts.referred, tone: "text-[var(--ink-strong)]" },
-    { label: "Enrolled", value: counts.enrolled, tone: "text-sky-700" },
-    { label: "Placed", value: counts.placed, tone: "text-emerald-700" },
-    { label: "High-Wage", value: counts.highWage, tone: "text-violet-700" },
-    { label: "Post-Secondary", value: counts.postSecondary, tone: "text-teal-700" },
+    { label: "Enrolled", value: counts.enrolled, tone: "text-[var(--badge-info-text)]" },
+    { label: "Placed", value: counts.placed, tone: "text-[var(--badge-success-text)]" },
+    { label: "High-Wage", value: counts.highWage, tone: "text-[var(--badge-success-text)]" },
+    { label: "Post-Secondary", value: counts.postSecondary, tone: "text-[var(--badge-success-text)]" },
   ];
 
   return (
@@ -302,10 +302,10 @@ export default function GrantKpiReport() {
   if (error || !data) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error || "Could not load grant KPI report."}</p>
+        <p className="text-[var(--badge-error-text)] mb-4">{error || "Could not load grant KPI report."}</p>
         <button
           onClick={() => void loadData()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="primary-button px-4 py-2"
         >
           Try Again
         </button>
@@ -371,7 +371,7 @@ export default function GrantKpiReport() {
             <button
               type="button"
               onClick={() => setDrillDown(null)}
-              className="text-sm text-[var(--ink-muted)] hover:text-[var(--ink-muted)]"
+              className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] hover:text-[var(--ink-muted)]"
             >
               Close
             </button>
@@ -395,7 +395,7 @@ export default function GrantKpiReport() {
                     <tr key={s.spokesRecordId} className="border-b border-[var(--border)]">
                       <td className="py-2 pr-4 font-medium text-[var(--ink-strong)]">
                         {s.studentId ? (
-                          <a href={`/teacher/students/${s.studentId}`} className="hover:underline">
+                          <a href={`/teacher/students/${s.studentId}`} className="inline-flex items-center pointer-coarse:min-h-11 hover:underline">
                             {s.name}
                           </a>
                         ) : (

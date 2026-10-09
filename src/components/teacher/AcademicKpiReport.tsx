@@ -74,10 +74,10 @@ const ADOPTION_CARDS: Array<{
   tone: string;
   denomLabel?: string;
 }> = [
-  { key: "withBhagPct", countKey: "withBhag", label: "Students with BHAG", tone: "text-violet-700" },
-  { key: "withMonthlyGoalPct", countKey: "withMonthlyGoal", label: "With monthly goal", tone: "text-sky-700" },
-  { key: "withWeeklyGoalPct", countKey: "withWeeklyGoal", label: "With weekly goal", tone: "text-teal-700" },
-  { key: "goalsWithResourcesPct", countKey: "goalsWithLinkedResources", label: "Goals with resources", tone: "text-emerald-700", denomLabel: "goals" },
+  { key: "withBhagPct", countKey: "withBhag", label: "Students with BHAG", tone: "text-[var(--badge-info-text)]" },
+  { key: "withMonthlyGoalPct", countKey: "withMonthlyGoal", label: "With monthly goal", tone: "text-[var(--badge-info-text)]" },
+  { key: "withWeeklyGoalPct", countKey: "withWeeklyGoal", label: "With weekly goal", tone: "text-[var(--badge-info-text)]" },
+  { key: "goalsWithResourcesPct", countKey: "goalsWithLinkedResources", label: "Goals with resources", tone: "text-[var(--badge-info-text)]", denomLabel: "goals" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -120,12 +120,12 @@ function ResourcePipelineSection({ data, totalStudents }: { data: ResourcePipeli
         </div>
         <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Has activity</p>
-          <p className="mt-2 text-3xl font-bold text-sky-700">{data.linksWithActivity}</p>
+          <p className="mt-2 text-3xl font-bold text-[var(--badge-info-text)]">{data.linksWithActivity}</p>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">{data.linksWithActivityPct}% of assigned links</p>
         </div>
         <div className="theme-card rounded-xl p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Completed</p>
-          <p className="mt-2 text-3xl font-bold text-emerald-700">{data.linksCompleted}</p>
+          <p className="mt-2 text-3xl font-bold text-[var(--badge-success-text)]">{data.linksCompleted}</p>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">{data.linksCompletedPct}% of assigned links</p>
         </div>
       </div>
@@ -316,10 +316,10 @@ export default function AcademicKpiReport() {
   if (error || !data) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error || "Could not load KPI report."}</p>
+        <p className="text-[var(--badge-error-text)] mb-4">{error || "Could not load KPI report."}</p>
         <button
           onClick={() => void loadData()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="primary-button px-4 py-2"
         >
           Try Again
         </button>

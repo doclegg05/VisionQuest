@@ -385,7 +385,7 @@ export default function AiProviderPanel() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-text)]">
           {error}
         </div>
       )}
@@ -680,7 +680,7 @@ export default function AiProviderPanel() {
                       setBearerToken("");
                       resetMessages();
                     }}
-                    className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                    className="rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
                   >
                     Clear Saved Token
                   </button>
@@ -729,7 +729,7 @@ export default function AiProviderPanel() {
                         setCloudflareClientSecret("");
                         resetMessages();
                       }}
-                      className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                      className="rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
                     >
                       Clear Saved Credentials
                     </button>
@@ -807,7 +807,7 @@ export default function AiProviderPanel() {
                   {capabilities.warnings.map((warning) => (
                     <li
                       key={warning}
-                      className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                      className="flex items-start gap-2 rounded-xl border border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)] px-3 py-2 text-xs text-[var(--badge-warning-text)]"
                     >
                       <span aria-hidden="true">⚠</span>
                       <span>{warning}</span>
@@ -837,7 +837,7 @@ function CapabilityRow({ label, ok }: { label: string; ok: boolean }) {
     <div className="flex items-center gap-2 text-sm">
       <span
         aria-hidden="true"
-        className={ok ? "text-[var(--accent-strong)]" : "text-amber-600"}
+        className={ok ? "text-[var(--accent-strong)]" : "text-[var(--badge-warning-text)]"}
       >
         {ok ? "✓" : "⚠"}
       </span>

@@ -154,8 +154,8 @@ function parseVerdict(recommendation: string): VerdictKind {
 
 function VerdictBadge({ kind }: { kind: VerdictKind }) {
   const styles: Record<VerdictKind, string> = {
-    KEEP: "bg-emerald-50 border-emerald-200 text-emerald-800",
-    REVIEW: "bg-amber-50 border-amber-200 text-amber-800",
+    KEEP: "bg-[var(--badge-success-bg)] border-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
+    REVIEW: "bg-[var(--badge-warning-bg)] border-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
     "INSUFFICIENT DATA": "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-muted)]",
   };
   return (
@@ -271,7 +271,7 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
   if (error || !readiness) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error ?? "Could not load monthly KPI dashboard."}</p>
+        <p className="text-[var(--badge-error-text)] mb-4">{error ?? "Could not load monthly KPI dashboard."}</p>
         <button
           type="button"
           onClick={() => void loadData()}
@@ -316,23 +316,23 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
             sub={`Median: ${summary.medianReadiness}%`}
             tone={
               summary.averageReadiness >= 75
-                ? "text-emerald-700"
+                ? "text-[var(--badge-success-text)]"
                 : summary.averageReadiness >= 50
-                  ? "text-amber-800"
-                  : "text-rose-700"
+                  ? "text-[var(--badge-warning-text)]"
+                  : "text-[var(--badge-error-text)]"
             }
           />
           <StatCard
             label="Above 75% readiness"
             value={summary.studentsAbove75}
             sub={`of ${summary.totalStudents} students`}
-            tone="text-emerald-700"
+            tone="text-[var(--badge-success-text)]"
           />
           <StatCard
             label="Above 50% readiness"
             value={summary.studentsAbove50}
             sub={`of ${summary.totalStudents} students`}
-            tone="text-sky-700"
+            tone="text-[var(--badge-info-text)]"
           />
           <StatCard
             label="Total students"
@@ -354,13 +354,13 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
               label="Completed"
               value={summary.totalCompleted}
               max={summary.totalGoals}
-              color="bg-emerald-500"
+              color="bg-[var(--accent-green)]"
             />
             <ProgressRow
               label="Confirmed by teacher"
               value={summary.totalConfirmed}
               max={summary.totalGoals}
-              color="bg-violet-500"
+              color="bg-[var(--accent-blue)]"
             />
           </div>
         </div>
@@ -378,23 +378,23 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
             sub={`${summary.pathwayCoverage.goalsWithPathway} of ${summary.pathwayCoverage.eligibleGoals} eligible goals`}
             tone={
               summary.pathwayCoverage.coverageRate >= 80
-                ? "text-emerald-700"
+                ? "text-[var(--badge-success-text)]"
                 : summary.pathwayCoverage.coverageRate >= 50
-                  ? "text-amber-800"
-                  : "text-rose-700"
+                  ? "text-[var(--badge-warning-text)]"
+                  : "text-[var(--badge-error-text)]"
             }
           />
           <StatCard
             label="Goals with pathway"
             value={summary.pathwayCoverage.goalsWithPathway}
             sub="Eligible goals assigned a pathway"
-            tone="text-sky-700"
+            tone="text-[var(--badge-info-text)]"
           />
           <StatCard
             label="Unmatched goals"
             value={unmatchedGoals}
             sub="Eligible goals without a pathway"
-            tone={unmatchedGoals > 0 ? "text-amber-800" : "text-emerald-700"}
+            tone={unmatchedGoals > 0 ? "text-[var(--badge-warning-text)]" : "text-[var(--badge-success-text)]"}
           />
         </div>
 
@@ -413,8 +413,8 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
                 max={summary.requirementCompliance.totalStudents}
                 color={
                   summary.requirementCompliance.complianceRate >= 80
-                    ? "bg-emerald-500"
-                    : "bg-amber-500"
+                    ? "bg-[var(--accent-green)]"
+                    : "bg-[var(--accent-gold)]"
                 }
               />
             </div>
@@ -471,9 +471,9 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
               <div
                 className={`rounded-xl border p-4 ${
                   pilot.behavioralCorrelation.readinessLift >= 10
-                    ? "border-emerald-200 bg-emerald-50"
+                    ? "border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)]"
                     : pilot.behavioralCorrelation.readinessLift > 0
-                      ? "border-amber-200 bg-amber-50"
+                      ? "border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)]"
                       : "border-[var(--border)] bg-[var(--surface-raised)]"
                 }`}
               >
@@ -483,9 +483,9 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
                 <p
                   className={`mt-2 text-2xl font-bold ${
                     pilot.behavioralCorrelation.readinessLift >= 10
-                      ? "text-emerald-700"
+                      ? "text-[var(--badge-success-text)]"
                       : pilot.behavioralCorrelation.readinessLift > 0
-                        ? "text-amber-800"
+                        ? "text-[var(--badge-warning-text)]"
                         : "text-[var(--ink-strong)]"
                   }`}
                 >
@@ -499,9 +499,9 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
               <div
                 className={`rounded-xl border p-4 ${
                   pilot.behavioralCorrelation.goalLift >= 0.5
-                    ? "border-emerald-200 bg-emerald-50"
+                    ? "border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)]"
                     : pilot.behavioralCorrelation.goalLift > 0
-                      ? "border-amber-200 bg-amber-50"
+                      ? "border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)]"
                       : "border-[var(--border)] bg-[var(--surface-raised)]"
                 }`}
               >
@@ -511,9 +511,9 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
                 <p
                   className={`mt-2 text-2xl font-bold ${
                     pilot.behavioralCorrelation.goalLift >= 0.5
-                      ? "text-emerald-700"
+                      ? "text-[var(--badge-success-text)]"
                       : pilot.behavioralCorrelation.goalLift > 0
-                        ? "text-amber-800"
+                        ? "text-[var(--badge-warning-text)]"
                         : "text-[var(--ink-strong)]"
                   }`}
                 >
