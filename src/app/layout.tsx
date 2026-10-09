@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Manrope, Sora } from "next/font/google";
+import { MotionProvider } from "@/components/ui/MotionProvider";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { getThemeFromCookie, THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
@@ -50,7 +51,9 @@ export default async function RootLayout({
           Skip to main content
         </a>
         <ThemeProvider initialTheme={theme}>
-          {children}
+          <MotionProvider>
+            {children}
+          </MotionProvider>
         </ThemeProvider>
       </body>
     </html>
