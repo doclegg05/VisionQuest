@@ -35,20 +35,27 @@ function UndoCase() {
   const [commits, setCommits] = useState(0);
   return (
     <section>
-      {visible && <p id="pin">Pin: dream job</p>}
-      <button
-        id="remove-pin"
-        onClick={() => {
-          setVisible(false);
-          scheduleRemoval({
-            label: "Pin removed.",
-            commit: async () => setCommits((n) => n + 1),
-            restore: () => setVisible(true),
-          });
-        }}
-      >
-        Remove pin
-      </button>
+      {visible && (
+        <p id="pin">
+          Pin: dream job{" "}
+          <button
+            id="remove-pin"
+            onClick={() => {
+              // The pin and its own Remove button disappear together, as in a real list row.
+              setVisible(false);
+              scheduleRemoval({
+                label: "Pin removed.",
+                restoredLabel: "Pin restored.",
+                commit: async () => setCommits((n) => n + 1),
+                restore: () => setVisible(true),
+                focusAfterRestore: () => document.getElementById("remove-pin"),
+              });
+            }}
+          >
+            Remove pin
+          </button>
+        </p>
+      )}
       <output id="commits">{commits}</output>
       {undoToast}
     </section>

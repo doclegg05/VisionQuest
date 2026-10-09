@@ -63,27 +63,49 @@ test.describe("useConfirm prompt", () => {
 });
 
 test.describe("useUndo", () => {
-  test("Undo restores the item and never commits", async ({ page }) => {
-    await page.clock.install();
+  // <output> elements also have role=status, so target the notice's live region.
+  const notice = (page: Page) => page.locator('[role="status"][aria-live="polite"]');
+
+  test("focus moves to Undo when the removed row took it, and Undo restores with focus back", async ({ page }) => {
     await openHarness(page);
-    await page.click("#remove-pin");
+    await page.focus("#remove-pin");
+    await page.keyboard.press("Enter");
     await expect(page.locator("#pin")).toBeHidden();
-    // <output> elements also have role=status, so target the toast's live region.
-    await expect(page.locator('[role="status"][aria-live="polite"]')).toContainText("Pin removed.");
-    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(notice(page)).toContainText("Pin removed.");
+    await expect(page.getByRole("button", { name: "Undo" })).toBeFocused();
+
+    await page.keyboard.press("Enter");
     await expect(page.locator("#pin")).toBeVisible();
-    await page.clock.runFor(10_000);
+    await expect(notice(page)).toContainText("Pin restored.");
+    await expect(page.locator("#remove-pin")).toBeFocused();
     await expect(page.locator("#commits")).toHaveText("0");
   });
 
-  test("commits once the undo window closes", async ({ page }) => {
+  test("Undo stays available however long the person takes", async ({ page }) => {
     await page.clock.install();
     await openHarness(page);
     await page.click("#remove-pin");
+    await page.clock.runFor(60_000);
+    await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
     await expect(page.locator("#commits")).toHaveText("0");
-    await page.clock.runFor(6_500);
+  });
+
+  test("Dismiss sends the removal once", async ({ page }) => {
+    await openHarness(page);
+    await page.click("#remove-pin");
+    await page.getByRole("button", { name: "Dismiss" }).click();
     await expect(page.locator("#commits")).toHaveText("1");
     await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(0);
+  });
+
+  test("hiding the tab sends the removal, since a hidden tab may be discarded", async ({ page }) => {
+    await openHarness(page);
+    await page.click("#remove-pin");
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect(page.locator("#commits")).toHaveText("1");
   });
 });
 
