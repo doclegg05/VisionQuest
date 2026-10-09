@@ -342,7 +342,7 @@ export default function DetailedQueues({
                   return (
                     <div
                       key={item.id}
-                      className="rounded-[1rem] border border-[var(--border)] bg-[rgba(255,255,255,0.68)] p-4"
+                      className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-soft)] p-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">

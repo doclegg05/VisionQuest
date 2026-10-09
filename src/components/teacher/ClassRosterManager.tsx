@@ -780,7 +780,7 @@ export default function ClassRosterManager() {
                             {enrollment.archivedAt ? ` • Archived ${new Date(enrollment.archivedAt).toLocaleDateString()}` : ""}
                           </p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                             {enrollment.status}
                           </span>
