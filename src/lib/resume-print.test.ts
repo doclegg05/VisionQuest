@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { openPrintWindow } from "./resume-print";
+import { openPrintWindow, pageNonce, withStyleNonce } from "./resume-print";
 
 /**
  * Resume Print failed for every student: it opened the print window with
@@ -66,5 +66,31 @@ describe("openPrintWindow", () => {
     const blocked = () => null;
 
     assert.equal(openPrintWindow("<p>resume</p>", blocked), null);
+  });
+});
+
+describe("withStyleNonce", () => {
+  it("stamps the nonce on every <style> tag", () => {
+    assert.equal(
+      withStyleNonce('<style>a{}</style><style media="print">b{}</style>', "abc+/="),
+      '<style nonce="abc+/=">a{}</style><style nonce="abc+/=" media="print">b{}</style>',
+    );
+  });
+
+  it("leaves the html alone without a usable nonce", () => {
+    assert.equal(withStyleNonce("<style>a{}</style>", undefined), "<style>a{}</style>");
+    assert.equal(withStyleNonce("<style>a{}</style>", '" onload="x'), "<style>a{}</style>");
+  });
+});
+
+describe("pageNonce", () => {
+  it("reads the nonce property, which browsers keep after hiding the attribute", () => {
+    const doc = { querySelector: () => ({ nonce: "n0nce" }) } as unknown as Document;
+    assert.equal(pageNonce(doc), "n0nce");
+  });
+
+  it("is undefined when no element carries one", () => {
+    const doc = { querySelector: () => null } as unknown as Document;
+    assert.equal(pageNonce(doc), undefined);
   });
 });

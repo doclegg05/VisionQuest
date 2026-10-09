@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   EMPTY_RESUME,
   buildResumePlainText,
@@ -11,7 +11,12 @@ import {
   type ResumeEducation,
   type ResumeExperience,
 } from "@/lib/resume";
-import { openPrintWindow } from "@/lib/resume-print";
+import { openPrintWindow, pageNonce, withStyleNonce } from "@/lib/resume-print";
+
+// The page's CSP nonce never changes, so there is nothing to subscribe to.
+const subscribeToNothing = () => () => {};
+const readPageNonce = () => pageNonce(document);
+const noNonceOnServer = () => undefined;
 
 interface ResumeAssistResponse {
   resume: ResumeContent;
@@ -32,6 +37,7 @@ function sanitizeFileName(value: string) {
 }
 
 export default function ResumeBuilder() {
+  const nonce = useSyncExternalStore(subscribeToNothing, readPageNonce, noNonceOnServer);
   const [resume, setResume] = useState<ResumeContent>(EMPTY_RESUME);
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -290,6 +296,7 @@ export default function ResumeBuilder() {
       const printWindow = openPrintWindow(
         buildResumePrintHtml(displayName || "Resume", resume),
         window.open.bind(window),
+        nonce,
       );
       if (!printWindow) {
         throw new Error("Pop-up blocked.");
@@ -464,7 +471,7 @@ export default function ResumeBuilder() {
               title="Resume preview"
               sandbox=""
               className="h-[80vh] w-full rounded-lg border border-[var(--border)] bg-white"
-              srcDoc={buildResumePrintHtml(displayName || "Resume", resume)}
+              srcDoc={withStyleNonce(buildResumePrintHtml(displayName || "Resume", resume), nonce)}
             />
           )}
         </div>
