@@ -81,7 +81,7 @@ export function ProposeConnectionButton({
         </p>
       )}
       {error && (
-        <p className="mt-2 text-sm text-red-600" role="alert">
+        <p className="mt-2 text-sm text-[var(--badge-error-text)]" role="alert">
           {error}
         </p>
       )}

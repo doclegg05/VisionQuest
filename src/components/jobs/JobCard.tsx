@@ -315,6 +315,7 @@ export function JobCard({
                 onChange={(event) => setDraftNotes(event.target.value)}
                 rows={2}
                 maxLength={10000}
+                aria-label="Application notes"
                 placeholder="Notes, next step, or follow-up date"
                 className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--ink-strong)]"
               />

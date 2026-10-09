@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { FormDialog } from "@/components/ui/FormDialog";
 import { api, apiFetch } from "@/lib/api";
 import { FIELD_TYPES, type FieldDef, type FieldType } from "@/lib/forms/schema";
 
@@ -55,26 +56,67 @@ function normalizeKey(raw: string): string {
   return cleaned || "field";
 }
 
+/** Everything the teacher can edit in the builder. */
+export interface BuilderSnapshot {
+  title: string;
+  description: string;
+  isOfficial: boolean;
+  programTypes: string[];
+  fields: FieldDef[];
+}
+
+const EMPTY_SNAPSHOT: BuilderSnapshot = {
+  title: "",
+  description: "",
+  isOfficial: false,
+  programTypes: [],
+  fields: [],
+};
+
+function snapshotKey(snapshot: BuilderSnapshot): string {
+  return JSON.stringify({ ...snapshot, programTypes: [...snapshot.programTypes].sort() });
+}
+
+/**
+ * True once the builder holds edits worth keeping. `initial` is null while an
+ * existing template is still loading, when there is nothing to lose yet.
+ */
+export function builderDirty(initial: BuilderSnapshot | null, current: BuilderSnapshot): boolean {
+  if (!initial) return false;
+  return snapshotKey(initial) !== snapshotKey(current);
+}
+
 export default function FormBuilder({ mode, templateId, onClose, onSaved }: FormBuilderProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isOfficial, setIsOfficial] = useState(false);
   const [programTypes, setProgramTypes] = useState<string[]>([]);
   const [fields, setFields] = useState<FieldDef[]>([]);
+  const [initial, setInitial] = useState<BuilderSnapshot | null>(mode === "edit" ? null : EMPTY_SNAPSHOT);
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const dirty = builderDirty(initial, { title, description, isOfficial, programTypes, fields });
 
   useEffect(() => {
     if (mode !== "edit" || !templateId) return;
     (async () => {
       try {
         const data = await api.get<TemplateDetailResponse>(`/api/teacher/forms/templates/${templateId}`);
-        setTitle(data.template.title);
-        setDescription(data.template.description ?? "");
-        setIsOfficial(data.template.isOfficial);
-        setProgramTypes(data.template.programTypes);
-        setFields(Array.isArray(data.template.schema) ? (data.template.schema as FieldDef[]) : []);
+        const loaded: BuilderSnapshot = {
+          title: data.template.title,
+          description: data.template.description ?? "",
+          isOfficial: data.template.isOfficial,
+          programTypes: data.template.programTypes,
+          fields: Array.isArray(data.template.schema) ? (data.template.schema as FieldDef[]) : [],
+        };
+        setTitle(loaded.title);
+        setDescription(loaded.description);
+        setIsOfficial(loaded.isOfficial);
+        setProgramTypes(loaded.programTypes);
+        setFields(loaded.fields);
+        setInitial(loaded);
       } catch {
         setError("Failed to load template.");
       } finally {
@@ -142,34 +184,16 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
+    <FormDialog
+      title={mode === "edit" ? "Edit form" : "New form"}
+      dirty={dirty}
+      onClose={onClose}
+      widthClass="max-w-4xl"
     >
-      <div
-        onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface-raised)] p-6 shadow-xl space-y-5"
-      >
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-display text-2xl text-[var(--ink-strong)]">
-              {mode === "edit" ? "Edit form" : "New form"}
-            </h2>
-            <p className="text-sm text-[var(--ink-muted)]">
-              Define the title, program scope, and fields. Students will see exactly what you build here.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close form builder"
-            className="rounded-lg p-2 text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
-          >
-            ✕
-          </button>
-        </header>
+      <div className="space-y-5">
+        <p className="text-sm text-[var(--ink-muted)]">
+          Define the title, program scope, and fields. Students will see exactly what you build here.
+        </p>
 
         {loading ? (
           <p className="text-sm text-[var(--ink-muted)]">Loading template…</p>
@@ -239,7 +263,7 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
                 <button
                   type="button"
                   onClick={addField}
-                  className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold"
+                  className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11"
                 >
                   Add field
                 </button>
@@ -286,7 +310,7 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
           </div>
         )}
       </div>
-    </div>
+    </FormDialog>
   );
 }
 
@@ -309,13 +333,13 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
           <span className="font-semibold">#{index + 1}</span>
           <span>{FIELD_TYPE_LABELS[field.type]}</span>
         </div>
-        <div className="flex items-center gap-1 text-xs">
+        <div className="flex items-center gap-2 text-xs">
           <button
             type="button"
             onClick={() => onMove(-1)}
             disabled={index === 0}
             aria-label="Move up"
-            className="rounded-lg border border-[var(--border)] px-2 py-1 disabled:opacity-40"
+            className="inline-flex size-8 items-center justify-center rounded-lg border border-[var(--border)] disabled:opacity-40 pointer-coarse:size-11"
           >
             ↑
           </button>
@@ -324,7 +348,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
             onClick={() => onMove(1)}
             disabled={index === total - 1}
             aria-label="Move down"
-            className="rounded-lg border border-[var(--border)] px-2 py-1 disabled:opacity-40"
+            className="inline-flex size-8 items-center justify-center rounded-lg border border-[var(--border)] disabled:opacity-40 pointer-coarse:size-11"
           >
             ↓
           </button>
@@ -332,7 +356,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
             type="button"
             onClick={onRemove}
             aria-label="Remove field"
-            className="rounded-lg border border-[var(--border)] px-2 py-1 text-[var(--error)]"
+            className="inline-flex items-center rounded-lg border border-[var(--border)] px-2 py-1 text-[var(--error)] pointer-coarse:min-h-11"
           >
             Remove
           </button>

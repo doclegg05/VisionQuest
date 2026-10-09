@@ -96,7 +96,7 @@ export function ConnectionsBoard({ connections }: { connections: ConnectionRow[]
             </p>
 
             {errors[row.id] && (
-              <p className="mt-2 text-sm text-red-600" role="alert">
+              <p className="mt-2 text-sm text-[var(--badge-error-text)]" role="alert">
                 {errors[row.id]}
               </p>
             )}

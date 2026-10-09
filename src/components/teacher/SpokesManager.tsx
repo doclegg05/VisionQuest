@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface ChecklistTemplate {
   id: string;
@@ -70,7 +71,14 @@ function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const FIELD_LABEL = "block space-y-1.5";
+const FIELD_LABEL_TEXT = "block text-sm font-medium text-[var(--ink-strong)]";
+const ROW_ACTION = "inline-flex items-center text-xs pointer-coarse:min-h-11";
+const ROW_DELETE = `${ROW_ACTION} text-[var(--badge-error-text)] hover:underline disabled:opacity-60`;
+
 export default function SpokesManager() {
+  const { confirm, confirmDialog } = useConfirm();
+  const countyFilterId = useId();
   const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
   const [moduleTemplates, setModuleTemplates] = useState<ModuleTemplate[]>([]);
   const [referrals, setReferrals] = useState<ReferralRecord[]>([]);
@@ -248,7 +256,13 @@ export default function SpokesManager() {
   }
 
   async function deleteTemplate(entity: "checklist" | "module", id: string) {
-    if (!confirm("Delete this template? Existing student progress tied to it will also be removed.")) {
+    if (
+      !(await confirm({
+        title: "Delete this template?",
+        message: "Student progress tied to it is also removed.",
+        confirmLabel: "Delete",
+      }))
+    ) {
       return;
     }
 
@@ -299,7 +313,13 @@ export default function SpokesManager() {
   }
 
   async function deleteReferral(id: string) {
-    if (!confirm("Delete this standalone referral?")) {
+    if (
+      !(await confirm({
+        title: "Delete this standalone referral?",
+        message: "It is removed from the SPOKES referral queue.",
+        confirmLabel: "Delete",
+      }))
+    ) {
       return;
     }
 
@@ -395,10 +415,14 @@ export default function SpokesManager() {
             </h3>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+            <label
+              htmlFor={countyFilterId}
+              className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]"
+            >
               County
             </label>
             <select
+              id={countyFilterId}
               value={countyFilter}
               onChange={(event) => {
                 const nextCounty = event.target.value;
@@ -422,94 +446,113 @@ export default function SpokesManager() {
             <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Add referral</h4>
             <div className="mt-3 grid gap-3">
               <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  value={referralForm.firstName}
-                  onChange={(event) =>
-                    setReferralForm((current) => ({ ...current, firstName: event.target.value }))
-                  }
-                  placeholder="First name"
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
-                <input
-                  value={referralForm.lastName}
-                  onChange={(event) =>
-                    setReferralForm((current) => ({ ...current, lastName: event.target.value }))
-                  }
-                  placeholder="Last name"
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
+                <label className={FIELD_LABEL}>
+                  <span className={FIELD_LABEL_TEXT}>First name</span>
+                  <input
+                    value={referralForm.firstName}
+                    onChange={(event) =>
+                      setReferralForm((current) => ({ ...current, firstName: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                </label>
+                <label className={FIELD_LABEL}>
+                  <span className={FIELD_LABEL_TEXT}>Last name</span>
+                  <input
+                    value={referralForm.lastName}
+                    onChange={(event) =>
+                      setReferralForm((current) => ({ ...current, lastName: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                </label>
               </div>
-              <input
-                value={referralForm.referralEmail}
-                onChange={(event) =>
-                  setReferralForm((current) => ({ ...current, referralEmail: event.target.value }))
-                }
-                placeholder="Referral email"
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
-              {countyTemplates.length > 0 ? (
-                <select
-                  value={referralForm.county}
-                  onChange={(event) =>
-                    setReferralForm((current) => ({ ...current, county: event.target.value }))
-                  }
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                >
-                  <option value="">Select county</option>
-                  {countyTemplates.map((template) => (
-                    <option key={template.id} value={template.label}>
-                      {template.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>Referral email</span>
                 <input
-                  value={referralForm.county}
+                  value={referralForm.referralEmail}
                   onChange={(event) =>
-                    setReferralForm((current) => ({ ...current, county: event.target.value }))
+                    setReferralForm((current) => ({ ...current, referralEmail: event.target.value }))
                   }
-                  placeholder="County"
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
-              )}
+              </label>
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>County</span>
+                {countyTemplates.length > 0 ? (
+                  <select
+                    value={referralForm.county}
+                    onChange={(event) =>
+                      setReferralForm((current) => ({ ...current, county: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  >
+                    <option value="">Select county</option>
+                    {countyTemplates.map((template) => (
+                      <option key={template.id} value={template.label}>
+                        {template.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={referralForm.county}
+                    onChange={(event) =>
+                      setReferralForm((current) => ({ ...current, county: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                )}
+              </label>
               <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  value={referralForm.householdType}
-                  onChange={(event) =>
-                    setReferralForm((current) => ({ ...current, householdType: event.target.value }))
-                  }
-                  placeholder="Household (1P/2P)"
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
-                <input
-                  value={referralForm.requiredParticipationHours}
-                  onChange={(event) =>
-                    setReferralForm((current) => ({
-                      ...current,
-                      requiredParticipationHours: event.target.value,
-                    }))
-                  }
-                  placeholder="Required hours"
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
+                <label className={FIELD_LABEL}>
+                  <span className={FIELD_LABEL_TEXT}>Household type</span>
+                  <input
+                    value={referralForm.householdType}
+                    onChange={(event) =>
+                      setReferralForm((current) => ({ ...current, householdType: event.target.value }))
+                    }
+                    placeholder="1P or 2P"
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                </label>
+                <label className={FIELD_LABEL}>
+                  <span className={FIELD_LABEL_TEXT}>Required hours</span>
+                  <input
+                    inputMode="decimal"
+                    value={referralForm.requiredParticipationHours}
+                    onChange={(event) =>
+                      setReferralForm((current) => ({
+                        ...current,
+                        requiredParticipationHours: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                </label>
               </div>
-              <input
-                type="date"
-                value={referralForm.referralDate}
-                onChange={(event) =>
-                  setReferralForm((current) => ({ ...current, referralDate: event.target.value }))
-                }
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
-              <textarea
-                value={referralForm.notes}
-                onChange={(event) =>
-                  setReferralForm((current) => ({ ...current, notes: event.target.value }))
-                }
-                placeholder="Notes"
-                rows={3}
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>Referral date</span>
+                <input
+                  type="date"
+                  value={referralForm.referralDate}
+                  onChange={(event) =>
+                    setReferralForm((current) => ({ ...current, referralDate: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                />
+              </label>
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>Notes</span>
+                <textarea
+                  value={referralForm.notes}
+                  onChange={(event) =>
+                    setReferralForm((current) => ({ ...current, notes: event.target.value }))
+                  }
+                  rows={3}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                />
+              </label>
               <button
                 type="button"
                 onClick={() => void createReferral()}
@@ -553,7 +596,7 @@ export default function SpokesManager() {
                       type="button"
                       onClick={() => void deleteReferral(referral.id)}
                       disabled={deletingReferralId === referral.id}
-                      className="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-60"
+                      className={ROW_DELETE}
                     >
                       Delete
                     </button>
@@ -624,14 +667,14 @@ export default function SpokesManager() {
                                 sortOrder: String(template.sortOrder),
                               });
                             }}
-                            className="text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                            className={`${ROW_ACTION} text-[var(--accent-strong)] hover:text-[var(--ink-strong)]`}
                           >
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => void deleteTemplate("checklist", template.id)}
-                            className="text-xs text-rose-600 hover:text-rose-800"
+                            className={ROW_DELETE}
                           >
                             Delete
                           </button>
@@ -655,43 +698,53 @@ export default function SpokesManager() {
               {editingChecklistId ? "Edit workflow template" : "Add workflow template"}
             </h4>
             <div className="mt-3 grid gap-3">
-              <input
-                value={checklistForm.label}
-                onChange={(event) => setChecklistForm((current) => ({ ...current, label: event.target.value }))}
-                placeholder="Template label"
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
-              <textarea
-                value={checklistForm.description}
-                onChange={(event) =>
-                  setChecklistForm((current) => ({ ...current, description: event.target.value }))
-                }
-                placeholder="Description"
-                rows={2}
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <select
-                  value={checklistForm.category}
-                  onChange={(event) =>
-                    setChecklistForm((current) => ({ ...current, category: event.target.value }))
-                  }
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                >
-                  {CHECKLIST_CATEGORY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>Template label</span>
                 <input
-                  value={checklistForm.sortOrder}
-                  onChange={(event) =>
-                    setChecklistForm((current) => ({ ...current, sortOrder: event.target.value }))
-                  }
-                  placeholder="Sort order (optional)"
-                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  value={checklistForm.label}
+                  onChange={(event) => setChecklistForm((current) => ({ ...current, label: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
+              </label>
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>Description</span>
+                <textarea
+                  value={checklistForm.description}
+                  onChange={(event) =>
+                    setChecklistForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                  rows={2}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className={FIELD_LABEL}>
+                  <span className={FIELD_LABEL_TEXT}>Category</span>
+                  <select
+                    value={checklistForm.category}
+                    onChange={(event) =>
+                      setChecklistForm((current) => ({ ...current, category: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  >
+                    {CHECKLIST_CATEGORY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={FIELD_LABEL}>
+                  <span className={FIELD_LABEL_TEXT}>Sort order (optional)</span>
+                  <input
+                    inputMode="numeric"
+                    value={checklistForm.sortOrder}
+                    onChange={(event) =>
+                      setChecklistForm((current) => ({ ...current, sortOrder: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                </label>
               </div>
               <div className="flex flex-wrap gap-4 text-sm text-[var(--ink-muted)]">
                 <label className="flex items-center gap-2">
@@ -776,14 +829,14 @@ export default function SpokesManager() {
                           sortOrder: String(template.sortOrder),
                         });
                       }}
-                      className="text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                      className={`${ROW_ACTION} text-[var(--accent-strong)] hover:text-[var(--ink-strong)]`}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => void deleteTemplate("module", template.id)}
-                      className="text-xs text-rose-600 hover:text-rose-800"
+                      className={ROW_DELETE}
                     >
                       Delete
                     </button>
@@ -804,29 +857,36 @@ export default function SpokesManager() {
               {editingModuleId ? "Edit module" : "Add module"}
             </h4>
             <div className="mt-3 grid gap-3">
-              <input
-                value={moduleForm.label}
-                onChange={(event) => setModuleForm((current) => ({ ...current, label: event.target.value }))}
-                placeholder="Module label"
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
-              <textarea
-                value={moduleForm.description}
-                onChange={(event) =>
-                  setModuleForm((current) => ({ ...current, description: event.target.value }))
-                }
-                placeholder="Description"
-                rows={2}
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
-              <input
-                value={moduleForm.sortOrder}
-                onChange={(event) =>
-                  setModuleForm((current) => ({ ...current, sortOrder: event.target.value }))
-                }
-                placeholder="Sort order (optional)"
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>Module label</span>
+                <input
+                  value={moduleForm.label}
+                  onChange={(event) => setModuleForm((current) => ({ ...current, label: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                />
+              </label>
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>Description</span>
+                <textarea
+                  value={moduleForm.description}
+                  onChange={(event) =>
+                    setModuleForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                  rows={2}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                />
+              </label>
+              <label className={FIELD_LABEL}>
+                <span className={FIELD_LABEL_TEXT}>Sort order (optional)</span>
+                <input
+                  inputMode="numeric"
+                  value={moduleForm.sortOrder}
+                  onChange={(event) =>
+                    setModuleForm((current) => ({ ...current, sortOrder: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                />
+              </label>
               <div className="flex flex-wrap gap-4 text-sm text-[var(--ink-muted)]">
                 <label className="flex items-center gap-2">
                   <input
@@ -871,6 +931,7 @@ export default function SpokesManager() {
           </div>
         </section>
       </div>
+      {confirmDialog}
     </div>
   );
 }

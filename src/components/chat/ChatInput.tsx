@@ -218,7 +218,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
                   type="button"
                   onClick={() => removeAttachment(attachment.id)}
                   aria-label={`Remove attachment ${attachment.filename}`}
-                  className="text-[var(--ink-faint)] hover:text-[var(--badge-error-text)]"
+                  className="-my-3.5 -mr-3 inline-flex size-11 items-center justify-center text-[var(--ink-faint)] hover:text-[var(--badge-error-text)]"
                 >
                   ×
                 </button>
@@ -231,6 +231,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
           type="file"
           className="hidden"
           onChange={handleFileChange}
+          aria-label="Upload file"
           aria-hidden="true"
           tabIndex={-1}
         />

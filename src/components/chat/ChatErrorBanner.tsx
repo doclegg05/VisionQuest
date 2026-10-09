@@ -35,7 +35,7 @@ export function ChatErrorBanner({ message, settingsHref = "/settings" }: ChatErr
         <Link
           href={settingsHref}
           prefetch={false}
-          className="mt-2 inline-block font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
+          className="mt-2 inline-flex min-h-11 items-center font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
         >
           Open Settings →
         </Link>

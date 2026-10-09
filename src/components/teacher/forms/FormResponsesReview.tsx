@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { FormDialog } from "@/components/ui/FormDialog";
 import { api, apiFetch } from "@/lib/api";
 import { type FieldDef } from "@/lib/forms/schema";
 
@@ -178,7 +179,7 @@ export default function FormResponsesReview() {
               <button
                 type="button"
                 onClick={() => void openResponse(row.id)}
-                className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold"
+                className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11"
               >
                 Open
               </button>
@@ -198,36 +199,21 @@ interface ReviewDrawerProps {
   onReview: (id: string, status: "reviewed" | "needs_changes", notes: string | undefined) => Promise<void>;
 }
 
-function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps) {
-  const [notes, setNotes] = useState(response.reviewerNotes ?? "");
+export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps) {
+  const initialNotes = response.reviewerNotes ?? "";
+  const [notes, setNotes] = useState(initialNotes);
   const [submitting, setSubmitting] = useState(false);
   const canReview = response.status === "submitted" || response.status === "needs_changes" || response.status === "reviewed";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
+    <FormDialog
+      title={response.template.title}
+      dirty={notes !== initialNotes}
+      onClose={onClose}
+      widthClass="max-w-2xl"
     >
-      <div
-        onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface-raised)] p-6 shadow-xl space-y-5"
-      >
-        <header className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-display text-xl text-[var(--ink-strong)]">{response.template.title}</h3>
-            <p className="text-sm text-[var(--ink-muted)]">{response.student.displayName}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-lg p-2 text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
-          >
-            ✕
-          </button>
-        </header>
+      <div className="space-y-5">
+        <p className="text-sm text-[var(--ink-muted)]">{response.student.displayName}</p>
 
         <div className="space-y-3">
           {response.template.schema.map((field) => (
@@ -287,7 +273,7 @@ function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps) {
           </button>
         </footer>
       </div>
-    </div>
+    </FormDialog>
   );
 }
 
