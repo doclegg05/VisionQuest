@@ -87,7 +87,7 @@ export function EmployerResponseActions({
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
-            className={`${BUTTON} bg-[var(--accent-primary)] text-white`}
+            className={`${BUTTON} bg-[var(--accent-green)] text-[var(--on-accent)]`}
             onClick={() => setMode("interested")}
           >
             I want to meet them
@@ -231,7 +231,7 @@ function NotNowForm({
         type="button"
         disabled={saving}
         onClick={() => onSubmit(reason, note.trim() || undefined)}
-        className={`${BUTTON} mt-4 w-full bg-[var(--accent-primary)] text-white disabled:opacity-50`}
+        className={`${BUTTON} mt-4 w-full bg-[var(--accent-green)] text-[var(--on-accent)] disabled:opacity-50`}
       >
         Send
       </button>
@@ -300,7 +300,7 @@ function HiredForm({
           setTouched(true);
           if (ready) onSubmit(startDate, wageNumber);
         }}
-        className={`${BUTTON} mt-4 w-full bg-[var(--accent-primary)] text-white disabled:opacity-50`}
+        className={`${BUTTON} mt-4 w-full bg-[var(--accent-green)] text-[var(--on-accent)] disabled:opacity-50`}
       >
         Send
       </button>

@@ -147,8 +147,8 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
         className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
         style={{
           borderColor: "var(--border)",
-          backgroundColor: "var(--surface-elevated)",
-          color: "var(--text-primary)",
+          backgroundColor: "var(--surface-raised)",
+          color: "var(--ink-strong)",
         }}
       >
         <div>
@@ -191,8 +191,8 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
       className="rounded-xl border p-4"
       style={{
         borderColor: "var(--border)",
-        backgroundColor: "var(--surface-elevated)",
-        color: "var(--text-primary)",
+        backgroundColor: "var(--surface-raised)",
+        color: "var(--ink-strong)",
       }}
     >
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
@@ -218,7 +218,7 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
           className="field flex-1 px-4 py-3 text-sm"
           style={{
             borderColor: "var(--border)",
-            color: "var(--text-primary)",
+            color: "var(--ink-strong)",
           }}
         />
         <button

@@ -127,7 +127,7 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-[var(--ink)]">West Virginia regions</h3>
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">West Virginia regions</h3>
           <p className="text-xs text-[var(--ink-muted)]">
             Click a region to view its rollup. County-level routing is coming in a later phase.
           </p>

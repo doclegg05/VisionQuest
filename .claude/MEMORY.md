@@ -7,6 +7,20 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
+**2026-10-09 Apple HIG design review, then Phase 1 fixes on draft PR #222 (`fix/hig-phase-1`, 9 commits on `main` @ `925b2dfa`, auto-fix on).** Five reviewers covered all 49 routes against the HIG, with each claim cited to a HIG page. The orchestrator re-checked 21 findings and corrected 3. Result: 205 findings (49 P1), seven root problems, and a three-phase fix order. Report: https://claude.ai/artifact/VY1JhUQxxKYN4XDsPpcUf4
+
+Phase 1 shipped test-first on #222:
+- Resume Print opens again.
+- The printed resume and its on-screen preview keep their styles under the CSP.
+- Two teacher 404 links are fixed.
+- Autofill attributes are set on the reset and registration pages.
+- Nine undefined CSS variables (about 150 uses) and two undefined text sizes are mapped to real tokens.
+- `.primary-button` and the NavBar fills pass 4.5:1.
+- framer-motion follows Reduce Motion.
+- The theme follows the device when nothing is saved, and the axe specs scan both themes.
+
+Local result: `npm test` 6,025/6,025, and tsc, eslint, readability, platform:validate and `next build` are clean. Not run locally: `a11y-authenticated.spec.ts`, which now scans light for the first time in CI.
+
 **2026-09-12 sage-grounding rights/responsibilities regression (issue #217, `cursor/sage-grounding-rights-8bc1`).** Nightly Benchmarks on `main` @ `44ec49a` (run 34687308524) failed `sage-grounding.pass_rate` 2/3 against floor 1.0. Retrieval still found `orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf` (no `expected citation … not found`); the reply omitted both fixture terms. Notes-only keyword context was formatted as a bare `Summary:` that #213's grounding instruction treats as non-evidence, the seeded note never contained "responsibilities", and the harness `present_form` stub returned no title so a "where can I find" turn became "I've opened that". Fix: title in `buildDocNote`, identity passage when chunks are missing, one-sentence RAG clarification (`SAGE_PROMPT_REVISION` `2026-09-12.1`), production-shaped form-tool stub in the grounding harness. Floor, other suites, and commit-results plumbing left alone.
 
 **2026-09-11 nightly Benchmarks fire drill (`cursor/bench-commit-results-pr-2f48`).** The scheduled Benchmarks workflow on `main` (@ `af6a6e0`, run 34589702084 and the Sep 9/10 nightlies) is red because `commit-results` does `git push` to protected `main` (GH006: pull request required, status check `verify` expected). Job `benchmarks` itself is green (sage-grounding `pass_rate` 1.000; regression-issue / fail-on-regression skipped). Fix is workflow-only: `commit-results` force-pushes `chore/nightly-benchmark-results` (path-allowlisted to `reports/benchmarks/latest/**`), opens or updates one PR, posts a path-gated `verify` check so the PR can merge without weakening branch protection, squash-merges with `[skip ci]`, and leaves the PR open if merge is refused. Suites, floors, and the `benchmarks` job are unchanged.
@@ -62,6 +76,23 @@ Shipped workflow surface: `/ci-pipeline` (#121–#125) and `/a11y-pipeline` (#12
 Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#117); see `docs/MATURITY_REVIEW.md`.
 
 ## Last Session
+- **Date**: 2026-10-09
+- **What we worked on**:
+  - Britt asked for an Apple HIG design review of every tab and page.
+    - Five parallel reviewers covered the shell, student pages (two groups), teacher pages, and public/admin/coordinator pages.
+    - A static scan (`hig-scan.mjs`) and an undefined-token check fed them leads.
+    - Live production probes at iPhone width found that a Light device gets dark, and the sign-in form starts 1,596pt down the page.
+    - The orchestrator re-checked 21 findings and published the report artifact.
+  - Then the Phase 1 fixes, one test-first commit each, in sibling worktree `../VisionQuest-hig-phase1`.
+  - An independent code review found the print window inherits the CSP and drops the resume's `<style>`. Fixing it showed the preview has been unstyled on `main` all along.
+  - A hydration mismatch on the nonce'd theme script was caught and fixed.
+- **What we decided**: see the 2026-10-09 rows in the Key Decisions Log.
+- **Where we left off**:
+  - Draft PR #222 is open with CI running and auto-fix on.
+  - Open test-plan items: the CI `a11y-authenticated` run (first light-theme scan, may surface new violations), `theme-variant.spec.ts`, a phone check of light/dark with no flash, and a signed-in Portfolio Print and Preview check.
+  - Phase 2 and Phase 3 are not started; see Open Items.
+
+## Prior Session (2026-09-12, sage-grounding rights/responsibilities)
 - **Date**: 2026-09-12 (sage-grounding rights/responsibilities, issue #217)
 - **What we worked on**: Nightly sage-grounding failed on `grounding-rights-responsibilities` (`expected one of [rights, responsibilities]`). Citation attachment to the retrieved context still passed; the generated reply did not name the form. Seeded the document title into `buildDocNote`, emit a notes-only identity passage, clarify that a supplied title+link establishes which document to open, and make the grounding harness form-tool stub return `Found "<title>"` like production `present_form`.
 - **What we decided**: Do not touch floors, unrelated suites, or commit-results workflow permissions. Prefer retrieval/citation/seed over a broad prompt rewrite; the one RAG sentence is scoped to document identity, not policy facts.
@@ -181,6 +212,25 @@ Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#1
 - **Where we left off**: PR #149 open against `main`, rebased onto #147/#148 (MEMORY.md conflict resolved by keeping both entries). Note for whoever runs local evals next: the 26b model was unloaded to free the GPU (`ollama stop gemma4:26b-a4b-it-qat`) because 15 GB + 9.6 GB do not co-reside, and requests stall swapping models.
 
 ## Open Items
+- [ ] **PR #222 (HIG Phase 1)**: finish the test plan in the PR body (CI authenticated axe in both themes, phone light/dark check, signed-in Print and Preview), then Britt reviews and merges.
+- [ ] **HIG Phase 2** (report: https://claude.ai/artifact/VY1JhUQxxKYN4XDsPpcUf4):
+  - Replace the 16 teacher `alert`/`confirm`/`prompt` calls with `useConfirm`, and add undo to dismiss/delete (D-24, B-32, C-47).
+  - 44pt touch minimum via `min-h-8 [@media(pointer:coarse)]:min-h-11` (D-25).
+  - Teacher raw palette classes onto tokens, with a lint rule (D-26; zero `dark:` utilities in teacher scope today).
+  - Label every field, starting with the SPOKES record form (D-23, E-26).
+- [ ] **HIG Phase 3**:
+  - Sign-in above the fold on phones (E-1).
+  - Phone tab bar per role; staff currently land on student `/chat` (A-4, A-9, A-10).
+  - Say Sage is an AI and can be wrong, and give students a memory off switch (B-19, C-24).
+  - Vision board by touch and keyboard (C-46 to C-49).
+- [ ] **Left out of #222 on purpose**:
+  - No way back to "follow device" after using the toggle; needs a System/Light/Dark setting.
+  - The toggle shows the light icon until hydration on dark devices.
+  - `themeColor` ignores an explicit in-app choice.
+  - Safari Keychain may still fill the `type=password` registration key; the complete fix is a masked text field.
+  - Goal confetti (canvas) and chat smooth-scroll ignore Reduce Motion (B-34, B-21).
+  - The skip link is white on near-white in dark mode (`layout.tsx`, `focus:text-white` on `--ink-strong`).
+  - The design hook flags `--ease-bounce` and the `.app-main::before` side border; owner call whether they are intentional.
 - [ ] **Coordinator dashboard is RLS-blind for real coordinators (found 2026-09-07 by the C7 builder; D2 territory)**: `rlsContextFor` collapses a coordinator session to RLS role `student`, and `region.ts`'s `coordinatorHasRegion`/`classIdsInRegion` run on the app client, so every real coordinator gets a 403 from the main rollup and silent zeros elsewhere (`grant-metrics`, `instructor-metrics`, `closed-loop-metrics`). The new forms rollup works because its module reads through `prismaAdmin` with the region scope enforced in every query; `region.ts` needs the same treatment or Slice D coordinator RLS policies. Nobody currently asserts that the collapse leaves the coordinator surface non-functional.
 - [ ] **USER veto (D8 shipped)**: teacher task/goal nudges about a student now reach only the student's assigned instructors; a student with none falls back to all active teachers and logs `intervention_nudge_fallback_program_wide` (count only). Admins and coordinators are not in the fallback (the builder's recommendation: the nudge is instructor work). Consider an alarm when the fallback resolves zero teachers, mirroring `wellbeing_no_recipients`. *Follow-up `fix/recipient-scoping-2` (security audit): instructors are resolved staff-only (`isStaffRole`, archived classes excluded), the fallback keys on delivered rather than resolved recipients, and `intervention_nudge_no_recipients` (count only) fires when nothing is delivered; the coordinator forms rollup suppresses per-template counts below 5 students (`suppressed: true`), validates `regionId` as a cuid, writes an audit row with counts only, and runs two grouped queries.*
 - [ ] **USER — PR #207 deploy check (2026-09-07)**: Render must have `ADMIN_DATABASE_URL` set and `RLS_CONTEXT_INJECTION` = the exact string `true`, or the boot probes refuse to start and the previous version stays live. Then run `npm run memory:pseudonymize:backfill` (dry run, then `--apply`) from a machine with `ADMIN_DATABASE_URL`; run `SELECT count(*) FROM "Student" WHERE "geminiApiKey" IS NOT NULL` (non-zero → a student notice that their personal key now serves only public prompts); set repo variable `GEMINI_EVAL_BUDGET_OK=1`; prod one-liners: `SELECT column_name FROM information_schema.columns WHERE table_schema='visionquest' AND table_name='CareerDiscovery' AND column_name LIKE 'riasec%';` (orphan columns from the apify branch — inert, keep or drop) and `SELECT source,"sourceId",count(*) FROM visionquest."JobListing" GROUP BY 1,2 HAVING count(*)>1;` (must be empty before the job-board compound-unique migration deploys).
@@ -286,6 +336,10 @@ Single home for engineering decisions. Product **scope** decisions live in `docs
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-10-09 | The theme defaults to the device ("system"). The server omits `data-theme`, and a nonce'd `<head>` script sets it from `prefers-color-scheme` before paint. `data-theme` stays the only key for `dark:` | Apple's guidance and `.impeccable.md` ("Light is primary") both say follow the device. Keeping the attribute as the single switch preserves #165's invariant. `ThemeProvider` uses `useSyncExternalStore` with a `null` server snapshot, so it never overwrites the boot script with a guess |
+| 2026-10-09 | Contrast on a gradient is tested at every stop, per theme, by resolving `var()` and `color-mix()` the way the browser does (`globals.primary-button.test.ts`) | axe reports text over a gradient as "incomplete", not as a violation. `.primary-button` sat at 2.0 to 2.7:1 in 52 files while the authenticated gate read 0 |
+| 2026-10-09 | Any HTML written into a child window or `srcdoc` iframe stamps the page nonce on its `<style>` tags (`withStyleNonce` + `pageNonce` in `src/lib/resume-print.ts`) | Both inherit the app CSP, whose `style-src-elem` admits only nonce'd stylesheets. A unit test with a fake window cannot see this; `e2e/resume-print-csp.spec.ts` serves the proxy's CSP shape and checks computed styles |
+| 2026-10-09 | Internal links and CSS variables have repo-wide guard tests (`internal-links.test.ts`, `globals.tokens.test.ts`) instead of one-off fixes | Two dead links and ten undefined variables (about 150 uses) had shipped silently. A guard that scans all of `src` catches the next one in the PR that adds it |
 | 2026-09-11 | Nightly `commit-results` lands `reports/benchmarks/latest/` through a reused PR (`chore/nightly-benchmark-results`), not `git push` to `main` | Branch protection on `main` rejects the direct push (GH006: pull request required, `verify` expected). The dashboard still reads committed files on `main`; the PR is the vehicle. A `verify` check is posted only after a path allowlist, because GITHUB_TOKEN events cannot trigger the real CI workflow (loop prevention) and `[skip ci]` is load-bearing to avoid a nightly full-CI loop |
 | 2026-09-07 | Cloud routing policy is a switch whose default is today's behaviour (`ai_cloud_policy` = `permissive`), and the de-identification decorator is the one thing that ships ON with a kill switch (`ai_deidentify_cloud` = anything but `off`) | Production runs `ai_provider` = cloud for real students; a refusal branch that fired by default would have turned Sage off for the whole program on deploy. De-identification is different: it only removes identifiers from what the model sees, the first de-identified eval run was green (red-team 33/33, tool selection 80%, guardrails 5/5), and the failure mode of leaving it off is exactly the disclosure the review measured — so on-by-default with an operator kill switch is the safe direction, and the direction Britt chose ("scaffold work-arounds like de-identification") |
 | 2026-09-07 | Pseudonym tokens are structural (`[STUDENT_NAME]`, `[EMAIL_n]`, …), never `_START`/`_END`-suffixed, substituted longest-first on Unicode word boundaries, and every string the model sees — system prompt, history, tool results — passes through the same vault; re-hydration happens on the stream with a carry buffer bounded by the longest token | `sanitizeForPrompt` strips any `[WORD_START]`/`[WORD_END]` shape from untrusted text, so a token in that shape would be destroyed before the model saw it; a vault that only covered the user turn would leak the same name through the roster in the system prompt; and a streaming boundary can split a token across chunks, so the re-hydrator must hold back at most one token's length rather than flush eagerly. The claim made externally stays "reduced disclosure of identifiers" — PTAC is explicit that removing direct identifiers is not de-identification |
@@ -429,6 +483,11 @@ Single home for engineering decisions. Product **scope** decisions live in `docs
 - Evals are hard gates — run all three before merging Sage-affecting changes
 
 ## Known Issues
+- **axe does not score text over a gradient background.** It reports such nodes as "incomplete", so the authenticated contrast gate cannot see them. Gradient fills need their own ratio test; see `globals.primary-button.test.ts`.
+- **A window from `window.open("")` and an `srcdoc` iframe inherit the app CSP.** Inline `<style>` in them is dropped unless it carries the page nonce; use `withStyleNonce(html, pageNonce(document))`.
+- **Browsers blank a script's `nonce` attribute after parsing, but keep the property.** React then reports a hydration mismatch on any server-rendered `<script nonce>`. Put `suppressHydrationWarning` on that element, and read nonces through the `.nonce` property, never `getAttribute`.
+- **Local Playwright on the Mac.** The project pins `chromium_headless_shell-1217`, which is not installed. Point `launchOptions.executablePath` at the installed 1248 build. Public-route e2e runs against `next dev` with no database when given placeholder `DATABASE_URL`, `APP_BASE_URL`, `JWT_SECRET`, and an `API_KEY_ENCRYPTION_KEY` that is base64 of 32 bytes.
+- **The desktop app's built-in browser pane blocks every popup.** It is not evidence about `window.open`. Harness auto-memory holds the detail (`browser-pane-blocks-popups`).
 - **A route that awaits `syncStudentAlerts` before responding makes the student wait for the teacher queue** (prod, 2026-09-07). Every app-client query is a two-round-trip transaction under RLS injection, the sync issues dozens of them plus an interactive transaction over every one of the student's alert rows, and concurrent calls for the same student serialise on those rows. Sub-millisecond execution times in `pg_stat_statements` say nothing about it. Use `deferAfterResponse` (`src/lib/after-response.ts`) for any student-facing write whose alert sync is bookkeeping; the staff paths of `/api/orientation` still await it on purpose so an instructor's queue is fresh on the next fetch.
 - **A submit button that ignores its in-flight state gets tapped again** — 14 times in 26 seconds on 2026-09-07. `SignaturePad` now takes `submitting`; any new confirm-style control needs the same: disabled while pending, label changes on the button itself, and a re-entry guard in the handler (the ref in `OrientationWizard.handleSign`), because a second tap can land before React re-renders with the disabled state.
 - **A streamed route segment briefly exists twice in the DOM** (reproduced locally 2026-09-07 after three CI flakes on `e81666d`, `d8483f8`, `a9fb485`): during a hard load of a student page, React parks a second copy of the page content in a hidden `<div id="S:n">` appended to `<body>` for ~150–250 ms before swapping it into the boundary inside `#main-content`; no console error, nothing visible to the student. A strict Playwright locator (`getByTestId`, `getByText`) counts both and throws "resolved to 2 elements" — `toHaveCount(1)` can pass one poll and `toBeVisible` fail the next. Scope journey-strip locators to `page.locator("#main-content")`, which the streaming container is outside of; `e2e/student-journey.spec.ts` does. The probe that found it is a 25 ms sampling loop over `document.querySelectorAll` printing each match's ancestor chain.

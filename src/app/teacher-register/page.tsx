@@ -109,6 +109,12 @@ export default function StaffRegisterPage() {
               <input
                 id="registrationKey"
                 type="password"
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={registrationKey}
                 onChange={(e) => setRegistrationKey(e.target.value)}
                 placeholder={`Enter the ${role} registration key`}
@@ -127,6 +133,7 @@ export default function StaffRegisterPage() {
               <input
                 id="displayName"
                 type="text"
+                autoComplete="name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Your full name"

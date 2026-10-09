@@ -106,7 +106,7 @@ export function SaveErrorBanner({ message, onDismiss }: { message: string; onDis
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss error"
-        className="min-h-11 min-w-11 shrink-0 rounded-lg p-2.5 text-[var(--error)] transition-colors hover:bg-[var(--surface-elevated)]"
+        className="min-h-11 min-w-11 shrink-0 rounded-lg p-2.5 text-[var(--error)] transition-colors hover:bg-[var(--surface-raised)]"
       >
         <X size={24} aria-hidden="true" />
       </button>
@@ -226,14 +226,14 @@ export function JobCard({
       </div>
 
       {/* Job info */}
-      <h3 className={["font-semibold text-[var(--text-primary)]", compact ? "text-sm" : "text-base", "leading-tight"].join(" ")}>
+      <h3 className={["font-semibold text-[var(--ink-strong)]", compact ? "text-sm" : "text-base", "leading-tight"].join(" ")}>
         {title}
       </h3>
-      <div className="flex items-center gap-1 text-sm text-[var(--text-secondary)] mt-1">
+      <div className="flex items-center gap-1 text-sm text-[var(--ink-muted)] mt-1">
         <Briefcase size={14} />
         <span>{company}</span>
       </div>
-      <div className="flex items-center gap-1 text-sm text-[var(--text-secondary)] mt-0.5">
+      <div className="flex items-center gap-1 text-sm text-[var(--ink-muted)] mt-0.5">
         <MapPin size={14} />
         <span>{location}</span>
       </div>
@@ -248,11 +248,11 @@ export function JobCard({
 
       {/* Posted date + source badge */}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className="text-xs text-[var(--text-secondary)]">
+        <span className="text-xs text-[var(--ink-muted)]">
           {formatPostedAt(postedAt, createdAt)}
         </span>
         {formatSourceLabel(source) && (
-          <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+          <span className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink-muted)]">
             {formatSourceLabel(source)}
           </span>
         )}
@@ -264,7 +264,7 @@ export function JobCard({
       </div>
 
       {workForceWv && (
-        <p className="mt-2 text-xs leading-snug text-[var(--text-secondary)]">
+        <p className="mt-2 text-xs leading-snug text-[var(--ink-muted)]">
           {MACC_APPLY_HINT}
         </p>
       )}
@@ -284,7 +284,7 @@ export function JobCard({
           {visibleReasons.map((reason) => (
             <span
               key={`${reason.type}:${reason.value ?? reason.label}`}
-              className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+              className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink-muted)]"
             >
               {reason.label}
             </span>
@@ -302,7 +302,7 @@ export function JobCard({
                 value={draftStatus}
                 onChange={(event) => setDraftStatus(event.target.value as SavedJobStatus)}
                 aria-label="Application status"
-                className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--ink-strong)]"
               >
                 {TRACKING_STATUSES.map((status) => (
                   <option key={status.value} value={status.value}>
@@ -316,7 +316,7 @@ export function JobCard({
                 rows={2}
                 maxLength={10000}
                 placeholder="Notes, next step, or follow-up date"
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--ink-strong)]"
               />
               <button
                 type="button"
@@ -336,7 +336,7 @@ export function JobCard({
               className={`flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
                 savedStatus
                   ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                  : "bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                  : "bg-[var(--surface-raised)] text-[var(--ink-muted)] hover:text-[var(--accent)]"
               }`}
             >
               <BookmarkSimple size={14} weight={savedStatus ? "fill" : "regular"} />
@@ -346,13 +346,13 @@ export function JobCard({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
+              className="flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-muted)] hover:text-[var(--primary)] transition-colors"
             >
               <ArrowSquareOut size={14} />
               View
             </a>
             {savedAppliedAt ? (
-              <span className="text-xs text-[var(--text-secondary)]">
+              <span className="text-xs text-[var(--ink-muted)]">
                 Applied {new Date(savedAppliedAt).toLocaleDateString()}
               </span>
             ) : null}

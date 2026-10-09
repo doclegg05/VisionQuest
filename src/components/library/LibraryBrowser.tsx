@@ -290,7 +290,7 @@ export default function LibraryBrowser() {
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-2 text-sm font-medium text-[var(--ink)] hover:bg-[var(--surface-muted)] disabled:cursor-wait disabled:opacity-60"
+                className="rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-2 text-sm font-medium text-[var(--ink-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-wait disabled:opacity-60"
               >
                 {loadingMore ? "Loading…" : `Load ${Math.min(PAGE_SIZE, total - offset - PAGE_SIZE)} more`}
               </button>
@@ -400,7 +400,7 @@ function PreviewModal({ doc, onClose }: { doc: Document; onClose: () => void }) 
           <div className="flex items-center gap-2">
             <a
               href={`/api/documents/download?id=${doc.id}&mode=download`}
-              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:bg-[var(--surface-muted)]"
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-medium text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
             >
               <Download weight="bold" className="size-3.5" /> Download
             </a>

@@ -271,18 +271,18 @@ export function JobConfigSection() {
   };
 
   if (classes.length === 0) {
-    return <p className="text-[var(--text-secondary)]">No classes found.</p>;
+    return <p className="text-[var(--ink-muted)]">No classes found.</p>;
   }
 
   return (
     <div className="space-y-6">
       {/* Class selector */}
       <div>
-        <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">Class</label>
+        <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">Class</label>
         <select
           value={selectedClassId}
           onChange={(e) => setSelectedClassId(e.target.value)}
-          className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-xs"
+          className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-xs"
         >
           {classes.map((c) => (
             <option key={c.id} value={c.id}>
@@ -293,18 +293,18 @@ export function JobConfigSection() {
       </div>
 
       {loading ? (
-        <p className="text-[var(--text-secondary)]">Loading config...</p>
+        <p className="text-[var(--ink-muted)]">Loading config...</p>
       ) : (
         <>
           {/* Status display */}
           {config && (
             <div className="surface-section rounded-xl p-4 flex items-center justify-between">
               <div>
-                <p className="text-sm text-[var(--text-primary)]">
+                <p className="text-sm text-[var(--ink-strong)]">
                   <Briefcase size={16} className="inline mr-1" />
                   <strong>{activeJobCount}</strong> active jobs
                 </p>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <p className="text-xs text-[var(--ink-muted)] mt-0.5">
                   Last refreshed: {config.lastScrapedAt
                     ? new Date(config.lastScrapedAt).toLocaleDateString()
                     : "Never"}
@@ -326,7 +326,7 @@ export function JobConfigSection() {
               className={`rounded-lg border px-3 py-2 text-sm ${
                 jobBoardError
                   ? "border-[var(--error)]/40 text-[var(--error)]"
-                  : "border-[var(--border)] text-[var(--text-secondary)]"
+                  : "border-[var(--border)] text-[var(--ink-muted)]"
               }`}
             >
               {jobBoardError ?? jobBoardNotice}
@@ -337,10 +337,10 @@ export function JobConfigSection() {
             <div className="surface-section rounded-xl p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">
+                  <p className="text-sm font-medium text-[var(--ink-strong)]">
                     Job Scout status: {scrapeRun.status}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  <p className="mt-1 text-xs text-[var(--ink-muted)]">
                     Sources {scrapeRun.completedSources}/{scrapeRun.totalSources}
                     {scrapeRun.failedSources > 0 ? `, ${scrapeRun.failedSources} failed` : ""}
                     {" · "}
@@ -350,7 +350,7 @@ export function JobConfigSection() {
                     <p className="mt-2 text-xs text-[var(--error)]">{scrapeRun.error}</p>
                   )}
                 </div>
-                <p className="text-xs text-[var(--text-secondary)]">
+                <p className="text-xs text-[var(--ink-muted)]">
                   {scrapeRun.completedAt
                     ? `Completed ${new Date(scrapeRun.completedAt).toLocaleString()}`
                     : scrapeRun.startedAt
@@ -363,13 +363,13 @@ export function JobConfigSection() {
                   {scrapeRun.sourceResults.map((source) => (
                     <div
                       key={source.id}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2"
+                      className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-[var(--text-primary)]">{source.source}</span>
-                        <span className="text-xs text-[var(--text-secondary)]">{source.status}</span>
+                        <span className="text-xs font-medium text-[var(--ink-strong)]">{source.source}</span>
+                        <span className="text-xs text-[var(--ink-muted)]">{source.status}</span>
                       </div>
-                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      <p className="mt-1 text-xs text-[var(--ink-muted)]">
                         {source.fetchedCount} fetched, {source.upsertedCount} saved
                       </p>
                       {source.error && (
@@ -384,7 +384,7 @@ export function JobConfigSection() {
                   type="button"
                   onClick={() => void handleRefresh(failedSources)}
                   disabled={refreshing}
-                  className="mt-3 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-elevated)] disabled:opacity-50"
+                  className="mt-3 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)] disabled:opacity-50"
                 >
                   Retry failed sources
                 </button>
@@ -396,8 +396,8 @@ export function JobConfigSection() {
             <div className="surface-section rounded-xl p-4">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">Source health</p>
-                  <p className="text-xs text-[var(--text-secondary)]">
+                  <p className="text-sm font-medium text-[var(--ink-strong)]">Source health</p>
+                  <p className="text-xs text-[var(--ink-muted)]">
                     Recent source reliability and configuration status.
                   </p>
                 </div>
@@ -412,19 +412,19 @@ export function JobConfigSection() {
                 {selectedSourceHealth.map((source) => (
                   <div
                     key={source.source}
-                    className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2"
+                    className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-medium text-[var(--text-primary)]">{source.label}</span>
-                      <span className={`text-xs ${source.configured ? "text-[var(--text-secondary)]" : "text-[var(--error)]"}`}>
+                      <span className="text-xs font-medium text-[var(--ink-strong)]">{source.label}</span>
+                      <span className={`text-xs ${source.configured ? "text-[var(--ink-muted)]" : "text-[var(--error)]"}`}>
                         {source.configured ? "configured" : "missing key"}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    <p className="mt-1 text-xs text-[var(--ink-muted)]">
                       {source.successRate === null ? "No recent runs" : `${source.successRate}% success`}
                       {source.lastStatus ? ` · last ${source.lastStatus}` : ""}
                     </p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    <p className="mt-1 text-xs text-[var(--ink-muted)]">
                       {source.lastFetchedCount} fetched, {source.lastUpsertedCount} saved
                     </p>
                     {source.lastError && (
@@ -438,17 +438,17 @@ export function JobConfigSection() {
 
           {recentRuns.length > 1 && (
             <div className="surface-section rounded-xl p-4">
-              <p className="text-sm font-medium text-[var(--text-primary)]">Recent scrape history</p>
+              <p className="text-sm font-medium text-[var(--ink-strong)]">Recent scrape history</p>
               <div className="mt-3 space-y-2">
                 {recentRuns.slice(0, 5).map((run) => (
                   <div
                     key={run.id}
                     className="flex flex-col gap-1 rounded-lg border border-[var(--border)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <p className="text-xs text-[var(--text-primary)]">
+                    <p className="text-xs text-[var(--ink-strong)]">
                       {run.status} · {run.completedSources}/{run.totalSources} sources · {run.totalUpserted} saved
                     </p>
-                    <p className="text-xs text-[var(--text-secondary)]">
+                    <p className="text-xs text-[var(--ink-muted)]">
                       {run.completedAt
                         ? new Date(run.completedAt).toLocaleString()
                         : new Date(run.queuedAt).toLocaleString()}
@@ -470,7 +470,7 @@ export function JobConfigSection() {
           {/* Config form */}
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">
+              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
                 Region
               </label>
               <input
@@ -478,18 +478,18 @@ export function JobConfigSection() {
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
                 placeholder="e.g., Charleston, WV"
-                className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-sm"
+                className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-sm"
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">
+              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
                 Search Radius
               </label>
               <select
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value))}
-                className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm"
+                className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm"
               >
                 {RADIUS_OPTIONS.map((r) => (
                   <option key={r} value={r}>
@@ -500,10 +500,10 @@ export function JobConfigSection() {
             </div>
 
             <fieldset>
-              <legend className="text-sm font-medium text-[var(--text-primary)] mb-2">
+              <legend className="text-sm font-medium text-[var(--ink-strong)] mb-2">
                 Local vs remote priority
               </legend>
-              <p className="mb-3 text-xs text-[var(--text-secondary)]">
+              <p className="mb-3 text-xs text-[var(--ink-muted)]">
                 Controls how the job board ranks (or hides) jobs based on whether they are local to
                 your class region.
               </p>
@@ -515,7 +515,7 @@ export function JobConfigSection() {
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                       localJobPriority === opt.value
                         ? "border-[var(--primary)] bg-[var(--primary)]/10"
-                        : "border-[var(--border)] bg-[var(--surface-elevated)] hover:border-[var(--text-secondary)]"
+                        : "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--ink-muted)]"
                     }`}
                   >
                     <input
@@ -528,10 +528,10 @@ export function JobConfigSection() {
                       className="mt-1"
                     />
                     <span className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                      <span className="text-sm font-medium text-[var(--ink-strong)]">
                         {opt.title}
                       </span>
-                      <span className="text-xs text-[var(--text-secondary)]">
+                      <span className="text-xs text-[var(--ink-muted)]">
                         {opt.description}
                       </span>
                     </span>
@@ -541,14 +541,14 @@ export function JobConfigSection() {
             </fieldset>
 
             <div>
-              <label className="text-sm font-medium text-[var(--text-primary)] block mb-2">
+              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-2">
                 Job Sources
               </label>
               <CareerOneStopUnconfiguredNotice sources={sources} sourceHealth={sourceHealth} />
               <div className="mt-2 grid gap-3 lg:grid-cols-3">
                 {SOURCE_GROUPS.map((group) => (
                   <div key={group.mode} className="rounded-lg border border-[var(--border)] p-3">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                       {group.label}
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -562,7 +562,7 @@ export function JobConfigSection() {
                               className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
                                 sources.includes(opt.value)
                                   ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
-                                  : "bg-[var(--surface-elevated)] border-[var(--border)] text-[var(--text-secondary)]"
+                                  : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-muted)]"
                               }`}
                             >
                               {opt.label}
@@ -591,7 +591,7 @@ export function JobConfigSection() {
                 onChange={(e) => setAutoRefresh(e.target.checked)}
                 className="rounded"
               />
-              <label htmlFor="autoRefresh" className="text-sm text-[var(--text-primary)]">
+              <label htmlFor="autoRefresh" className="text-sm text-[var(--ink-strong)]">
                 Auto-refresh every Monday at 6 AM
               </label>
             </div>

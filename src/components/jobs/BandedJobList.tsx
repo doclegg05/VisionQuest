@@ -35,13 +35,13 @@ export function BandedJobList({ jobs, onSave }: BandedJobListProps) {
             <div className="mb-3">
               <h4
                 id={`job-band-${section.key}`}
-                className="text-base font-semibold text-[var(--text-primary)]"
+                className="text-base font-semibold text-[var(--ink-strong)]"
               >
                 {section.label}{" "}
-                <span className="font-normal text-[var(--text-secondary)]">({section.count})</span>
+                <span className="font-normal text-[var(--ink-muted)]">({section.count})</span>
               </h4>
               {section.explainer && (
-                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">
                   {section.explainer}
                 </p>
               )}

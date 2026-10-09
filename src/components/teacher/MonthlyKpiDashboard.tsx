@@ -185,7 +185,7 @@ function QuickActions({ classId }: QuickActionsProps) {
     },
     {
       label: "Intervention Queue",
-      href: `/teacher/students`,
+      href: `/teacher`,
       description: "Students who may need a touchpoint",
       icon: "🎯",
     },

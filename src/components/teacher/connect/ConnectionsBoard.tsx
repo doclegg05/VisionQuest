@@ -117,7 +117,7 @@ export function ConnectionsBoard({ connections }: { connections: ConnectionRow[]
                   type="button"
                   disabled={busy === row.id}
                   onClick={() => act(row.id, "send")}
-                  className={`${BUTTON} mt-3 bg-[var(--accent-primary)] text-white disabled:opacity-50`}
+                  className={`${BUTTON} mt-3 bg-[var(--accent-green)] text-[var(--on-accent)] disabled:opacity-50`}
                 >
                   {busy === row.id ? "Sending…" : "Send it"}
                 </button>

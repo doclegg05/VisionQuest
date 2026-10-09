@@ -42,9 +42,9 @@ const JOB_TYPE_OPTIONS = [
 ];
 
 const CONTROL_CLASSES =
-  "min-h-11 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm";
+  "min-h-11 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm";
 
-const VISIBLE_LABEL_CLASSES = "text-sm font-medium text-[var(--text-secondary)]";
+const VISIBLE_LABEL_CLASSES = "text-sm font-medium text-[var(--ink-muted)]";
 
 export type JobProximityFilter = "local" | "remote" | "all";
 
@@ -116,7 +116,7 @@ export function JobFilters({
       <div
         role="tablist"
         aria-label="Filter jobs by location"
-        className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] p-1"
+        className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-1"
       >
         {PROXIMITY_TABS.map((tab) => {
           const isSelected = proximity === tab.value;
@@ -131,7 +131,7 @@ export function JobFilters({
               className={`flex min-h-11 min-w-20 items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
                 isSelected
                   ? "bg-[var(--primary)] text-white"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >
               <span>{tab.label}</span>
@@ -139,7 +139,7 @@ export function JobFilters({
                 className={`rounded-full px-1.5 text-xs ${
                   isSelected
                     ? "bg-white/20 text-white"
-                    : "bg-[var(--border)] text-[var(--text-secondary)]"
+                    : "bg-[var(--border)] text-[var(--ink-muted)]"
                 }`}
                 aria-label={`${count} ${tab.label.toLowerCase()} jobs`}
               >
@@ -186,7 +186,7 @@ export function JobFilters({
         aria-expanded={filtersOpen}
         aria-controls="job-filters-panel"
         onClick={() => setFiltersOpen((current) => !current)}
-        className="flex min-h-11 items-center gap-1.5 self-end rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:text-[var(--primary)]"
+        className="flex min-h-11 items-center gap-1.5 self-end rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:text-[var(--primary)]"
       >
         Filters{activeSecondaryCount > 0 ? ` (${activeSecondaryCount})` : ""}
         <CaretDown

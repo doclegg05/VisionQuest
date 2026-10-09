@@ -652,10 +652,10 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       </span>
                       {isMProposed && (
                         <>
-                          <span className="rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 px-2 py-0.5 text-3xs font-semibold">
+                          <span className="rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 px-2 py-0.5 text-xs font-semibold">
                             SAGE SUGGESTION
                           </span>
-                          <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-3xs font-semibold">
+                          <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-xs font-semibold">
                             Awaiting instructor confirmation
                           </span>
                         </>
@@ -713,7 +713,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       <button
                         type="button"
                         onClick={() => setSageModalGoal(monthly)}
-                        className="flex items-center gap-1 px-2.5 py-1 text-3xs font-semibold rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors shrink-0"
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors shrink-0"
                         title="Ask Sage to help break down this goal"
                       >
                         <Sparkle size={10} weight="fill" />
@@ -726,7 +726,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 {/* Mountain Trail Progress Bar */}
                 {totalDescendants > 0 && (
                   <div className="mt-3 mb-5 bg-slate-50/55 dark:bg-slate-900/30 p-2.5 rounded-xl border border-[var(--border)]/60">
-                    <div className="flex justify-between items-center text-3xs font-bold uppercase tracking-wider text-[var(--ink-muted)] mb-1">
+                    <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] mb-1">
                       <span>Mountain Trail Progress</span>
                       <span>{progressPercent}% Complete ({completedDescendants}/{totalDescendants})</span>
                     </div>
@@ -1048,7 +1048,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         [monthly.id]: !prev[monthly.id],
                       }));
                     }}
-                    className="w-full flex items-center justify-between text-2xs font-bold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink-strong)] py-1"
+                    className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink-strong)] py-1"
                   >
                     <span className="flex items-center gap-1">
                       <FolderOpen size={12} />
@@ -1096,7 +1096,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                     [link.id]: next,
                                   }));
                                 }}
-                                className="px-2 py-1 text-2xs border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                                className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                               >
                                 {resourceStatusOptions(link.status).map((status) => (
                                   <option key={status} value={status}>
@@ -1109,7 +1109,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 type="button"
                                 onClick={() => handleSaveLinkStatus(monthly.id, link.id)}
                                 disabled={isSaving || draftStatus === link.status}
-                                className="px-2 py-0.5 bg-[var(--accent-strong)] text-[var(--on-accent)] font-semibold rounded text-3xs hover:bg-[var(--accent)] transition-colors disabled:opacity-50"
+                                className="px-2 py-0.5 bg-[var(--accent-strong)] text-[var(--on-accent)] font-semibold rounded text-xs hover:bg-[var(--accent)] transition-colors disabled:opacity-50"
                               >
                                 {isSaving ? "Saving..." : "Update"}
                               </button>

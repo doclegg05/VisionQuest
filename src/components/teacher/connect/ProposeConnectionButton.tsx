@@ -146,7 +146,7 @@ export function ProposeConnectionButton({
               setState("idle");
             }
           }}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--accent-green)] px-3 py-1.5 text-sm font-semibold text-[var(--on-accent)] disabled:opacity-50"
         >
           {state === "saving" ? "Asking…" : "Ask the student"}
         </button>
