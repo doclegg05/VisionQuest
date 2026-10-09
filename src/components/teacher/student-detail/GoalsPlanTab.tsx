@@ -13,11 +13,11 @@ import { goalLevelLabel, goalStatusLabel } from "@/lib/goals";
 
 const EVIDENCE_STATUS_STYLES: Record<GoalEvidenceData["evidenceStatus"], string> = {
   not_started: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
-  in_progress: "bg-sky-100 text-sky-700",
-  submitted: "bg-amber-100 text-amber-800",
-  completed: "bg-emerald-100 text-emerald-700",
-  approved: "bg-emerald-100 text-emerald-700",
-  blocked: "bg-rose-100 text-rose-800",
+  in_progress: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
+  submitted: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
+  completed: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
+  approved: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
+  blocked: "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]",
 };
 
 const REVIEW_KIND_LABELS: Record<ReviewQueueItemData["kind"], string> = {
@@ -128,7 +128,7 @@ export default function GoalsPlanTab({
                       </span>
                     </div>
                     {item.dueAt ? (
-                      <p className="mt-2 text-xs font-medium text-rose-600">
+                      <p className="mt-2 text-xs font-medium text-[var(--badge-error-text)]">
                         Due {dateFormatter.format(new Date(item.dueAt))}
                       </p>
                     ) : null}
@@ -192,7 +192,7 @@ export default function GoalsPlanTab({
                                           href={link.url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                                          className="inline-flex items-center font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
                                         >
                                           Open resource
                                         </a>
@@ -204,7 +204,7 @@ export default function GoalsPlanTab({
                                       Status: {evidence?.evidenceLabel || "Waiting for activity"}
                                     </span>
                                     {evidence?.reviewNeeded ? (
-                                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                                      <span className="rounded-full bg-[var(--badge-warning-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--badge-warning-text)]">
                                         Teacher review
                                       </span>
                                     ) : null}
@@ -250,7 +250,7 @@ export default function GoalsPlanTab({
                     <div className="flex gap-2">
                       <button
                         onClick={() => void onGoalAction(goal.id, { confirm: true })}
-                        className="min-h-11 rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-200"
+                        className="min-h-11 rounded-lg bg-[var(--badge-success-bg)] px-3 py-2 text-sm font-medium text-[var(--badge-success-text)] hover:ring-1 hover:ring-current"
                       >
                         Confirm
                       </button>
@@ -282,12 +282,12 @@ export default function GoalsPlanTab({
             Career Discovery
           </h3>
           {careerDiscovery?.status === "complete" && (
-            <span className="rounded-full border border-green-300 bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">
+            <span className="rounded-full border border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)] px-3 py-1 text-sm font-semibold text-[var(--badge-success-text)]">
               Status: Complete
             </span>
           )}
           {careerDiscovery?.status === "in_progress" && (
-            <span className="rounded-full border border-yellow-300 bg-yellow-100 px-3 py-1 text-sm font-semibold text-yellow-900">
+            <span className="rounded-full border border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)] px-3 py-1 text-sm font-semibold text-[var(--badge-warning-text)]">
               Status: In progress
             </span>
           )}
@@ -304,7 +304,7 @@ export default function GoalsPlanTab({
                 <span className="text-xs font-medium text-[var(--ink-muted)] uppercase">Top Pathways</span>
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {careerDiscovery.topClusters.map((cluster) => (
-                    <span key={cluster} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">
+                    <span key={cluster} className="text-xs bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-2 py-1 rounded-md">
                       {cluster.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                     </span>
                   ))}

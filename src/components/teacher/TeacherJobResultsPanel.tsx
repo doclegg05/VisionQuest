@@ -74,9 +74,9 @@ const SORT_OPTIONS = [
 ];
 
 const WORK_MODE_STYLES: Record<JobWorkMode, string> = {
-  onsite: "bg-emerald-500/15 text-emerald-700",
-  remote: "bg-sky-500/15 text-sky-700",
-  hybrid: "bg-amber-500/15 text-amber-700",
+  onsite: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
+  remote: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
+  hybrid: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
 };
 
 function clusterLabel(cluster: string): string {
@@ -146,7 +146,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Briefcase size={18} className="text-[var(--primary)]" />
+            <Briefcase size={18} className="text-[var(--accent-blue)]" />
             <p className="text-sm font-medium text-[var(--ink-strong)]">Job results</p>
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">
@@ -189,6 +189,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           />
         </label>
         <select
+          aria-label="Source"
           value={source}
           onChange={(event) => {
             setSource(event.target.value);
@@ -204,6 +205,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           ))}
         </select>
         <select
+          aria-label="Career cluster"
           value={cluster}
           onChange={(event) => {
             setCluster(event.target.value);
@@ -218,6 +220,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           ))}
         </select>
         <select
+          aria-label="Work mode"
           value={workMode}
           onChange={(event) => {
             setWorkMode(event.target.value);
@@ -233,6 +236,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
           ))}
         </select>
         <select
+          aria-label="Sort by"
           value={sort}
           onChange={(event) => {
             setSort(event.target.value);
@@ -287,7 +291,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
                   href={job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--surface-raised)] px-3 py-1.5 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--primary)]"
+                  className="inline-flex items-center gap-1 pointer-coarse:min-h-11 rounded-lg bg-[var(--surface-raised)] px-3 py-1.5 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--badge-info-text)]"
                 >
                   <ArrowSquareOut size={14} />
                   View
@@ -320,7 +324,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
                 </span>
               )}
               {job.duplicateCount > 1 && (
-                <span className="rounded-full bg-[var(--primary)]/15 px-2 py-0.5 text-xs text-[var(--primary)]">
+                <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-xs text-[var(--badge-info-text)]">
                   merged {job.duplicateCount} postings
                 </span>
               )}
@@ -346,7 +350,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             type="button"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={data.page <= 1}
-            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
+            className="inline-flex items-center pointer-coarse:min-h-11 gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
           >
             <CaretLeft size={14} />
             Previous
@@ -358,7 +362,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             type="button"
             onClick={() => setPage((current) => Math.min(data.totalPages, current + 1))}
             disabled={data.page >= data.totalPages}
-            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
+            className="inline-flex items-center pointer-coarse:min-h-11 gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
           >
             Next
             <CaretRight size={14} />

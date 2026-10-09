@@ -263,7 +263,7 @@ export default function ForgotPasswordPage() {
 
           <Link
             href="/"
-            className="mt-5 inline-block text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+            className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
           >
             Back to sign in
           </Link>

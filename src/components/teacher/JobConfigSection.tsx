@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { Briefcase, ArrowClockwise } from "@phosphor-icons/react";
 import { DEFAULT_JOB_SOURCES, JOB_SOURCE_OPTIONS, getJobSourceMode } from "@/lib/job-board/source-options";
 import type { JobScrapeRunStatusResult, JobSourceHealthResult } from "@/lib/job-board/types";
@@ -121,6 +121,10 @@ export function JobConfigSection() {
   const [sources, setSources] = useState<string[]>([...DEFAULT_JOB_SOURCES]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [localJobPriority, setLocalJobPriority] = useState<LocalJobPriority>("prefer_local");
+  const classSelectId = useId();
+  const regionId = useId();
+  const radiusId = useId();
+  const sourcesId = useId();
   const scrapeInProgress = scrapeRun?.status === "queued" || scrapeRun?.status === "processing";
   const failedSources = scrapeRun?.sourceResults
     .filter((source) => source.status === "failed")
@@ -278,8 +282,9 @@ export function JobConfigSection() {
     <div className="space-y-6">
       {/* Class selector */}
       <div>
-        <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">Class</label>
+        <label htmlFor={classSelectId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">Class</label>
         <select
+          id={classSelectId}
           value={selectedClassId}
           onChange={(e) => setSelectedClassId(e.target.value)}
           className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-xs"
@@ -313,7 +318,7 @@ export function JobConfigSection() {
               <button
                 onClick={() => void handleRefresh()}
                 disabled={refreshing || scrapeInProgress}
-                className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 pointer-coarse:min-h-11"
               >
                 <ArrowClockwise size={16} className={refreshing || scrapeInProgress ? "animate-spin" : ""} />
                 {scrapeInProgress ? "Refreshing..." : refreshing ? "Queueing..." : "Refresh Now"}
@@ -384,7 +389,7 @@ export function JobConfigSection() {
                   type="button"
                   onClick={() => void handleRefresh(failedSources)}
                   disabled={refreshing}
-                  className="mt-3 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)] disabled:opacity-50"
+                  className="mt-3 inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)] disabled:opacity-50 pointer-coarse:min-h-11"
                 >
                   Retry failed sources
                 </button>
@@ -470,10 +475,11 @@ export function JobConfigSection() {
           {/* Config form */}
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
+              <label htmlFor={regionId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
                 Region
               </label>
               <input
+                id={regionId}
                 type="text"
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
@@ -483,10 +489,11 @@ export function JobConfigSection() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
+              <label htmlFor={radiusId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
                 Search Radius
               </label>
               <select
+                id={radiusId}
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value))}
                 className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm"
@@ -514,7 +521,7 @@ export function JobConfigSection() {
                     htmlFor={`localJobPriority-${opt.value}`}
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                       localJobPriority === opt.value
-                        ? "border-[var(--primary)] bg-[var(--primary)]/10"
+                        ? "border-[var(--accent-blue)] bg-[var(--badge-info-bg)]"
                         : "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--ink-muted)]"
                     }`}
                   >
@@ -541,11 +548,11 @@ export function JobConfigSection() {
             </fieldset>
 
             <div>
-              <label className="text-sm font-medium text-[var(--ink-strong)] block mb-2">
+              <p id={sourcesId} className="text-sm font-medium text-[var(--ink-strong)] block mb-2">
                 Job Sources
-              </label>
+              </p>
               <CareerOneStopUnconfiguredNotice sources={sources} sourceHealth={sourceHealth} />
-              <div className="mt-2 grid gap-3 lg:grid-cols-3">
+              <div role="group" aria-labelledby={sourcesId} className="mt-2 grid gap-3 lg:grid-cols-3">
                 {SOURCE_GROUPS.map((group) => (
                   <div key={group.mode} className="rounded-lg border border-[var(--border)] p-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
@@ -559,9 +566,10 @@ export function JobConfigSection() {
                             <button
                               type="button"
                               onClick={() => toggleSource(opt.value)}
-                              className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                              aria-pressed={sources.includes(opt.value)}
+                              className={`inline-flex items-center pointer-coarse:min-h-11 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
                                 sources.includes(opt.value)
-                                  ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
+                                  ? "bg-[var(--badge-info-bg)] border-[var(--accent-blue)] text-[var(--badge-info-text)]"
                                   : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-muted)]"
                               }`}
                             >
@@ -599,7 +607,7 @@ export function JobConfigSection() {
             <button
               onClick={handleSave}
               disabled={saving || !region.trim()}
-              className="px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 pointer-coarse:min-h-11"
             >
               {saving ? "Saving..." : config ? "Update Config" : "Enable Job Board"}
             </button>

@@ -55,9 +55,9 @@ export async function loadSageOperations(
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === "executed" || status === "confirmed") return "bg-emerald-100 text-emerald-700";
-  if (status === "failed" || status === "rejected") return "bg-rose-100 text-rose-800";
-  return "bg-amber-100 text-amber-800"; // proposed / unrecognized
+  if (status === "executed" || status === "confirmed") return "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]";
+  if (status === "failed" || status === "rejected") return "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]";
+  return "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"; // proposed / unrecognized
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -148,7 +148,7 @@ export function SageActivityPanel({ studentId }: SageActivityPanelProps) {
         Actions Sage has taken or proposed for this student — never conversation content.
       </p>
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[var(--badge-error-text)]">{error}</p>}
 
       {operations === null ? (
         <p className="mt-3 text-sm text-[var(--ink-faint)]">Loading…</p>

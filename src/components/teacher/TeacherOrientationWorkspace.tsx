@@ -192,7 +192,7 @@ export default function TeacherOrientationWorkspace() {
   if (error && classes.length === 0) {
     return (
       <div className="surface-section px-6 py-10 text-center">
-        <p className="mb-4 text-sm text-red-600">{error}</p>
+        <p className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
       </div>
     );
   }
@@ -210,7 +210,7 @@ export default function TeacherOrientationWorkspace() {
       <div className="surface-section p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
               Class
             </span>
             <select
@@ -227,7 +227,7 @@ export default function TeacherOrientationWorkspace() {
           </label>
 
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
               Student
             </span>
             <select
@@ -248,19 +248,19 @@ export default function TeacherOrientationWorkspace() {
             <div className="flex flex-wrap gap-2 lg:justify-end">
               <Link
                 href={`/teacher/students/${selectedStudent.id}`}
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Open record
               </Link>
               <Link
                 href={`/teacher/students/${selectedStudent.id}#submitted-forms`}
-                className="rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-4 py-2 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.14)]"
+                className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-4 py-2 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.14)]"
               >
                 Submitted forms
               </Link>
               <Link
                 href={`/teacher/students/${selectedStudent.id}#goal-plans`}
-                className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
+                className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Goals
               </Link>
@@ -278,7 +278,7 @@ export default function TeacherOrientationWorkspace() {
           </div>
         ) : null}
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="mt-3 text-sm text-[var(--badge-error-text)]">{error}</p> : null}
       </div>
 
       {!selectedStudent ? (
@@ -329,7 +329,7 @@ export default function TeacherOrientationWorkspace() {
                   // as a popup; the server streams a single merged PDF into the tab.
                   window.open("/api/forms/orientation-packet", "_blank", "noopener");
                 }}
-                className="primary-button shrink-0 px-5 py-2.5 text-sm"
+                className="primary-button shrink-0 px-5 py-2.5 text-sm pointer-coarse:min-h-11"
                 title="Open a single printable PDF of every onboarding form, ready to print for a paper orientation packet."
               >
                 🖨️ Print all orientation forms

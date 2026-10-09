@@ -431,7 +431,7 @@ export default function ClassRosterManager() {
   return (
     <div className="space-y-6">
       {error ? (
-        <div className="surface-section border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="surface-section border border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] p-4 text-sm text-[var(--badge-error-text)]">
           {error}
         </div>
       ) : null}
@@ -451,38 +451,50 @@ export default function ClassRosterManager() {
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <input
-              value={newClassName}
-              onChange={(event) => setNewClassName(event.target.value)}
-              placeholder="Class name"
-              className="field px-4 py-3 text-sm"
-            />
-            <input
-              value={newClassCode}
-              onChange={(event) => setNewClassCode(event.target.value)}
-              placeholder="Class code"
-              className="field px-4 py-3 text-sm"
-            />
-            <input
-              type="date"
-              value={newClassStartDate}
-              onChange={(event) => setNewClassStartDate(event.target.value)}
-              className="field px-4 py-3 text-sm"
-            />
-            <input
-              type="date"
-              value={newClassEndDate}
-              onChange={(event) => setNewClassEndDate(event.target.value)}
-              className="field px-4 py-3 text-sm"
-            />
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Class name</span>
+              <input
+                value={newClassName}
+                onChange={(event) => setNewClassName(event.target.value)}
+                className="field px-4 py-3 text-sm"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Class code</span>
+              <input
+                value={newClassCode}
+                onChange={(event) => setNewClassCode(event.target.value)}
+                className="field px-4 py-3 text-sm"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>
+              <input
+                type="date"
+                value={newClassStartDate}
+                onChange={(event) => setNewClassStartDate(event.target.value)}
+                className="field px-4 py-3 text-sm"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">End date</span>
+              <input
+                type="date"
+                value={newClassEndDate}
+                onChange={(event) => setNewClassEndDate(event.target.value)}
+                className="field px-4 py-3 text-sm"
+              />
+            </label>
           </div>
-          <textarea
-            value={newClassDescription}
-            onChange={(event) => setNewClassDescription(event.target.value)}
-            placeholder="Class description"
-            rows={3}
-            className="field px-4 py-3 text-sm"
-          />
+          <label className="block space-y-1.5">
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Description</span>
+            <textarea
+              value={newClassDescription}
+              onChange={(event) => setNewClassDescription(event.target.value)}
+              rows={3}
+              className="field px-4 py-3 text-sm"
+            />
+          </label>
           <div className="rounded-2xl border border-[var(--border)] p-4">
             <p className="text-sm font-semibold text-[var(--ink-strong)]">Assign instructors</p>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -561,7 +573,7 @@ export default function ClassRosterManager() {
                         type="button"
                         onClick={() => void saveClassSettings()}
                         disabled={saving}
-                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Save Settings
                       </button>
@@ -569,7 +581,7 @@ export default function ClassRosterManager() {
                         type="button"
                         onClick={() => void updateClassStatus(classDetail.status === "archived" ? "active" : "archived")}
                         disabled={saving}
-                        className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {classDetail.status === "archived" ? "Reactivate Class" : "Archive Class"}
                       </button>
@@ -580,35 +592,50 @@ export default function ClassRosterManager() {
                 {adminMode ? (
                   <div className="mt-4 space-y-3">
                     <div className="grid gap-3 md:grid-cols-2">
-                      <input
-                        value={className}
-                        onChange={(event) => setClassName(event.target.value)}
-                        className="field px-4 py-3 text-sm"
-                      />
-                      <input
-                        value={classCode}
-                        onChange={(event) => setClassCode(event.target.value)}
-                        className="field px-4 py-3 text-sm"
-                      />
-                      <input
-                        type="date"
-                        value={classStartDate}
-                        onChange={(event) => setClassStartDate(event.target.value)}
-                        className="field px-4 py-3 text-sm"
-                      />
-                      <input
-                        type="date"
-                        value={classEndDate}
-                        onChange={(event) => setClassEndDate(event.target.value)}
-                        className="field px-4 py-3 text-sm"
-                      />
+                      <label className="block space-y-1.5">
+                        <span className="block text-sm font-medium text-[var(--ink-strong)]">Class name</span>
+                        <input
+                          value={className}
+                          onChange={(event) => setClassName(event.target.value)}
+                          className="field px-4 py-3 text-sm"
+                        />
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="block text-sm font-medium text-[var(--ink-strong)]">Class code</span>
+                        <input
+                          value={classCode}
+                          onChange={(event) => setClassCode(event.target.value)}
+                          className="field px-4 py-3 text-sm"
+                        />
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>
+                        <input
+                          type="date"
+                          value={classStartDate}
+                          onChange={(event) => setClassStartDate(event.target.value)}
+                          className="field px-4 py-3 text-sm"
+                        />
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="block text-sm font-medium text-[var(--ink-strong)]">End date</span>
+                        <input
+                          type="date"
+                          value={classEndDate}
+                          onChange={(event) => setClassEndDate(event.target.value)}
+                          className="field px-4 py-3 text-sm"
+                        />
+                      </label>
                     </div>
-                    <textarea
-                      value={classDescription}
-                      onChange={(event) => setClassDescription(event.target.value)}
-                      rows={3}
-                      className="field px-4 py-3 text-sm"
-                    />
+                    <label className="block space-y-1.5">
+                      <span className="block text-sm font-medium text-[var(--ink-strong)]">Description</span>
+                      <textarea
+                        value={classDescription}
+                        onChange={(event) => setClassDescription(event.target.value)}
+                        rows={3}
+                        className="field px-4 py-3 text-sm"
+                      />
+                    </label>
                     <div className="grid gap-2 md:grid-cols-2">
                       {availableInstructors.map((instructor) => (
                         <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink-strong)]">
@@ -636,46 +663,54 @@ export default function ClassRosterManager() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Add student</p>
                 <p className="mt-1 text-sm text-[var(--ink-muted)]">Create an account and enroll in this class.</p>
                 <div className="mt-3 space-y-3">
-                  <input
-                    value={newStudentName}
-                    onChange={(event) => {
-                      setNewStudentName(event.target.value);
-                      setCreateStudentError("");
-                    }}
-                    placeholder="Name"
-                    className="field px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={newStudentUsername}
-                    onChange={(event) => {
-                      setNewStudentUsername(event.target.value);
-                      setCreateStudentError("");
-                    }}
-                    placeholder="Username"
-                    className="field px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={newStudentEmail}
-                    onChange={(event) => {
-                      setNewStudentEmail(event.target.value);
-                      setCreateStudentError("");
-                    }}
-                    placeholder="Email (optional)"
-                    type="email"
-                    className="field px-4 py-3 text-sm"
-                  />
-                  <input
-                    value={newStudentPassword}
-                    onChange={(event) => {
-                      setNewStudentPassword(event.target.value);
-                      setCreateStudentError("");
-                    }}
-                    placeholder="Password"
-                    type="text"
-                    autoComplete="off"
-                    aria-describedby="new-student-password-help"
-                    className="field px-4 py-3 text-sm"
-                  />
+                  <label className="block space-y-1.5">
+                    <span className="block text-sm font-medium text-[var(--ink-strong)]">Name</span>
+                    <input
+                      value={newStudentName}
+                      onChange={(event) => {
+                        setNewStudentName(event.target.value);
+                        setCreateStudentError("");
+                      }}
+                      className="field px-4 py-3 text-sm"
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="block text-sm font-medium text-[var(--ink-strong)]">Username</span>
+                    <input
+                      value={newStudentUsername}
+                      onChange={(event) => {
+                        setNewStudentUsername(event.target.value);
+                        setCreateStudentError("");
+                      }}
+                      className="field px-4 py-3 text-sm"
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="block text-sm font-medium text-[var(--ink-strong)]">Email (optional)</span>
+                    <input
+                      value={newStudentEmail}
+                      onChange={(event) => {
+                        setNewStudentEmail(event.target.value);
+                        setCreateStudentError("");
+                      }}
+                      type="email"
+                      className="field px-4 py-3 text-sm"
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="block text-sm font-medium text-[var(--ink-strong)]">Password</span>
+                    <input
+                      value={newStudentPassword}
+                      onChange={(event) => {
+                        setNewStudentPassword(event.target.value);
+                        setCreateStudentError("");
+                      }}
+                      type="text"
+                      autoComplete="off"
+                      aria-describedby="new-student-password-help"
+                      className="field px-4 py-3 text-sm"
+                    />
+                  </label>
                   <p id="new-student-password-help" className="text-xs text-[var(--ink-muted)]">
                     Use at least 8 characters.
                   </p>
@@ -688,7 +723,7 @@ export default function ClassRosterManager() {
                     {saving ? "Creating..." : "Create Account"}
                   </button>
                   {createStudentError ? (
-                    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    <div role="alert" className="rounded-xl border border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] p-3 text-sm text-[var(--badge-error-text)]">
                       {createStudentError}
                     </div>
                   ) : null}
@@ -745,7 +780,7 @@ export default function ClassRosterManager() {
                             {enrollment.archivedAt ? ` • Archived ${new Date(enrollment.archivedAt).toLocaleDateString()}` : ""}
                           </p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                             {enrollment.status}
                           </span>
@@ -754,7 +789,7 @@ export default function ClassRosterManager() {
                               type="button"
                               onClick={() => void updateEnrollmentStatus(enrollment.id, "active")}
                               disabled={saving}
-                              className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
                             >
                               Restore
                             </button>
@@ -764,7 +799,7 @@ export default function ClassRosterManager() {
                                 type="button"
                                 onClick={() => void updateEnrollmentStatus(enrollment.id, enrollment.status === "inactive" ? "active" : "inactive")}
                                 disabled={saving}
-                                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
                               >
                                 {enrollment.status === "inactive" ? "Mark Active" : "Mark Inactive"}
                               </button>
@@ -772,7 +807,7 @@ export default function ClassRosterManager() {
                                 type="button"
                                 onClick={() => void updateEnrollmentStatus(enrollment.id, "archived")}
                                 disabled={saving}
-                                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
                               >
                                 Archive
                               </button>

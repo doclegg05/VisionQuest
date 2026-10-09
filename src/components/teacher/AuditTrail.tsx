@@ -51,7 +51,7 @@ export default function AuditTrail() {
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+      <div className="rounded-xl border border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] p-4 text-sm text-[var(--badge-error-text)]">
         {error}
       </div>
     );

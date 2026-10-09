@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useProgression } from "@/components/progression/ProgressionProvider";
+import { useConfirm, type ConfirmOptions } from "@/components/ui/useConfirm";
+import { useUndo } from "@/components/ui/useUndo";
 import {
   GOAL_LEVEL_META,
   type GoalLevel,
@@ -20,14 +22,14 @@ import {
   Square,
   CheckSquare,
   PencilSimple,
-  X,
+  Trash,
   Plus,
   Sparkle,
   FolderOpen,
   SpeakerHigh,
 } from "@phosphor-icons/react";
 
-interface GoalRecord {
+export interface GoalRecord {
   id: string;
   level: GoalLevel;
   content: string;
@@ -40,6 +42,9 @@ interface GoalsPageClientProps {
   initialGoals: GoalRecord[];
   initialGoalPlans: GoalPlanEntry[];
 }
+
+/** Save, Add and Cancel beside an inline goal field: a full 44pt target on a phone. */
+const INLINE_FORM_BUTTON = "inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs";
 
 const STUDENT_LINK_STATUSES: GoalResourceLinkStatus[] = ["assigned", "in_progress", "completed", "blocked"];
 
@@ -61,15 +66,75 @@ function resourceStatusOptions(currentStatus: GoalResourceLinkStatus): GoalResou
   return [...new Set([...STUDENT_LINK_STATUSES, currentStatus])];
 }
 
+/**
+ * Removal relies on Undo, except where the impact is larger: the Big Vision,
+ * and any goal with steps under it, ask first (B-32). The server does not
+ * cascade: steps stay on the board (under "Other Tasks & Steps" when their
+ * parent was a monthly or weekly goal), so the copy says they stay.
+ */
+export function removalConfirmation(
+  target: Pick<GoalRecord, "id" | "level">,
+  activeGoals: ReadonlyArray<Pick<GoalRecord, "parentId">>,
+): ConfirmOptions | null {
+  const stepCount = activeGoals.filter((g) => g.parentId === target.id).length;
+  if (stepCount > 0) {
+    return {
+      title: target.level === "bhag" ? "Remove your Big Vision?" : "Remove this goal?",
+      message:
+        stepCount === 1
+          ? "The step under it stays on your board."
+          : `The ${stepCount} steps under it stay on your board.`,
+      confirmLabel: "Remove",
+    };
+  }
+  if (target.level === "bhag") {
+    return {
+      title: "Remove your Big Vision?",
+      message: "You can write a new one any time.",
+      confirmLabel: "Remove",
+    };
+  }
+  return null;
+}
+
+/** Sends a removal once its undo window closes. `keepalive` lets it finish if the tab closes first. */
+export async function sendGoalRemoval(goalId: string): Promise<GoalRecord> {
+  const response = await fetch(`/api/goals/${goalId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "abandoned" }),
+    keepalive: true,
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.goal) {
+    throw new Error(payload?.error || "Could not remove the goal.");
+  }
+  return payload.goal as GoalRecord;
+}
+
 export default function GoalsPageClient({ initialGoals, initialGoalPlans }: GoalsPageClientProps) {
   const { checkProgression } = useProgression();
+  const { confirm, confirmDialog } = useConfirm();
+  const { scheduleRemoval, undoToast } = useUndo();
+  const bhagInputId = useId();
   const [goals, setGoals] = useState(initialGoals);
+  // Goals removed inside the undo window: hidden now, sent when the window closes (B-32).
+  const [hiddenGoalIds, setHiddenGoalIds] = useState<ReadonlySet<string>>(() => new Set());
   const [goalPlans, setGoalPlans] = useState(initialGoalPlans);
   const [linkStatusDrafts, setLinkStatusDrafts] = useState(() => createLinkStatusLookup(initialGoalPlans));
   const [, setSavingGoalId] = useState<string | null>(null);
   const [savingLinkId, setSavingLinkId] = useState<string | null>(null);
   const [, setCreatingGoal] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  // A failed removal reports about 6s after the tap, when the student is usually
+  // down in a card and this banner is off-screen above them. Bring it into view.
+  const messageRef = useRef<HTMLDivElement>(null);
+  const revealMessageRef = useRef(false);
+  useEffect(() => {
+    if (!message || !revealMessageRef.current) return;
+    revealMessageRef.current = false;
+    messageRef.current?.scrollIntoView({ block: "nearest" });
+  }, [message]);
 
   // Redesign local interactive states
   const [expandedResources, setExpandedResources] = useState<Record<string, boolean>>({});
@@ -95,6 +160,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   // Parent lookup for the proposed-goal lock (F23): a weekly or task under a
   // Sage proposal cannot be checked off until the instructor confirms it.
   const goalsById = new Map<string, GoalRecord>(goals.map((g) => [g.id, g]));
+
+  // 1. Active goals: not abandoned, and not waiting out an undo window.
+  const activeGoals = goals.filter((g) => g.status !== "abandoned" && !hiddenGoalIds.has(g.id));
 
   // Confetti state lives on this instance, not the module (F36 / FE-01), so
   // celebrations cannot interfere and unmount cancels the frame loop.
@@ -286,36 +354,47 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
     }
   }
 
-  async function handleDismissGoal(goalId: string) {
-    setSavingGoalId(goalId);
+  function setGoalHidden(goalId: string, hidden: boolean) {
+    setHiddenGoalIds((current) => {
+      const next = new Set(current);
+      if (hidden) next.add(goalId);
+      else next.delete(goalId);
+      return next;
+    });
+  }
+
+  // Remove with undo (B-32): hide now, send the PATCH when the notice is
+  // dismissed, another removal follows, or the page is left; put the goal back
+  // on Undo or when the request fails.
+  async function handleRemoveGoal(goalId: string) {
+    const target = goalsById.get(goalId);
+    if (!target) return;
+
+    const confirmation = removalConfirmation(target, activeGoals);
+    if (confirmation && !(await confirm(confirmation))) return;
+
     setMessage(null);
-
-    try {
-      const response = await fetch(`/api/goals/${goalId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "abandoned" }),
-      });
-
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.goal) {
-        throw new Error(payload?.error || "Could not dismiss the goal.");
-      }
-
-      const updatedGoal = payload.goal as GoalRecord;
-      setGoals((current) =>
-        current.map((item) => (item.id === goalId ? updatedGoal : item)),
-      );
-      setMessage({ tone: "success", text: "Goal dismissed." });
-      await checkProgression();
-    } catch (error) {
-      setMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : "Could not dismiss the goal.",
-      });
-    } finally {
-      setSavingGoalId(null);
-    }
+    setGoalHidden(goalId, true);
+    scheduleRemoval({
+      label: "Goal removed.",
+      restoredLabel: "Goal restored.",
+      focusAfterRestore: () =>
+        document.querySelector<HTMLElement>(`[data-goal-id="${CSS.escape(goalId)}"] button[aria-label^="Remove"]`),
+      commit: async () => {
+        const updatedGoal = await sendGoalRemoval(goalId);
+        setGoals((current) => current.map((item) => (item.id === goalId ? updatedGoal : item)));
+        setGoalHidden(goalId, false);
+        await checkProgression();
+      },
+      restore: () => setGoalHidden(goalId, false),
+      onCommitError: (error) => {
+        revealMessageRef.current = true;
+        setMessage({
+          tone: "error",
+          text: error instanceof Error ? error.message : "Could not remove the goal.",
+        });
+      },
+    });
   }
 
   async function handleSaveLinkStatus(goalId: string, linkId: string) {
@@ -347,9 +426,6 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       setSavingLinkId(null);
     }
   }
-
-  // 1. Filter active goals
-  const activeGoals = goals.filter((g) => g.status !== "abandoned");
 
   // 2. BHAG goals
   const bhags = activeGoals.filter((g) => g.level === "bhag");
@@ -413,7 +489,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           disabled={rowLocked}
           aria-describedby={rowLocked ? "orphan-proposed-hint" : undefined}
           aria-label={item.status === "completed" ? "Mark incomplete" : "Mark complete"}
-          className="mt-1 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
+          className="-mx-3.5 -my-2.5 inline-flex size-11 shrink-0 items-center justify-center text-[var(--ink-muted)] hover:text-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {item.status === "completed" ? (
             <CheckSquare size={16} weight="fill" className="text-[var(--accent-strong)]" />
@@ -433,13 +509,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
             >
               <input
                 type="text"
+                aria-label={item.level === "weekly" ? "Weekly goal" : "Item"}
                 value={editingGoalContent}
                 onChange={(e) => setEditingGoalContent(e.target.value)}
-                className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                 autoFocus
               />
-              <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Save</button>
-              <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
+              <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+              <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
             </form>
           ) : (
             <div className="flex items-start justify-between">
@@ -447,13 +524,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 {item.content}
               </span>
               <GoalRowActions
+                goalId={item.id}
                 label={label}
                 iconSize={12}
                 onEdit={() => {
                   setEditingGoalId(item.id);
                   setEditingGoalContent(item.content);
                 }}
-                onDismiss={() => handleDismissGoal(item.id)}
+                onDismiss={() => handleRemoveGoal(item.id)}
               />
             </div>
           )}
@@ -476,7 +554,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
       {message ? (
         <div
-          className={`surface-section p-4 text-sm ${
+          ref={messageRef}
+          role={message.tone === "error" ? "alert" : "status"}
+          className={`surface-section scroll-my-24 p-4 text-sm ${
             message.tone === "success"
               ? "border border-[var(--border-strong)] bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
               : "border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]"
@@ -515,6 +595,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 >
                   <input
                     type="text"
+                    aria-label="Big Vision"
                     value={editingGoalContent}
                     onChange={(e) => setEditingGoalContent(e.target.value)}
                     className="min-h-11 flex-1 px-3 py-2 text-sm border border-amber-300 dark:border-amber-800 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -549,11 +630,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         <PencilSimple size={16} />
                       </button>
                       <button
-                        onClick={() => handleDismissGoal(bhag.id)}
+                        onClick={() => handleRemoveGoal(bhag.id)}
                         className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-red-50 dark:hover:bg-red-950/40 text-[var(--ink-muted)] hover:text-red-500"
-                        aria-label="Dismiss Big Vision"
+                        aria-label="Remove Big Vision"
                       >
-                        <X size={16} />
+                        <Trash size={16} aria-hidden="true" />
                       </button>
                     </div>
                   </div>
@@ -573,9 +654,13 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 }}
                 className="flex flex-wrap gap-2"
               >
+                <label htmlFor={bhagInputId} className="w-full text-left text-sm font-medium text-[var(--ink-strong)]">
+                  What is your ultimate dream career?
+                </label>
                 <input
+                  id={bhagInputId}
                   type="text"
-                  placeholder="What is your ultimate dream career? (e.g. Become a certified welder)"
+                  placeholder="e.g. Become a certified welder"
                   value={addingBhagContent}
                   onChange={(e) => setAddingBhagContent(e.target.value)}
                   className="min-h-11 flex-1 px-3 py-2 text-sm border border-amber-300 dark:border-amber-800 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -605,7 +690,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       </div>
 
       {/* Grid of Note Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         {monthlyGoals.map((monthly) => {
           const isMEditing = editingGoalId === monthly.id;
           const isMProposed = monthly.status === "proposed";
@@ -644,8 +729,10 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
               {/* Monthly Goal Header */}
               <div className="mb-4 pr-1">
-                <div className="flex items-start justify-between gap-3 border-b border-dashed border-[var(--border)] pb-2">
-                  <div className="flex-1 min-w-0">
+                {/* flex-wrap: the edit form below wraps onto its own full-width line. Beside
+                    the read-aloud and Ask Sage column it was 18px wide on a phone. */}
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-dashed border-[var(--border)] pb-2">
+                  <div className="min-w-0 grow basis-44">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)]">
                         Monthly Plan
@@ -662,49 +749,32 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       )}
                     </div>
 
-                    {isMEditing ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          handleSaveInlineGoal(monthly.id, editingGoalContent);
-                        }}
-                        className="flex gap-2 mt-1"
-                      >
-                        <input
-                          type="text"
-                          value={editingGoalContent}
-                          onChange={(e) => setEditingGoalContent(e.target.value)}
-                          className="flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
-                          autoFocus
-                        />
-                        <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Save</button>
-                        <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
-                      </form>
-                    ) : (
+                    {!isMEditing && (
                       <div className="group flex items-start justify-between mt-1">
                         <h3 className={`font-display text-lg text-[var(--ink-strong)] leading-snug break-words ${monthly.status === "completed" ? "line-through opacity-60" : ""}`}>
                           {monthly.content}
                         </h3>
                         <GoalRowActions
+                          goalId={monthly.id}
                           label="Monthly"
                           iconSize={16}
                           onEdit={() => {
                             setEditingGoalId(monthly.id);
                             setEditingGoalContent(monthly.content);
                           }}
-                          onDismiss={() => handleDismissGoal(monthly.id)}
+                          onDismiss={() => handleRemoveGoal(monthly.id)}
                         />
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="ml-auto flex flex-col items-end gap-1.5 shrink-0">
                     <span className="text-xs text-[var(--ink-muted)]">
                       {formatCreatedAt(monthly.createdAt)}
                     </span>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleReadAloud(monthly.id, `Monthly Plan: ${monthly.content}`)}
-                        className={`p-1.5 rounded-full hover:bg-[var(--border)] transition-colors text-[var(--ink-muted)] hover:text-[var(--ink-strong)] ${speakingId === monthly.id ? "text-emerald-500 animate-pulse bg-emerald-50 dark:bg-emerald-950/20" : ""}`}
+                        className={`inline-flex size-11 items-center justify-center rounded-full hover:bg-[var(--border)] transition-colors text-[var(--ink-muted)] hover:text-[var(--ink-strong)] ${speakingId === monthly.id ? "text-emerald-500 animate-pulse bg-emerald-50 dark:bg-emerald-950/20" : ""}`}
                         aria-label="Read goal aloud"
                         title="Read goal aloud"
                       >
@@ -713,7 +783,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       <button
                         type="button"
                         onClick={() => setSageModalGoal(monthly)}
-                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors shrink-0"
+                        className="flex min-h-11 items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors shrink-0"
                         title="Ask Sage to help break down this goal"
                       >
                         <Sparkle size={10} weight="fill" />
@@ -721,6 +791,26 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       </button>
                     </div>
                   </div>
+                  {isMEditing && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSaveInlineGoal(monthly.id, editingGoalContent);
+                      }}
+                      className="flex min-w-0 basis-full gap-2"
+                    >
+                      <input
+                        type="text"
+                        aria-label="Monthly goal"
+                        value={editingGoalContent}
+                        onChange={(e) => setEditingGoalContent(e.target.value)}
+                        className="min-w-0 flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                        autoFocus
+                      />
+                      <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                      <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
+                    </form>
+                  )}
                 </div>
 
                 {/* Mountain Trail Progress Bar */}
@@ -751,14 +841,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 {isMProposed && (
                   <div className="mt-2 bg-indigo-50/80 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-950 text-xs text-indigo-900 dark:text-indigo-200">
                     <p className="font-semibold">Sage suggested this goal — ask your instructor to confirm it.</p>
-                    <p className="mt-1">Not a good fit? You can dismiss it.</p>
+                    <p className="mt-1">Not a good fit? You can remove it.</p>
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
-                        onClick={() => handleDismissGoal(monthly.id)}
-                        className="border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-black/30 text-indigo-700 dark:text-indigo-300 font-semibold rounded px-2.5 py-1 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                        onClick={() => handleRemoveGoal(monthly.id)}
+                        className="inline-flex min-h-11 items-center border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-black/30 text-indigo-700 dark:text-indigo-300 font-semibold rounded px-2.5 py-1 hover:bg-indigo-50 dark:hover:bg-indigo-950"
                       >
-                        Dismiss
+                        Remove
                       </button>
                     </div>
                   </div>
@@ -787,7 +877,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                           onClick={(e) => handleToggleGoalStatus(weekly.id, weekly.status, e)}
                           disabled={wLocked}
                           aria-describedby={wLocked ? proposedHintId : undefined}
-                          className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                          className="size-11 -ml-4.5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label={weekly.status === "completed" ? "Mark incomplete" : "Mark complete"}
                         >
                           {weekly.status === "completed" ? (
@@ -808,13 +898,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                             >
                               <input
                                 type="text"
+                                aria-label="Weekly goal"
                                 value={editingGoalContent}
                                 onChange={(e) => setEditingGoalContent(e.target.value)}
-                                className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                                className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                 autoFocus
                               />
-                              <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Save</button>
-                              <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
+                              <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                              <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                             </form>
                           ) : (
                             <div className="flex items-start justify-between">
@@ -822,13 +913,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 {weekly.content}
                               </span>
                               <GoalRowActions
+                                goalId={weekly.id}
                                 label="Weekly"
                                 iconSize={14}
                                 onEdit={() => {
                                   setEditingGoalId(weekly.id);
                                   setEditingGoalContent(weekly.content);
                                 }}
-                                onDismiss={() => handleDismissGoal(weekly.id)}
+                                onDismiss={() => handleRemoveGoal(weekly.id)}
                               />
                             </div>
                           )}
@@ -847,7 +939,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 onClick={(e) => handleToggleGoalStatus(task.id, task.status, e)}
                                 disabled={tLocked}
                                 aria-describedby={tLocked ? proposedHintId : undefined}
-                                className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                                className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={task.status === "completed" ? "Mark incomplete" : "Mark complete"}
                               >
                                 {task.status === "completed" ? (
@@ -868,13 +960,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                   >
                                     <input
                                       type="text"
+                                      aria-label="Task"
                                       value={editingGoalContent}
                                       onChange={(e) => setEditingGoalContent(e.target.value)}
-                                      className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                                      className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                       autoFocus
                                     />
-                                    <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Save</button>
-                                    <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
+                                    <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                                    <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                                   </form>
                                 ) : (
                                   <div className="flex items-start justify-between">
@@ -882,13 +975,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                       {task.content}
                                     </span>
                                     <GoalRowActions
+                                      goalId={task.id}
                                       label="Task"
                                       iconSize={12}
                                       onEdit={() => {
                                         setEditingGoalId(task.id);
                                         setEditingGoalContent(task.content);
                                       }}
-                                      onDismiss={() => handleDismissGoal(task.id)}
+                                      onDismiss={() => handleRemoveGoal(task.id)}
                                     />
                                   </div>
                                 )}
@@ -907,18 +1001,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 setAddingTaskToParentId(null);
                                 setAddingTaskContent("");
                               }}
-                              className="flex gap-1.5"
+                              className="flex gap-2"
                             >
                               <input
                                 type="text"
+                                aria-label="New task"
                                 placeholder="Type a task and press Enter..."
                                 value={addingTaskContent}
                                 onChange={(e) => setAddingTaskContent(e.target.value)}
-                                className="flex-1 px-2 py-0.5 text-xs border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                                className="min-w-0 flex-1 px-2 py-0.5 text-xs border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                 autoFocus
                               />
-                              <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Add</button>
-                              <button type="button" onClick={() => setAddingTaskToParentId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
+                              <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Add</button>
+                              <button type="button" onClick={() => setAddingTaskToParentId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                             </form>
                           ) : (
                             <button
@@ -949,7 +1044,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         onClick={(e) => handleToggleGoalStatus(item.id, item.status, e)}
                         disabled={itemLocked}
                         aria-describedby={itemLocked ? proposedHintId : undefined}
-                        className="p-2 -m-2 mt-0.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                        className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label={item.status === "completed" ? "Mark incomplete" : "Mark complete"}
                       >
                         {item.status === "completed" ? (
@@ -970,13 +1065,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                           >
                             <input
                               type="text"
+                              aria-label="Item"
                               value={editingGoalContent}
                               onChange={(e) => setEditingGoalContent(e.target.value)}
-                              className="flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                              className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                               autoFocus
                             />
-                            <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Save</button>
-                            <button type="button" onClick={() => setEditingGoalId(null)} className="text-xs text-[var(--ink-muted)]">Cancel</button>
+                            <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                            <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                           </form>
                         ) : (
                           <div className="flex items-start justify-between">
@@ -984,13 +1080,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               {item.content}
                             </span>
                             <GoalRowActions
+                              goalId={item.id}
                               label="Item"
                               iconSize={12}
                               onEdit={() => {
                                 setEditingGoalId(item.id);
                                 setEditingGoalContent(item.content);
                               }}
-                              onDismiss={() => handleDismissGoal(item.id)}
+                              onDismiss={() => handleRemoveGoal(item.id)}
                             />
                           </div>
                         )}
@@ -1009,18 +1106,19 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         setAddingWeeklyToParentId(null);
                         setAddingWeeklyContent("");
                       }}
-                      className="flex gap-1.5"
+                      className="flex gap-2"
                     >
                       <input
                         type="text"
+                        aria-label="New weekly milestone"
                         placeholder="Type a weekly goal and press Enter..."
                         value={addingWeeklyContent}
                         onChange={(e) => setAddingWeeklyContent(e.target.value)}
-                        className="flex-1 px-2.5 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                        className="min-w-0 flex-1 px-2.5 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                         autoFocus
                       />
-                      <button type="submit" className="text-xs text-[var(--accent-strong)] font-semibold">Add</button>
-                      <button type="button" onClick={() => setAddingWeeklyToParentId(null)} className="text-xs text-[var(--ink-muted)] font-medium">Cancel</button>
+                      <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Add</button>
+                      <button type="button" onClick={() => setAddingWeeklyToParentId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)] font-medium`}>Cancel</button>
                     </form>
                   ) : (
                     <button
@@ -1029,7 +1127,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         setAddingWeeklyToParentId(monthly.id);
                         setAddingWeeklyContent("");
                       }}
-                      className="text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)] flex items-center gap-1 font-semibold"
+                      className="text-sm text-[var(--ink-muted)] hover:text-[var(--ink-strong)] flex min-h-11 items-center gap-1 font-semibold"
                     >
                       <Plus size={14} /> Add weekly milestone
                     </button>
@@ -1048,7 +1146,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         [monthly.id]: !prev[monthly.id],
                       }));
                     }}
-                    className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink-strong)] py-1"
+                    className="w-full flex min-h-11 items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] hover:text-[var(--ink-strong)] py-1"
                   >
                     <span className="flex items-center gap-1">
                       <FolderOpen size={12} />
@@ -1079,7 +1177,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                   href={link.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="shrink-0 text-[var(--accent-blue)] hover:underline font-semibold"
+                                  className="inline-flex min-h-11 shrink-0 items-center text-[var(--accent-blue)] hover:underline font-semibold"
                                 >
                                   Open ↗
                                 </a>
@@ -1088,6 +1186,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
                             <div className="flex items-center justify-between gap-2 mt-1">
                               <select
+                                aria-label={`Status for ${link.title}`}
                                 value={draftStatus}
                                 onChange={(e) => {
                                   const next = e.target.value as GoalResourceLinkStatus;
@@ -1109,7 +1208,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 type="button"
                                 onClick={() => handleSaveLinkStatus(monthly.id, link.id)}
                                 disabled={isSaving || draftStatus === link.status}
-                                className="px-2 py-0.5 bg-[var(--accent-strong)] text-[var(--on-accent)] font-semibold rounded text-xs hover:bg-[var(--accent)] transition-colors disabled:opacity-50"
+                                className="inline-flex min-h-11 items-center px-3 bg-[var(--accent-strong)] text-[var(--on-accent)] font-semibold rounded text-xs hover:bg-[var(--accent)] transition-colors disabled:opacity-50"
                               >
                                 {isSaving ? "Saving..." : "Update"}
                               </button>
@@ -1200,13 +1299,13 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 autoFocus
               />
               <div className="flex justify-end gap-2">
-                <button type="submit" className="primary-button px-4 py-2 text-xs" disabled={!addingMonthlyContent.trim()}>
+                <button type="submit" className="primary-button min-h-11 px-4 py-2 text-xs" disabled={!addingMonthlyContent.trim()}>
                   Create Card
                 </button>
                 <button
                   type="button"
                   onClick={() => setAddingMonthly(false)}
-                  className="rounded-full border border-[var(--border)] px-4 py-2 text-xs text-[var(--ink-muted)]"
+                  className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-xs text-[var(--ink-muted)]"
                 >
                   Cancel
                 </button>
@@ -1232,6 +1331,8 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       </div>
 
       {sageModalGoal && <AskSageModal goal={sageModalGoal} onClose={() => setSageModalGoal(null)} />}
+      {undoToast}
+      {confirmDialog}
     </div>
   );
 }

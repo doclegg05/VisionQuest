@@ -84,7 +84,7 @@ export default function DocumentCard({
             href={viewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] sm:flex-none"
+            className="flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] sm:flex-none"
             aria-label={`View ${doc.title}`}
           >
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -96,7 +96,7 @@ export default function DocumentCard({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="flex min-w-[2.5rem] flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] disabled:opacity-40 sm:flex-none"
+            className="flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-lg p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] disabled:opacity-40 sm:flex-none"
             aria-label={`Download ${doc.title}`}
           >
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -139,7 +139,7 @@ export default function DocumentCard({
             href={viewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)] sm:flex-none"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)] sm:flex-none"
             aria-label={`View ${doc.title}`}
           >
             View
@@ -148,7 +148,7 @@ export default function DocumentCard({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)] disabled:opacity-40 sm:flex-none"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)] disabled:opacity-40 sm:flex-none"
             aria-label={`Download ${doc.title}`}
           >
             {downloading ? "..." : downloadError ? "Failed" : "Download"}

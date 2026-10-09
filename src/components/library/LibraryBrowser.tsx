@@ -222,7 +222,7 @@ export default function LibraryBrowser() {
           <button
             type="button"
             onClick={() => setCategory(null)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors pointer-coarse:min-h-11 ${
               category === null
                 ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -236,7 +236,7 @@ export default function LibraryBrowser() {
               key={cat}
               type="button"
               onClick={() => setCategory(cat)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors pointer-coarse:min-h-11 ${
                 category === cat
                   ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                   : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -290,7 +290,7 @@ export default function LibraryBrowser() {
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-2 text-sm font-medium text-[var(--ink-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-wait disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-2 text-sm font-medium text-[var(--ink-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-wait disabled:opacity-60 pointer-coarse:min-h-11"
               >
                 {loadingMore ? "Loading…" : `Load ${Math.min(PAGE_SIZE, total - offset - PAGE_SIZE)} more`}
               </button>
@@ -352,19 +352,19 @@ function DocumentCard({ doc, onPreview }: DocumentCardProps) {
             · {CATEGORY_LABELS[doc.category] ?? doc.category}
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             ref={previewRef}
             type="button"
             onClick={() => onPreview(doc, previewRef.current)}
-            className="rounded-md p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--accent-strong)]"
+            className="inline-flex size-8 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--accent-strong)] pointer-coarse:size-11"
             aria-label={`Preview ${doc.title}`}
           >
             <Eye weight="bold" className="size-4" />
           </button>
           <a
             href={`/api/documents/download?id=${doc.id}&mode=download`}
-            className="rounded-md p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--accent-strong)]"
+            className="inline-flex size-8 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--accent-strong)] pointer-coarse:size-11"
             aria-label={`Download ${doc.title}`}
           >
             <Download weight="bold" className="size-4" />
@@ -400,14 +400,14 @@ function PreviewModal({ doc, onClose }: { doc: Document; onClose: () => void }) 
           <div className="flex items-center gap-2">
             <a
               href={`/api/documents/download?id=${doc.id}&mode=download`}
-              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-medium text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-medium text-[var(--ink-strong)] hover:bg-[var(--surface-muted)] pointer-coarse:min-h-11"
             >
               <Download weight="bold" className="size-3.5" /> Download
             </a>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)]"
+              className="inline-flex size-8 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] pointer-coarse:size-11"
               aria-label="Close preview"
             >
               <X weight="bold" className="size-4" />
@@ -439,7 +439,7 @@ function PreviewModal({ doc, onClose }: { doc: Document; onClose: () => void }) 
                 </p>
                 <a
                   href={`/api/documents/download?id=${doc.id}&mode=download`}
-                  className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] hover:opacity-90"
+                  className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] hover:opacity-90 pointer-coarse:min-h-11"
                 >
                   <Download weight="bold" className="size-4" /> Download {mimeToLabel(doc.mimeType)}
                 </a>

@@ -330,6 +330,7 @@ export default function OpportunitiesHub({
                         },
                       }))
                     }
+                    aria-label="Application notes"
                     placeholder="Notes, follow-up steps, or interview details"
                     rows={3}
                     className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"

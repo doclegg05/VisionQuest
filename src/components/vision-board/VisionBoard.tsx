@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import CorkboardCanvas from "./CorkboardCanvas";
 import VisionBoardToolbar from "./VisionBoardToolbar";
+import { removePinLabel } from "./VisionBoardPin";
 import { useProgression } from "@/components/progression/ProgressionProvider";
+import { useUndo } from "@/components/ui/useUndo";
 
 export interface VisionBoardItemData {
   id: string;
@@ -20,19 +22,42 @@ export interface VisionBoardItemData {
   zIndex: number;
 }
 
+const REMOVE_FAILED_MESSAGE = "We couldn't remove that pin, so it is back on your board. Please try again.";
+
+/** Sends the real delete. Rejects on any failure so the undo queue restores the pin. */
+export async function deletePin(id: string): Promise<void> {
+  const res = await fetch("/api/vision-board", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+    keepalive: true,
+  });
+  if (!res.ok) throw new Error(`Removing pin failed with status ${res.status}`);
+}
+
+/** Returns the list with the pin back at its old position, or the same list if it is already there. */
+export function reinsertPin(items: VisionBoardItemData[], pin: VisionBoardItemData, index: number): VisionBoardItemData[] {
+  if (items.some((entry) => entry.id === pin.id)) return items;
+  return [...items.slice(0, index), pin, ...items.slice(index)];
+}
+
 export default function VisionBoard() {
   const { checkProgression } = useProgression();
+  const { scheduleRemoval, undoToast } = useUndo();
   const [items, setItems] = useState<VisionBoardItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Pins hidden while their delete waits out the undo window. A refetch in that window must not bring them back.
+  const pendingRemovalsRef = useRef<Set<string>>(new Set());
 
   const fetchItems = useCallback(async () => {
     try {
       const res = await fetch("/api/vision-board");
       if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
+        const data: { items?: VisionBoardItemData[] } = await res.json();
+        setItems((data.items ?? []).filter((entry) => !pendingRemovalsRef.current.has(entry.id)));
         setError(null);
       }
     } catch {
@@ -108,16 +133,40 @@ export default function VisionBoard() {
     saveItemLayout(id, { width, posX: nextPosX, zIndex: nextZ });
   }, [saveItemLayout]);
 
-  const handleDelete = useCallback(async (id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id));
-    try {
-      await fetch("/api/vision-board", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-    } catch {}
-  }, []);
+  const handleDelete = useCallback((id: string) => {
+    const index = items.findIndex((entry) => entry.id === id);
+    if (index === -1) return;
+    const pin = items[index];
+    const pending = pendingRemovalsRef.current;
+
+    pending.add(id);
+    setRemoveError(null);
+    setItems((prev) => prev.filter((entry) => entry.id !== id));
+    scheduleRemoval({
+      label: "Pin removed.",
+      restoredLabel: "Pin restored.",
+      // The board and the phone list each render the pin; focus whichever Remove is on screen.
+      focusAfterRestore: () =>
+        [...document.querySelectorAll<HTMLElement>("button[aria-label]")].find(
+          (button) => button.getAttribute("aria-label") === removePinLabel(pin) && button.offsetParent !== null,
+        ) ?? null,
+      commit: async () => {
+        try {
+          await deletePin(id);
+        } finally {
+          pending.delete(id);
+        }
+      },
+      restore: () => {
+        pending.delete(id);
+        setItems((prev) => reinsertPin(prev, pin, index));
+      },
+      onCommitError: (err) => {
+        console.error("Remove pin failed:", err instanceof Error ? err.message : "Unknown error");
+        setRemoveError(REMOVE_FAILED_MESSAGE);
+      },
+    });
+  }, [items, scheduleRemoval]);
 
   const handleItemAdded = useCallback(() => {
     fetchItems();
@@ -127,8 +176,8 @@ export default function VisionBoard() {
   if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading your vision board...</p>;
   if (error) return (
     <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchItems} className="primary-button px-4 py-2 text-sm">Try Again</button>
+      <p role="alert" className="mb-4 text-[var(--badge-error-text)]">{error}</p>
+      <button onClick={fetchItems} className="primary-button min-h-11 px-4 py-2 text-sm">Try Again</button>
     </div>
   );
 
@@ -143,9 +192,15 @@ export default function VisionBoard() {
             {items.length} pinned
           </span>
         </div>
+        {removeError && (
+          <p role="alert" className="mb-3 rounded-xl bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-text)]">
+            {removeError}
+          </p>
+        )}
         <CorkboardCanvas items={items} onMove={handleMove} onResize={handleResize} onDelete={handleDelete} />
       </div>
       <VisionBoardToolbar onItemAdded={handleItemAdded} />
+      {undoToast}
     </div>
   );
 }

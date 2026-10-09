@@ -13,23 +13,23 @@ export default function StudentError({
       <p className="mt-3 max-w-md text-sm text-[var(--ink-muted)]">
         We hit an unexpected error. You can try again, or head back to your dashboard.
       </p>
-      <div className="mt-6 flex gap-3">
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button
           onClick={reset}
-          className="primary-button px-5 py-2.5 text-sm"
+          className="primary-button min-h-11 px-5 py-2.5 text-sm"
         >
           Try again
         </button>
         <a
           href="/dashboard"
-          className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
         >
           Go to Dashboard
         </a>
       </div>
       <a
         href="/help"
-        className="mt-4 text-xs font-semibold text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink-strong)] hover:underline"
+        className="mt-4 inline-flex min-h-11 items-center text-xs font-semibold text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink-strong)] hover:underline"
       >
         Still stuck? Visit the Help page.
       </a>

@@ -91,8 +91,8 @@ export function DiscoveryClusterPicker({
 }: DiscoveryClusterPickerProps) {
   if (savedClusterId) {
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-        <p className="text-sm text-emerald-900">
+      <div className="rounded-xl border border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)] p-3">
+        <p className="text-sm text-[var(--badge-success-text)]">
           Pathway saved: <strong>{clusterLabel(savedClusterId)}</strong>
         </p>
       </div>
@@ -100,8 +100,8 @@ export function DiscoveryClusterPicker({
   }
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <p className="text-sm text-amber-900">Sage did not record a pathway. Pick one to set it.</p>
+    <div className="rounded-xl border border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)] p-3">
+      <p className="text-sm text-[var(--badge-warning-text)]">Sage did not record a pathway. Pick one to set it.</p>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <div className="flex flex-col gap-1">
           <label
@@ -128,13 +128,13 @@ export function DiscoveryClusterPicker({
           type="button"
           onClick={onConfirm}
           disabled={saving || value === ""}
-          className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="primary-button min-h-[44px] rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save pathway"}
         </button>
       </div>
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-600">
+        <p role="alert" className="mt-2 text-xs text-[var(--badge-error-text)]">
           {error}
         </p>
       )}

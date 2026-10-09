@@ -7,6 +7,28 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
+**2026-10-09 HIG Phase 2 on `fix/hig-phase-2` (stacked on #222's `fix/hig-phase-1`; draft PR #223 targets that branch, so CI, which runs only on PRs to `main`, has not run on it).** Built in two fan-out rounds (10 + 8 file groups in isolated worktrees, each built, reviewed through two lenses and fixed), then two independent reviews of the shared code.
+
+Shared pieces:
+- `useConfirm`: 44pt, error tokens, a prompt mode, and overlap/unmount safety.
+- `useUndo`: no timer, explicit Dismiss, focus moves to Undo and back, announced restore.
+- `FormDialog`: on `<dialog>`, returns focus, never loses dirty text, drag-select safe.
+
+App-wide guards, all green:
+- `hig-guards.test.ts`: every control reaches 44pt (estimated height, judged per conditional branch); every field has a label; spaced label text gets its spacing.
+- ESLint bans native dialogs everywhere, and raw palette colors in teacher scope plus converted student files.
+- `globals.badge-contrast.test.ts` composites every tinted pair over the page, a card, a card's sheen-lit top and a muted panel.
+- `e2e-placeholder-locators.test.ts`.
+
+Browser harness specs run with no app server, 52/52 in Chromium and WebKit: `ui-primitives`, `goals-layout`, `vision-board-undo`.
+
+Local result:
+- `npm test` 6,201/6,201 at `--test-concurrency=4`.
+- tsc, eslint, readability, platform:validate and `next build` clean.
+- Dev-server e2e 13/13.
+
+PR #222 CI is green, including the first light-theme authenticated axe scan (run 37964705961).
+
 **2026-10-09 Apple HIG design review, then Phase 1 fixes on draft PR #222 (`fix/hig-phase-1`, 9 commits on `main` @ `925b2dfa`, auto-fix on).** Five reviewers covered all 49 routes against the HIG, with each claim cited to a HIG page. The orchestrator re-checked 21 findings and corrected 3. Result: 205 findings (49 P1), seven root problems, and a three-phase fix order. Report: https://claude.ai/artifact/VY1JhUQxxKYN4XDsPpcUf4
 
 Phase 1 shipped test-first on #222:
@@ -78,19 +100,21 @@ Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#1
 ## Last Session
 - **Date**: 2026-10-09
 - **What we worked on**:
-  - Britt asked for an Apple HIG design review of every tab and page.
-    - Five parallel reviewers covered the shell, student pages (two groups), teacher pages, and public/admin/coordinator pages.
-    - A static scan (`hig-scan.mjs`) and an undefined-token check fed them leads.
-    - Live production probes at iPhone width found that a Light device gets dark, and the sign-in form starts 1,596pt down the page.
-    - The orchestrator re-checked 21 findings and published the report artifact.
-  - Then the Phase 1 fixes, one test-first commit each, in sibling worktree `../VisionQuest-hig-phase1`.
-  - An independent code review found the print window inherits the CSP and drops the resume's `<style>`. Fixing it showed the preview has been unstyled on `main` all along.
-  - A hydration mismatch on the nonce'd theme script was caught and fixed.
+  - The Apple HIG review (205 findings, report artifact above).
+  - Phase 1 (PR #222).
+  - Phase 2 (`fix/hig-phase-2`), built from shared primitives and failing-first guards, then fanned out with agents.
+    - Round 1 covered dialogs, labels, palette and touch targets in 98 files.
+    - Round 2 grew 173 controls after the touch check started estimating rendered height.
+  - Reviewers' blockers were fixed and measured in real browsers:
+    - FormDialog Escape lock-up
+    - goals Edit/Remove covered on phones
+    - dark error/info badges failing at card tops
+    - two e2e specs stranded by placeholder-to-label changes
 - **What we decided**: see the 2026-10-09 rows in the Key Decisions Log.
 - **Where we left off**:
-  - Draft PR #222 is open with CI running and auto-fix on.
-  - Open test-plan items: the CI `a11y-authenticated` run (first light-theme scan, may surface new violations), `theme-variant.spec.ts`, a phone check of light/dark with no flash, and a signed-in Portfolio Print and Preview check.
-  - Phase 2 and Phase 3 are not started; see Open Items.
+  - `fix/hig-phase-2` is pushed with a draft PR stacked on #222.
+  - Worktree: `.claude/worktrees/hig-phases`. The old sibling folder broke the cluster rule and was moved.
+  - Waiting on Britt: the two phone/manual checks on #222, review of both PRs, and the design calls in Open Items.
 
 ## Prior Session (2026-09-12, sage-grounding rights/responsibilities)
 - **Date**: 2026-09-12 (sage-grounding rights/responsibilities, issue #217)
@@ -213,11 +237,27 @@ Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#1
 
 ## Open Items
 - [ ] **PR #222 (HIG Phase 1)**: finish the test plan in the PR body (CI authenticated axe in both themes, phone light/dark check, signed-in Print and Preview), then Britt reviews and merges.
-- [ ] **HIG Phase 2** (report: https://claude.ai/artifact/VY1JhUQxxKYN4XDsPpcUf4):
-  - Replace the 16 teacher `alert`/`confirm`/`prompt` calls with `useConfirm`, and add undo to dismiss/delete (D-24, B-32, C-47).
-  - 44pt touch minimum via `min-h-8 [@media(pointer:coarse)]:min-h-11` (D-25).
-  - Teacher raw palette classes onto tokens, with a lint rule (D-26; zero `dark:` utilities in teacher scope today).
-  - Label every field, starting with the SPOKES record form (D-23, E-26).
+- [ ] **HIG Phase 2, draft PR #223** (`fix/hig-phase-2`, stacked on #222): Britt reviews. Merge #222 first, then retarget #223 to `main`; CI first runs then.
+- [ ] **USER, design calls from the Phase 2 reviews**:
+  - `useConfirm` styles every Delete confirm red. HIG alerts reserve the destructive style for actions the person did not deliberately choose (the Empty Trash example). Should the default be `destructive: false`?
+  - The undo notice is an inverted near-white slab in dark mode. Legible at 16:1, but HIG dark-mode prefers elevated dark surfaces.
+- [ ] **HIG follow-ups found in Phase 2, not done**:
+  - Raw palette colors in student and shared files: SettingsView, StaffMfaPanel, DocumentCard, CoursesHub, OrientationChecklist, DashboardClient, FormUploadButton, FileManager, DocumentBrowser, OrientationFormDetail, AuthPageClient. Convert them and add each to ESLint's cleaned-student-files block.
+  - JobConfigSection uses light-only `--primary` as a fill.
+  - Silent failures:
+    - FileManager failed delete
+    - FormUploadButton error in pending/rejected states
+    - VisionBoard layout save `.catch(() => {})`
+    - VisionBoardToolbar loadGoals
+    - PathwayManager delete/toggle
+  - `GoalRowActions` uses `-my-1.5` on 44px buttons and overlaps any row under 38px.
+  - Checker gaps that are logged, with no live misses:
+    - icon-only flex buttons need an explicit size
+    - responsive text-size variants (`sm:text-sm`)
+    - `htmlFor` matched by expression text
+    - `aria-label={undefined}` counts as a name
+  - Checkboxes and radios are outside the touch-target check (CertTracker's 16px requirement checkbox).
+  - The focus ring sits around the 44px box, not the visible circle, on ThemeToggle and the goal checkboxes.
 - [ ] **HIG Phase 3**:
   - Sign-in above the fold on phones (E-1).
   - Phone tab bar per role; staff currently land on student `/chat` (A-4, A-9, A-10).
@@ -336,6 +376,10 @@ Single home for engineering decisions. Product **scope** decisions live in `docs
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-10-09 | Undo has no timer. A removal is sent on Dismiss, the next removal, unmount, pagehide or a hidden tab. | A 6s window was a WCAG 2.2.1 time limit: it did not pause on focus, and assistive-tech users could not reach Undo in time. HIG accessibility: "Prefer dismissing views with an explicit action". The removals had dropped their confirm because undo existed, so an unreachable undo made them unconfirmed and irreversible. |
+| 2026-10-09 | HIG guards are failing-first tests and lint, then agents fan out over disjoint file groups. Shared files are fenced off from builders. | Guards define done for every builder and stay as CI protection. Fences kept parallel worktrees conflict-free across 18 groups; the shared-code bugs builders found came back as reports and were fixed by the orchestrator. |
+| 2026-10-09 | The touch-target check estimates rendered height and judges each conditional class combination on its own. | Padding heuristics passed 34-36px `py-2 text-sm` buttons, and merged branches made the result depend on branch order. A rendered audit of 248 controls agreed with the estimate within 0.23px on average, with no false flags in isolation. |
+| 2026-10-09 | Student files join the raw-palette ESLint ban one at a time, in a block after the student-surfaces block. | Flat config replaces a rule entry rather than merging it. A palette entry placed in the teacher block was silently overridden for student files. |
 | 2026-10-09 | The theme defaults to the device ("system"). The server omits `data-theme`, and a nonce'd `<head>` script sets it from `prefers-color-scheme` before paint. `data-theme` stays the only key for `dark:` | Apple's guidance and `.impeccable.md` ("Light is primary") both say follow the device. Keeping the attribute as the single switch preserves #165's invariant. `ThemeProvider` uses `useSyncExternalStore` with a `null` server snapshot, so it never overwrites the boot script with a guess |
 | 2026-10-09 | Contrast on a gradient is tested at every stop, per theme, by resolving `var()` and `color-mix()` the way the browser does (`globals.primary-button.test.ts`) | axe reports text over a gradient as "incomplete", not as a violation. `.primary-button` sat at 2.0 to 2.7:1 in 52 files while the authenticated gate read 0 |
 | 2026-10-09 | Any HTML written into a child window or `srcdoc` iframe stamps the page nonce on its `<style>` tags (`withStyleNonce` + `pageNonce` in `src/lib/resume-print.ts`) | Both inherit the app CSP, whose `style-src-elem` admits only nonce'd stylesheets. A unit test with a fake window cannot see this; `e2e/resume-print-csp.spec.ts` serves the proxy's CSP shape and checks computed styles |
@@ -483,6 +527,11 @@ Single home for engineering decisions. Product **scope** decisions live in `docs
 - Evals are hard gates — run all three before merging Sage-affecting changes
 
 ## Known Issues
+- **`src/lib/sage/agent/explain-faithfulness.test.ts` timing-ratio tests flake under full parallelism on the 10-core Mac.** A different one fails each run. They pass alone and at `--test-concurrency=4`, and CI has passed them. Rerun at lower concurrency before treating one as a regression.
+- **Flat-config ESLint replaces a rule entry; it does not merge.** A later block with `no-restricted-syntax` for overlapping files silently drops earlier selectors. Check with `npx eslint --print-config <file>` after any edit.
+- **Safari does not focus a button on mouse click.** A test of focus return must open the dialog by keyboard.
+- **Browser-only behavior needs a harness, not renderToString.** No DOM library is installed. `e2e/harness/*` bundles a real component with esbuild (plus the compiled `globals.css` via `@tailwindcss/postcss` when layout matters), serves it with `page.route`, and needs no app server. A bundle that reads env vars needs a `process` banner.
+- **Tailwind 4 `space-y-*` margins do nothing on inline children.** Label text in a spaced `<label>` needs `block`. `inlineSpacedChildren` guards this.
 - **axe does not score text over a gradient background.** It reports such nodes as "incomplete", so the authenticated contrast gate cannot see them. Gradient fills need their own ratio test; see `globals.primary-button.test.ts`.
 - **A window from `window.open("")` and an `srcdoc` iframe inherit the app CSP.** Inline `<style>` in them is dropped unless it carries the page nonce; use `withStyleNonce(html, pageNonce(document))`.
 - **Browsers blank a script's `nonce` attribute after parsing, but keep the property.** React then reports a hydration mismatch on any server-rendered `<script nonce>`. Put `suppressHydrationWarning` on that element, and read nonces through the `.nonce` property, never `getAttribute`.

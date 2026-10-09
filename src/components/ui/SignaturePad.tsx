@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 type SignatureMode = "draw" | "type";
 
@@ -17,6 +17,9 @@ interface SignaturePadProps {
 }
 
 const CANVAS_HEIGHT = 150;
+// Fixed dark ink, because the exported PNG is drawn on white. Both pads are
+// therefore paper in either theme: bg-white plus data-theme="light", so the
+// tokens inside (caption, placeholder, typed name) take their light values.
 const STROKE_COLOR = "#1a2a3a";
 const STROKE_WIDTH = 2;
 
@@ -32,7 +35,7 @@ export default function SignaturePad({ onSign, onCancel, submitting = false }: S
           type="button"
           onClick={() => setMode("draw")}
           disabled={submitting}
-          className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
+          className={`inline-flex min-h-11 flex-1 items-center justify-center px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
             mode === "draw"
               ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -44,7 +47,7 @@ export default function SignaturePad({ onSign, onCancel, submitting = false }: S
           type="button"
           onClick={() => setMode("type")}
           disabled={submitting}
-          className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
+          className={`inline-flex min-h-11 flex-1 items-center justify-center px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
             mode === "type"
               ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -230,11 +233,11 @@ function DrawPad({
 
   return (
     <>
-      <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-raised)]">
+      <div ref={containerRef} data-theme="light" className="relative overflow-hidden rounded-xl border-2 border-dashed border-[var(--border)] bg-white">
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label="Signature drawing area. Use the text input below for an accessible alternative."
+          aria-label="Signature drawing area. To type your name instead, choose Type above."
           className="block cursor-crosshair touch-none"
           onMouseDown={startStroke}
           onMouseMove={draw}
@@ -284,6 +287,7 @@ function TypePad({
   submitting: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const nameInputId = useId();
   const trimmed = typedName.trim();
 
   function handleSubmit() {
@@ -312,11 +316,12 @@ function TypePad({
   return (
     <>
       <div ref={containerRef} className="space-y-3">
-        <div className="rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-raised)] p-4">
-          <label className="block text-xs font-semibold text-[var(--ink-muted)] mb-2">
+        <div data-theme="light" className="rounded-xl border-2 border-dashed border-[var(--border)] bg-white p-4">
+          <label htmlFor={nameInputId} className="block text-xs font-semibold text-[var(--ink-muted)] mb-2">
             Type your full legal name
           </label>
           <input
+            id={nameInputId}
             type="text"
             value={typedName}
             onChange={(e) => onTypedNameChange(e.target.value)}
@@ -370,7 +375,7 @@ function SignatureButtons({
         type="button"
         onClick={onClear}
         disabled={!canClear || submitting}
-        className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:opacity-40"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:opacity-40"
       >
         Clear
       </button>
@@ -379,7 +384,7 @@ function SignatureButtons({
           type="button"
           onClick={onCancel}
           disabled={submitting}
-          className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Cancel
         </button>
@@ -387,7 +392,7 @@ function SignatureButtons({
           type="button"
           onClick={onSubmit}
           disabled={!canSubmit || submitting}
-          className="primary-button px-5 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+          className="primary-button min-h-11 px-5 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Saving..." : "Sign & Submit"}
         </button>

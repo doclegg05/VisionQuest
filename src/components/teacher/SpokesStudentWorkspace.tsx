@@ -499,10 +499,10 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
+        <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
         <button
           onClick={() => void loadData()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="primary-button px-4 py-2 pointer-coarse:min-h-11"
         >
           Try Again
         </button>
@@ -511,7 +511,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
   }
 
   if (!data) {
-    return <p className="text-sm text-red-500">SPOKES record not found.</p>;
+    return <p className="text-sm text-[var(--badge-error-text)]">SPOKES record not found.</p>;
   }
 
   const payload = data;
@@ -550,14 +550,14 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                 <div className="flex-1">
                   <p className="text-sm font-medium text-[var(--ink-strong)]">
                     {template.label}
-                    {template.required ? <span className="ml-1 text-xs text-rose-500">*</span> : null}
+                    {template.required ? <span className="ml-1 text-xs text-[var(--badge-error-text)]">*</span> : null}
                   </p>
                   {template.description ? (
                     <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">{template.description}</p>
                   ) : null}
                 </div>
                 {progress?.completedAt ? (
-                  <span className="text-xs uppercase tracking-[0.12em] text-emerald-700">
+                  <span className="text-xs uppercase tracking-[0.12em] text-[var(--badge-success-text)]">
                     {formatDateInput(progress.completedAt)}
                   </span>
                 ) : null}
@@ -576,7 +576,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <Link href={`/teacher/students/${studentId}`} className="text-sm text-[var(--accent-strong)] hover:text-[var(--ink-strong)]">
+          <Link href={`/teacher/students/${studentId}`} className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--accent-strong)] hover:text-[var(--ink-strong)]">
             ← Back to student detail
           </Link>
           <h1 className="mt-2 font-display text-3xl text-[var(--ink-strong)]">{payload.student.displayName}</h1>
@@ -634,7 +634,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             type="button"
             onClick={() => void handleSaveProfile()}
             disabled={savingProfile}
-            className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
+            className="inline-flex items-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
           >
             {savingProfile ? "Saving..." : "Save Record"}
           </button>
@@ -643,67 +643,139 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         <div className="mt-5 grid gap-6 xl:grid-cols-3">
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Referral</h3>
-            <input value={profileForm.firstName} onChange={(event) => setProfileForm((current) => ({ ...current, firstName: event.target.value }))} placeholder="First name" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.lastName} onChange={(event) => setProfileForm((current) => ({ ...current, lastName: event.target.value }))} placeholder="Last name" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.referralEmail} onChange={(event) => setProfileForm((current) => ({ ...current, referralEmail: event.target.value }))} placeholder="Referral email" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">First name</span>
+              <input value={profileForm.firstName} onChange={(event) => setProfileForm((current) => ({ ...current, firstName: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Last name</span>
+              <input value={profileForm.lastName} onChange={(event) => setProfileForm((current) => ({ ...current, lastName: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Referral email</span>
+              <input value={profileForm.referralEmail} onChange={(event) => setProfileForm((current) => ({ ...current, referralEmail: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
             {countyOptions.length > 0 ? (
-              <select
-                value={profileForm.county}
-                onChange={(event) => setProfileForm((current) => ({ ...current, county: event.target.value }))}
-                className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              >
-                <option value="">Select county</option>
-                {profileForm.county && !countyOptions.some((option) => option.label === profileForm.county) ? (
-                  <option value={profileForm.county}>{profileForm.county}</option>
-                ) : null}
-                {countyOptions.map((option) => (
-                  <option key={option.id} value={option.label}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-medium text-[var(--ink-strong)]">County</span>
+                <select
+                  value={profileForm.county}
+                  onChange={(event) => setProfileForm((current) => ({ ...current, county: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                >
+                  <option value="">Select county</option>
+                  {profileForm.county && !countyOptions.some((option) => option.label === profileForm.county) ? (
+                    <option value={profileForm.county}>{profileForm.county}</option>
+                  ) : null}
+                  {countyOptions.map((option) => (
+                    <option key={option.id} value={option.label}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ) : (
-              <input value={profileForm.county} onChange={(event) => setProfileForm((current) => ({ ...current, county: event.target.value }))} placeholder="County" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-medium text-[var(--ink-strong)]">County</span>
+                <input value={profileForm.county} onChange={(event) => setProfileForm((current) => ({ ...current, county: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+              </label>
             )}
             <div className="grid gap-3 sm:grid-cols-2">
-              <input value={profileForm.householdType} onChange={(event) => setProfileForm((current) => ({ ...current, householdType: event.target.value }))} placeholder="Household (1P/2P)" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-              <input value={profileForm.requiredParticipationHours} onChange={(event) => setProfileForm((current) => ({ ...current, requiredParticipationHours: event.target.value }))} placeholder="Required hours" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-medium text-[var(--ink-strong)]">Household type</span>
+                <input value={profileForm.householdType} onChange={(event) => setProfileForm((current) => ({ ...current, householdType: event.target.value }))} placeholder="1P or 2P" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-medium text-[var(--ink-strong)]">Required hours</span>
+                <input inputMode="numeric" value={profileForm.requiredParticipationHours} onChange={(event) => setProfileForm((current) => ({ ...current, requiredParticipationHours: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+              </label>
             </div>
-            <input type="date" value={profileForm.referralDate} onChange={(event) => setProfileForm((current) => ({ ...current, referralDate: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <select value={profileForm.status} onChange={(event) => setProfileForm((current) => ({ ...current, status: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]">
-              <option value="referred">Referred</option>
-              <option value="enrolled">Enrolled</option>
-              <option value="completed">Completed</option>
-              <option value="exited">Exited</option>
-              <option value="non_completer">Non-completer</option>
-            </select>
-            <input type="date" value={profileForm.enrolledAt} onChange={(event) => setProfileForm((current) => ({ ...current, enrolledAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input type="date" value={profileForm.exitDate} onChange={(event) => setProfileForm((current) => ({ ...current, exitDate: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Referral date</span>
+              <input type="date" value={profileForm.referralDate} onChange={(event) => setProfileForm((current) => ({ ...current, referralDate: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Status</span>
+              <select value={profileForm.status} onChange={(event) => setProfileForm((current) => ({ ...current, status: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]">
+                <option value="referred">Referred</option>
+                <option value="enrolled">Enrolled</option>
+                <option value="completed">Completed</option>
+                <option value="exited">Exited</option>
+                <option value="non_completer">Non-completer</option>
+              </select>
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Enrollment date</span>
+              <input type="date" value={profileForm.enrolledAt} onChange={(event) => setProfileForm((current) => ({ ...current, enrolledAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Exit date</span>
+              <input type="date" value={profileForm.exitDate} onChange={(event) => setProfileForm((current) => ({ ...current, exitDate: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
           </div>
 
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Profile & barriers</h3>
-            <input value={profileForm.gender} onChange={(event) => setProfileForm((current) => ({ ...current, gender: event.target.value }))} placeholder="Gender" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input type="date" value={profileForm.birthDate} onChange={(event) => setProfileForm((current) => ({ ...current, birthDate: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.race} onChange={(event) => setProfileForm((current) => ({ ...current, race: event.target.value }))} placeholder="Race" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.ethnicity} onChange={(event) => setProfileForm((current) => ({ ...current, ethnicity: event.target.value }))} placeholder="Ethnicity" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <textarea value={profileForm.barriersOnEntry} onChange={(event) => setProfileForm((current) => ({ ...current, barriersOnEntry: event.target.value }))} placeholder="Barriers on entry (one per line)" rows={3} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Gender</span>
+              <input value={profileForm.gender} onChange={(event) => setProfileForm((current) => ({ ...current, gender: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Birth date</span>
+              <input type="date" value={profileForm.birthDate} onChange={(event) => setProfileForm((current) => ({ ...current, birthDate: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Race</span>
+              <input value={profileForm.race} onChange={(event) => setProfileForm((current) => ({ ...current, race: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Ethnicity</span>
+              <input value={profileForm.ethnicity} onChange={(event) => setProfileForm((current) => ({ ...current, ethnicity: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Barriers on entry</span>
+              <textarea value={profileForm.barriersOnEntry} onChange={(event) => setProfileForm((current) => ({ ...current, barriersOnEntry: event.target.value }))} placeholder="One per line" rows={3} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
             <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <input type="checkbox" checked={profileForm.jobRetentionStudent} onChange={(event) => setProfileForm((current) => ({ ...current, jobRetentionStudent: event.target.checked }))} />
               Job retention student
             </label>
-            <input type="date" value={profileForm.tabeDate} onChange={(event) => setProfileForm((current) => ({ ...current, tabeDate: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.educationalLevel} onChange={(event) => setProfileForm((current) => ({ ...current, educationalLevel: event.target.value }))} placeholder="Educational level / TABE level" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <textarea value={profileForm.barriersRemaining} onChange={(event) => setProfileForm((current) => ({ ...current, barriersRemaining: event.target.value }))} placeholder="Barriers remaining on exit (one per line)" rows={3} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">TABE date</span>
+              <input type="date" value={profileForm.tabeDate} onChange={(event) => setProfileForm((current) => ({ ...current, tabeDate: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Educational level / TABE level</span>
+              <input value={profileForm.educationalLevel} onChange={(event) => setProfileForm((current) => ({ ...current, educationalLevel: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Barriers remaining on exit</span>
+              <textarea value={profileForm.barriersRemaining} onChange={(event) => setProfileForm((current) => ({ ...current, barriersRemaining: event.target.value }))} placeholder="One per line" rows={3} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
           </div>
 
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Outcomes & follow-through</h3>
-            <input type="date" value={profileForm.documentedAcademicAchievementAt} onChange={(event) => setProfileForm((current) => ({ ...current, documentedAcademicAchievementAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input type="date" value={profileForm.highSchoolEquivalencyAt} onChange={(event) => setProfileForm((current) => ({ ...current, highSchoolEquivalencyAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input type="date" value={profileForm.familySurveyOfferedAt} onChange={(event) => setProfileForm((current) => ({ ...current, familySurveyOfferedAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input type="date" value={profileForm.postSecondaryEnteredAt} onChange={(event) => setProfileForm((current) => ({ ...current, postSecondaryEnteredAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.postSecondaryProgram} onChange={(event) => setProfileForm((current) => ({ ...current, postSecondaryProgram: event.target.value }))} placeholder="Post-secondary school or training" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Documented academic achievement date</span>
+              <input type="date" value={profileForm.documentedAcademicAchievementAt} onChange={(event) => setProfileForm((current) => ({ ...current, documentedAcademicAchievementAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">High school equivalency date</span>
+              <input type="date" value={profileForm.highSchoolEquivalencyAt} onChange={(event) => setProfileForm((current) => ({ ...current, highSchoolEquivalencyAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Family survey offered date</span>
+              <input type="date" value={profileForm.familySurveyOfferedAt} onChange={(event) => setProfileForm((current) => ({ ...current, familySurveyOfferedAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Post-secondary entry date</span>
+              <input type="date" value={profileForm.postSecondaryEnteredAt} onChange={(event) => setProfileForm((current) => ({ ...current, postSecondaryEnteredAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Post-secondary school or training</span>
+              <input value={profileForm.postSecondaryProgram} onChange={(event) => setProfileForm((current) => ({ ...current, postSecondaryProgram: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
             {data?.placementSuggestion && !data.record.placementApplicationId ? (
               <div
                 role="region"
@@ -745,12 +817,30 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                 accepted application.
               </p>
             ) : null}
-            <input type="date" aria-label="Employment start date" value={profileForm.unsubsidizedEmploymentAt} onChange={(event) => setProfileForm((current) => ({ ...current, unsubsidizedEmploymentAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.employerName} onChange={(event) => setProfileForm((current) => ({ ...current, employerName: event.target.value }))} placeholder="Employer name" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input value={profileForm.hourlyWage} onChange={(event) => setProfileForm((current) => ({ ...current, hourlyWage: event.target.value }))} placeholder="Hourly wage" className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <input type="date" value={profileForm.nonCompleterAt} onChange={(event) => setProfileForm((current) => ({ ...current, nonCompleterAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <textarea value={profileForm.nonCompleterReason} onChange={(event) => setProfileForm((current) => ({ ...current, nonCompleterReason: event.target.value }))} placeholder="Non-completer notes" rows={2} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
-            <textarea value={profileForm.notes} onChange={(event) => setProfileForm((current) => ({ ...current, notes: event.target.value }))} placeholder="General SPOKES notes" rows={3} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Employment start date</span>
+              <input type="date" value={profileForm.unsubsidizedEmploymentAt} onChange={(event) => setProfileForm((current) => ({ ...current, unsubsidizedEmploymentAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Employer name</span>
+              <input value={profileForm.employerName} onChange={(event) => setProfileForm((current) => ({ ...current, employerName: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Hourly wage</span>
+              <input inputMode="decimal" value={profileForm.hourlyWage} onChange={(event) => setProfileForm((current) => ({ ...current, hourlyWage: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Non-completer date</span>
+              <input type="date" value={profileForm.nonCompleterAt} onChange={(event) => setProfileForm((current) => ({ ...current, nonCompleterAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Non-completer notes</span>
+              <textarea value={profileForm.nonCompleterReason} onChange={(event) => setProfileForm((current) => ({ ...current, nonCompleterReason: event.target.value }))} rows={2} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">General SPOKES notes</span>
+              <textarea value={profileForm.notes} onChange={(event) => setProfileForm((current) => ({ ...current, notes: event.target.value }))} rows={3} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
+            </label>
           </div>
         </div>
       </section>
@@ -856,23 +946,26 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                                 )}
                               </div>
 
-                              <div className="mt-3 flex items-center gap-2 flex-wrap">
-                                <input
-                                  type="date"
-                                  value={moduleDates[template.id] || todayInputValue()}
-                                  onChange={(event) =>
-                                    setModuleDates((current) => ({
-                                      ...current,
-                                      [template.id]: event.target.value,
-                                    }))
-                                  }
-                                  className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                                />
+                              <div className="mt-3 flex items-end gap-2 flex-wrap">
+                                <label className="block space-y-1.5">
+                                  <span className="block text-sm font-medium text-[var(--ink-strong)]">Date earned</span>
+                                  <input
+                                    type="date"
+                                    value={moduleDates[template.id] || todayInputValue()}
+                                    onChange={(event) =>
+                                      setModuleDates((current) => ({
+                                        ...current,
+                                        [template.id]: event.target.value,
+                                      }))
+                                    }
+                                    className="block rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                                  />
+                                </label>
                                 <button
                                   type="button"
                                   onClick={() => void saveModule(template.id)}
                                   disabled={savingModuleId === template.id}
-                                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
+                                  className="inline-flex items-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
                                 >
                                   {progress ? "Update completion" : "Mark complete"}
                                 </button>
@@ -881,7 +974,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                                     type="button"
                                     onClick={() => void removeModule(template.id)}
                                     disabled={savingModuleId === template.id}
-                                    className="rounded-xl border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] px-4 py-2 text-sm text-[var(--urgency-critical-text)] transition hover:brightness-110 disabled:opacity-60"
+                                    className="inline-flex items-center rounded-xl border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] px-4 py-2 text-sm text-[var(--urgency-critical-text)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
                                   >
                                     Remove
                                   </button>
@@ -931,9 +1024,9 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
                         item.status === "completed"
-                          ? "bg-emerald-100 text-emerald-700"
+                          ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
                           : item.status === "due"
-                            ? "bg-amber-100 text-amber-800"
+                            ? "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"
                             : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                       }`}
                     >
@@ -954,14 +1047,14 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                             notes: item.followUp?.notes || "",
                           })
                         }
-                        className="text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                        className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => void removeFollowUp(item.checkpointMonths)}
-                        className="text-xs text-rose-600 hover:text-rose-800"
+                        className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-error-text)] hover:underline"
                       >
                         Remove
                       </button>
@@ -975,41 +1068,52 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
           <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Record a follow-up</h3>
             <div className="mt-3 grid gap-3">
-              <select
-                value={followUpForm.checkpointMonths}
-                onChange={(event) => setFollowUpForm((current) => ({ ...current, checkpointMonths: event.target.value }))}
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              >
-                <option value="1">1-month</option>
-                <option value="3">3-month</option>
-                <option value="6">6-month</option>
-              </select>
-              <select
-                value={followUpForm.status}
-                onChange={(event) => setFollowUpForm((current) => ({ ...current, status: event.target.value }))}
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              >
-                <option value="employed">Employed</option>
-                <option value="unemployed">Unemployed</option>
-              </select>
-              <input
-                type="date"
-                value={followUpForm.checkedAt}
-                onChange={(event) => setFollowUpForm((current) => ({ ...current, checkedAt: event.target.value }))}
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
-              <textarea
-                value={followUpForm.notes}
-                onChange={(event) => setFollowUpForm((current) => ({ ...current, notes: event.target.value }))}
-                placeholder="Follow-up notes"
-                rows={3}
-                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-              />
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-medium text-[var(--ink-strong)]">Checkpoint</span>
+                <select
+                  value={followUpForm.checkpointMonths}
+                  onChange={(event) => setFollowUpForm((current) => ({ ...current, checkpointMonths: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                >
+                  <option value="1">1-month</option>
+                  <option value="3">3-month</option>
+                  <option value="6">6-month</option>
+                </select>
+              </label>
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-medium text-[var(--ink-strong)]">Employment status</span>
+                <select
+                  value={followUpForm.status}
+                  onChange={(event) => setFollowUpForm((current) => ({ ...current, status: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                >
+                  <option value="employed">Employed</option>
+                  <option value="unemployed">Unemployed</option>
+                </select>
+              </label>
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-medium text-[var(--ink-strong)]">Check-in date</span>
+                <input
+                  type="date"
+                  value={followUpForm.checkedAt}
+                  onChange={(event) => setFollowUpForm((current) => ({ ...current, checkedAt: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="block text-sm font-medium text-[var(--ink-strong)]">Follow-up notes</span>
+                <textarea
+                  value={followUpForm.notes}
+                  onChange={(event) => setFollowUpForm((current) => ({ ...current, notes: event.target.value }))}
+                  rows={3}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                />
+              </label>
               <button
                 type="button"
                 onClick={() => void saveFollowUp()}
                 disabled={savingFollowUp}
-                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
               >
                 {savingFollowUp ? "Saving..." : "Save Follow-Up"}
               </button>

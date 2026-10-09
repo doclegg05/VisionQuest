@@ -250,8 +250,8 @@ export default function ClassOverview({
 
   if (error) return (
     <div className="surface-section px-6 py-10 text-center">
-      <p className="mb-4 text-sm text-red-600">{error}</p>
-      <button onClick={() => fetchStudents()} className="primary-button px-4 py-2 text-sm">
+      <p className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
+      <button onClick={() => fetchStudents()} className="primary-button px-4 py-2 text-sm pointer-coarse:min-h-11">
         Try Again
       </button>
     </div>
@@ -363,7 +363,7 @@ export default function ClassOverview({
           <div className="flex rounded-full border border-[var(--border)] bg-[var(--surface-raised)]/70 p-1">
             <button
               onClick={() => setViewMode("table")}
-              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center pointer-coarse:min-h-11 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
                 viewMode === "table" ? "bg-[var(--accent-strong)] text-[var(--on-accent)]" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >
@@ -371,7 +371,7 @@ export default function ClassOverview({
             </button>
             <button
               onClick={() => setViewMode("cards")}
-              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center pointer-coarse:min-h-11 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
                 viewMode === "cards" ? "bg-[var(--accent-strong)] text-[var(--on-accent)]" : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >

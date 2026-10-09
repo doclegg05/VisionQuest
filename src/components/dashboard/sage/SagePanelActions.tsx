@@ -59,8 +59,7 @@ export function SagePanelActions({ panelId }: { panelId: string }) {
         type="button"
         onClick={refresh}
         disabled={pending}
-        aria-label="Ask Sage for a fresh set of suggestions"
-        className="rounded px-1.5 py-1 text-[var(--ink-faint)] hover:text-[var(--ink-muted)] disabled:opacity-50"
+        className="inline-flex min-h-11 items-center rounded px-1.5 py-1 text-[var(--ink-faint)] hover:text-[var(--ink-muted)] disabled:opacity-50"
       >
         Refresh
       </button>
@@ -68,8 +67,7 @@ export function SagePanelActions({ panelId }: { panelId: string }) {
         type="button"
         onClick={dismiss}
         disabled={pending}
-        aria-label="Hide Sage's suggestions for today"
-        className="rounded px-1.5 py-1 text-[var(--ink-faint)] hover:text-[var(--ink-muted)] disabled:opacity-50"
+        className="inline-flex min-h-11 items-center rounded px-1.5 py-1 text-[var(--ink-faint)] hover:text-[var(--ink-muted)] disabled:opacity-50"
       >
         Hide for today
       </button>

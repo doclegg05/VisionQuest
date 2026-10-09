@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { FormDialog } from "@/components/ui/FormDialog";
 import { api, apiFetch } from "@/lib/api";
 import { type FieldDef } from "@/lib/forms/schema";
 
@@ -38,6 +39,8 @@ interface ResponseDetail {
     schema: FieldDef[];
   };
 }
+
+type ReviewStatus = "reviewed" | "needs_changes";
 
 const STATUS_LABEL: Record<ResponseRow["status"], string> = {
   draft: "Draft",
@@ -98,22 +101,20 @@ export default function FormResponsesReview() {
     }
   }
 
-  async function handleReview(id: string, status: "reviewed" | "needs_changes", reviewerNotes: string | undefined) {
-    try {
-      const res = await apiFetch(`/api/teacher/forms/responses/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, reviewerNotes }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error ?? "Review failed");
-      }
-      setDetail(null);
-      if (selectedTemplateId) await fetchResponses(selectedTemplateId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Review failed.");
+  // Rejects on failure: the review dialog is modal, so the page-level alert
+  // below is inert while it is open. ReviewDrawer shows the message instead.
+  async function handleReview(id: string, status: ReviewStatus, reviewerNotes: string | undefined) {
+    const res = await apiFetch(`/api/teacher/forms/responses/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, reviewerNotes }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error ?? "Review failed.");
     }
+    setDetail(null);
+    if (selectedTemplateId) await fetchResponses(selectedTemplateId);
   }
 
   const activeTemplates = useMemo(
@@ -178,7 +179,7 @@ export default function FormResponsesReview() {
               <button
                 type="button"
                 onClick={() => void openResponse(row.id)}
-                className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold"
+                className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11"
               >
                 Open
               </button>
@@ -195,39 +196,47 @@ export default function FormResponsesReview() {
 interface ReviewDrawerProps {
   response: ResponseDetail;
   onClose: () => void;
-  onReview: (id: string, status: "reviewed" | "needs_changes", notes: string | undefined) => Promise<void>;
+  /** Rejects with an Error whose message the dialog shows to the teacher. */
+  onReview: (id: string, status: ReviewStatus, notes: string | undefined) => Promise<void>;
 }
 
-function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps) {
-  const [notes, setNotes] = useState(response.reviewerNotes ?? "");
+/**
+ * Runs a review and returns the message to show inside the review dialog,
+ * or null when it succeeded.
+ */
+export async function runReview(review: () => Promise<void>): Promise<string | null> {
+  try {
+    await review();
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : "Review failed.";
+  }
+}
+
+export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps) {
+  const initialNotes = response.reviewerNotes ?? "";
+  const [notes, setNotes] = useState(initialNotes);
   const [submitting, setSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const canReview = response.status === "submitted" || response.status === "needs_changes" || response.status === "reviewed";
 
+  async function submitReview(status: ReviewStatus, reviewerNotes: string | undefined) {
+    setSubmitting(true);
+    setReviewError(null);
+    const failure = await runReview(() => onReview(response.id, status, reviewerNotes));
+    setReviewError(failure);
+    setSubmitting(false);
+  }
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
+    <FormDialog
+      title={response.template.title}
+      dirty={notes !== initialNotes}
+      onClose={onClose}
+      widthClass="max-w-2xl"
     >
-      <div
-        onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface-raised)] p-6 shadow-xl space-y-5"
-      >
-        <header className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-display text-xl text-[var(--ink-strong)]">{response.template.title}</h3>
-            <p className="text-sm text-[var(--ink-muted)]">{response.student.displayName}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-lg p-2 text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
-          >
-            ✕
-          </button>
-        </header>
+      <div className="space-y-5">
+        <p className="text-sm text-[var(--ink-muted)]">{response.student.displayName}</p>
 
         <div className="space-y-3">
           {response.template.schema.map((field) => (
@@ -242,7 +251,7 @@ function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps) {
 
         <section className="space-y-2">
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Reviewer notes</span>
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Reviewer notes</span>
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
@@ -253,41 +262,39 @@ function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps) {
           </label>
         </section>
 
+        {reviewError && (
+          <p role="alert" className="text-sm text-[var(--badge-error-text)]">
+            {reviewError}
+          </p>
+        )}
+
         <footer className="flex flex-wrap justify-end gap-2 border-t border-[var(--border)] pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm"
+            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm pointer-coarse:min-h-11"
           >
             Cancel
           </button>
           <button
             type="button"
             disabled={submitting || !canReview || !notes.trim()}
-            onClick={async () => {
-              setSubmitting(true);
-              await onReview(response.id, "needs_changes", notes.trim());
-              setSubmitting(false);
-            }}
-            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-red)] disabled:opacity-50"
+            onClick={() => void submitReview("needs_changes", notes.trim())}
+            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-red)] disabled:opacity-50 pointer-coarse:min-h-11"
           >
             Needs changes
           </button>
           <button
             type="button"
             disabled={submitting || !canReview}
-            onClick={async () => {
-              setSubmitting(true);
-              await onReview(response.id, "reviewed", notes.trim() || undefined);
-              setSubmitting(false);
-            }}
-            className="primary-button px-5 py-2 text-sm disabled:opacity-50"
+            onClick={() => void submitReview("reviewed", notes.trim() || undefined)}
+            className="primary-button px-5 py-2 text-sm disabled:opacity-50 pointer-coarse:min-h-11"
           >
             Mark reviewed
           </button>
         </footer>
       </div>
-    </div>
+    </FormDialog>
   );
 }
 

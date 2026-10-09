@@ -74,16 +74,16 @@ export default async function StudentDashboardPreview({
   return (
     <div className="page-shell">
       {/* Teacher-only preview banner */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)] px-5 py-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-600">Dashboard Preview</p>
-          <p className="mt-1 text-sm text-amber-800">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--badge-warning-text)]">Dashboard Preview</p>
+          <p className="mt-1 text-sm text-[var(--badge-warning-text)]">
             Viewing <span className="font-semibold">{managedStudent.displayName}</span>&apos;s dashboard as the student sees it. Read-only.
           </p>
         </div>
         <Link
           href={`/teacher/students/${studentId}`}
-          className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
+          className="inline-flex items-center rounded-full border border-[var(--badge-warning-bg)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--badge-warning-text)] transition-colors hover:bg-[var(--badge-warning-bg)] pointer-coarse:min-h-11"
         >
           Back to Student Detail
         </Link>

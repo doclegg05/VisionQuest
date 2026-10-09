@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import { FORMS, FORM_CATEGORIES, FormCategory } from "@/lib/spokes/forms";
 import ResourceCard from "./ResourceCard";
 
@@ -79,13 +80,18 @@ export default function ResourceLibrary({
   return (
     <div className="space-y-8">
       {/* Search */}
-      <div>
+      <div className="relative">
+        <MagnifyingGlass
+          className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[var(--ink-muted)]"
+          aria-hidden="true"
+        />
         <input
-          type="text"
+          type="search"
+          aria-label="Search forms"
           placeholder="Search forms by title or description..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-3 text-sm text-[var(--ink-strong)] placeholder:text-[var(--muted)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
+          className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] py-3 pl-11 pr-5 text-sm text-[var(--ink-strong)] placeholder:text-[var(--ink-muted)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent-secondary)]/40"
         />
       </div>
 
@@ -95,7 +101,7 @@ export default function ResourceLibrary({
           <button
             type="button"
             onClick={() => setSelectedCategory("all")}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === "all"
                 ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -108,7 +114,7 @@ export default function ResourceLibrary({
               key={key}
               type="button"
               onClick={() => setSelectedCategory(key)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                 selectedCategory === key
                   ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                   : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -181,7 +187,7 @@ function CategorySection({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 text-left"
+        className="flex min-h-11 w-full items-center gap-3 text-left"
       >
         <span className="text-2xl">{icon}</span>
         <div className="flex-1">

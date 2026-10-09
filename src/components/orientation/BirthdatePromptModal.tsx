@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 interface BirthdatePromptModalProps {
   open: boolean;
@@ -28,6 +28,7 @@ export default function BirthdatePromptModal({
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const dateInputId = useId();
 
   // Capture focus when opened, restore on close.
   useEffect(() => {
@@ -102,11 +103,12 @@ export default function BirthdatePromptModal({
           You can skip for now and add it later from Settings.
         </p>
 
-        <label className="block text-xs font-medium text-[var(--ink-muted)]">
+        <label htmlFor={dateInputId} className="block text-xs font-medium text-[var(--ink-muted)]">
           Birthdate
         </label>
         <input
           ref={dateInputRef}
+          id={dateInputId}
           type="date"
           max={maxDate}
           value={value}
@@ -130,7 +132,7 @@ export default function BirthdatePromptModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-full border border-[var(--border)] bg-[var(--surface-base)] px-4 py-2 text-sm font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)] disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] bg-[var(--surface-base)] px-4 py-2 text-sm font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)] disabled:opacity-50"
           >
             Skip for now
           </button>
@@ -138,7 +140,7 @@ export default function BirthdatePromptModal({
             type="button"
             onClick={save}
             disabled={!value || saving}
-            className="rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
           </button>

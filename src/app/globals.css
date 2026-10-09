@@ -67,6 +67,9 @@
   --accent-gold: #ad8806;
   --accent-red: #c43c3c;
   --error: #c43c3c;
+  /* Ink on an --error fill (Delete, Remove, Discard): white 5.2:1 here, navy 6.1:1
+     on the dark theme's #f06b6b. Use text-[var(--on-error)] with bg-[var(--error)]. */
+  --on-error: #ffffff;
   --success: #2a8a3c;
   --glow-green: rgba(55, 181, 80, 0.15);
   --glow-gold: rgba(211, 178, 87, 0.1);
@@ -192,6 +195,7 @@
   --accent-gold: #e0c06a;
   --accent-red: #f06b6b;
   --error: #f06b6b;
+  --on-error: #0a1628;
   --success: #3fcf5e;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
@@ -213,9 +217,12 @@
   --badge-warning-bg: rgba(224, 192, 106, 0.15);
   --badge-warning-text: #e0c06a;
   --badge-error-bg: rgba(240, 107, 107, 0.15);
-  --badge-error-text: #f06b6b;
+  /* Text on its own tint, drawn on the page, a card, a card's sheen-lit top, or a
+     muted panel: #f06b6b fell to 3.89:1 at a card's top; #f58f8f clears 4.6:1
+     everywhere (globals.badge-contrast.test.ts). */
+  --badge-error-text: #f58f8f;
   --badge-info-bg: rgba(56, 168, 216, 0.15);
-  --badge-info-text: #38a8d8;
+  --badge-info-text: #64bbe1;
 
   /* Toast/celebration */
   --toast-celebration-bg: rgba(224, 192, 106, 0.15);
@@ -224,11 +231,11 @@
 
   /* Urgency (teacher) */
   --urgency-critical-bg: rgba(240, 107, 107, 0.15);
-  --urgency-critical-text: #f06b6b;
+  --urgency-critical-text: #f58f8f;
   --urgency-high-bg: rgba(224, 192, 106, 0.15);
   --urgency-high-text: #e0c06a;
   --urgency-medium-bg: rgba(56, 168, 216, 0.15);
-  --urgency-medium-text: #38a8d8;
+  --urgency-medium-text: #64bbe1;
 
   /* Program badges — dark mode; brighter tints for low-luminance surfaces */
   --program-spokes-bg: rgba(15, 154, 146, 0.18);

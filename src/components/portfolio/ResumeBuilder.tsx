@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import {
   EMPTY_RESUME,
   buildResumePlainText,
@@ -26,8 +26,9 @@ interface ResumeAssistResponse {
 
 const INPUT_CLASS =
   "w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+const LABEL_TEXT_CLASS = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]";
 const SECONDARY_BUTTON_CLASS =
-  "rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60";
 
 function sanitizeFileName(value: string) {
   return value
@@ -38,6 +39,7 @@ function sanitizeFileName(value: string) {
 
 export default function ResumeBuilder() {
   const nonce = useSyncExternalStore(subscribeToNothing, readPageNonce, noNonceOnServer);
+  const fieldId = useId();
   const [resume, setResume] = useState<ResumeContent>(EMPTY_RESUME);
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -408,7 +410,7 @@ export default function ResumeBuilder() {
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 saved
                   ? "bg-green-100 text-green-700"
                   : "bg-blue-600 text-white hover:bg-blue-700"
@@ -497,13 +499,14 @@ export default function ResumeBuilder() {
               type="file"
               accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="hidden"
+              aria-label="Upload existing resume"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); }}
             />
             <button
               type="button"
               onClick={() => uploadInputRef.current?.click()}
               disabled={uploading}
-              className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {uploading ? "Sage is reading..." : "Upload Resume"}
             </button>
@@ -548,19 +551,22 @@ export default function ResumeBuilder() {
             type="button"
             onClick={() => void handleAssist()}
             disabled={assistantLoading}
-            className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {assistantLoading ? "Sage is drafting..." : "Draft with Sage"}
           </button>
         </div>
 
-        <textarea
-          value={assistantPrompt}
-          onChange={(event) => setAssistantPrompt(event.target.value)}
-          placeholder="Example: Tailor this for entry-level office administrator roles. Highlight customer service, Microsoft Office, reliability, and any training or certifications."
-          rows={4}
-          className="mt-4 w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <label className="mt-4 block">
+          <span className={LABEL_TEXT_CLASS}>What Sage should focus on</span>
+          <textarea
+            value={assistantPrompt}
+            onChange={(event) => setAssistantPrompt(event.target.value)}
+            placeholder="Example: Tailor this for entry-level office administrator roles. Highlight customer service, Microsoft Office, reliability, and any training or certifications."
+            rows={4}
+            className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </label>
 
         {assistantMessage ? (
           <div className="mt-4 rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
@@ -583,31 +589,25 @@ export default function ResumeBuilder() {
       <div className="surface-section p-5">
         <h4 className="mb-3 text-sm font-semibold text-[var(--ink-strong)]">Header</h4>
         <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-              Display name
-            </label>
+          <label className="block">
+            <span className={LABEL_TEXT_CLASS}>Display name</span>
             <input
               value={displayName}
               readOnly
               className={[INPUT_CLASS, "bg-[var(--surface-soft)]", "text-[var(--ink-muted)]"].join(" ")}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-              Headline
-            </label>
+          </label>
+          <label className="block">
+            <span className={LABEL_TEXT_CLASS}>Headline</span>
             <input
               value={resume.headline}
               onChange={(event) => setResume((current) => ({ ...current, headline: event.target.value }))}
               placeholder="Example: Job-ready office support candidate with customer service experience"
               className={INPUT_CLASS}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-              Email
-            </label>
+          </label>
+          <label className="block">
+            <span className={LABEL_TEXT_CLASS}>Email</span>
             <input
               type="email"
               value={resume.contact.email}
@@ -615,57 +615,50 @@ export default function ResumeBuilder() {
               placeholder="name@example.com"
               className={INPUT_CLASS}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-              Phone
-            </label>
+          </label>
+          <label className="block">
+            <span className={LABEL_TEXT_CLASS}>Phone</span>
             <input
               value={resume.contact.phone}
               onChange={(event) => updateContact("phone", event.target.value)}
               placeholder="(555) 555-5555"
               className={INPUT_CLASS}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-              Location
-            </label>
+          </label>
+          <label className="block">
+            <span className={LABEL_TEXT_CLASS}>Location</span>
             <input
               value={resume.contact.location}
               onChange={(event) => updateContact("location", event.target.value)}
               placeholder="City, State"
               className={INPUT_CLASS}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-              Website or portfolio
-            </label>
+          </label>
+          <label className="block">
+            <span className={LABEL_TEXT_CLASS}>Website or portfolio</span>
             <input
               value={resume.contact.website}
               onChange={(event) => updateContact("website", event.target.value)}
               placeholder="https://example.com"
               className={INPUT_CLASS}
             />
-          </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-              LinkedIn
-            </label>
+          </label>
+          <label className="block md:col-span-2">
+            <span className={LABEL_TEXT_CLASS}>LinkedIn</span>
             <input
               value={resume.contact.linkedin}
               onChange={(event) => updateContact("linkedin", event.target.value)}
               placeholder="https://linkedin.com/in/your-name"
               className={INPUT_CLASS}
             />
-          </div>
+          </label>
         </div>
       </div>
 
       <div className="surface-section p-5">
-        <h4 className="mb-2 text-sm font-semibold text-[var(--ink-strong)]">Professional Summary</h4>
+        <h4 id={`${fieldId}-summary`} className="mb-2 text-sm font-semibold text-[var(--ink-strong)]">Professional Summary</h4>
         <textarea
+          aria-labelledby={`${fieldId}-summary`}
           value={resume.objective}
           onChange={(event) => setResume((current) => ({ ...current, objective: event.target.value }))}
           placeholder="Write 2-4 lines summarizing the kind of work you want, the strengths you bring, and the training or experience that supports you."
@@ -680,10 +673,10 @@ export default function ResumeBuilder() {
           {resume.skills.map((skill, index) => (
             <span
               key={`${skill}-${index}`}
-              className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
+              className="flex items-center gap-2 rounded-full bg-blue-50 px-3 text-xs font-medium text-blue-700"
             >
               {skill}
-              <button type="button" onClick={() => removeSkill(index)} className="text-blue-500 hover:text-blue-700">
+              <button type="button" onClick={() => removeSkill(index)} className="inline-flex min-h-11 items-center text-blue-500 hover:text-blue-700">
                 Remove
               </button>
             </span>
@@ -692,6 +685,7 @@ export default function ResumeBuilder() {
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             type="text"
+            aria-label="Add a skill"
             value={skillInput}
             onChange={(event) => setSkillInput(event.target.value)}
             onKeyDown={(event) => {
@@ -703,7 +697,7 @@ export default function ResumeBuilder() {
             placeholder="Add a skill such as Microsoft Excel, customer service, scheduling, or inventory tracking"
             className={`${INPUT_CLASS} flex-1`}
           />
-          <button type="button" onClick={addSkill} className="rounded-lg bg-[var(--surface-interactive)] px-4 py-2 text-sm text-[var(--ink-strong)] hover:bg-[var(--surface-strong)]">
+          <button type="button" onClick={addSkill} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--surface-interactive)] px-4 py-2 text-sm text-[var(--ink-strong)] hover:bg-[var(--surface-strong)]">
             Add Skill
           </button>
         </div>
@@ -712,7 +706,7 @@ export default function ResumeBuilder() {
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Work Experience</h4>
-          <button type="button" onClick={addExperience} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+          <button type="button" onClick={addExperience} className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
             Add Experience
           </button>
         </div>
@@ -724,43 +718,55 @@ export default function ResumeBuilder() {
             <div key={`experience-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Experience {index + 1}</p>
-                <button type="button" onClick={() => removeExperience(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
+                <button type="button" onClick={() => removeExperience(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-red-500 hover:text-red-700">
                   Remove
                 </button>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <input
-                  value={item.title}
-                  onChange={(event) => updateExperience(index, "title", event.target.value)}
-                  placeholder="Job title"
-                  className={INPUT_CLASS}
-                />
-                <input
-                  value={item.company}
-                  onChange={(event) => updateExperience(index, "company", event.target.value)}
-                  placeholder="Employer or organization"
-                  className={INPUT_CLASS}
-                />
-                <input
-                  value={item.location}
-                  onChange={(event) => updateExperience(index, "location", event.target.value)}
-                  placeholder="Location"
-                  className={INPUT_CLASS}
-                />
-                <input
-                  value={item.dates}
-                  onChange={(event) => updateExperience(index, "dates", event.target.value)}
-                  placeholder="Dates, for example Jan 2024 - Present"
-                  className={INPUT_CLASS}
-                />
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Job title</span>
+                  <input
+                    value={item.title}
+                    onChange={(event) => updateExperience(index, "title", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Employer or organization</span>
+                  <input
+                    value={item.company}
+                    onChange={(event) => updateExperience(index, "company", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Location</span>
+                  <input
+                    value={item.location}
+                    onChange={(event) => updateExperience(index, "location", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Dates</span>
+                  <input
+                    value={item.dates}
+                    onChange={(event) => updateExperience(index, "dates", event.target.value)}
+                    placeholder="For example Jan 2024 - Present"
+                    className={INPUT_CLASS}
+                  />
+                </label>
               </div>
-              <textarea
-                value={item.description}
-                onChange={(event) => updateExperience(index, "description", event.target.value)}
-                rows={4}
-                placeholder={"Use short bullet lines, for example:\n- Helped customers with questions and scheduling\n- Organized records and completed data entry accurately"}
-                className="mt-3 w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="mt-3 block">
+                <span className={LABEL_TEXT_CLASS}>Description</span>
+                <textarea
+                  value={item.description}
+                  onChange={(event) => updateExperience(index, "description", event.target.value)}
+                  rows={4}
+                  placeholder={"Use short bullet lines, for example:\n- Helped customers with questions and scheduling\n- Organized records and completed data entry accurately"}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </label>
             </div>
           ))}
         </div>
@@ -769,7 +775,7 @@ export default function ResumeBuilder() {
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Education</h4>
-          <button type="button" onClick={addEducation} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+          <button type="button" onClick={addEducation} className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
             Add Education
           </button>
         </div>
@@ -781,35 +787,44 @@ export default function ResumeBuilder() {
             <div key={`education-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Education {index + 1}</p>
-                <button type="button" onClick={() => removeEducation(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
+                <button type="button" onClick={() => removeEducation(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-red-500 hover:text-red-700">
                   Remove
                 </button>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <input
-                  value={item.school}
-                  onChange={(event) => updateEducation(index, "school", event.target.value)}
-                  placeholder="School or program"
-                  className={INPUT_CLASS}
-                />
-                <input
-                  value={item.degree}
-                  onChange={(event) => updateEducation(index, "degree", event.target.value)}
-                  placeholder="Diploma, GED, certificate, or program name"
-                  className={INPUT_CLASS}
-                />
-                <input
-                  value={item.location}
-                  onChange={(event) => updateEducation(index, "location", event.target.value)}
-                  placeholder="Location"
-                  className={INPUT_CLASS}
-                />
-                <input
-                  value={item.dates}
-                  onChange={(event) => updateEducation(index, "dates", event.target.value)}
-                  placeholder="Dates"
-                  className={INPUT_CLASS}
-                />
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>School or program</span>
+                  <input
+                    value={item.school}
+                    onChange={(event) => updateEducation(index, "school", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Diploma or certificate</span>
+                  <input
+                    value={item.degree}
+                    onChange={(event) => updateEducation(index, "degree", event.target.value)}
+                    placeholder="Diploma, GED, certificate, or program name"
+                    className={INPUT_CLASS}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Location</span>
+                  <input
+                    value={item.location}
+                    onChange={(event) => updateEducation(index, "location", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Dates</span>
+                  <input
+                    value={item.dates}
+                    onChange={(event) => updateEducation(index, "dates", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
               </div>
             </div>
           ))}
@@ -819,7 +834,7 @@ export default function ResumeBuilder() {
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Certifications</h4>
-          <button type="button" onClick={addCertification} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+          <button type="button" onClick={addCertification} className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
             Add Certification
           </button>
         </div>
@@ -831,29 +846,35 @@ export default function ResumeBuilder() {
             <div key={`certification-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Certification {index + 1}</p>
-                <button type="button" onClick={() => removeCertification(index)} className="text-xs font-semibold text-red-500 hover:text-red-700">
+                <button type="button" onClick={() => removeCertification(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-red-500 hover:text-red-700">
                   Remove
                 </button>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
-                <input
-                  value={item.name}
-                  onChange={(event) => updateCertification(index, "name", event.target.value)}
-                  placeholder="Certification name"
-                  className={INPUT_CLASS}
-                />
-                <input
-                  value={item.issuer}
-                  onChange={(event) => updateCertification(index, "issuer", event.target.value)}
-                  placeholder="Issuer"
-                  className={INPUT_CLASS}
-                />
-                <input
-                  value={item.dates}
-                  onChange={(event) => updateCertification(index, "dates", event.target.value)}
-                  placeholder="Date earned"
-                  className={INPUT_CLASS}
-                />
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Certification name</span>
+                  <input
+                    value={item.name}
+                    onChange={(event) => updateCertification(index, "name", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Issued by</span>
+                  <input
+                    value={item.issuer}
+                    onChange={(event) => updateCertification(index, "issuer", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL_TEXT_CLASS}>Date earned</span>
+                  <input
+                    value={item.dates}
+                    onChange={(event) => updateCertification(index, "dates", event.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </label>
               </div>
             </div>
           ))}
@@ -861,8 +882,9 @@ export default function ResumeBuilder() {
       </div>
 
       <div className="surface-section p-5">
-        <h4 className="mb-2 text-sm font-semibold text-[var(--ink-strong)]">References</h4>
+        <h4 id={`${fieldId}-references`} className="mb-2 text-sm font-semibold text-[var(--ink-strong)]">References</h4>
         <textarea
+          aria-labelledby={`${fieldId}-references`}
           value={resume.references}
           onChange={(event) => setResume((current) => ({ ...current, references: event.target.value }))}
           placeholder="Usually this should be: Available upon request"

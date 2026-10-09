@@ -22,10 +22,10 @@ const TASK_PRIORITIES = ["low", "normal", "high"] as const;
 type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled";
 
 function statusBadge(status: string): string {
-  if (status === "completed") return "bg-emerald-100 text-emerald-700";
-  if (status === "missed") return "bg-rose-100 text-rose-800";
+  if (status === "completed") return "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]";
+  if (status === "missed") return "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]";
   if (status === "cancelled") return "bg-[var(--surface-interactive)] text-[var(--ink-strong)]";
-  return "bg-sky-100 text-sky-700";
+  return "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]";
 }
 
 interface AppointmentFormValues {
@@ -155,10 +155,10 @@ export default function OperationsTab({
                       <p className="text-sm font-semibold text-[var(--ink-strong)]">{submission.title}</p>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         submission.status === "approved"
-                          ? "bg-emerald-100 text-emerald-700"
+                          ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
                           : submission.status === "rejected"
-                            ? "bg-rose-100 text-rose-800"
-                            : "bg-amber-100 text-amber-800"
+                            ? "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]"
+                            : "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"
                       }`}>
                         {humanizeStatusValue(submission.status)}
                       </span>
@@ -181,7 +181,7 @@ export default function OperationsTab({
                         href={`/api/files/download?id=${submission.file.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+                        className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] pointer-coarse:min-h-11"
                       >
                         Open file
                       </a>
@@ -191,7 +191,7 @@ export default function OperationsTab({
                         href={`/api/files/download?id=${submission.signatureFile.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                        className="inline-flex items-center rounded-full border border-[var(--badge-info-bg)] bg-[var(--badge-info-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-info-text)] hover:ring-1 hover:ring-current pointer-coarse:min-h-11"
                       >
                         View signature
                       </a>
@@ -200,7 +200,7 @@ export default function OperationsTab({
                       type="button"
                       onClick={() => onReviewForm(submission.id, "approved")}
                       disabled={reviewingFormId === submission.id}
-                      className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60"
+                      className="inline-flex items-center rounded-full bg-[var(--badge-success-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-success-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
                     >
                       {reviewingFormId === submission.id ? "Saving..." : "Approve"}
                     </button>
@@ -208,7 +208,7 @@ export default function OperationsTab({
                       type="button"
                       onClick={() => onReviewForm(submission.id, "rejected")}
                       disabled={reviewingFormId === submission.id}
-                      className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-200 disabled:opacity-60"
+                      className="inline-flex items-center rounded-full bg-[var(--badge-error-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-error-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
                     >
                       Return
                     </button>
@@ -237,20 +237,29 @@ export default function OperationsTab({
           </div>
 
           <form onSubmit={onCreateAppointment} className="mt-4 space-y-3">
-            <input
-              type="text"
-              value={appointmentForm.title}
-              onChange={(event) => onAppointmentFormChange((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Appointment title"
-              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <textarea
-              value={appointmentForm.description}
-              onChange={(event) => onAppointmentFormChange((current) => ({ ...current, description: event.target.value }))}
-              placeholder="What is this session for?"
-              rows={3}
-              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm text-[var(--ink-muted)]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                Appointment title
+              </span>
+              <input
+                type="text"
+                value={appointmentForm.title}
+                onChange={(event) => onAppointmentFormChange((current) => ({ ...current, title: event.target.value }))}
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+              />
+            </label>
+            <label className="block text-sm text-[var(--ink-muted)]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                Description
+              </span>
+              <textarea
+                value={appointmentForm.description}
+                onChange={(event) => onAppointmentFormChange((current) => ({ ...current, description: event.target.value }))}
+                placeholder="What is this session for?"
+                rows={3}
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+              />
+            </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
@@ -260,7 +269,7 @@ export default function OperationsTab({
                   type="datetime-local"
                   value={appointmentForm.startsAt}
                   onChange={(event) => onAppointmentFormChange((current) => ({ ...current, startsAt: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 />
               </label>
               <label className="text-sm text-[var(--ink-muted)]">
@@ -271,7 +280,7 @@ export default function OperationsTab({
                   type="datetime-local"
                   value={appointmentForm.endsAt}
                   onChange={(event) => onAppointmentFormChange((current) => ({ ...current, endsAt: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 />
               </label>
             </div>
@@ -283,7 +292,7 @@ export default function OperationsTab({
                 <select
                   value={appointmentForm.locationType}
                   onChange={(event) => onAppointmentFormChange((current) => ({ ...current, locationType: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   <option value="virtual">Virtual</option>
                   <option value="in_person">In person</option>
@@ -299,24 +308,32 @@ export default function OperationsTab({
                   value={appointmentForm.locationLabel}
                   onChange={(event) => onAppointmentFormChange((current) => ({ ...current, locationLabel: event.target.value }))}
                   placeholder="Zoom room, Office 201, Phone call"
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 />
               </label>
             </div>
-            <input
-              type="url"
-              value={appointmentForm.meetingUrl}
-              onChange={(event) => onAppointmentFormChange((current) => ({ ...current, meetingUrl: event.target.value }))}
-              placeholder="Meeting URL (optional)"
-              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              value={appointmentForm.notes}
-              onChange={(event) => onAppointmentFormChange((current) => ({ ...current, notes: event.target.value }))}
-              placeholder="Student-facing note (optional)"
-              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm text-[var(--ink-muted)]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                Meeting URL (optional)
+              </span>
+              <input
+                type="url"
+                value={appointmentForm.meetingUrl}
+                onChange={(event) => onAppointmentFormChange((current) => ({ ...current, meetingUrl: event.target.value }))}
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+              />
+            </label>
+            <label className="block text-sm text-[var(--ink-muted)]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                Student-facing note (optional)
+              </span>
+              <input
+                type="text"
+                value={appointmentForm.notes}
+                onChange={(event) => onAppointmentFormChange((current) => ({ ...current, notes: event.target.value }))}
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+              />
+            </label>
             <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <input
                 type="checkbox"
@@ -328,7 +345,7 @@ export default function OperationsTab({
             <button
               type="submit"
               disabled={savingAppointment}
-              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-center rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
             >
               {savingAppointment ? "Scheduling..." : "Schedule Appointment"}
             </button>
@@ -348,7 +365,7 @@ export default function OperationsTab({
                           {humanizeStatusValue(appointment.status)}
                         </span>
                         {appointment.followUpRequired && (
-                          <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                          <span className="rounded-full bg-[var(--badge-warning-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--badge-warning-text)]">
                             follow-up
                           </span>
                         )}
@@ -368,7 +385,7 @@ export default function OperationsTab({
                             type="button"
                             onClick={() => onAppointmentStatusChange(appointment.id, "completed")}
                             disabled={updatingAppointmentId === appointment.id}
-                            className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60"
+                            className="inline-flex items-center rounded-full bg-[var(--badge-success-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-success-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
                           >
                             Complete
                           </button>
@@ -376,7 +393,7 @@ export default function OperationsTab({
                             type="button"
                             onClick={() => onAppointmentStatusChange(appointment.id, "missed")}
                             disabled={updatingAppointmentId === appointment.id}
-                            className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-200 disabled:opacity-60"
+                            className="inline-flex items-center rounded-full bg-[var(--badge-error-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-error-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
                           >
                             Missed
                           </button>
@@ -384,7 +401,7 @@ export default function OperationsTab({
                             type="button"
                             onClick={() => onAppointmentStatusChange(appointment.id, "cancelled")}
                             disabled={updatingAppointmentId === appointment.id}
-                            className="rounded-full bg-[var(--surface-interactive)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive-hover)] disabled:opacity-60"
+                            className="inline-flex items-center rounded-full bg-[var(--surface-interactive)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive-hover)] disabled:opacity-60 pointer-coarse:min-h-11"
                           >
                             Cancel
                           </button>
@@ -394,7 +411,7 @@ export default function OperationsTab({
                           type="button"
                           onClick={() => onAppointmentStatusChange(appointment.id, "scheduled")}
                           disabled={updatingAppointmentId === appointment.id}
-                          className="rounded-full bg-sky-100 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-200 disabled:opacity-60"
+                          className="inline-flex items-center rounded-full bg-[var(--badge-info-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-info-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
                         >
                           Reopen
                         </button>
@@ -408,7 +425,7 @@ export default function OperationsTab({
                         href={appointment.meetingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800"
+                        className="inline-flex items-center text-[var(--badge-info-text)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
                       >
                         Open link
                       </a>
@@ -429,20 +446,29 @@ export default function OperationsTab({
           </p>
 
           <form onSubmit={onCreateTask} className="mt-4 space-y-3">
-            <input
-              type="text"
-              value={taskForm.title}
-              onChange={(event) => onTaskFormChange((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Task title"
-              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <textarea
-              value={taskForm.description}
-              onChange={(event) => onTaskFormChange((current) => ({ ...current, description: event.target.value }))}
-              placeholder="What should the student do next?"
-              rows={3}
-              className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-sm text-[var(--ink-muted)]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                Task title
+              </span>
+              <input
+                type="text"
+                value={taskForm.title}
+                onChange={(event) => onTaskFormChange((current) => ({ ...current, title: event.target.value }))}
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+              />
+            </label>
+            <label className="block text-sm text-[var(--ink-muted)]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                Description
+              </span>
+              <textarea
+                value={taskForm.description}
+                onChange={(event) => onTaskFormChange((current) => ({ ...current, description: event.target.value }))}
+                placeholder="What should the student do next?"
+                rows={3}
+                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+              />
+            </label>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
@@ -452,7 +478,7 @@ export default function OperationsTab({
                   type="datetime-local"
                   value={taskForm.dueAt}
                   onChange={(event) => onTaskFormChange((current) => ({ ...current, dueAt: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 />
               </label>
               <label className="text-sm text-[var(--ink-muted)]">
@@ -462,7 +488,7 @@ export default function OperationsTab({
                 <select
                   value={taskForm.priority}
                   onChange={(event) => onTaskFormChange((current) => ({ ...current, priority: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   {TASK_PRIORITIES.map((priority) => (
                     <option key={priority} value={priority}>
@@ -478,7 +504,7 @@ export default function OperationsTab({
                 <select
                   value={taskForm.appointmentId}
                   onChange={(event) => onTaskFormChange((current) => ({ ...current, appointmentId: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   <option value="">None</option>
                   {appointments.map((appointment: AppointmentData) => (
@@ -492,7 +518,7 @@ export default function OperationsTab({
             <button
               type="submit"
               disabled={savingTask}
-              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-center rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
             >
               {savingTask ? "Saving..." : "Create Task"}
             </button>
@@ -517,10 +543,10 @@ export default function OperationsTab({
                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                           task.priority === "high"
-                            ? "bg-rose-100 text-rose-800"
+                            ? "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]"
                             : task.priority === "low"
                               ? "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
-                              : "bg-amber-100 text-amber-800"
+                              : "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"
                         }`}>
                           {task.priority}
                         </span>
@@ -537,7 +563,7 @@ export default function OperationsTab({
                       type="button"
                       onClick={() => onTaskStatusChange(task.id, task.status === "completed" ? "open" : "completed")}
                       disabled={updatingTaskId === task.id}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+                      className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-60 pointer-coarse:min-h-11 ${
                         task.status === "completed"
                           ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
                           : "bg-[var(--accent-strong)] text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90"
@@ -555,7 +581,7 @@ export default function OperationsTab({
                     <p className="mt-3 text-sm text-[var(--ink-muted)]">{task.description}</p>
                   ) : null}
                   {task.completedAt ? (
-                    <p className="mt-2 text-xs text-emerald-700">
+                    <p className="mt-2 text-xs text-[var(--badge-success-text)]">
                       Completed {dateFormatter.format(new Date(task.completedAt))}
                     </p>
                   ) : null}
@@ -573,30 +599,40 @@ export default function OperationsTab({
           Capture advising context, concerns, and wins for the teaching team.
         </p>
 
-        <form onSubmit={onCreateNote} className="mt-4 grid gap-3 lg:grid-cols-[12rem_1fr_auto]">
-          <select
-            value={noteForm.category}
-            onChange={(event) => onNoteFormChange((current) => ({ ...current, category: event.target.value }))}
-            aria-label="Note category"
-            className="min-h-11 theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {NOTE_CATEGORIES.map((category) => (
-              <option key={category.value} value={category.value}>
-                {category.label}
-              </option>
-            ))}
-          </select>
-          <textarea
-            value={noteForm.body}
-            onChange={(event) => onNoteFormChange((current) => ({ ...current, body: event.target.value }))}
-            placeholder="What happened, what matters, and what should happen next?"
-            rows={3}
-            className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <form onSubmit={onCreateNote} className="mt-4 grid gap-3 lg:grid-cols-[12rem_1fr_auto] lg:items-end">
+          <label className="block text-sm text-[var(--ink-muted)]">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+              Note category
+            </span>
+            <select
+              value={noteForm.category}
+              onChange={(event) => onNoteFormChange((current) => ({ ...current, category: event.target.value }))}
+              aria-label="Note category"
+              className="block w-full min-h-11 theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+            >
+              {NOTE_CATEGORIES.map((category) => (
+                <option key={category.value} value={category.value}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm text-[var(--ink-muted)]">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+              Note
+            </span>
+            <textarea
+              value={noteForm.body}
+              onChange={(event) => onNoteFormChange((current) => ({ ...current, body: event.target.value }))}
+              placeholder="What happened, what matters, and what should happen next?"
+              rows={3}
+              className="block w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+            />
+          </label>
           <button
             type="submit"
             disabled={savingNote}
-            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
           >
             {savingNote ? "Saving..." : "Add Note"}
           </button>

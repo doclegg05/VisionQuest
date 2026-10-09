@@ -139,7 +139,7 @@ export default function GoalPlanFocus({
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
+                                className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
                               >
                                 Open
                               </a>
@@ -179,7 +179,7 @@ export default function GoalPlanFocus({
                               href={entry.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
+                              className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
                             >
                               View
                             </a>
