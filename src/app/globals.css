@@ -217,7 +217,8 @@
   --badge-warning-bg: rgba(224, 192, 106, 0.15);
   --badge-warning-text: #e0c06a;
   --badge-error-bg: rgba(240, 107, 107, 0.15);
-  --badge-error-text: #f06b6b;
+  /* #f06b6b measured 4.41:1 on its tint over a raised card; #f37878 is 4.86:1. */
+  --badge-error-text: #f37878;
   --badge-info-bg: rgba(56, 168, 216, 0.15);
   --badge-info-text: #38a8d8;
 
@@ -228,7 +229,7 @@
 
   /* Urgency (teacher) */
   --urgency-critical-bg: rgba(240, 107, 107, 0.15);
-  --urgency-critical-text: #f06b6b;
+  --urgency-critical-text: #f37878;
   --urgency-high-bg: rgba(224, 192, 106, 0.15);
   --urgency-high-text: #e0c06a;
   --urgency-medium-bg: rgba(56, 168, 216, 0.15);

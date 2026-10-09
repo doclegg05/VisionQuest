@@ -21,3 +21,30 @@ export function cssTokenValue(css: string, name: string, theme: "light" | "dark"
   if (values.length === 0) return undefined;
   return theme === "dark" && values.length > 1 ? values[1] : values[0];
 }
+
+/** An sRGB color with alpha, channels 0-255 and alpha 0-1. */
+export interface Rgba {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
+/** Parses #rrggbb or rgb()/rgba() with comma-separated channels. */
+export function parseColor(value: string): Rgba {
+  const v = value.trim();
+  const hex = v.match(/^#([0-9a-f]{6})$/i);
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a: 1 };
+  }
+  const fn = v.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
+  if (fn) return { r: Number(fn[1]), g: Number(fn[2]), b: Number(fn[3]), a: fn[4] === undefined ? 1 : Number(fn[4]) };
+  throw new Error(`cannot parse color "${value}"`);
+}
+
+/** Paints `top` over an opaque `bottom` and returns the result as #rrggbb. */
+export function composite(top: Rgba, bottom: Rgba): string {
+  const mix = (t: number, b: number) => Math.round(t * top.a + b * (1 - top.a));
+  return `#${[mix(top.r, bottom.r), mix(top.g, bottom.g), mix(top.b, bottom.b)].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+}
