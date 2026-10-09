@@ -144,6 +144,10 @@ export default function ForgotPasswordPage() {
                 <input
                   id="question-login"
                   type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
                   placeholder="you@example.com or student ID"
@@ -167,6 +171,7 @@ export default function ForgotPasswordPage() {
                 <input
                   id="new-password"
                   type="password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 6 characters"
@@ -182,6 +187,7 @@ export default function ForgotPasswordPage() {
                 <input
                   id="confirm-password"
                   type="password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Re-enter your password"
@@ -220,6 +226,10 @@ export default function ForgotPasswordPage() {
                 <input
                   id="email-login"
                   type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
                   placeholder="you@example.com or student ID"
