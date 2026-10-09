@@ -493,7 +493,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
-        <button onClick={loadData} className="primary-button px-4 py-2">
+        <button onClick={loadData} className="primary-button px-4 py-2 pointer-coarse:min-h-11">
           Try Again
         </button>
       </div>

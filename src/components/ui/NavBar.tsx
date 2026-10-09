@@ -303,7 +303,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {/* Tab 3: Sage — elevated center FAB */}
           <Link
             href="/chat"
-            className="flex flex-col items-center gap-0.5 px-3"
+            className="flex min-h-11 flex-col items-center gap-0.5 px-3"
             aria-label="Open Sage chat"
           >
             <div className={`-mt-4 grid h-11 w-11 place-items-center rounded-full bg-[var(--accent-green)] text-[var(--on-accent)] shadow-[0_4px_16px_var(--glow-green)] transition-transform active:scale-95 ${pathname === "/chat" ? "animate-glow-pulse" : ""}`}>
@@ -363,7 +363,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   key={item.href}
                   href={item.href}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     isActive(item.href)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
@@ -379,7 +379,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 <Link
                   href={settingsHref}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     isActive(settingsHref)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
@@ -464,7 +464,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 <Link
                   href={settingsHref}
                   onClick={() => setProfileOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                  className="flex min-h-11 items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                   role="menuitem"
                 >
                   <Gear size={16} weight="regular" />
@@ -481,7 +481,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   handleLogout();
                 }}
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                 role="menuitem"
               >
                 <SignOut size={16} weight="regular" />

@@ -272,7 +272,7 @@ export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps)
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm"
+            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm pointer-coarse:min-h-11"
           >
             Cancel
           </button>
@@ -280,7 +280,7 @@ export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps)
             type="button"
             disabled={submitting || !canReview || !notes.trim()}
             onClick={() => void submitReview("needs_changes", notes.trim())}
-            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-red)] disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-red)] disabled:opacity-50 pointer-coarse:min-h-11"
           >
             Needs changes
           </button>
@@ -288,7 +288,7 @@ export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps)
             type="button"
             disabled={submitting || !canReview}
             onClick={() => void submitReview("reviewed", notes.trim() || undefined)}
-            className="primary-button px-5 py-2 text-sm disabled:opacity-50"
+            className="primary-button px-5 py-2 text-sm disabled:opacity-50 pointer-coarse:min-h-11"
           >
             Mark reviewed
           </button>

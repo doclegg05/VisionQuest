@@ -117,7 +117,7 @@ export default function CertManager() {
   if (error) return (
     <div className="text-center py-12">
       <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
-      <button onClick={fetchTemplates} className="primary-button px-4 py-2">
+      <button onClick={fetchTemplates} className="primary-button px-4 py-2 pointer-coarse:min-h-11">
         Try Again
       </button>
     </div>
@@ -221,10 +221,10 @@ export default function CertManager() {
             </label>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} className="primary-button text-sm px-4 py-2">
+            <button onClick={handleSave} className="primary-button text-sm px-4 py-2 pointer-coarse:min-h-11">
               {editingId ? "Save Changes" : "Add Requirement"}
             </button>
-            <button onClick={resetForm} className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]">Cancel</button>
+            <button onClick={resetForm} className="inline-flex items-center justify-center text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)] pointer-coarse:min-h-11">Cancel</button>
           </div>
         </div>
       ) : (

@@ -99,7 +99,7 @@ export default function FormTemplatesList() {
         <button
           type="button"
           onClick={() => setBuilder({ mode: "new" })}
-          className="primary-button px-4 py-2 text-sm"
+          className="primary-button px-4 py-2 text-sm pointer-coarse:min-h-11"
         >
           New form
         </button>

@@ -290,7 +290,7 @@ export default function LibraryBrowser() {
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-2 text-sm font-medium text-[var(--ink-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-wait disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-2 text-sm font-medium text-[var(--ink-strong)] hover:bg-[var(--surface-muted)] disabled:cursor-wait disabled:opacity-60 pointer-coarse:min-h-11"
               >
                 {loadingMore ? "Loading…" : `Load ${Math.min(PAGE_SIZE, total - offset - PAGE_SIZE)} more`}
               </button>
@@ -439,7 +439,7 @@ function PreviewModal({ doc, onClose }: { doc: Document; onClose: () => void }) 
                 </p>
                 <a
                   href={`/api/documents/download?id=${doc.id}&mode=download`}
-                  className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] hover:opacity-90"
+                  className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] hover:opacity-90 pointer-coarse:min-h-11"
                 >
                   <Download weight="bold" className="size-4" /> Download {mimeToLabel(doc.mimeType)}
                 </a>

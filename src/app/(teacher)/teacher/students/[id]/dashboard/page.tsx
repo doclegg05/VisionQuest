@@ -83,7 +83,7 @@ export default async function StudentDashboardPreview({
         </div>
         <Link
           href={`/teacher/students/${studentId}`}
-          className="rounded-full border border-[var(--badge-warning-bg)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--badge-warning-text)] transition-colors hover:bg-[var(--badge-warning-bg)]"
+          className="inline-flex items-center rounded-full border border-[var(--badge-warning-bg)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--badge-warning-text)] transition-colors hover:bg-[var(--badge-warning-bg)] pointer-coarse:min-h-11"
         >
           Back to Student Detail
         </Link>
