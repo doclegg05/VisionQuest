@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 interface BirthdatePromptModalProps {
   open: boolean;
@@ -28,6 +28,7 @@ export default function BirthdatePromptModal({
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const dateInputId = useId();
 
   // Capture focus when opened, restore on close.
   useEffect(() => {
@@ -102,11 +103,12 @@ export default function BirthdatePromptModal({
           You can skip for now and add it later from Settings.
         </p>
 
-        <label className="block text-xs font-medium text-[var(--ink-muted)]">
+        <label htmlFor={dateInputId} className="block text-xs font-medium text-[var(--ink-muted)]">
           Birthdate
         </label>
         <input
           ref={dateInputRef}
+          id={dateInputId}
           type="date"
           max={maxDate}
           value={value}

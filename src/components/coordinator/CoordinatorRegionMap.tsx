@@ -206,7 +206,7 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
             })}
           </g>
         </svg>
-        <ul className="flex flex-col gap-1.5 text-xs" aria-label="Region legend">
+        <ul className="flex flex-col gap-2 text-xs" aria-label="Region legend">
           {REGION_SHAPES.map((shape) => {
             const region = regionsByCode.get(shape.code);
             const isActive = activeCode === shape.code;
@@ -215,7 +215,7 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
               <li key={shape.code}>
                 <button
                   type="button"
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors ${
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors pointer-coarse:min-h-11 ${
                     isActive
                       ? "bg-[var(--surface-muted)] font-semibold"
                       : "hover:bg-[var(--surface-muted)]/50"

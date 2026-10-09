@@ -55,7 +55,7 @@ export default function GrantProgressPanel({ goals, regionId, onChange }: GrantP
         <button
           type="button"
           onClick={() => setAdding((value) => !value)}
-          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold"
+          className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11"
         >
           {adding ? "Cancel" : "Add target"}
         </button>
@@ -268,14 +268,14 @@ function AddGoalForm({ regionId, onCancel, onCreated, onError }: AddGoalFormProp
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold"
+          className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="primary-button px-4 py-1.5 text-xs disabled:opacity-50"
+          className="primary-button px-4 py-1.5 text-xs disabled:opacity-50 pointer-coarse:min-h-11"
         >
           {saving ? "Saving…" : "Add target"}
         </button>

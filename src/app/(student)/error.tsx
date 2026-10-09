@@ -29,7 +29,7 @@ export default function StudentError({
       </div>
       <a
         href="/help"
-        className="mt-4 text-xs font-semibold text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink-strong)] hover:underline"
+        className="mt-4 inline-flex min-h-11 items-center text-xs font-semibold text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink-strong)] hover:underline"
       >
         Still stuck? Visit the Help page.
       </a>

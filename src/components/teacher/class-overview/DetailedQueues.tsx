@@ -124,7 +124,7 @@ export default function DetailedQueues({
                               {alert.student.displayName} &bull; {alert.student.studentId}
                             </p>
                           </div>
-                          <span className="shrink-0 rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">
+                          <span className="shrink-0 rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--badge-warning-text)]">
                             {alert.severity}
                           </span>
                         </div>
@@ -142,21 +142,21 @@ export default function DetailedQueues({
                               <button
                                 type="button"
                                 onClick={() => onSetActionIntent(quickIntent)}
-                                className="rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
+                                className="inline-flex items-center rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-xs pointer-coarse:min-h-11 font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
                               >
                                 {quickAction?.label}
                               </button>
                             ) : null}
                             <Link
                               href={action.href}
-                              className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                              className="inline-flex items-center rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                             >
                               {action.label}
                             </Link>
                             <button
                               type="button"
                               onClick={() => void onSnoozeAlert(alert.id)}
-                              className="rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
+                              className="inline-flex items-center rounded-full px-2.5 py-1.5 text-xs font-medium pointer-coarse:min-h-11 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
                               title="Snooze for 24 hours"
                             >
                               Snooze
@@ -164,7 +164,7 @@ export default function DetailedQueues({
                             <button
                               type="button"
                               onClick={() => void onDismissAlert(alert.id)}
-                              className="rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
+                              className="inline-flex items-center rounded-full px-2.5 py-1.5 text-xs font-medium pointer-coarse:min-h-11 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
                               title="Dismiss this alert"
                             >
                               Dismiss
@@ -232,14 +232,14 @@ export default function DetailedQueues({
                               <button
                                 type="button"
                                 onClick={() => onSetActionIntent(quickIntent)}
-                                className="rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
+                                className="inline-flex items-center rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-xs pointer-coarse:min-h-11 font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
                               >
                                 {quickAction?.label}
                               </button>
                             ) : null}
                             <Link
                               href={action.href}
-                              className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                              className="inline-flex items-center rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                             >
                               {action.label}
                             </Link>
@@ -318,13 +318,13 @@ export default function DetailedQueues({
               <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                 14-day {inactivitySummary.followUp14}
               </span>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              <span className="rounded-full bg-[var(--urgency-medium-bg)] px-3 py-1 text-xs font-semibold text-[var(--urgency-medium-text)]">
                 30-day {inactivitySummary.inactive30}
               </span>
-              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+              <span className="rounded-full bg-[var(--urgency-high-bg)] px-3 py-1 text-xs font-semibold text-[var(--urgency-high-text)]">
                 60-day {inactivitySummary.reengage60}
               </span>
-              <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
+              <span className="rounded-full bg-[var(--urgency-critical-bg)] px-3 py-1 text-xs font-semibold text-[var(--urgency-critical-text)]">
                 90-day {inactivitySummary.archiveReview90}
               </span>
             </div>
@@ -354,11 +354,11 @@ export default function DetailedQueues({
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${
                             item.type === "inactive_student_90"
-                              ? "bg-rose-100 text-rose-800"
+                              ? "bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]"
                               : item.type === "inactive_student_60"
-                                ? "bg-orange-100 text-orange-700"
+                                ? "bg-[var(--urgency-high-bg)] text-[var(--urgency-high-text)]"
                                 : item.type === "inactive_student_30"
-                                  ? "bg-amber-100 text-amber-800"
+                                  ? "bg-[var(--urgency-medium-bg)] text-[var(--urgency-medium-text)]"
                                   : "bg-[var(--surface-muted)] text-[var(--ink-muted)]"
                           }`}
                         >
@@ -385,20 +385,20 @@ export default function DetailedQueues({
                                   linkId: null,
                                 })
                               }
-                              className="rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
+                              className="inline-flex items-center rounded-full border border-white/80 bg-[var(--surface-raised)]/70 px-3 py-1.5 text-xs pointer-coarse:min-h-11 font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
                             >
                               {quickAction.label}
                             </button>
                           ) : null}
                           <Link
                             href={`/teacher/students/${item.student.id}`}
-                            className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                            className="inline-flex items-center rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                           >
                             Open student
                           </Link>
                           <Link
                             href={`/teacher/classes${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
-                            className="rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                            className="inline-flex items-center rounded-full bg-[var(--surface-raised)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
                           >
                             Manage roster
                           </Link>

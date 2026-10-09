@@ -250,7 +250,7 @@ export default function ClassOverview({
 
   if (error) return (
     <div className="surface-section px-6 py-10 text-center">
-      <p className="mb-4 text-sm text-red-600">{error}</p>
+      <p className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
       <button onClick={() => fetchStudents()} className="primary-button px-4 py-2 text-sm">
         Try Again
       </button>
