@@ -22,13 +22,34 @@ function hasSpread(node: ts.JsxOpeningLikeElement): boolean {
   return node.attributes.properties.some(ts.isJsxSpreadAttribute);
 }
 
-/** Every string literal inside a className expression, joined. Dynamic parts are ignored. */
-function classText(node: ts.JsxOpeningLikeElement): string | null {
+/** `const NAME = "classes"` declarations in the file, so `${NAME}` in a className can be read. */
+function stringConstants(source: ts.SourceFile): Map<string, string> {
+  const constants = new Map<string, string>();
+  const visit = (n: ts.Node) => {
+    if (
+      ts.isVariableDeclaration(n) &&
+      ts.isIdentifier(n.name) &&
+      n.initializer &&
+      (ts.isStringLiteral(n.initializer) || ts.isNoSubstitutionTemplateLiteral(n.initializer)) &&
+      ts.isVariableDeclarationList(n.parent) &&
+      (n.parent.flags & ts.NodeFlags.Const) !== 0
+    ) {
+      constants.set(n.name.text, n.initializer.text);
+    }
+    n.forEachChild(visit);
+  };
+  visit(source);
+  return constants;
+}
+
+/** Every string inside a className expression, joined: literals and same-file constants. Other dynamic parts are ignored. */
+function classText(node: ts.JsxOpeningLikeElement, constants: Map<string, string>): string | null {
   const attr = attribute(node, "className");
   if (!attr?.initializer) return null;
   const parts: string[] = [];
   const visit = (n: ts.Node) => {
-    if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) parts.push(n.text);
+    if (ts.isIdentifier(n) && constants.has(n.text)) parts.push(constants.get(n.text) ?? "");
+    else if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) parts.push(n.text);
     else if (ts.isTemplateExpression(n)) {
       parts.push(n.head.text, ...n.templateSpans.map((s) => s.literal.text));
       n.templateSpans.forEach((s) => visit(s.expression));
@@ -76,12 +97,13 @@ const ANY_PADDING = /(?:^|\s)(?:p|py|px|pt|pb)-/;
  */
 export function undersizedTargets(fileName: string, text: string): JsxViolation[] {
   const source = parse(fileName, text);
+  const constants = stringConstants(source);
   const out: JsxViolation[] = [];
   walkJsx(source, (node, tag) => {
     if (!["button", "a", "Link"].includes(tag)) return;
     // WCAG 2.5.8 exempts links inside a sentence; the marker makes the exemption explicit.
     if (tag !== "button" && attribute(node, "data-inline-link")) return;
-    const classes = classText(node);
+    const classes = classText(node, constants);
     if (classes === null || /(?:^|\s)sr-only(?=\s|$)/.test(classes)) return;
     if (TALL_ENOUGH.test(classes)) return;
     if (SMALL_PADDING.test(classes) || !ANY_PADDING.test(classes)) {

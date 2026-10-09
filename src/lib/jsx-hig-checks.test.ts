@@ -49,6 +49,16 @@ describe("undersizedTargets", () => {
     assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1]);
   });
 
+  it("resolves a same-file string constant used in the className", () => {
+    const src = [
+      'const BUTTON = "inline-flex min-h-11 items-center px-4";',
+      'const SMALL = "px-2 py-1";',
+      "export function A() { return <><button className={`${BUTTON} border`}>Ok</button><button className={`${SMALL} border`}>No</button></>; }",
+    ].join("\n");
+    assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [3]);
+    assert.equal(undersizedTargets("f.tsx", src).length, 1);
+  });
+
   it("skips visually hidden and fully dynamic elements", () => {
     const src = [`<a href="#main" className="sr-only focus:not-sr-only">Skip</a>`, `<button className={styles}>D</button>`].join("\n");
     assert.deepEqual(undersizedTargets("f.tsx", src), []);
