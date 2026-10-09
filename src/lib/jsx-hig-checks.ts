@@ -24,18 +24,21 @@ function hasSpread(node: ts.JsxOpeningLikeElement): boolean {
 
 /**
  * `const NAME = "classes"` declarations in the file, so `${NAME}` in a className
- * can be read. A template literal built only from earlier constants counts too
- * (`const ROW_DELETE = \`${ROW} text-red\``).
+ * can be read. A template literal counts too: earlier constants are inlined
+ * (`const ROW_DELETE = \`${ROW} text-red\``) and runtime parts are dropped.
  */
 function stringConstants(source: ts.SourceFile): Map<string, string> {
   const constants = new Map<string, string>();
   const valueOf = (init: ts.Expression): string | null => {
     if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) return init.text;
     if (ts.isTemplateExpression(init)) {
-      const spans = init.templateSpans.map((s) =>
-        ts.isIdentifier(s.expression) && constants.has(s.expression.text) ? `${constants.get(s.expression.text)}${s.literal.text}` : null,
-      );
-      return spans.every((x) => x !== null) ? init.head.text + spans.join("") : null;
+      // Known constants are inlined; a runtime part contributes nothing, but the
+      // literal classes around it still count.
+      const spans = init.templateSpans.map((s) => {
+        const known = ts.isIdentifier(s.expression) ? constants.get(s.expression.text) : undefined;
+        return `${known ?? " "}${s.literal.text}`;
+      });
+      return init.head.text + spans.join("");
     }
     return null;
   };
@@ -159,7 +162,9 @@ const TALL_ENOUGH = /(?:^|\s)(?:pointer-coarse:)?(?:min-h|h|size)-(?:1[1-9]|[2-9
 // A fixed height under 44px sets the height, whatever the padding (border-box).
 const FIXED_SMALL = /^(?:h|size)-(?:[1-9]|10|\[(?:[1-3]?\d|4[0-3])px\])$/;
 // min-height does nothing on an inline element, which <a> is by default.
-const BOX_DISPLAY = /^(?:block|flex|inline-flex|grid|inline-grid|inline-block|table)$/;
+// .primary-button and .secondary-button set display: inline-flex in globals.css.
+const BOX_DISPLAY = /^(?:block|flex|inline-flex|grid|inline-grid|inline-block|table|primary-button|secondary-button)$/;
+const FLEX_OR_GRID = /(?:^|\s)(?:flex|inline-flex|grid|inline-grid)(?=\s|$)/;
 
 // Tailwind 4 type scale: font size and line height in px. The body inherits 16px / 24px.
 const TYPE_SCALE: Record<string, [number, number]> = {
@@ -187,10 +192,18 @@ export function estimatedHeight(classes: string): number {
   return top + bottom + line + border;
 }
 
-function tooSmall(classes: string, tag: string): boolean {
+/** The nearest JSX element that contains this one, through any {cond && ...} wrappers. */
+function enclosingElement(node: ts.JsxOpeningLikeElement): ts.JsxElement | null {
+  let current: ts.Node | undefined = ts.isJsxOpeningElement(node) ? node.parent.parent : node.parent;
+  while (current && !ts.isJsxElement(current)) current = current.parent;
+  return current ?? null;
+}
+
+function tooSmall(classes: string, tag: string, inFlexOrGrid: boolean): boolean {
   const tokens = classes.split(" ").filter((c) => !c.includes(":"));
   if (tokens.includes("sr-only")) return false;
-  const boxed = tag === "button" || tokens.some((c) => BOX_DISPLAY.test(c));
+  // A flex or grid child is blockified, so its min-height applies.
+  const boxed = tag === "button" || inFlexOrGrid || tokens.some((c) => BOX_DISPLAY.test(c));
   if (TALL_ENOUGH.test(classes) && boxed) return false;
   if (tokens.some((c) => FIXED_SMALL.test(c))) return true;
   return estimatedHeight(classes) < 44;
@@ -219,7 +232,10 @@ export function undersizedTargets(fileName: string, text: string): JsxViolation[
     if (!hasClassName && hasSpread(node)) return;
     const variants = hasClassName ? classVariants(node, constants) : [""];
     if (variants === null) return;
-    if (variants.some((classes) => tooSmall(classes, tag))) {
+    const parent = enclosingElement(node);
+    const parentClasses = parent ? classText(parent.openingElement, constants) : null;
+    const inFlexOrGrid = parentClasses !== null && FLEX_OR_GRID.test(parentClasses.split(" ").filter((c) => !c.includes(":")).join(" "));
+    if (variants.some((classes) => tooSmall(classes, tag, inFlexOrGrid))) {
       out.push({ line: line(source, node), element: tag, detail: "under 44pt on touch; add min-h-11 or pointer-coarse:min-h-11" });
     }
   });

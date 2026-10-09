@@ -100,6 +100,32 @@ describe("undersizedTargets", () => {
     assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1]);
   });
 
+  it("knows .primary-button and .secondary-button render as inline-flex", () => {
+    const src = [
+      `<Link href="/x" className="primary-button min-h-11 px-4 py-2.5 text-sm">Go</Link>`,
+      `<a href="/y" className="secondary-button min-h-11 text-sm">Go</a>`,
+    ].join("\n");
+    assert.deepEqual(undersizedTargets("f.tsx", src), []);
+  });
+
+  it("keeps the literal classes of a template constant that has runtime parts", () => {
+    const src = [
+      "const shared = `block rounded ${tone}`;",
+      "export function A() { return <a href=\"/x\" className={`${shared} min-h-11`}>Card</a>; }",
+    ].join("\n");
+    assert.deepEqual(undersizedTargets("f.tsx", src), []);
+  });
+
+  it("credits min-height on a link that is a flex or grid child, which the browser blockifies", () => {
+    const src = [
+      `<div className="flex gap-2"><Link href="/x" className="min-w-0 flex-1 min-h-11">Row</Link></div>`,
+      `<div className="grid"><a href="/y" className="pointer-coarse:min-h-11 px-2 py-1 text-xs">Cell</a></div>`,
+      `<p className="text-sm"><Link href="/z" className="min-h-11">Inline</Link></p>`,
+      `<div className="flex">{show && <Link href="/w" className="min-h-11" />}</div>`,
+    ].join("\n");
+    assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [3]);
+  });
+
   it("treats a fixed height under 44px as the height, whatever the padding", () => {
     const src = [`<button className="h-8 px-3 py-3 text-sm">Fixed</button>`, `<button className="size-10 p-3">Icon</button>`].join("\n");
     assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1, 2]);

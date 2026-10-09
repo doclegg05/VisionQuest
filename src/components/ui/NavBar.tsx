@@ -215,7 +215,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       <Link
         key={item.href}
         href={item.href}
-        className={`premium-nav-link mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
+        className={`premium-nav-link mb-1 flex min-h-11 items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
           active
             ? "premium-nav-link-active bg-[var(--accent-green)] text-[var(--on-accent)] shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
             : "premium-nav-link-idle text-white/90 hover:text-white"
