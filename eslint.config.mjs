@@ -114,6 +114,36 @@ const appPrismaImportWithoutSession = {
   },
 };
 
+// The browser's own dialogs are not accessible, cannot be styled to the app,
+// and block the page. Use useConfirm (confirm/alert/prompt) or useUndo
+// (HIG review D-24, 2026-10-09). Scope-aware: a `confirm` destructured from
+// useConfirm is a local binding, not the global.
+const nativeDialogGlobals = ["confirm", "alert", "prompt"].map((name) => ({
+  name,
+  message: `Use useConfirm() from @/components/ui/useConfirm instead of the browser's ${name}().`,
+}));
+const nativeDialogProperties = ["confirm", "alert", "prompt"].map((property) => ({
+  object: "window",
+  property,
+  message: `Use useConfirm() from @/components/ui/useConfirm instead of window.${property}().`,
+}));
+
+// Raw Tailwind palette colors ignore the theme: no dark values, no contrast
+// guarantee (HIG review D-26: 348 lines, zero dark: utilities in teacher
+// scope). Staff surfaces use the semantic tokens in globals.css instead.
+const RAW_PALETTE =
+  "(^|[\\s:])(bg|text|border|from|to|via|ring|divide|fill|stroke|outline|placeholder|decoration|accent|caret)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}([\\s/]|$)";
+const rawPaletteSyntax = [
+  {
+    selector: `Literal[value=/${RAW_PALETTE}/]`,
+    message: "Raw Tailwind palette color. Use a theme token from globals.css, e.g. text-[var(--badge-success-text)].",
+  },
+  {
+    selector: `TemplateElement[value.raw=/${RAW_PALETTE}/]`,
+    message: "Raw Tailwind palette color. Use a theme token from globals.css, e.g. text-[var(--badge-success-text)].",
+  },
+];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -128,6 +158,17 @@ const eslintConfig = defineConfig([
         },
       ],
       "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere],
+      "no-restricted-globals": ["error", ...nativeDialogGlobals],
+      "no-restricted-properties": ["error", ...nativeDialogProperties],
+    },
+  },
+  // Staff surfaces: no raw palette colors. Spreads restrictedSyntaxEverywhere
+  // because a flat-config rule entry replaces, rather than merges with, the
+  // one above.
+  {
+    files: ["src/components/teacher/**", "src/app/(teacher)/**"],
+    rules: {
+      "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, ...rawPaletteSyntax],
     },
   },
   // Student-facing surfaces. Staff-only trees are excluded by name; the
