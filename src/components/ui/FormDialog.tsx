@@ -52,6 +52,16 @@ export function FormDialog({ title, dirty, onClose, widthClass = "max-w-md", chi
       ref={dialogRef}
       aria-labelledby={titleId}
       onCancel={(event) => {
+        // React bubbles the nested "Discard changes?" dialog's cancel up to here;
+        // that one is useConfirm's to handle.
+        if (event.target !== event.currentTarget) return;
+        // Escape is not user activation, so after one prevented cancel the
+        // browser's close watcher force-closes the dialog. Follow it, or the
+        // closed dialog stays mounted and the page is left unclickable.
+        if (!event.cancelable) {
+          onClose();
+          return;
+        }
         event.preventDefault();
         void requestClose();
       }}

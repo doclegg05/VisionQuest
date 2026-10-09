@@ -112,6 +112,49 @@ test.describe("FormDialog", () => {
     await expect(page.locator("#form-state")).toHaveText("closed");
   });
 
+  test("Escape on the discard question returns to the form with the text kept", async ({ page }) => {
+    await openHarness(page);
+    await page.click("#open-form");
+    await page.getByLabel("What needs to be done?").fill("abc");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("alertdialog", { name: "Discard changes?" })).toBeVisible();
+    // The nested <dialog>'s cancel bubbles through React to FormDialog's onCancel,
+    // which used to reopen the question instead of returning to the form.
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("alertdialog", { name: "Discard changes?" })).toBeHidden();
+    await expect(page.locator("#form-state")).toHaveText("open");
+    await expect(page.getByLabel("What needs to be done?")).toHaveValue("abc");
+  });
+
+  test("repeated Escape never leaves the page locked behind a closed dialog", async ({ page }) => {
+    await openHarness(page);
+    await page.click("#open-form");
+    await page.getByLabel("What needs to be done?").fill("abc");
+    // Escape is not user activation, so Chromium's close watcher stops letting
+    // cancel be prevented and force-closes the dialog; WebKit keeps asking.
+    // Either way the page must never end up behind a closed-but-mounted dialog.
+    for (let i = 0; i < 4; i++) await page.keyboard.press("Escape");
+    const state = await page.locator("#form-state").textContent();
+    const modals = await page.evaluate(() => document.querySelectorAll("dialog:modal").length);
+    if (state === "open") {
+      // Still open: the form itself must be the visible, usable modal.
+      await expect(page.getByRole("dialog", { name: "Quick task for Sam" })).toBeVisible();
+      await page.getByLabel("What needs to be done?").fill("still usable");
+      expect(modals).toBe(1);
+    } else {
+      // Closed: React followed the browser and nothing modal is left behind.
+      expect(modals).toBe(0);
+      await page.click("#open-prompt");
+      await expect(page.getByRole("alertdialog", { name: "Return this form?" })).toBeVisible();
+    }
+  });
+
+  test("the first field has focus when the dialog opens", async ({ page }) => {
+    await openHarness(page);
+    await page.click("#open-form");
+    await expect(page.getByLabel("What needs to be done?")).toBeFocused();
+  });
+
   test("a backdrop tap on a dirty form asks too", async ({ page }) => {
     await openHarness(page);
     await page.click("#open-form");
