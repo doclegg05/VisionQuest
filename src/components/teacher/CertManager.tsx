@@ -178,7 +178,7 @@ export default function CertManager() {
             {editingId ? "Edit Requirement" : "New Certification Requirement"}
           </h3>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-[var(--ink-strong)]">Requirement name</span>
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Requirement name</span>
             <input
               type="text"
               placeholder="e.g., Complete Interview Skills module"
@@ -188,7 +188,7 @@ export default function CertManager() {
             />
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-[var(--ink-strong)]">Description (optional)</span>
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Description (optional)</span>
             <input
               type="text"
               value={form.description}
@@ -197,7 +197,7 @@ export default function CertManager() {
             />
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-[var(--ink-strong)]">Lesson URL (optional)</span>
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Lesson URL (optional)</span>
             <input
               type="url"
               placeholder="e.g., GitHub Pages link"

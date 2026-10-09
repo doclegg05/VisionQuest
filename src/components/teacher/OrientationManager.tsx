@@ -143,7 +143,7 @@ function InlineEditForm({
   return (
     <div className="bg-[var(--badge-info-bg)]/50 rounded-xl border border-[var(--badge-info-bg)] p-4 space-y-3">
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium text-[var(--ink-strong)]">Item label</span>
+        <span className="block text-sm font-medium text-[var(--ink-strong)]">Item label</span>
         <input
           ref={labelRef}
           type="text"
@@ -153,7 +153,7 @@ function InlineEditForm({
         />
       </label>
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium text-[var(--ink-strong)]">Description (optional)</span>
+        <span className="block text-sm font-medium text-[var(--ink-strong)]">Description (optional)</span>
         <input
           type="text"
           value={form.description}

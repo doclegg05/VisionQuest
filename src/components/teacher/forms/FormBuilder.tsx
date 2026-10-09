@@ -209,7 +209,7 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-1 md:col-span-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Title</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Title</span>
                 <input
                   type="text"
                   value={title}
@@ -219,7 +219,7 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
                 />
               </label>
               <label className="space-y-1 md:col-span-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Description (optional)</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Description (optional)</span>
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
@@ -367,7 +367,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
 
       <div className="grid gap-3 md:grid-cols-2">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Label</span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Label</span>
           <input
             type="text"
             value={field.label}
@@ -376,7 +376,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Key</span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Key</span>
           <input
             type="text"
             value={field.key}
@@ -386,7 +386,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
           <p className="text-xs text-[var(--ink-faint)]">Used as the CSV column header. Change carefully — existing responses reference the old key.</p>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Type</span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Type</span>
           <select
             value={field.type}
             onChange={(event) => {
@@ -418,7 +418,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
 
         {hasOptions && "options" in field && (
           <label className="space-y-1 md:col-span-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Options (one per line)</span>
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Options (one per line)</span>
             <textarea
               value={field.options.join("\n")}
               onChange={(event) =>
@@ -436,7 +436,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
         )}
 
         <label className="space-y-1 md:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Help text (optional)</span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Help text (optional)</span>
           <input
             type="text"
             value={field.helpText ?? ""}

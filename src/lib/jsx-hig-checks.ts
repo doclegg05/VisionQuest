@@ -148,3 +148,33 @@ export function unlabelledFields(fileName: string, text: string): JsxViolation[]
   });
   return out;
 }
+
+const INLINE_TAGS = new Set(["span", "a", "strong", "em", "small", "b", "i", "abbr", "label"]);
+const DISPLAY_CLASS = /(?:^|\s)(?:block|flex|inline-flex|grid|inline-grid|inline-block|table|contents|hidden|sr-only)(?=\s|$)/;
+
+/**
+ * Inline children of a `space-y-*` parent. Tailwind 4 spaces a stack with a
+ * bottom margin on every child but the last, and a vertical margin does
+ * nothing on an inline element, so a `<span>` label text sits flush against
+ * its field. Give the child `block` (or any display class).
+ */
+export function inlineSpacedChildren(fileName: string, text: string): JsxViolation[] {
+  const source = parse(fileName, text);
+  const constants = stringConstants(source);
+  const out: JsxViolation[] = [];
+  const visit = (n: ts.Node) => {
+    if (ts.isJsxElement(n) && /(?:^|\s)space-y-/.test(classText(n.openingElement, constants) ?? "")) {
+      const children = n.children.filter((c): c is ts.JsxElement | ts.JsxSelfClosingElement => ts.isJsxElement(c) || ts.isJsxSelfClosingElement(c));
+      for (const child of children.slice(0, -1)) {
+        const open = ts.isJsxElement(child) ? child.openingElement : child;
+        const tag = open.tagName.getText(source);
+        if (INLINE_TAGS.has(tag) && !DISPLAY_CLASS.test(classText(open, constants) ?? "")) {
+          out.push({ line: line(source, open), element: tag, detail: "inline child of a space-y stack gets no spacing; add block" });
+        }
+      }
+    }
+    n.forEachChild(visit);
+  };
+  visit(source);
+  return out;
+}

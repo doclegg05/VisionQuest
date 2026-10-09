@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { undersizedTargets, unlabelledFields } from "./jsx-hig-checks";
+import { inlineSpacedChildren, undersizedTargets, unlabelledFields } from "./jsx-hig-checks";
 
 const lines = (v: { line: number }[]) => v.map((x) => x.line);
 
@@ -94,5 +94,25 @@ describe("unlabelledFields", () => {
   it("ignores hidden and button-like inputs and fields with spread props", () => {
     const src = [`<input type="hidden" value="x" />`, `<input type="submit" />`, `<input {...field} />`].join("\n");
     assert.deepEqual(unlabelledFields("f.tsx", src), []);
+  });
+});
+
+describe("inlineSpacedChildren", () => {
+  it("flags an inline child of a space-y parent, whose margin never renders", () => {
+    const src = `<label className="block space-y-1.5"><span className="text-sm">Start date</span><input type="date" /></label>`;
+    assert.deepEqual(lines(inlineSpacedChildren("f.tsx", src)), [1]);
+  });
+
+  it("accepts block, flex, and grid children, and the last child", () => {
+    const src = [
+      `<label className="space-y-1.5"><span className="block text-sm">A</span><input /></label>`,
+      `<div className="space-y-2"><span className="flex gap-1">B</span><p>C</p></div>`,
+      `<div className="space-y-2"><p>D</p><span>last</span></div>`,
+    ].join("\n");
+    assert.deepEqual(inlineSpacedChildren("f.tsx", src), []);
+  });
+
+  it("ignores parents without space-y", () => {
+    assert.deepEqual(inlineSpacedChildren("f.tsx", `<label className="flex gap-2"><span>A</span><input /></label>`), []);
   });
 });

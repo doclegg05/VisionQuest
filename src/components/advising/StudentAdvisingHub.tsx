@@ -184,7 +184,7 @@ export default function StudentAdvisingHub({
         ) : (
           <div className="mt-4 grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
             <div className="space-y-3 rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-              <label className="text-sm text-[var(--ink-muted)]">
+              <label className="block text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Advisor
                 </span>
@@ -208,7 +208,7 @@ export default function StudentAdvisingHub({
                 </select>
               </label>
 
-              <label className="text-sm text-[var(--ink-muted)]">
+              <label className="block text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Time slot
                 </span>

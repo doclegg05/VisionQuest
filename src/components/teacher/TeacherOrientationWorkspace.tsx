@@ -210,7 +210,7 @@ export default function TeacherOrientationWorkspace() {
       <div className="surface-section p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
               Class
             </span>
             <select
@@ -227,7 +227,7 @@ export default function TeacherOrientationWorkspace() {
           </label>
 
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
               Student
             </span>
             <select

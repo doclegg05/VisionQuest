@@ -251,7 +251,7 @@ export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps)
 
         <section className="space-y-2">
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Reviewer notes</span>
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Reviewer notes</span>
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}

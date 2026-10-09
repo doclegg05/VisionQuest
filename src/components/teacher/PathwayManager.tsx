@@ -243,7 +243,7 @@ export default function PathwayManager() {
           )}
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-[var(--ink-muted)]">Pathway name</span>
+            <span className="block text-xs font-medium text-[var(--ink-muted)]">Pathway name</span>
             <input
               type="text"
               placeholder="e.g. Office Administration"
@@ -254,7 +254,7 @@ export default function PathwayManager() {
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-[var(--ink-muted)]">Description (optional)</span>
+            <span className="block text-xs font-medium text-[var(--ink-muted)]">Description (optional)</span>
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { undersizedTargets, unlabelledFields, type JsxViolation } from "@/lib/jsx-hig-checks";
+import { inlineSpacedChildren, undersizedTargets, unlabelledFields, type JsxViolation } from "@/lib/jsx-hig-checks";
 
 /**
  * App-wide HIG guards (HIG review Phase 2, 2026-10-09).
@@ -41,5 +41,9 @@ describe("HIG guards", () => {
 
   it("every form field has a label", () => {
     assert.deepEqual(report(unlabelledFields), []);
+  });
+
+  it("label text in a spaced stack actually gets its spacing", () => {
+    assert.deepEqual(report(inlineSpacedChildren), []);
   });
 });

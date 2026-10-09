@@ -163,7 +163,7 @@ export function QuickTaskModal({
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && <p className="text-sm text-[var(--error)]">{error}</p>}
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-[var(--ink-strong)]">What needs to be done?</span>
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">What needs to be done?</span>
           <input
             type="text"
             value={title}
@@ -173,7 +173,7 @@ export function QuickTaskModal({
           />
         </label>
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-[var(--ink-strong)]">Due date (optional)</span>
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Due date (optional)</span>
           <input
             type="date"
             value={dueAt}
@@ -258,7 +258,7 @@ export function QuickNoteModal({
             field, and React's autoFocus cannot reach a field inside a dialog
             that is still closed at commit time. */}
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-[var(--ink-strong)]">Note</span>
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Note</span>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -268,7 +268,7 @@ export function QuickNoteModal({
           />
         </label>
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-[var(--ink-strong)]">Category</span>
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Category</span>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -368,7 +368,7 @@ export function QuickAppointmentModal({
         <p className="text-xs text-[var(--ink-muted)]">Duration defaults to 30 minutes.</p>
         {error && <p className="text-sm text-[var(--error)]">{error}</p>}
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-[var(--ink-strong)]">Appointment title</span>
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Appointment title</span>
           <input
             type="text"
             value={title}
@@ -378,7 +378,7 @@ export function QuickAppointmentModal({
           />
         </label>
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-[var(--ink-strong)]">Date and time</span>
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Date and time</span>
           <input
             type="datetime-local"
             value={startsAt}
