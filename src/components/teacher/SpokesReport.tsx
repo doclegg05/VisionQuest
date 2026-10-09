@@ -97,7 +97,7 @@ export default function SpokesReport() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--badge-error-text)] mb-4">{error || "Could not load the SPOKES report."}</p>
-        <button onClick={() => void loadData()} className="primary-button px-4 py-2 rounded-lg">
+        <button onClick={() => void loadData()} className="primary-button px-4 py-2 rounded-lg pointer-coarse:min-h-11">
           Try Again
         </button>
       </div>

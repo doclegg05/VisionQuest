@@ -106,7 +106,7 @@ export default function CredentialSharePanel() {
           <button
             type="button"
             onClick={() => void copyUrl()}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)]"
           >
             Copy link
           </button>

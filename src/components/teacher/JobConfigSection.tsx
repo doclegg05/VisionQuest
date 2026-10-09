@@ -318,7 +318,7 @@ export function JobConfigSection() {
               <button
                 onClick={() => void handleRefresh()}
                 disabled={refreshing || scrapeInProgress}
-                className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 pointer-coarse:min-h-11"
               >
                 <ArrowClockwise size={16} className={refreshing || scrapeInProgress ? "animate-spin" : ""} />
                 {scrapeInProgress ? "Refreshing..." : refreshing ? "Queueing..." : "Refresh Now"}
@@ -389,7 +389,7 @@ export function JobConfigSection() {
                   type="button"
                   onClick={() => void handleRefresh(failedSources)}
                   disabled={refreshing}
-                  className="mt-3 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)] disabled:opacity-50"
+                  className="mt-3 inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)] disabled:opacity-50 pointer-coarse:min-h-11"
                 >
                   Retry failed sources
                 </button>
@@ -607,7 +607,7 @@ export function JobConfigSection() {
             <button
               onClick={handleSave}
               disabled={saving || !region.trim()}
-              className="px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 pointer-coarse:min-h-11"
             >
               {saving ? "Saving..." : config ? "Update Config" : "Enable Job Board"}
             </button>

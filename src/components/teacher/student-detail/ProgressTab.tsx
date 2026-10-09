@@ -423,7 +423,7 @@ export default function ProgressTab({
             {!showAllConversations && conversations.length > 20 && (
               <button
                 onClick={onShowAllConversations}
-                className="w-full text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)] py-2"
+                className="flex w-full items-center justify-center text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)] py-2 pointer-coarse:min-h-11"
               >
                 Show all {conversations.length} conversations
               </button>

@@ -16,13 +16,13 @@ export default function TeacherError({
       <div className="mt-6 flex gap-3">
         <button
           onClick={reset}
-          className="primary-button px-5 py-2.5 text-sm"
+          className="primary-button px-5 py-2.5 text-sm pointer-coarse:min-h-11"
         >
           Try again
         </button>
         <a
           href="/teacher"
-          className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+          className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)] pointer-coarse:min-h-11"
         >
           Go to Dashboard
         </a>

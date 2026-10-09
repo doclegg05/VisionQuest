@@ -345,7 +345,7 @@ export default function OperationsTab({
             <button
               type="submit"
               disabled={savingAppointment}
-              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-center rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
             >
               {savingAppointment ? "Scheduling..." : "Schedule Appointment"}
             </button>
@@ -518,7 +518,7 @@ export default function OperationsTab({
             <button
               type="submit"
               disabled={savingTask}
-              className="w-full rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-center rounded-full bg-[var(--accent-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
             >
               {savingTask ? "Saving..." : "Create Task"}
             </button>
@@ -632,7 +632,7 @@ export default function OperationsTab({
           <button
             type="submit"
             disabled={savingNote}
-            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
           >
             {savingNote ? "Saving..." : "Add Note"}
           </button>

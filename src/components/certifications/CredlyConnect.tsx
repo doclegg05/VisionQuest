@@ -173,7 +173,7 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
           type="button"
           onClick={() => void handleDisconnect()}
           disabled={state.status === "saving"}
-          className="rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-11 items-center justify-center rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             borderColor: "var(--border)",
             color: "var(--ink-muted)",
