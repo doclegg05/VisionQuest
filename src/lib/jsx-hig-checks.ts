@@ -70,14 +70,17 @@ const ANY_PADDING = /(?:^|\s)(?:p|py|px|pt|pb)-/;
 /**
  * Buttons and links that would render under 44pt on a touch screen: small or
  * no padding, and no height class of 44px or more. `pointer-coarse:min-h-11`
- * counts, which keeps the compact look for a mouse. Visually hidden elements
- * and fully dynamic classNames are skipped.
+ * counts, which keeps the compact look for a mouse. Visually hidden elements,
+ * fully dynamic classNames, and links marked `data-inline-link` (a link inside
+ * running text, exempt under WCAG 2.5.8) are skipped.
  */
 export function undersizedTargets(fileName: string, text: string): JsxViolation[] {
   const source = parse(fileName, text);
   const out: JsxViolation[] = [];
   walkJsx(source, (node, tag) => {
     if (!["button", "a", "Link"].includes(tag)) return;
+    // WCAG 2.5.8 exempts links inside a sentence; the marker makes the exemption explicit.
+    if (tag !== "button" && attribute(node, "data-inline-link")) return;
     const classes = classText(node);
     if (classes === null || /(?:^|\s)sr-only(?=\s|$)/.test(classes)) return;
     if (TALL_ENOUGH.test(classes)) return;

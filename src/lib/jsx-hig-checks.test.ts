@@ -39,6 +39,16 @@ describe("undersizedTargets", () => {
     assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1]);
   });
 
+  it("skips a link marked as inline in running text, which WCAG exempts", () => {
+    const src = `<p>Read the <a href="/guide" data-inline-link className="underline">orientation guide</a> first.</p>`;
+    assert.deepEqual(undersizedTargets("f.tsx", src), []);
+  });
+
+  it("does not let a button opt out as an inline link", () => {
+    const src = `<button data-inline-link className="py-1">X</button>`;
+    assert.deepEqual(lines(undersizedTargets("f.tsx", src)), [1]);
+  });
+
   it("skips visually hidden and fully dynamic elements", () => {
     const src = [`<a href="#main" className="sr-only focus:not-sr-only">Skip</a>`, `<button className={styles}>D</button>`].join("\n");
     assert.deepEqual(undersizedTargets("f.tsx", src), []);
