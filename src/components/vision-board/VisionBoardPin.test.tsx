@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { renderToString } from "react-dom/server";
 
-import VisionBoardPin, { removePinLabel, resizeWidthForKey } from "./VisionBoardPin";
+import VisionBoardPin, { removePinLabel, resizePinLabel, resizeWidthForKey } from "./VisionBoardPin";
 import type { VisionBoardItemData } from "./VisionBoard";
 
 const GOAL_ITEM: VisionBoardItemData = {
@@ -56,30 +56,86 @@ describe("VisionBoardPin remove button", () => {
   });
 });
 
+describe("resizePinLabel", () => {
+  it("names the pin the handle resizes", () => {
+    assert.equal(resizePinLabel({ type: "goal", content: "Get a CDL" }), "Width of goal pin: Get a CDL");
+    assert.equal(resizePinLabel({ type: "image", content: null }), "Width of image pin");
+  });
+});
+
+/**
+ * HIG review C-47, round 2: the resize handle is an adjustable control
+ * (ARIA slider), so VoiceOver's swipe up/down and a keyboard's arrow keys
+ * both change the width. A <button> cannot carry role="slider".
+ */
 describe("VisionBoardPin resize handle", () => {
-  it("is a 44pt target", () => {
+  const renderHandle = () => {
     const html = renderToString(<VisionBoardPin item={GOAL_ITEM} onDelete={() => {}} />);
-    const handle = html.match(/<button[^>]*aria-label="Resize pin"[^>]*>/)?.[0];
-    assert.ok(handle, "expected a resize handle");
-    assert.match(handle, /\bsize-11\b/);
+    const handle = html.match(/<(\w+)[^>]*role="slider"[^>]*>/);
+    assert.ok(handle, "expected a slider resize handle");
+    return { tag: handle[1], attrs: handle[0] };
+  };
+
+  it("is a focusable slider, not a button", () => {
+    const { tag, attrs } = renderHandle();
+    assert.notEqual(tag, "button");
+    assert.match(attrs, /\btabindex="0"/i);
+    assert.match(attrs, /\baria-orientation="horizontal"/);
+    assert.match(attrs, /\bdata-resize-handle="true"/);
+  });
+
+  it("reports the pin's width and limits", () => {
+    const { attrs } = renderHandle();
+    assert.match(attrs, /\baria-valuemin="16"/);
+    assert.match(attrs, /\baria-valuemax="34"/);
+    assert.match(attrs, /\baria-valuenow="20"/);
+    assert.match(attrs, /\baria-valuetext="20% of board width"/);
+  });
+
+  it("names the pin it resizes", () => {
+    const { attrs } = renderHandle();
+    assert.match(attrs, /\baria-label="Width of goal pin: Get a CDL"/);
+  });
+
+  it("does not claim a global shortcut", () => {
+    const { attrs } = renderHandle();
+    assert.doesNotMatch(attrs, /aria-keyshortcuts/);
+  });
+
+  it("is a 44pt target", () => {
+    const { attrs } = renderHandle();
+    assert.match(attrs, /\bsize-11\b/);
   });
 });
 
 describe("resizeWidthForKey", () => {
   const bounds = { min: 16, max: 34 };
 
-  it("widens on ArrowRight and narrows on ArrowLeft", () => {
+  it("widens on ArrowRight and ArrowUp", () => {
     assert.equal(resizeWidthForKey("ArrowRight", 20, bounds), 22);
+    assert.equal(resizeWidthForKey("ArrowUp", 20, bounds), 22);
+  });
+
+  it("narrows on ArrowLeft and ArrowDown", () => {
     assert.equal(resizeWidthForKey("ArrowLeft", 20, bounds), 18);
+    assert.equal(resizeWidthForKey("ArrowDown", 20, bounds), 18);
+  });
+
+  it("jumps to the smallest size on Home and the largest on End", () => {
+    assert.equal(resizeWidthForKey("Home", 20, bounds), 16);
+    assert.equal(resizeWidthForKey("End", 20, bounds), 34);
   });
 
   it("stays inside the pin's size limits", () => {
     assert.equal(resizeWidthForKey("ArrowRight", 33, bounds), 34);
+    assert.equal(resizeWidthForKey("ArrowUp", 33, bounds), 34);
     assert.equal(resizeWidthForKey("ArrowLeft", 17, bounds), 16);
+    assert.equal(resizeWidthForKey("ArrowDown", 17, bounds), 16);
   });
 
   it("ignores other keys", () => {
     assert.equal(resizeWidthForKey("Enter", 20, bounds), null);
-    assert.equal(resizeWidthForKey("ArrowUp", 20, bounds), null);
+    assert.equal(resizeWidthForKey(" ", 20, bounds), null);
+    assert.equal(resizeWidthForKey("Tab", 20, bounds), null);
   });
 });

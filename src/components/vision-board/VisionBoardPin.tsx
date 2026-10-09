@@ -56,23 +56,50 @@ function clamp(value: number, min: number, max: number) {
 }
 
 /** Width change, in percent of the board, for one arrow-key press on the resize handle. */
-const RESIZE_KEY_STEPS: Partial<Record<string, number>> = { ArrowLeft: -2, ArrowRight: 2 };
+const RESIZE_KEY_STEP = 2;
+
+type WidthLimits = { min: number; max: number };
+
+/**
+ * Slider keys for the resize handle. VoiceOver's swipe up/down on an ARIA
+ * slider reaches the page as arrow keys, so all four arrows must work.
+ */
+const RESIZE_KEYS: Partial<Record<string, (width: number, bounds: WidthLimits) => number>> = {
+  ArrowUp: (width) => width + RESIZE_KEY_STEP,
+  ArrowRight: (width) => width + RESIZE_KEY_STEP,
+  ArrowDown: (width) => width - RESIZE_KEY_STEP,
+  ArrowLeft: (width) => width - RESIZE_KEY_STEP,
+  Home: (_width, { min }) => min,
+  End: (_width, { max }) => max,
+};
 
 /** New pin width for a key press on the resize handle, or null when the key does not resize. */
-export function resizeWidthForKey(key: string, width: number, bounds: { min: number; max: number }): number | null {
-  const step = RESIZE_KEY_STEPS[key];
-  if (step === undefined) return null;
-  return clamp(width + step, bounds.min, bounds.max);
+export function resizeWidthForKey(key: string, width: number, bounds: WidthLimits): number | null {
+  const next = RESIZE_KEYS[key];
+  if (!next) return null;
+  return clamp(next(width, bounds), bounds.min, bounds.max);
 }
 
 const LABEL_PREVIEW_CHARS = 40;
 
-/** Accessible name for a pin's remove button, so a screen reader says which pin goes. */
-export function removePinLabel({ type, content }: Pick<VisionBoardItemData, "type" | "content">): string {
+type PinNameParts = Pick<VisionBoardItemData, "type" | "content">;
+
+/** Short spoken name for a pin: its kind plus the start of its text. */
+function pinName({ type, content }: PinNameParts): string {
   const text = content?.replace(/\s+/g, " ").trim() ?? "";
-  if (!text) return `Remove ${type} pin`;
+  if (!text) return `${type} pin`;
   const preview = text.length > LABEL_PREVIEW_CHARS ? `${text.slice(0, LABEL_PREVIEW_CHARS).trimEnd()}…` : text;
-  return `Remove ${type} pin: ${preview}`;
+  return `${type} pin: ${preview}`;
+}
+
+/** Accessible name for a pin's remove button, so a screen reader says which pin goes. */
+export function removePinLabel(pin: PinNameParts): string {
+  return `Remove ${pinName(pin)}`;
+}
+
+/** Accessible name for a pin's resize handle, so a screen reader says which pin it sizes. */
+export function resizePinLabel(pin: PinNameParts): string {
+  return `Width of ${pinName(pin)}`;
 }
 
 export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) {
@@ -181,7 +208,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
     touchStartRef.current = null;
   }, [dispatchMove, isDragging, item.width, touchOffset]);
 
-  const handleResizeStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+  const handleResizeStart = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -196,7 +223,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
     setIsResizing(true);
   }, [item.width]);
 
-  const handleResizeKey = useCallback((e: React.KeyboardEvent<HTMLButtonElement>) => {
+  const handleResizeKey = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     const width = resizeWidthForKey(e.key, item.width, widthBounds);
     if (width === null) return;
     e.preventDefault();
@@ -338,14 +365,20 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         </div>
       )}
 
-      <button
-        type="button"
+      {/* An adjustable control: arrow keys and VoiceOver swipe up/down change the width. */}
+      <div
+        role="slider"
+        tabIndex={0}
         data-resize-handle="true"
         onPointerDown={handleResizeStart}
         onKeyDown={handleResizeKey}
-        aria-keyshortcuts="ArrowLeft ArrowRight"
+        aria-label={resizePinLabel(item)}
+        aria-orientation="horizontal"
+        aria-valuemin={widthBounds.min}
+        aria-valuemax={widthBounds.max}
+        aria-valuenow={Math.round(item.width)}
+        aria-valuetext={`${Math.round(item.width)}% of board width`}
         className="group/resize absolute -bottom-1 -right-1 z-20 inline-flex size-11 items-center justify-center rounded-full"
-        aria-label="Resize pin"
       >
         <span
           aria-hidden="true"
@@ -357,7 +390,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
             className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]"
           />
         </span>
-      </button>
+      </div>
     </div>
   );
 }
