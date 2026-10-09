@@ -217,10 +217,12 @@
   --badge-warning-bg: rgba(224, 192, 106, 0.15);
   --badge-warning-text: #e0c06a;
   --badge-error-bg: rgba(240, 107, 107, 0.15);
-  /* #f06b6b measured 4.41:1 on its tint over a raised card; #f37878 is 4.86:1. */
-  --badge-error-text: #f37878;
+  /* Text on its own tint, drawn on the page, a card, a card's sheen-lit top, or a
+     muted panel: #f06b6b fell to 3.89:1 at a card's top; #f58f8f clears 4.6:1
+     everywhere (globals.badge-contrast.test.ts). */
+  --badge-error-text: #f58f8f;
   --badge-info-bg: rgba(56, 168, 216, 0.15);
-  --badge-info-text: #38a8d8;
+  --badge-info-text: #64bbe1;
 
   /* Toast/celebration */
   --toast-celebration-bg: rgba(224, 192, 106, 0.15);
@@ -229,11 +231,11 @@
 
   /* Urgency (teacher) */
   --urgency-critical-bg: rgba(240, 107, 107, 0.15);
-  --urgency-critical-text: #f37878;
+  --urgency-critical-text: #f58f8f;
   --urgency-high-bg: rgba(224, 192, 106, 0.15);
   --urgency-high-text: #e0c06a;
   --urgency-medium-bg: rgba(56, 168, 216, 0.15);
-  --urgency-medium-text: #38a8d8;
+  --urgency-medium-text: #64bbe1;
 
   /* Program badges — dark mode; brighter tints for low-luminance surfaces */
   --program-spokes-bg: rgba(15, 154, 146, 0.18);
