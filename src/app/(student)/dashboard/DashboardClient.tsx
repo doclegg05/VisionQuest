@@ -223,7 +223,7 @@ export default function DashboardClient({
                 <p className="mt-0.5 text-sm text-[var(--ink-muted)]">{nextStep.detail}</p>
                 <p className="mt-2 text-sm leading-6 text-[var(--ink-strong)]">{nextStep.reason}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href={nextStep.href} prefetch={false} className="primary-button px-4 py-2.5 text-sm">
+                  <Link href={nextStep.href} prefetch={false} className="primary-button min-h-11 px-4 py-2.5 text-sm">
                     {nextStep.ctaLabel}
                     <ArrowRight size={16} weight="bold" />
                   </Link>
@@ -261,7 +261,7 @@ export default function DashboardClient({
                 <Link
                   key={item.id}
                   href="/orientation"
-                  className="flex items-center gap-2 rounded-lg border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] px-3 py-2 text-sm transition-colors hover:bg-[var(--badge-warning-bg)]"
+                  className="flex min-h-11 items-center gap-2 rounded-lg border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] px-3 py-2 text-sm transition-colors hover:bg-[var(--badge-warning-bg)]"
                 >
                   <span className="text-[var(--badge-warning-text)]">○</span>
                   <span>{item.label}</span>
@@ -284,7 +284,7 @@ export default function DashboardClient({
                       key={action.href}
                       href={action.href}
                       prefetch={false}
-                      className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
+                      className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
                     >
                       <ActionIcon size={16} weight="bold" className="text-[var(--accent-blue)]" />
                       {action.label}

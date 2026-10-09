@@ -277,7 +277,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                           type="button"
                           onClick={() => handleSaveLink(link.id)}
                           disabled={savingLinkId === link.id}
-                          className="rounded-full border border-[var(--border-strong)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center justify-center pointer-coarse:min-h-11 rounded-full border border-[var(--border-strong)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {savingLinkId === link.id ? "Saving..." : "Save details"}
                         </button>

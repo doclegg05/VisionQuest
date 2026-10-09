@@ -350,7 +350,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             type="button"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={data.page <= 1}
-            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
+            className="inline-flex items-center pointer-coarse:min-h-11 gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
           >
             <CaretLeft size={14} />
             Previous
@@ -362,7 +362,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
             type="button"
             onClick={() => setPage((current) => Math.min(data.totalPages, current + 1))}
             disabled={data.page >= data.totalPages}
-            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
+            className="inline-flex items-center pointer-coarse:min-h-11 gap-1 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-strong)] disabled:opacity-50"
           >
             Next
             <CaretRight size={14} />

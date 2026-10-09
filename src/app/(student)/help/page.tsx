@@ -51,7 +51,7 @@ export default function HelpPage() {
             <Link
               href="/appointments"
               prefetch={false}
-              className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
+              className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
             >
               Book a time on Advising →
             </Link>
@@ -99,7 +99,7 @@ export default function HelpPage() {
             <Link
               href="/forgot-password"
               prefetch={false}
-              className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
+              className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
             >
               Reset your password →
             </Link>

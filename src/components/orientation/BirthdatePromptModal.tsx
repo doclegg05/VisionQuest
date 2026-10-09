@@ -132,7 +132,7 @@ export default function BirthdatePromptModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-full border border-[var(--border)] bg-[var(--surface-base)] px-4 py-2 text-sm font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)] disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] bg-[var(--surface-base)] px-4 py-2 text-sm font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)] disabled:opacity-50"
           >
             Skip for now
           </button>
@@ -140,7 +140,7 @@ export default function BirthdatePromptModal({
             type="button"
             onClick={save}
             disabled={!value || saving}
-            className="rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full bg-[var(--accent-strong)] px-5 py-2 text-sm font-semibold text-[var(--on-accent)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}
           </button>

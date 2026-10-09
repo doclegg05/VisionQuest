@@ -323,14 +323,14 @@ export default function DashboardActionPanel({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/teacher/students/${intent.student.id}`}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+            className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
           >
             Open student
           </Link>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
+            className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
           >
             Close
           </button>
@@ -643,7 +643,7 @@ export default function DashboardActionPanel({
           <button
             type="submit"
             disabled={savingTask}
-            className="rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2 xl:col-span-1 xl:self-end"
+            className="inline-flex items-center justify-center pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2 xl:col-span-1 xl:self-end"
           >
             {savingTask ? "Saving..." : "Create task"}
           </button>
