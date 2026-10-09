@@ -7,7 +7,7 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
-**2026-10-09 HIG Phase 2 on `fix/hig-phase-2` (stacked on #222's `fix/hig-phase-1`; draft PR targets that branch).** Built in two fan-out rounds (10 + 8 file groups in isolated worktrees, each built, reviewed through two lenses and fixed), then two independent reviews of the shared code.
+**2026-10-09 HIG Phase 2 on `fix/hig-phase-2` (stacked on #222's `fix/hig-phase-1`; draft PR #223 targets that branch, so CI, which runs only on PRs to `main`, has not run on it).** Built in two fan-out rounds (10 + 8 file groups in isolated worktrees, each built, reviewed through two lenses and fixed), then two independent reviews of the shared code.
 
 Shared pieces:
 - `useConfirm`: 44pt, error tokens, a prompt mode, and overlap/unmount safety.
@@ -237,7 +237,7 @@ Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#1
 
 ## Open Items
 - [ ] **PR #222 (HIG Phase 1)**: finish the test plan in the PR body (CI authenticated axe in both themes, phone light/dark check, signed-in Print and Preview), then Britt reviews and merges.
-- [ ] **HIG Phase 2 PR** (`fix/hig-phase-2`, stacked on #222): Britt reviews. Merge #222 first, then retarget this PR to `main`.
+- [ ] **HIG Phase 2, draft PR #223** (`fix/hig-phase-2`, stacked on #222): Britt reviews. Merge #222 first, then retarget #223 to `main`; CI first runs then.
 - [ ] **USER, design calls from the Phase 2 reviews**:
   - `useConfirm` styles every Delete confirm red. HIG alerts reserve the destructive style for actions the person did not deliberately choose (the Empty Trash example). Should the default be `destructive: false`?
   - The undo notice is an inverted near-white slab in dark mode. Legible at 16:1, but HIG dark-mode prefers elevated dark surfaces.
