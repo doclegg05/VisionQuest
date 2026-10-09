@@ -234,7 +234,7 @@ export default function CertTracker() {
                 )}
 
                 {/* Status badges */}
-                <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex flex-wrap items-center gap-2 mt-2">
                   {req.needsVerify && (
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       req.verifiedBy

@@ -146,7 +146,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Briefcase size={18} className="text-[var(--primary)]" />
+            <Briefcase size={18} className="text-[var(--accent-blue)]" />
             <p className="text-sm font-medium text-[var(--ink-strong)]">Job results</p>
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">
@@ -291,7 +291,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
                   href={job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 pointer-coarse:min-h-11 rounded-lg bg-[var(--surface-raised)] px-3 py-1.5 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--primary)]"
+                  className="inline-flex items-center gap-1 pointer-coarse:min-h-11 rounded-lg bg-[var(--surface-raised)] px-3 py-1.5 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--badge-info-text)]"
                 >
                   <ArrowSquareOut size={14} />
                   View
@@ -324,7 +324,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
                 </span>
               )}
               {job.duplicateCount > 1 && (
-                <span className="rounded-full bg-[var(--primary)]/15 px-2 py-0.5 text-xs text-[var(--primary)]">
+                <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-xs text-[var(--badge-info-text)]">
                   merged {job.duplicateCount} postings
                 </span>
               )}
