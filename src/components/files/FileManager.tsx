@@ -228,7 +228,7 @@ export default function FileManager() {
                     </a>
                     <button
                       onClick={() => handleDelete(file.id, file.filename)}
-                      className="inline-flex min-h-11 items-center rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                      className="inline-flex min-h-11 items-center rounded-full border border-[var(--badge-error-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
                     >
                       Delete
                     </button>

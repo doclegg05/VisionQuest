@@ -17,6 +17,9 @@ interface SignaturePadProps {
 }
 
 const CANVAS_HEIGHT = 150;
+// Fixed dark ink, because the exported PNG is drawn on white. Both pads are
+// therefore paper in either theme: bg-white plus data-theme="light", so the
+// tokens inside (caption, placeholder, typed name) take their light values.
 const STROKE_COLOR = "#1a2a3a";
 const STROKE_WIDTH = 2;
 
@@ -230,7 +233,7 @@ function DrawPad({
 
   return (
     <>
-      <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-raised)]">
+      <div ref={containerRef} data-theme="light" className="relative overflow-hidden rounded-xl border-2 border-dashed border-[var(--border)] bg-white">
         <canvas
           ref={canvasRef}
           role="img"
@@ -313,7 +316,7 @@ function TypePad({
   return (
     <>
       <div ref={containerRef} className="space-y-3">
-        <div className="rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-raised)] p-4">
+        <div data-theme="light" className="rounded-xl border-2 border-dashed border-[var(--border)] bg-white p-4">
           <label htmlFor={nameInputId} className="block text-xs font-semibold text-[var(--ink-muted)] mb-2">
             Type your full legal name
           </label>
