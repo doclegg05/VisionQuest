@@ -126,6 +126,15 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
   const [savingLinkId, setSavingLinkId] = useState<string | null>(null);
   const [, setCreatingGoal] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  // A failed removal reports about 6s after the tap, when the student is usually
+  // down in a card and this banner is off-screen above them. Bring it into view.
+  const messageRef = useRef<HTMLDivElement>(null);
+  const revealMessageRef = useRef(false);
+  useEffect(() => {
+    if (!message || !revealMessageRef.current) return;
+    revealMessageRef.current = false;
+    messageRef.current?.scrollIntoView({ block: "nearest" });
+  }, [message]);
 
   // Redesign local interactive states
   const [expandedResources, setExpandedResources] = useState<Record<string, boolean>>({});
@@ -374,11 +383,13 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
         await checkProgression();
       },
       restore: () => setGoalHidden(goalId, false),
-      onCommitError: (error) =>
+      onCommitError: (error) => {
+        revealMessageRef.current = true;
         setMessage({
           tone: "error",
           text: error instanceof Error ? error.message : "Could not remove the goal.",
-        }),
+        });
+      },
     });
   }
 
@@ -538,8 +549,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
       {message ? (
         <div
+          ref={messageRef}
           role={message.tone === "error" ? "alert" : "status"}
-          className={`surface-section p-4 text-sm ${
+          className={`surface-section scroll-my-24 p-4 text-sm ${
             message.tone === "success"
               ? "border border-[var(--border-strong)] bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
               : "border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]"
@@ -712,7 +724,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
               {/* Monthly Goal Header */}
               <div className="mb-4 pr-1">
-                <div className="flex items-start justify-between gap-3 border-b border-dashed border-[var(--border)] pb-2">
+                {/* flex-wrap: the edit form below wraps onto its own full-width line. Beside
+                    the read-aloud and Ask Sage column it was 18px wide on a phone. */}
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-dashed border-[var(--border)] pb-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)]">
@@ -730,26 +744,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       )}
                     </div>
 
-                    {isMEditing ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          handleSaveInlineGoal(monthly.id, editingGoalContent);
-                        }}
-                        className="flex gap-2 mt-1"
-                      >
-                        <input
-                          type="text"
-                          aria-label="Monthly goal"
-                          value={editingGoalContent}
-                          onChange={(e) => setEditingGoalContent(e.target.value)}
-                          className="min-w-0 flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
-                          autoFocus
-                        />
-                        <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
-                        <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
-                      </form>
-                    ) : (
+                    {!isMEditing && (
                       <div className="group flex items-start justify-between mt-1">
                         <h3 className={`font-display text-lg text-[var(--ink-strong)] leading-snug break-words ${monthly.status === "completed" ? "line-through opacity-60" : ""}`}>
                           {monthly.content}
@@ -790,6 +785,26 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       </button>
                     </div>
                   </div>
+                  {isMEditing && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSaveInlineGoal(monthly.id, editingGoalContent);
+                      }}
+                      className="flex min-w-0 basis-full gap-2"
+                    >
+                      <input
+                        type="text"
+                        aria-label="Monthly goal"
+                        value={editingGoalContent}
+                        onChange={(e) => setEditingGoalContent(e.target.value)}
+                        className="min-w-0 flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
+                        autoFocus
+                      />
+                      <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                      <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
+                    </form>
+                  )}
                 </div>
 
                 {/* Mountain Trail Progress Bar */}
