@@ -48,7 +48,7 @@ test.describe("useConfirm prompt", () => {
     const dialog = page.getByRole("alertdialog", { name: "Return this form?" });
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("Note for the student (optional)").fill("  fix page 2  ");
-    await dialog.getByRole("button", { name: "OK" }).click();
+    await dialog.getByRole("button", { name: "Return form" }).click();
     await expect(page.locator("#prompt-result")).toHaveText("text:fix page 2");
     await expect(dialog).toBeHidden();
   });
@@ -59,6 +59,27 @@ test.describe("useConfirm prompt", () => {
     await expect(page.getByRole("alertdialog")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.locator("#prompt-result")).toHaveText("null");
+  });
+});
+
+test.describe("useConfirm lifecycle", () => {
+  test("a second request resolves the first as cancelled instead of leaving it hanging", async ({ page }) => {
+    await openHarness(page);
+    await page.click("#overlap");
+    await expect(page.getByRole("alertdialog", { name: "Second?" })).toBeVisible();
+    await expect(page.locator("#overlap-log")).toHaveText("first:false;");
+    await page.getByRole("alertdialog", { name: "Second?" }).getByRole("button", { name: "Yes" }).click();
+    await expect(page.locator("#overlap-log")).toHaveText("first:false;second:true;");
+  });
+
+  test("unmounting with a dialog open settles its request as cancelled", async ({ page }) => {
+    await openHarness(page);
+    await page.click("#confirm-then-unmount");
+    await expect(page.getByRole("alertdialog", { name: "Leaving?" })).toBeVisible();
+    // The dialog is modal, so remove the owner the way a route change would.
+    await page.evaluate(() => (document.getElementById("unmount-child") as HTMLButtonElement).click());
+    await expect(page.locator("#unmount-settled")).toHaveText("false");
+    expect(await page.evaluate(() => document.querySelectorAll("dialog:modal").length)).toBe(0);
   });
 });
 

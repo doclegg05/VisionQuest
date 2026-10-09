@@ -17,7 +17,7 @@ function PromptCase() {
       <button
         id="open-prompt"
         onClick={async () => {
-          const note = await prompt({ title: "Return this form?", label: "Note for the student (optional)" });
+          const note = await prompt({ title: "Return this form?", label: "Note for the student (optional)", confirmLabel: "Return form" });
           setResult(note === null ? "null" : `text:${note}`);
         }}
       >
@@ -25,6 +25,52 @@ function PromptCase() {
       </button>
       <output id="prompt-result">{result}</output>
       {confirmDialog}
+    </section>
+  );
+}
+
+function OverlapCase() {
+  const { confirm, confirmDialog } = useConfirm();
+  const [log, setLog] = useState("");
+  return (
+    <section>
+      <button
+        id="overlap"
+        onClick={() => {
+          void confirm({ title: "First?", confirmLabel: "Yes" }).then((v) => setLog((l) => `${l}first:${v};`));
+          void confirm({ title: "Second?", confirmLabel: "Yes" }).then((v) => setLog((l) => `${l}second:${v};`));
+        }}
+      >
+        Two confirms
+      </button>
+      <output id="overlap-log">{log}</output>
+      {confirmDialog}
+    </section>
+  );
+}
+
+function UnmountChild({ onSettled }: { onSettled: (v: string) => void }) {
+  const { confirm, confirmDialog } = useConfirm();
+  return (
+    <>
+      <button id="confirm-then-unmount" onClick={() => void confirm({ title: "Leaving?", confirmLabel: "Leave" }).then((v) => onSettled(String(v)))}>
+        Ask
+      </button>
+      {confirmDialog}
+    </>
+  );
+}
+
+function UnmountCase() {
+  const [mounted, setMounted] = useState(true);
+  const [settled, setSettled] = useState("pending");
+  return (
+    <section>
+      {mounted && <UnmountChild onSettled={setSettled} />}
+      <button id="unmount-child" onClick={() => setMounted(false)}>
+        Unmount
+      </button>
+      <output id="unmount-settled">{settled}</output>
     </section>
   );
 }
@@ -100,6 +146,8 @@ function FormDialogCase() {
 createRoot(document.getElementById("root")!).render(
   <>
     <PromptCase />
+    <OverlapCase />
+    <UnmountCase />
     <UndoCase />
     <FormDialogCase />
   </>,

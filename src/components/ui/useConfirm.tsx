@@ -24,7 +24,8 @@ export interface PromptOptions {
   /** Visible label for the text area. */
   label: string;
   placeholder?: string;
-  confirmLabel?: string;
+  /** The verb for what happens, e.g. "Return form". HIG alerts: avoid "OK" unless purely informational. */
+  confirmLabel: string;
   cancelLabel?: string;
   maxLength?: number;
 }
@@ -161,10 +162,22 @@ export function useConfirm() {
   );
 
   const open = useCallback((next: DialogState, resolver: Resolver) => {
+    // A newer request replaces the dialog; settle the older one as cancelled
+    // rather than leaving its caller awaiting forever.
+    resolverRef.current?.(false, "");
     setInputValue("");
     setState(next);
     resolverRef.current = resolver;
   }, []);
+
+  // Unmounting with a dialog open (a route change, a closed parent) cancels it.
+  useEffect(
+    () => () => {
+      resolverRef.current?.(false, "");
+      resolverRef.current = null;
+    },
+    [],
+  );
 
   const confirm = useCallback(
     (opts: ConfirmOptions): Promise<boolean> =>
@@ -207,7 +220,7 @@ export function useConfirm() {
           {
             title: opts.title,
             message: opts.message,
-            confirmLabel: opts.confirmLabel ?? "OK",
+            confirmLabel: opts.confirmLabel,
             cancelLabel: opts.cancelLabel ?? "Cancel",
             destructive: false,
             input: { label: opts.label, placeholder: opts.placeholder, maxLength: opts.maxLength },
