@@ -64,6 +64,10 @@ export default function FormUploadButton({
     }
   }
 
+  const errorMessage = error ? (
+    <p role="alert" className="mt-1 text-xs text-[var(--badge-error-text)]">{error}</p>
+  ) : null;
+
   // Status badge rendering
   if (currentStatus === "approved") {
     return (
@@ -75,50 +79,56 @@ export default function FormUploadButton({
 
   if (currentStatus === "pending") {
     return (
-      <div className="inline-flex items-center gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
-          ⏳ Pending Review
-        </span>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
-        >
-          Re-upload
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
-          onChange={handleFileChange}
-          aria-label="Form file to upload"
-          className="hidden"
-        />
+      <div className="inline-flex flex-col items-start">
+        <div className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+            ⏳ Pending Review
+          </span>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+          >
+            Re-upload
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={handleFileChange}
+            aria-label="Form file to upload"
+            className="hidden"
+          />
+        </div>
+        {errorMessage}
       </div>
     );
   }
 
   if (currentStatus === "rejected") {
     return (
-      <div className="inline-flex items-center gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-600">
-          ✗ Rejected
-        </span>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
-        >
-          {uploading ? "Uploading..." : "Re-upload"}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
-          onChange={handleFileChange}
-          aria-label="Form file to upload"
-          className="hidden"
-        />
+      <div className="inline-flex flex-col items-start">
+        <div className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+            ✗ Rejected
+          </span>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+          >
+            {uploading ? "Uploading..." : "Re-upload"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={handleFileChange}
+            aria-label="Form file to upload"
+            className="hidden"
+          />
+        </div>
+        {errorMessage}
       </div>
     );
   }
@@ -142,7 +152,7 @@ export default function FormUploadButton({
         aria-label="Form file to upload"
         className="hidden"
       />
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {errorMessage}
     </div>
   );
 }

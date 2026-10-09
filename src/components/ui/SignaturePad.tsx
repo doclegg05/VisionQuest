@@ -237,7 +237,7 @@ function DrawPad({
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label="Signature drawing area. Use the text input below for an accessible alternative."
+          aria-label="Signature drawing area. To type your name instead, choose Type above."
           className="block cursor-crosshair touch-none"
           onMouseDown={startStroke}
           onMouseMove={draw}

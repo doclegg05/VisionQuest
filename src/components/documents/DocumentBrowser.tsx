@@ -222,7 +222,7 @@ export default function DocumentBrowser({
           <button
             type="button"
             onClick={() => setFetchKey((k) => k + 1)}
-            className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-600 underline"
+            className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-700 underline"
           >
             Retry
           </button>

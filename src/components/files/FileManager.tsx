@@ -38,10 +38,11 @@ export default function FileManager() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const categoryId = useId();
   const [category, setCategory] = useState("general");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { confirm, alert, confirmDialog } = useConfirm();
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     fetchFiles();
@@ -67,8 +68,9 @@ export default function FileManager() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploadError(null);
     if (file.size > 10 * 1024 * 1024) {
-      setError("File is too large. Maximum size is 10MB.");
+      setUploadError("File is too large. Maximum size is 10MB.");
       return;
     }
 
@@ -83,10 +85,11 @@ export default function FileManager() {
         fetchFiles();
       } else {
         const err = await res.json();
-        await alert({ title: "Upload failed", message: err.error || "Please try again." });
+        setUploadError(err.error || "Upload failed. Please try again.");
       }
     } catch (err) {
       console.error("Upload failed:", err instanceof Error ? err.message : "Unknown error");
+      setUploadError("Upload failed. Please try again.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -112,7 +115,7 @@ export default function FileManager() {
 
   if (error) return (
     <div className="surface-section px-6 py-10 text-center">
-      <p className="mb-4 text-sm text-red-600">{error}</p>
+      <p role="alert" className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
       <button onClick={fetchFiles} className="primary-button px-4 py-2 text-sm">
         Try Again
       </button>
@@ -165,6 +168,9 @@ export default function FileManager() {
             </button>
           </div>
         </div>
+        {uploadError && (
+          <p role="alert" className="mt-2 text-xs text-[var(--badge-error-text)]">{uploadError}</p>
+        )}
         <p className="mt-2 text-xs text-[var(--ink-muted)]">PDF, JPG, PNG, or GIF. Max 10MB.</p>
       </div>
 
