@@ -871,7 +871,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                           onClick={(e) => handleToggleGoalStatus(weekly.id, weekly.status, e)}
                           disabled={wLocked}
                           aria-describedby={wLocked ? proposedHintId : undefined}
-                          className="size-11 -ml-4.5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                          className="size-11 -ml-4.5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label={weekly.status === "completed" ? "Mark incomplete" : "Mark complete"}
                         >
                           {weekly.status === "completed" ? (
@@ -932,7 +932,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 onClick={(e) => handleToggleGoalStatus(task.id, task.status, e)}
                                 disabled={tLocked}
                                 aria-describedby={tLocked ? proposedHintId : undefined}
-                                className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                                className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={task.status === "completed" ? "Mark incomplete" : "Mark complete"}
                               >
                                 {task.status === "completed" ? (
@@ -1036,7 +1036,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         onClick={(e) => handleToggleGoalStatus(item.id, item.status, e)}
                         disabled={itemLocked}
                         aria-describedby={itemLocked ? proposedHintId : undefined}
-                        className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                        className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label={item.status === "completed" ? "Mark incomplete" : "Mark complete"}
                       >
                         {item.status === "completed" ? (
