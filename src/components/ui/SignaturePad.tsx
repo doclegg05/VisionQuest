@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 type SignatureMode = "draw" | "type";
 
@@ -284,6 +284,7 @@ function TypePad({
   submitting: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const nameInputId = useId();
   const trimmed = typedName.trim();
 
   function handleSubmit() {
@@ -313,10 +314,11 @@ function TypePad({
     <>
       <div ref={containerRef} className="space-y-3">
         <div className="rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-raised)] p-4">
-          <label className="block text-xs font-semibold text-[var(--ink-muted)] mb-2">
+          <label htmlFor={nameInputId} className="block text-xs font-semibold text-[var(--ink-muted)] mb-2">
             Type your full legal name
           </label>
           <input
+            id={nameInputId}
             type="text"
             value={typedName}
             onChange={(e) => onTypedNameChange(e.target.value)}

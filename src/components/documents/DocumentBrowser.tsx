@@ -222,7 +222,7 @@ export default function DocumentBrowser({
           <button
             type="button"
             onClick={() => setFetchKey((k) => k + 1)}
-            className="mt-2 text-xs font-medium text-red-600 underline"
+            className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-600 underline"
           >
             Retry
           </button>
@@ -286,7 +286,7 @@ function CategorySection({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 text-left"
+        className="flex min-h-11 w-full items-center gap-3 text-left"
       >
         <span aria-hidden="true" className="text-2xl">{icon}</span>
         <div className="flex-1">

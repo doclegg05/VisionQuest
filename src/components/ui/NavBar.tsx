@@ -440,7 +440,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 ref={profileButtonRef}
                 onClick={() => setProfileOpen(!profileOpen)}
                 type="button"
-                className="rounded-full border border-white/12 p-1.5 text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                className="inline-flex size-11 items-center justify-center rounded-full border border-white/12 text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                 aria-label="Profile menu"
                 aria-expanded={profileOpen}
                 aria-haspopup="menu"

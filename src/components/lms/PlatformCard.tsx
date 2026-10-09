@@ -102,7 +102,7 @@ export default function PlatformCard({
                 e.preventDefault();
                 setLinksOpen(!linksOpen);
               }}
-              className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] transition-colors cursor-pointer"
+              className="inline-flex min-h-11 items-center text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] transition-colors cursor-pointer"
             >
               {linksOpen ? "Less resources \u25B4" : "More resources \u25BE"}
             </button>
@@ -121,7 +121,7 @@ export default function PlatformCard({
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-xs text-[var(--accent-secondary)] hover:underline"
+                className="flex min-h-11 items-center text-xs text-[var(--accent-secondary)] hover:underline"
               >
                 {link.label} &nearr;
               </a>
@@ -143,7 +143,7 @@ export default function PlatformCard({
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => onVisit?.(platform.id)}
-        className={`${sharedClasses} no-underline cursor-pointer`}
+        className={`${sharedClasses} min-h-11 no-underline cursor-pointer`}
       >
         {cardContent}
       </a>
