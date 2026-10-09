@@ -557,7 +557,7 @@ export default function SpokesManager() {
                 type="button"
                 onClick={() => void createReferral()}
                 disabled={creatingReferral}
-                className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
               >
                 {creatingReferral ? "Saving..." : "Add Referral"}
               </button>
@@ -772,7 +772,7 @@ export default function SpokesManager() {
                 <button
                   type="button"
                   onClick={() => void saveChecklistTemplate()}
-                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110"
+                  className="inline-flex items-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 pointer-coarse:min-h-11"
                 >
                   {editingChecklistId ? "Save Changes" : "Add Item"}
                 </button>
@@ -780,7 +780,7 @@ export default function SpokesManager() {
                   <button
                     type="button"
                     onClick={resetChecklistForm}
-                    className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--ink-strong)]"
+                    className="inline-flex items-center rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
                   >
                     Cancel
                   </button>
@@ -913,7 +913,7 @@ export default function SpokesManager() {
                 <button
                   type="button"
                   onClick={() => void saveModuleTemplate()}
-                  className="rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110"
+                  className="inline-flex items-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 pointer-coarse:min-h-11"
                 >
                   {editingModuleId ? "Save Changes" : "Add Module"}
                 </button>
@@ -921,7 +921,7 @@ export default function SpokesManager() {
                   <button
                     type="button"
                     onClick={resetModuleForm}
-                    className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--ink-strong)]"
+                    className="inline-flex items-center rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--ink-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
                   >
                     Cancel
                   </button>

@@ -319,7 +319,7 @@ export default function AcademicKpiReport() {
         <p className="text-[var(--badge-error-text)] mb-4">{error || "Could not load KPI report."}</p>
         <button
           onClick={() => void loadData()}
-          className="primary-button px-4 py-2"
+          className="primary-button px-4 py-2 pointer-coarse:min-h-11"
         >
           Try Again
         </button>

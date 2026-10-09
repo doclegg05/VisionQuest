@@ -116,7 +116,7 @@ export default function FileManager() {
   if (error) return (
     <div className="surface-section px-6 py-10 text-center">
       <p role="alert" className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
-      <button onClick={fetchFiles} className="primary-button px-4 py-2 text-sm">
+      <button onClick={fetchFiles} className="primary-button min-h-11 px-4 py-2 text-sm">
         Try Again
       </button>
     </div>
@@ -162,7 +162,7 @@ export default function FileManager() {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               type="button"
-              className="primary-button w-full px-4 py-2.5 text-sm disabled:opacity-50 sm:w-auto"
+              className="primary-button min-h-11 w-full px-4 py-2.5 text-sm disabled:opacity-50 sm:w-auto"
             >
               {uploading ? "Uploading..." : "Choose File"}
             </button>
@@ -189,7 +189,7 @@ export default function FileManager() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="primary-button px-4 py-2.5 text-sm disabled:opacity-50"
+              className="primary-button min-h-11 px-4 py-2.5 text-sm disabled:opacity-50"
             >
               {uploading ? "Uploading..." : "Choose a file"}
             </button>

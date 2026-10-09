@@ -177,7 +177,7 @@ export default function DocumentBrowser({
           <button
             type="button"
             onClick={() => setSelectedCategory("all")}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === "all"
                 ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
@@ -194,7 +194,7 @@ export default function DocumentBrowser({
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   selectedCategory === cat
                     ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                     : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"

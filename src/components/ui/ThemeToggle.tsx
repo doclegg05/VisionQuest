@@ -11,7 +11,9 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       onClick={toggleTheme}
       type="button"
       className={[
-        "rounded-full border border-[var(--border)] p-2 transition-colors hover:bg-[var(--surface-overlay)]",
+        // size-11 with p-3 centers the 18px block svg (1 + 12 + 18 + 12 + 1 = 44) without a display class,
+        // so callers can still pass `hidden`/`block` (NavBar does) without breaking the layout.
+        "size-11 rounded-full border border-[var(--border)] p-3 transition-colors hover:bg-[var(--surface-overlay)]",
         className,
       ]
         .filter(Boolean)

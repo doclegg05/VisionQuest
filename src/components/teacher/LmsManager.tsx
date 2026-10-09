@@ -128,7 +128,7 @@ export default function LmsManager() {
   if (error) return (
     <div className="surface-section px-6 py-10 text-center">
       <p className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
-      <button onClick={fetchLinks} className="primary-button px-4 py-2 text-sm">
+      <button onClick={fetchLinks} className="primary-button px-4 py-2 text-sm pointer-coarse:min-h-11">
         Try Again
       </button>
     </div>
@@ -253,13 +253,13 @@ export default function LmsManager() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleSave}
-              className="primary-button px-4 py-2 text-sm"
+              className="primary-button px-4 py-2 text-sm pointer-coarse:min-h-11"
             >
               {editingId ? "Save Changes" : "Add Link"}
             </button>
             <button
               onClick={resetForm}
-              className="rounded-full px-4 py-2 text-sm font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)]"
+              className="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
             >
               Cancel
             </button>
