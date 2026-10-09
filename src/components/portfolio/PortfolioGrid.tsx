@@ -267,7 +267,7 @@ export default function PortfolioGrid() {
   if (error) return (
     <div className="text-center py-12">
       <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchItems} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+      <button onClick={fetchItems} className="inline-flex min-h-11 items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
         Try Again
       </button>
     </div>
@@ -301,7 +301,7 @@ export default function PortfolioGrid() {
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="primary-button px-4 py-2.5 text-sm"
+              className="primary-button min-h-11 px-4 py-2.5 text-sm"
             >
               Add first item
             </button>

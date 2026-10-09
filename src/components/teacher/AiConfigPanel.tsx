@@ -213,14 +213,14 @@ export default function AiConfigPanel() {
               type="button"
               onClick={() => void handleTest()}
               disabled={testing}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {testing ? "Testing..." : "Test Connection"}
             </button>
             <button
               type="button"
               onClick={() => void handleRemove()}
-              className="rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
+              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
             >
               Remove
             </button>

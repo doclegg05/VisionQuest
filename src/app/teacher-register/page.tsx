@@ -90,7 +90,7 @@ export default function StaffRegisterPage() {
                       setError("");
                       setNotice("");
                     }}
-                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                    className={`inline-flex flex-1 items-center justify-center rounded-lg py-2 text-sm font-medium transition-colors pointer-coarse:min-h-11 ${
                       role === option
                         ? "bg-[var(--surface-strong)] text-[var(--ink-strong)] shadow-sm"
                         : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"

@@ -28,7 +28,7 @@ const INPUT_CLASS =
   "w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 const LABEL_TEXT_CLASS = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]";
 const SECONDARY_BUTTON_CLASS =
-  "rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60";
 
 function sanitizeFileName(value: string) {
   return value
@@ -410,7 +410,7 @@ export default function ResumeBuilder() {
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 saved
                   ? "bg-green-100 text-green-700"
                   : "bg-blue-600 text-white hover:bg-blue-700"
@@ -506,7 +506,7 @@ export default function ResumeBuilder() {
               type="button"
               onClick={() => uploadInputRef.current?.click()}
               disabled={uploading}
-              className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {uploading ? "Sage is reading..." : "Upload Resume"}
             </button>
@@ -551,7 +551,7 @@ export default function ResumeBuilder() {
             type="button"
             onClick={() => void handleAssist()}
             disabled={assistantLoading}
-            className="rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {assistantLoading ? "Sage is drafting..." : "Draft with Sage"}
           </button>
@@ -697,7 +697,7 @@ export default function ResumeBuilder() {
             placeholder="Add a skill such as Microsoft Excel, customer service, scheduling, or inventory tracking"
             className={`${INPUT_CLASS} flex-1`}
           />
-          <button type="button" onClick={addSkill} className="rounded-lg bg-[var(--surface-interactive)] px-4 py-2 text-sm text-[var(--ink-strong)] hover:bg-[var(--surface-strong)]">
+          <button type="button" onClick={addSkill} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--surface-interactive)] px-4 py-2 text-sm text-[var(--ink-strong)] hover:bg-[var(--surface-strong)]">
             Add Skill
           </button>
         </div>

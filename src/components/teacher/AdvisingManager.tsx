@@ -149,7 +149,7 @@ export default function AdvisingManager() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
-        <button onClick={() => void fetchAvailability()} className="primary-button px-4 py-2 rounded-lg">
+        <button onClick={() => void fetchAvailability()} className="primary-button px-4 py-2 rounded-lg pointer-coarse:min-h-11">
           Try Again
         </button>
       </div>
@@ -180,7 +180,7 @@ export default function AdvisingManager() {
             type="button"
             onClick={() => void handleSendReminders()}
             disabled={sendingReminders}
-            className="mt-3 inline-flex rounded-full bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-3 inline-flex items-center pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {sendingReminders ? "Sending..." : "Send upcoming reminders"}
           </button>
@@ -329,14 +329,14 @@ export default function AdvisingManager() {
             <button
               type="button"
               onClick={() => void handleSave()}
-              className="primary-button text-sm px-4 py-2 rounded-lg"
+              className="primary-button text-sm px-4 py-2 rounded-lg pointer-coarse:min-h-11"
             >
               Add Availability
             </button>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
+              className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
             >
               Cancel
             </button>
