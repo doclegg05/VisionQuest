@@ -1,0 +1,19 @@
+{
+  "suite": "explain-faithfulness",
+  "tier": "nightly",
+  "startedAt": "2026-10-10T11:55:06.647Z",
+  "durationMs": 680,
+  "commit": "925b2df",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.21.0",
+    "ollama": null
+  },
+  "metrics": [],
+  "status": "error",
+  "error": "[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]\nError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]\n    at handleResponseNotOk (/home/runner/work/VisionQuest/VisionQuest/node_modules/@google/generative-ai/dist/index.js:434:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async makeRequest (/home/runner/work/VisionQuest/VisionQuest/node_modules/@google/generative-ai/dist/index.js:403:9)\n    at async generateContent (/home/runner/work/VisionQuest/VisionQuest/node_modules/@google/generative-ai/dist/index.js:867:22)\n    at async ChatSession.sendMessage (/home/runner/work/VisionQuest/VisionQuest/node_modules/@google/generative-ai/dist/index.js:1210:9)\n    at async withDeadline (/home/runner/work/VisionQuest/VisionQuest/src/lib/ai/gemini-provider.ts:130:12)\n    at async <anonymous> (/home/runner/work/VisionQuest/VisionQuest/src/lib/ai/gemini-provider.ts:303:22)\n    at async withTransientRetry (/home/runner/work/VisionQuest/VisionQuest/src/lib/ai/gemini-provider.ts:173:14)\n    at async Module.run (/home/runner/work/VisionQuest/VisionQuest/scripts/bench/suites/explain-faithfulness.mjs:70:7)\n    at async runSuite (/home/runner/work/VisionQuest/VisionQuest/scripts/bench/run.mjs:190:14)"
+}
