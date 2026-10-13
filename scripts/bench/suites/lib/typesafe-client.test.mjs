@@ -90,6 +90,19 @@ describe("parseChoiceAnswer", () => {
     );
   });
 
+  it("renormalizes probabilities that two-decimal rounding leaves just short of 1", () => {
+    // The live bake-off's office-admin-01-es answer summed to 0.990 and was
+    // rejected, which scored a probably-correct answer as a failed case.
+    const parsed = parseChoiceAnswer(
+      { choice: "office-admin", probabilities: { "office-admin": 0.66, "tech-digital": 0.33 }, confidence: 0.5 },
+      keys,
+    );
+    const total = Object.values(parsed.probabilities).reduce((sum, value) => sum + value, 0);
+    assert.ok(Math.abs(total - 1) < 1e-9, String(total));
+    assert.ok(Math.abs(parsed.probabilities["office-admin"] - 0.66 / 0.99) < 1e-9);
+    assert.equal(parsed.choice, "office-admin");
+  });
+
   it("rejects probabilities that are missing, non-numeric, or do not sum to 1", () => {
     assert.throws(() => parseChoiceAnswer({ choice: "office-admin" }, keys), TypeSafeError);
     assert.throws(

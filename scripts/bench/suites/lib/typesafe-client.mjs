@@ -19,7 +19,13 @@ export const JEV_DEFAULT_MODEL = "typesafe/jev-1.13";
 
 const MAX_CHOICE_OPTIONS = 255;
 const RETRYABLE_STATUSES = new Set([429, 529]);
-const PROBABILITY_SUM_TOLERANCE = 0.01;
+/**
+ * Jev reports each probability rounded to two decimals, so a sum can drift by
+ * up to half a hundredth per option. Within that drift the answer is
+ * renormalized; beyond it the answer is treated as malformed.
+ */
+const ROUNDING_DRIFT_PER_OPTION = 0.005;
+const MIN_SUM_TOLERANCE = 0.01;
 const ERROR_EXCERPT_CHARS = 200;
 const BASE_BACKOFF_MS = 500;
 
@@ -85,12 +91,14 @@ export function parseChoiceAnswer(answer, optionKeys) {
     probabilities[key] = value;
     sum += value;
   }
-  if (Math.abs(sum - 1) > PROBABILITY_SUM_TOLERANCE) {
+  const tolerance = Math.max(MIN_SUM_TOLERANCE, ROUNDING_DRIFT_PER_OPTION * optionKeys.length);
+  if (Math.abs(sum - 1) > tolerance) {
     throw new TypeSafeError(`Jev probabilities sum to ${sum.toFixed(3)}, not 1`);
   }
+  const normalized = Object.fromEntries(Object.entries(probabilities).map(([key, value]) => [key, value / sum]));
 
   const confidence = typeof record.confidence === "number" ? record.confidence : null;
-  return { choice, probabilities, confidence };
+  return { choice, probabilities: normalized, confidence };
 }
 
 function scrub(text, apiKey) {
