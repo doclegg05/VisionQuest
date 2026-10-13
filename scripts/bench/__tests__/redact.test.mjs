@@ -28,6 +28,7 @@ test("every secret the runner can hand a scorer is on the list", () => {
       "DIRECT_URL",
       "GEMINI_API_KEY",
       "TWILIO_AUTH_TOKEN",
+      "TYPESAFE_API_KEY",
     ]
   );
 });
