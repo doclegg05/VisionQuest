@@ -1,23 +1,21 @@
 /**
- * Minimal client for TypeSafe's Jev classifier (POST /v1/systemone).
+ * Minimal client for TypeSafe's Jev classifier, called through OpenRouter's
+ * System One endpoint (POST https://openrouter.ai/api/v1/systemone), which
+ * implements TypeSafe's own request and response shapes.
  *
- * BENCHMARK USE ONLY, SYNTHETIC DATA ONLY. This lives under scripts/bench on
- * purpose: it bypasses resolveAiProvider, the AI audit log, and the
- * de-identification layer, which is acceptable for made-up fixture text and
- * nothing else. Sending student data to TypeSafe is an owner decision that has
- * not been made (no FERPA language in its DPA, retention "as long as
- * necessary", zero retention only for enterprise). A production integration
- * would be a new provider behind the resolver, not an import of this file.
+ * BENCHMARK USE ONLY, SYNTHETIC DATA ONLY. Real student data must never reach
+ * OpenRouter (docs/runbooks/openrouter-test-bench.md).
  *
- * API contract, from https://docs.typesafe.ai/api.md (October 2026):
+ * API contract, from https://docs.typesafe.ai/api.md and
+ * https://openrouter.ai/docs/guides/community/typesafe-sdk.md (October 2026):
  *   POST {base}/v1/systemone, Authorization: Bearer <key>
  *   body     { model, state, questions: { <id>: { type: "choice", instructions, criteria } } }
- *   response { model, answers: { <id>: { type, choice, probabilities, confidence } }, usage }
+ *   response { model, provider, answers: { <id>: { type, choice, probabilities, confidence } }, usage }
  *   429 and 529 are retryable; 401 and 422 are not.
  */
 
-export const TYPESAFE_DEFAULT_BASE = "https://api.typesafe.ai";
-export const TYPESAFE_DEFAULT_MODEL = "jev-1.13.0";
+export const SYSTEMONE_DEFAULT_BASE = "https://openrouter.ai/api";
+export const JEV_DEFAULT_MODEL = "typesafe/jev-1.13";
 
 const MAX_CHOICE_OPTIONS = 255;
 const RETRYABLE_STATUSES = new Set([429, 529]);
@@ -96,7 +94,7 @@ export function parseChoiceAnswer(answer, optionKeys) {
 }
 
 function scrub(text, apiKey) {
-  return apiKey ? text.split(apiKey).join("[redacted:TYPESAFE_API_KEY]") : text;
+  return apiKey ? text.split(apiKey).join("[redacted:OPENROUTER_API_KEY]") : text;
 }
 
 async function readJson(response, apiKey) {
@@ -143,13 +141,13 @@ export async function callSystemOne({
   model,
   state,
   questions,
-  baseUrl = TYPESAFE_DEFAULT_BASE,
+  baseUrl = SYSTEMONE_DEFAULT_BASE,
   fetchImpl = fetch,
   timeoutMs = 15_000,
   maxRetries = 3,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) {
-  if (!apiKey) throw new TypeSafeError("TYPESAFE_API_KEY is not set");
+  if (!apiKey) throw new TypeSafeError("OPENROUTER_API_KEY is not set");
 
   const url = `${baseUrl.replace(/\/+$/, "")}/v1/systemone`;
   const body = JSON.stringify({ model, state, questions });
@@ -158,7 +156,14 @@ export async function callSystemOne({
     const { response, latencyMs } = await postOnce({ url, apiKey, body, fetchImpl, timeoutMs });
     if (response.ok) {
       const json = await readJson(response, apiKey);
-      return { model: json.model ?? model, answers: json.answers ?? {}, usage: json.usage ?? null, latencyMs, retries: attempt };
+      return {
+        model: json.model ?? model,
+        answers: json.answers ?? {},
+        usage: json.usage ?? null,
+        upstreamProvider: typeof json.provider === "string" ? json.provider : null,
+        latencyMs,
+        retries: attempt,
+      };
     }
     if (RETRYABLE_STATUSES.has(response.status) && attempt < maxRetries) {
       await sleep(BASE_BACKOFF_MS * 2 ** attempt);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // =============================================================================
-// career-classifier — bake-off: today's Gemini discovery extractor vs Jev.
+// career-classifier: bake-off of today's Gemini discovery extractor vs Jev.
 //
 // Both arms read the same synthetic career-discovery conversation and must name
 // the student's best-fit SPOKES pathway (7 options) and national career cluster
@@ -8,12 +8,15 @@
 // adding for career classification; see the research notes in the PR.
 //
 //   Gemini arm  extractDiscoverySignals, imported from production with its real
-//               prompt, on a GeminiProvider. Top-1 is the highest cluster score.
+//               prompt, on an OpenRouterProvider running google/gemini-3.1-flash-lite.
+//               Top-1 is the highest cluster score. OpenRouter cannot send
+//               production's safety settings; for classifying synthetic
+//               conversations that does not matter.
 //   Jev arm     two Choice questions (SPOKES, national) over the same last-10
-//               message window. Asked twice, the second time with every option
-//               list reversed, because Jev's own docs say it leans toward the
-//               first option; the forward call is the prediction and the pair
-//               gives the order-flip rate.
+//               message window, through OpenRouter's System One endpoint. Asked
+//               twice, the second time with every option list reversed, because
+//               Jev's own docs say it leans toward the first option; the forward
+//               call is the prediction and the pair gives the order-flip rate.
 //
 // Information parity, stated so the numbers are read correctly:
 //   national  both arms see the 14 cluster NAMES only. Like for like.
@@ -23,13 +26,14 @@
 //             descriptions, and that is also a cheap fix for the Gemini prompt.
 //
 // Manual tier, no floors: this informs one decision and gates nothing.
-// Synthetic fixture only (config/benchmarks/fixtures/career-classifier.json);
-// typesafe-client.mjs bypasses the AI resolver and must never see student data.
+// Synthetic fixture only (config/benchmarks/fixtures/career-classifier.json).
+// OpenRouter is eval-only: real student data must never reach it
+// (docs/runbooks/openrouter-test-bench.md).
 //
-//   GEMINI_API_KEY=… TYPESAFE_API_KEY=… npm run bench -- --suite=career-classifier
-//   BENCH_CAREER_LIMIT=4   first 4 English cases and their Spanish pairs (smoke)
-//   BENCH_JEV_MODEL        default jev-1.13.0 (pinned; jev-latest moves)
-//   TYPESAFE_API_BASE      default https://api.typesafe.ai
+//   OPENROUTER_API_KEY=... npm run bench -- --suite=career-classifier
+//   BENCH_CAREER_LIMIT=4          first 4 English cases and their Spanish pairs
+//   BENCH_CAREER_GEMINI_MODEL     default google/gemini-3.1-flash-lite
+//   BENCH_JEV_MODEL               default typesafe/jev-1.13
 // =============================================================================
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -48,8 +52,8 @@ import {
   validateFixture,
 } from "./lib/career-classifier-score.mjs";
 import {
-  TYPESAFE_DEFAULT_BASE,
-  TYPESAFE_DEFAULT_MODEL,
+  JEV_DEFAULT_MODEL,
+  SYSTEMONE_DEFAULT_BASE,
   callSystemOne,
   choiceQuestion,
   parseChoiceAnswer,
@@ -71,8 +75,8 @@ async function loadProduction() {
   const { CAREER_CLUSTERS } = await import("../../../src/lib/spokes/career-clusters.ts");
   const { NATIONAL_CAREER_CLUSTERS } = await import("../../../src/lib/spokes/national-clusters.ts");
   const { extractDiscoverySignals } = await import("../../../src/lib/sage/discovery-extractor.ts");
-  const { GeminiProvider } = await import("../../../src/lib/ai/gemini-provider.ts");
-  return { CAREER_CLUSTERS, NATIONAL_CAREER_CLUSTERS, extractDiscoverySignals, GeminiProvider };
+  const { OpenRouterProvider, OPENROUTER_DEFAULT_MODEL } = await import("../../../src/lib/ai/openrouter-provider.ts");
+  return { CAREER_CLUSTERS, NATIONAL_CAREER_CLUSTERS, extractDiscoverySignals, OpenRouterProvider, OPENROUTER_DEFAULT_MODEL };
 }
 
 /** Jev option keys: SPOKES ids as-is; national names slugged, name as the description. */
@@ -129,7 +133,9 @@ function scoredRow(testCase, vocab, prediction) {
   };
 }
 
-export async function runGeminiCase({ provider, extract }, testCase, vocab) {
+export async function runGeminiCase({ makeProvider, extract }, testCase, vocab) {
+  const metas = [];
+  const provider = makeProvider((meta) => metas.push(meta));
   const startedAt = performance.now();
   let result = null;
   let error = null;
@@ -141,13 +147,14 @@ export async function runGeminiCase({ provider, extract }, testCase, vocab) {
     error = caught instanceof Error ? caught.message.slice(0, 200) : "extractor threw";
   }
   const spokesScores = result?.cluster_scores ?? {};
-  return scoredRow(testCase, vocab, {
+  const row = scoredRow(testCase, vocab, {
     spokesTop: topLabels(spokesScores, vocab.spokesIds),
     nationalTop: topLabels(nationalScoreMap(result?.national_career_clusters), vocab.nationalNames),
     spokesDistribution: toDistribution(spokesScores, vocab.spokesIds),
     latencyMs: Math.round(performance.now() - startedAt),
     error,
   });
+  return { ...row, upstreamProvider: metas.at(-1)?.upstreamProvider ?? null };
 }
 
 function parseJevPair(forward, reverse, vocab) {
@@ -173,7 +180,7 @@ export async function runJevCase(jev, testCase, vocab) {
       confidence: answer.spokes.confidence,
     });
     return {
-      row: { ...row, spokesProbabilities: answer.spokes.probabilities },
+      row: { ...row, spokesProbabilities: answer.spokes.probabilities, upstreamProvider: forward.upstreamProvider },
       flips: {
         spokes: { a: answer.spokes.choice, b: answer.spokesReversed.choice },
         national: { a: answer.national.choice, b: answer.nationalReversed.choice },
@@ -184,18 +191,17 @@ export async function runJevCase(jev, testCase, vocab) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Jev call failed";
     const row = scoredRow(testCase, vocab, { spokesTop: [], nationalTop: [], spokesDistribution: null, latencyMs: null, error: message });
-    return { row, flips: null, inputTokens: 0, model: null };
+    return { row: { ...row, upstreamProvider: null }, flips: null, inputTokens: 0, model: null };
   }
 }
 
-function jevConfig(vocab, env = process.env) {
-  const apiKey = env.TYPESAFE_API_KEY?.trim() || "";
+function jevConfig(vocab, apiKey, env = process.env) {
   if (!apiKey) return null;
   return {
     request: {
       apiKey,
-      model: env.BENCH_JEV_MODEL?.trim() || TYPESAFE_DEFAULT_MODEL,
-      baseUrl: env.TYPESAFE_API_BASE?.trim() || TYPESAFE_DEFAULT_BASE,
+      model: env.BENCH_JEV_MODEL?.trim() || JEV_DEFAULT_MODEL,
+      baseUrl: SYSTEMONE_DEFAULT_BASE,
     },
     forward: jevQuestions(vocab, false),
     reversed: jevQuestions(vocab, true),
@@ -245,8 +251,8 @@ function writeArtifact(repoRoot, payload) {
 }
 
 export async function run(ctx) {
-  if (!ctx.env.geminiApiKey) {
-    return { skipped: "no GEMINI_API_KEY — the baseline arm is the production Gemini extractor" };
+  if (!ctx.env.openrouterApiKey) {
+    return { skipped: "no OPENROUTER_API_KEY: both arms run through OpenRouter" };
   }
   const production = await loadProduction();
   const vocab = buildVocab(production);
@@ -256,13 +262,17 @@ export async function run(ctx) {
   }
 
   const cases = selectCases(ctx.fixture.cases, Number(process.env.BENCH_CAREER_LIMIT));
-  const gemini = { provider: new production.GeminiProvider(ctx.env.geminiApiKey), extract: production.extractDiscoverySignals };
+  const geminiModel = process.env.BENCH_CAREER_GEMINI_MODEL?.trim() || production.OPENROUTER_DEFAULT_MODEL;
+  const gemini = {
+    makeProvider: (onResponseMeta) =>
+      new production.OpenRouterProvider(ctx.env.openrouterApiKey, geminiModel, { onResponseMeta }),
+    extract: production.extractDiscoverySignals,
+  };
   const geminiRows = [];
   for (const testCase of cases) geminiRows.push(await runGeminiCase(gemini, testCase, vocab));
 
-  const jev = jevConfig(vocab);
+  const jev = jevConfig(vocab, ctx.env.openrouterApiKey);
   const jevRun = jev ? await runJevArm(jev, cases, vocab) : null;
-  const geminiModel = production.GeminiProvider.modelName;
   const geminiSummary = summarize(geminiRows);
   const jevSummary = jevRun ? summarize(jevRun.rows) : null;
 
@@ -275,12 +285,12 @@ export async function run(ctx) {
     gemini: { summary: geminiSummary, rows: geminiRows },
     jev: jevRun
       ? { summary: jevSummary, rows: jevRun.rows, orderFlip: { spokes: jevRun.flipSpokes, national: jevRun.flipNational }, inputTokens: jevRun.inputTokens, estimatedUsd: jevRun.estimatedUsd }
-      : { skipped: "TYPESAFE_API_KEY is not set" },
+      : { skipped: "OPENROUTER_API_KEY is not set" },
   });
 
-  const jevSkip = "TYPESAFE_API_KEY is not set; the Jev arm did not run";
+  const jevSkip = "OPENROUTER_API_KEY is not set; the Jev arm did not run";
   return {
-    provider: jevRun ? "gemini vs typesafe" : "gemini",
+    provider: "openrouter",
     model: jevRun ? `${geminiModel} vs ${jevRun.model}` : geminiModel,
     metrics: [
       ...armMetrics("gemini", geminiSummary, null, artifactPath),

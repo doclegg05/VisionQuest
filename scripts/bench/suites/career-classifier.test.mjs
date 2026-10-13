@@ -68,6 +68,7 @@ describe("runJevCase", () => {
       },
       usage: { input_tokens: 500 },
       model: "jev-1.13.0",
+      provider: "TypeSafe",
     };
     const reverse = {
       answers: {
@@ -85,6 +86,7 @@ describe("runJevCase", () => {
     assert.deepEqual(outcome.row.nationalTop, ["Digital Technology"]);
     assert.deepEqual(outcome.flips.spokes, { a: "tech-digital", b: "office-admin" });
     assert.equal(outcome.inputTokens, 1000);
+    assert.equal(outcome.row.upstreamProvider, "TypeSafe");
     assert.deepEqual(Object.keys(calls[1].questions.spokes.criteria), [...vocab.spokesIds].reverse());
     assert.deepEqual(Object.keys(calls[1].questions.national.criteria), [...nationalKeys].reverse());
     assert.deepEqual(calls[0].state.at(-1), { speaker: "Student", text: testCase.messages[1].content });
@@ -107,7 +109,7 @@ describe("runGeminiCase", () => {
   };
 
   it("scores the production extractor's output", async () => {
-    const row = await runGeminiCase({ provider: {}, extract: async () => goodResult }, testCase, vocab);
+    const row = await runGeminiCase({ makeProvider: () => ({}), extract: async () => goodResult }, testCase, vocab);
     assert.equal(row.correctSpokes, true);
     assert.equal(row.correctNational, true);
     assert.equal(row.failed, false);
@@ -115,9 +117,9 @@ describe("runGeminiCase", () => {
 
   it("counts the extractor's empty result and a thrown error alike as failed", async () => {
     const empty = { cluster_scores: {}, national_career_clusters: [] };
-    const fromEmpty = await runGeminiCase({ provider: {}, extract: async () => empty }, testCase, vocab);
+    const fromEmpty = await runGeminiCase({ makeProvider: () => ({}), extract: async () => empty }, testCase, vocab);
     const fromThrow = await runGeminiCase(
-      { provider: {}, extract: async () => { throw new Error("provider down"); } },
+      { makeProvider: () => ({}), extract: async () => { throw new Error("provider down"); } },
       testCase,
       vocab,
     );
@@ -126,6 +128,21 @@ describe("runGeminiCase", () => {
       assert.equal(row.correctSpokes, false);
     }
     assert.equal(fromThrow.error, "provider down");
+  });
+
+  it("records the upstream provider OpenRouter reported", async () => {
+    const row = await runGeminiCase(
+      {
+        makeProvider: (onResponseMeta) => {
+          onResponseMeta({ upstreamProvider: "Google Vertex", model: "google/gemini-3.1-flash-lite" });
+          return {};
+        },
+        extract: async () => goodResult,
+      },
+      testCase,
+      vocab,
+    );
+    assert.equal(row.upstreamProvider, "Google Vertex");
   });
 });
 

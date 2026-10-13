@@ -5,7 +5,7 @@
   "tier": "manual",
   "scorer": "scripts/bench/suites/career-classifier.mjs",
   "fixture": "config/benchmarks/fixtures/career-classifier.json",
-  "requires": ["gemini"],
+  "requires": ["openrouter"],
   "metrics": [
     { "id": "gemini_spokes_top1", "unit": "ratio", "direction": "higher" },
     { "id": "gemini_national_top1", "unit": "ratio", "direction": "higher" },
@@ -19,5 +19,5 @@
     { "id": "jev_p50_ms", "unit": "ms", "direction": "lower" },
     { "id": "jev_order_flip_rate", "unit": "ratio", "direction": "lower" }
   ],
-  "notes": "Decision instrument for adding TypeSafe's Jev classifier to career classification (2026-10-13). Manual tier with no floors: it informs one owner decision and gates nothing. The Gemini arm runs the production extractDiscoverySignals with its real prompt; the Jev arm asks two Choice questions over the same last-10 message window, twice, the second time with every option list reversed (Jev's docs say it favors the first option), so jev_order_flip_rate measures that bias. Information parity: on national clusters both arms see the 14 names only; on SPOKES pathways the extractor prompt lists ids only while Jev gets each pathway's production label and description, which is how Jev would be deployed. A failed case (empty or all-zero extraction, a thrown error, or a refused Jev call) counts as wrong in every top-1 ratio. Fixture is synthetic, written by an AI agent from a written labeling rule (the rule is what an instructor should audit), 32 English cases with Spanish pairs; Spanish rows await native-speaker review. TYPESAFE_API_KEY is optional: without it the Jev metrics are null with a skipped note and the Gemini baseline still runs. Per-case predictions land in reports/benchmarks/career-classifier/<timestamp>.json. Never point this suite at real student conversations: scripts/bench/suites/lib/typesafe-client.mjs bypasses the AI resolver, audit log and de-identification on purpose."
+  "notes": "Decision instrument for adding TypeSafe's Jev classifier to career classification (2026-10-13). Manual tier with no floors. Both arms run through OpenRouter on one OPENROUTER_API_KEY: the Gemini arm runs the production extractDiscoverySignals on google/gemini-3.1-flash-lite (OpenRouter cannot send production's safety settings, which does not matter for classifying synthetic conversations); the Jev arm asks two Choice questions through OpenRouter's System One endpoint, twice, the second time with every option list reversed, so jev_order_flip_rate measures Jev's first-option bias. Information parity: on national clusters both arms see the 14 names only; on SPOKES pathways the extractor prompt lists ids only while Jev gets each pathway's production label and description. A failed case counts as wrong in every top-1 ratio. Each artifact row records the upstream provider OpenRouter reported. Fixture is synthetic, written by an AI agent from a written labeling rule; Spanish rows await native-speaker review. Never point this suite at real student conversations: OpenRouter is eval-only (docs/runbooks/openrouter-test-bench.md)."
 }

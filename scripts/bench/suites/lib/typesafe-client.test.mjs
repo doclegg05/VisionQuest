@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  TYPESAFE_DEFAULT_BASE,
+  SYSTEMONE_DEFAULT_BASE,
   TypeSafeError,
   callSystemOne,
   choiceQuestion,
@@ -33,6 +33,7 @@ function recordingFetch(responses) {
 
 const OK_BODY = {
   model: "jev-1.13.0",
+  provider: "TypeSafe",
   answers: {
     spokes: {
       type: "choice",
@@ -124,7 +125,8 @@ describe("callSystemOne", () => {
     const result = await callSystemOne({ ...request, fetchImpl });
 
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, `${TYPESAFE_DEFAULT_BASE}/v1/systemone`);
+    assert.equal(calls[0].url, "https://openrouter.ai/api/v1/systemone");
+    assert.equal(SYSTEMONE_DEFAULT_BASE, "https://openrouter.ai/api");
     assert.equal(calls[0].init.method, "POST");
     assert.equal(calls[0].init.headers.Authorization, `Bearer ${KEY}`);
     assert.ok(calls[0].init.signal, "every request carries an abort signal");
@@ -136,6 +138,7 @@ describe("callSystemOne", () => {
     assert.deepEqual(result.answers, OK_BODY.answers);
     assert.deepEqual(result.usage, OK_BODY.usage);
     assert.equal(typeof result.latencyMs, "number");
+    assert.equal(result.upstreamProvider, "TypeSafe");
   });
 
   it("retries 429 and 529, then succeeds", async () => {
