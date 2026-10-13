@@ -6,6 +6,7 @@ import {
   OpenRouterProvider,
   buildRequestBody,
   classifyOpenRouterFailure,
+  normalizeToolName,
 } from "./openrouter-provider";
 import type { ChatMessage, ToolDeclaration, ToolStreamEvent, TokenUsage } from "./types";
 
@@ -240,6 +241,41 @@ describe("OpenRouterProvider streaming", () => {
   });
 });
 
+describe("OpenRouterProvider stream errors", () => {
+  it("retries when the very first stream event is an error, before anything reached the caller", async () => {
+    const { fetchImpl, bodies } = recordingFetch([
+      () => sseResponse([{ error: { code: 502, message: "upstream unavailable" } }]),
+      () => sseResponse([textChunk("ok"), stopChunk(5, 1)]),
+    ]);
+    const chunks = await drain(makeProvider(fetchImpl).streamResponse("sys", MESSAGES));
+    assert.deepEqual(chunks, ["ok"]);
+    assert.equal(bodies.length, 2);
+  });
+
+  it("classifies a mid-stream error by its code, so exhausted credits are not retried", async () => {
+    const { fetchImpl, bodies } = recordingFetch([
+      () => sseResponse([{ error: { code: 402, message: "Insufficient credits" } }]),
+      () => sseResponse([textChunk("should not be fetched")]),
+    ]);
+    await assert.rejects(
+      drain(makeProvider(fetchImpl).streamResponse("sys", MESSAGES)),
+      (error) => error instanceof OpenRouterError && error.kind === "credits",
+    );
+    assert.equal(bodies.length, 1);
+  });
+});
+
+describe("normalizeToolName", () => {
+  const declared = new Set(["lookup_goals", "save_job"]);
+
+  it("strips Gemini's default_api. prefix only when the rest is a declared tool", () => {
+    assert.equal(normalizeToolName("default_api.lookup_goals", declared), "lookup_goals");
+    assert.equal(normalizeToolName("lookup_goals", declared), "lookup_goals");
+    assert.equal(normalizeToolName("default_api.not_a_tool", declared), "default_api.not_a_tool");
+    assert.equal(normalizeToolName("other_ns.save_job", declared), "other_ns.save_job");
+  });
+});
+
 describe("OpenRouterProvider tool loop", () => {
   const TOOLS: ToolDeclaration[] = [
     {
@@ -304,6 +340,37 @@ describe("OpenRouterProvider tool loop", () => {
       { role: "tool", tool_call_id: "call_1", content: JSON.stringify({ goals: [], _summary: "0 goals" }) },
     ]);
     assert.deepEqual(usages, [{ inputTokens: 20, outputTokens: 7, totalTokens: 27, source: "provider" }]);
+  });
+
+  it("maps a default_api.-prefixed tool call to the declared tool, in events, the handler and the next round", async () => {
+    const prefixedHop = () =>
+      sseResponse([
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: "default_api.lookup_goals", arguments: "{}" } }],
+              },
+            },
+          ],
+        },
+        { choices: [{ delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 } },
+      ]);
+    const { fetchImpl, bodies } = recordingFetch([prefixedHop, answerHop]);
+    const handled: string[] = [];
+    const events = await drain(
+      makeProvider(fetchImpl).streamWithTools("sys", [{ role: "user", content: "q" }], TOOLS, async (call) => {
+        handled.push(call.name);
+        return handler();
+      }),
+    );
+    assert.deepEqual(handled, ["lookup_goals"]);
+    const toolCall = events.find((event) => event.kind === "tool_call");
+    assert.equal(toolCall?.kind === "tool_call" ? toolCall.name : null, "lookup_goals");
+    const assistant = (bodies[1].messages as Array<{ role: string; tool_calls?: Array<{ function: { name: string } }> }>).find(
+      (message) => message.role === "assistant",
+    );
+    assert.equal(assistant?.tool_calls?.[0].function.name, "lookup_goals");
   });
 
   it("gives a parameterless tool call an empty object", async () => {

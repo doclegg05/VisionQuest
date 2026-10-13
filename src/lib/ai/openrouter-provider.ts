@@ -202,6 +202,19 @@ export function mergeToolCallPart(prev: PartialToolCall | undefined, part: WireD
   };
 }
 
+/**
+ * Gemini 2.x models reached through OpenAI-style APIs sometimes name a tool
+ * "default_api.<tool>". Strip that prefix only when what remains is a tool we
+ * declared, so a comparison judges the model's choice, not its formatting.
+ */
+const GEMINI_TOOL_NAMESPACE = "default_api.";
+
+export function normalizeToolName(name: string, declared: ReadonlySet<string>): string {
+  if (declared.has(name) || !name.startsWith(GEMINI_TOOL_NAMESPACE)) return name;
+  const bare = name.slice(GEMINI_TOOL_NAMESPACE.length);
+  return declared.has(bare) ? bare : name;
+}
+
 /** Boundary parse of a model-written argument string. */
 function parseToolCall(call: PartialToolCall): ParsedToolCall {
   const raw = call.arguments.trim();
@@ -325,11 +338,19 @@ function parseChunk(data: string): StreamChunk {
   }
 }
 
-function checkChunk(chunk: StreamChunk): StreamChunk {
-  if (chunk.error !== undefined || chunk.choices?.[0]?.finish_reason === "error") {
-    throw new OpenRouterError("OpenRouter reported an error mid-stream", "unavailable");
+function errorCodeOf(error: unknown): number | null {
+  if (error && typeof error === "object" && typeof (error as { code?: unknown }).code === "number") {
+    return (error as { code: number }).code;
   }
-  return chunk;
+  return null;
+}
+
+/** A stream event that reports an error, classified by its code (credits are not retried). */
+function checkChunk(chunk: StreamChunk): StreamChunk {
+  if (chunk.error === undefined && chunk.choices?.[0]?.finish_reason !== "error") return chunk;
+  const code = errorCodeOf(chunk.error);
+  const kind = code === null ? "unavailable" : classifyOpenRouterFailure(code, JSON.stringify(chunk.error));
+  throw new OpenRouterError(`OpenRouter reported an error mid-stream${code === null ? "" : ` (${code})`}`, kind, code);
 }
 
 /** `data:` payload of one SSE line; null for blank lines and `: comment` keep-alives. */
@@ -521,12 +542,14 @@ export class OpenRouterProvider implements AIProvider {
       ...(tools.length > 0 ? { tools: tools.map(toWireTool) } : {}),
       ...temperatureOf(options),
     };
+    const declared = new Set(tools.map((tool) => tool.name));
     let history = toWireMessages(messages);
     let usage: TokenUsage | null = null;
     let outputChars = 0;
 
     for (let hop = 0; hop < maxHops; hop += 1) {
-      const result = yield* this.streamHop(buildRequestBody(this.model, systemPrompt, history, extra));
+      const raw = yield* this.streamHop(buildRequestBody(this.model, systemPrompt, history, extra));
+      const result = { ...raw, calls: raw.calls.map((call) => ({ ...call, name: normalizeToolName(call.name, declared) })) };
       usage = accumulateUsage(usage, result.usage);
       outputChars += result.text.length;
       if (result.calls.length === 0) {
@@ -590,7 +613,7 @@ export class OpenRouterProvider implements AIProvider {
     const { first, rest, controller } = await this.withRetries(() => this.establish(body));
     try {
       this.onResponseMeta?.(metaOf(first));
-      yield checkChunk(first);
+      yield first;
       for await (const chunk of rest) yield checkChunk(chunk);
     } finally {
       controller.abort();
@@ -612,7 +635,9 @@ export class OpenRouterProvider implements AIProvider {
       const rest = readSseChunks(response, controller, this.streamStallTimeoutMs);
       const first = await rest.next();
       if (first.done) throw new OpenRouterError("OpenRouter stream ended before any data", "unavailable");
-      return { first: first.value, rest, controller };
+      // Inside the retry boundary: nothing has reached the caller yet, so an
+      // error in the first event is as safe to retry as a failed request.
+      return { first: checkChunk(first.value), rest, controller };
     } catch (error) {
       controller.abort();
       if (timedOut) {
