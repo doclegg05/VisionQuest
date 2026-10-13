@@ -128,6 +128,14 @@ export function isSafeAiProviderUrl(url: string): boolean {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
 
+    // OpenRouter is eval-only (docs/runbooks/openrouter-test-bench.md). The
+    // local-model slot is classed "local", so pointing it at OpenRouter would
+    // send student records there with de-identification and the cloud policy
+    // both skipped.
+    if (hostname === "openrouter.ai" || hostname.endsWith(".openrouter.ai")) {
+      return false;
+    }
+
     if (
       hostname === "localhost" ||
       hostname === "127.0.0.1" ||

@@ -7,7 +7,11 @@ describe("parseArgs", () => {
   it("reads models and defaults to every CI-gated eval", () => {
     const { models, evals } = parseArgs(["--models=a/one, b/two"]);
     assert.deepEqual(models, ["a/one", "b/two"]);
-    assert.deepEqual(evals.map((e) => e.id), ["redteam", "harness", "agent", "quality"]);
+    assert.deepEqual(evals.map((e) => e.id), ["redteam", "harness", "agent"]);
+  });
+
+  it("leaves out the quality eval, which has no pass criterion without its judge", () => {
+    assert.throws(() => parseArgs(["--models=a", "--evals=quality"]), /Unknown --evals: quality/);
   });
 
   it("narrows to the evals asked for and rejects unknown ones", () => {

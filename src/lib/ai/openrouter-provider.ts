@@ -56,6 +56,24 @@ export class OpenRouterError extends Error {
   }
 }
 
+/** The Next.js server sets NEXT_RUNTIME; Render sets RENDER. OpenRouter must run in neither. */
+const APP_SERVER_MARKERS = ["NEXT_RUNTIME", "RENDER"] as const;
+
+/**
+ * Runtime half of the eval-only rule. The lint guard can be sidestepped by an
+ * import shape it does not know; this check cannot, because it runs wherever
+ * the provider is constructed.
+ */
+export function assertNotAppServer(env: NodeJS.ProcessEnv = process.env): void {
+  const marker = APP_SERVER_MARKERS.find((name) => Boolean(env[name]?.trim()));
+  if (marker) {
+    throw new OpenRouterError(
+      `OpenRouter is eval-only and refuses to run inside the app server (${marker} is set).`,
+      "bad_request",
+    );
+  }
+}
+
 export interface OpenRouterResponseMeta {
   upstreamProvider: string | null;
   model: string | null;
@@ -431,6 +449,7 @@ export class OpenRouterProvider implements AIProvider {
   private readonly onResponseMeta?: (meta: OpenRouterResponseMeta) => void;
 
   constructor(apiKey: string, model: string = OPENROUTER_DEFAULT_MODEL, options: OpenRouterProviderOptions = {}) {
+    assertNotAppServer();
     if (!apiKey) throw new OpenRouterError("OPENROUTER_API_KEY is not set", "bad_request");
     this.apiKey = apiKey;
     this.model = model;

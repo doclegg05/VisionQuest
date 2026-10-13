@@ -10,6 +10,8 @@ import {
   EvalBudgetExhaustedError,
   reportEvalFailure,
   resolveEvalProvider,
+  EvalProviderUnavailableError,
+  isEvalAbort,
 } from "./sage-eval-provider.mjs";
 
 /**
@@ -345,5 +347,123 @@ describe("OpenRouter credits", () => {
       console.error = originalError;
       process.exitCode = originalExitCode;
     }
+  });
+});
+
+describe("OpenRouter unavailable models and keys", () => {
+  function failing(error) {
+    return {
+      name: "openrouter",
+      async generateResponse() {
+        throw error;
+      },
+      async *streamResponse() {
+        throw error;
+      },
+      async generateStructuredResponse() {
+        throw error;
+      },
+    };
+  }
+
+  function openRouterError(kind, status) {
+    return Object.assign(new Error(`OpenRouter request failed (${status}, ${kind})`), {
+      name: "OpenRouterError",
+      kind,
+      status,
+    });
+  }
+
+  for (const status of [400, 401, 404]) {
+    it(`reports a ${status} bad request as unavailable, not as a failed test`, async () => {
+      const wrapped = wrapWithBudgetDetection(failing(openRouterError("bad_request", status)));
+      await assert.rejects(
+        wrapped.generateResponse("sys", [{ role: "user", content: "q" }]),
+        (err) => err instanceof EvalProviderUnavailableError && err.providerLabel === "OpenRouter",
+      );
+    });
+  }
+
+  it("leaves a model's malformed tool-call JSON as a real failure", async () => {
+    const malformed = openRouterError("bad_request", null);
+    const wrapped = wrapWithBudgetDetection(failing(malformed));
+    await assert.rejects(wrapped.generateResponse("sys", [{ role: "user", content: "q" }]), (err) => err === malformed);
+  });
+
+  it("isEvalAbort is true only for not-run errors", () => {
+    assert.equal(isEvalAbort(new EvalBudgetExhaustedError(undefined, "OpenRouter")), true);
+    assert.equal(isEvalAbort(new EvalProviderUnavailableError(undefined, "OpenRouter")), true);
+    assert.equal(isEvalAbort(new Error("boom")), false);
+    assert.equal(isEvalAbort(undefined), false);
+  });
+
+  it("names the unavailable provider and exits 4", () => {
+    const logged = [];
+    const originalError = console.error;
+    const originalExitCode = process.exitCode;
+    console.error = (...args) => logged.push(args[0]);
+    try {
+      reportEvalFailure(new EvalProviderUnavailableError(undefined, "OpenRouter"));
+      assert.ok(logged.includes("::error::OpenRouter provider or model unavailable — evals not run"));
+      assert.equal(process.exitCode, 4);
+    } finally {
+      console.error = originalError;
+      process.exitCode = originalExitCode;
+    }
+  });
+});
+
+describe("--provider=openrouter refuses a non-local database", () => {
+  const DB_VARS = ["DATABASE_URL", "DIRECT_URL", "ADMIN_DATABASE_URL", "BENCH_PROD_READONLY_URL"];
+
+  async function withDbEnv(values, fn) {
+    const saved = Object.fromEntries([...DB_VARS, "OPENROUTER_API_KEY"].map((name) => [name, process.env[name]]));
+    for (const name of DB_VARS) delete process.env[name];
+    Object.assign(process.env, { OPENROUTER_API_KEY: "sk-or-test-key-0123456789" }, values);
+    try {
+      return await fn();
+    } finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  }
+
+  it("refuses a remote DATABASE_URL and names the variable without printing it", async () => {
+    await withDbEnv({ DATABASE_URL: "postgresql://app:hunter2secret@db.abcdef.supabase.co:5432/postgres" }, async () => {
+      await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), (err) => {
+        assert.match(err.message, /DATABASE_URL/);
+        assert.match(err.message, /non-local database/);
+        assert.equal(err.message.includes("supabase.co"), false, err.message);
+        assert.equal(err.message.includes("hunter2secret"), false, err.message);
+        return true;
+      });
+    });
+  });
+
+  it("checks every database variable, not just DATABASE_URL", async () => {
+    await withDbEnv({ BENCH_PROD_READONLY_URL: "postgres://ro:pw@prod.example.com/db" }, async () => {
+      await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), /BENCH_PROD_READONLY_URL/);
+    });
+  });
+
+  it("refuses a database URL it cannot parse", async () => {
+    await withDbEnv({ DIRECT_URL: "not a url" }, async () => {
+      await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), /DIRECT_URL/);
+    });
+  });
+
+  it("allows loopback and unset database URLs", async () => {
+    for (const url of ["postgresql://none@127.0.0.1:1/none", "postgres://u@localhost/db", "postgres://u@[::1]:5432/db"]) {
+      await withDbEnv({ DATABASE_URL: url }, async () => {
+        const { provider } = await resolveEvalProvider(["--provider=openrouter"]);
+        assert.equal(provider.name, "openrouter");
+      });
+    }
+    await withDbEnv({}, async () => {
+      const { provider } = await resolveEvalProvider(["--provider=openrouter"]);
+      assert.equal(provider.name, "openrouter");
+    });
   });
 });

@@ -147,6 +147,9 @@ export async function callSystemOne({
   maxRetries = 3,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) {
+  if (process.env.NEXT_RUNTIME?.trim() || process.env.RENDER?.trim()) {
+    throw new TypeSafeError("Jev through OpenRouter is eval-only and refuses to run inside the app server.");
+  }
   if (!apiKey) throw new TypeSafeError("OPENROUTER_API_KEY is not set");
 
   const url = `${baseUrl.replace(/\/+$/, "")}/v1/systemone`;

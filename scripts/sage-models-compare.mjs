@@ -3,10 +3,11 @@
  * Compare models on Sage's CI-gated evals through OpenRouter.
  *
  *   OPENROUTER_API_KEY=... npm run sage:models:compare -- --models=google/gemini-3.1-flash-lite,<id>
- *   ... --evals=agent,harness        run a subset
+ *   ... --evals=agent,harness        run a subset (redteam, harness, agent)
  *
  * Each eval runs as a child process with --provider=openrouter --model=<id>
- * and the same flags .github/workflows/sage-evals.yml gates on. The OpenRouter
+ * and the same flags .github/workflows/sage-evals.yml gates on. Exit 4 from
+ * an eval (model or key unavailable) is recorded as "error", not "fail". The OpenRouter
  * key's spend is read before and after each model, so every row carries its
  * cost. Exit codes from the evals: 0 pass, 1 fail, 3 not run. A "not run"
  * means credits or the key limit ran out, and it stops the whole comparison.
@@ -33,8 +34,9 @@ export const EVALS = Object.freeze([
     args: ["--strict", "--families=tool,tool_watch,guardrail", "--temperature=0", "--samples=3"],
   },
   { id: "agent", script: "scripts/sage-agent-eval.mjs", args: ["--min-accuracy=75", "--deidentify=Sam,Ms. Lee"] },
-  { id: "quality", script: "scripts/sage-quality-eval.mjs", args: [] },
 ]);
+// sage-quality-eval is left out on purpose: without its Gemini judge it has no
+// pass criterion and always exits 0, so it would read as "pass" for any model.
 
 function flagValue(argv, name) {
   return argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? null;

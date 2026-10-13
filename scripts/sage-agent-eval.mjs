@@ -40,7 +40,7 @@
 
 import { readFileSync } from "node:fs";
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
+import { isEvalAbort, resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 
 loadEnvFile();
 
@@ -170,6 +170,9 @@ async function main() {
         if (event.kind === "tool_call") calls.push(event.name);
       }
     } catch (err) {
+      // Nothing can be evaluated (credits, key, or model unavailable): stop the
+      // whole run with its not-run exit code instead of grading this case.
+      if (isEvalAbort(err)) throw err;
       record(scenario, false);
       noteMiss(scenario, `${scenario.id}: provider error — ${err.message}`);
       continue;

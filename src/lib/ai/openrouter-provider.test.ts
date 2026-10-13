@@ -335,3 +335,24 @@ describe("OpenRouterProvider tool loop", () => {
     assert.equal(bodies.length, 2);
   });
 });
+
+describe("OpenRouterProvider refuses the app server", () => {
+  for (const [name, value] of [
+    ["NEXT_RUNTIME", "nodejs"],
+    ["RENDER", "true"],
+  ]) {
+    it(`refuses to construct when ${name} is set`, () => {
+      const previous = process.env[name];
+      process.env[name] = value;
+      try {
+        assert.throws(
+          () => new OpenRouterProvider(KEY, MODEL),
+          (error) => error instanceof OpenRouterError && /eval-only/.test(error.message),
+        );
+      } finally {
+        if (previous === undefined) delete process.env[name];
+        else process.env[name] = previous;
+      }
+    });
+  }
+});

@@ -184,11 +184,42 @@ async function resolveOllamaProvider(modelOverride = null) {
  * docs/runbooks/openrouter-test-bench.md). --model takes any OpenRouter model
  * id; the default matches production's Gemini model.
  */
+const DATABASE_ENV_NAMES = ["DATABASE_URL", "DIRECT_URL", "ADMIN_DATABASE_URL", "BENCH_PROD_READONLY_URL"];
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+function isLoopbackDatabaseUrl(value) {
+  try {
+    return LOOPBACK_HOSTS.has(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * OpenRouter runs must never sit next to a real database. Eval scripts call
+ * loadEnvFile(".env.local"), and a worktree's .env.local can be a symlink to
+ * the production file, so a memory or grounding eval would read and write
+ * production rows while sending prompts to OpenRouter. Names the variable,
+ * never its value.
+ */
+export function assertNoRemoteDatabase(env = process.env) {
+  for (const name of DATABASE_ENV_NAMES) {
+    const value = env[name]?.trim();
+    if (value && !isLoopbackDatabaseUrl(value)) {
+      throw new Error(
+        `--provider=openrouter refuses to run with a non-local database in ${name}. OpenRouter is for synthetic data only: ` +
+          `run from a directory without .env.local, or set ${name} to a local or dummy value such as postgresql://none@127.0.0.1:1/none.`,
+      );
+    }
+  }
+}
+
 async function resolveOpenRouterProvider(modelOverride = null) {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY missing: required for --provider=openrouter.");
   }
+  assertNoRemoteDatabase();
   const { OpenRouterProvider, OPENROUTER_DEFAULT_MODEL } = await import("../../src/lib/ai/openrouter-provider.ts");
   const model = modelOverride || process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
   return { provider: new OpenRouterProvider(apiKey, model), model, label: `openrouter (${model})` };
@@ -227,6 +258,32 @@ export class EvalBudgetExhaustedError extends Error {
 }
 
 /**
+ * Thrown by `wrapWithBudgetDetection` when the provider refuses the model or
+ * the key itself, so nothing could be evaluated: an OpenRouter 400 (unknown
+ * model id), 401 (bad key) or 404 (no endpoint satisfies the zero-retention
+ * routing rule). Exit code 4, so sage:models:compare and a human can tell
+ * "this model is not available here" from "this model failed Sage's evals".
+ */
+export class EvalProviderUnavailableError extends Error {
+  constructor(cause, providerLabel = "OpenRouter") {
+    super(`${providerLabel} provider or model unavailable (bad model id, key, or routing rule) — evals not run.`);
+    this.name = "EvalProviderUnavailableError";
+    this.providerLabel = providerLabel;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/**
+ * True for errors that mean "nothing can be evaluated", which every eval
+ * script's per-case catch must rethrow instead of grading as a failed case.
+ */
+export function isEvalAbort(error) {
+  return error instanceof EvalBudgetExhaustedError || error instanceof EvalProviderUnavailableError;
+}
+
+const UNAVAILABLE_STATUSES = new Set([400, 401, 404]);
+
+/**
  * True only for the specific "prepaid wallet is empty" 429 shape, never for
  * an ordinary per-minute/per-day rate limit (also always a 429). The match
  * text is deliberately narrow for that reason: "quota" alone appears on
@@ -262,6 +319,9 @@ function describeProviderError(error) {
 function classifyAndRethrow(error) {
   if (error?.name === "OpenRouterError" && error.kind === "credits") {
     throw new EvalBudgetExhaustedError(error, "OpenRouter");
+  }
+  if (error?.name === "OpenRouterError" && error.kind === "bad_request" && UNAVAILABLE_STATUSES.has(error.status)) {
+    throw new EvalProviderUnavailableError(error, "OpenRouter");
   }
   const { status, bodyText } = describeProviderError(error);
   if (isBudgetExhausted(status, bodyText)) throw new EvalBudgetExhaustedError(error);
@@ -342,6 +402,12 @@ export function wrapWithBudgetDetection(provider) {
  * see docs/runbooks/sage-eval-budget.md.
  */
 export function reportEvalFailure(error) {
+  if (error instanceof EvalProviderUnavailableError) {
+    console.error(`::error::${error.providerLabel} provider or model unavailable — evals not run`);
+    console.error(error);
+    process.exitCode = 4;
+    return;
+  }
   if (error instanceof EvalBudgetExhaustedError) {
     console.error(`::error::${error.providerLabel ?? "Gemini"} budget exhausted \u2014 evals not run`);
     console.error(error);

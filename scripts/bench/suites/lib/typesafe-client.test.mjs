@@ -186,3 +186,21 @@ describe("callSystemOne", () => {
     assert.equal(calls.length, 0);
   });
 });
+
+describe("callSystemOne refuses the app server", () => {
+  it("rejects without calling the network when NEXT_RUNTIME is set", async () => {
+    const previous = process.env.NEXT_RUNTIME;
+    process.env.NEXT_RUNTIME = "nodejs";
+    const { fetchImpl, calls } = recordingFetch([jsonResponse(200, OK_BODY)]);
+    try {
+      await assert.rejects(
+        callSystemOne({ apiKey: KEY, model: "typesafe/jev-1.13", state: "x", questions: {}, fetchImpl }),
+        (error) => error instanceof TypeSafeError && /eval-only/.test(error.message),
+      );
+      assert.equal(calls.length, 0);
+    } finally {
+      if (previous === undefined) delete process.env.NEXT_RUNTIME;
+      else process.env.NEXT_RUNTIME = previous;
+    }
+  });
+});
