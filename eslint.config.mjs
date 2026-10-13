@@ -86,6 +86,26 @@ const studentAlertDirectRead = {
     "Student-facing code must not read StudentAlert directly; the table is the staff queue and RLS admits the student's own rows. Use listStudentVisibleAlerts / countStudentVisibleAlerts from src/lib/student-alerts.ts, the only sanctioned reader for student surfaces.",
 };
 
+// OpenRouter is an eval-only provider. Its data agreement does not cover
+// education records, so real student data must never reach it
+// (docs/superpowers/specs/2026-10-13-openrouter-test-bench-design.md).
+// Flat config REPLACES a rule's options when two blocks set it for the same
+// file, so every block that sets no-restricted-imports under src/ must
+// include this pattern too.
+const openRouterEvalOnlyPattern = {
+  regex: "(^|/)openrouter-provider$",
+  message:
+    "OpenRouterProvider is for evals and benchmarks on synthetic data only. Real student data must never reach OpenRouter. See docs/runbooks/openrouter-test-bench.md.",
+};
+
+const openRouterEvalOnly = {
+  files: ["src/**/*.{ts,tsx,js,jsx,mjs}"],
+  ignores: ["src/lib/ai/openrouter-provider.test.ts"],
+  rules: {
+    "no-restricted-imports": ["error", { patterns: [openRouterEvalOnlyPattern] }],
+  },
+};
+
 // Code with no request session: pg_cron reaches these routes with only a
 // bearer secret, and job handlers run from the processor. Nothing seeds an
 // RLS context, so the app client fails closed under vq_app (reads empty,
@@ -108,6 +128,7 @@ const appPrismaImportWithoutSession = {
             message:
               "No request session here, so the app prisma client has no RLS context and fails closed under vq_app. Import prismaAdmin for cross-student rows, and run per-student lib helpers inside withStudentRlsContext from @/lib/rls-context.",
           },
+          openRouterEvalOnlyPattern,
         ],
       },
     ],
@@ -153,6 +174,7 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, studentAlertDirectRead],
     },
   },
+  openRouterEvalOnly,
   appPrismaImportWithoutSession,
   // Override default ignores of eslint-config-next.
   globalIgnores([
