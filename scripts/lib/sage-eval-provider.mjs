@@ -11,8 +11,9 @@
  *   const { provider, label } = await resolveEvalProvider(["--provider=ollama"]);
  *   const { provider, label } = await resolveEvalProvider(["--provider=ollama", "--model=gemma4:e4b"]);
  *
- * `--provider` selects the provider CLASS; `--model` selects the model tag
- * within it, overriding OLLAMA_MODEL / GEMINI_MODEL. This is the single
+ * `--provider` selects the provider CLASS (`gemini`, `ollama` or the eval-only
+ * `openrouter`); `--model` selects the model tag within it, overriding
+ * OLLAMA_MODEL / GEMINI_MODEL / OPENROUTER_MODEL. This is the single
  * chokepoint every model-driving eval resolves through, so a model flag added
  * here reaches all of them — which is what makes a per-model bake-off possible
  * without mutating global configuration between arms.
@@ -33,13 +34,16 @@ export async function resolveEvalProvider(argvOrEnv = process.argv.slice(2)) {
   const modelOverride = readModelOverride(argvOrEnv);
   const deidentifyNames = readDeidentifyNames(argvOrEnv);
 
-  if (requested !== "ollama" && requested !== "gemini") {
-    throw new Error(`Unknown --provider "${requested}" — expected "gemini" or "ollama".`);
+  const RESOLVERS = {
+    gemini: resolveGeminiProvider,
+    ollama: resolveOllamaProvider,
+    openrouter: resolveOpenRouterProvider,
+  };
+  const resolve = RESOLVERS[requested];
+  if (!resolve) {
+    throw new Error(`Unknown --provider "${requested}". Expected "gemini", "ollama" or "openrouter".`);
   }
-  const resolved =
-    requested === "ollama"
-      ? await resolveOllamaProvider(modelOverride)
-      : await resolveGeminiProvider(modelOverride);
+  const resolved = await resolve(modelOverride);
 
   const deidentified = deidentifyNames
     ? {
@@ -176,6 +180,21 @@ async function resolveOllamaProvider(modelOverride = null) {
 }
 
 /**
+ * OpenRouter is eval-only: synthetic fixtures, never real student data (see
+ * docs/runbooks/openrouter-test-bench.md). --model takes any OpenRouter model
+ * id; the default matches production's Gemini model.
+ */
+async function resolveOpenRouterProvider(modelOverride = null) {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY missing: required for --provider=openrouter.");
+  }
+  const { OpenRouterProvider, OPENROUTER_DEFAULT_MODEL } = await import("../../src/lib/ai/openrouter-provider.ts");
+  const model = modelOverride || process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
+  return { provider: new OpenRouterProvider(apiKey, model), model, label: `openrouter (${model})` };
+}
+
+/**
  * Ticket E8 (2026-09-07): 2026-09-05 six eval runs drained the Gemini
  * prepaid balance and every Sage-touching PR read red for hours on a 429
  * "prepayment credits depleted" — under the repo's rule an ungraded
@@ -195,9 +214,14 @@ async function resolveOllamaProvider(modelOverride = null) {
  * docs/runbooks/sage-eval-budget.md.
  */
 export class EvalBudgetExhaustedError extends Error {
-  constructor(cause) {
-    super("Gemini eval budget exhausted (429: prepayment/credits/quota) — evals not run.");
+  constructor(cause, providerLabel = "Gemini") {
+    super(
+      providerLabel === "Gemini"
+        ? "Gemini eval budget exhausted (429: prepayment/credits/quota) — evals not run."
+        : `${providerLabel} eval budget exhausted (credits or key limit) \u2014 evals not run.`,
+    );
     this.name = "EvalBudgetExhaustedError";
+    this.providerLabel = providerLabel;
     if (cause !== undefined) this.cause = cause;
   }
 }
@@ -236,6 +260,9 @@ function describeProviderError(error) {
 
 /** Reclassifies a budget-exhausted error and rethrows; every other error is rethrown untouched. */
 function classifyAndRethrow(error) {
+  if (error?.name === "OpenRouterError" && error.kind === "credits") {
+    throw new EvalBudgetExhaustedError(error, "OpenRouter");
+  }
   const { status, bodyText } = describeProviderError(error);
   if (isBudgetExhausted(status, bodyText)) throw new EvalBudgetExhaustedError(error);
   throw error;
@@ -316,7 +343,7 @@ export function wrapWithBudgetDetection(provider) {
  */
 export function reportEvalFailure(error) {
   if (error instanceof EvalBudgetExhaustedError) {
-    console.error("::error::Gemini budget exhausted — evals not run");
+    console.error(`::error::${error.providerLabel ?? "Gemini"} budget exhausted \u2014 evals not run`);
     console.error(error);
     process.exitCode = 3;
     return;

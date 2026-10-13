@@ -9,6 +9,7 @@ import {
   wrapWithBudgetDetection,
   EvalBudgetExhaustedError,
   reportEvalFailure,
+  resolveEvalProvider,
 } from "./sage-eval-provider.mjs";
 
 /**
@@ -247,5 +248,102 @@ describe("reportEvalFailure", () => {
       !loggedArgs.some((args) => args[0] === "::error::Gemini budget exhausted — evals not run"),
       "an ordinary failure must never print the budget-exhausted line",
     );
+  });
+});
+
+async function withEnv(name, value, fn) {
+  const previous = process.env[name];
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+  try {
+    return await fn();
+  } finally {
+    if (previous === undefined) delete process.env[name];
+    else process.env[name] = previous;
+  }
+}
+
+describe("--provider=openrouter", () => {
+  it("resolves an OpenRouter provider for the requested model", async () => {
+    await withEnv("OPENROUTER_API_KEY", "sk-or-test-key-0123456789", async () => {
+      const { provider, model, label } = await resolveEvalProvider([
+        "--provider=openrouter",
+        "--model=meta-llama/llama-3.3-70b-instruct",
+      ]);
+      assert.equal(provider.name, "openrouter");
+      assert.equal(model, "meta-llama/llama-3.3-70b-instruct");
+      assert.equal(label, "openrouter (meta-llama/llama-3.3-70b-instruct)");
+    });
+  });
+
+  it("defaults to the production model", async () => {
+    await withEnv("OPENROUTER_API_KEY", "sk-or-test-key-0123456789", async () => {
+      const { model } = await resolveEvalProvider(["--provider=openrouter"]);
+      assert.equal(model, "google/gemini-3.1-flash-lite");
+    });
+  });
+
+  it("stops with a clear error when the key is missing", async () => {
+    await withEnv("OPENROUTER_API_KEY", undefined, async () => {
+      await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), /OPENROUTER_API_KEY missing/);
+    });
+  });
+
+  it("names all three providers when one is unknown", async () => {
+    await assert.rejects(resolveEvalProvider(["--provider=claude"]), /"gemini", "ollama" or "openrouter"/);
+  });
+});
+
+describe("OpenRouter credits", () => {
+  function failingProvider(error) {
+    return {
+      name: "openrouter",
+      async generateResponse() {
+        throw error;
+      },
+      async *streamResponse() {
+        throw error;
+      },
+      async generateStructuredResponse() {
+        throw error;
+      },
+    };
+  }
+
+  function openRouterError(kind, status) {
+    return Object.assign(new Error(`OpenRouter request failed (${status}, ${kind})`), {
+      name: "OpenRouterError",
+      kind,
+      status,
+    });
+  }
+
+  it("reports exhausted credits as budget exhausted", async () => {
+    const wrapped = wrapWithBudgetDetection(failingProvider(openRouterError("credits", 402)));
+    await assert.rejects(
+      wrapped.generateResponse("sys", [{ role: "user", content: "q" }]),
+      (err) => err instanceof EvalBudgetExhaustedError && err.providerLabel === "OpenRouter",
+    );
+  });
+
+  it("leaves a refused 403 as a real failure", async () => {
+    const refused = openRouterError("refused", 403);
+    const wrapped = wrapWithBudgetDetection(failingProvider(refused));
+    await assert.rejects(wrapped.generateResponse("sys", [{ role: "user", content: "q" }]), (err) => err === refused);
+  });
+
+  it("names OpenRouter in the not-run line and exits 3", () => {
+    const logged = [];
+    const originalError = console.error;
+    const originalExitCode = process.exitCode;
+    console.error = (...args) => logged.push(args[0]);
+    try {
+      reportEvalFailure(new EvalBudgetExhaustedError(undefined, "OpenRouter"));
+      assert.ok(logged.includes("::error::OpenRouter budget exhausted \u2014 evals not run"));
+      assert.equal(process.exitCode, 3);
+    } finally {
+      console.error = originalError;
+      process.exitCode = originalExitCode;
+    }
   });
 });
