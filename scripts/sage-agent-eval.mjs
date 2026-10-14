@@ -140,25 +140,36 @@ export function buildScenarioContext(scenario, formatAttachmentContext) {
   );
 }
 
+/**
+ * The tool declarations the model is offered for one scenario: the student
+ * registry filtered the way /api/chat/send filters it (toolsForTurn), so a
+ * scenario with no attachment is not offered the tools that need a
+ * fileUploadId. The caller passes toolsForTurn for the same reason it passes
+ * the attachment formatter (see buildScenarioContext).
+ */
+export function scenarioDeclarations(scenario, tools, toolsForTurn) {
+  return toolsForTurn(tools, { hasAttachment: Boolean(scenario.attachment) }).map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+  }));
+}
+
 /** No-op tool handler: returns a canned success stub. Never executes a real tool or touches the DB. */
 async function noopToolHandler() {
   return { response: { ok: true }, summary: "(eval stub — not executed)", status: "success" };
 }
 
 async function main() {
-  const { getEnabledTools } = await import("../src/lib/sage/agent/tools.ts");
+  const { getEnabledTools, toolsForTurn } = await import("../src/lib/sage/agent/tools.ts");
   const { formatAttachmentContext } = await import("../src/lib/chat/attachment-context.ts");
   const { provider, label } = await resolveEvalProvider();
 
-  const declarations = getEnabledTools("student").map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters,
-  }));
+  const studentTools = getEnabledTools("student");
   const watchCount = SCENARIOS.filter(isWatchScenario).length;
   const tierNote = watchCount > 0 ? ` (${SCENARIOS.length - watchCount} gating, ${watchCount} watch)` : "";
   console.log(
-    `Evaluating ${SCENARIOS.length} scenarios${tierNote} against ${label} with ${declarations.length} tools…`,
+    `Evaluating ${SCENARIOS.length} scenarios${tierNote} against ${label} with ${studentTools.length} tools…`,
   );
 
   /** @type {Array<{ id: string, watch: boolean, correct: boolean }>} */
@@ -172,6 +183,7 @@ async function main() {
 
   for (const scenario of SCENARIOS) {
     const context = buildScenarioContext(scenario, formatAttachmentContext);
+    const declarations = scenarioDeclarations(scenario, studentTools, toolsForTurn);
 
     const calls = [];
     try {

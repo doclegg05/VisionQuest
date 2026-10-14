@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { getEnabledTools } from "./agent/tools";
+import { getEnabledTools, toolsForTurn } from "./agent/tools";
 import { formatAttachmentContext } from "../chat/attachment-context";
 import { CAREER_GROUNDING_TOOL_NAMES } from "../../../scripts/lib/sage-career-eval.mjs";
 import {
   buildScenarioContext,
   computeAgentEvalExitCode,
+  scenarioDeclarations,
   isWatchScenario,
   summarizeAgentEvalAccuracy,
 } from "../../../scripts/sage-agent-eval.mjs";
@@ -350,6 +351,52 @@ describe("sage agent eval — scenario context", () => {
         files: [{ id: attachment.fileUploadId, filename: attachment.filename, gist: attachment.gist }],
         openOrientationItems,
       }),
+    );
+  });
+});
+
+/**
+ * Production does not offer the tools that need a fileUploadId on a turn with
+ * no attachment (toolsForTurn, 2026-10-14). The eval offers the same set, or it
+ * grades selection over a tool list no student turn ever sees.
+ */
+describe("sage agent eval — tools offered per scenario", () => {
+  const studentTools = getEnabledTools("student", "full");
+  const attachmentOnly = studentTools.filter((tool) => tool.requiresAttachment).map((tool) => tool.name);
+  const offered = (scenario: AgentEvalScenario) =>
+    (scenarioDeclarations(scenario, studentTools, toolsForTurn) as Array<{ name: string }>).map((d) => d.name);
+
+  it("a scenario with no attachment is not offered the file tools", () => {
+    const names = offered({ id: "x", message: "Put my food handler card in my portfolio" });
+    for (const name of attachmentOnly) assert.ok(!names.includes(name), `${name} offered with no attachment`);
+    assert.ok(names.includes("add_portfolio_item"));
+  });
+
+  it("a scenario with an attachment is offered every student tool", () => {
+    const names = offered({
+      id: "x",
+      message: "File this",
+      attachment: { fileUploadId: "f", filename: "f.pdf", gist: "g" },
+    });
+    assert.deepEqual([...names].sort(), studentTools.map((tool) => tool.name).sort());
+  });
+
+  it("a scenario that expects or accepts a file tool carries an attachment, or it could never pass", () => {
+    for (const scenario of SCENARIOS) {
+      const wanted = [scenario.expectedTool, ...(scenario.acceptableTools ?? [])].filter(
+        (name): name is string => Boolean(name),
+      );
+      for (const name of wanted.filter((n) => attachmentOnly.includes(n))) {
+        assert.ok(scenario.attachment, `scenario "${scenario.id}" wants ${name} but attaches no file`);
+      }
+    }
+  });
+
+  it("the live run offers each scenario its own tool set", () => {
+    const source = readFileSync(SCRIPT_PATH, "utf8");
+    assert.ok(
+      source.includes("scenarioDeclarations(scenario, studentTools, toolsForTurn)"),
+      `${SCRIPT_PATH} no longer builds declarations per scenario`,
     );
   });
 });
