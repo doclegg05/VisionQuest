@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import NodeCache from "node-cache";
 import {
   cached,
   invalidate,
@@ -7,6 +8,13 @@ import {
   invalidateChatContext,
   invalidatePrefix,
 } from "./cache";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
 
 // Each test uses a unique key prefix to avoid cross-test cache pollution
 // since the module holds a singleton NodeCache instance.
@@ -154,6 +162,149 @@ test("cached() propagates fetcher errors without caching anything", async () => 
   assert.equal(callCount, 2);
 });
 
+test("concurrent cold reads execute one fetch and isolate mutable results", async () => {
+  const key = "cache-test:concurrent";
+  const gate = deferred<{ items: string[]; date: Date }>();
+  let queries = 0;
+  const reads = Array.from({ length: 50 }, () => cached(key, 60, () => {
+    queries++;
+    return gate.promise;
+  }));
+  await Promise.resolve();
+  assert.equal(queries, 1);
+  gate.resolve({ items: ["original"], date: new Date(0) });
+  const values = await Promise.all(reads);
+  values[0].items.push("changed");
+  assert.deepEqual(values[1].items, ["original"]);
+  assert.ok(values[1].date instanceof Date);
+  assert.deepEqual((await cached(key, 60, async () => values[0])).items, ["original"]);
+  invalidate(key);
+});
+
+for (const [label, key, clear] of [
+  ["key", "cache-test:race:key", () => invalidate("cache-test:race:key")],
+  ["prefix", "cache-test:race:prefix", () => invalidatePrefix("cache-test:race:")],
+  ["student chat", "chat:snapshot:race-student", () => invalidateChatContext("race-student")],
+  ["all chat", "chat:profile:race-student", () => invalidateAllChatContext()],
+] as const) {
+  for (const oldFirst of [true, false]) {
+    test(`${label} invalidation fences pending fetches (old finishes first: ${oldFirst})`, async () => {
+      const old = deferred<string>();
+      const fresh = deferred<string>();
+      const before = cached(key, 60, () => old.promise);
+      await Promise.resolve();
+      clear();
+      let queries = 0;
+      const fetchFresh = () => { queries++; return fresh.promise; };
+      const after = cached(key, 60, fetchFresh);
+      if (oldFirst) {
+        old.resolve("stale");
+        assert.equal(await before, "stale");
+      }
+      const joined = cached(key, 60, fetchFresh);
+      fresh.resolve("fresh");
+      assert.equal(await after, "fresh");
+      assert.equal(await joined, "fresh");
+      if (!oldFirst) {
+        old.resolve("stale");
+        assert.equal(await before, "stale");
+      }
+      assert.equal(await cached(key, 60, async () => "unexpected"), "fresh");
+      assert.equal(queries, 1, "old cleanup must not detach the new pending fetch");
+      invalidate(key);
+    });
+  }
+}
+
+test("shared rejection is cleared and synchronous failures can retry", async () => {
+  const key = "cache-test:shared-error";
+  const gate = deferred<string>();
+  let queries = 0;
+  const fetcher = () => { queries++; return gate.promise; };
+  const results = Promise.allSettled([cached(key, 60, fetcher), cached(key, 60, fetcher)]);
+  gate.reject(new Error("failed"));
+  assert.ok((await results).every((result) => result.status === "rejected"));
+  assert.equal(queries, 1);
+  await assert.rejects(cached(key, 60, () => { throw new Error("sync"); }), /sync/);
+  assert.equal(await cached(key, 60, async () => "recovered"), "recovered");
+  invalidate(key);
+});
+
+test("full cache returns successful reads rather than throwing ECACHEFULL", async () => {
+  const prefix = "cache-test:capacity:";
+  try {
+    for (let i = 0; i < 10_001; i++) {
+      assert.equal(await cached(`${prefix}${i}`, 60, async () => i), i);
+    }
+    invalidate(`${prefix}0`);
+    assert.equal(await cached(`${prefix}new`, 60, async () => "admitted"), "admitted");
+    assert.equal(await cached(`${prefix}new`, 60, async () => "miss"), "admitted");
+  } finally {
+    invalidatePrefix(prefix);
+  }
+});
+
+test("pending registry is bounded and overflow reads are not retained", async () => {
+  const prefix = "cache-test:pending-capacity:";
+  const gate = deferred<string>();
+  const pending = Array.from({ length: 10_000 }, (_, i) => cached(`${prefix}${i}`, 60, () => gate.promise));
+  let queries = 0;
+  const overflow = () => { queries++; return Promise.resolve("uncached"); };
+  try {
+    assert.equal(await cached(`${prefix}overflow`, 60, overflow), "uncached");
+    assert.equal(await cached(`${prefix}overflow`, 60, overflow), "uncached");
+    assert.equal(queries, 2);
+    gate.resolve("done");
+    await Promise.all(pending);
+    invalidatePrefix(prefix);
+    await cached(`${prefix}overflow`, 60, overflow);
+    await cached(`${prefix}overflow`, 60, overflow);
+    assert.equal(queries, 3, "settled pending work must release capacity");
+  } finally {
+    gate.resolve("done");
+    await Promise.all(pending);
+    invalidatePrefix(prefix);
+  }
+});
+
+test("an old rejection cannot detach newer pending work", async () => {
+  const key = "cache-test:rejected-generation";
+  const old = deferred<string>();
+  const fresh = deferred<string>();
+  const before = cached(key, 60, () => old.promise);
+  const rejection = assert.rejects(before, /obsolete/);
+  await Promise.resolve();
+  invalidate(key);
+  let queries = 0;
+  const fetcher = () => { queries++; return fresh.promise; };
+  const after = cached(key, 60, fetcher);
+  old.reject(new Error("obsolete"));
+  await rejection;
+  const joined = cached(key, 60, fetcher);
+  fresh.resolve("fresh");
+  assert.deepEqual(await Promise.all([after, joined]), ["fresh", "fresh"]);
+  assert.equal(queries, 1);
+  invalidate(key);
+});
+
+test("TTL expires deterministically and null remains a cache hit", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1_000 });
+  const key = "cache-test:ttl";
+  let queries = 0;
+  const fetcher = async () => { queries++; return null; };
+  try {
+    assert.equal(await cached(key, 1, fetcher), null);
+    assert.equal(await cached(key, 1, fetcher), null);
+    assert.equal(queries, 1);
+    t.mock.timers.tick(1_001);
+    assert.equal(await cached(key, 1, fetcher), null);
+    assert.equal(queries, 2);
+  } finally {
+    invalidate(key);
+    t.mock.timers.reset();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // invalidateChatContext / invalidateAllChatContext — write-through
 // invalidation of every per-student chat context layer.
@@ -250,6 +401,19 @@ test("invalidateAllChatContext clears chat layers for every student but not laye
 // This block runs LAST in the file on purpose: it fills the module's
 // singleton adapter and never empties it.
 // ---------------------------------------------------------------------------
+
+test("cache adapter and snapshot failures never fail a successful fetch", async (t) => {
+  const key = "cache-test:adapter-failure";
+  const failure = () => { throw new Error("cache unavailable"); };
+  t.mock.method(NodeCache.prototype, "get", failure);
+  t.mock.method(NodeCache.prototype, "set", failure);
+  t.mock.method(NodeCache.prototype, "del", failure);
+  t.mock.method(NodeCache.prototype, "keys", failure);
+  const value = { ok: true };
+  assert.deepEqual(await cached(key, 60, async () => value), value);
+  assert.doesNotThrow(() => invalidate(key));
+  assert.doesNotThrow(() => invalidatePrefix("cache-test:adapter-failure"));
+});
 
 const MAX_KEYS = 10_000;
 

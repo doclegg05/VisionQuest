@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
+import { validateUploadContent } from "@/lib/file-security";
 import { logger } from "@/lib/logger";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
@@ -86,6 +87,9 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     if (buffer.length > 500_000) {
       throw badRequest("Signature image too large.");
     }
+
+    const contentError = validateUploadContent(buffer, "image/png");
+    if (contentError) throw badRequest(contentError);
 
     const storageKey = generateStorageKey(targetStudentId, `signature-${formId}.png`);
     await uploadFile(storageKey, buffer, "image/png");

@@ -88,10 +88,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (needsRehash && student) {
     try {
       const { hash: newHash } = hashPassword(password);
-      await prisma.student.update({
-        where: { id: student.id },
+      // Never restore the old password over a concurrent reset/change.
+      const migrated = await prisma.student.updateMany({
+        where: { id: student.id, passwordHash: student.passwordHash },
         data: { passwordHash: newHash },
       });
+      if (migrated.count !== 1) {
+        return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      }
     } catch (err) {
       logger.warn("Password rehash failed", { student: studentLogKey(student.id), error: String(err) });
     }

@@ -4,9 +4,11 @@ import type { Session } from "@/lib/api-error";
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-32-chars-minimum-ok!!";
 
-// Control the rate-limit decision the executor sees, and confirm it enforces
-// BEFORE the tool runs. present_form is a read tool that reads only static
-// FORMS data — no DB — so a success path here does not touch the database.
+// Control the rate-limit decision and isolate form search: present_form's
+// hybrid search otherwise invokes embeddings/config DB reads on a cache miss.
+mock.module("@/lib/spokes/form-search", {
+  namedExports: { searchForms: async () => ({ candidates: [], method: "keyword" }) },
+});
 let allow = true;
 const rateCalls: Array<{ studentId: string; toolName: string; tier: string }> = [];
 const auditActions: string[] = [];

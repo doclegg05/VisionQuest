@@ -10,7 +10,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { rateLimited } from "@/lib/api-error";
+import { badRequest, rateLimited } from "@/lib/api-error";
+import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { withRegistry } from "@/lib/registry/middleware";
 import { parseBody } from "@/lib/schemas";
@@ -34,12 +35,35 @@ export const POST = withRegistry("sage.propose_goal", async (session, req: NextR
 
   const body = await parseBody(req, proposeGoalSchema);
 
+  // Traceability and hierarchy references come from an untrusted HTTP body.
+  // Scope them before the internal proposal helper can persist any links.
+  const sourceMessage = await prisma.message.findFirst({
+    where: {
+      id: body.sourceMessageId,
+      role: "assistant",
+      conversation: {
+        studentId: session.id,
+        ...(body.conversationId ? { id: body.conversationId } : {}),
+      },
+    },
+    select: { conversationId: true },
+  });
+  if (!sourceMessage) throw badRequest("Source message not found.");
+
+  if (body.parentId) {
+    const parent = await prisma.goal.findFirst({
+      where: { id: body.parentId, studentId: session.id },
+      select: { id: true },
+    });
+    if (!parent) throw badRequest("Parent goal not found.");
+  }
+
   const result = await proposeGoal({
     studentId: session.id,
     level: body.level,
     content: body.content,
     sourceMessageId: body.sourceMessageId,
-    conversationId: body.conversationId,
+    conversationId: sourceMessage.conversationId,
     parentId: body.parentId ?? null,
     invokedBy: session.id,
     confidence: body.confidence,

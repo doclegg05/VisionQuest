@@ -180,7 +180,8 @@ catches it.
 CRON_CHECK_DATABASE_URL='<postgres-role connection string>' npm run cron:health
 ```
 
-Exit 0: all seven present, active, have run, and last succeeded, and every
+Exit 0: all eight expected jobs (including the later `connect-nudges` job) are
+present, active, have run, and last succeeded, and every
 `net._http_response` row in the last 6 hours is a 200. Exit 1: problems,
 listed one per line. Exit 2: the check did not run (no connection string, or
 the queries failed). If `net._http_response` is absent or not readable the
@@ -191,8 +192,9 @@ scheduled them.
 `.github/workflows/cron-health.yml` runs the same check nightly and on
 demand. It needs the `CRON_CHECK_DATABASE_URL` repository secret, which is
 a merge condition for the repair PR, not an option; without it the workflow
-emits a warning annotation and a step summary saying the check did not run,
-rather than passing.
+emits an error annotation and a step summary saying the check did not run,
+then exits 2. Before the September 23 release this branch exited 0; those
+green workflow runs are not evidence of scheduled-layer health.
 
 ### Known gaps after the repair
 
