@@ -176,6 +176,31 @@ describe("OpenRouterProvider non-streaming", () => {
     assert.equal(bodies.length, 3);
   });
 
+  it("names a connection that never happened as a network failure, and retries it", async () => {
+    const dropped = () => {
+      throw new TypeError("fetch failed");
+    };
+    const { fetchImpl, bodies } = recordingFetch([dropped, dropped, dropped]);
+    await assert.rejects(
+      makeProvider(fetchImpl).generateResponse("sys", MESSAGES),
+      (error) => error instanceof OpenRouterError && error.kind === "network" && error.status === null,
+    );
+    assert.equal(bodies.length, 3);
+  });
+
+  it("keeps a timeout apart from a network failure", async () => {
+    const timedOut = () => {
+      const error = new Error("The operation timed out.");
+      error.name = "TimeoutError";
+      throw error;
+    };
+    const { fetchImpl } = recordingFetch([timedOut, timedOut, timedOut]);
+    await assert.rejects(
+      makeProvider(fetchImpl).generateResponse("sys", MESSAGES),
+      (error) => error instanceof OpenRouterError && error.kind === "unavailable",
+    );
+  });
+
   it("does not retry a bad request and keeps the key and body out of the message", async () => {
     const { fetchImpl, bodies } = recordingFetch([
       () => jsonResponse(400, { error: { message: `secret detail for ${KEY}` } }),

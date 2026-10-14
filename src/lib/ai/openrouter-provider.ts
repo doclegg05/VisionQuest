@@ -42,7 +42,12 @@ const DEFAULT_MAX_HOPS = 5;
 const FORBIDDEN_BODY_KEYS = new Set(["user", "session_id", "plugins", "provider"]);
 const KEY_LIMIT_PATTERN = /key[_\s-]?limit/i;
 
-export type OpenRouterErrorKind = "credits" | "refused" | "rate_limited" | "unavailable" | "bad_request";
+/**
+ * "network" is a connection that never happened (fetch threw before any
+ * response); the evals use it to tell an unreachable provider from a slow or
+ * failing one. "unavailable" covers timeouts, 5xx and broken replies.
+ */
+export type OpenRouterErrorKind = "credits" | "refused" | "rate_limited" | "unavailable" | "network" | "bad_request";
 
 export class OpenRouterError extends Error {
   readonly kind: OpenRouterErrorKind;
@@ -305,11 +310,14 @@ function transportError(error: unknown, timeoutMs: number): OpenRouterError {
   if (name === "TimeoutError" || name === "AbortError") {
     return new OpenRouterError(`OpenRouter request timed out after ${timeoutMs}ms`, "unavailable");
   }
-  return new OpenRouterError("OpenRouter request failed (network)", "unavailable");
+  return new OpenRouterError("OpenRouter request failed (network)", "network");
 }
 
 function isRetryable(error: unknown): boolean {
-  return error instanceof OpenRouterError && (error.kind === "rate_limited" || error.kind === "unavailable");
+  return (
+    error instanceof OpenRouterError &&
+    (error.kind === "rate_limited" || error.kind === "unavailable" || error.kind === "network")
+  );
 }
 
 async function failureFromResponse(response: Response): Promise<OpenRouterError> {

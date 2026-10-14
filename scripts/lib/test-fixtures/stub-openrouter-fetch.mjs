@@ -1,6 +1,9 @@
 // Test preload: answers every OpenRouter request with STUB_OPENROUTER_STATUS
 // and refuses every other request, so an eval run under it never reaches the
-// network. Used by scripts/lib/eval-abort.e2e.test.mjs.
+// network. STUB_OPENROUTER_STATUS=network fails every request the way fetch
+// does when the connection never happens. Used by
+// scripts/lib/eval-abort.e2e.test.mjs.
+const networkDown = process.env.STUB_OPENROUTER_STATUS === "network";
 const status = Number(process.env.STUB_OPENROUTER_STATUS ?? "402");
 const bodies = {
   402: { error: { code: 402, message: "Insufficient credits" } },
@@ -10,6 +13,7 @@ const bodies = {
 globalThis.fetch = async (input) => {
   const url = typeof input === "string" ? input : input.url;
   if (!url.includes("openrouter.ai")) throw new Error(`stub fetch refused a non-OpenRouter request: ${url}`);
+  if (networkDown) throw new TypeError("fetch failed");
   return new Response(JSON.stringify(bodies[status] ?? { error: { code: status } }), {
     status,
     headers: { "Content-Type": "application/json" },

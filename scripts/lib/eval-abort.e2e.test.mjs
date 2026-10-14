@@ -54,6 +54,17 @@ describe("eval runs that cannot evaluate exit with 'not run' codes", () => {
     });
   }
 
+  for (const [script, args] of SCRIPTS) {
+    it(`${path.basename(script)} exits 4 when OpenRouter cannot be reached at all`, () => {
+      // Before 2026-10-14 every case was graded as a miss: the agent eval
+      // printed "0.0% (0/45)" and exited 0, and the run took two minutes of
+      // retries against a dead connection.
+      const { code, output } = runEval(script, args, "network");
+      assert.equal(code, 4, output.slice(-1500));
+      assert.match(output, /OpenRouter could not be reached/);
+    });
+  }
+
   it("sage-agent-eval.mjs exits 4 when the model is unavailable", () => {
     const { code, output } = runEval("scripts/sage-agent-eval.mjs", [], 404);
     assert.equal(code, 4, output.slice(-1500));

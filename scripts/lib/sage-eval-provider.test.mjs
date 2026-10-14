@@ -11,6 +11,7 @@ import {
   reportEvalFailure,
   resolveEvalProvider,
   EvalProviderUnavailableError,
+  EvalProviderUnreachableError,
   isEvalAbort,
 } from "./sage-eval-provider.mjs";
 
@@ -216,6 +217,103 @@ describe("wrapWithBudgetDetection", () => {
  * Every eval script's `main().catch(reportEvalFailure)` — the shared
  * top-level handler the workflow's exit-code branching depends on.
  */
+/**
+ * A run whose provider was never reached evaluated nothing. Before
+ * 2026-10-14 every eval graded each such case as a miss: with OpenRouter
+ * unreachable the agent eval reported "0.0% (0/45)" and exited 0 without a
+ * floor (1 with CI's floor), so a dead connection read as "ran" in both.
+ * A network failure is "never reached" only if no call in the run has
+ * succeeded yet; after that it stays an ordinary, graded failure.
+ */
+describe("wrapWithBudgetDetection — a provider that was never reached", () => {
+  const openRouterNetwork = () =>
+    Object.assign(new Error("OpenRouter request failed (network)"), { name: "OpenRouterError", kind: "network", status: null });
+  const geminiFetchFailed = () =>
+    new Error("[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/x: fetch failed");
+  const openRouterTimeout = () =>
+    Object.assign(new Error("OpenRouter request timed out after 30000ms"), { name: "OpenRouterError", kind: "unavailable", status: null });
+
+  function provider(name, failWith, { succeedFirst = false } = {}) {
+    let calls = 0;
+    return {
+      name,
+      async generateResponse() {
+        calls += 1;
+        if (succeedFirst && calls === 1) return "ok";
+        throw failWith();
+      },
+      async *streamResponse() {
+        yield "";
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+      async *streamWithTools() {
+        calls += 1;
+        if (succeedFirst && calls === 1) {
+          yield { kind: "text", text: "ok" };
+          return;
+        }
+        throw failWith();
+      },
+    };
+  }
+
+  it("aborts the run as unreachable when the first call cannot connect", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterNetwork));
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (error) => error instanceof EvalProviderUnreachableError && isEvalAbort(error) && /OpenRouter/.test(error.message),
+    );
+  });
+
+  it("recognises Gemini's 'fetch failed' the same way", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("gemini", geminiFetchFailed));
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (error) => error instanceof EvalProviderUnreachableError && /Gemini/.test(error.message),
+    );
+  });
+
+  it("aborts from streamWithTools too, the call every tool eval makes", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterNetwork));
+    await assert.rejects(async () => {
+      for await (const _event of wrapped.streamWithTools("sys", [], [], async () => ({}), {})) {
+        // drain
+      }
+    }, EvalProviderUnreachableError);
+  });
+
+  it("grades a network failure as an ordinary error once any call has succeeded", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterNetwork, { succeedFirst: true }));
+    assert.equal(await wrapped.generateResponse("sys", []), "ok");
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (error) => !isEvalAbort(error) && error.message === "OpenRouter request failed (network)",
+    );
+  });
+
+  it("counts a stream that delivered an event as reached", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterNetwork, { succeedFirst: true }));
+    for await (const _event of wrapped.streamWithTools("sys", [], [], async () => ({}), {})) {
+      // drain the successful first call
+    }
+    await assert.rejects(async () => {
+      for await (const _event of wrapped.streamWithTools("sys", [], [], async () => ({}), {})) {
+        // drain
+      }
+    }, (error) => !isEvalAbort(error));
+  });
+
+  it("never treats a timeout as unreachable", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterTimeout));
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (error) => !isEvalAbort(error) && /timed out/.test(error.message),
+    );
+  });
+});
+
 describe("reportEvalFailure", () => {
   function withCapturedExitCodeAndConsoleError(fn) {
     const originalExitCode = process.exitCode;
@@ -238,6 +336,16 @@ describe("reportEvalFailure", () => {
     assert.equal(exitCode, 3);
     assert.ok(
       loggedArgs.some((args) => args[0] === "::error::Gemini budget exhausted — evals not run"),
+      `expected the named ::error:: line, got: ${JSON.stringify(loggedArgs)}`,
+    );
+  });
+
+  it("sets exit code 4 and names the unreachable provider for a run that never connected", () => {
+    const unreachable = new EvalProviderUnreachableError(new Error("fetch failed"), "OpenRouter");
+    const { exitCode, loggedArgs } = withCapturedExitCodeAndConsoleError(() => reportEvalFailure(unreachable));
+    assert.equal(exitCode, 4);
+    assert.ok(
+      loggedArgs.some((args) => args[0] === "::error::OpenRouter could not be reached — evals not run"),
       `expected the named ::error:: line, got: ${JSON.stringify(loggedArgs)}`,
     );
   });

@@ -274,6 +274,35 @@ export class EvalProviderUnavailableError extends Error {
 }
 
 /**
+ * Thrown by `wrapWithBudgetDetection` when a call fails at the network level
+ * (the connection never happened) before any call in the run has succeeded:
+ * the provider was never reached, so nothing was evaluated. A subclass of the
+ * unavailable error, so every eval's per-case catch already rethrows it and
+ * the run exits 4. Before this, each case was graded as a miss and a dead
+ * connection read as "0.0%" (exit 0 without a floor, 1 with one).
+ */
+export class EvalProviderUnreachableError extends EvalProviderUnavailableError {
+  constructor(cause, providerLabel) {
+    super(cause, providerLabel);
+    this.message = `${providerLabel} could not be reached (network) before any call succeeded — evals not run.`;
+    this.name = "EvalProviderUnreachableError";
+  }
+}
+
+/**
+ * True when a call failed because no connection happened: OpenRouter's
+ * "network" kind, or the "fetch failed" Gemini's SDK reports. Timeouts, 5xx
+ * and broken replies are not network failures; the provider answered.
+ */
+export function isNetworkFailure(error) {
+  if (error?.name === "OpenRouterError") return error.kind === "network";
+  const text = [error?.message, error?.cause?.message].filter((part) => typeof part === "string").join(" ");
+  return /fetch failed/i.test(text);
+}
+
+const PROVIDER_LABELS = { openrouter: "OpenRouter", gemini: "Gemini", ollama: "Ollama" };
+
+/**
  * True for errors that mean "nothing can be evaluated", which every eval
  * script's per-case catch must rethrow instead of grading as a failed case.
  */
@@ -315,8 +344,12 @@ function describeProviderError(error) {
   return { status, bodyText };
 }
 
-/** Reclassifies a budget-exhausted error and rethrows; every other error is rethrown untouched. */
-function classifyAndRethrow(error) {
+/**
+ * Reclassifies a budget-exhausted, unavailable or never-reached error and
+ * rethrows; every other error is rethrown untouched. `run.reached` is false
+ * until some call in this run has succeeded.
+ */
+function classifyAndRethrow(error, run) {
   if (error?.name === "OpenRouterError" && error.kind === "credits") {
     throw new EvalBudgetExhaustedError(error, "OpenRouter");
   }
@@ -325,6 +358,7 @@ function classifyAndRethrow(error) {
   }
   const { status, bodyText } = describeProviderError(error);
   if (isBudgetExhausted(status, bodyText)) throw new EvalBudgetExhaustedError(error);
+  if (!run.reached && isNetworkFailure(error)) throw new EvalProviderUnreachableError(error, run.label);
   throw error;
 }
 
@@ -345,50 +379,37 @@ function classifyAndRethrow(error) {
  * `Boolean(provider.streamWithTools)` remains truthful through the wrapper.
  */
 export function wrapWithBudgetDetection(provider) {
+  // One run per wrapped provider: `reached` flips on the first call that
+  // returns, or the first event a stream yields, and never flips back.
+  const run = { reached: false, label: PROVIDER_LABELS[provider.name] ?? provider.name };
+  const call = async (method, args) => {
+    try {
+      const result = await provider[method](...args);
+      run.reached = true;
+      return result;
+    } catch (error) {
+      classifyAndRethrow(error, run);
+    }
+  };
+  async function* stream(method, args) {
+    try {
+      for await (const item of provider[method](...args)) {
+        run.reached = true;
+        yield item;
+      }
+    } catch (error) {
+      classifyAndRethrow(error, run);
+    }
+  }
+
   const wrapped = {
     name: provider.name,
-    async generateResponse(...args) {
-      try {
-        return await provider.generateResponse(...args);
-      } catch (error) {
-        classifyAndRethrow(error);
-      }
-    },
-    async *streamResponse(...args) {
-      try {
-        yield* provider.streamResponse(...args);
-      } catch (error) {
-        classifyAndRethrow(error);
-      }
-    },
-    async generateStructuredResponse(...args) {
-      try {
-        return await provider.generateStructuredResponse(...args);
-      } catch (error) {
-        classifyAndRethrow(error);
-      }
-    },
+    generateResponse: (...args) => call("generateResponse", args),
+    streamResponse: (...args) => stream("streamResponse", args),
+    generateStructuredResponse: (...args) => call("generateStructuredResponse", args),
   };
-
-  if (provider.streamWithTools) {
-    wrapped.streamWithTools = async function* (...args) {
-      try {
-        yield* provider.streamWithTools(...args);
-      } catch (error) {
-        classifyAndRethrow(error);
-      }
-    };
-  }
-  if (provider.describeDocument) {
-    wrapped.describeDocument = async (...args) => {
-      try {
-        return await provider.describeDocument(...args);
-      } catch (error) {
-        classifyAndRethrow(error);
-      }
-    };
-  }
-
+  if (provider.streamWithTools) wrapped.streamWithTools = (...args) => stream("streamWithTools", args);
+  if (provider.describeDocument) wrapped.describeDocument = (...args) => call("describeDocument", args);
   return wrapped;
 }
 
@@ -402,6 +423,12 @@ export function wrapWithBudgetDetection(provider) {
  * see docs/runbooks/sage-eval-budget.md.
  */
 export function reportEvalFailure(error) {
+  if (error instanceof EvalProviderUnreachableError) {
+    console.error(`::error::${error.providerLabel} could not be reached — evals not run`);
+    console.error(error);
+    process.exitCode = 4;
+    return;
+  }
   if (error instanceof EvalProviderUnavailableError) {
     console.error(`::error::${error.providerLabel} provider or model unavailable — evals not run`);
     console.error(error);
