@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { getEnabledTools } from "./agent/tools";
+import { formatAttachmentContext } from "../chat/attachment-context";
 import { CAREER_GROUNDING_TOOL_NAMES } from "../../../scripts/lib/sage-career-eval.mjs";
 import {
+  buildScenarioContext,
   computeAgentEvalExitCode,
   isWatchScenario,
   summarizeAgentEvalAccuracy,
@@ -36,6 +38,8 @@ interface AgentEvalScenario {
   forbiddenTools?: string[];
   context?: string;
   attachment?: { fileUploadId: string; filename: string; gist: string };
+  /** The student's open orientation checklist, as chat lists it beside an attachment. */
+  openOrientationItems?: Array<{ id: string; label: string }>;
   note?: string;
   /** Opt out of the gating accuracy and the --min-accuracy denominator. */
   watch?: true;
@@ -274,6 +278,42 @@ describe("sage agent eval — watch tier", () => {
     assert.ok(
       source.includes("const accuracyPct = summary.gating.accuracyPct"),
       `${SCRIPT_PATH} no longer feeds the gating-tier accuracy into computeAgentEvalExitCode`,
+    );
+  });
+});
+
+/**
+ * What the model is shown for a scenario. Until 2026-10-14 an attachment
+ * REPLACED the scenario's context instead of following it, so an attachment
+ * case could never carry the ids its tool needs, and the attachment text was a
+ * hand-written copy that had already drifted from what chat sends.
+ */
+describe("sage agent eval — scenario context", () => {
+  const attachment = { fileUploadId: "file-attach-9", filename: "form.pdf", gist: "A signed form." };
+
+  it("keeps the scenario's context when the scenario also has an attachment", () => {
+    const context = buildScenarioContext({
+      id: "both",
+      message: "file it",
+      context: "STUDENT'S SAVED JOBS:\n- jobListingId job-1: CNA",
+      attachment,
+    }, formatAttachmentContext);
+    assert.ok(context.includes("jobListingId job-1"), "the attachment wiped the scenario context");
+    assert.ok(context.includes("fileUploadId file-attach-9"));
+  });
+
+  it("builds the attachment block with the formatter chat uses, checklist included", () => {
+    const openOrientationItems = [{ id: "orient-dress", label: "Review Code of Conduct and Dress Code" }];
+    const context = buildScenarioContext(
+      { id: "form", message: "file it", attachment, openOrientationItems },
+      formatAttachmentContext,
+    );
+    assert.equal(
+      context,
+      formatAttachmentContext({
+        files: [{ id: attachment.fileUploadId, filename: attachment.filename, gist: attachment.gist }],
+        openOrientationItems,
+      }),
     );
   });
 });
