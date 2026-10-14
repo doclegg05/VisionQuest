@@ -269,6 +269,12 @@ const FILE_CATEGORIES = ["general", "resume", "portfolio", "cert_evidence", "ori
 
 const fileDocument: AgentTool = {
   name: "file_document",
+  // Measured wording, keep it. On 2026-10-14 two narrower descriptions ("into
+  // one of their document categories") scored the same on every eval case,
+  // but sent "put my WorkKeys certificate with my certification records" to
+  // file_document (a label) instead of lookup_cert_progress, which leads to
+  // mark_certification_complete and actually counts the file. Re-measure
+  // before changing it.
   description:
     "File an uploaded chat document into the right place: a document category, or as evidence for a certification requirement. Requires user confirmation.",
   // No requirement id here, deliberately. A requirement parameter on this
@@ -321,10 +327,12 @@ const fileDocument: AgentTool = {
       const filed = `Filed "${file.filename}" under ${category.replace("_", " ")}.`;
       // A category label does not touch the Ready-to-Work checklist; say so,
       // or the student hears "filed" and assumes the requirement is covered.
+      // The student reads this (ConfirmToolCard shows it after a confirm), so
+      // it names no tools.
       return {
         summary:
           category === "cert_evidence"
-            ? `${filed} This labels the file only. To count it toward a Ready-to-Work requirement, call mark_certification_complete with that requirement's requirementId from lookup_cert_progress and this fileUploadId.`
+            ? `${filed} It does not count toward your Ready-to-Work checklist yet. Ask Sage to mark that checklist item done with this file.`
             : filed,
       };
     });

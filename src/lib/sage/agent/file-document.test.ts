@@ -90,7 +90,7 @@ describe("file_document — certification evidence", () => {
     assert.deepEqual(Object.keys(properties).sort(), ["category", "fileUploadId"]);
   });
 
-  it("files cert evidence by category, attaches nothing, and points at mark_certification_complete", async () => {
+  it("files cert evidence by category, attaches nothing, and tells the student plainly it isn't counted yet", async () => {
     const args = { fileUploadId: "file-1", category: "cert_evidence" };
     const record = await executeAgentTool({
       session,
@@ -105,11 +105,13 @@ describe("file_document — certification evidence", () => {
       data: { category: "cert_evidence" },
     });
     assert.equal(mockRequirementUpdateMany.mock.callCount(), 0, "file_document never writes a requirement");
-    assert.match(
-      record.result.summary,
-      /mark_certification_complete/,
-      "a label is not a checklist item; the reply must say what counts it toward one",
-    );
+    // This reply reaches the STUDENT: a confirmed tool runs through
+    // /api/chat/tool-confirm, and ConfirmToolCard shows the summary as is.
+    // Sage never reads it, so it must not be written for Sage.
+    const summary = record.result.summary;
+    assert.doesNotMatch(summary, /[a-z]+_[a-z_]+|requirementId|fileUploadId/, `tool jargon shown to a student: ${summary}`);
+    assert.match(summary, /Ready-to-Work checklist/);
+    assert.match(summary, /does not count/, "a label is not a checklist item; the student must not think it is");
   });
 
   it("rejects a requirement id instead of filing as if it had been attached", async () => {
