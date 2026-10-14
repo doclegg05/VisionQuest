@@ -129,6 +129,42 @@ describe("sage agent eval scenarios", () => {
     );
   });
 
+  it("a scenario that expects a tool needing an id supplies the id, or accepts a lookup first", () => {
+    // The eval sends one message with no earlier turns, so a model can only
+    // know an id the scenario puts in front of it. Five gating cases expected
+    // submit_form, save_job and file_document with no id anywhere; every model
+    // tested went to a lookup instead (the right move), and the only way to
+    // "pass" was to invent an id. Ids from a fixed enum need no supplying.
+    const tools = new Map(getEnabledTools("student", "full").map((tool) => [tool.name, tool]));
+    const supplies = (scenario: AgentEvalScenario, param: string) => {
+      if (param === "fileUploadId" && scenario.attachment) return true;
+      if (param === "orientationItemId" && (scenario.openOrientationItems?.length ?? 0) > 0) return true;
+      return scenario.context?.includes(param) ?? false;
+    };
+    const gaps: string[] = [];
+    for (const scenario of SCENARIOS) {
+      const tool = scenario.expectedTool ? tools.get(scenario.expectedTool) : undefined;
+      if (!tool) continue;
+      const schema = tool.parameters as {
+        required?: string[];
+        properties?: Record<string, { enum?: unknown[] }>;
+      };
+      const missing = (schema.required ?? []).filter(
+        (param) => param.endsWith("Id") && !schema.properties?.[param]?.enum && !supplies(scenario, param),
+      );
+      const acceptsLookup = (scenario.acceptableTools ?? []).some((name) => tools.get(name)?.riskTier === "read");
+      if (missing.length > 0 && !acceptsLookup) {
+        gaps.push(`${scenario.id} (${scenario.expectedTool} needs ${missing.join(", ")})`);
+      }
+    }
+    assert.deepEqual(
+      gaps,
+      [],
+      `these scenarios expect a tool whose required id they never supply: ${gaps.join("; ")}. Put the id ` +
+        `in context (or openOrientationItems), or accept the read tool a model would call to find it.`,
+    );
+  });
+
   it("the watch field is either absent or exactly true", () => {
     for (const scenario of SCENARIOS) {
       if (!("watch" in scenario)) continue;
