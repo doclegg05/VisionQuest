@@ -283,9 +283,9 @@ const fileDocument: AgentTool = {
         enum: FILE_CATEGORIES,
         description: "Where the document belongs.",
       },
-      certRequirementTemplateId: {
+      certRequirementId: {
         type: "string",
-        description: "Only with category cert_evidence: the certification requirement template this file evidences.",
+        description: "Only with category cert_evidence: the requirementId from lookup_cert_progress that this file is evidence for.",
       },
     },
     required: ["fileUploadId", "category"],
@@ -296,9 +296,7 @@ const fileDocument: AgentTool = {
   async execute(args, ctx): Promise<AgentToolResult> {
     const fileUploadId = String(args.fileUploadId ?? "");
     const category = String(args.category ?? "");
-    const templateId = args.certRequirementTemplateId
-      ? String(args.certRequirementTemplateId)
-      : undefined;
+    const requirementId = args.certRequirementId ? String(args.certRequirementId) : undefined;
     const studentId = ctx.targetStudentId ?? ctx.session.id;
 
     if (!(FILE_CATEGORIES as ReadonlyArray<string>).includes(category)) {
@@ -310,40 +308,86 @@ const fileDocument: AgentTool = {
     });
     if (!file) return { status: "error", summary: "That uploaded file was not found on this account." };
 
-    const gateArgs: Record<string, unknown> = templateId
-      ? { fileUploadId, category, certRequirementTemplateId: templateId }
-      : { fileUploadId, category };
+    if (category === "cert_evidence") {
+      return fileCertEvidence({ file, requirementId, studentId, ctx });
+    }
+
+    const gateArgs: Record<string, unknown> = { fileUploadId, category };
     const gate = await confirmationGate(
       "file_document",
       gateArgs,
       ctx,
-      category === "cert_evidence"
-        ? `Attach "${file.filename}" as certification evidence?`
-        : `File "${file.filename}" under ${category.replace("_", " ")}?`,
+      `File "${file.filename}" under ${category.replace("_", " ")}?`,
       `File "${file.filename}"`,
     );
     if (gate) return gate;
 
     return executeAndLedger("file_document", gateArgs, ctx, async () => {
       await prisma.fileUpload.update({ where: { id: fileUploadId }, data: { category } });
-
-      if (category === "cert_evidence" && templateId) {
-        const cert = await prisma.certification.findFirst({
-          where: { studentId },
-          select: { id: true },
-        });
-        if (cert) {
-          // Attach evidence only — completion/verification stays with the teacher.
-          await prisma.certRequirement.updateMany({
-            where: { certificationId: cert.id, templateId },
-            data: { fileId: fileUploadId },
-          });
-        }
-      }
       return { summary: `Filed "${file.filename}" under ${category.replace("_", " ")}.` };
     });
   },
 };
+
+/**
+ * Evidence for one requirement on the student's own certification. The
+ * requirement is resolved before the confirm card so the card names it, and
+ * the attach must match a row, or the student hears it failed: the old
+ * template-id path matched nothing and still said "Filed".
+ */
+interface CertEvidenceRequest {
+  file: { id: string; filename: string };
+  requirementId: string | undefined;
+  studentId: string;
+  ctx: AgentToolContext;
+}
+
+async function fileCertEvidence(params: CertEvidenceRequest): Promise<AgentToolResult> {
+  const { file, requirementId, studentId, ctx } = params;
+  if (!requirementId) {
+    return {
+      status: "error",
+      summary:
+        "To attach certification evidence I need the requirement it proves. Call lookup_cert_progress for the requirementId, then file it again.",
+    };
+  }
+  const ownedRequirement = { id: requirementId, certification: { studentId } };
+  const requirement = await prisma.certRequirement.findFirst({
+    where: ownedRequirement,
+    select: { id: true, template: { select: { label: true } } },
+  });
+  if (!requirement) {
+    return { status: "error", summary: "That certification item wasn't found on this account." };
+  }
+
+  const label = requirement.template.label;
+  const gateArgs: Record<string, unknown> = {
+    fileUploadId: file.id,
+    category: "cert_evidence",
+    certRequirementId: requirementId,
+  };
+  const gate = await confirmationGate(
+    "file_document",
+    gateArgs,
+    ctx,
+    `Attach "${file.filename}" as evidence for "${label}"?`,
+    `File "${file.filename}"`,
+  );
+  if (gate) return gate;
+
+  return executeAndLedger("file_document", gateArgs, ctx, async () => {
+    // Attach evidence only: completion and verification stay with the teacher.
+    const attached = await prisma.certRequirement.updateMany({
+      where: ownedRequirement,
+      data: { fileId: file.id },
+    });
+    if (attached.count === 0) {
+      throw new Error(`Certification requirement ${requirementId} matched no row; nothing was attached.`);
+    }
+    await prisma.fileUpload.update({ where: { id: file.id }, data: { category: "cert_evidence" } });
+    return { summary: `Attached "${file.filename}" as evidence for "${label}".` };
+  });
+}
 
 // ─── update_goal_status ──────────────────────────────────────────────────────
 
