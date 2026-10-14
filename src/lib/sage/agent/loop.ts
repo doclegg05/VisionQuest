@@ -10,7 +10,7 @@ import { logger } from "@/lib/logger";
 import type { AIProvider, ChatMessage, ToolDeclaration } from "@/lib/ai/types";
 import type { Session } from "@/lib/api-error";
 import { executeAgentTool } from "./executor";
-import { getEnabledTools } from "./tools";
+import { getEnabledTools, toolsForTurn } from "./tools";
 import type { AgentEvent, AgentTool, AgentToolCallRecord } from "./types";
 
 interface AgentTurnOptions {
@@ -23,15 +23,22 @@ interface AgentTurnOptions {
   /** Override the role-based default tool subset (e.g., constrain to a single tool). */
   toolNames?: string[];
   maxHops?: number;
+  /**
+   * Whether this turn carries a file the user attached. Required, so every
+   * caller decides: without one, tools that need a fileUploadId are not
+   * offered (toolsForTurn).
+   */
+  hasAttachment: boolean;
 }
 
 export async function* runAgentTurn(
   options: AgentTurnOptions,
 ): AsyncGenerator<AgentEvent> {
-  const { provider, systemPrompt, messages, session, conversationId, targetStudentId, toolNames, maxHops } = options;
+  const { provider, systemPrompt, messages, session, conversationId, targetStudentId, toolNames, maxHops, hasAttachment } =
+    options;
 
   const role = session.role || "student";
-  const enabledTools = filterTools(getEnabledTools(role), toolNames);
+  const enabledTools = filterTools(toolsForTurn(getEnabledTools(role), { hasAttachment }), toolNames);
 
   // No tools available or provider can't function-call → fall back to plain stream.
   if (enabledTools.length === 0 || !provider.streamWithTools) {

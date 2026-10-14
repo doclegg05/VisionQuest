@@ -159,6 +159,8 @@ export async function runHeadlessReadonlyTurn(
     conversationId,
     toolNames,
     maxHops: maxHops ?? 4,
+    // A headless run has no chat upload behind it.
+    hasAttachment: false,
   });
 
   for await (const event of turn) {
