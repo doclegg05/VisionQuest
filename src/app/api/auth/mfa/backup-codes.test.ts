@@ -62,13 +62,13 @@ mock.module("@/lib/db", {
     prisma: {
       student: {
         findUnique: mockFindUnique,
-        update: mockUpdate,
+        updateMany: mockUpdate,
       },
     },
     prismaAdmin: {
       student: {
         findUnique: mockFindUnique,
-        update: mockUpdate,
+        updateMany: mockUpdate,
       },
     },
   },
@@ -151,7 +151,7 @@ describe("MFA backup code routes", () => {
     mockSetSessionCookie.mock.mockImplementation(async () => undefined);
     mockGetMfaSessionToken.mock.mockImplementation(async () => null);
     mockClearMfaSessionCookie.mock.mockImplementation(async () => undefined);
-    mockUpdate.mock.mockImplementation(async () => undefined);
+    mockUpdate.mock.mockImplementation(async () => ({ count: 1 }));
   });
 
   it("stores only hashed backup codes when MFA is enabled", async () => {

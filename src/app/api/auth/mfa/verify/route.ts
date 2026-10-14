@@ -63,8 +63,8 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
   const backupCodes = generateBackupCodes();
 
   // Enable MFA and persist only the hashed recovery codes.
-  await prisma.student.update({
-    where: { id: student.id },
+  const changed = await prisma.student.updateMany({
+    where: { id: student.id, mfaEnabled: false, mfaSecret: student.mfaSecret },
     data: {
       mfaEnabled: true,
       mfaVerifiedAt: new Date(),
@@ -72,6 +72,10 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
       ...(counter != null ? { mfaLastUsedCounter: counter } : {}),
     },
   });
+
+  if (changed.count !== 1) {
+    return NextResponse.json({ error: "MFA configuration changed. Please try again." }, { status: 409 });
+  }
 
   await logAuditEvent({
     actorId: student.id,

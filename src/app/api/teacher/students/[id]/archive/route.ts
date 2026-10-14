@@ -10,8 +10,9 @@ import { studentLogKey } from "@/lib/log-keys";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unknown) => {
-  const { id: studentId } = await (ctx as RouteContext).params;
-  const student = await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier } = await (ctx as RouteContext).params;
+  const student = await assertStaffCanManageStudent(session, identifier);
+  const studentId = student.id;
 
   try {
     const { storageKey, fileCount } = await generateStudentArchive(
@@ -46,8 +47,8 @@ export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unkn
 });
 
 export const GET = withTeacherAuth(async (session, req: NextRequest, ctx: unknown) => {
-  const { id: studentId } = await (ctx as RouteContext).params;
-  await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier } = await (ctx as RouteContext).params;
+  const { id: studentId } = await assertStaffCanManageStudent(session, identifier);
 
   const url = new URL(req.url);
   const storageKey = url.searchParams.get("key");

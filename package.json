@@ -101,16 +101,16 @@
     "clsx": "^2.1.1",
     "cookie": "^1.1.1",
     "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "eslint-config-next": "16.3.3",
     "framer-motion": "^12.38.0",
     "google-auth-library": "^10.6.2",
     "gray-matter": "^4.0.3",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "mammoth": "^1.12.0",
-    "next": "^16.2.4",
+    "next": "^16.3.3",
     "node-cache": "^5.1.2",
-    "nodemailer": "9.0.3",
+    "nodemailer": "9.1.1",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
     "prisma": "^6.19.3",
@@ -125,7 +125,8 @@
   },
   "overrides": {
     "postcss": "8.5.24",
-    "fast-uri": "3.1.4",
-    "sharp": "0.35.3"
+    "fast-uri": "3.1.6",
+    "sharp": "0.35.4",
+    "deepmerge-ts": "8.0.2"
   }
 }

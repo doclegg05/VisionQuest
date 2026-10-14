@@ -24,8 +24,8 @@ mock.module("@/lib/auth", {
 
 mock.module("@/lib/db", {
   namedExports: {
-    prismaAdmin: { student: { findUnique: mockFindUnique, update: mockUpdate } },
-    prisma: { student: { findUnique: mockFindUnique, update: mockUpdate } },
+    prismaAdmin: { student: { findUnique: mockFindUnique, updateMany: mockUpdate } },
+    prisma: { student: { findUnique: mockFindUnique, updateMany: mockUpdate } },
   },
 });
 
@@ -68,7 +68,7 @@ describe("POST /api/auth/mfa/setup", () => {
       studentId: teacher.studentId,
       role: teacher.role,
     }));
-    mockUpdate.mock.mockImplementation(async () => undefined);
+    mockUpdate.mock.mockImplementation(async () => ({ count: 1 }));
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
   });
 
@@ -126,8 +126,19 @@ describe("POST /api/auth/mfa/setup", () => {
 
     // Only the encrypted form reaches the database, and MFA stays off until verified.
     const update = mockUpdate.mock.calls[0]?.arguments[0];
-    assert.deepEqual(update, { where: { id: teacher.id }, data: { mfaSecret: "enc:JBSWY3DPEHPK3PXP" } });
+    assert.deepEqual(update, { where: { id: teacher.id, mfaEnabled: false }, data: { mfaSecret: "enc:JBSWY3DPEHPK3PXP" } });
     assert.deepEqual(auditActions(), ["mfa.setup_started"]);
+  });
+
+  it("refuses to replace a secret if MFA was enabled after the read", async () => {
+    mockUpdate.mock.mockImplementation(async ({ where }: any) => {
+      assert.equal(where.mfaEnabled, false);
+      return { count: 0 };
+    });
+    const res = await setupRoute.POST();
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).secret, undefined);
+    assert.deepEqual(auditActions(), []);
   });
 
   it("falls back to the login id in the TOTP URI when the account has no email", async () => {
