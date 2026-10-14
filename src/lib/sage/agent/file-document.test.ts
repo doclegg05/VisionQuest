@@ -5,14 +5,22 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-32-chars-minimum-ok!!";
 
 /**
- * file_document's certification-evidence path.
+ * file_document and certification evidence.
  *
- * The tool used to take a certRequirementTemplateId that no tool ever
+ * file_document used to take a certRequirementTemplateId that no tool ever
  * returned. lookup_cert_progress hands out the requirement's own row id, a
  * model that passed it matched zero rows in updateMany, and the student was
- * still told "Filed". These tests pin the replacement: the requirement id from
- * lookup_cert_progress, checked against the student's own certification before
- * the confirm card, and a refusal whenever nothing was attached.
+ * still told "Filed". Renaming the parameter to the requirement id fixed that
+ * but broke an unrelated gating case: with a `certRequirementId` property on
+ * file_document, the production model filed "put my food handler card in my
+ * portfolio" with file_document in 4 of 4 samples (2026-10-14 A/B probe; the
+ * same tool list without the property went 4 of 4 to add_portfolio_item).
+ * The probe also showed the model never took that path when it did know the
+ * requirement: it chose mark_certification_complete, which already takes the
+ * requirementId plus a fileId, in 16 of 16 samples.
+ *
+ * So file_document labels a file as cert evidence and nothing more, and
+ * attaching it to a requirement is mark_certification_complete's job.
  */
 
 const mockFileFindFirst = mock.fn(async () => ({ id: "file-1", filename: "workkeys.pdf" })) as any;
@@ -61,7 +69,6 @@ before(async () => {
 });
 
 const session = { id: "stu-1", role: "student" } as any;
-const EVIDENCE_ARGS = { fileUploadId: "file-1", category: "cert_evidence", certRequirementId: "req-1" };
 
 function confirmed(args: Record<string, unknown>) {
   return createConfirmationToken(
@@ -75,90 +82,52 @@ describe("file_document — certification evidence", () => {
     for (const fn of [mockFileUpdate, mockRequirementFindFirst, mockRequirementUpdateMany, mockRecordOperation]) {
       fn.mock.resetCalls();
     }
-    mockRequirementFindFirst.mock.mockImplementation(async () => ({ id: "req-1", template: { label: "WorkKeys certificate" } }));
-    mockRequirementUpdateMany.mock.mockImplementation(async () => ({ count: 1 }));
   });
 
-  it("asks for the requirement id lookup_cert_progress returns, not a template id no tool exposes", () => {
+  it("declares no requirement id, so it cannot compete with tools that need one", () => {
     const tool = getEnabledTools("student", "full").find((t) => t.name === "file_document")!;
-    const properties = (tool.parameters as { properties: Record<string, { description?: string }> }).properties;
-    assert.ok(!("certRequirementTemplateId" in properties), "no tool returns a template id");
-    assert.match(properties.certRequirementId?.description ?? "", /lookup_cert_progress/);
+    const properties = (tool.parameters as { properties: Record<string, unknown> }).properties;
+    assert.deepEqual(Object.keys(properties).sort(), ["category", "fileUploadId"]);
   });
 
-  it("refuses cert evidence with no requirement, before any card or write", async () => {
+  it("files cert evidence by category, attaches nothing, and points at mark_certification_complete", async () => {
+    const args = { fileUploadId: "file-1", category: "cert_evidence" };
     const record = await executeAgentTool({
       session,
       conversationId: "conv-1",
       toolName: "file_document",
-      args: { fileUploadId: "file-1", category: "cert_evidence" },
-    });
-    assert.equal(record.result.status, "error");
-    assert.match(record.result.summary, /lookup_cert_progress/);
-    assert.equal(record.result.action, undefined, "no confirm card for a call that cannot attach anything");
-    assert.equal(mockFileUpdate.mock.callCount(), 0);
-  });
-
-  it("refuses a requirement that is not on this student's certification, before the card", async () => {
-    mockRequirementFindFirst.mock.mockImplementation(async () => null);
-    const record = await executeAgentTool({
-      session,
-      conversationId: "conv-1",
-      toolName: "file_document",
-      args: EVIDENCE_ARGS,
-    });
-    assert.equal(record.result.status, "error");
-    assert.equal(record.result.action, undefined);
-    const where = mockRequirementFindFirst.mock.calls[0].arguments[0].where;
-    assert.deepEqual(where, { id: "req-1", certification: { studentId: "stu-1" } });
-  });
-
-  it("names the requirement on the confirm card", async () => {
-    const record = await executeAgentTool({
-      session,
-      conversationId: "conv-1",
-      toolName: "file_document",
-      args: EVIDENCE_ARGS,
-    });
-    assert.equal(record.result.action?.action, "confirm_tool");
-    assert.match(record.result.summary, /WorkKeys certificate/);
-    assert.equal(mockRequirementUpdateMany.mock.callCount(), 0, "nothing is attached until the student confirms");
-  });
-
-  it("once confirmed, attaches the file to that requirement on the student's own certification", async () => {
-    const record = await executeAgentTool({
-      session,
-      conversationId: "conv-1",
-      toolName: "file_document",
-      args: EVIDENCE_ARGS,
-      confirmedToken: confirmed(EVIDENCE_ARGS),
+      args,
+      confirmedToken: confirmed(args),
     });
     assert.equal(record.result.status, "success");
-    assert.match(record.result.summary, /WorkKeys certificate/);
-    const update = mockRequirementUpdateMany.mock.calls[0].arguments[0];
-    assert.deepEqual(update.where, { id: "req-1", certification: { studentId: "stu-1" } });
-    assert.deepEqual(update.data, { fileId: "file-1" });
+    assert.deepEqual(mockFileUpdate.mock.calls[0].arguments[0], {
+      where: { id: "file-1" },
+      data: { category: "cert_evidence" },
+    });
+    assert.equal(mockRequirementUpdateMany.mock.callCount(), 0, "file_document never writes a requirement");
+    assert.match(
+      record.result.summary,
+      /mark_certification_complete/,
+      "a label is not a checklist item; the reply must say what counts it toward one",
+    );
   });
 
-  it("never reports Filed when the attach matched no requirement", async () => {
-    // The requirement was valid at proposal time and gone at confirm time
-    // (an instructor removed the template in between). The old code said
-    // "Filed" here with no evidence attached.
-    mockRequirementUpdateMany.mock.mockImplementation(async () => ({ count: 0 }));
+  it("rejects a requirement id instead of filing as if it had been attached", async () => {
+    const args = { fileUploadId: "file-1", category: "cert_evidence", certRequirementId: "req-1" };
     const record = await executeAgentTool({
       session,
       conversationId: "conv-1",
       toolName: "file_document",
-      args: EVIDENCE_ARGS,
-      confirmedToken: confirmed(EVIDENCE_ARGS),
+      args,
+      confirmedToken: confirmed(args),
     });
-    assert.equal(mockRequirementUpdateMany.mock.callCount(), 1, "the attach ran and matched nothing");
     assert.equal(record.result.status, "error");
     assert.doesNotMatch(record.result.summary, /Filed/);
-    assert.equal(mockFileUpdate.mock.callCount(), 0, "the file keeps its old category when nothing was attached");
+    assert.equal(mockFileUpdate.mock.callCount(), 0);
+    assert.equal(mockRequirementUpdateMany.mock.callCount(), 0);
   });
 
-  it("still files ordinary documents by category with no requirement", async () => {
+  it("still files ordinary documents by category", async () => {
     const args = { fileUploadId: "file-1", category: "resume" };
     const record = await executeAgentTool({
       session,

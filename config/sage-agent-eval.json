@@ -154,7 +154,7 @@
     },
     "expectedTool": "file_document",
     "acceptableTools": ["lookup_cert_progress"],
-    "note": "file_document attaches cert evidence by the requirementId that lookup_cert_progress returns, and nothing else supplies one, so on a fresh upload the right first call is that lookup. Same shape as job-cover-letter accepting lookup_saved_jobs. file-cert-evidence-known-requirement covers the second hop."
+    "note": "file_document labels the file as cert evidence. Counting it toward a Ready-to-Work requirement is mark_certification_complete, which needs the requirementId only lookup_cert_progress returns, so on a fresh upload the lookup is an equally right first call. Same shape as job-cover-letter accepting lookup_saved_jobs. file-cert-evidence-known-requirement covers the second hop."
   },
   {
     "id": "file-cert-evidence-known-requirement",
@@ -165,9 +165,9 @@
       "filename": "workkeys-silver.pdf",
       "gist": "ACT WorkKeys National Career Readiness Certificate, silver level, issued to the student."
     },
-    "expectedTool": "file_document",
+    "expectedTool": "mark_certification_complete",
     "watch": true,
-    "note": "The second hop of file-cert-evidence: the requirementId is already known from lookup_cert_progress, so the right call is file_document with category cert_evidence and that certRequirementId. Enters on the watch tier because its rate has never been measured."
+    "note": "The second hop of file-cert-evidence: the requirementId is already known from lookup_cert_progress, so the right call is mark_certification_complete with that requirementId and the attached file, the same self-report the Certifications page makes (an instructor still verifies). file_document has no requirement parameter: one there pulled unrelated portfolio requests to it (2026-10-14 A/B probe), and the production model chose mark_certification_complete here in 16 of 16 samples anyway. Enters on the watch tier because its rate has never been measured."
   },
   {
     "id": "file-resume-doc",
