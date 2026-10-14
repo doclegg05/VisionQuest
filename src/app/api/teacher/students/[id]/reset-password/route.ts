@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withTeacherAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
-import { prisma } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
+import { prismaAdmin } from "@/lib/db";
+import { hashPassword, invalidateSessionCache } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { parseBody } from "@/lib/schemas";
 
@@ -17,27 +17,31 @@ export const POST = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id } = await params;
+  const { id: identifier } = await params;
   const { newPassword } = await parseBody(req, teacherResetPasswordSchema);
 
-  const student = await assertStaffCanManageStudent(session, id);
-  if (!student || student.role === "teacher") {
+  const student = await assertStaffCanManageStudent(session, identifier);
+  const id = student.id;
+  if (student.role !== "student") {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
   const { hash } = hashPassword(newPassword);
-  await prisma.$transaction([
-    prisma.student.update({
-      where: { id },
+  // Reset tokens are own-only under RLS. After student authorization, use
+  // one privileged transaction so a teacher reset actually revokes them.
+  await prismaAdmin.$transaction([
+    prismaAdmin.student.update({
+      where: { id, role: "student" },
       data: {
         passwordHash: hash,
         sessionVersion: { increment: 1 },
       },
     }),
-    prisma.passwordResetToken.deleteMany({
+    prismaAdmin.passwordResetToken.deleteMany({
       where: { studentId: id },
     }),
   ]);
+  invalidateSessionCache(id);
 
   await logAuditEvent({
     actorId: session.id,

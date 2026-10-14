@@ -32,8 +32,9 @@ export const GET = withTeacherAuth(async (
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) => {
-  const { id: studentId } = await params;
-  const student = await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier } = await params;
+  const student = await assertStaffCanManageStudent(session, identifier);
+  const studentId = student.id;
 
   const now = new Date();
 

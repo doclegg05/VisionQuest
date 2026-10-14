@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
+import { detectedFileType, safeDownloadFilename } from "@/lib/file-security";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   withAuth,
@@ -55,7 +56,7 @@ export const GET = withAuth(async (session, req: Request) => {
   const lastSegment = doc.storageKey.split("/").pop() ?? "";
   const ext = lastSegment.includes(".") ? lastSegment.split(".").pop()! : "pdf";
   const safeTitle = doc.title.replace(/[^a-zA-Z0-9._\- ]/g, "_").replace(/"+/g, "").replace(/\.+$/, "").slice(0, 200);
-  const filename = `${safeTitle}.${ext}`;
+  const filename = safeDownloadFilename(`${safeTitle}.${ext}`);
 
   const disposition = mode === "download"
     ? `attachment; filename="${filename}"`
@@ -87,7 +88,8 @@ export const GET = withAuth(async (session, req: Request) => {
 
   return new NextResponse(new Uint8Array(result.buffer), {
     headers: {
-      "Content-Type": doc.mimeType || result.mimeType,
+      "Content-Type": detectedFileType(result.buffer) || "application/octet-stream",
+      "X-Content-Type-Options": "nosniff",
       "Content-Disposition": disposition,
       "Cache-Control": "private, max-age=3600",
     },

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { invalidateSessionCache } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { generateStudentArchive } from "@/lib/student-archive";
 import { logger } from "@/lib/logger";
@@ -13,7 +14,7 @@ export const PATCH = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id } = await params;
+  const { id: identifier } = await params;
   const body = await req.json();
   const isActive = body.isActive;
 
@@ -21,12 +22,10 @@ export const PATCH = withTeacherAuth(async (
     return NextResponse.json({ error: "isActive must be a boolean" }, { status: 400 });
   }
 
-  const student = await assertStaffCanManageStudent(session, id);
-  if (!student) {
-    return NextResponse.json({ error: "Student not found" }, { status: 404 });
-  }
-  if (student.role === "teacher") {
-    return NextResponse.json({ error: "Cannot change status of teacher accounts" }, { status: 403 });
+  const student = await assertStaffCanManageStudent(session, identifier);
+  const id = student.id;
+  if (student.role !== "student") {
+    return NextResponse.json({ error: "Cannot change status of staff accounts" }, { status: 403 });
   }
 
   // Increment sessionVersion on deactivation to force logout
@@ -37,6 +36,8 @@ export const PATCH = withTeacherAuth(async (
       ...(isActive === false ? { sessionVersion: { increment: 1 } } : {}),
     },
   });
+
+  invalidateSessionCache(id);
 
   await logAuditEvent({
     actorId: session.id,
