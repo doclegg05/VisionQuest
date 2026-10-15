@@ -1,136 +1,102 @@
-# Runbook — Sage eval budget guard
+# Runbook: Sage eval budget
 
-Ticket E8 (2026-09-07). On 2026-09-05 six eval runs drained the Gemini
-prepaid balance and every Sage-touching PR read red for hours on a 429
-"prepayment credits depleted" — under the repo's standing rule an ungraded
-scenario is not a pass, so a drained wallet blocked merges exactly like a
-real safety regression would, with nothing in the log to tell the two apart.
-This guard makes a drained wallet read as **NOT RUN**, never as a pass and
-never as a code failure.
+The model-backed Sage evals in CI cost money, and the repo's standing rule is
+that an ungraded scenario is not a pass. So a run that could not grade
+anything must say **NOT RUN**, never pass and never look like a code failure.
 
-Related: `.github/workflows/sage-evals.yml`, `scripts/lib/sage-eval-provider.mjs`
-(the `isBudgetExhausted` classifier, `EvalBudgetExhaustedError`,
-`reportEvalFailure`), `.claude/rules/sage-ai.md`.
+History: ticket E8 (2026-09-07) built this guard after six eval runs drained
+the Gemini prepaid balance on 2026-09-05 and every Sage-touching PR read red
+for hours. On 2026-10-15 the `sage-evals` job moved from the Gemini API to
+OpenRouter, and the OpenRouter key's own spending limit replaced the
+`GEMINI_EVAL_BUDGET_OK` opt-in for that job.
 
-## The two variables
+Related: `.github/workflows/sage-evals.yml`, `scripts/run-sage-eval-step.sh`,
+`scripts/lib/sage-eval-provider.mjs`, `docs/runbooks/openrouter-test-bench.md`.
 
-Both are **repository variables** (Settings → Secrets and variables →
-Actions → **Variables** tab — not Secrets; there is nothing sensitive in
-either value), read in the workflow as `${{ vars.NAME }}`.
+## Which job uses which key
 
-| Variable | Values | Meaning |
-|---|---|---|
-| `GEMINI_EVAL_BUDGET_OK` | `1` / unset (or anything else) | **Pre-flight** gate. `1` means an operator has just confirmed the Gemini project's prepaid balance can absorb this run. Unset (the default) means every model-backed step skips before spending a token: it prints a `::warning::` and a step-summary line and exits 0. This is deliberately separate from `GEMINI_API_KEY` — the key can be valid while the wallet behind it is empty, which is exactly what happened on 2026-09-05. |
-| `GEMINI_EVAL_BUDGET_SOFT_FAIL` | `1` / unset (or anything else) | **Runtime** behavior when the wallet turns out to be empty mid-run anyway (see "How a drained wallet is detected" below). `1` downgrades that outcome to a `::warning::` + exit 0. Unset (the default) keeps the job **failing** — the standing rule is that an ungraded scenario is not a pass, so a mid-run drain still blocks a Sage-touching PR by default. Either way the log names the cause instead of a bare non-zero exit. |
+| Job | Steps | Key (repository secret) | Budget control |
+|---|---|---|---|
+| `sage-evals` | red-team, quality (informational), tool selection, chat harness | `OPENROUTER_API_KEY` | The key's monthly spending limit on OpenRouter |
+| `sage-memory-eval` | answer quality (informational), memory | `GEMINI_API_KEY` | `GEMINI_EVAL_BUDGET_OK` and `GEMINI_EVAL_BUDGET_SOFT_FAIL` (below) |
+| `sage-freshness-eval` | freshness | none | none: it calls no model |
 
-Both are wired into the `sage-evals` and `sage-memory-eval` jobs. The
-red-team, quality, tool-selection, chat-harness, and memory eval steps each
-carry both guards. `sage-freshness-eval` does **not** — it calls no model at
-all (see the doc comment at its job's top: "Fully deterministic (no model)"),
-so a budget guard there would gate a job that was never going to spend
-anything.
+The memory job stays on Google because its evals store embeddings, and the
+app's embeddings come from Google's embedding API. It moves when an
+OpenRouter embedding provider exists.
 
-## What each state means, end to end
+## Setting up the OpenRouter key for CI
 
-1. **`GEMINI_API_KEY` unset** — unchanged from before this ticket: the step
-   prints `::notice::` and exits 0. No behavior change here.
-2. **`GEMINI_API_KEY` set, `GEMINI_EVAL_BUDGET_OK` not `1`** — the step never
-   calls the model. Prints `::warning::GEMINI_EVAL_BUDGET_OK is not 1 —
-   model-backed eval skipped (not run, not passed)` and a step-summary line,
-   exits 0. The job is green, but a Sage-touching PR still needs a REAL run
-   before merge — see "Merging with a NOT RUN eval" below.
-3. **Both set, the wallet is actually funded** — runs exactly as it always
-   has. No behavior change.
-4. **Both set, but the wallet runs out mid-run** — the shared classifier
-   (below) catches it, the script exits 3 instead of the ordinary 1, and the
-   workflow step prints `::warning::` + a step-summary line either way. It
-   then exits 0 only if `GEMINI_EVAL_BUDGET_SOFT_FAIL` is `1`; otherwise it
-   re-exits 3 and the job fails (default).
-5. **Any other failure** (a real safety/accuracy regression, a network
-   error, a bug) — exits 1, unchanged. Nothing about this ticket changes
-   what a real failure looks like.
+1. On openrouter.ai, create a separate key named "VisionQuest CI" with a
+   monthly spending limit. In October 2026 one run of the three gating evals
+   on the production model cost $0.10 to $0.17; the workflow runs nightly and
+   on every PR that touches Sage.
+2. Store it as a repository secret named `OPENROUTER_API_KEY`:
 
-## How a drained wallet is detected at runtime
+   ```bash
+   gh secret set OPENROUTER_API_KEY --repo doclegg05/VisionQuest
+   ```
 
-`scripts/lib/sage-eval-provider.mjs` wraps the resolved `AIProvider` (both
-Gemini and Ollama — Ollama errors never match, so wrapping is unconditional
-and costs nothing) so any error a live call throws is inspected:
+   It prompts for the value; paste the key there. Or use GitHub: Settings,
+   Secrets and variables, Actions, New repository secret.
+3. The account's privacy settings apply to every key on the account. See
+   setup step 2 in `docs/runbooks/openrouter-test-bench.md`.
 
-- `isBudgetExhausted(status, bodyText)` is `true` **only** for a 429 whose
-  body names the specific "wallet is empty" shape (`prepayment`, a
-  `credit(s)` phrase paired with `depleted`/`exhausted`/`insufficient`, or
-  `quota` paired with `exhaust`). An **ordinary per-minute rate limit** is
-  also a 429 and must stay a normal, retryable failure — Gemini's stock
-  message for that case is "You exceeded your current quota, please check
-  your plan and billing details," which does not match. Reclassifying an
-  ordinary rate limit as "not run, budget" would hide a real problem behind
-  a shrug.
-- A match is rethrown as `EvalBudgetExhaustedError`; anything else passes
-  through completely untouched.
-- Each eval script's top-level `main().catch(reportEvalFailure)` checks
-  `instanceof EvalBudgetExhaustedError`: on a match it prints
-  `::error::Gemini budget exhausted — evals not run` and sets exit code
-  **3**; otherwise it behaves exactly as before (`console.error` + exit 1).
+The model is set once, as `OPENROUTER_MODEL` in the `sage-evals` job.
 
-This lives in `sage-redteam-eval.mjs`, `sage-agent-eval.mjs`,
-`sage-chat-harness.mjs`, and `sage-memory-eval.mjs` — the four scripts that
-call a live model through `resolveEvalProvider`. `sage-freshness-eval.mjs`
-never resolves a model provider, so it has nothing to classify and was left
-untouched. `sage-quality-eval.mjs` also resolves a provider through the same
-chokepoint and its `main().catch()` goes through `reportEvalFailure` too, so a
-budget-drained run there exits 3 like the others; its workflow step stays
-non-gating (`continue-on-error: true`), so the exit code only changes the label.
+## What each outcome means (`sage-evals` job)
 
-## Topping up the wallet
+`scripts/run-sage-eval-step.sh` wraps each step (tests:
+`scripts/run-sage-eval-step.test.mjs`).
 
-The Gemini project (`GEMINI_API_KEY`'s Cloud project) is confirmed on the
-**paid tier** (Britt, 2026-09-07) — Google's no-training terms apply, and the
-billing model is prepaid credits against that Cloud project.
+1. **No `OPENROUTER_API_KEY` secret.** The step prints
+   `::notice::OPENROUTER_API_KEY not set, skipping <eval>.`, adds a NOT RUN line
+   to the job summary and exits 0. Forks and secret-less runs stay green.
+2. **Key set, eval runs.** It passes or fails on its own result.
+3. **Credits or the key's spending limit run out.** The eval exits 3. The step
+   prints `::warning::<eval> NOT RUN: OpenRouter credits or the key's spending
+   limit ran out` and a summary line, then fails.
+4. **OpenRouter, the model or the key is unavailable**: a key OpenRouter does
+   not accept (401), an unknown model (400), a model with no endpoint that
+   meets the account's retention settings (404), or no connection before any
+   call succeeded. The eval exits 4. The step prints
+   `::warning::<eval> NOT RUN: OpenRouter, the model or the key was
+   unavailable` and a summary line, then fails.
+5. **Anything else**, such as a red-team hard violation or a tool-selection
+   miss, exits 1 and is a real finding.
 
-1. Google Cloud Console → the project behind `GEMINI_API_KEY` → **Billing**.
-2. Confirm the billing account is active, then add credit / raise the budget
-   per the account's normal top-up flow (this is a Google Cloud billing
-   action — there is no VisionQuest-side lever beyond the two variables
-   above).
-3. Once funded, set the repo variable `GEMINI_EVAL_BUDGET_OK=1` for the run(s)
-   that need it. Consider a billing alert on the Cloud project so a drain
-   shows up before six eval runs find it the hard way (open item, not built
-   here).
-4. If a PR's gating evals read **NOT RUN** (state 2 above), that PR is not
-   mergeable as-is — see the next section.
+Setting the repository variable `SAGE_EVAL_SOFT_FAIL=1` lets outcomes 3 and 4
+pass instead of failing. Outcome 5 always fails.
+
+The evals decide exit 3 and 4 in `scripts/lib/sage-eval-provider.mjs`: an
+OpenRouter `credits` error (402, or a 403 naming the key limit) is exit 3; a
+400, 401 or 404, or a network failure before any call succeeded, is exit 4.
+Any other 403 is an ordinary failure.
+
+## The memory job's Gemini guard
+
+`sage-memory-eval` keeps the 2026-09-07 guard. Both values are repository
+variables (Settings, Secrets and variables, Actions, Variables tab).
+
+| Variable | Meaning |
+|---|---|
+| `GEMINI_EVAL_BUDGET_OK` | `1` means an operator confirmed the Gemini project's prepaid balance can absorb the run. Anything else skips the step with a warning and a summary line, before any spending. |
+| `GEMINI_EVAL_BUDGET_SOFT_FAIL` | `1` lets a run that drains the wallet mid-way pass with a warning. Anything else fails the job. |
+
+Without `GEMINI_API_KEY` the memory steps skip with a notice. A drained Gemini
+wallet is recognized only from a 429 whose body names prepaid credits as
+depleted or exhausted (`isBudgetExhausted`), so an ordinary per-minute rate
+limit stays a normal, retryable failure.
 
 ## Merging with a NOT RUN eval
 
-**The standing rule is unchanged: an ungraded scenario is not a pass, so a
-NOT RUN result never substitutes for a green gating eval on a Sage-touching
-PR.** `GEMINI_EVAL_BUDGET_OK` exists so CI can say *why* nothing ran — "the
-wallet wasn't confirmed funded," not "something is broken" — never to let a
-PR through without the eval actually running. Before merging a PR whose
-red-team, tool-selection, chat-harness, or memory eval reads NOT RUN:
+A NOT RUN result never substitutes for a green gating eval on a Sage-touching
+PR. Before merging one whose red-team, tool-selection, chat-harness or memory
+eval reads NOT RUN:
 
-1. Confirm/top up the wallet (above).
-2. Set `GEMINI_EVAL_BUDGET_OK=1`.
-3. Re-run the workflow (`workflow_dispatch`, or push a commit — the PR path
-   filter re-fires it on any push touching `src/lib/sage/**`,
-   `config/sage-*.json`, `scripts/sage-*.mjs`, or `scripts/lib/**`).
-4. Confirm the step actually ran (not another NOT RUN) before merging.
-
-## Reading the log
-
-Every state above prints a `::warning::` or `::error::` annotation (visible
-in the GitHub Checks UI, not just the raw log) and a step-summary line, so
-"why didn't this run" is answerable without opening the full log:
-
-- `GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not
-  passed)` — pre-flight skip, nothing was spent.
-- `Gemini budget exhausted at runtime — <eval> NOT RUN (not a pass, not a
-  code failure)` — the wallet ran out mid-run; check whether
-  `GEMINI_EVAL_BUDGET_SOFT_FAIL` was `1` (job passed) or unset (job failed,
-  by design) by reading whether the job is actually green.
-- `Gemini budget exhausted — evals not run` (`::error::`, from the script
-  itself) — the same event, logged by the script before the workflow's own
-  annotation.
-
-Anything else (a red-team hard violation, a tool-selection accuracy miss, a
-guardrail failure) prints its own, unrelated message and is a real finding —
-this guard does not touch that path at all.
+1. Fix the cause: add the secret, raise the key's limit or add credits.
+2. Re-run the workflow (`workflow_dispatch`, or push a commit; the PR path
+   filter fires on `src/lib/sage/**`, `config/sage-*.json`,
+   `scripts/sage-*.mjs`, `scripts/lib/**`, `scripts/run-sage-eval-step.sh`
+   and the workflow file itself).
+3. Confirm the step ran before merging.

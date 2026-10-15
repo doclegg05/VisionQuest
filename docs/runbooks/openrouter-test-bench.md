@@ -27,6 +27,8 @@ If you are about to connect OpenRouter to the app itself, stop. That is a FERPA 
 
 Every request the provider sends also carries `provider: { zdr: true, data_collection: "deny" }`, which asks for the same routing as the switches above. Two things only the account settings in step 2 decide: whether a zero-retention request may use endpoints that keep prompts for safety monitoring (the choice under each model group), and OpenRouter's own Input & Output Logging and 1% data discount.
 
+CI's `sage-evals` job uses its own key, stored as the `OPENROUTER_API_KEY` repository secret on GitHub. Setup and spending limits are in `docs/runbooks/sage-eval-budget.md`.
+
 ## Running
 
 The eval scripts load `.env.local` from the folder you run them in, and a worktree's `.env.local` can be a symlink to the main checkout's file, whose `DATABASE_URL` is production. So set every database variable to a dummy local value first. `loadEnvFile` only fills variables that are unset, and `--provider=openrouter` refuses to start while any database variable points at a non-local host.
