@@ -6,10 +6,12 @@ import path from "node:path";
 /**
  * 2026-10-15: the chat-harness suites (sage-grounding, sage-readability,
  * sage-career) call production's model through OpenRouter. The key is mapped
- * only on the two steps that run `npm run bench`, never at job level, so the
- * setup steps (`npm ci` and any dependency lifecycle script it runs, the
- * migrations, the seeds) never hold it. Same rule as sage-evals.yml. The
- * workflow has no unit under test, so this reads its YAML as text.
+ * on the two steps that run `npm run bench` and on the regression-issue step,
+ * whose second redaction pass needs the value to strip it, never at job
+ * level. The setup steps (`npm ci` and any dependency lifecycle script it
+ * runs, the migrations, the seeds) never hold it. PR #234 moves
+ * sage-evals.yml to the same rule. The workflow has no unit under test, so
+ * this reads its YAML as text.
  */
 
 const WORKFLOW = readFileSync(
@@ -57,11 +59,19 @@ for (const name of ["Nightly-tier benchmarks", "Watch-tier benchmarks"]) {
   });
 }
 
+test("the regression-issue step holds the key, so its second redaction pass can strip it", () => {
+  // The issue body is public. redact.mjs reads each secret's value from the
+  // step's own environment, so without the mapping it cannot redact this key.
+  const step = stepNamed("Open or update the regression issue");
+  assert.ok(step.includes(KEY_MAPPING), step);
+  assert.match(step, /redactSecrets/);
+});
+
 test("no other step in the workflow maps the OpenRouter key", () => {
   const mapped = steps().filter((step) => step.includes("OPENROUTER_API_KEY"));
   assert.deepEqual(
     mapped.map((step) => step.match(/- name: ([^\n]+)/)?.[1]),
-    ["Nightly-tier benchmarks", "Watch-tier benchmarks"],
+    ["Nightly-tier benchmarks", "Watch-tier benchmarks", "Open or update the regression issue"],
   );
-  assert.equal(WORKFLOW.split("secrets.OPENROUTER_API_KEY").length - 1, 2);
+  assert.equal(WORKFLOW.split("secrets.OPENROUTER_API_KEY").length - 1, 3);
 });

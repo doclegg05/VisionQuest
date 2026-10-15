@@ -56,7 +56,7 @@ test("chatHarnessArgs: spawns the harness on OpenRouter with the model pinned", 
   assert.equal(CHAT_HARNESS_PROVIDER, "openrouter");
 });
 
-test("CHAT_HARNESS_MODEL is production's Gemini model, as OpenRouter names it", async () => {
+test("CHAT_HARNESS_MODEL is production's default Gemini model (DEFAULT_GEMINI_MODEL), as OpenRouter names it", async () => {
   const { DEFAULT_GEMINI_MODEL } = await import("../../../../src/lib/gemini.ts");
   assert.equal(CHAT_HARNESS_MODEL, `google/${DEFAULT_GEMINI_MODEL}`);
 });

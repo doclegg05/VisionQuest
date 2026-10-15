@@ -55,3 +55,15 @@ for (const suite of STAYS_ON_GEMINI) {
     assert.match(notes, /stays on a direct Gemini key/i);
   });
 }
+
+test("sage-grounding: refuses a non-local DATABASE_URL before it reads that database", async () => {
+  // The harness child refuses a remote database (assertNoRemoteDatabase), but
+  // the scorer reads DATABASE_URL first to check the grounding corpus. A
+  // local run with a production URL must stop here, not after a SELECT.
+  // `.invalid` never resolves, so a regression fails fast instead of hanging.
+  const { run } = await import("./sage-grounding.mjs");
+  await assert.rejects(
+    run({ env: { openrouterApiKey: "or-key", databaseUrl: "postgresql://reader@db.invalid:5432/prod" } }),
+    /non-local database/,
+  );
+});

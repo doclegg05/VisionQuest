@@ -20,9 +20,10 @@ name: Benchmarks
 # The chat-harness suites call production's model through OpenRouter on the
 # synthetic fixture config/sage-chat-eval.json; OpenRouter never sees student
 # data (docs/runbooks/openrouter-test-bench.md). OPENROUTER_API_KEY is mapped
-# only on the two steps that run `npm run bench`, never at job level, so the
-# setup steps (`npm ci` and any dependency lifecycle script it runs, the
-# migrations, the seeds) never hold it.
+# on the two steps that run `npm run bench`, and on the regression-issue step
+# so its second redaction pass can strip it, never at job level. The setup
+# steps (`npm ci` and any dependency lifecycle script it runs, the migrations,
+# the seeds) never hold it.
 #
 # "A number nobody reads is not a benchmark" (design §6): every run uploads
 # its results, main runs land them so the trend is in git, and any failure
@@ -172,6 +173,10 @@ jobs:
       - name: Open or update the regression issue
         if: always() && steps.nightly.outcome == 'failure'
         uses: actions/github-script@v7
+        env:
+          # For redaction only. redact.mjs reads each secret's value from this
+          # step's environment; the job-level env does not hold this key.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         with:
           script: |
             const fs = require("fs");

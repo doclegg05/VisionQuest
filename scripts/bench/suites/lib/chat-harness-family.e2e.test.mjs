@@ -51,6 +51,9 @@ describe("chat-harness suites call production's model through OpenRouter (stubbe
             DATABASE_URL: LOOPBACK_DB,
             DIRECT_URL: LOOPBACK_DB,
             ADMIN_DATABASE_URL: LOOPBACK_DB,
+            // The harness would refuse this remote URL; the runner must swap it
+            // for a loopback value before the child starts.
+            BENCH_PROD_READONLY_URL: "postgresql://reader@db.invalid:5432/prod",
           },
         });
 

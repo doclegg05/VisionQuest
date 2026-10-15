@@ -64,7 +64,7 @@ export function chatHarnessEnv({ openrouterApiKey, env = {} }) {
  * @param {string} opts.openrouterApiKey
  * @param {NodeJS.ProcessEnv} [opts.env]
  */
-export async function runChatHarnessFamily(family, opts) {
+export async function runChatHarnessFamily(family, opts = {}) {
   const report = await runScriptForJsonReport("scripts/sage-chat-harness.mjs", chatHarnessArgs(family), {
     env: chatHarnessEnv(opts),
     timeoutMs: 300_000,

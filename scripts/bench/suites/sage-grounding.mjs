@@ -7,6 +7,7 @@
 
 import { maybeRunSelfTest } from "./lib/self-test.mjs";
 import { runChatHarnessFamily, passRateFromBucket } from "./lib/chat-harness-family.mjs";
+import { assertNoRemoteDatabase } from "../../lib/sage-eval-provider.mjs";
 import {
   expectedGroundingStorageKeys,
   missingGroundingKeysInDatabase,
@@ -54,6 +55,9 @@ export async function run(ctx) {
   if (!databaseUrl) {
     throw new Error("sage-grounding requires DATABASE_URL (hermetic Postgres with the catalog corpus).");
   }
+  // The harness runs on OpenRouter, which refuses a non-local database. Check
+  // here too, because ensureGroundingCorpus reads this database first.
+  assertNoRemoteDatabase({ DATABASE_URL: databaseUrl });
 
   await ensureGroundingCorpus(databaseUrl, (message) => ctx.log?.(message));
 

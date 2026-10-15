@@ -352,8 +352,10 @@ secret exists (nightly model spend is an owner decision, design §9.4).
 `sage-grounding`, `sage-readability` and `sage-career` call production's model,
 `google/gemini-3.1-flash-lite`, through OpenRouter (`OPENROUTER_API_KEY`) on the
 synthetic fixture `config/sage-chat-eval.json`. The key is mapped only on the
-two `npm run bench` steps, and the harness runs with an empty `GEMINI_API_KEY`,
-so it cannot call Google directly. `sage-latency` and `explain-faithfulness`
+two `npm run bench` steps (and the regression-issue step, to redact it). In CI
+the harness runs with an empty `GEMINI_API_KEY`, so it cannot call Google
+directly; locally `.env.local` can refill it, but the OpenRouter path never
+reads it. `sage-latency` and `explain-faithfulness`
 stay on `GEMINI_API_KEY` on purpose: the latency floor is a bar for direct
 Gemini calls, and `explain-faithfulness` generates through the production
 resolver, which never returns OpenRouter. Both suites state why in their

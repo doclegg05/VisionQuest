@@ -41,7 +41,9 @@ function record(entry) {
 }
 
 globalThis.fetch = async (input, init) => {
-  const url = typeof input === "string" ? input : input.url;
+  // Query strings dropped from what is recorded or thrown: a Gemini request
+  // can carry its key as ?key=.
+  const url = (typeof input === "string" ? input : input.url).split("?")[0];
   if (!url.includes("openrouter.ai")) {
     record({ url, refused: true });
     throw new Error(`stub fetch refused a non-OpenRouter request: ${url}`);
