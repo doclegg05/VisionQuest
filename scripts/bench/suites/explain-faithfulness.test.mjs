@@ -69,3 +69,26 @@ test("explain-faithfulness generates every draft with production's model through
     assert.equal(byId.get("faithful_explanations").n, fixture.postings.length);
   });
 });
+
+test("explain-faithfulness fails the run when OpenRouter refuses the key, never scores it", async () => {
+  // The #220 shape: a key that is set but refused. The suite must throw, which
+  // the runner records as a scorer error, rather than return a number.
+  const { run } = await import("./explain-faithfulness.mjs");
+  const saved = { fetch: globalThis.fetch, key: process.env.OPENROUTER_API_KEY };
+  process.env.OPENROUTER_API_KEY = "sk-or-revoked-key-123";
+  globalThis.fetch = async (input) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (!url.includes("openrouter.ai")) throw new Error(`refused a non-OpenRouter request: ${url}`);
+    return new Response(JSON.stringify({ error: { code: 401, message: "User not found." } }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    await assert.rejects(run({ fixture, env: { openrouterApiKey: "sk-or-revoked-key-123" } }));
+  } finally {
+    globalThis.fetch = saved.fetch;
+    if (saved.key === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = saved.key;
+  }
+});

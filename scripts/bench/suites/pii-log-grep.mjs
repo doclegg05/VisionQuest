@@ -165,6 +165,22 @@ export function tallyPiiMessages(jsonText) {
 }
 
 /**
+ * The eslint metric from `countPiiEslintViolations()`'s result. `n` is the
+ * files checked: a tooling failure checked none, so it reads as zero samples
+ * and the runner reports it as an error, never as a clean tree.
+ */
+export function eslintMetric(eslintResult) {
+  return {
+    id: "pii_eslint_violations",
+    value: eslintResult.violations?.length ?? 0,
+    n: eslintResult.filesLinted ?? 0,
+    details: eslintResult.toolingError
+      ? { toolingError: eslintResult.toolingError }
+      : { violations: eslintResult.violations.slice(0, 20) },
+  };
+}
+
+/**
  * The real behavior, unconditionally: capture (or read) the test log, grep
  * only its logger-formatted lines, and count PII-selector eslint violations.
  * Never branches on `ctx.fixture` — see the file-header note on why.
@@ -176,7 +192,6 @@ export async function run(_ctx) {
 
   const hits = grepLoggerLines(loggerLines, fixtureCuids);
   const eslintResult = await countPiiEslintViolations();
-  const eslintCount = eslintResult.violations?.length ?? 0;
 
   return {
     metrics: [
@@ -190,16 +205,7 @@ export async function run(_ctx) {
           hits: hits.slice(0, 20),
         },
       },
-      {
-        id: "pii_eslint_violations",
-        value: eslintCount,
-        // Files checked. A tooling failure checked none, so it reads as zero
-        // samples and the runner reports it as an error, never as clean.
-        n: eslintResult.filesLinted ?? 0,
-        details: eslintResult.toolingError
-          ? { toolingError: eslintResult.toolingError }
-          : { violations: eslintResult.violations.slice(0, 20) },
-      },
+      eslintMetric(eslintResult),
     ],
   };
 }

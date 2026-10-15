@@ -15,7 +15,8 @@
  *   0  every suite passed, watched, or was skipped — and every run without
  *      --compare, which measures rather than judges
  *   1  with --compare: a gate- or nightly-tier metric under its floor, or a
- *      suite whose scorer threw
+ *      suite whose scorer threw or measured nothing (a null value, or zero
+ *      samples behind a floored metric)
  *   2  a usage or config error (unknown suite/tier, unparseable config,
  *      --update-baseline without --reason)
  *
@@ -289,9 +290,10 @@ function measuredNothingError(tier, metrics) {
       "a null on a floored metric would pass every floor while measuring nothing"
     );
   }
+  // The error result carries no metrics, so each value rides in the message.
   const unsampled = metrics
     .filter((metric) => metric.floor !== null && metric.n === 0 && metric.details?.skipped !== true)
-    .map((metric) => metric.id);
+    .map((metric) => `${metric.id}=${metric.value}`);
   if (unsampled.length > 0) {
     return (
       `the scorer ran but measured zero samples for ${tier}-tier metric(s): ${unsampled.join(", ")} — ` +

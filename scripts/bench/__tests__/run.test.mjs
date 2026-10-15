@@ -265,8 +265,10 @@ test("a nightly metric measured over zero samples is an error, not a pass", () =
     assert.equal(out.status, 1, out.stdout + out.stderr);
     const result = readResult(root, "demo");
     assert.equal(result.status, "error");
-    assert.match(result.error, /p95_ms/);
     assert.match(result.error, /zero samples/);
+    // The error result drops its metrics, so the values ride in the message:
+    // a blocked nudge-sweep must still say what it saw.
+    assert.match(result.error, /p95_ms=0\b/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
