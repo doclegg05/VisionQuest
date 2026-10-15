@@ -6,10 +6,12 @@ import {
   formatCronHealthReport,
 } from "../../scripts/lib/cron-health.mjs";
 
-// The eight names the scheduled layer must carry: the four baseline jobs the
-// 2026-09 repair re-registers, the three Sage jobs that already existed, and
-// connect-nudges (2026-09-05, migration 20260905140000_add_connect_nudges_cron).
-const ALL_EIGHT = [
+// The ten names the scheduled layer must carry: the four baseline jobs the
+// 2026-09 repair re-registers, the three Sage jobs that already existed,
+// connect-nudges (2026-09-05, migration 20260905140000_add_connect_nudges_cron),
+// and the two stall detectors (2026-10-15, migration
+// 20261015120000_schedule_stall_detectors).
+const ALL_TEN = [
   "appointment-reminders",
   "job-processor",
   "daily-coaching",
@@ -18,13 +20,15 @@ const ALL_EIGHT = [
   "sage-memory-consolidate",
   "sage-wager-resolve",
   "connect-nudges",
+  "evidence-gap-detection",
+  "goal-stale-detection",
 ];
 
-function healthyJobs(names = ALL_EIGHT) {
+function healthyJobs(names = ALL_TEN) {
   return names.map((jobname) => ({ jobname, schedule: "0 * * * *", active: true }));
 }
 
-function healthyRuns(names = ALL_EIGHT) {
+function healthyRuns(names = ALL_TEN) {
   return names.map((jobname) => ({
     jobname,
     status: "succeeded",
@@ -34,8 +38,8 @@ function healthyRuns(names = ALL_EIGHT) {
 }
 
 describe("EXPECTED_CRON_JOBS (scripts/lib/cron-health.mjs)", () => {
-  it("lists exactly the eight scheduled jobs", () => {
-    assert.deepEqual([...EXPECTED_CRON_JOBS].sort(), [...ALL_EIGHT].sort());
+  it("lists exactly the ten scheduled jobs", () => {
+    assert.deepEqual([...EXPECTED_CRON_JOBS].sort(), [...ALL_TEN].sort());
   });
 });
 
@@ -44,11 +48,11 @@ describe("evaluateCronHealth", () => {
     const result = evaluateCronHealth({ jobs: healthyJobs(), latestRuns: healthyRuns() });
     assert.equal(result.ok, true);
     assert.deepEqual(result.problems, []);
-    assert.equal(result.jobs.length, 8);
+    assert.equal(result.jobs.length, 10);
   });
 
   it("fails when connect-nudges is missing from cron.job (the eighth job, added 2026-09-05)", () => {
-    const names = ALL_EIGHT.filter((n) => n !== "connect-nudges");
+    const names = ALL_TEN.filter((n) => n !== "connect-nudges");
     const result = evaluateCronHealth({ jobs: healthyJobs(names), latestRuns: healthyRuns(names) });
     assert.equal(result.ok, false);
     assert.deepEqual(result.problems, ["connect-nudges: missing from cron.job"]);
@@ -75,7 +79,7 @@ describe("evaluateCronHealth", () => {
   });
 
   it("fails when an expected job is missing from cron.job", () => {
-    const names = ALL_EIGHT.filter((n) => n !== "job-processor");
+    const names = ALL_TEN.filter((n) => n !== "job-processor");
     const result = evaluateCronHealth({ jobs: healthyJobs(names), latestRuns: healthyRuns(names) });
     assert.equal(result.ok, false);
     assert.deepEqual(result.problems, ["job-processor: missing from cron.job"]);
