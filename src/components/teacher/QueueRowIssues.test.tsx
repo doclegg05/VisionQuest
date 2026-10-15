@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToString } from "react-dom/server";
+import { formatWellbeingCardSummary } from "@/lib/sage/wellbeing-card";
 import type { QueueAlert } from "@/lib/teacher/intervention-queue";
 import { groupQueueIssues } from "@/lib/teacher/queue-issue-groups";
 import { QueueRowIssues } from "./QueueRowIssues";
@@ -22,7 +23,11 @@ function alert(id: string, type: string, severity: string, summary: string): Que
   };
 }
 
-const CRISIS_SUMMARY = "Category: low mood\nNext step: check in today";
+const CRISIS_SUMMARY = formatWellbeingCardSummary({
+  category: "low_mood",
+  detectedAt: new Date("2026-10-03T12:00:00.000Z"),
+  mood: null,
+});
 const alerts = [
   alert("w1", "wellbeing_concern", "critical", CRISIS_SUMMARY),
   alert("f1", "orientation_form_missing", "medium", "Intake form not turned in."),
@@ -47,6 +52,16 @@ describe("QueueRowIssues", () => {
 
   it("shows the full crisis card, not one line", () => {
     assert.ok(html.includes(renderToString(<WellbeingCrisisCard summary={CRISIS_SUMMARY} />)));
+  });
+
+  it("renders the crisis card's structured checklist", () => {
+    assert.match(html, /<ol[^>]*>\s*<li>Reach the student today/);
+  });
+
+  it("keeps the urgent group on the card surface", () => {
+    // The critical tint drops the crisis card's faint "detected" text below 4.5:1 in dark.
+    // The card's own category chip may use the tint (it is a span), so only group <li> tags are checked.
+    assert.doesNotMatch(html, /<li[^>]*--urgency-critical-bg/);
   });
 
   it("shows every alert, with its age", () => {
