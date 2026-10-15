@@ -9,7 +9,31 @@ import {
   wrapWithBudgetDetection,
   EvalBudgetExhaustedError,
   reportEvalFailure,
+  readOllamaNumCtx,
 } from "./sage-eval-provider.mjs";
+
+/**
+ * Ollama endpoints now run at the provider's `num_ctx` (native /api/chat with
+ * truncate:false), so an eval whose prompt is longer than 8,192 tokens is
+ * refused with a 400 instead of silently cut. OLLAMA_NUM_CTX lets a local
+ * run size the window to the prompt it sends.
+ */
+describe("readOllamaNumCtx", () => {
+  it("returns undefined when unset, so the provider default applies", () => {
+    assert.equal(readOllamaNumCtx({}), undefined);
+    assert.equal(readOllamaNumCtx({ OLLAMA_NUM_CTX: "  " }), undefined);
+  });
+
+  it("parses a positive integer", () => {
+    assert.equal(readOllamaNumCtx({ OLLAMA_NUM_CTX: "16384" }), 16384);
+  });
+
+  it("throws on anything else rather than silently running at the default", () => {
+    for (const bad of ["0", "-1", "8k", "1.5", "abc"]) {
+      assert.throws(() => readOllamaNumCtx({ OLLAMA_NUM_CTX: bad }), /OLLAMA_NUM_CTX/);
+    }
+  });
+});
 
 /**
  * AC5 — the eval harness must be able to measure the SHIPPED configuration.

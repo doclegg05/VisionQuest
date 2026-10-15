@@ -144,6 +144,25 @@ async function resolveGeminiProvider(modelOverride = null) {
   return { provider, model, label: `gemini (${model})` };
 }
 
+/**
+ * OLLAMA_NUM_CTX: the context window for a local eval run.
+ *
+ * Ollama endpoints run at the provider's `num_ctx` (8192 by default) and send
+ * truncate:false, so a prompt longer than the window is refused with a 400
+ * rather than cut from the front. An eval that sends a bigger prompt than
+ * production does (the red-team eval builds the "full" tier) needs a bigger
+ * window. Unset means the provider default; anything but a positive integer
+ * throws, so a typo never runs silently at the default.
+ */
+export function readOllamaNumCtx(env = process.env) {
+  const raw = env.OLLAMA_NUM_CTX?.trim();
+  if (!raw) return undefined;
+  if (!/^\d+$/.test(raw) || Number(raw) <= 0) {
+    throw new Error(`OLLAMA_NUM_CTX must be a positive integer, got "${raw}".`);
+  }
+  return Number(raw);
+}
+
 async function resolveOllamaProvider(modelOverride = null) {
   const url = process.env.OLLAMA_URL?.trim();
   const model = modelOverride || process.env.OLLAMA_MODEL?.trim();
@@ -156,8 +175,10 @@ async function resolveOllamaProvider(modelOverride = null) {
   const { resolveLocalAiAuthMode } = await import("../../src/lib/ai/local-auth.ts");
 
   const authMode = resolveLocalAiAuthMode(process.env.OLLAMA_AUTH_MODE ?? null);
+  const numCtx = readOllamaNumCtx();
   const authConfig = {
     authMode,
+    ...(numCtx ? { numCtx } : {}),
     apiKey: process.env.AI_PROVIDER_API_KEY || process.env.OLLAMA_API_KEY || null,
     cloudflareAccessClientId:
       process.env.AI_PROVIDER_CLOUDFLARE_ACCESS_CLIENT_ID ||
@@ -172,7 +193,8 @@ async function resolveOllamaProvider(modelOverride = null) {
   };
 
   const provider = new OllamaProvider(url, model, authConfig);
-  return { provider, model, url, label: `ollama (${model} @ ${url})` };
+  const ctxNote = numCtx ? `, num_ctx ${numCtx}` : "";
+  return { provider, model, url, label: `ollama (${model} @ ${url}${ctxNote})` };
 }
 
 /**
