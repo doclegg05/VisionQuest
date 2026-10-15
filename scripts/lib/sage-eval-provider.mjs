@@ -373,6 +373,75 @@ function classifyAndRethrow(error, run) {
   throw error;
 }
 
+const EMBEDDING_LABEL = "Gemini embeddings";
+const EMBEDDING_FAILURE = /Embedding request failed: (\d{3})\b([\s\S]*)/;
+const INVALID_KEY = /API key not valid|API_KEY_INVALID/i;
+
+/**
+ * The memory and answer-quality evals embed through the app's Gemini
+ * embedding path, which OpenRouter does not serve. GeminiEmbeddingProvider
+ * throws `Embedding request failed: <status> <body>`. Returns the not-run
+ * error for a refused key, a missing model, a drained wallet or a connection
+ * that never happened, and the original error for anything else.
+ */
+export function classifyEmbeddingFailure(error) {
+  if (isNetworkFailure(error)) return new EvalProviderUnreachableError(error, EMBEDDING_LABEL);
+  const match = typeof error?.message === "string" ? EMBEDDING_FAILURE.exec(error.message) : null;
+  if (!match) return error;
+  const status = Number(match[1]);
+  const body = match[2];
+  if (status === 401 || status === 403 || status === 404 || (status === 400 && INVALID_KEY.test(body))) {
+    return new EvalProviderUnavailableError(error, EMBEDDING_LABEL);
+  }
+  if (isBudgetExhausted(status, body)) return new EvalBudgetExhaustedError(error, EMBEDDING_LABEL);
+  return error;
+}
+
+/**
+ * Remembers the first eval-abort error any call throws, even when the caller
+ * swallows it. Memory extraction never throws to its caller, so without this
+ * a drained OpenRouter wallet inside sage-memory-eval reads as a 0% retrieval
+ * hit rate (exit 1) instead of "not run" (exit 3). The eval calls
+ * `throwIfAborted()` after each extraction.
+ */
+export function trackEvalAborts(provider) {
+  let firstAbort = null;
+  const remember = (error) => {
+    if (firstAbort === null && isEvalAbort(error)) firstAbort = error;
+    throw error;
+  };
+  const call = (method) => async (...args) => {
+    try {
+      return await provider[method](...args);
+    } catch (error) {
+      remember(error);
+    }
+  };
+  const stream = (method) =>
+    async function* (...args) {
+      try {
+        yield* provider[method](...args);
+      } catch (error) {
+        remember(error);
+      }
+    };
+
+  const tracked = {
+    name: provider.name,
+    generateResponse: call("generateResponse"),
+    streamResponse: stream("streamResponse"),
+    generateStructuredResponse: call("generateStructuredResponse"),
+  };
+  if (provider.streamWithTools) tracked.streamWithTools = stream("streamWithTools");
+  if (provider.describeDocument) tracked.describeDocument = call("describeDocument");
+  return {
+    provider: tracked,
+    throwIfAborted() {
+      if (firstAbort !== null) throw firstAbort;
+    },
+  };
+}
+
 /**
  * Wraps a resolved AIProvider so any error a live call throws is inspected
  * for the budget-exhausted shape and rethrown as `EvalBudgetExhaustedError`;

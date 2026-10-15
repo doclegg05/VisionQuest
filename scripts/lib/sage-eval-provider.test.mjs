@@ -16,6 +16,8 @@ import {
   EvalProviderUnavailableError,
   EvalProviderUnreachableError,
   isEvalAbort,
+  classifyEmbeddingFailure,
+  trackEvalAborts,
 } from "./sage-eval-provider.mjs";
 
 /**
@@ -603,5 +605,89 @@ describe("--provider=openrouter refuses a non-local database", () => {
       const { provider } = await resolveEvalProvider(["--provider=openrouter"]);
       assert.equal(provider.name, "openrouter");
     });
+  });
+});
+
+describe("classifyEmbeddingFailure", () => {
+  const embeddingError = (status, body) => new Error(`Embedding request failed: ${status} ${body}`);
+
+  it("reads Google's invalid-key 400 as unavailable, not as a failed eval", () => {
+    const error = classifyEmbeddingFailure(
+      embeddingError(400, '{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT"'),
+    );
+    assert.ok(error instanceof EvalProviderUnavailableError);
+    assert.equal(error.providerLabel, "Gemini embeddings");
+  });
+
+  it("reads 401, 403 and 404 as unavailable", () => {
+    for (const status of [401, 403, 404]) {
+      assert.ok(classifyEmbeddingFailure(embeddingError(status, "{}")) instanceof EvalProviderUnavailableError, String(status));
+    }
+  });
+
+  it("reads a drained wallet as budget exhausted and an ordinary rate limit as itself", () => {
+    const drained = classifyEmbeddingFailure(embeddingError(429, "Your prepayment credits are depleted."));
+    assert.ok(drained instanceof EvalBudgetExhaustedError);
+    const limited = embeddingError(429, "You exceeded your current quota, please check your plan and billing details.");
+    assert.equal(classifyEmbeddingFailure(limited), limited);
+  });
+
+  it("reads a connection that never happened as unreachable", () => {
+    const error = classifyEmbeddingFailure(new TypeError("fetch failed"));
+    assert.ok(error instanceof EvalProviderUnreachableError);
+  });
+
+  it("leaves any other error alone, including a 400 that is not about the key", () => {
+    const server = embeddingError(500, "internal");
+    assert.equal(classifyEmbeddingFailure(server), server);
+    const badInput = embeddingError(400, '{"error":{"message":"Request payload size exceeds the limit"}}');
+    assert.equal(classifyEmbeddingFailure(badInput), badInput);
+  });
+});
+
+describe("trackEvalAborts", () => {
+  const abort = new EvalBudgetExhaustedError(undefined, "OpenRouter");
+
+  function provider(failWith) {
+    return {
+      name: "openrouter",
+      generateResponse: async () => "ok",
+      generateStructuredResponse: async () => {
+        if (failWith) throw failWith;
+        return "{}";
+      },
+      async *streamResponse() {
+        if (failWith) throw failWith;
+        yield "ok";
+      },
+    };
+  }
+
+  it("remembers an abort even when the caller swallows it, as memory extraction does", async () => {
+    const tracked = trackEvalAborts(provider(abort));
+    await tracked.provider.generateStructuredResponse("system", []).catch(() => undefined);
+    assert.throws(() => tracked.throwIfAborted(), (error) => error === abort);
+  });
+
+  it("remembers an abort thrown from a stream", async () => {
+    const tracked = trackEvalAborts(provider(abort));
+    await (async () => {
+      for await (const chunk of tracked.provider.streamResponse("system", [])) void chunk;
+    })().catch(() => undefined);
+    assert.throws(() => tracked.throwIfAborted(), (error) => error === abort);
+  });
+
+  it("does not treat an ordinary failure as an abort", async () => {
+    const tracked = trackEvalAborts(provider(new Error("model returned bad JSON")));
+    await tracked.provider.generateStructuredResponse("system", []).catch(() => undefined);
+    assert.doesNotThrow(() => tracked.throwIfAborted());
+  });
+
+  it("passes results through and keeps optional capabilities truthful", async () => {
+    const tracked = trackEvalAborts(provider(null));
+    assert.equal(await tracked.provider.generateResponse("system", []), "ok");
+    assert.equal(tracked.provider.name, "openrouter");
+    assert.equal("streamWithTools" in tracked.provider, false);
+    assert.doesNotThrow(() => tracked.throwIfAborted());
   });
 });
