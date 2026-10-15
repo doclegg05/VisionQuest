@@ -498,7 +498,7 @@ body {
 
 .theme-input {
   background: var(--surface-soft);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control);
   color: var(--ink-strong);
   box-shadow:
     inset 0 1px 0 var(--surface-overlay),
@@ -898,7 +898,7 @@ select.theme-input::placeholder {
 .select-field {
   width: 100%;
   border-radius: 1rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control);
   background:
     linear-gradient(180deg, var(--surface-sheen), transparent 50%),
     var(--surface-raised);
