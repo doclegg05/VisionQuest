@@ -339,3 +339,44 @@ test("each queue entry carries every open alert, most urgent first", () => {
   assert.equal(entry.primaryAlert?.id, entry.openAlerts[0]?.id);
   assert.equal(entry.openAlerts[0]?.detectedAt, "2026-04-01T00:00:00.000Z");
 });
+
+test("a queue alert carries only its eight fields, whatever the record holds", () => {
+  // The record type is hand-written, so a wider select still typechecks. The
+  // cast stands in for a field someone later adds to the shared alerts select.
+  const widened = { ...makeAlert(), studentId: "student-1" } as unknown as InterventionQueueStudentRecord["alerts"][number];
+  const entry = buildInterventionQueueEntry({
+    student: makeStudent({ alerts: [widened] }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.deepEqual(
+    Object.keys(entry.openAlerts[0] ?? {}).sort(),
+    ["detectedAt", "id", "severity", "sourceId", "sourceType", "summary", "title", "type"],
+  );
+});
+
+test("a student with no alerts has no open alerts and no primary alert", () => {
+  const entry = buildInterventionQueueEntry({
+    student: makeStudent({ alerts: [] }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.deepEqual(entry.openAlerts, []);
+  assert.equal(entry.primaryAlert, null);
+});
+
+test("building an entry leaves the student's alert order alone", () => {
+  const student = makeStudent({
+    alerts: [
+      makeAlert({ id: "a-medium", severity: "medium" }),
+      makeAlert({ id: "a-crisis", severity: "critical", type: "wellbeing_concern" }),
+      makeAlert({ id: "a-high", severity: "high" }),
+    ],
+  });
+
+  buildInterventionQueueEntry({ student, now: NOW, orientationTotalCount: 0 });
+
+  assert.deepEqual(student.alerts.map((alert) => alert.id), ["a-medium", "a-crisis", "a-high"]);
+});

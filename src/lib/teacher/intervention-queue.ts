@@ -147,8 +147,21 @@ const ALERT_TYPE_PRIORITY: Record<string, number> = {
 
 type QueueAlertRecord = InterventionQueueStudentRecord["alerts"][number];
 
+/**
+ * Picks the eight fields by name. A spread would also send any field later
+ * added to the shared alerts select to every teacher's browser.
+ */
 function serializeQueueAlert(alert: QueueAlertRecord): QueueAlert {
-  return { ...alert, detectedAt: alert.detectedAt.toISOString() };
+  return {
+    id: alert.id,
+    type: alert.type,
+    severity: alert.severity,
+    title: alert.title,
+    summary: alert.summary,
+    sourceType: alert.sourceType,
+    sourceId: alert.sourceId,
+    detectedAt: alert.detectedAt.toISOString(),
+  };
 }
 
 /** Most urgent first: severity, then alert-type priority, then newest. */
