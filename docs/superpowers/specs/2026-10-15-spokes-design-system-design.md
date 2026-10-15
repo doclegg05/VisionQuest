@@ -8,11 +8,30 @@
 
 ---
 
+## Revisions during planning (2026-10-15)
+
+Writing the plan against the HIG Phase 2 branch, the installed Tailwind (4.3.3), and the existing token tests changed these values. Each was measured, not chosen by taste. The sections below already carry them, and the plan is `docs/superpowers/plans/2026-10-15-spokes-design-system.md`.
+
+| What | Approved value | Revised value | Why |
+|---|---|---|---|
+| Light success tint | `--accent` at 12% | at 8% | HIG Phase 2's badge test checks every tint on the page background too. `accent-text` on a 12% tint over the muted page is 4.37:1, and the palette has no darker green. 8% measures 4.52:1. |
+| Dark warning text | `--gold` | `--light`, with a gold border | Gold on its own tint over a navy card is about 3.8:1. |
+| `--ink-faint` | `--dark` at 30%, decoration only | `--dark` at 75% (light), `--light` at 65% (dark) | HIG Phase 2 found it carries text, so 30% would fail axe. |
+| Page background | SPOKES `--grad-slide-bg` | solid `--muted` | The gradient ends in offwhite, where gray body text is 4.0:1. |
+| Shadow on hover | `rgba(0, 0, 0, 0.15)` | `rgba(0, 19, 63, 0.15)` | SPOKES's own shadow-hover is black, which the palette rule forbids. Royal at the same alpha looks the same. |
+| Primary button | `--primary` fill, white text | SPOKES Button primary variant: solid `--primary`, 8px corners, weight 600, ink token `--on-primary` | Taken from the artifact's Button component. HIG Phase 2's button test changes its expected ink token from `--on-accent` to `--on-primary` and accepts a solid fill; its 4.5:1 check is unchanged. |
+| Progress bars | `--grad-progress` | the same gradient plus a 1px inset edge (navy in light, gold in dark) | Gold on a light track is about 1.8:1, under the 3:1 floor for graphics. |
+| PR count | five, with three sweeps | four, with two sweeps | HIG Phase 2 already moved most hue classes onto tokens. About 382 uses in about 45 files remain, and teacher components have none. |
+| Codemod timing | sweep PRs | tokens PR | About 84 text uses of `--error`, `--accent-*`, `--success`, and `--primary` must become role utilities in the same PR, or dark-theme text breaks the day the tokens land. |
+| Codemod files | `scripts/lib/spokes-color-map.mjs`, test in `scripts/lib/` | `scripts/lib/spokes-class-map.mjs`, test at `src/lib/spokes-class-map.test.ts` | `npm test` and CI run tests under `src`, following `src/lib/percentile.test.ts`. The module also handles corners, small text, and display weight. |
+
+Confirmed during planning: Tailwind 4.3.3 reads `--background-color-*`, `--text-color-*`, `--border-color-*`, `--ring-color-*`, `--outline-color-*`, and `--divide-color-*` before `--color-*`, so `text-danger` and `bg-danger` can carry different values with no workaround.
+
 ## Problem
 
 VisionQuest serves SPOKES students and staff, but it doesn't look like a SPOKES product yet. The core palette already matches. Everything around it is off-brand:
 
-- about 1,100 Tailwind color classes outside the SPOKES palette, about 390 of them in teacher components
+- about 1,100 Tailwind color classes outside the SPOKES palette on `main` (about 382 once HIG Phase 2 lands, nearly all in student components)
 - 15 component files with raw hex colors
 - off-palette tokens in `globals.css` (error red, amber chat errors, purple and orange program badges, a dark theme built on `#0a1628`)
 - Sora and Manrope fonts instead of DM Serif Display and Outfit
@@ -29,13 +48,12 @@ Rebuild VisionQuest's design tokens on SPOKES values. Then sweep every component
 - corners, shadows, motion, and the focus ring follow SPOKES tokens
 - light and dark themes both pass WCAG AA for every documented text and background pair
 
-The work ships as five draft PRs, each landing on its own:
+The work ships as four draft PRs, each landing on its own:
 
-1. 'Tokens' - rewrites `globals.css` and `layout.tsx` to SPOKES color, type, shape, and motion values (Design 2, 3, 4). Adds the palette and contrast tests and the lint rule (Design 6), and updates the docs (Design 8).
-2. 'Student sweep' - moves student components onto role tokens with the codemod (Design 5).
-3. 'Teacher sweep' - the same for teacher components.
-4. 'Remaining sweep' - sign-in, admin, coordinator, routes, `src/lib` maps, and hand-fixed drawings and charts. Ends the lint rule's warn-only list.
-5. 'Polish' - SPOKES card, header, progress, logo, and heading-case patterns (Design 7).
+1. 'Tokens' - rewrites `globals.css` and `layout.tsx` to SPOKES color, type, shape, and motion values (Design 2, 3, 4). Adds the palette and contrast tests, the codemod, and the lint rule (Design 5, 6). Moves token text colors onto role utilities, and updates the docs (Design 8).
+2. 'Student sweep' - moves student components onto role utilities with the codemod (Design 5).
+3. 'Remaining sweep' - teacher, sign-in, admin, coordinator, routes, `src/lib` maps, and hand-fixed drawings and charts. Ends the lint rule's warn-only list.
+4. 'Polish' - SPOKES card, header, progress, logo, and heading-case patterns (Design 7).
 
 Decisions made during brainstorming:
 
@@ -76,13 +94,13 @@ The 11 SPOKES palette colors plus SPOKES `accent-text #1e7a2e`. Transparency of 
 | `--surface-overlay` | black at 4% | `--dark` at 4% |
 | `--ink-strong` (headings, labels, key values) | `#00133f` | `--dark` `#004071` |
 | `--ink-muted` (body and secondary text) | `#4a4d54` | `--gray` `#60636b` |
-| `--ink-faint` (decoration only, never text) | black at 25% | `--dark` at 30% |
+| `--ink-faint` (carries text) | black at 55% | `--dark` at 75% |
 | `--border` (card hairlines) | `rgba(18,38,63,0.12)` | `--offwhite` `#d1d3d4` |
 | `--border-control` (new: inputs, checkboxes, toggles) | none | `--gray` `#60636b` |
 | `--accent-green`, `--success` | `#2a8a3c` | `--accent-text` `#1e7a2e` |
 | `--accent-blue` | `#005d8a` | `--primary` `#007baf` |
 | `--accent-red`, `--error` | `#c43c3c` | `--mauve` `#a7253f` |
-| `--app-background` | gradient plus ambient lines | SPOKES `--grad-slide-bg`: `linear-gradient(170deg, var(--muted) 0%, var(--light) 50%, var(--offwhite) 100%)`. The ambient line pattern is removed. |
+| `--app-background` | gradient plus ambient lines | solid `--muted`. The ambient line pattern is removed. (SPOKES `--grad-slide-bg` ends in offwhite, where gray body text is 4.0:1.) |
 | `--paper-bg`, `--paper-margin` | `#fffdf2`, red at 20% | `--light`, `--mauve` at 20% |
 
 Text color rule for light grounds: text may use `--dark`, `--gray`, `--royal`, `--mauve`, `--accent-text`, or `--primary`. `--primary` is allowed on white only, because it measures about 4.2:1 on `--muted`. Gold and bright green never carry text on light grounds. They appear as fills, dots, rules, and borders.
@@ -97,6 +115,7 @@ Chat tokens follow the same surfaces. The chat area is white and the sidebar is 
 | Cards and raised surfaces | `--dark` `#004071` |
 | Strong text | `--light` |
 | Body and secondary text | `--light` at 75% |
+| Faint text | `--light` at 65% |
 | Card hairlines | `--light` at 12% |
 | Control borders | `--light` at 60% |
 | Sticky bars | `--royal` at 82% with blur |
@@ -110,8 +129,8 @@ The tokens PR adds role tokens and exposes them as Tailwind utilities (`bg-dange
 | Role | Solid fill | Text on solid | Soft tint | Text color (light) | Text color (dark) | Border |
 |---|---|---|---|---|---|---|
 | `danger` | `--mauve` | `--light` | `--mauve` at 10% | `--mauve` | `--light` | `--mauve` |
-| `success` | `--accent-text` | `--light` | `--accent` at 12% | `--accent-text` | `--light`, with a `--accent` dot | `--accent` |
-| `warning` | `--gold` | `--dark` | `--gold` at 25% | `--dark`, with a `--muted-gold` dot | `--gold` | `--gold` |
+| `success` | `--accent-text` | `--light` | `--accent` at 8% | `--accent-text` | `--light`, with a `--accent` dot | `--accent` |
+| `warning` | `--gold` | `--dark` | `--gold` at 25% | `--dark`, with a `--muted-gold` dot | `--light`, with a `--gold` border | `--gold` |
 | `info` | `--primary` | `--light` | `--primary` at 10% | `--dark` | `--light` | `--primary` |
 | `brand-deep` | `--royal` | `--light` | `--royal` at 8% | `--royal` | `--light` | `--royal` |
 
@@ -129,7 +148,7 @@ The three differ by fill versus outline as well as color, so they stay distinct 
 
 #### 2.6 Buttons
 
-- **Primary:** `--primary` fill with white text (4.72:1).
+- **Primary:** the SPOKES Button primary variant: solid `--primary`, white text (4.72:1, ink token `--on-primary`), 8px corners, weight 600.
 - **Positive** (save, download, submit): `--accent-text` fill with white text. SPOKES puts white text on `--accent #37b550`, which is 2.66:1 and fails. This spec corrects that one value.
 - **Secondary:** transparent fill, `--dark` border and text.
 - **Destructive:** the `danger` solid.
@@ -184,7 +203,7 @@ Remapping size names is legitimate because a size name promises a step on a scal
 | `--shadow-card` | `shadow-md` | `0 4px 15px rgba(0, 64, 113, 0.08)` |
 | `--shadow-card-lg` | `shadow-lg` | `0 8px 32px rgba(0, 64, 113, 0.08)` |
 | `--shadow-premium` | `shadow-float` | `0 18px 50px -12px rgba(0, 19, 63, 0.35)` |
-| `--shadow-premium-hover` | `shadow-hover` | `0 10px 30px rgba(0, 0, 0, 0.15)` |
+| `--shadow-premium-hover` | `shadow-hover` | `0 10px 30px rgba(0, 19, 63, 0.15)` (SPOKES uses black; royal keeps the palette rule) |
 
 Cards become solid surfaces. Backdrop blur stays only on sticky bars, using SPOKES `bar-bg` (`rgba(255, 255, 255, 0.82)` light, `--royal` at 82% dark).
 
@@ -228,7 +247,7 @@ Remapping Tailwind's color names to SPOKES colors in config was considered and r
 
 #### 5.2 The codemod
 
-- `scripts/lib/spokes-color-map.mjs` holds the mapping as a pure function, with unit tests in `scripts/lib/spokes-color-map.test.mjs`.
+- `scripts/lib/spokes-class-map.mjs` holds the mapping as a pure function, with unit tests in `src/lib/spokes-class-map.test.ts`. `scripts/lib/spokes-source-rewrite.mjs` applies it to files through the TypeScript AST.
 - `scripts/spokes-color-sweep.mjs --paths=<globs> [--write]` rewrites class strings in `.tsx` and `.ts` files, including the status-color maps in `src/lib`. Without `--write` it prints every change and changes nothing.
 - Anything it cannot map with certainty goes on a printed hand-review list instead of being guessed: a hue inside a gradient, a computed or concatenated class name, an arbitrary value.
 
@@ -236,9 +255,9 @@ The student sweep does a few files by hand first, then runs the script on the sa
 
 #### 5.3 Order
 
-1. **Student components:** orientation, portfolio, goals, career, certifications, jobs, vision board, Sage, LMS, documents, student and settings folders. About 25 files. Students see these, and the batch is small enough to prove the script.
-2. **Teacher components:** 42 files, about 390 uses.
-3. **Everything else:** sign-in, admin, coordinator, `src/app` routes, the remaining `src/lib` maps, and the 15 raw-hex files fixed by hand (Design 2.8).
+0. **Token text (tokens PR):** text uses of `--error`, `--accent-*`, `--success`, and `--primary` move onto role utilities, because their dark values become fills.
+1. **Student components:** goals, portfolio, orientation, career, Sage, LMS, vision board, SPOKES hub, documents, certifications, student, settings, dashboard, and shared UI folders, plus `src/app/(student)`. Students see these, and the first three files prove the script against hand edits.
+2. **Everything else:** teacher, sign-in, admin, coordinator, `src/app` routes, the remaining `src/lib` maps, and the remaining raw-hex files fixed by hand (Design 2.8).
 
 ### 6. Guards
 
@@ -256,7 +275,7 @@ VisionQuest components are restyled to SPOKES. The SPOKES React bundle is not im
 
 - **Cards.** One treatment app-wide: white, `--border` hairline, `--shadow-card`, 12px corners. The SPOKES 6px left border (green, or gold for achievements) marks callouts only: tips, "Sage suggests", activity prompts. SPOKES rotates card styles per lesson chapter; an app keeps one look.
 - **Page headers.** Eyebrow label, DM Serif title, and a 48px by 3px `--gold` rule underneath, matching the SPOKES title rule.
-- **Progress bars.** SPOKES `--grad-progress` (`--primary` to `--gold`). The mountain metaphor stays and suits the logo.
+- **Progress bars.** SPOKES `--grad-progress` (`--primary` to `--gold`) with a 1px inset edge in `--progress-edge` (navy in light, gold in dark), because gold on a light track is about 1.8:1. The mountain metaphor stays and suits the logo.
 - **Logo.** A white rounded plate behind the logo on navy and royal grounds.
 - **Icons.** Phosphor stays (approved exception), colored with role and ink tokens only. No emoji.
 - **Heading casing.** Page titles (`h1`) and card headings become Title Case, per SPOKES content rules. Buttons, labels, body copy, and Sage's generated text keep sentence case. Case does not change reading level, so the copy readability gate is unaffected.
@@ -276,8 +295,9 @@ VisionQuest components are restyled to SPOKES. The SPOKES React bundle is not im
 
 ### 10. Risks
 
-- **Bigger text in dense teacher tables.** `text-xs` and `text-sm` each grow 1px, which can wrap or overflow table cells. The teacher sweep checks every table at 375px and 1280px and fixes layout where needed.
+- **Bigger text in dense teacher tables.** `text-xs` and `text-sm` each grow 1px, which can wrap or overflow table cells. The screenshot spec checks the teacher queue and student detail pages at 375px and 1280px, and the remaining sweep and fixes layout where needed.
 - **Serif headings in narrow spaces.** DM Serif Display sets wider than Sora. Long titles in cards may wrap to an extra line. The screenshot review catches this.
+- **No red in dark-theme error text.** No SPOKES red passes as text on navy, so danger text is white in the dark theme. Every error must carry an icon; the screenshot spec checks the sign-in error in both themes.
 - **Lighter body text.** Body text moves from `#4a4d54` to `#60636b`. That still passes (6.01:1 on white, 5.37:1 on muted), but it reads lighter. If testing with students says otherwise, the fix is a request to change the SPOKES artifact, not a local override.
 - **Conflicts with other branches.** The tokens PR touches `globals.css` and `layout.tsx`, which most UI branches also touch. Building after #223 removes the largest conflict. Other open branches rebase over the tokens PR.
 
@@ -301,17 +321,17 @@ These are inconsistencies inside the SPOKES artifact itself, recorded so whoever
 
 1. **Plan.** After Britt approves `SPEC`, write `PLAN` with the `superpowers:writing-plans` skill. Build nothing before `PLAN` exists and Britt has picked how to execute it.
 2. **Wait for the base.** Build starts only after #223 merges. Bring `WORKTREE` up to date with `BASE` first.
-3. **Build in PR order.** Tokens, student sweep, teacher sweep, remaining sweep, polish. Each PR is a draft against `BASE`. Each passes its Definition of done checks before the next one starts.
+3. **Build in PR order.** Tokens, student sweep, remaining sweep, polish. Each PR is a draft against `BASE`. Each passes its Definition of done checks before the next one starts.
 4. **Verify.** Run every Definition of done check that applies to the PR, quote the output in the PR description, and publish the screenshot set for Britt's review. Report what passed, what failed, and what is blocked.
 5. **Release.** Britt picks when the tokens PR deploys relative to class sessions. Teachers get a heads-up first.
 
 ## Deliverables
 
 - `PLAN`
-- Five draft PRs to `BASE`, as listed under Solution
+- Four draft PRs to `BASE`, as listed under Solution
 - `src/app/globals.css` and `src/app/layout.tsx` on SPOKES values
 - `src/app/globals.palette.test.ts` and `src/app/globals.contrast.test.ts`
-- `scripts/lib/spokes-color-map.mjs`, `scripts/lib/spokes-color-map.test.mjs`, and `scripts/spokes-color-sweep.mjs`
+- `scripts/lib/spokes-class-map.mjs`, `scripts/lib/spokes-source-rewrite.mjs`, `scripts/spokes-class-sweep.mjs`, and their tests under `src/lib/`
 - The `spokes/no-off-palette-color` rule in `eslint.config.mjs`
 - Updated `.impeccable.md`, `CLAUDE.md`, `.claude/agents/ux-reviewer.md`, and `.claude/MEMORY.md`
 - One published screenshot artifact per PR: both themes at 375px and 1280px for the student dashboard (Sage home), goals, orientation, portfolio, and career; the teacher queue and student detail; and sign-in
@@ -360,7 +380,7 @@ These are inconsistencies inside the SPOKES artifact itself, recorded so whoever
 ### Codemod
 
 - The mapping is tested.
-  - Check: `node --test scripts/lib/spokes-color-map.test.mjs`
+  - Check: `npx tsx --test src/lib/spokes-class-map.test.ts src/lib/spokes-source-rewrite.test.ts`
     Expected: pass.
 - The script matches hand work.
   - Check: the student sweep PR description.
