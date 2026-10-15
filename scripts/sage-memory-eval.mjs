@@ -207,6 +207,11 @@ async function probeHit(retrieveMemories, subjectType, subjectId, scenario) {
 }
 
 async function main() {
+  // Resolve the provider before importing or touching the database: provider
+  // checks (e.g. OpenRouter refusing a non-local DATABASE_URL) must run before
+  // the sentinel deleteMany below can reach a real database.
+  const { provider, label: providerLabel } = await resolveEvalProvider();
+  console.log(`Provider: ${providerLabel}`);
   const { prisma } = await import("../src/lib/db.ts");
   const { extractAndStoreMemories } = await import("../src/lib/sage/memory/extract.ts");
   const { extractAndStoreStaffMemories } = await import("../src/lib/sage/memory/staff-extract.ts");
@@ -224,8 +229,6 @@ async function main() {
     },
   });
 
-  const { provider, label: providerLabel } = await resolveEvalProvider();
-  console.log(`Provider: ${providerLabel}`);
   const totals = { stored: 0, deduped: 0, rejected: 0 };
 
   console.log(`\nSuite 1/3 — replaying ${CONVERSATIONS.length} student conversations…`);

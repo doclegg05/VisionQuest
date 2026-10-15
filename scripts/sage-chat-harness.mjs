@@ -80,7 +80,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { loadEnvFile, parseArgs, ensureParentDir } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
+import { isEvalAbort, resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 import {
   isRefusalOrRedirect,
   normalizeForMatch,
@@ -795,6 +795,9 @@ async function main() {
         };
       }
     } catch (err) {
+      // Nothing can be evaluated (credits, key, or model unavailable): stop the
+      // whole run with its not-run exit code instead of grading this case.
+      if (isEvalAbort(err)) throw err;
       outcome = { pass: false, reason: `error — ${err.message}` };
     }
     const latencyMs = Math.round(performance.now() - startedAt);

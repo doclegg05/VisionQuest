@@ -43,7 +43,7 @@
 
 import { readFileSync } from "node:fs";
 import { loadEnvFile, parseArgs } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
+import { isEvalAbort, resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 import { isRefusalOrRedirect, normalizeForMatch } from "./lib/sage-eval-text.mjs";
 import { buildScenarioContext } from "./lib/eval-scenario-context.mjs";
 
@@ -217,6 +217,9 @@ async function main() {
       // space — chunks already carry their own whitespace, so concatenate.
       text = textParts.join("").trim();
     } catch (err) {
+      // Nothing can be evaluated (credits, key, or model unavailable): stop the
+      // whole run with its not-run exit code instead of grading this case.
+      if (isEvalAbort(err)) throw err;
       // The provider already retries transient failures internally, so a
       // scenario that still throws here could not be evaluated at all. An
       // ungraded scenario is an unknown, not a pass — counted and failed
