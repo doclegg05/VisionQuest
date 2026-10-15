@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 
 import { logger } from "@/lib/logger";
 import { errorForLog } from "@/lib/log-error";
@@ -16,14 +17,9 @@ import { runNudges } from "@/lib/nudges/schedule";
  * `?dryRun=1` returns the plan and writes nothing — the safe way to see what a
  * class would receive before the flags are turned on.
  */
-function isAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 export async function POST(req: Request): Promise<NextResponse> {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

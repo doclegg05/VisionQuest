@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { errorForLog } from "@/lib/log-error";
@@ -10,13 +11,6 @@ import { withStudentRlsContext } from "@/lib/rls-context";
 import { studentLogKey } from "@/lib/log-keys";
 
 const COOLDOWN_HOURS = 20;
-
-function isAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
-}
 
 /**
  * One student's daily prompt: arc upkeep, prompt selection, notification.
@@ -65,7 +59,7 @@ async function sendDailyPromptForStudent(studentId: string) {
  * as that student (review F5, 2026-09-01).
  */
 export async function GET(req: Request): Promise<NextResponse> {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

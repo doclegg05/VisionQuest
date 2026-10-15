@@ -1,15 +1,9 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { invalidateAllChatContext } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { errorForLog } from "@/lib/log-error";
-
-function isAuthorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
-}
 
 /** Weekly decay multiplier for episodic memories past the fresh window. */
 const EPISODIC_DECAY = 0.95;
@@ -31,7 +25,7 @@ const ARCHIVE_BELOW_CONFIDENCE = 0.2;
  * Auth: Bearer CRON_SECRET. Registered in pg_cron as 'sage-memory-consolidate'.
  */
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

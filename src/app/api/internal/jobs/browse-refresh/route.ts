@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 import { logger } from "@/lib/logger";
 import { errorForLog } from "@/lib/log-error";
 import { runBrowseRefresh } from "@/lib/job-board/browse-scrape";
-
-function isAuthorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
-}
 
 /**
  * POST /api/internal/jobs/browse-refresh
@@ -17,7 +11,7 @@ function isAuthorized(req: Request) {
  * Auth: Bearer CRON_SECRET
  */
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { errorForLog } from "@/lib/log-error";
@@ -9,13 +10,6 @@ import {
 
 // ~50 docs at 1-2 minutes total; give the embed loop room on Render.
 export const maxDuration = 300;
-
-function isAuthorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
-}
 
 const bodySchema = z.object({
   force: z.boolean().optional(),
@@ -36,7 +30,7 @@ const bodySchema = z.object({
  * Auth: Bearer CRON_SECRET (same pattern as /api/internal/memory/consolidate).
  */
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

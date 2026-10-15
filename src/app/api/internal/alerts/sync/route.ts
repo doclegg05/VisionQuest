@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { syncAlertsForStudents } from "@/lib/advising";
 import { logger } from "@/lib/logger";
-
-function isAuthorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
-}
 
 /**
  * POST /api/internal/alerts/sync
@@ -21,7 +15,7 @@ function isAuthorized(req: Request) {
  * and syncAlertsForStudents runs each student's sync as that student.
  */
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
