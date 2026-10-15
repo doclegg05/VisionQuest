@@ -5,9 +5,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Ticket D3 — static source pins for the 44px touch-target floor and the
- * three select-name / link-name / nested-interactive axe fixes that don't
- * have a component test file of their own to extend.
+ * Ticket D3. Static source pins for the 44px touch-target floor, the
+ * select-name fixes and the color-contrast tokens, for components that have
+ * no test file of their own to extend. The link-name and nested-interactive
+ * pins went with the old intervention queue; the QueueStudentRow tests and
+ * the CI axe scan cover the row that replaced it.
  *
  * This greps rendered-class source text rather than mounting components in
  * a browser: this container cannot run the Playwright collectors
