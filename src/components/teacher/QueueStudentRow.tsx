@@ -74,11 +74,15 @@ export function QueueStudentRow({
     () => groupQueueIssues(student.openAlerts, student.studentId),
     [student.openAlerts, student.studentId],
   );
-  const [expanded, setExpanded] = useState(student.primaryAlert?.severity === "critical");
+  const issueCount = student.openAlerts.length;
+  const isCrisis = student.primaryAlert?.severity === "critical";
+  // Null until the teacher uses the toggle, so a crisis raised by a later refresh still opens the row. A row with no
+  // open issues never shows an empty list.
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const expanded = (toggled ?? isCrisis) && issueCount > 0;
   const badge = URGENCY_BADGE[urgencyLevel(student)];
   const main = mainActionMode(student);
   const issuesId = `queue-issues-${student.studentId}`;
-  const issueCount = student.openAlerts.length;
   const chips = student.urgencyReasons.slice(0, 3);
   const hiddenReasonCount = student.urgencyReasons.length - chips.length;
   const crisisLine =
@@ -123,7 +127,7 @@ export function QueueStudentRow({
             type="button"
             aria-expanded={expanded}
             aria-controls={issuesId}
-            onClick={() => setExpanded((open) => !open)}
+            onClick={() => setToggled(!expanded)}
             className={PILL}
           >
             {expanded ? "Hide issues" : `See all ${plural(issueCount, "issue")}`}

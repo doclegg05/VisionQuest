@@ -110,4 +110,11 @@ describe("QueueStudentRow", () => {
     const html = render({ student: entry({ primaryAlert: null, openAlerts: [] }) });
     assert.doesNotMatch(html, /See all/);
   });
+
+  it("renders no empty issues list when a crisis row has no open alerts left", () => {
+    // Stands in for a refresh that cleared every alert while the crisis row was open.
+    const html = render({ student: entry({ primaryAlert: CRISIS, openAlerts: [] }) });
+    assert.doesNotMatch(html, /Open issues for Sam Rivera/);
+    assert.doesNotMatch(html, /id="queue-issues-stu-1"/);
+  });
 });
