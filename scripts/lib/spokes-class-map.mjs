@@ -25,6 +25,11 @@ const SOFT_PREFIXES = new Set(["bg", "from", "via", "to"]);
 const LINE_PREFIX = /^(border(?:-[xytrbl])?|ring|outline|divide)$/;
 const HEAVY = new Set(["font-semibold", "font-bold", "font-extrabold", "font-black"]);
 const DISPLAY_FAMILY = "font-[family-name:var(--font-display)]";
+const STATE_VARIANTS = Object.freeze(["hover:", "focus:", "focus-visible:", "active:", "group-hover:"]);
+// A fixed light or dark color: it does not switch with the theme, so a removed dark: sibling breaks dark mode.
+const FIXED_COLOR_RE = /^(?:[a-z0-9-]+:)*(?:bg|text|border|from|via|to|ring|fill|stroke)-(?:white|black|\[)/;
+const DARK_REVIEW_REASON = "dark: color removed but the list keeps a fixed color; check the dark theme by hand";
+const STATE_REVIEW_REASON = "state color now matches the base color; choose a visibly different state, for example /90";
 
 const V = "((?:[a-z0-9-]+:)*)";
 const HUE_RE = new RegExp(`^${V}(bg|text|border(?:-[xytrbl])?|from|via|to|ring|fill|stroke|outline|divide|decoration|accent|caret|placeholder|shadow)-(${HUES})-(\\d{2,3})(\\/\\d{1,3})?$`);
@@ -93,28 +98,77 @@ function classify(token, usesDisplay, enabled) {
   return {};
 }
 
-/** Rewrites a whitespace-separated class list. Untouched input comes back byte for byte. */
-export function rewriteClassList(classList, rules = ALL_RULES) {
-  const enabled = new Set(rules);
-  const core = classList.trim();
-  if (!core) return { output: classList, changes: [], review: [] };
-  const tokens = core.split(/\s+/);
-  const usesDisplay = tokens.some((t) => t === "font-display" || t.endsWith(DISPLAY_FAMILY));
+// `classList.split(/(\s+)/)` alternates class names (even indexes, "" at the ends) with whitespace (odd indexes).
+const isName = (part, index) => index % 2 === 0 && part !== "";
+const usesDisplayFamily = (token) => token === "font-display" || token.endsWith(DISPLAY_FAMILY);
+const hasDarkVariant = (token) => token.split(":").slice(0, -1).includes("dark");
+
+function stripStateVariant(token) {
+  const variant = STATE_VARIANTS.find((prefix) => token.startsWith(prefix));
+  return variant ? token.slice(variant.length) : null;
+}
+
+function collectChanges(parts, outcomes) {
   const changes = [];
   const review = [];
-  const kept = [];
-  for (const token of tokens) {
-    const result = classify(token, usesDisplay, enabled);
-    if (result.review) review.push({ token, reason: result.review });
-    if (result.to === undefined) {
-      kept.push(token);
-      continue;
-    }
-    changes.push({ from: token, to: result.to });
-    if (result.to !== null) kept.push(result.to);
-  }
+  parts.forEach((part, index) => {
+    const outcome = outcomes[index];
+    if (!outcome) return;
+    if (outcome.review) review.push({ token: part, reason: outcome.review });
+    if (outcome.to !== undefined) changes.push({ from: part, to: outcome.to });
+  });
+  return { changes, review };
+}
+
+// A deleted class takes the whitespace before it; the first class has none, so it takes the whitespace after.
+function deletedIndexes(parts, outcomes) {
+  const firstName = parts.findIndex(isName);
+  const drop = new Set();
+  outcomes.forEach((outcome, index) => {
+    if (outcome?.to !== null) return;
+    drop.add(index);
+    drop.add(index === firstName ? index + 1 : index - 1);
+  });
+  return drop;
+}
+
+function renderParts(parts, outcomes) {
+  const drop = deletedIndexes(parts, outcomes);
+  return parts
+    .map((part, index) => (typeof outcomes[index]?.to === "string" ? outcomes[index].to : part))
+    .filter((_, index) => !drop.has(index))
+    .join("");
+}
+
+function darkReviews(parts, outcomes, kept, hadOtherReviews) {
+  const fixedKept = kept.some((token) => FIXED_COLOR_RE.test(token));
+  if (!fixedKept && !hadOtherReviews) return [];
+  return parts
+    .filter((part, index) => outcomes[index]?.to === null && hasDarkVariant(part))
+    .map((token) => ({ token, reason: DARK_REVIEW_REASON }));
+}
+
+function stateReviews(changes, kept) {
+  return changes.flatMap(({ from, to }) => {
+    const base = to === null ? null : stripStateVariant(to);
+    const collides = base !== null && !base.includes(":") && kept.includes(base);
+    return collides ? [{ token: from, reason: STATE_REVIEW_REASON }] : [];
+  });
+}
+
+/**
+ * Rewrites a whitespace-separated class list. Only the classes that change are rewritten;
+ * all other text, including line breaks and indentation, comes back byte for byte.
+ */
+export function rewriteClassList(classList, rules = ALL_RULES) {
+  const enabled = new Set(rules);
+  const parts = classList.split(/(\s+)/);
+  const usesDisplay = parts.some((part, index) => isName(part, index) && usesDisplayFamily(part));
+  const outcomes = parts.map((part, index) => (isName(part, index) ? classify(part, usesDisplay, enabled) : null));
+  const { changes, review } = collectChanges(parts, outcomes);
   if (changes.length === 0) return { output: classList, changes, review };
-  const leading = classList.slice(0, classList.length - classList.trimStart().length);
-  const trailing = classList.slice(classList.trimEnd().length);
-  return { output: `${leading}${kept.join(" ")}${trailing}`, changes, review };
+  const output = renderParts(parts, outcomes);
+  const kept = output.split(/\s+/).filter(Boolean);
+  const darkFlags = darkReviews(parts, outcomes, kept, review.length > 0);
+  return { output, changes, review: [...review, ...darkFlags, ...stateReviews(changes, kept)] };
 }

@@ -21,13 +21,17 @@ describe("hue classes become SPOKES roles", () => {
     ["bg-indigo-50", "bg-brand-deep-soft"],
     ["ring-teal-400", "ring-info"],
     ["fill-orange-500", "fill-warning"],
-    ["dark:bg-red-950/40", null],
     ["text-gray-500", "text-ink-muted"],
     ["text-slate-900", "text-ink-strong"],
     ["bg-gray-100", "bg-surface-muted"],
     ["border-gray-200", "border-line"],
   ];
   for (const [input, expected] of cases) it(`${input} -> ${expected}`, () => assert.equal(to(input), expected));
+
+  it("deletes dark: hue classes, since role tokens already switch per theme", () => {
+    assert.deepEqual(mapClass("dark:bg-red-950/40"), { rule: "hue", to: null });
+    assert.equal(rewriteClassList("bg-red-50 dark:bg-red-950/40").output, "bg-danger-soft");
+  });
 
   it("sends text with opacity, placeholder hues, and odd neutrals to review", () => {
     for (const token of ["text-red-600/80", "placeholder-gray-400", "bg-gray-700"]) {
@@ -61,6 +65,54 @@ describe("token text, display family, corners, and small text", () => {
   });
 });
 
+const ROLE_OF: Record<string, string> = {
+  red: "danger", rose: "danger", pink: "danger", fuchsia: "danger",
+  emerald: "success", green: "success", lime: "success",
+  amber: "warning", yellow: "warning", orange: "warning",
+  blue: "info", sky: "info", cyan: "info", teal: "info",
+  indigo: "brand-deep", violet: "brand-deep", purple: "brand-deep",
+};
+
+describe("every hue maps to its role", () => {
+  for (const [hue, role] of Object.entries(ROLE_OF)) {
+    it(`${hue} -> ${role}`, () => {
+      assert.equal(to(`bg-${hue}-100`), `bg-${role}-soft`);
+      assert.equal(to(`bg-${hue}-600`), `bg-${role}`);
+      assert.equal(to(`text-${hue}-700`), `text-${role}`);
+      assert.equal(to(`border-${hue}-300`), `border-${role}`);
+    });
+  }
+  for (const neutral of ["slate", "gray", "zinc", "neutral", "stone"]) {
+    it(`${neutral} -> ink, surface, and line tokens`, () => {
+      assert.equal(to(`text-${neutral}-800`), "text-ink-strong");
+      assert.equal(to(`text-${neutral}-500`), "text-ink-muted");
+      assert.equal(to(`bg-${neutral}-50`), "bg-surface-muted");
+      assert.equal(to(`border-${neutral}-300`), "border-line");
+    });
+  }
+});
+
+describe("hue prefixes and token text beyond the basic table", () => {
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ["via-red-100", "via-danger-soft"],
+    ["to-red-700", "to-danger"],
+    ["outline-red-500", "outline-danger"],
+    ["divide-red-200", "divide-danger"],
+    ["stroke-red-500", "stroke-danger"],
+    ["decoration-red-500", "decoration-danger"],
+    ["accent-red-500", "accent-danger"],
+    ["caret-red-500", "caret-danger"],
+    ["shadow-red-500", "shadow-danger"],
+    ["border-x-red-500", "border-x-danger"],
+    ["border-t-red-500", "border-t-danger"],
+    ["text-[var(--accent-red)]", "text-danger"],
+    ["text-[var(--success)]", "text-success"],
+    ["text-[var(--accent-blue)]", "text-info"],
+    ["text-[var(--accent-gold)]", "text-warning"],
+  ];
+  for (const [input, expected] of cases) it(`${input} -> ${expected}`, () => assert.equal(to(input), expected));
+});
+
 describe("rewriteClassList", () => {
   it("drops a heavy weight only when the list uses the display font", () => {
     assert.equal(rewriteClassList("font-display text-2xl font-bold").output, "font-display text-2xl");
@@ -84,5 +136,33 @@ describe("rewriteClassList", () => {
     const result = rewriteClassList("data-[state=open]:bg-red-50");
     assert.equal(result.output, "data-[state=open]:bg-red-50");
     assert.equal(result.review.length, 1);
+  });
+
+  it("keeps the original line breaks and indentation when a multi-line list changes", () => {
+    assert.equal(rewriteClassList("px-4\n  bg-red-50\n  py-2").output, "px-4\n  bg-danger-soft\n  py-2");
+  });
+
+  it("removes a deleted class together with the whitespace before it", () => {
+    assert.equal(rewriteClassList("px-4\n  dark:bg-red-900\n  py-2").output, "px-4\n  py-2");
+  });
+});
+
+describe("removed dark: colors are reviewed when the dark theme could break", () => {
+  it("flags a removed dark: color when the list keeps a fixed light color", () => {
+    const result = rewriteClassList("bg-white dark:bg-slate-900 border border-emerald-500");
+    assert.equal(result.output, "bg-white border border-success");
+    assert.ok(result.review.some((r) => r.token === "dark:bg-slate-900"));
+  });
+
+  it("does not flag a removed dark: color when everything else mapped", () => {
+    assert.equal(rewriteClassList("bg-red-50 dark:bg-red-950/40").review.length, 0);
+  });
+});
+
+describe("hover and focus colors that collapse onto their base", () => {
+  it("flags a hover color that the mapping made identical to its base", () => {
+    const result = rewriteClassList("bg-blue-600 text-white hover:bg-blue-700");
+    assert.equal(result.output, "bg-info text-white hover:bg-info");
+    assert.ok(result.review.some((r) => r.token === "hover:bg-blue-700"));
   });
 });
