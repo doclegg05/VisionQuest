@@ -12,9 +12,10 @@ mock.module("@/lib/audit", {
 });
 
 let logAiAuditEvent: typeof import("./audit").logAiAuditEvent;
+let getProviderClass: typeof import("./audit").getProviderClass;
 
 before(async () => {
-  ({ logAiAuditEvent } = await import("./audit"));
+  ({ logAiAuditEvent, getProviderClass } = await import("./audit"));
 });
 
 beforeEach(() => {
@@ -70,5 +71,19 @@ describe("logAiAuditEvent", () => {
     const [event] = capturedEvents();
     assert.equal(event.action, "ai.request.blocked");
     assert.equal(event.metadata.promptRevision, SAGE_PROMPT_REVISION);
+  });
+});
+
+describe("getProviderClass", () => {
+  it("classes every known provider", () => {
+    assert.equal(getProviderClass("gemini"), "cloud");
+    assert.equal(getProviderClass("ollama"), "local");
+    assert.equal(getProviderClass("openrouter"), "cloud");
+  });
+
+  it("keeps unknown and missing names distinct", () => {
+    assert.equal(getProviderClass("something-new"), "unknown");
+    assert.equal(getProviderClass(null), "none");
+    assert.equal(getProviderClass(""), "none");
   });
 });
