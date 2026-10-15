@@ -1,18 +1,20 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
-import { Manrope, Sora } from "next/font/google";
+import { DM_Serif_Display, Outfit } from "next/font/google";
 import { MotionProvider } from "@/components/ui/MotionProvider";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { getThemePreferenceFromCookie, THEME_BOOT_SCRIPT, THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
-const manrope = Manrope({
+const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-body",
 });
 
-const sora = Sora({
+// One weight only: .font-display turns off synthetic bold (globals.css).
+const dmSerifDisplay = DM_Serif_Display({
   subsets: ["latin"],
+  weight: "400",
   variable: "--font-display",
 });
 
@@ -48,7 +50,7 @@ export default async function RootLayout({
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} suppressHydrationWarning />
       </head>
-      <body className={`${manrope.variable} ${sora.variable} antialiased`}>
+      <body className={`${outfit.variable} ${dmSerifDisplay.variable} antialiased`}>
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100]
