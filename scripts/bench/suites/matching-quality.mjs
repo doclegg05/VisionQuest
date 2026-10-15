@@ -116,7 +116,9 @@ export async function run(ctx) {
         n: scored,
         details: {
           studentsSkipped: skipped.length,
-          skipped: skipped.slice(0, 5),
+          // Not `skipped`: under details that key is the runner's
+          // "this scorer skipped itself" declaration (scripts/bench/run.mjs).
+          studentsSkippedSample: skipped.slice(0, 5),
           // Sorted worst-first and capped: a failing gate should show the ten
           // most informative disagreements, not two thousand rows.
           worstStudents: worst.sort((a, b) => a.precision - b.precision).slice(0, 10),
