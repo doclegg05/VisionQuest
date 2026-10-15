@@ -41,6 +41,7 @@ const GROUP_LABELS: Readonly<Record<string, { label: string; category: string }>
   goal_platform_stale: { label: "platforms visited, no follow-through", category: "Goals" },
   goal_review_pending: { label: "goal evidence items awaiting review", category: "Goals" },
   goal_stale: { label: "stale goals", category: "Goals" },
+  goal_unconfirmed: { label: "goals awaiting confirmation", category: "Goals" },
   overdue_task: { label: "overdue tasks", category: "Tasks" },
   missed_appointment: { label: "missed appointments", category: "Advising" },
   certification_stalled: { label: "certifications stalled", category: "Certifications" },

@@ -37,6 +37,17 @@ test("same-type alerts fold into one counted group", () => {
   assert.equal(groups[0]?.count, 3);
 });
 
+test("unconfirmed goals fold into one counted group", () => {
+  const groups = groupQueueIssues(
+    ["u1", "u2", "u3"].map((id) => alert(id, "goal_unconfirmed", "medium", "Sage-proposed goal awaiting confirmation")),
+    STUDENT,
+  );
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0]?.count, 3);
+  assert.equal(groups[0]?.category, "Goals");
+  assert.equal(groups[0]?.label, "3 goals awaiting confirmation");
+});
+
 test("a group of one keeps the alert's own title", () => {
   const [group] = groupQueueIssues([alert("t1", "overdue_task", "medium", "Résumé draft is overdue")], STUDENT);
   assert.equal(group?.label, "Résumé draft is overdue");
