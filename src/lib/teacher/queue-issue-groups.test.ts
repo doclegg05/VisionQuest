@@ -8,6 +8,7 @@ import {
   countInactivityStages,
   groupQueueIssues,
   openForLabel,
+  queueBodyView,
   visibleQueueRows,
   withPinnedRow,
 } from "./queue-issue-groups";
@@ -152,6 +153,21 @@ test("no pinned id, or one that left the queue, changes nothing", () => {
   const visible = all.slice(0, 10);
   assert.deepEqual(withPinnedRow(visible, all, null), visible);
   assert.deepEqual(withPinnedRow(visible, all, "gone"), visible);
+});
+
+test("a failed refresh keeps the last good list on screen, marked stale", () => {
+  assert.deepEqual(queueBodyView({ loading: false, failed: true, rowCount: 3 }), { kind: "list", stale: true });
+  assert.deepEqual(queueBodyView({ loading: false, failed: false, rowCount: 3 }), { kind: "list", stale: false });
+});
+
+test("the in-place error shows only when there are no rows to fall back on", () => {
+  assert.deepEqual(queueBodyView({ loading: false, failed: true, rowCount: 0 }), { kind: "error" });
+  assert.deepEqual(queueBodyView({ loading: false, failed: false, rowCount: 0 }), { kind: "empty" });
+});
+
+test("loading shows the skeleton whatever else is true", () => {
+  assert.deepEqual(queueBodyView({ loading: true, failed: false, rowCount: 0 }), { kind: "loading" });
+  assert.deepEqual(queueBodyView({ loading: true, failed: true, rowCount: 3 }), { kind: "loading" });
 });
 
 test("Sage prompts list every group and mark urgent ones", () => {

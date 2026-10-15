@@ -208,6 +208,23 @@ export function withPinnedRow<T extends { studentId: string }>(
   return all.filter((row) => row.studentId === pinnedStudentId || shown.has(row.studentId));
 }
 
+/** What the queue body shows. "stale" means the last load failed and the rows are from an earlier one. */
+export type QueueBodyView =
+  | { kind: "loading" }
+  | { kind: "error" }
+  | { kind: "empty" }
+  | { kind: "list"; stale: boolean };
+
+/**
+ * A failed refresh never hides rows the teacher already has: the list stays, marked stale. The in-place error is
+ * only for a load that left nothing to show.
+ */
+export function queueBodyView(input: { loading: boolean; failed: boolean; rowCount: number }): QueueBodyView {
+  if (input.loading) return { kind: "loading" };
+  if (input.rowCount > 0) return { kind: "list", stale: input.failed };
+  return input.failed ? { kind: "error" } : { kind: "empty" };
+}
+
 export function buildStudentSageMessage(name: string, groups: readonly QueueIssueGroup[]): string {
   return [
     `I need help with interventions for ${name}. Here are their current issues:`,

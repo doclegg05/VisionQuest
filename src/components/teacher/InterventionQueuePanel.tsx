@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, apiFetch } from "@/lib/api";
 import { FormDialog } from "@/components/ui/FormDialog";
@@ -10,6 +10,7 @@ import {
   countInactivityStages,
   groupQueueIssues,
   QUEUE_ROWS_SHOWN,
+  queueBodyView,
   visibleQueueRows,
   withPinnedRow,
   type QueueIssueGroup,
@@ -412,23 +413,41 @@ export default function InterventionQueuePanel({
     setLoading(true);
     setShowAll(false);
     setActionIntent(null);
+    // A failed load for the new class must not leave the previous class's rows on screen.
+    setQueue([]);
   }
 
-  /** Loads the queue. Returns the loaded rows, or null when the load failed. */
+  // Only the newest request may change state, so a slow answer cannot overwrite a newer one.
+  const latestRequest = useRef(0);
+  // A class switch also retires any request still in flight for the class being left. This runs at commit, before
+  // the effect below starts the new class's request, so an old answer landing in between is ignored too.
+  useLayoutEffect(() => {
+    latestRequest.current += 1;
+  }, [classId]);
+
+  /**
+   * Loads the queue. Returns the loaded rows, or null when the load failed. A request that a newer one replaced
+   * still returns what it got, but changes no state.
+   */
   const fetchQueue = useCallback(async (): Promise<InterventionQueueEntry[] | null> => {
+    latestRequest.current += 1;
+    const request = latestRequest.current;
+    const isLatest = () => request === latestRequest.current;
     try {
       const url = classId
         ? `/api/teacher/intervention-queue?classId=${encodeURIComponent(classId)}`
         : "/api/teacher/intervention-queue";
       const data = await api.get<QueueResponse>(url);
-      setQueue(data.queue);
-      setError(null);
+      if (isLatest()) {
+        setQueue(data.queue);
+        setError(null);
+      }
       return data.queue;
     } catch {
-      setError("Could not load the intervention queue.");
+      if (isLatest()) setError("Could not load the intervention queue.");
       return null;
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
   }, [classId]);
 
@@ -445,9 +464,11 @@ export default function InterventionQueuePanel({
   const openPanelStudentId = actionIntent?.student.id ?? null;
   const visible = withPinnedRow(visibleQueueRows(queue, showAll), queue, openPanelStudentId);
   const hiddenCount = queue.length - visible.length;
-  const listShown = !loading && !error && queue.length > 0;
-  // When no row is on screen for the open panel (the student left the queue, or the list is hidden by a failed
-  // refresh), the panel is shown above the list so the teacher still sees how their action ended.
+  // A failed refresh keeps the last good rows on screen under a banner. The list hides only while loading or empty.
+  const body = queueBodyView({ loading, failed: error !== null, rowCount: queue.length });
+  const listShown = body.kind === "list";
+  // When no row is on screen for the open panel (the student left the queue, or no list is showing), the panel is
+  // shown above the list so the teacher still sees how their action ended.
   const panelHasNoRow =
     actionIntent !== null && !(listShown && queue.some((student) => student.studentId === openPanelStudentId));
   const urgentCount = queue.filter((student) => student.signals.highSeverityAlertCount > 0).length;
@@ -518,7 +539,7 @@ export default function InterventionQueuePanel({
             Needs attention
           </p>
           <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>
-          {!loading && !error && queue.length > 0 ? (
+          {listShown ? (
             <p className="mt-1 text-sm text-[var(--ink-muted)]">
               {queue.length} student{queue.length === 1 ? "" : "s"} need follow-up
               {urgentCount > 0 ? ` · ${urgentCount} urgent` : ""}
@@ -530,7 +551,7 @@ export default function InterventionQueuePanel({
             </p>
           ) : null}
         </div>
-        {!loading && !error && queue.length > 0 ? (
+        {listShown ? (
           <button
             type="button"
             onClick={askSageToPrioritize}
@@ -556,22 +577,40 @@ export default function InterventionQueuePanel({
       ) : null}
 
       {/* Body */}
-      {loading && <QueueSkeleton />}
+      {body.kind === "loading" && <QueueSkeleton />}
 
-      {!loading && error && (
+      {body.kind === "error" && (
         <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--error)]" role="alert">
           {error}
         </p>
       )}
 
-      {!loading && !error && queue.length === 0 && (
+      {body.kind === "empty" && (
         <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
           All students are on track. No follow-up needed right now.
         </p>
       )}
 
-      {listShown && (
+      {body.kind === "list" && (
         <>
+          {body.stale ? (
+            <div
+              role="alert"
+              className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2"
+            >
+              <p className="text-sm text-[var(--error)]">
+                Could not refresh the queue. The list below may be out of date.
+              </p>
+              <button
+                type="button"
+                onClick={() => void fetchQueue()}
+                aria-label="Try again to load the intervention queue"
+                className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)]"
+              >
+                Try again
+              </button>
+            </div>
+          ) : null}
           <ul className="space-y-2">
             {visible.map((student) => (
               <QueueStudentRow
