@@ -69,12 +69,12 @@ describe("class requirement compliance: certification matching", () => {
     certRows = [];
   });
 
-  it("counts a completed legacy ready-to-work row toward Ready to Work family requirements only", async () => {
+  it("does not count a completed ready-to-work row toward a WorkKeys NCRC requirement", async () => {
     certRows = [{ studentId: STUDENT_ID, certType: "ready-to-work", status: "completed" }];
     for (const [name, check] of checkers) {
       assert.deepEqual(
         metByItemId(await check()),
-        { "ready-to-work": true, "workkeys-ncrc": true, ic3: false },
+        { "ready-to-work": true, "workkeys-ncrc": false, ic3: false },
         name,
       );
     }

@@ -73,8 +73,20 @@ describe("POST /api/cron/evidence-gap-detection: certification requirements", ()
     certRows = [];
   });
 
-  it("opens no gap for Ready to Work family requirements a completed legacy row satisfies", async () => {
+  it("keeps the WorkKeys NCRC gap open when only Ready to Work is complete", async () => {
     certRows = [{ studentId: STUDENT_ID, certType: "ready-to-work", status: "completed" }];
+
+    const res = await POST(cronRequest());
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(upsertedAlertKeys, [
+      `evidence_gap:${STUDENT_ID}:req-workkeys-ncrc`,
+      `evidence_gap:${STUDENT_ID}:req-ic3`,
+    ]);
+  });
+
+  it("opens no Ready to Work gap when the student's Ready to Work row is labelled workkeys-ncrc", async () => {
+    certRows = [{ studentId: STUDENT_ID, certType: "workkeys-ncrc", status: "completed" }];
 
     const res = await POST(cronRequest());
 
