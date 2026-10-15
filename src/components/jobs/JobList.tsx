@@ -78,7 +78,7 @@ export function JobList({ jobs, onSave }: JobListProps) {
 
   if (jobs.length === 0) {
     return (
-      <div className="text-center py-12 text-[var(--text-secondary)]">
+      <div className="text-center py-12 text-[var(--ink-muted)]">
         <p className="text-lg">No jobs available right now.</p>
         <p className="text-sm mt-1">Check back soon — new listings are added weekly.</p>
       </div>
@@ -109,7 +109,7 @@ export function JobList({ jobs, onSave }: JobListProps) {
         <button
           type="button"
           onClick={() => setRevealedAll(true)}
-          className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:text-[var(--primary)]"
+          className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:text-[var(--primary)]"
         >
           Show {remaining} more jobs
         </button>

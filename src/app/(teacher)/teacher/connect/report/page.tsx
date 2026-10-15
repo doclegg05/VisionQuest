@@ -408,7 +408,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
         </p>
         <a
           href={exportHref}
-          className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-medium hover:opacity-90"
+          className="mt-3 inline-flex items-center rounded-lg border px-4 py-2 text-sm font-medium hover:opacity-90 pointer-coarse:min-h-11"
         >
           Download DoHS export (CSV)
         </a>

@@ -183,11 +183,11 @@ function consolidateItems(items: UnifiedItem[]): ConsolidatedItem[] {
 function getCategoryBadge(category: string) {
   switch (category) {
     case "inactivity":
-      return { label: "Inactive", className: "bg-red-100 text-red-700" };
+      return { label: "Inactive", className: "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]" };
     case "review":
-      return { label: "Review", className: "bg-blue-100 text-blue-700" };
+      return { label: "Review", className: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]" };
     default:
-      return { label: "Alert", className: "bg-amber-100 text-amber-800" };
+      return { label: "Alert", className: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]" };
   }
 }
 
@@ -276,11 +276,11 @@ function StudentAccordion({
   onAction: InterventionQueueProps["onAction"];
 }) {
   const borderColor = group.highCount > 0
-    ? "border-red-200"
-    : "border-amber-200";
+    ? "border-[var(--urgency-critical-bg)]"
+    : "border-[var(--urgency-high-bg)]";
   const bgColor = group.highCount > 0
-    ? "bg-red-50/40"
-    : "bg-amber-50/40";
+    ? "bg-[var(--urgency-critical-bg)]/40"
+    : "bg-[var(--urgency-high-bg)]/40";
 
   // Build a compact preview of consolidated categories
   const preview = group.consolidated
@@ -332,7 +332,7 @@ function StudentAccordion({
                 {group.student.displayName}
               </span>
               {group.highCount > 0 && (
-                <span className="rounded-full bg-red-200 px-2 py-0.5 text-xs font-semibold text-red-800">
+                <span className="rounded-full bg-[var(--error)] px-2 py-0.5 text-xs font-semibold text-[var(--on-error)]">
                   {group.highCount} urgent
                 </span>
               )}
@@ -381,7 +381,7 @@ function StudentAccordion({
                       {c.groupCategory}
                     </span>
                     {isHigh && (
-                      <span className="rounded-full bg-red-200 px-1.5 py-0.5 text-[9px] font-bold text-red-800">
+                      <span className="rounded-full bg-[var(--error)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--on-error)]">
                         HIGH
                       </span>
                     )}

@@ -20,6 +20,18 @@ const bodies = {
   404: { error: { code: 404, message: "No endpoints found matching your data policy" } },
 };
 
+/** An embeddings reply: one 768-dimension vector per input, as OpenRouter's /v1/embeddings returns. */
+function okEmbeddings(init) {
+  const input = JSON.parse(String(init?.body ?? "{}")).input;
+  const count = Array.isArray(input) ? input.length : 1;
+  const embedding = Array.from({ length: 768 }, (_, index) => (index === 0 ? 1 : 0));
+  const data = Array.from({ length: count }, (_, index) => ({ embedding, index }));
+  return new Response(JSON.stringify({ data, usage: { prompt_tokens: count, cost } }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 function okReply(init) {
   const usage = { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11, cost };
   const streaming = JSON.parse(String(init?.body ?? "{}")).stream === true;
@@ -51,7 +63,7 @@ globalThis.fetch = async (input, init) => {
   const body = JSON.parse(String(init?.body ?? "{}"));
   record({ url, model: body.model ?? null, routing: body.provider ?? null });
   if (networkDown) throw new TypeError("fetch failed");
-  if (ok) return okReply(init);
+  if (ok) return url.endsWith("/embeddings") ? okEmbeddings(init) : okReply(init);
   return new Response(JSON.stringify(bodies[status] ?? { error: { code: status } }), {
     status,
     headers: { "Content-Type": "application/json" },

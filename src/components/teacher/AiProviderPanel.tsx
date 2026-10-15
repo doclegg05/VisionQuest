@@ -383,7 +383,7 @@ export default function AiProviderPanel() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-text)]">
           {error}
         </div>
       )}
@@ -465,11 +465,22 @@ export default function AiProviderPanel() {
             </p>
           </div>
 
-          <details className="rounded-lg border border-[var(--line)] p-4">
+          <details className="rounded-lg border border-[var(--border)] p-4">
             <summary className="cursor-pointer text-sm font-medium text-[var(--ink-strong)]">
               Answer length per job
             </summary>
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              Sage asks the local AI to do four different jobs. Leave a job blank to use
+              the main model above — that is the default, and often the right answer.
+              Every extra model you name stays loaded in memory alongside the others, so
+              add one only when a bake-off shows it earns its place.
+            </p>
+            <p className="mt-2 text-xs text-[var(--ink-muted)]">
+              Compare models with{" "}
+              <code className="rounded bg-[var(--surface-muted)] px-1 py-0.5">
+                npm run sage:model:bakeoff -- --models=a,b,c
+              </code>
+              .
               All jobs use Gemma 4 12B. Adjust answer length below when needed.
             </p>
             <div className="mt-4 space-y-4">
@@ -652,7 +663,7 @@ export default function AiProviderPanel() {
                       setBearerToken("");
                       resetMessages();
                     }}
-                    className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                    className="inline-flex items-center rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)] pointer-coarse:min-h-11"
                   >
                     Clear Saved Token
                   </button>
@@ -701,7 +712,7 @@ export default function AiProviderPanel() {
                         setCloudflareClientSecret("");
                         resetMessages();
                       }}
-                      className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                      className="inline-flex items-center rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)] pointer-coarse:min-h-11"
                     >
                       Clear Saved Credentials
                     </button>
@@ -752,7 +763,7 @@ export default function AiProviderPanel() {
             type="button"
             onClick={() => void handleTest()}
             disabled={testing || !url}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
           >
             {testing ? "Testing..." : "Test Connection"}
           </button>
@@ -779,7 +790,7 @@ export default function AiProviderPanel() {
                   {capabilities.warnings.map((warning) => (
                     <li
                       key={warning}
-                      className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                      className="flex items-start gap-2 rounded-xl border border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)] px-3 py-2 text-xs text-[var(--badge-warning-text)]"
                     >
                       <span aria-hidden="true">⚠</span>
                       <span>{warning}</span>
@@ -809,7 +820,7 @@ function CapabilityRow({ label, ok }: { label: string; ok: boolean }) {
     <div className="flex items-center gap-2 text-sm">
       <span
         aria-hidden="true"
-        className={ok ? "text-[var(--accent-strong)]" : "text-amber-600"}
+        className={ok ? "text-[var(--accent-strong)]" : "text-[var(--badge-warning-text)]"}
       >
         {ok ? "✓" : "⚠"}
       </span>
