@@ -29,7 +29,6 @@ const EVAL_COMMAND = /sage:(?:redteam|agent|quality|memory):eval|sage-chat-harne
 const SAGE_SCRIPT = /\bsage:[a-z:-]+|\bscripts\/sage-[a-z-]+\.mjs/;
 const KEYLESS_SAGE_SCRIPTS = new Set(["sage:freshness:eval"]);
 const OPENROUTER_SECRET = "OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}";
-const GEMINI_SECRET = "GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}";
 
 /** Top-level jobs, keyed by id, each holding its own text. */
 function jobs(yml: string): Map<string, string> {
@@ -54,6 +53,12 @@ function stepName(step: string): string {
   return step.match(/- name: ([^\n]*)/)?.[1] ?? step.slice(0, 60);
 }
 
+/** Each eval or embedding-seed command in a step, from its name to the end of that command. */
+function routedCommands(step: string): string[] {
+  const pattern = /sage:(?:redteam|agent|quality|memory):eval|sage-chat-harness\.mjs|seed-catalog-corpus\.mjs[^;\n']*--embed/g;
+  return step.split("\n").flatMap((line) => [...line.matchAll(pattern)].map((match) => line.slice(match.index).split(/;|'/)[0]));
+}
+
 function callsSageScript(step: string): boolean {
   return (step.match(new RegExp(SAGE_SCRIPT, "g")) ?? []).some((script) => !KEYLESS_SAGE_SCRIPTS.has(script));
 }
@@ -74,21 +79,23 @@ describe("Sage Evals workflow: every live model call goes through OpenRouter", (
     );
   });
 
-  it("runs each one through the step runner, with --provider=openrouter on every eval command", () => {
+  it("runs each one through the step runner, with --provider=openrouter on every eval and embedding command", () => {
     for (const { name, step } of MODEL_STEPS) {
       assert.ok(step.includes(RUNNER), `"${name}" must run through ${RUNNER}`);
       assert.match(step, /--label="[^"]+"/, `"${name}" must name itself with --label`);
-      const evals = step.match(EVAL_COMMAND)?.length ?? 0;
-      const routed = step.match(/--provider=openrouter\b/g)?.length ?? 0;
-      assert.ok(evals > 0, `"${name}" runs a Sage script that is not a known eval; route it or list it as keyless`);
-      assert.equal(routed, evals, `"${name}" runs ${evals} eval command(s) but routes ${routed} through OpenRouter`);
+      assert.ok((step.match(EVAL_COMMAND)?.length ?? 0) > 0, `"${name}" runs a Sage script that is not a known eval; route it or list it as keyless`);
+      for (const command of routedCommands(step)) {
+        assert.match(command, /--provider=openrouter\b/, `"${name}": ${command.trim()}`);
+      }
     }
+    const embedSeed = MODEL_STEPS.flatMap(({ step }) => routedCommands(step)).filter((command) => command.includes("seed-catalog-corpus"));
+    assert.equal(embedSeed.length, 1, "the answer-quality step seeds embeddings once, through OpenRouter");
   });
 
-  it("calls Google from nowhere but the embedding steps", () => {
+  it("calls Google directly from nowhere: no Gemini key, provider or judge", () => {
     assert.doesNotMatch(WORKFLOW, /--provider=gemini/);
     assert.doesNotMatch(WORKFLOW, /--judge=/, "the LLM judges call Google directly with GEMINI_API_KEY");
-    assert.doesNotMatch(JOBS.get("sage-evals") ?? "", /GEMINI_API_KEY/, "the sage-evals job needs no Gemini key at all");
+    assert.doesNotMatch(WORKFLOW, /GEMINI_API_KEY/, "embeddings go through OpenRouter too; no step needs a Gemini key");
   });
 
   it("measures production's model and keeps no budget opt-in", () => {
@@ -118,12 +125,10 @@ describe("Sage Evals workflow: keys reach only the steps that call a model", () 
     }
   });
 
-  it("gives each model step the OpenRouter key, and the embedding steps the Gemini key too", () => {
+  it("gives each model step the OpenRouter key, and checks it before every step that embeds", () => {
     for (const { job, name, step } of MODEL_STEPS) {
       assert.ok(step.includes(`          ${OPENROUTER_SECRET}`), `"${name}" must map OPENROUTER_API_KEY in its own env`);
-      const embeds = job === "sage-memory-eval";
-      assert.equal(step.includes("--needs-gemini-embeddings"), embeds, `"${name}": --needs-gemini-embeddings`);
-      assert.equal(step.includes(`          ${GEMINI_SECRET}`), embeds, `"${name}": GEMINI_API_KEY only where it embeds`);
+      assert.equal(step.includes("--needs-embeddings"), job === "sage-memory-eval", `"${name}": --needs-embeddings`);
     }
   });
 

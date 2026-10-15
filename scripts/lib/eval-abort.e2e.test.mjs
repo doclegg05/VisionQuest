@@ -109,54 +109,48 @@ describe("sage-memory-eval checks the provider before touching the database", ()
   });
 });
 
-const GEMINI_STUB = path.join(REPO_ROOT, "scripts/lib/test-fixtures/stub-gemini-embedding-fetch.mjs");
-
-/** Runs the embedding preflight under the Gemini stub. node --import tsx, so it also runs where the tsx CLI cannot. */
-function runPreflight(mode) {
-  const result = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "--import", GEMINI_STUB, "scripts/sage-embedding-preflight.mjs"],
-    {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      timeout: 120_000,
-      env: {
-        ...process.env,
-        STUB_GEMINI_EMBEDDING: mode,
-        GEMINI_API_KEY: "stub-gemini-key",
-        DATABASE_URL: LOOPBACK_DB,
-        DIRECT_URL: LOOPBACK_DB,
-        ADMIN_DATABASE_URL: LOOPBACK_DB,
-        BENCH_PROD_READONLY_URL: LOOPBACK_DB,
-      },
+/** Runs the embedding preflight under the OpenRouter stub. node --import tsx, so it also runs where the tsx CLI cannot. */
+function runPreflight(status) {
+  const result = spawnSync(process.execPath, ["--import", "tsx", "--import", PRELOAD, "scripts/sage-embedding-preflight.mjs"], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    timeout: 120_000,
+    env: {
+      ...process.env,
+      STUB_OPENROUTER_STATUS: String(status),
+      OPENROUTER_API_KEY: "stub-openrouter-key",
+      DATABASE_URL: LOOPBACK_DB,
+      DIRECT_URL: LOOPBACK_DB,
+      ADMIN_DATABASE_URL: LOOPBACK_DB,
+      BENCH_PROD_READONLY_URL: LOOPBACK_DB,
     },
-  );
+  });
   return { code: result.status, output: `${result.stdout}\n${result.stderr}` };
 }
 
-describe("sage-embedding-preflight says whether the Gemini embedding key works", () => {
-  it("exits 0 when Google embeds", () => {
+describe("sage-embedding-preflight says whether OpenRouter embeddings work", () => {
+  it("exits 0 when OpenRouter embeds", () => {
     const { code, output } = runPreflight("ok");
     assert.equal(code, 0, output.slice(-1500));
-    assert.match(output, /Gemini embeddings reachable \(gemini-embedding-001\)/);
+    assert.match(output, /OpenRouter embeddings reachable \(google\/gemini-embedding-001\)/);
   });
 
-  it("exits 4 when Google refuses the key", () => {
-    const { code, output } = runPreflight("invalid-key");
-    assert.equal(code, 4, output.slice(-1500));
-    assert.match(output, /Gemini embeddings provider or model unavailable/);
-  });
-
-  it("exits 3 when the prepaid wallet is empty", () => {
-    const { code, output } = runPreflight("prepayment");
+  it("exits 3 when credits run out", () => {
+    const { code, output } = runPreflight(402);
     assert.equal(code, 3, output.slice(-1500));
-    assert.match(output, /Gemini embeddings budget exhausted/);
+    assert.match(output, /OpenRouter embeddings budget exhausted/);
   });
 
-  it("exits 4 when Google cannot be reached", () => {
+  it("exits 4 when the model has no endpoint that meets the retention rule", () => {
+    const { code, output } = runPreflight(404);
+    assert.equal(code, 4, output.slice(-1500));
+    assert.match(output, /OpenRouter embeddings provider or model unavailable/);
+  });
+
+  it("exits 4 when OpenRouter cannot be reached", () => {
     const { code, output } = runPreflight("network");
     assert.equal(code, 4, output.slice(-1500));
-    assert.match(output, /Gemini embeddings could not be reached/);
+    assert.match(output, /OpenRouter embeddings could not be reached/);
   });
 });
 

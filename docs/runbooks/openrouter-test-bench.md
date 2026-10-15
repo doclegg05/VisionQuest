@@ -6,11 +6,12 @@ Design: `docs/superpowers/specs/2026-10-13-openrouter-test-bench-design.md`.
 
 ## The rule
 
-Real student data never reaches OpenRouter. OpenRouter's data agreement does not cover education records, and the 2026-09-06 FERPA review recommends against it for student data. Three things hold the rule:
+Real student data never reaches OpenRouter. OpenRouter's data agreement does not cover education records, and the 2026-09-06 FERPA review recommends against it for student data. Four things hold the rule:
 
-1. ESLint rejects any import of `openrouter-provider` from `src/`. The test `src/lib/ai/openrouter-import-guard.test.ts` proves the rule fires.
-2. `src/lib/ai/__tests__/provider.openrouter-unreachable.test.ts` proves neither app resolver can return OpenRouter.
-3. `OPENROUTER_API_KEY` is never set in Render. The app has no code path that reads it.
+1. ESLint rejects static, dynamic and `require()` imports of `openrouter-provider` or `openrouter-embedding-provider` from `src/`. It cannot see an import built at runtime; check 3 is the backstop for that. The test `src/lib/ai/openrouter-import-guard.test.ts` proves the rule fires.
+2. `src/lib/ai/__tests__/provider.openrouter-unreachable.test.ts` proves neither app resolver can return OpenRouter on its own.
+3. The one way the embedding resolver can return OpenRouter is an eval-only override that only the eval harness installs (`installOpenRouterEvalEmbeddings` in `scripts/lib/sage-eval-provider.mjs`, for `--provider=openrouter` runs). The production server marks itself at boot (`src/instrumentation.ts`, first thing in the Node runtime) and locks the override slot empty, so an install there fails. From then on both OpenRouter providers refuse to run in that process. `RENDER` and `NEXT_RUNTIME` are a second check only, because the standalone `server.js` does not set `NEXT_RUNTIME`. The override also still obeys `ai_cloud_policy`. `src/lib/ai/embedding-provider.eval-override.test.ts` and `src/lib/ai/app-server-lock.test.ts` fail if anything in app code installs an override or the boot stops locking.
+4. `OPENROUTER_API_KEY` is never set in Render. The app has no code path that reads it.
 
 If you are about to connect OpenRouter to the app itself, stop. That is a FERPA decision for the program owner, not a code change.
 
@@ -27,7 +28,7 @@ If you are about to connect OpenRouter to the app itself, stop. That is a FERPA 
 
 Every request the provider sends also carries `provider: { zdr: true, data_collection: "deny" }`, which asks for the same routing as the switches above. Two things only the account settings in step 2 decide: whether a zero-retention request may use endpoints that keep prompts for safety monitoring (the choice under each model group), and OpenRouter's own Input & Output Logging and 1% data discount.
 
-CI's Sage Evals workflow uses its own key, stored as the `OPENROUTER_API_KEY` repository secret on GitHub, for every model call in the `sage-evals` and `sage-memory-eval` jobs. The rule above still holds: CI sends synthetic fixtures only, and the key goes in GitHub, never in Render. The memory job also embeds through the app's Gemini path, so its two model steps get `GEMINI_API_KEY` as well. Setup, spending limits and what each result means are in `docs/runbooks/sage-eval-budget.md`.
+CI's Sage Evals workflow uses its own key, stored as the `OPENROUTER_API_KEY` repository secret on GitHub, for every model call in the `sage-evals` and `sage-memory-eval` jobs, embeddings included (`google/gemini-embedding-001` at 768 dimensions, through guard 3 above). The rule above still holds: CI sends synthetic fixtures only, and the key goes in GitHub, never in Render. No step uses a direct Gemini key. Setup, spending limits and what each result means are in `docs/runbooks/sage-eval-budget.md`.
 
 ## Running
 

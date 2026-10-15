@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -17,6 +18,7 @@ import {
   EvalProviderUnreachableError,
   isEvalAbort,
   classifyEmbeddingFailure,
+  installOpenRouterEvalEmbeddings,
   trackEvalAborts,
 } from "./sage-eval-provider.mjs";
 
@@ -609,39 +611,99 @@ describe("--provider=openrouter refuses a non-local database", () => {
 });
 
 describe("classifyEmbeddingFailure", () => {
-  const embeddingError = (status, body) => new Error(`Embedding request failed: ${status} ${body}`);
+  let OpenRouterError;
+  const failure = (kind, status = null) => new OpenRouterError(`OpenRouter request failed (${status}, ${kind})`, kind, status);
 
-  it("reads Google's invalid-key 400 as unavailable, not as a failed eval", () => {
-    const error = classifyEmbeddingFailure(
-      embeddingError(400, '{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT"'),
-    );
-    assert.ok(error instanceof EvalProviderUnavailableError);
-    assert.equal(error.providerLabel, "Gemini embeddings");
+  it("loads the OpenRouter error class", async () => {
+    ({ OpenRouterError } = await import("../../src/lib/ai/openrouter-provider.ts"));
   });
 
-  it("reads 401, 403 and 404 as unavailable", () => {
-    for (const status of [401, 403, 404]) {
-      assert.ok(classifyEmbeddingFailure(embeddingError(status, "{}")) instanceof EvalProviderUnavailableError, String(status));
+  it("reads exhausted credits as budget exhausted", () => {
+    const error = classifyEmbeddingFailure(failure("credits", 402));
+    assert.ok(error instanceof EvalBudgetExhaustedError);
+    assert.equal(error.providerLabel, "OpenRouter embeddings");
+  });
+
+  it("reads a refused key, an unknown model or no endpoint (400, 401, 404) as unavailable", () => {
+    for (const status of [400, 401, 404]) {
+      const error = classifyEmbeddingFailure(failure("bad_request", status));
+      assert.ok(error instanceof EvalProviderUnavailableError, String(status));
+      assert.equal(error.providerLabel, "OpenRouter embeddings");
     }
   });
 
-  it("reads a drained wallet as budget exhausted and an ordinary rate limit as itself", () => {
-    const drained = classifyEmbeddingFailure(embeddingError(429, "Your prepayment credits are depleted."));
-    assert.ok(drained instanceof EvalBudgetExhaustedError);
-    const limited = embeddingError(429, "You exceeded your current quota, please check your plan and billing details.");
-    assert.equal(classifyEmbeddingFailure(limited), limited);
-  });
-
   it("reads a connection that never happened as unreachable", () => {
-    const error = classifyEmbeddingFailure(new TypeError("fetch failed"));
-    assert.ok(error instanceof EvalProviderUnreachableError);
+    assert.ok(classifyEmbeddingFailure(failure("network")) instanceof EvalProviderUnreachableError);
   });
 
-  it("leaves any other error alone, including a 400 that is not about the key", () => {
-    const server = embeddingError(500, "internal");
-    assert.equal(classifyEmbeddingFailure(server), server);
-    const badInput = embeddingError(400, '{"error":{"message":"Request payload size exceeds the limit"}}');
-    assert.equal(classifyEmbeddingFailure(badInput), badInput);
+  it("leaves server errors, rate limits, refusals and non-OpenRouter errors alone", () => {
+    for (const error of [failure("unavailable", 503), failure("rate_limited", 429), failure("refused", 403), new Error("boom")]) {
+      assert.equal(classifyEmbeddingFailure(error), error);
+    }
+  });
+});
+
+describe("installOpenRouterEvalEmbeddings", () => {
+  const KEY = Symbol.for("visionquest.evalEmbeddingProvider");
+  const NAMES = ["DATABASE_URL", "DIRECT_URL", "ADMIN_DATABASE_URL", "BENCH_PROD_READONLY_URL", "OPENROUTER_API_KEY"];
+
+  async function withEnvValues(values, fn) {
+    const saved = Object.fromEntries(NAMES.map((name) => [name, process.env[name]]));
+    for (const name of NAMES) delete process.env[name];
+    Object.assign(process.env, values);
+    try {
+      return await fn();
+    } finally {
+      Reflect.deleteProperty(globalThis, KEY);
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  }
+
+  it("installs OpenRouter's gemini-embedding-001 where the app's resolver looks", async () => {
+    await withEnvValues({ OPENROUTER_API_KEY: "test-key" }, async () => {
+      const provider = await installOpenRouterEvalEmbeddings();
+      assert.equal(Reflect.get(globalThis, KEY), provider);
+      assert.equal(provider.name, "openrouter");
+      assert.equal(provider.model, "google/gemini-embedding-001");
+    });
+  });
+
+  it("refuses a non-local database and a missing key, and installs nothing", async () => {
+    await withEnvValues({ OPENROUTER_API_KEY: "test-key", DATABASE_URL: "postgresql://app@db.example.com:5432/postgres" }, async () => {
+      await assert.rejects(installOpenRouterEvalEmbeddings(), /non-local database in DATABASE_URL/);
+      assert.equal(Reflect.get(globalThis, KEY), undefined);
+    });
+    await withEnvValues({}, async () => {
+      await assert.rejects(installOpenRouterEvalEmbeddings(), /OPENROUTER_API_KEY missing/);
+      assert.equal(Reflect.get(globalThis, KEY), undefined);
+    });
+  });
+
+  it("fails, and installs nothing, once the app server has locked the slot at boot", () => {
+    // A child process: the lock is permanent for the process that takes it.
+    const code = `
+      const { lockEvalEmbeddingOverride } = await import("./src/lib/ai/eval-embedding-override-key.ts");
+      const { installOpenRouterEvalEmbeddings } = await import("./scripts/lib/sage-eval-provider.mjs");
+      lockEvalEmbeddingOverride();
+      try { await installOpenRouterEvalEmbeddings({ apiKey: "test-key" }); console.log("INSTALLED"); }
+      catch (error) { console.log("REFUSED " + error.message); }
+    `;
+    const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", code], {
+      cwd: path.resolve(import.meta.dirname, "..", ".."),
+      encoding: "utf8",
+      env: { ...process.env, DATABASE_URL: "", DIRECT_URL: "", ADMIN_DATABASE_URL: "", BENCH_PROD_READONLY_URL: "" },
+    });
+    assert.match(result.stdout, /^REFUSED .*locked/m, `${result.stdout}\n${result.stderr}`);
+  });
+
+  it("is installed by every --provider=openrouter eval", async () => {
+    await withEnvValues({ OPENROUTER_API_KEY: "test-key" }, async () => {
+      await resolveEvalProvider(["--provider=openrouter"]);
+      assert.equal(Reflect.get(globalThis, KEY)?.model, "google/gemini-embedding-001");
+    });
   });
 });
 

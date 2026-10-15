@@ -32,14 +32,14 @@ const REQUIRED: Env = { SAGE_EVAL_REQUIRED: "true" };
 
 const GATING = parseStepArgs(["--label=Red-team eval", "--", "npm", "run", "sage:redteam:eval"]);
 const INFORMATIONAL = parseStepArgs(["--label=Quality eval", "--informational", "--", "npm", "run", "sage:quality:eval"]);
-const EMBEDDING = parseStepArgs(["--label=Memory eval", "--needs-gemini-embeddings", "--", "npm", "run", "sage:memory:eval"]);
-const EMBEDDING_ENV: Env = { ...READY_ENV, GEMINI_API_KEY: "AIza-test" };
+const EMBEDDING = parseStepArgs(["--label=Memory eval", "--needs-embeddings", "--", "npm", "run", "sage:memory:eval"]);
+const EMBEDDING_ENV: Env = READY_ENV;
 
 describe("parseStepArgs", () => {
   it("reads the label, flags and the command after --", () => {
     const step = parseStepArgs([
       "--label=Tool-selection eval",
-      "--needs-gemini-embeddings",
+      "--needs-embeddings",
       "--",
       "npm",
       "run",
@@ -60,6 +60,7 @@ describe("parseStepArgs", () => {
     assert.throws(() => parseStepArgs(["--label=X", "--"]), /command/);
     assert.throws(() => parseStepArgs(["--label=X", "npm", "test"]), /--/);
     assert.throws(() => parseStepArgs(["--label=X", "--informatonal", "--", "npm", "test"]), /--informatonal/);
+    assert.throws(() => parseStepArgs(["--label=X", "--needs-gemini-embeddings", "--", "npm", "test"]), /--needs-gemini-embeddings/);
   });
 });
 
@@ -92,11 +93,10 @@ describe("skipReason: a missing secret never reads as a pass", () => {
     assert.match(skipReason(GATING, { ...READY_ENV, OPENROUTER_API_KEY: "  " })?.summary ?? "", /NOT RUN/);
   });
 
-  it("needs GEMINI_API_KEY for an embedding step, and only for that step", () => {
-    assert.match(skipReason(EMBEDDING, READY_ENV)?.summary ?? "", /NOT RUN — GEMINI_API_KEY secret not set \(needed for embeddings\)$/);
-    assert.equal(skipReason(EMBEDDING, { ...READY_ENV, ...REQUIRED })?.exitCode, 4);
-    assert.equal(skipReason(EMBEDDING, EMBEDDING_ENV), null);
-    assert.equal(skipReason(GATING, READY_ENV), null);
+  it("runs an embedding step on the OpenRouter key alone, with no Gemini key", () => {
+    assert.equal(skipReason(EMBEDDING, READY_ENV), null);
+    assert.equal(skipReason(EMBEDDING, { ...READY_ENV, GEMINI_API_KEY: undefined, ...REQUIRED }), null);
+    assert.equal(skipReason(EMBEDDING, REQUIRED)?.exitCode, 4);
   });
 });
 
@@ -146,9 +146,9 @@ describe("outcomeForExit: exit codes map to PASSED, FAILED or NOT RUN", () => {
     assert.equal(outcomeForExit(GATING, "eval", 4, { ...READY_ENV, SAGE_EVAL_SOFT_FAIL: "1" }).exitCode, 0);
   });
 
-  it("names Gemini embeddings when the embedding check is what failed", () => {
-    assert.match(outcomeForExit(EMBEDDING, "preflight", 4, READY_ENV).summary, /NOT RUN — Gemini embeddings key/);
-    assert.match(outcomeForExit(EMBEDDING, "preflight", 3, READY_ENV).summary, /NOT RUN — Gemini embeddings budget/);
+  it("names OpenRouter embeddings when the embedding check is what failed", () => {
+    assert.match(outcomeForExit(EMBEDDING, "preflight", 4, READY_ENV).summary, /NOT RUN — OpenRouter embeddings key/);
+    assert.match(outcomeForExit(EMBEDDING, "preflight", 3, READY_ENV).summary, /NOT RUN — OpenRouter embeddings budget/);
     assert.match(outcomeForExit(EMBEDDING, "preflight", 1, READY_ENV).summary, /FAILED \(embedding preflight exit 1\)/);
     assert.match(outcomeForExit(EMBEDDING, "recheck", 3, READY_ENV).summary, /budget exhausted at runtime, found after the eval failed$/);
   });
@@ -183,14 +183,13 @@ describe("runStep", () => {
     const stopped = await runStep(EMBEDDING, EMBEDDING_ENV, run);
     assert.deepEqual(calls.map((call) => call.command), [EMBEDDING_PREFLIGHT_COMMAND]);
     assert.equal(stopped.exitCode, 4);
-    assert.match(stopped.summary, /NOT RUN — Gemini embeddings/);
+    assert.match(stopped.summary, /NOT RUN — OpenRouter embeddings/);
   });
 
-  it("never hands the OpenRouter key to the embedding check", async () => {
+  it("gives the embedding check the OpenRouter key it embeds with", async () => {
     const { run, calls } = fakeRunner([0, 0]);
     await runStep(EMBEDDING, EMBEDDING_ENV, run);
-    assert.equal("OPENROUTER_API_KEY" in calls[0].env, false);
-    assert.equal(calls[0].env.GEMINI_API_KEY, "AIza-test");
+    assert.equal(calls[0].env.OPENROUTER_API_KEY, "sk-or-test");
     assert.equal(calls[1].env.OPENROUTER_API_KEY, "sk-or-test");
   });
 
@@ -203,7 +202,7 @@ describe("runStep", () => {
       EMBEDDING_PREFLIGHT_COMMAND,
     ]);
     assert.equal(outcome.exitCode, 3);
-    assert.match(outcome.summary, /NOT RUN — Gemini embeddings budget exhausted at runtime, found after the eval failed/);
+    assert.match(outcome.summary, /NOT RUN — OpenRouter embeddings budget exhausted at runtime, found after the eval failed/);
   });
 
   it("keeps a real failure a failure when the key still works", async () => {
@@ -240,7 +239,6 @@ describe("the CLI propagates the outcome to the job", () => {
           env: {
             ...process.env,
             OPENROUTER_API_KEY: "",
-            GEMINI_API_KEY: "",
             SAGE_EVAL_REQUIRED: "",
             SAGE_EVAL_SOFT_FAIL: "",
             GITHUB_STEP_SUMMARY: summaryFile,

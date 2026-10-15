@@ -233,7 +233,34 @@ async function resolveOpenRouterProvider(modelOverride = null) {
   const model = modelOverride || process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
   const costLog = process.env[COST_LOG_ENV]?.trim();
   const options = costLog ? { onCost: (costUsd) => appendFileSync(costLog, `${costUsd}\n`) } : {};
+  // The memory and RAG evals embed through the app's resolver, so an
+  // OpenRouter run embeds through OpenRouter too, never a direct Gemini key.
+  await installOpenRouterEvalEmbeddings({ apiKey, onCost: options.onCost });
   return { provider: new OpenRouterProvider(apiKey, model, options), model, label: `openrouter (${model})` };
+}
+
+/**
+ * Points the app's embedding resolver at OpenRouter's google/gemini-embedding-001
+ * for this eval process, through the eval-only override that
+ * resolveEmbeddingProvider and getActiveEmbeddingModel read
+ * (src/lib/ai/eval-embedding-override-key.ts). Synthetic data only: it refuses
+ * a non-local database, and the resolver refuses the override inside the app
+ * server. src/lib/ai/embedding-provider.eval-override.test.ts pins that this is
+ * the only place that installs it.
+ */
+export async function installOpenRouterEvalEmbeddings({ apiKey = process.env.OPENROUTER_API_KEY?.trim(), onCost } = {}) {
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY missing: required for OpenRouter embeddings.");
+  assertNoRemoteDatabase();
+  const [{ OpenRouterEmbeddingProvider }, { EVAL_EMBEDDING_OVERRIDE_KEY }] = await Promise.all([
+    import("../../src/lib/ai/openrouter-embedding-provider.ts"),
+    import("../../src/lib/ai/eval-embedding-override-key.ts"),
+  ]);
+  const provider = new OpenRouterEmbeddingProvider(apiKey, undefined, onCost ? { onCost } : {});
+  // False when the app server locked the slot at boot (src/instrumentation.ts).
+  if (!Reflect.set(globalThis, EVAL_EMBEDDING_OVERRIDE_KEY, provider)) {
+    throw new Error("The eval embedding override slot is locked: this process is the app server.");
+  }
+  return provider;
 }
 
 /**
@@ -373,27 +400,22 @@ function classifyAndRethrow(error, run) {
   throw error;
 }
 
-const EMBEDDING_LABEL = "Gemini embeddings";
-const EMBEDDING_FAILURE = /Embedding request failed: (\d{3})\b([\s\S]*)/;
-const INVALID_KEY = /API key not valid|API_KEY_INVALID/i;
+const EMBEDDING_LABEL = "OpenRouter embeddings";
 
 /**
- * The memory and answer-quality evals embed through the app's Gemini
- * embedding path, which OpenRouter does not serve. GeminiEmbeddingProvider
- * throws `Embedding request failed: <status> <body>`. Returns the not-run
- * error for a refused key, a missing model, a drained wallet or a connection
- * that never happened, and the original error for anything else.
+ * The memory and answer-quality evals embed through OpenRouter, and the app
+ * swallows embedding errors, so scripts/sage-embedding-preflight.mjs checks
+ * the key with one call. Returns the not-run error for exhausted credits, a
+ * refused key or model, or a connection that never happened, and the
+ * original error for anything else.
  */
 export function classifyEmbeddingFailure(error) {
-  if (isNetworkFailure(error)) return new EvalProviderUnreachableError(error, EMBEDDING_LABEL);
-  const match = typeof error?.message === "string" ? EMBEDDING_FAILURE.exec(error.message) : null;
-  if (!match) return error;
-  const status = Number(match[1]);
-  const body = match[2];
-  if (status === 401 || status === 403 || status === 404 || (status === 400 && INVALID_KEY.test(body))) {
+  if (error?.name !== "OpenRouterError") return error;
+  if (error.kind === "credits") return new EvalBudgetExhaustedError(error, EMBEDDING_LABEL);
+  if (error.kind === "network") return new EvalProviderUnreachableError(error, EMBEDDING_LABEL);
+  if (error.kind === "bad_request" && UNAVAILABLE_STATUSES.has(error.status)) {
     return new EvalProviderUnavailableError(error, EMBEDDING_LABEL);
   }
-  if (isBudgetExhausted(status, body)) return new EvalBudgetExhaustedError(error, EMBEDDING_LABEL);
   return error;
 }
 

@@ -23,7 +23,7 @@ paths:
 - Chat streaming via SSE at `/api/chat/send` (heartbeats, disconnect handling)
 - Two-call pattern: (1) stream response to student, (2) async `handlePostResponse` (`src/lib/chat/post-response.ts`) runs prioritized background extraction — mood/wellbeing always first and cap-exempt, then goals, discovery, classroom confirmation, memory (optional `SAGE_POST_RESPONSE_MAX_CALLS` cap)
 - Prompt changes must bump `SAGE_PROMPT_REVISION` (`src/lib/sage/prompt-revision.ts`) — it stamps every LlmCallLog row and AI audit event for regression attribution
-- **OpenRouter is eval-only.** `src/lib/ai/openrouter-provider.ts` serves evals, benchmarks and `npm run sage:models:compare` on synthetic data. ESLint forbids importing it from `src/`, the resolvers never return it, and `OPENROUTER_API_KEY` never goes in Render. Real student data must not reach OpenRouter. See `docs/runbooks/openrouter-test-bench.md`
+- **OpenRouter is eval-only.** `src/lib/ai/openrouter-provider.ts` serves evals, benchmarks and `npm run sage:models:compare` on synthetic data. ESLint forbids importing it or `openrouter-embedding-provider.ts` from `src/`, the resolvers never return it except through the eval-only embedding override that only the eval harness installs, the server marks itself and locks that override at boot (`src/instrumentation.ts`; never move or drop that call), and `OPENROUTER_API_KEY` never goes in Render. Real student data must not reach OpenRouter. See `docs/runbooks/openrouter-test-bench.md`
 
 ## Goal Extraction
 - After each Sage response, a background call extracts goals from conversation context
