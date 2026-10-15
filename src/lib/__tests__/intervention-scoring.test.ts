@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  computeUrgencyReasons,
   computeUrgencyScore,
   type StudentSignals,
 } from "../intervention-scoring";
@@ -130,5 +131,20 @@ describe("computeUrgencyScore", () => {
     });
     // Expected: 14 + 21 + 25 + 15 + 40 + 20 + 15 + 10 + 20 = 180
     assert.equal(score, 180);
+  });
+});
+
+describe("no active goals", () => {
+  it("adds no goal-review points and no goal-review reason", () => {
+    const withoutGoals = makeActiveStudent({ daysSinceLastGoalReview: null });
+    assert.equal(computeUrgencyScore(withoutGoals), computeUrgencyScore(makeActiveStudent({ daysSinceLastGoalReview: 0 })));
+    assert.ok(!computeUrgencyReasons(withoutGoals).some((reason) => reason.startsWith("goals unreviewed")));
+  });
+});
+
+describe("urgent alert wording", () => {
+  it("calls critical-or-high alerts urgent", () => {
+    const reasons = computeUrgencyReasons(makeActiveStudent({ openAlertCount: 1, highSeverityAlertCount: 1 }));
+    assert.ok(reasons.includes("1 urgent alert"), `got ${JSON.stringify(reasons)}`);
   });
 });

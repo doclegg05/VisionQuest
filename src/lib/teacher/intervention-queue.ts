@@ -1,4 +1,6 @@
+import { alertSeverityRank, isUrgentSeverity } from "@/lib/alert-severity";
 import { computeUrgencyScore, computeUrgencyReasons, type StudentSignals } from "@/lib/intervention-scoring";
+import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
 import { isGoalStale } from "@/lib/stale-goal-rules";
 import { buildReadinessSnapshot } from "@/lib/teacher/readiness-snapshot";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
@@ -109,6 +111,10 @@ function latestDate(...values: Array<Date | null | undefined>): Date | null {
 }
 
 const ALERT_TYPE_PRIORITY: Record<string, number> = {
+  // A crisis check-in outranks every other alert type. It is also the only
+  // type written as "critical", so severity already puts it first; this entry
+  // keeps the order right if a writer ever uses "high" for it.
+  [WELLBEING_ALERT_TYPE]: 130,
   goal_missing_confirmed: 110,
   goal_unconfirmed: 108,
   goal_review_pending: 105,
@@ -135,23 +141,21 @@ const ALERT_TYPE_PRIORITY: Record<string, number> = {
   connect_employer_no_view: 58,
 };
 
-function severityRank(value: string) {
-  if (value === "high") return 3;
-  if (value === "medium") return 2;
-  return 1;
+type QueueAlertRecord = InterventionQueueStudentRecord["alerts"][number];
+
+/** Most urgent first: severity, then alert-type priority, then newest. */
+export function compareQueueAlerts(left: QueueAlertRecord, right: QueueAlertRecord): number {
+  const severityGap = alertSeverityRank(right.severity) - alertSeverityRank(left.severity);
+  if (severityGap !== 0) return severityGap;
+
+  const priorityGap = (ALERT_TYPE_PRIORITY[right.type] ?? 0) - (ALERT_TYPE_PRIORITY[left.type] ?? 0);
+  if (priorityGap !== 0) return priorityGap;
+
+  return right.detectedAt.getTime() - left.detectedAt.getTime();
 }
 
 function pickPrimaryAlert(alerts: InterventionQueueStudentRecord["alerts"]) {
-  return [...alerts].sort((left, right) => {
-    const severityGap = severityRank(right.severity) - severityRank(left.severity);
-    if (severityGap !== 0) return severityGap;
-
-    const priorityGap =
-      (ALERT_TYPE_PRIORITY[right.type] ?? 0) - (ALERT_TYPE_PRIORITY[left.type] ?? 0);
-    if (priorityGap !== 0) return priorityGap;
-
-    return right.detectedAt.getTime() - left.detectedAt.getTime();
-  })[0] ?? null;
+  return [...alerts].sort(compareQueueAlerts)[0] ?? null;
 }
 
 function fallbackAction(studentId: string, signals: StudentSignals) {
@@ -163,7 +167,7 @@ function fallbackAction(studentId: string, signals: StudentSignals) {
     };
   }
 
-  if (signals.stalledGoalCount > 0 || signals.daysSinceLastGoalReview >= 14) {
+  if (signals.stalledGoalCount > 0 || (signals.daysSinceLastGoalReview ?? 0) >= 14) {
     return {
       kind: "create_task" as const,
       label: "Add goal review task",
@@ -261,9 +265,7 @@ export function buildInterventionQueueEntry(input: {
   ).length;
 
   const signals: StudentSignals = {
-    daysSinceLastGoalReview: lastGoalReviewedAt
-      ? daysBetween(lastGoalReviewedAt, now)
-      : 9999,
+    daysSinceLastGoalReview: lastGoalReviewedAt ? daysBetween(lastGoalReviewedAt, now) : null,
     daysSinceLastLogin: daysBetween(lastActiveAt, now),
     orientationComplete: readiness.state.orientationComplete,
     orientationProgress:
@@ -271,9 +273,7 @@ export function buildInterventionQueueEntry(input: {
         ? completedOrientationCount / input.orientationTotalCount
         : 1,
     openAlertCount: student.alerts.length,
-    highSeverityAlertCount: student.alerts.filter(
-      (alert) => alert.severity === "high",
-    ).length,
+    highSeverityAlertCount: student.alerts.filter((alert) => isUrgentSeverity(alert.severity)).length,
     evidenceGapCount: student.alerts.filter(
       (alert) => alert.type === "evidence_gap",
     ).length,
@@ -329,4 +329,30 @@ export function buildInterventionQueueEntry(input: {
     },
     signals,
   };
+}
+
+export type UrgencyLevel = "critical" | "high" | "medium";
+
+/** The badge level for a queue row. A crisis alert is critical whatever the score. */
+export function urgencyLevel(
+  entry: Pick<InterventionQueueEntry, "urgencyScore" | "primaryAlert">,
+): UrgencyLevel {
+  if (entry.primaryAlert?.severity === "critical" || entry.urgencyScore >= 50) return "critical";
+  if (entry.urgencyScore >= 25) return "high";
+  return "medium";
+}
+
+/**
+ * Queue order. A student with an open crisis alert always comes first, then
+ * everyone else by urgency score. Score alone cannot do this: a long absence
+ * outscores one crisis alert, and a crisis must never sit below the fold.
+ */
+export function compareQueueEntries(left: InterventionQueueEntry, right: InterventionQueueEntry): number {
+  const crisisGap = Number(hasCrisis(right)) - Number(hasCrisis(left));
+  if (crisisGap !== 0) return crisisGap;
+  return right.urgencyScore - left.urgencyScore;
+}
+
+function hasCrisis(entry: InterventionQueueEntry): boolean {
+  return entry.primaryAlert?.severity === "critical";
 }

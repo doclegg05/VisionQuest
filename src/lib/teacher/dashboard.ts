@@ -23,51 +23,15 @@ import { fetchReadinessDataForStudents } from "@/lib/progression/fetch-readiness
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import {
   buildInterventionQueueEntry,
+  compareQueueEntries,
+  type InterventionQueueEntry,
   type InterventionQueueStudentRecord,
 } from "@/lib/teacher/intervention-queue";
 import { interventionQueueStudentSelect } from "@/lib/teacher/intervention-queue-select";
-import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
 
 export { interventionQueueStudentSelect };
 
-export interface QueueStudent {
-  studentId: string;
-  publicStudentId: string;
-  name: string;
-  email: string | null;
-  programType: ProgramType;
-  urgencyScore: number;
-  /** Plain-language chips explaining the score (Phase 6). */
-  urgencyReasons: string[];
-  primaryAlert: {
-    id: string;
-    type: string;
-    severity: string;
-    title: string;
-    summary: string;
-    sourceType: string | null;
-    sourceId: string | null;
-    detectedAt: string;
-  } | null;
-  recommendedAction: {
-    kind: DashboardQuickActionKind | null;
-    label: string;
-    href: string;
-  };
-  signals: {
-    stalledGoalCount: number;
-    highSeverityAlertCount: number;
-    evidenceGapCount: number;
-    overdueTaskCount: number;
-    daysSinceLastLogin: number;
-    orientationComplete: boolean;
-    orientationProgress: number;
-    readinessScore: number;
-    openAlertCount: number;
-    daysSinceLastGoalReview: number;
-    unmatchedGoalCount: number;
-  };
-}
+export type QueueStudent = InterventionQueueEntry;
 
 export interface InterventionQueueResponse {
   queue: QueueStudent[];
@@ -203,7 +167,7 @@ function latestDate(...values: Array<Date | null | undefined>) {
 
 /**
  * Shared tail of both queue variants: score each student, drop
- * zero-urgency entries, sort most-urgent first.
+ * zero-urgency entries, crisis first, then most urgent.
  */
 function buildQueueResponse(
   students: InterventionQueueStudentRecord[],
@@ -221,7 +185,7 @@ function buildQueueResponse(
   return {
     queue: queueEntries
       .filter((entry) => entry.urgencyScore > 0)
-      .sort((a, b) => b.urgencyScore - a.urgencyScore),
+      .sort(compareQueueEntries),
   };
 }
 
