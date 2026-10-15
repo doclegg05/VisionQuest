@@ -118,7 +118,7 @@ before the Vault secret exists: `job-processor` starts within ten minutes of
 registration, and a missing `CRON_SECRET` makes every HTTP call 401 while
 `cron.job_run_details` still shows succeeded.
 
-### 4. Verify all seven jobs
+### 4. Verify all ten jobs
 
 ```sql
 SELECT jobname, schedule, active
@@ -130,12 +130,18 @@ WHERE jobname IN (
   'cron-health-monitor',
   'sage-daily-briefing',
   'sage-memory-consolidate',
-  'sage-wager-resolve'
+  'sage-wager-resolve',
+  'connect-nudges',
+  'evidence-gap-detection',
+  'goal-stale-detection'
 )
 ORDER BY jobname;
 ```
 
-Expected: 7 rows, all `active = true`. After an hour, the latest run of each:
+Expected: 10 rows, all `active = true`. The repair migration registers the
+first seven; `connect-nudges` comes from `20260905140000_add_connect_nudges_cron`
+and the two stall detectors from `20261015120000_add_stall_detector_cron`
+(see "Stall detectors, 2026-10" below). After an hour, the latest run of each:
 
 ```sql
 SELECT DISTINCT ON (j.jobname)
@@ -146,8 +152,9 @@ ORDER BY j.jobname, d.start_time DESC;
 ```
 
 Expected: `status = 'succeeded'` for every job that has had a scheduled slot
-(`daily-coaching` runs at 13:00 UTC, the Sage jobs daily or weekly, so their
-rows appear when their slot passes). A `return_message` of `unrecognized
+(`daily-coaching` runs at 13:00 UTC, the Sage jobs daily or weekly, and the
+stall detectors at 10:35 and 10:45 UTC, so their rows appear when their slot
+passes). A `return_message` of `unrecognized
 configuration parameter "app.base_url"` means the job command is still the
 pre-repair `current_setting('app.base_url')` form; confirm this migration
 finished on the ledger and that `cron.job.command` contains `current_setting('app.base_url', true)`.
@@ -180,8 +187,8 @@ catches it.
 CRON_CHECK_DATABASE_URL='<postgres-role connection string>' npm run cron:health
 ```
 
-Exit 0: all eight expected jobs (including the later `connect-nudges` job) are
-present, active, have run, and last succeeded, and every
+Exit 0: all ten expected jobs (including the later `connect-nudges` job and
+the two stall detectors) are present, active, have run, and last succeeded, and every
 `net._http_response` row in the last 6 hours is a 200. Exit 1: problems,
 listed one per line. Exit 2: the check did not run (no connection string, or
 the queries failed). If `net._http_response` is absent or not readable the
@@ -206,12 +213,56 @@ green workflow runs are not evidence of scheduled-layer health.
   database with `pg_cron`/`pg_net` enabled before `migrate deploy` (see
   "What was found"); `docs/runbooks/backup-restore.md` section 4.2 still
   prescribes that order.
-- pg_cron does not purge `cron.job_run_details`: seven jobs write about 195
+- pg_cron does not purge `cron.job_run_details`: the ten jobs write about 220
   rows a day, unbounded. Supabase recommends a scheduled
   `DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days'`.
   Whether `postgres` may DELETE from that table on Supabase is unverified;
   try it once in the SQL Editor before scheduling it.
 - The `insufficient_privilege` guards report through NOTICE only; see step 4.
+
+## Stall detectors, 2026-10
+
+The two jobs that feed the teacher intervention queue's stall signals
+(issue #39; review finding F6) were routes with no scheduler, so they never
+ran in production:
+
+| Job | Schedule | Route | Writes |
+|-----|----------|-------|--------|
+| `evidence-gap-detection` | `35 10 * * *` (10:35 UTC daily) | `POST /api/internal/evidence-gap-detection` | `evidence_gap` alerts, one per unmet required class item; the queue's `evidenceGapCount` |
+| `goal-stale-detection` | `45 10 * * *` (10:45 UTC daily) | `POST /api/internal/goal-stale-detection` | `goal_stale` alerts, by the queue's level-aware rule |
+
+They used to live under `/api/cron`, where `src/proxy.ts` answers a bearer
+call with no Origin header with 403. Migration
+`20261015120000_add_stall_detector_cron` registers both with the guarded
+pattern above, and its header explains the times: before classrooms open in
+Eastern time, before `sage-daily-briefing` at 11:00 UTC, and on minutes no
+other job uses. Each request waits up to 2 minutes (`timeout_milliseconds`),
+because each route holds one database transaction of up to 90 seconds.
+
+Prerequisites are the same as for the repair: `pg_cron` and `pg_net` enabled
+(without them the migration skips with a NOTICE) and the Vault `CRON_SECRET`
+row matching Render's `CRON_SECRET`. The `app.base_url` GUC is not needed;
+the job SQL falls back to the production origin (step 1 above).
+
+After the deploy, confirm both rows exist:
+
+```sql
+SELECT jobname, schedule, active
+FROM cron.job
+WHERE jobname IN ('evidence-gap-detection', 'goal-stale-detection');
+```
+
+Expected: 2 rows, `active = true`. After 10:45 UTC, `npm run cron:health`
+with `CRON_CHECK_DATABASE_URL` set checks both, along with their HTTP
+responses. To run one before its slot, call it the way the job does:
+
+```bash
+curl -X POST https://visionquest.onrender.com/api/internal/evidence-gap-detection -H "Authorization: Bearer $CRON_SECRET"
+```
+
+A 200 response reports `studentsScanned`, `requirementsChecked`,
+`newAlerts` and `resolvedAlerts`. The goal-stale route reports `scanned`
+and `newAlerts`.
 
 ## Prerequisites
 
@@ -281,14 +332,19 @@ WHERE jobname IN (
   'cron-health-monitor',
   'sage-daily-briefing',
   'sage-memory-consolidate',
-  'sage-wager-resolve'
+  'sage-wager-resolve',
+  'connect-nudges',
+  'evidence-gap-detection',
+  'goal-stale-detection'
 )
 ORDER BY jobname;
 ```
 
-Expected: 7 rows, all `active = true`. The three Sage jobs come from their
+Expected: 10 rows, all `active = true`. The three Sage jobs come from their
 own migrations (`20260625001000`, `20260701140000`, `20260708121000`); the
-four baseline names come from `20260902120000_reregister_baseline_cron_jobs`.
+four baseline names come from `20260902120000_reregister_baseline_cron_jobs`;
+`connect-nudges` from `20260905140000_add_connect_nudges_cron`; and the two
+stall detectors from `20261015120000_add_stall_detector_cron`.
 
 ## Manual Smoke Test
 
