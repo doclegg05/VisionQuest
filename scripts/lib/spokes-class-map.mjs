@@ -19,6 +19,8 @@ const ROLE_BY_HUE = Object.freeze({
 const TOKEN_TEXT_ROLE = Object.freeze({
   "--error": "danger", "--accent-red": "danger", "--success": "success", "--accent-green": "success",
   "--accent-blue": "info", "--primary": "info", "--accent-gold": "warning",
+  // Legacy text aliases. Their dark values are fills too, so text moves onto the matching role.
+  "--accent-strong": "success", "--accent-secondary": "info", "--accent-tertiary": "warning",
 });
 const NAMED_TEXT_ROLE = Object.freeze({ "accent-red": "danger", "accent-green": "success", "accent-blue": "info", "accent-gold": "warning" });
 const RADIUS_STEPS = Object.freeze([["sm", 6], ["md", 8], ["lg", 12], ["xl", 16], ["2xl", 20], ["3xl", 24]]);

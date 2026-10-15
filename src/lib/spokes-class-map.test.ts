@@ -109,6 +109,9 @@ describe("hue prefixes and token text beyond the basic table", () => {
     ["text-[var(--success)]", "text-success"],
     ["text-[var(--accent-blue)]", "text-info"],
     ["text-[var(--accent-gold)]", "text-warning"],
+    ["text-[var(--accent-strong)]", "text-success"],
+    ["text-[var(--accent-secondary)]", "text-info"],
+    ["text-[var(--accent-tertiary)]", "text-warning"],
   ];
   for (const [input, expected] of cases) it(`${input} -> ${expected}`, () => assert.equal(to(input), expected));
 });
