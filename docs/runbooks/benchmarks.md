@@ -104,7 +104,7 @@ The `ctx` handed to `run`:
 |---|---|
 | `fixture` | the parsed fixture JSON, or `null` when the suite declares none (or a non-JSON path) |
 | `fixturePath` | absolute path to the fixture, or `null` |
-| `env` | `{ databaseUrl, geminiApiKey, ollamaHost, baseUrl, prodReadonlyUrl, playwright }` — every value a string or `null`, never `undefined` |
+| `env` | `{ databaseUrl, geminiApiKey, ollamaHost, baseUrl, prodReadonlyUrl, playwright, openrouterApiKey }` — every value a string or `null`, never `undefined` |
 | `log` | `(...args) => void`, prefixed with the suite name |
 | `now` | `() => Date` |
 | `suite`, `config` | the suite name and its parsed config |
@@ -211,7 +211,7 @@ whether or not the metric is `exact`.
 | `fail` | the floor was crossed, or an `exact` metric moved off its baseline |
 | `info` | nothing to judge against — no floor **and** no baseline |
 | `skipped` | no value: the suite's `requires` were unmet |
-| `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met |
+| `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met, or measured zero samples (`n: 0`) for a floored gate/nightly metric. A metric the scorer marks `details.skipped` is a skip, not a zero-sample measurement. Issue #220: `sage-latency` passed its 6000 ms floor for a week with `p95_ms: 0` over no samples |
 
 The suite's own `status` is the worst of its metrics, except `skipped` and
 `error`, which are facts about the run rather than about any metric.
@@ -269,7 +269,7 @@ in CI.
 | `crisis-latency`, `job-refresh`, `matching-scale`, `page-timing`, `sage-latency`, `nudge-sweep` (`sweep_ms`), `classroom-concurrency` | they report `ms`/`seconds`, so the number is a property of the machine, not of the code | the nightly `benchmarks.yml` run on `main`, whose commit-back seeds them from CI hardware |
 | `nudge-sweep`, `packet-privacy`, `query-plans`, `consent-scopes`, `migration-drift-schema` | need a migrated Postgres and the seeded cohort | the nightly run, or the `verify` job's hermetic pgvector service |
 | `connect-journey`, `journey-day1`, `journey-teacher-loop`, `touch-targets`, `axe-authenticated` | need a browser and a running server | the `e2e` job's collectors |
-| `sage-grounding`, `sage-career`, `sage-readability`, `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when `GEMINI_API_KEY` is present |
+| `sage-grounding`, `sage-career`, `sage-readability`, `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when its key is present (`OPENROUTER_API_KEY` for the Sage model suites) |
 | `cron-health`, `cost-per-student`, `ferpa-routing`, `backup-drill` | need the prod read-only URL (an owner step) | once that secret exists |
 
 **A timing metric must never be baselined from a laptop or a build container.**
@@ -346,8 +346,20 @@ opens or updates one results PR (protected `main` rejects a direct push —
 GH006) with `[skip ci]` so the merge does not re-trigger full CI, and
 opens or updates the "Benchmark regression" issue on any failure.
 
-Suites needing `GEMINI_API_KEY` never run per-PR — only nightly, and only when
-the secret exists (nightly Gemini spend is an owner decision, design §9.4).
+Model-backed suites never run per-PR. They run nightly, and only when
+`OPENROUTER_API_KEY` exists. `sage-grounding`, `sage-readability`,
+`sage-career` and `explain-faithfulness` reach production's model,
+`google/gemini-3.1-flash-lite`, through OpenRouter on synthetic fixtures, the
+same route as the Sage Evals workflow (`OPENROUTER_MODEL` in `benchmarks.yml`).
+That is about two dozen model calls a night on the shared key. The repo holds
+no Gemini key (issue #220), so `sage-latency`, whose floor is production's
+direct-to-Google p95 bar in `config/sage-slo.json`, reports skipped. A round
+trip through OpenRouter is a different measurement, so it stays on Gemini
+until a key is restored. `explain-faithfulness` generates through the eval
+resolver (`scripts/lib/sage-eval-provider.mjs`), because the app's
+`resolveAiProvider` never returns OpenRouter. It measures the shipped prompt
+and the shipped guard, not production's provider routing.
+`src/lib/ci-benchmarks-openrouter.test.ts` pins all of this.
 
 ---
 
@@ -455,6 +467,8 @@ These are the secrets the suite reports `skipped` for until they exist
 - `CRON_CHECK_DATABASE_URL` — the scheduled-layer health suite.
 - `BENCH_PROD_READONLY_URL` — a read-only production connection string for
   drift, cost-per-student and FERPA-routing suites.
-- `GEMINI_API_KEY` in the repository's secrets — the model-backed nightly
-  suites. Confirm a monthly ceiling first (the 2026-08-21 credit-drain
-  incident).
+- `OPENROUTER_API_KEY` in the repository's secrets, shared with the Sage
+  Evals workflow: the model-backed nightly suites. Its spending limit is the
+  ceiling (`docs/runbooks/sage-eval-budget.md`). The workflow maps no
+  `GEMINI_API_KEY`; the revoked one in the repository's secrets can be
+  deleted.
