@@ -428,6 +428,64 @@ describe("OpenRouterProvider tool loop", () => {
   });
 });
 
+describe("OpenRouterProvider per-call cost", () => {
+  const withCost = <T extends { usage: Record<string, unknown> }>(body: T, cost: unknown) => ({
+    ...body,
+    usage: { ...body.usage, cost },
+  });
+  const costsOf = (fetchImpl: typeof fetch) => {
+    const costs: number[] = [];
+    return { costs, provider: makeProvider(fetchImpl, { onCost: (usd: number) => costs.push(usd) }) };
+  };
+
+  it("reports the cost OpenRouter returns with a non-streamed reply", async () => {
+    const { fetchImpl } = recordingFetch([() => jsonResponse(200, withCost(completion("hi"), 0.0012))]);
+    const { costs, provider } = costsOf(fetchImpl);
+    await provider.generateResponse("sys", MESSAGES);
+    assert.deepEqual(costs, [0.0012]);
+  });
+
+  it("reports a streamed reply's cost once, from the final usage chunk", async () => {
+    const { fetchImpl } = recordingFetch([() => sseResponse([textChunk("Hel"), textChunk("lo"), withCost(stopChunk(12, 3), 0.0005)])]);
+    const { costs, provider } = costsOf(fetchImpl);
+    await drain(provider.streamResponse("sys", MESSAGES));
+    assert.deepEqual(costs, [0.0005]);
+  });
+
+  it("reports one cost per round of a tool loop", async () => {
+    const toolRound = () =>
+      sseResponse([
+        { choices: [{ delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "lookup_goals", arguments: "{}" } }] } }] },
+        { choices: [{ delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 4, cost: 0.001 } },
+      ]);
+    const answerRound = () => sseResponse([textChunk("Done"), withCost(stopChunk(20, 3), 0.002)]);
+    const { fetchImpl } = recordingFetch([toolRound, answerRound]);
+    const { costs, provider } = costsOf(fetchImpl);
+    const tools: ToolDeclaration[] = [{ name: "lookup_goals", description: "List goals.", parameters: { type: "object", properties: {} } }];
+    await drain(
+      provider.streamWithTools("sys", [{ role: "user", content: "q" }], tools, async () => ({
+        response: {},
+        summary: "ok",
+        status: "success" as const,
+      })),
+    );
+    assert.deepEqual(costs, [0.001, 0.002]);
+  });
+
+  it("reports nothing when a reply carries no usable cost", async () => {
+    const { fetchImpl } = recordingFetch([
+      () => jsonResponse(200, completion("no cost field")),
+      () => jsonResponse(200, withCost(completion("a string"), "0.01")),
+      () => jsonResponse(200, withCost(completion("negative"), -1)),
+      () => sseResponse([textChunk("streamed"), withCost(stopChunk(1, 1), Number.NaN)]),
+    ]);
+    const { costs, provider } = costsOf(fetchImpl);
+    for (let i = 0; i < 3; i += 1) await provider.generateResponse("sys", MESSAGES);
+    await drain(provider.streamResponse("sys", MESSAGES));
+    assert.deepEqual(costs, []);
+  });
+});
+
 describe("OpenRouterProvider refuses the app server", () => {
   for (const [name, value] of [
     ["NEXT_RUNTIME", "nodejs"],

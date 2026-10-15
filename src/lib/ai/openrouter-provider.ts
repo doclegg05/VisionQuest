@@ -92,12 +92,19 @@ export interface OpenRouterProviderOptions {
   streamStallTimeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
   onResponseMeta?: (meta: OpenRouterResponseMeta) => void;
+  /**
+   * Called once per request with the cost OpenRouter billed for it, in USD,
+   * read from the reply's usage. Summing these gives a run's own spend, which
+   * the key's total usage cannot when other runs share the key.
+   */
+  onCost?: (costUsd: number) => void;
 }
 
 interface WireUsage {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+  cost?: unknown;
 }
 
 interface WireToolCall {
@@ -250,6 +257,12 @@ function toTokenUsage(usage: WireUsage | null | undefined): TokenUsage | null {
     totalTokens: usage.total_tokens ?? usage.prompt_tokens + usage.completion_tokens,
     source: "provider",
   };
+}
+
+/** OpenRouter's billed cost for one request in USD, or null when the reply carries none. */
+function costOf(usage: WireUsage | null | undefined): number | null {
+  const cost = usage?.cost;
+  return typeof cost === "number" && Number.isFinite(cost) && cost >= 0 ? cost : null;
 }
 
 /** Like GeminiProvider: input is the latest hop's (it already holds the history), output sums. */
@@ -476,6 +489,7 @@ export class OpenRouterProvider implements AIProvider {
   private readonly streamStallTimeoutMs: number;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly onResponseMeta?: (meta: OpenRouterResponseMeta) => void;
+  private readonly onCost?: (costUsd: number) => void;
 
   constructor(apiKey: string, model: string = OPENROUTER_DEFAULT_MODEL, options: OpenRouterProviderOptions = {}) {
     assertNotAppServer();
@@ -489,6 +503,7 @@ export class OpenRouterProvider implements AIProvider {
     this.streamStallTimeoutMs = options.streamStallTimeoutMs ?? DEFAULT_STREAM_STALL_TIMEOUT_MS;
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.onResponseMeta = options.onResponseMeta;
+    this.onCost = options.onCost;
   }
 
   async generateResponse(
@@ -588,6 +603,8 @@ export class OpenRouterProvider implements AIProvider {
     });
     const json = await this.withRetries(() => this.postJson(body));
     this.onResponseMeta?.(metaOf(json));
+    const cost = costOf(json.usage);
+    if (cost !== null) this.onCost?.(cost);
     const choice = json.choices?.[0];
     const text = typeof choice?.message?.content === "string" ? choice.message.content : "";
     if (text.length === 0) throw emptyReplyError(choice?.finish_reason);
@@ -619,12 +636,19 @@ export class OpenRouterProvider implements AIProvider {
 
   private async *streamChunks(body: Record<string, unknown>): AsyncGenerator<StreamChunk> {
     const { first, rest, controller } = await this.withRetries(() => this.establish(body));
+    // OpenRouter sends usage, with the cost, in the stream's last chunk.
+    let cost = costOf(first.usage);
     try {
       this.onResponseMeta?.(metaOf(first));
       yield first;
-      for await (const chunk of rest) yield checkChunk(chunk);
+      for await (const chunk of rest) {
+        const checked = checkChunk(chunk);
+        cost = costOf(checked.usage) ?? cost;
+        yield checked;
+      }
     } finally {
       controller.abort();
+      if (cost !== null) this.onCost?.(cost);
     }
   }
 

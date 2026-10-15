@@ -7,23 +7,25 @@
  *
  * Each eval runs as a child process with --provider=openrouter --model=<id>
  * and the same flags .github/workflows/sage-evals.yml gates on. Exit 4 from
- * an eval (model or key unavailable) is recorded as "error", not "fail". The OpenRouter
- * key's spend is read before and after each model, so every row carries its
- * cost. Exit codes from the evals: 0 pass, 1 fail, 3 not run. A "not run"
- * means credits or the key limit ran out, and it stops the whole comparison.
+ * an eval (model or key unavailable) is recorded as "error", not "fail". Each
+ * model gets a cost log of its own (SAGE_EVAL_COST_LOG): every OpenRouter call
+ * its evals make appends the cost OpenRouter billed for it, and the row's cost
+ * is their sum. Reading the key's total usage instead would also count any
+ * other run sharing the key, such as a second comparison started alongside.
+ * Exit codes from the evals: 0 pass, 1 fail, 3 not run. A "not run" means
+ * credits or the key limit ran out, and it stops the whole comparison.
  *
  * A pass here means "this model passes Sage's evals on synthetic data through
  * OpenRouter". It does not approve the model for real student data. See
  * docs/runbooks/openrouter-test-bench.md.
  */
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { isMainModule } from "./bench/lib/entry.mjs";
-
-const KEY_URL = "https://openrouter.ai/api/v1/key";
-const KEY_CHECK_TIMEOUT_MS = 15_000;
+import { COST_LOG_ENV } from "./lib/sage-eval-provider.mjs";
 
 /** Mirrors the flags .github/workflows/sage-evals.yml passes to each gating eval. */
 export const EVALS = Object.freeze([
@@ -65,21 +67,15 @@ export function classifyExit(code) {
   return "error";
 }
 
-export function costDelta(before, after) {
-  if (typeof before !== "number" || typeof after !== "number") return null;
-  return Number((after - before).toFixed(6));
-}
-
-export async function readKeyUsage(apiKey, fetchImpl = fetch) {
-  const response = await fetchImpl(KEY_URL, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-    signal: AbortSignal.timeout(KEY_CHECK_TIMEOUT_MS),
-  });
-  if (!response.ok) throw new Error(`OpenRouter key check failed (${response.status})`);
-  const json = await response.json();
-  const usage = json?.data?.usage;
-  if (typeof usage !== "number") throw new Error("OpenRouter key check returned no usage figure");
-  return usage;
+/** Sums a cost log: one billed cost in USD per line. Null when no log was written. */
+export function sumCostLog(text) {
+  if (text === null) return null;
+  const costs = text
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map(Number)
+    .filter((cost) => Number.isFinite(cost) && cost >= 0);
+  return Number(costs.reduce((sum, cost) => sum + cost, 0).toFixed(6));
 }
 
 export function runEvalProcess(evalSpec, model, env = process.env) {
@@ -94,18 +90,22 @@ export function runEvalProcess(evalSpec, model, env = process.env) {
   });
 }
 
-export async function compareModels({ models, evals, runEval, readUsage }) {
+/**
+ * runEval(evalSpec, model, costLog) runs one eval with its OpenRouter calls
+ * logging to costLog; costLogFor(model, index) names a model's log and
+ * readCostLog(costLog) returns its text, or null when nothing was written.
+ */
+export async function compareModels({ models, evals, runEval, costLogFor, readCostLog }) {
   const rows = [];
-  for (const model of models) {
-    const before = await readUsage();
+  for (const [index, model] of models.entries()) {
+    const costLog = costLogFor(model, index);
     const outcomes = [];
     for (const evalSpec of evals) {
-      const outcome = classifyExit(await runEval(evalSpec, model));
+      const outcome = classifyExit(await runEval(evalSpec, model, costLog));
       outcomes.push({ eval: evalSpec.id, outcome });
       if (outcome === "not_run") break;
     }
-    const after = await readUsage();
-    rows.push({ model, outcomes, costUsd: costDelta(before, after) });
+    rows.push({ model, outcomes, costUsd: sumCostLog(readCostLog(costLog)) });
     if (outcomes.some((entry) => entry.outcome === "not_run")) return { rows, stoppedEarly: true };
   }
   return { rows, stoppedEarly: false };
@@ -134,14 +134,22 @@ function writeReport(result, evals) {
 
 async function main() {
   const { models, evals } = parseArgs(process.argv.slice(2));
-  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
-  if (!apiKey) throw new Error("OPENROUTER_API_KEY missing: required for sage:models:compare.");
-  const result = await compareModels({
-    models,
-    evals,
-    runEval: (evalSpec, model) => runEvalProcess(evalSpec, model),
-    readUsage: () => readKeyUsage(apiKey),
-  });
+  if (!process.env.OPENROUTER_API_KEY?.trim()) {
+    throw new Error("OPENROUTER_API_KEY missing: required for sage:models:compare.");
+  }
+  const logDir = mkdtempSync(path.join(tmpdir(), "sage-models-compare-"));
+  let result;
+  try {
+    result = await compareModels({
+      models,
+      evals,
+      runEval: (evalSpec, model, costLog) => runEvalProcess(evalSpec, model, { ...process.env, [COST_LOG_ENV]: costLog }),
+      costLogFor: (_model, index) => path.join(logDir, `model-${index}.costs`),
+      readCostLog: (costLog) => (existsSync(costLog) ? readFileSync(costLog, "utf8") : null),
+    });
+  } finally {
+    rmSync(logDir, { recursive: true, force: true });
+  }
   console.log(`\n${formatTable(result.rows, evals)}`);
   if (result.stoppedEarly) console.log("\nStopped early: an eval reported not run (OpenRouter credits or key limit).");
   console.log(`Wrote ${writeReport(result, evals)}`);

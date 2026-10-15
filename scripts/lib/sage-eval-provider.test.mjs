@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -391,6 +394,33 @@ describe("--provider=openrouter", () => {
       const { model } = await resolveEvalProvider(["--provider=openrouter"]);
       assert.equal(model, "google/gemini-3.1-flash-lite");
     });
+  });
+
+  it("appends each call's billed cost to the file SAGE_EVAL_COST_LOG names", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "vq-cost-log-"));
+    const file = path.join(dir, "costs.log");
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "hi" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 3, completion_tokens: 1, cost: 0.0031 },
+        }),
+        { status: 200 },
+      );
+    try {
+      await withEnv("OPENROUTER_API_KEY", "test-key", () =>
+        withEnv("SAGE_EVAL_COST_LOG", file, async () => {
+          const { provider } = await resolveEvalProvider(["--provider=openrouter"]);
+          await provider.generateResponse("sys", [{ role: "user", content: "q" }]);
+          await provider.generateResponse("sys", [{ role: "user", content: "q" }]);
+        }),
+      );
+      assert.equal(readFileSync(file, "utf8"), "0.0031\n0.0031\n");
+    } finally {
+      globalThis.fetch = realFetch;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("stops with a clear error when the key is missing", async () => {

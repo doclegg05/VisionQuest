@@ -55,7 +55,7 @@ A model comparison across the evals CI gates on:
 npm run sage:models:compare -- --models=google/gemini-3.1-flash-lite,<id>
 ```
 
-The comparison prints each model's pass or fail per eval and what OpenRouter charged, and writes the same table to `reports/model-compare/`. Run one model first to learn the cost before a longer list.
+The comparison prints each model's pass or fail per eval and what OpenRouter charged, and writes the same table to `reports/model-compare/`. A model's cost is the sum of what OpenRouter billed for that model's own calls, so comparisons running at the same time on one key do not count each other's spend. Run one model first to learn the cost before a longer list.
 
 Exit code 3 means "not run": the key's credits or spending limit ran out. Exit code 4 also means "not run": OpenRouter refused the model or the key (a mistyped model id, or a model with no endpoint that meets the zero-retention rule), or could not be reached at all, because the first call failed to connect before any call succeeded. A network failure after a call has succeeded still counts as a failed case. None of these is a failed test, and the comparison table shows them as `not_run` and `error`.
 

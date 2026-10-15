@@ -25,6 +25,15 @@
  * first name is the student, the rest are staff; the arm is named in the
  * label so a run's provenance records which one it was.
  */
+import { appendFileSync } from "node:fs";
+
+/**
+ * When set, every OpenRouter call appends the cost OpenRouter billed for it,
+ * in USD, to this file, one figure per line. sage:models:compare gives each
+ * model its own file and sums it, because the key's total usage also moves
+ * with every other run that shares the key.
+ */
+export const COST_LOG_ENV = "SAGE_EVAL_COST_LOG";
 
 export async function resolveEvalProvider(argvOrEnv = process.argv.slice(2)) {
   const flag = argvOrEnv.find((arg) => arg.startsWith("--provider="));
@@ -222,7 +231,9 @@ async function resolveOpenRouterProvider(modelOverride = null) {
   assertNoRemoteDatabase();
   const { OpenRouterProvider, OPENROUTER_DEFAULT_MODEL } = await import("../../src/lib/ai/openrouter-provider.ts");
   const model = modelOverride || process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
-  return { provider: new OpenRouterProvider(apiKey, model), model, label: `openrouter (${model})` };
+  const costLog = process.env[COST_LOG_ENV]?.trim();
+  const options = costLog ? { onCost: (costUsd) => appendFileSync(costLog, `${costUsd}\n`) } : {};
+  return { provider: new OpenRouterProvider(apiKey, model, options), model, label: `openrouter (${model})` };
 }
 
 /**

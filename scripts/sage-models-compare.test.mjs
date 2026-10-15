@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { EVALS, classifyExit, compareModels, costDelta, formatTable, parseArgs, readKeyUsage } from "./sage-models-compare.mjs";
+import { EVALS, classifyExit, compareModels, formatTable, parseArgs, sumCostLog } from "./sage-models-compare.mjs";
 
 describe("parseArgs", () => {
   it("reads models and defaults to every CI-gated eval", () => {
@@ -24,51 +24,54 @@ describe("parseArgs", () => {
   });
 });
 
-describe("classifyExit and costDelta", () => {
+describe("classifyExit", () => {
   it("maps eval exit codes", () => {
     assert.equal(classifyExit(0), "pass");
     assert.equal(classifyExit(1), "fail");
     assert.equal(classifyExit(3), "not_run");
     assert.equal(classifyExit(2), "error");
   });
+});
 
-  it("subtracts key usage, or reports null when a reading is missing", () => {
-    assert.equal(costDelta(1.25, 1.5), 0.25);
-    assert.equal(costDelta(null, 1.5), null);
+describe("sumCostLog", () => {
+  it("adds one billed cost per line and skips lines that are not a cost", () => {
+    assert.equal(sumCostLog("0.1\n0.25\n\nnot a number\n-1\n0.000005\n"), 0.350005);
+  });
+
+  it("reports an unknown cost when no log was written", () => {
+    assert.equal(sumCostLog(null), null);
   });
 });
 
-describe("readKeyUsage", () => {
-  it("reads usage from GET /api/v1/key with the bearer key", async () => {
-    let seen = null;
-    const fetchImpl = async (url, init) => {
-      seen = { url, auth: init.headers.Authorization };
-      return new Response(JSON.stringify({ data: { usage: 0.42 } }), { status: 200 });
-    };
-    assert.equal(await readKeyUsage("sk-or-test", fetchImpl), 0.42);
-    assert.deepEqual(seen, { url: "https://openrouter.ai/api/v1/key", auth: "Bearer sk-or-test" });
-  });
-
-  it("fails loudly on a bad key", async () => {
-    const fetchImpl = async () => new Response("{}", { status: 401 });
-    await assert.rejects(readKeyUsage("sk-or-test", fetchImpl), /401/);
-  });
-});
+/** In-memory cost logs: runEval appends to the log it is given, as an eval process would. */
+function fakeCostLogs() {
+  const files = new Map();
+  return {
+    files,
+    costLogFor: (model, index) => `/logs/${index}-${model}`,
+    readCostLog: (file) => files.get(file) ?? null,
+    append: (file, cost) => files.set(file, `${files.get(file) ?? ""}${cost}\n`),
+  };
+}
 
 describe("compareModels", () => {
-  it("runs every eval per model and records each model's spend", async () => {
-    const usage = [0, 0.1, 0.1, 0.35];
+  it("runs every eval per model and charges each model the costs in its own log", async () => {
+    const logs = fakeCostLogs();
     const runs = [];
     const result = await compareModels({
       models: ["a", "b"],
       evals: EVALS.slice(0, 2),
-      runEval: async (evalSpec, model) => {
-        runs.push(`${model}:${evalSpec.id}`);
+      runEval: async (evalSpec, model, costLog) => {
+        runs.push(`${model}:${evalSpec.id}:${costLog}`);
+        logs.append(costLog, model === "a" ? 0.05 : 0.125);
+        // Another comparison on the same key, billed at the same moment, must not count.
+        logs.append("/logs/someone-else", 9.99);
         return model === "b" && evalSpec.id === "harness" ? 1 : 0;
       },
-      readUsage: async () => usage.shift(),
+      costLogFor: logs.costLogFor,
+      readCostLog: logs.readCostLog,
     });
-    assert.deepEqual(runs, ["a:redteam", "a:harness", "b:redteam", "b:harness"]);
+    assert.deepEqual(runs, ["a:redteam:/logs/0-a", "a:harness:/logs/0-a", "b:redteam:/logs/1-b", "b:harness:/logs/1-b"]);
     assert.equal(result.stoppedEarly, false);
     assert.deepEqual(result.rows, [
       { model: "a", outcomes: [{ eval: "redteam", outcome: "pass" }, { eval: "harness", outcome: "pass" }], costUsd: 0.1 },
@@ -76,7 +79,20 @@ describe("compareModels", () => {
     ]);
   });
 
+  it("reports an unknown cost for a model whose evals made no billed call", async () => {
+    const logs = fakeCostLogs();
+    const result = await compareModels({
+      models: ["a"],
+      evals: EVALS.slice(0, 1),
+      runEval: async () => 4,
+      costLogFor: logs.costLogFor,
+      readCostLog: logs.readCostLog,
+    });
+    assert.deepEqual(result.rows, [{ model: "a", outcomes: [{ eval: "redteam", outcome: "error" }], costUsd: null }]);
+  });
+
   it("stops the whole comparison when credits run out", async () => {
+    const logs = fakeCostLogs();
     const runs = [];
     const result = await compareModels({
       models: ["a", "b"],
@@ -85,7 +101,8 @@ describe("compareModels", () => {
         runs.push(`${model}:${evalSpec.id}`);
         return 3;
       },
-      readUsage: async () => 0,
+      costLogFor: logs.costLogFor,
+      readCostLog: logs.readCostLog,
     });
     assert.deepEqual(runs, ["a:redteam"]);
     assert.equal(result.stoppedEarly, true);
