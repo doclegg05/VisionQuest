@@ -22,6 +22,27 @@ export const READY_TO_WORK_FAMILY_CERT_TYPES: readonly string[] = [
   "workkeys-ncrc",
 ];
 
+/**
+ * Whether a class requirement for certification `itemId` is satisfied by
+ * the certTypes of a student's completed Certification rows. An exact
+ * certType match counts first. Otherwise the Ready-to-Work family counts as
+ * one credential: a completed row under any family certType satisfies a
+ * requirement for any family id, so a legacy "ready-to-work" row satisfies a
+ * "workkeys-ncrc" requirement and the reverse. This is the same rule as the
+ * goal-evidence soft match (src/lib/goal-evidence.ts). Catalog ids outside
+ * the family never borrow Ready-to-Work evidence.
+ */
+export function isCertificationRequirementMet(
+  itemId: string,
+  completedCertTypes: ReadonlySet<string>,
+): boolean {
+  if (completedCertTypes.has(itemId)) return true;
+  return (
+    READY_TO_WORK_FAMILY_CERT_TYPES.includes(itemId) &&
+    READY_TO_WORK_FAMILY_CERT_TYPES.some((certType) => completedCertTypes.has(certType))
+  );
+}
+
 export interface CertificationTemplateRule {
   id: string;
   required: boolean;

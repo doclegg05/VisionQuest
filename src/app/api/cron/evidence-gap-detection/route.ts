@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCertificationRequirementMet } from "@/lib/certifications";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -177,7 +178,7 @@ export async function POST(req: Request) {
         let met = false;
         switch (req.itemType) {
           case "certification":
-            met = completedCerts.has(req.itemId);
+            met = isCertificationRequirementMet(req.itemId, completedCerts);
             break;
           case "orientation":
             met = completedOrientation.has(req.itemId);
