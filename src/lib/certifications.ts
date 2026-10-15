@@ -25,12 +25,17 @@ export const READY_TO_WORK_FAMILY_CERT_TYPES: readonly string[] = [
 /**
  * Whether a class requirement for certification `itemId` is satisfied by
  * the certTypes of a student's completed Certification rows. An exact
- * certType match counts first. Otherwise the Ready-to-Work family counts as
- * one credential: a completed row under any family certType satisfies a
- * requirement for any family id, so a legacy "ready-to-work" row satisfies a
- * "workkeys-ncrc" requirement and the reverse. This is the same rule as the
- * goal-evidence soft match (src/lib/goal-evidence.ts). Catalog ids outside
- * the family never borrow Ready-to-Work evidence.
+ * certType match counts first. A Ready to Work requirement
+ * (READY_TO_WORK_CERT_TYPE) is also met by a completed row under any
+ * family certType, because every family row holds the Ready to Work
+ * checklist whatever its label.
+ *
+ * Every other requirement, "workkeys-ncrc" included, is exact-match only.
+ * Owner decision 2026-10-15: finishing the Ready to Work checklist is not
+ * evidence of passing the WorkKeys NCRC exam, which the program treats as a
+ * separate prerequisite. This deliberately differs from the goal-evidence
+ * soft match (src/lib/goal-evidence.ts), where a "workkeys-ncrc" goal link
+ * falls back to the "ready-to-work" row.
  */
 export function isCertificationRequirementMet(
   itemId: string,
@@ -38,7 +43,7 @@ export function isCertificationRequirementMet(
 ): boolean {
   if (completedCertTypes.has(itemId)) return true;
   return (
-    READY_TO_WORK_FAMILY_CERT_TYPES.includes(itemId) &&
+    itemId === READY_TO_WORK_CERT_TYPE &&
     READY_TO_WORK_FAMILY_CERT_TYPES.some((certType) => completedCertTypes.has(certType))
   );
 }
