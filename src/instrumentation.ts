@@ -1,9 +1,18 @@
+import { markAppServer } from "@/lib/ai/app-server";
+import { lockEvalEmbeddingOverride } from "@/lib/ai/eval-embedding-override-key";
 import { runBootProbes } from "@/lib/boot-probes";
 import { validateRuntimeEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // First, before anything can load eval-only code: from here on the
+    // OpenRouter providers refuse to run in this process, and the eval
+    // embedding override cannot be installed. Real student data never
+    // reaches OpenRouter (docs/runbooks/openrouter-test-bench.md).
+    markAppServer();
+    lockEvalEmbeddingOverride();
+
     try {
       validateRuntimeEnv();
     } catch (error) {

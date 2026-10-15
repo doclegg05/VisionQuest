@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { inspect } from "node:util";
 import {
   OPENROUTER_PRIVACY,
   OpenRouterError,
@@ -569,4 +570,12 @@ describe("OpenRouterProvider refuses the app server", () => {
       }
     });
   }
+});
+
+describe("OpenRouterProvider key handling", () => {
+  it("never exposes the key when the provider is logged or serialized", () => {
+    const provider = new OpenRouterProvider("sk-or-secret-value", MODEL);
+    assert.doesNotMatch(JSON.stringify(provider), /sk-or-secret-value/);
+    assert.doesNotMatch(inspect(provider, { showHidden: true, depth: 5 }), /sk-or-secret-value/);
+  });
 });

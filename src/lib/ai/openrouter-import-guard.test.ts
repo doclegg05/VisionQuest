@@ -19,6 +19,13 @@ const QUERY_PROBE =
   'import { OpenRouterProvider } from "@/lib/ai/openrouter-provider?raw";\nexport const probe = OpenRouterProvider;\n';
 const SCRIPTS_REEXPORT_PROBE = 'export { resolveEvalProvider } from "../../../scripts/lib/sage-eval-provider.mjs";\n';
 const JEV_CLIENT_PROBE = 'export { callSystemOne } from "../../scripts/bench/suites/lib/typesafe-client.mjs";\n';
+const EMBEDDING_ALIAS_PROBE =
+  'import { OpenRouterEmbeddingProvider } from "@/lib/ai/openrouter-embedding-provider";\nexport const probe = OpenRouterEmbeddingProvider;\n';
+const EMBEDDING_RELATIVE_PROBE =
+  'import { OpenRouterEmbeddingProvider } from "./openrouter-embedding-provider";\nexport const probe = OpenRouterEmbeddingProvider;\n';
+const REQUIRE_PROBE = 'export const probe = require("./openrouter-embedding-provider");\n';
+const REQUIRE_HARNESS_PROBE = 'export const probe = require("../../../scripts/lib/sage-eval-provider.mjs");\n';
+const EMBEDDING_DYNAMIC_PROBE = 'export async function probe() {\n  return import("./openrouter-embedding-provider");\n}\n';
 const STUDENT_ALERT_PROBE = "export const probe = (db: { studentAlert: unknown }) => db.studentAlert;\n";
 
 async function ruleIds(code: string, filePath: string): Promise<string[]> {
@@ -59,6 +66,25 @@ describe("OpenRouter import guard", () => {
 
   it("keeps the student-alert rule working on student-facing files", async () => {
     assert.ok((await ruleIds(STUDENT_ALERT_PROBE, "src/components/openrouter-probe.tsx")).includes("no-restricted-syntax"));
+  });
+
+  it("rejects the OpenRouter embedding provider from app code, including the embedding resolver itself", async () => {
+    assert.ok((await ruleIds(EMBEDDING_ALIAS_PROBE, "src/app/openrouter-probe.ts")).includes("no-restricted-imports"));
+    assert.ok((await ruleIds(EMBEDDING_RELATIVE_PROBE, "src/lib/ai/embedding-provider.ts")).includes("no-restricted-imports"));
+    assert.ok((await ruleIds(EMBEDDING_DYNAMIC_PROBE, "src/lib/ai/embeddings.ts")).includes("no-restricted-syntax"));
+  });
+
+  it("rejects require() of the OpenRouter providers or the eval harness", async () => {
+    assert.ok((await ruleIds(REQUIRE_PROBE, "src/lib/ai/embeddings.ts")).includes("no-restricted-syntax"));
+    assert.ok((await ruleIds(REQUIRE_HARNESS_PROBE, "src/lib/ai/embedding-provider.ts")).includes("no-restricted-syntax"));
+    // The student-facing block sets no-restricted-syntax again; it must keep the selector.
+    assert.ok((await ruleIds(REQUIRE_PROBE, "src/components/openrouter-probe.tsx")).includes("no-restricted-syntax"));
+  });
+
+  it("allows the embedding provider beside the chat provider, its own test, and the scripts folder", async () => {
+    assert.ok(!(await ruleIds(RELATIVE_PROBE, "src/lib/ai/openrouter-embedding-provider.ts")).includes("no-restricted-imports"));
+    assert.ok(!(await ruleIds(EMBEDDING_RELATIVE_PROBE, "src/lib/ai/openrouter-embedding-provider.test.ts")).includes("no-restricted-imports"));
+    assert.ok(!(await ruleIds(EMBEDDING_ALIAS_PROBE, "scripts/openrouter-probe.mjs")).includes("no-restricted-imports"));
   });
 
   it("allows the provider's own test and the scripts folder", async () => {
