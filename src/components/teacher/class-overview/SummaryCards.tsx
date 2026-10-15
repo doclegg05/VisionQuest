@@ -25,7 +25,7 @@ export default function SummaryCards({
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
           Pending Verifications
         </p>
-        <p className="mt-3 text-3xl font-bold text-orange-600">
+        <p className="mt-3 text-3xl font-bold text-[var(--badge-warning-text)]">
           {pendingVerifications}
         </p>
       </div>
@@ -33,7 +33,7 @@ export default function SummaryCards({
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
           Need Attention
         </p>
-        <p className="mt-3 text-3xl font-bold text-rose-600">
+        <p className="mt-3 text-3xl font-bold text-[var(--badge-error-text)]">
           {studentsNeedingAttention}
         </p>
       </div>
@@ -41,7 +41,7 @@ export default function SummaryCards({
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
           Average XP
         </p>
-        <p className="mt-3 text-3xl font-bold text-blue-600">{avgXp}</p>
+        <p className="mt-3 text-3xl font-bold text-[var(--badge-info-text)]">{avgXp}</p>
       </div>
     </div>
   );

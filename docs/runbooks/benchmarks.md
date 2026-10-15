@@ -173,11 +173,12 @@ cross is not a gate, and `bench:validate` says so.
 
 ### `requires`
 
-`postgres` · `cohort` · `gemini` · `ollama` · `browser` · `prod-readonly` ·
-`server`. The runner maps each to an environment variable —
+`postgres` · `cohort` · `gemini` · `ollama` · `openrouter` · `browser` ·
+`prod-readonly` · `server`. The runner maps each to an environment variable:
 `DATABASE_URL` (for both `postgres` and `cohort`), `GEMINI_API_KEY`,
-`OLLAMA_HOST`, `PLAYWRIGHT`, `BENCH_PROD_READONLY_URL`, `BENCH_BASE_URL` — and
-marks the suite **`skipped`** when one is unset. Skipped is never a failure:
+`OLLAMA_HOST`, `OPENROUTER_API_KEY`, `PLAYWRIGHT`, `BENCH_PROD_READONLY_URL`,
+`BENCH_BASE_URL`. It marks the suite **`skipped`** when one is unset.
+`openrouter` is for synthetic fixtures only; see `docs/runbooks/openrouter-test-bench.md`. Skipped is never a failure:
 the missing secrets are owner steps, and a benchmark that reds a PR because a
 key was never set teaches everyone to ignore the gate.
 

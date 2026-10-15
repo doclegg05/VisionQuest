@@ -27,7 +27,7 @@
 
 import { readFileSync } from "node:fs";
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
+import { isEvalAbort, resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 import { buildQualityEvalPrompt } from "./lib/sage-quality-eval-prompt.mjs";
 
 loadEnvFile();
@@ -118,6 +118,9 @@ async function main() {
       );
       reply = await provider.generateResponse(systemPrompt, [{ role: "user", content: scenario.message }]);
     } catch (err) {
+      // Nothing can be evaluated (credits, key, or model unavailable): stop the
+      // whole run with its not-run exit code instead of grading this case.
+      if (isEvalAbort(err)) throw err;
       console.log(`  ?? ${scenario.id}: Sage call failed — ${err.message}`);
       continue;
     }
