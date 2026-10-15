@@ -1,85 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  Warning,
-  Target,
-  CalendarX,
-  UserCircle,
-  ClipboardText,
-  DotsThree,
-  NotePencil,
-  CalendarPlus,
-  BookOpenText,
-  CheckCircle,
-  Clock,
-} from "@phosphor-icons/react";
 import { api, apiFetch } from "@/lib/api";
-import ProgramBadge from "@/components/ui/ProgramBadge";
 import { FormDialog } from "@/components/ui/FormDialog";
-import { WELLBEING_ALERT_TYPE, formatWellbeingQueueLine } from "@/lib/sage/wellbeing-card";
-import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
+import type { InterventionQueueEntry } from "@/lib/teacher/intervention-queue";
 import {
-  type InterventionQueueResponse as QueueResponse,
-  type QueueStudent,
-} from "@/lib/teacher/dashboard";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function urgencyBadge(score: number): { label: string; color: string } {
-  if (score >= 50) return { label: "Critical", color: "bg-[var(--urgency-critical-bg)] text-[var(--urgency-critical-text)]" };
-  if (score >= 25) return { label: "High", color: "bg-[var(--urgency-high-bg)] text-[var(--urgency-high-text)]" };
-  return { label: "Medium", color: "bg-[var(--urgency-medium-bg)] text-[var(--urgency-medium-text)]" };
-}
-
-function topReason(signals: QueueStudent["signals"]): string {
-  if (signals.highSeverityAlertCount > 0)
-    return `${signals.highSeverityAlertCount} alert${signals.highSeverityAlertCount !== 1 ? "s" : ""}`;
-  if (signals.stalledGoalCount > 0)
-    return `${signals.stalledGoalCount} stalled goal${signals.stalledGoalCount !== 1 ? "s" : ""}`;
-  if (signals.overdueTaskCount > 0)
-    return `${signals.overdueTaskCount} overdue task${signals.overdueTaskCount !== 1 ? "s" : ""}`;
-  if (signals.unmatchedGoalCount > 0)
-    return `${signals.unmatchedGoalCount} unmatched goal${signals.unmatchedGoalCount !== 1 ? "s" : ""}`;
-  if (signals.daysSinceLastLogin > 7) return `${signals.daysSinceLastLogin}d since login`;
-  if (!signals.orientationComplete)
-    return `Orientation ${Math.round(signals.orientationProgress * 100)}%`;
-  return "Low readiness";
-}
-
-/**
- * Compact one-line summary for a queue row. Wellbeing crisis cards are
- * multi-line structured blocks — collapse them to "category · mood — next
- * step" so the row stays scannable; the full card renders on student detail
- * and the class-overview alert list.
- */
-function primaryAlertLine(alert: NonNullable<QueueStudent["primaryAlert"]>): string {
-  if (alert.type !== WELLBEING_ALERT_TYPE) return alert.summary;
-  return formatWellbeingQueueLine(alert.summary) ?? alert.summary;
-}
-
-function buildQueueActionIntent(student: QueueStudent): DashboardActionIntent | null {
-  const alert = student.primaryAlert;
-  if (!alert || !student.recommendedAction.kind) return null;
-  if (student.recommendedAction.kind === "assign_support" && alert.sourceType !== "goal") return null;
-
-  return {
-    kind: student.recommendedAction.kind,
-    title: alert.title,
-    summary: alert.summary,
-    severity: alert.severity,
-    student: {
-      id: student.studentId,
-      studentId: student.publicStudentId,
-      displayName: student.name,
-    },
-    alertId: alert.id,
-    goalId: alert.sourceType === "goal" ? alert.sourceId : null,
-    linkId: alert.sourceType === "goal_resource_link" ? alert.sourceId : null,
-  };
-}
+  buildQueueSageMessage,
+  countInactivityStages,
+  groupQueueIssues,
+  QUEUE_ROWS_SHOWN,
+  visibleQueueRows,
+  type QueueIssueGroup,
+} from "@/lib/teacher/queue-issue-groups";
+import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
+import { buildAlertActionIntent, mainActionMode } from "./queue-actions";
+import { QueueStudentRow } from "./QueueStudentRow";
+import type { QueueAlertAction } from "./QueueRowIssues";
+import type { InterventionQueueResponse as QueueResponse } from "@/lib/teacher/dashboard";
 
 // ─── Loading Skeleton ─────────────────────────────────────────────────────────
 
@@ -407,214 +345,59 @@ export function QuickAppointmentModal({
   );
 }
 
-// ─── Student Row ──────────────────────────────────────────────────────────────
+// ─── Queue ────────────────────────────────────────────────────────────────────
 
-function StudentRow({
-  student,
-  onPrimaryAction,
-  onAlertAction,
-  onQuickTask,
-  onQuickNote,
-  onSchedule,
+/** Opens Sage without loading the chat bundle until a teacher asks for it. */
+function askSage(message: string) {
+  void import("@/components/chat/SageMiniChat").then(({ openSageWithMessage }) => openSageWithMessage(message));
+}
+
+/** The action panel, opened under the row it belongs to, with focus moved into it. */
+function InlineActionPanel({
+  intent,
+  onClose,
+  onChanged,
 }: {
-  student: QueueStudent;
-  onPrimaryAction: (student: QueueStudent) => void;
-  onAlertAction: (alertId: string, action: "resolve" | "snooze") => void;
-  onQuickTask: (studentId: string, name: string) => void;
-  onQuickNote: (studentId: string, name: string) => void;
-  onSchedule: (studentId: string, name: string) => void;
+  intent: DashboardActionIntent;
+  onClose: () => void;
+  onChanged: () => Promise<void>;
 }) {
-  const badge = urgencyBadge(student.urgencyScore);
-  const reason = student.primaryAlert?.title ?? topReason(student.signals);
-  const { signals } = student;
-  const actionIntent = buildQueueActionIntent(student);
-  const evidenceGapLabel = `${signals.evidenceGapCount} evidence gap(s) — review Goals & Plan`;
-
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
   return (
-    <div className="flex flex-col gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)] lg:flex-row lg:items-center">
-      {/* Avatar placeholder */}
-      <Link
-        href={`/teacher/students/${student.studentId}`}
-        className="inline-flex size-8 shrink-0 items-center justify-center pointer-coarse:size-11"
-        aria-label={`Open ${student.name}'s student profile`}
-      >
-        <UserCircle
-          size={32}
-          weight="light"
-          aria-hidden="true"
-          className="text-[var(--ink-muted)]"
-        />
-      </Link>
-
-      {/* Name + reason */}
-      <Link href={`/teacher/students/${student.studentId}`} className="min-w-0 flex-1 pointer-coarse:min-h-11">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-semibold text-[var(--ink-strong)]">
-            {student.name}
-          </p>
-          <ProgramBadge programType={student.programType} size="sm" />
-        </div>
-        <p className="truncate text-xs text-[var(--ink-muted)]">{reason}</p>
-        {student.urgencyReasons.length > 0 && (
-          <p
-            className="mt-0.5 truncate text-xs text-[var(--ink-faint)]"
-            title={student.urgencyReasons.join(" · ")}
-          >
-            Flagged for: {student.urgencyReasons.slice(0, 3).join(" · ")}
-            {student.urgencyReasons.length > 3
-              ? ` · +${student.urgencyReasons.length - 3} more`
-              : ""}
-          </p>
-        )}
-        {student.primaryAlert?.summary ? (
-          <p className="mt-0.5 line-clamp-2 text-xs text-[var(--ink-muted)]">
-            {primaryAlertLine(student.primaryAlert)}
-          </p>
-        ) : null}
-      </Link>
-
-      {/* Signal icons */}
-      <div className="flex shrink-0 items-center gap-2 text-[var(--ink-muted)]">
-        {signals.stalledGoalCount > 0 && (
-          <span title={`${signals.stalledGoalCount} stalled goal(s)`}>
-            <Target size={16} weight="duotone" className="text-[var(--badge-warning-text)]" />
-          </span>
-        )}
-        {signals.overdueTaskCount > 0 && (
-          <span title={`${signals.overdueTaskCount} overdue task(s)`}>
-            <CalendarX size={16} weight="duotone" className="text-[var(--badge-error-text)]" />
-          </span>
-        )}
-        {signals.highSeverityAlertCount > 0 && (
-          <span title={`${signals.highSeverityAlertCount} high-severity alert(s)`}>
-            <Warning size={16} weight="duotone" className="text-[var(--badge-error-text)]" />
-          </span>
-        )}
-        {signals.unmatchedGoalCount > 0 && (
-          <span title={`${signals.unmatchedGoalCount} goal(s) without pathway`}>
-            <ClipboardText size={16} weight="duotone" className="text-[var(--badge-info-text)]" />
-          </span>
-        )}
-        {signals.evidenceGapCount > 0 && (
-          <Link
-            href={`/teacher/students/${student.studentId}`}
-            title={evidenceGapLabel}
-            aria-label={evidenceGapLabel}
-            className="inline-flex size-8 items-center justify-center pointer-coarse:size-11"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <BookOpenText size={16} weight="duotone" className="text-[var(--badge-info-text)]" />
-          </Link>
-        )}
-      </div>
-
-      {/* Quick actions */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {actionIntent ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              onPrimaryAction(student);
-            }}
-            className="inline-flex items-center pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
-          >
-            {student.recommendedAction.label}
-          </button>
-        ) : (
-          <Link
-            href={student.recommendedAction.href}
-            className="inline-flex items-center pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
-          >
-            {student.recommendedAction.label}
-          </Link>
-        )}
-        {student.primaryAlert ? (
-          <>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                onAlertAction(student.primaryAlert!.id, "snooze");
-              }}
-              title="Snooze for 24 hours"
-              aria-label="Snooze for 24 hours"
-              className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
-            >
-              <Clock size={16} weight="regular" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                onAlertAction(student.primaryAlert!.id, "resolve");
-              }}
-              title="Mark resolved"
-              aria-label="Mark resolved"
-              className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
-            >
-              <CheckCircle size={16} weight="regular" />
-            </button>
-          </>
-        ) : null}
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            onQuickNote(student.studentId, student.name);
-          }}
-          title="Add quick note"
-          aria-label="Add quick note"
-          className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
-        >
-          <NotePencil size={16} weight="regular" />
-        </button>
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            onSchedule(student.studentId, student.name);
-          }}
-          title="Schedule appointment"
-          aria-label="Schedule appointment"
-          className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
-        >
-          <CalendarPlus size={16} weight="regular" />
-        </button>
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            onQuickTask(student.studentId, student.name);
-          }}
-          title="Assign quick task"
-          aria-label="Assign quick task"
-          className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
-        >
-          <DotsThree size={18} weight="bold" />
-        </button>
-      </div>
-
-      {/* Urgency badge */}
-      <span
-        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.color}`}
-      >
-        {badge.label}
-      </span>
+    <div
+      ref={ref}
+      tabIndex={-1}
+      role="group"
+      aria-label={`Action for ${intent.student.displayName}`}
+      className="mt-3 rounded-[1rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)]"
+    >
+      <DashboardActionPanel intent={intent} onClose={onClose} onChanged={onChanged} />
     </div>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+type StudentTarget = { studentId: string; name: string };
+
+function targetOf(student: InterventionQueueEntry): StudentTarget {
+  return { studentId: student.studentId, name: student.name };
+}
 
 export default function InterventionQueuePanel({
   initialQueue,
 }: {
-  initialQueue?: QueueStudent[];
+  initialQueue?: InterventionQueueEntry[];
 }) {
-  const [queue, setQueue] = useState<QueueStudent[]>(initialQueue ?? []);
+  const [queue, setQueue] = useState<InterventionQueueEntry[]>(initialQueue ?? []);
   const [loading, setLoading] = useState(initialQueue === undefined);
   const [error, setError] = useState<string | null>(null);
-  const [taskTarget, setTaskTarget] = useState<{ studentId: string; name: string } | null>(null);
-  const [noteTarget, setNoteTarget] = useState<{ studentId: string; name: string } | null>(null);
-  const [scheduleTarget, setScheduleTarget] = useState<{ studentId: string; name: string } | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [now] = useState(() => Date.now());
+  const [taskTarget, setTaskTarget] = useState<StudentTarget | null>(null);
+  const [noteTarget, setNoteTarget] = useState<StudentTarget | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<StudentTarget | null>(null);
   const [actionIntent, setActionIntent] = useState<DashboardActionIntent | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const searchParams = useSearchParams();
@@ -634,7 +417,7 @@ export default function InterventionQueuePanel({
       const data = await api.get<QueueResponse>(url);
       setQueue(data.queue);
     } catch {
-      setError("Failed to load intervention queue.");
+      setError("Could not load the intervention queue.");
     } finally {
       setLoading(false);
     }
@@ -647,60 +430,90 @@ export default function InterventionQueuePanel({
     })();
   }, [initialQueue, fetchQueue, classId]);
 
-  async function handleAlertAction(alertId: string, action: "resolve" | "snooze") {
+  const visible = visibleQueueRows(queue, showAll);
+  const hiddenCount = queue.length - visible.length;
+  const urgentCount = queue.filter((student) => student.signals.highSeverityAlertCount > 0).length;
+  const inactivityStages = useMemo(() => countInactivityStages(queue), [queue]);
+
+  async function handleAlertAction(alertId: string, action: QueueAlertAction) {
     setActionMessage(null);
     try {
       await api.patch(`/api/teacher/alerts/${alertId}`, {
         action,
         ...(action === "snooze" ? { hours: 24 } : {}),
       });
-      setActionMessage(action === "snooze" ? "Queue item snoozed for 24 hours." : "Queue item marked resolved.");
+      setActionMessage(
+        action === "snooze"
+          ? "Snoozed for 24 hours."
+          : action === "resolve"
+            ? "Marked resolved."
+            : "Dismissed.",
+      );
       await fetchQueue();
     } catch {
-      setActionMessage("Could not update that queue item.");
+      setActionMessage("Could not update that issue. Try again.");
     }
   }
 
-  function handlePrimaryAction(student: QueueStudent) {
-    const intent = buildQueueActionIntent(student);
-    if (intent) {
-      setActionIntent(intent);
-    }
+  function handleMainAction(student: InterventionQueueEntry) {
+    const main = mainActionMode(student);
+    if (main.mode === "panel") setActionIntent(main.intent);
+    if (main.mode === "task") setTaskTarget(targetOf(student));
+  }
+
+  function handleQuickAction(student: InterventionQueueEntry, group: QueueIssueGroup) {
+    const alert = group.alerts[0];
+    if (!alert || !group.quickAction) return;
+    const intent = buildAlertActionIntent(student, alert, group.quickAction.kind);
+    if (intent) setActionIntent(intent);
+  }
+
+  function askSageToPrioritize() {
+    askSage(
+      buildQueueSageMessage(
+        queue.map((student) => ({
+          name: student.name,
+          groups: groupQueueIssues(student.openAlerts, student.studentId),
+        })),
+      ),
+    );
   }
 
   return (
     <section className="surface-section p-5">
-      {actionIntent ? (
-        <div className="mb-5">
-          <DashboardActionPanel
-            intent={actionIntent}
-            onClose={() => setActionIntent(null)}
-            onChanged={async () => {
-              await fetchQueue();
-            }}
-          />
-        </div>
-      ) : null}
-
       {/* Header */}
-      <div className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
-          Needs attention
-        </p>
-        <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
-          Intervention Queue
-        </h2>
-        {!loading && !error && queue.length > 0 && (
-          <p className="mt-1 text-xs text-[var(--ink-muted)]">
-            {queue.length} student{queue.length !== 1 ? "s" : ""} need follow-up
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+            Needs attention
           </p>
-        )}
-        {actionMessage ? (
-          <p className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-muted)]">
-            {actionMessage}
-          </p>
+          <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>
+          {!loading && !error && queue.length > 0 ? (
+            <p className="mt-1 text-sm text-[var(--ink-muted)]">
+              {queue.length} student{queue.length === 1 ? "" : "s"} need follow-up
+              {urgentCount > 0 ? ` · ${urgentCount} urgent` : ""}
+            </p>
+          ) : null}
+          {inactivityStages.length > 0 ? (
+            <p className="mt-0.5 text-xs text-[var(--ink-muted)]">
+              Inactive: {inactivityStages.map((stage) => `${stage.label} ${stage.count}`).join(" · ")}
+            </p>
+          ) : null}
+        </div>
+        {!loading && !error && queue.length > 0 ? (
+          <button
+            type="button"
+            onClick={askSageToPrioritize}
+            className="inline-flex min-h-11 items-center rounded-full bg-[var(--accent-strong)] px-4 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
+          >
+            Ask Sage to prioritize
+          </button>
         ) : null}
       </div>
+
+      <p role="status" className={actionMessage ? "mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-muted)]" : "sr-only"}>
+        {actionMessage ?? ""}
+      </p>
 
       {/* Body */}
       {loading && <QueueSkeleton />}
@@ -713,27 +526,58 @@ export default function InterventionQueuePanel({
 
       {!loading && !error && queue.length === 0 && (
         <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
-          All students are on track. No interventions needed right now.
+          All students are on track. No follow-up needed right now.
         </p>
       )}
 
       {!loading && !error && queue.length > 0 && (
-        <div className="space-y-2">
-          {queue.map((student) => (
-            <StudentRow
-              key={student.studentId}
-              student={student}
-              onPrimaryAction={handlePrimaryAction}
-              onAlertAction={(alertId, action) => void handleAlertAction(alertId, action)}
-              onQuickTask={(id, name) => setTaskTarget({ studentId: id, name })}
-              onQuickNote={(id, name) => setNoteTarget({ studentId: id, name })}
-              onSchedule={(id, name) => setScheduleTarget({ studentId: id, name })}
-            />
-          ))}
-        </div>
+        <>
+          <ul className="space-y-2">
+            {visible.map((student) => (
+              <QueueStudentRow
+                key={student.studentId}
+                student={student}
+                now={now}
+                actionPanel={
+                  actionIntent?.student.id === student.studentId ? (
+                    <InlineActionPanel
+                      intent={actionIntent}
+                      onClose={() => setActionIntent(null)}
+                      onChanged={fetchQueue}
+                    />
+                  ) : null
+                }
+                onMainAction={handleMainAction}
+                onQuickAction={handleQuickAction}
+                onAlertAction={(alertId, action) => void handleAlertAction(alertId, action)}
+                onQuickTask={(row) => setTaskTarget(targetOf(row))}
+                onQuickNote={(row) => setNoteTarget(targetOf(row))}
+                onSchedule={(row) => setScheduleTarget(targetOf(row))}
+                onAskSage={askSage}
+              />
+            ))}
+          </ul>
+          {hiddenCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--border)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+            >
+              Show {hiddenCount} more student{hiddenCount === 1 ? "" : "s"}
+            </button>
+          ) : null}
+          {showAll && queue.length > QUEUE_ROWS_SHOWN ? (
+            <button
+              type="button"
+              onClick={() => setShowAll(false)}
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--border)] px-4 text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
+            >
+              Show fewer students
+            </button>
+          ) : null}
+        </>
       )}
 
-      {/* Quick Task Modal */}
       {taskTarget && (
         <QuickTaskModal
           studentId={taskTarget.studentId}
@@ -743,7 +587,6 @@ export default function InterventionQueuePanel({
         />
       )}
 
-      {/* Quick Note Modal */}
       {noteTarget && (
         <QuickNoteModal
           studentId={noteTarget.studentId}
@@ -753,7 +596,6 @@ export default function InterventionQueuePanel({
         />
       )}
 
-      {/* Quick Appointment Modal */}
       {scheduleTarget && (
         <QuickAppointmentModal
           studentId={scheduleTarget.studentId}

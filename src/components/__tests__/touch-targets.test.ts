@@ -204,16 +204,6 @@ describe("D3 axe-authenticated — select-name", () => {
   });
 });
 
-describe("D3 axe-authenticated — link-name", () => {
-  it("InterventionQueuePanel's icon-only avatar Link has an accessible name", () => {
-    const src = read("src/components/teacher/InterventionQueuePanel.tsx");
-    const idx = src.indexOf("Avatar placeholder");
-    assert.ok(idx > -1, "could not find the avatar Link block");
-    const block = src.slice(idx, idx + 300);
-    assert.ok(/aria-label=\{`Open \$\{student\.name\}/.test(block), "avatar Link missing an accessible name");
-  });
-});
-
 describe("D3 axe-authenticated — nested-interactive", () => {
   it("InterventionQueue's StudentAccordion no longer nests a button/Link inside its toggle button", () => {
     const src = read("src/components/teacher/InterventionQueue.tsx");
