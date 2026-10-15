@@ -35,29 +35,6 @@ interface ReadinessPayload {
   summary: ReadinessSummary;
 }
 
-interface GamificationPilot {
-  adoption: {
-    withAnyAchievement: number;
-    achievementRate: number;
-    withStreak3Plus: number;
-    withStreak7Plus: number;
-    withStreak14Plus: number;
-  };
-  behavioralCorrelation: {
-    readinessLift: number;
-    goalLift: number;
-  };
-  verdict: {
-    meetsLiftThreshold: boolean;
-    recommendation: string;
-  };
-}
-
-interface GamificationPayload {
-  students: number;
-  pilot: GamificationPilot | null;
-}
-
 interface MonthlyKpiDashboardProps {
   classId?: string;
 }
@@ -141,31 +118,6 @@ function ProgressRow({ label, value, max, color = "bg-[linear-gradient(90deg,var
 }
 
 // ---------------------------------------------------------------------------
-// Verdict badge
-// ---------------------------------------------------------------------------
-
-type VerdictKind = "KEEP" | "REVIEW" | "INSUFFICIENT DATA";
-
-function parseVerdict(recommendation: string): VerdictKind {
-  if (recommendation.startsWith("KEEP")) return "KEEP";
-  if (recommendation.startsWith("REVIEW")) return "REVIEW";
-  return "INSUFFICIENT DATA";
-}
-
-function VerdictBadge({ kind }: { kind: VerdictKind }) {
-  const styles: Record<VerdictKind, string> = {
-    KEEP: "bg-[var(--badge-success-bg)] border-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
-    REVIEW: "bg-[var(--badge-warning-bg)] border-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
-    "INSUFFICIENT DATA": "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-muted)]",
-  };
-  return (
-    <span className={`inline-block rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${styles[kind]}`}>
-      {kind}
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Quick actions
 // ---------------------------------------------------------------------------
 
@@ -226,7 +178,6 @@ function QuickActions({ classId }: QuickActionsProps) {
 
 export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProps) {
   const [readiness, setReadiness] = useState<ReadinessPayload | null>(null);
-  const [gamification, setGamification] = useState<GamificationPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -241,10 +192,7 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
       setError(null);
 
       const classParam = classId ? `?classId=${classId}` : "";
-      const [readinessRes, gamificationRes] = await Promise.all([
-        fetch(`/api/teacher/reports/readiness-monthly${classParam}`),
-        fetch(`/api/teacher/reports/gamification-pilot${classParam}`),
-      ]);
+      const readinessRes = await fetch(`/api/teacher/reports/readiness-monthly${classParam}`);
 
       const readinessPayload = await readinessRes.json().catch(() => null);
       if (!readinessRes.ok) {
@@ -255,10 +203,7 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
         );
       }
 
-      const gamificationPayload = await gamificationRes.json().catch(() => null);
-      // Gamification is optional — don't block on it
       setReadiness(readinessPayload);
-      setGamification(gamificationRes.ok ? gamificationPayload : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load monthly KPI dashboard.");
     } finally {
@@ -284,8 +229,6 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
   }
 
   const { summary } = readiness;
-  const pilot = gamification?.pilot ?? null;
-  const verdictKind = pilot ? parseVerdict(pilot.verdict.recommendation) : null;
   const unmatchedGoals =
     summary.pathwayCoverage.eligibleGoals - summary.pathwayCoverage.goalsWithPathway;
 
@@ -426,110 +369,7 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
         )}
       </section>
 
-      {/* Section 3: Gamification Pilot Verdict */}
-      {pilot && verdictKind && (
-        <section>
-          <p className="mb-3 text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">
-            Gamification pilot
-          </p>
-          <div className="theme-card rounded-2xl p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--ink-strong)]">
-                  Pilot verdict
-                </h3>
-                <p className="mt-1 text-sm text-[var(--ink-muted)] max-w-prose">
-                  {pilot.verdict.recommendation}
-                </p>
-              </div>
-              <VerdictBadge kind={verdictKind} />
-            </div>
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                  Adoption
-                </p>
-                <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">
-                  {pilot.adoption.achievementRate}%
-                </p>
-                <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                  {pilot.adoption.withAnyAchievement} students with achievements
-                </p>
-              </div>
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                  Streak 7+
-                </p>
-                <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">
-                  {pilot.adoption.withStreak7Plus}
-                </p>
-                <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                  students on a 7-day streak
-                </p>
-              </div>
-              <div
-                className={`rounded-xl border p-4 ${
-                  pilot.behavioralCorrelation.readinessLift >= 10
-                    ? "border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)]"
-                    : pilot.behavioralCorrelation.readinessLift > 0
-                      ? "border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)]"
-                      : "border-[var(--border)] bg-[var(--surface-raised)]"
-                }`}
-              >
-                <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                  Readiness lift
-                </p>
-                <p
-                  className={`mt-2 text-2xl font-bold ${
-                    pilot.behavioralCorrelation.readinessLift >= 10
-                      ? "text-[var(--badge-success-text)]"
-                      : pilot.behavioralCorrelation.readinessLift > 0
-                        ? "text-[var(--badge-warning-text)]"
-                        : "text-[var(--ink-strong)]"
-                  }`}
-                >
-                  {pilot.behavioralCorrelation.readinessLift >= 0 ? "+" : ""}
-                  {pilot.behavioralCorrelation.readinessLift}pts
-                </p>
-                <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                  streak vs. no-streak group
-                </p>
-              </div>
-              <div
-                className={`rounded-xl border p-4 ${
-                  pilot.behavioralCorrelation.goalLift >= 0.5
-                    ? "border-[var(--badge-success-bg)] bg-[var(--badge-success-bg)]"
-                    : pilot.behavioralCorrelation.goalLift > 0
-                      ? "border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)]"
-                      : "border-[var(--border)] bg-[var(--surface-raised)]"
-                }`}
-              >
-                <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                  Goal lift
-                </p>
-                <p
-                  className={`mt-2 text-2xl font-bold ${
-                    pilot.behavioralCorrelation.goalLift >= 0.5
-                      ? "text-[var(--badge-success-text)]"
-                      : pilot.behavioralCorrelation.goalLift > 0
-                        ? "text-[var(--badge-warning-text)]"
-                        : "text-[var(--ink-strong)]"
-                  }`}
-                >
-                  {pilot.behavioralCorrelation.goalLift >= 0 ? "+" : ""}
-                  {pilot.behavioralCorrelation.goalLift}
-                </p>
-                <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                  avg completed goals lift
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Section 4: Quick Actions */}
+      {/* Section 3: Quick Actions */}
       <section>
         <p className="mb-3 text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">
           Quick actions
