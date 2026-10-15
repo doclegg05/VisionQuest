@@ -351,7 +351,14 @@ Model-backed suites never run per-PR. They run nightly, and only when
 `sage-career` and `explain-faithfulness` reach production's model,
 `google/gemini-3.1-flash-lite`, through OpenRouter on synthetic fixtures, the
 same route as the Sage Evals workflow (`OPENROUTER_MODEL` in `benchmarks.yml`).
-That is about two dozen model calls a night on the shared key. The repo holds
+That is 21 generations a night on the shared key (3 grounding, 3 readability,
+5 career, 10 explain-faithfulness). The nightly OpenRouter suites run in their
+own step, "Nightly-tier model benchmarks", after the tier step: OpenRouter gets
+synthetic data only, so `--provider=openrouter` refuses to run beside any
+non-local database URL, and the tier step holds `BENCH_PROD_READONLY_URL`.
+The tier step writes `skipped` for them and the model step overwrites it. A new
+nightly suite that requires `openrouter` goes in that step's `--suite=` list;
+the pinning test fails until it does. The repo holds
 no Gemini key (issue #220), so `sage-latency`, whose floor is production's
 direct-to-Google p95 bar in `config/sage-slo.json`, reports skipped. A round
 trip through OpenRouter is a different measurement, so it stays on Gemini

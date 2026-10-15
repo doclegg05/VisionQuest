@@ -29,6 +29,8 @@ const jobHeader = benchmarksJob.slice(0, benchmarksJob.indexOf("\n    steps:\n")
 const steps = benchmarksJob.split(/\n(?= {6}- )/).filter((part) => part.startsWith("      - "));
 const stepName = (step: string) => step.match(/- name: ([^\n]*)/)?.[1] ?? step.slice(0, 60);
 const suiteSteps = steps.filter((step) => /npm run bench -- /.test(step));
+const modelSteps = suiteSteps.filter((step) => step.includes(OPENROUTER_SECRET));
+const findStep = (name: string) => steps.find((step) => stepName(step) === name) ?? "";
 
 type SuiteConfig = { suite: string; tier: string; requires?: string[] };
 const SUITES: SuiteConfig[] = readdirSync(path.resolve("config/benchmarks"))
@@ -43,18 +45,50 @@ function suitesRequiring(requirement: string, tiers: string[]): string[] {
 }
 
 describe("Benchmarks workflow: model suites go through OpenRouter", () => {
-  it("finds the two steps that run suites", () => {
-    assert.deepEqual(suiteSteps.map(stepName), ["Nightly-tier benchmarks", "Watch-tier benchmarks"]);
+  it("finds the three steps that run suites, two of them with the OpenRouter key", () => {
+    assert.deepEqual(suiteSteps.map(stepName), [
+      "Nightly-tier benchmarks",
+      "Nightly-tier model benchmarks",
+      "Watch-tier benchmarks",
+    ]);
+    assert.deepEqual(modelSteps.map(stepName), ["Nightly-tier model benchmarks", "Watch-tier benchmarks"]);
   });
 
-  it("gives the OpenRouter key to those two steps and to no other step or level", () => {
-    for (const step of suiteSteps) {
+  it("maps the OpenRouter key on those two steps and nowhere else in the file", () => {
+    for (const step of modelSteps) {
       assert.ok(step.includes(`          ${OPENROUTER_SECRET}`), `"${stepName(step)}" must map OPENROUTER_API_KEY in its own env`);
     }
-    for (const step of steps.filter((candidate) => !suiteSteps.includes(candidate))) {
-      assert.doesNotMatch(step, /OPENROUTER_API_KEY/, `"${stepName(step)}" runs no model and must hold no model key`);
+    assert.equal(WORKFLOW.split(OPENROUTER_SECRET).length - 1, modelSteps.length, "one mapping per model step");
+    // Each mapping names the key twice (variable and secret); any other mention is a mapping elsewhere.
+    assert.equal(WORKFLOW.split("OPENROUTER_API_KEY").length - 1, 2 * modelSteps.length, "no mapping outside the model steps");
+  });
+
+  it("keeps the production read-only URL out of every process that holds the OpenRouter key", () => {
+    // scripts/lib/sage-eval-provider.mjs refuses --provider=openrouter while any
+    // non-local database URL, BENCH_PROD_READONLY_URL included, is in the
+    // environment: OpenRouter gets synthetic data only.
+    assert.doesNotMatch(jobHeader, /BENCH_PROD_READONLY_URL/, "not at job level");
+    const withProdUrl = steps.filter((step) => /BENCH_PROD_READONLY_URL/.test(step)).map(stepName);
+    assert.deepEqual(withProdUrl, ["Nightly-tier benchmarks"]);
+  });
+
+  it("runs every nightly OpenRouter suite in the model step, after the tier step", () => {
+    // The tier step has no OpenRouter key, so it writes `skipped` for these
+    // suites; the model step must run after it to write their real results.
+    const step = findStep("Nightly-tier model benchmarks");
+    const listed = (step.match(/--suite=([a-z0-9,-]+)/)?.[1] ?? "").split(",").filter(Boolean).sort();
+    assert.deepEqual(listed, suitesRequiring("openrouter", ["nightly"]));
+    assert.match(step, /--compare/);
+    assert.ok(steps.indexOf(step) > steps.indexOf(findStep("Nightly-tier benchmarks")));
+    assert.match(step, /^ {8}id: nightly_models$/m);
+  });
+
+  it("files the regression issue and fails the run when either nightly step fails", () => {
+    for (const name of ["Open or update the regression issue", "Fail the run when a nightly benchmark regressed"]) {
+      const condition = findStep(name).match(/^ {8}if: (.+)$/m)?.[1] ?? "";
+      assert.match(condition, /steps\.nightly\.outcome == 'failure'/, name);
+      assert.match(condition, /steps\.nightly_models\.outcome == 'failure'/, name);
     }
-    assert.doesNotMatch(jobHeader, /OPENROUTER_API_KEY/, "no model key at job level");
   });
 
   it("maps no Gemini key anywhere", () => {

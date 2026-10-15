@@ -77,8 +77,10 @@ jobs:
       # `skipped` instead of failing. Values that reach a scorer through
       # ctx.env are redacted out of every result file by
       # scripts/bench/lib/redact.mjs before it is written.
-      # The model key is mapped on the two steps that run suites, not here.
-      BENCH_PROD_READONLY_URL: ${{ secrets.BENCH_PROD_READONLY_URL }}
+      # Secrets are mapped on the steps that run suites, never here: the
+      # OpenRouter key and the production read-only URL must not share a
+      # process (scripts/lib/sage-eval-provider.mjs refuses --provider=openrouter
+      # beside any non-local database URL, so OpenRouter sees synthetic data only).
       # What the model suites measure: production's model, through OpenRouter.
       # Pinned to DEFAULT_GEMINI_MODEL by src/lib/ci-benchmarks-openrouter.test.ts.
       OPENROUTER_MODEL: google/gemini-3.1-flash-lite
@@ -133,8 +135,21 @@ jobs:
         id: nightly
         # continue-on-error so the watch tier still runs and the regression
         # issue is still filed; the job's own verdict is re-applied at the end.
+        # No OpenRouter key here, so the OpenRouter suites report skipped and
+        # the next step overwrites their results.
         continue-on-error: true
         run: npm run bench -- --tier=nightly --compare
+        env:
+          BENCH_PROD_READONLY_URL: ${{ secrets.BENCH_PROD_READONLY_URL }}
+
+      - name: Nightly-tier model benchmarks
+        id: nightly_models
+        # The nightly suites that require `openrouter`, in a process without
+        # the production read-only URL. Must run after the tier step above.
+        # The list is pinned to the configs by
+        # src/lib/ci-benchmarks-openrouter.test.ts.
+        continue-on-error: true
+        run: npm run bench -- --suite=explain-faithfulness,sage-grounding,sage-readability --compare
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
@@ -171,7 +186,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Open or update the regression issue
-        if: always() && steps.nightly.outcome == 'failure'
+        if: always() && (steps.nightly.outcome == 'failure' || steps.nightly_models.outcome == 'failure')
         uses: actions/github-script@v7
         with:
           script: |
@@ -182,7 +197,10 @@ jobs:
             // Second line of defence: result files are already redacted by
             // the runner (scripts/bench/lib/redact.mjs) before being written,
             // but the issue body is public, so the same redactor runs again
-            // over whatever is about to be posted. If the module cannot be
+            // over whatever is about to be posted. It sees this step's env
+            // only; the OpenRouter key and the production read-only URL are
+            // mapped on the suite steps alone, so the runner's own pass is
+            // what covers them. If the module cannot be
             // loaded for any reason, fall back to posting nothing but a link
             // rather than posting unredacted text.
             let redactSecrets = null;
@@ -274,7 +292,7 @@ jobs:
             }
 
       - name: Fail the run when a nightly benchmark regressed
-        if: always() && steps.nightly.outcome == 'failure'
+        if: always() && (steps.nightly.outcome == 'failure' || steps.nightly_models.outcome == 'failure')
         run: |
           echo "::error::A nightly-tier benchmark crossed its floor. See the Benchmark regression issue."
           exit 1
