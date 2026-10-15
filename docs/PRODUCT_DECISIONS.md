@@ -410,3 +410,14 @@ changes in [MATURITY_REVIEW.md](./MATURITY_REVIEW.md)):
   DSAR self-serve export deliberately deferred until their manual loops are proven
   (Step 5 Automation Readiness Test). Retention durations await OWNER-CONFIRM in
   [DATA_RETENTION_POLICY.md](./DATA_RETENTION_POLICY.md).
+
+
+## 2026-10-08 — Local model simplification (implementation prepared locally)
+
+Owner requested EmbeddingGemma 2 inside VisionQuest and Gemma 4 12B as the only
+local conversational model choice, limited to VisionQuest. All local generative
+roles are pinned to `gemma4:12b`; existing downloaded host models remain intact.
+EmbeddingGemma 2 serves the separate search/embedding role through a local bridge.
+Cloud policy and selection remain unchanged. Local synthetic integration is verified;
+production deployment, secured connectivity, and index migration are separate steps.
+See [installation and activation runbook](./runbooks/embeddinggemma-2-local.md).

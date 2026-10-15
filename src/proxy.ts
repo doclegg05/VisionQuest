@@ -91,12 +91,10 @@ export function proxy(request: NextRequest) {
     // before it acts — see SIGNED_WEBHOOK_PATHS in src/lib/csrf.ts.
     const isSignedWebhook = isSignedWebhookPath(pathname);
 
-    if (
-      !isInternal &&
-      !isSignedWebhook &&
-      !isUrlHostMatch(origin, host) &&
-      !isUrlHostMatch(referer, host)
-    ) {
+    // A present Origin is authoritative (including the opaque "null" origin).
+    // Referer is a fallback only when Origin is absent, never an override.
+    const isSameOrigin = isUrlHostMatch(origin ?? referer, host);
+    if (!isInternal && !isSignedWebhook && !isSameOrigin) {
       return NextResponse.json(
         { error: "Forbidden: origin mismatch." },
         { status: 403 },
@@ -193,7 +191,7 @@ export function proxy(request: NextRequest) {
  * excluded by name, so the hot path is untouched. No path under `public/`
  * matches a gated prefix, so none of them can be redirected.
  */
-export const PROXY_MATCHER = "/((?!_next/static|_next/image|favicon.ico).*)";
+export const PROXY_MATCHER = "/((?!_next/static/|_next/image$|favicon\\.ico$).*)";
 
 export const config = {
   // Next.js 16 proxy (renamed from middleware) always runs on Node.js runtime —
@@ -201,8 +199,7 @@ export const config = {
   // works out of the box.
   //
   // The matcher MUST be a string literal here: Next parses `config` statically
-  // at build time and rejects an identifier ("Entry `matcher[0]` need to be
-  // static strings"). `PROXY_MATCHER` above is the SAME string exported for the
-  // tests; `proxy.test.ts` pins that the two never drift apart.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // at build time and rejects an identifier. `proxy.test.ts` pins it to
+  // PROXY_MATCHER. Only framework-owned assets bypass the perimeter.
+  matcher: ["/((?!_next/static/|_next/image$|favicon\\.ico$).*)"],
 };

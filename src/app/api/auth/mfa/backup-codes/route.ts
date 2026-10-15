@@ -55,13 +55,23 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
 
   const backupCodes = generateBackupCodes();
 
-  await prisma.student.update({
-    where: { id: student.id },
+  // Spending the counter and replacing recovery codes must be one conditional write.
+  const changed = await prisma.student.updateMany({
+    where: {
+      id: student.id,
+      mfaEnabled: true,
+      mfaSecret: student.mfaSecret,
+      mfaLastUsedCounter: student.mfaLastUsedCounter,
+    },
     data: {
       mfaBackupCodes: hashBackupCodes(backupCodes),
       ...(counter != null ? { mfaLastUsedCounter: counter } : {}),
     },
   });
+
+  if (changed.count !== 1) {
+    return NextResponse.json({ error: "Invalid MFA code. Please try again." }, { status: 401 });
+  }
 
   await logAuditEvent({
     actorId: student.id,

@@ -130,6 +130,12 @@ interface NativeChatResponse {
 
 type OllamaApiMode = "unknown" | "openai" | "native";
 
+interface ChatFetchResult {
+  response: Response;
+  /** Parsed under the request deadline; absent for streaming or HTTP errors. */
+  data?: unknown;
+}
+
 /** The clock a single `reader.read()` runs against. */
 interface StreamDeadline {
   /** Epoch ms at which the read is abandoned. */
@@ -629,33 +635,66 @@ export class OllamaProvider implements AIProvider {
   }
 
   /**
-   * Create a fetch call with an AbortController timeout.
-   * Cloudflare Tunnel returns 524 if the origin takes >100s to send
-   * the first byte.  We abort before that threshold so callers get a
-   * clear timeout error instead of a cryptic 524.
+   * Non-streaming requests share one deadline across headers and the JSON body.
+   * Streaming requests hand off at headers to the existing content deadlines.
    */
   private async fetchWithTimeout(
     url: string,
     init: RequestInit,
     timeoutMs: number,
-  ): Promise<Response> {
+    streaming: boolean,
+  ): Promise<ChatFetchResult> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     try {
-      return await fetch(url, {
-        ...init,
-        signal: controller.signal,
-      });
+      return await Promise.race([
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            const error = new Error(`Local AI request timed out after ${Math.round(timeoutMs / 1000)} seconds`);
+            // Reject first: abort/cancel can otherwise complete a pending read.
+            reject(error);
+            controller.abort(error);
+            void reader?.cancel(error).catch(() => undefined);
+          }, timeoutMs);
+        }),
+        (async (): Promise<ChatFetchResult> => {
+          const response = await fetch(url, { ...init, signal: controller.signal });
+          // Also dispose of a late response from a transport ignoring abort.
+          if (controller.signal.aborted) {
+            void response.body?.cancel().catch(() => undefined);
+            throw controller.signal.reason;
+          }
+          if (streaming || !response.ok) return { response };
+
+          reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let text = "";
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              text += decoder.decode(value, { stream: true });
+            }
+          }
+          text += decoder.decode();
+          return { response, data: JSON.parse(text) };
+        })(),
+      ]);
     } finally {
-      clearTimeout(timer);
+      if (timer !== undefined) clearTimeout(timer);
+      // Never await a broken upstream cancellation hook during cleanup.
+      void reader?.cancel().catch(() => undefined);
+      reader?.releaseLock();
     }
   }
 
   private async postOpenAIChat(
     body: unknown,
     timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
-  ): Promise<Response> {
+    streaming = false,
+  ): Promise<ChatFetchResult> {
     return this.fetchWithTimeout(
       `${this.baseUrl}/v1/chat/completions`,
       {
@@ -664,13 +703,15 @@ export class OllamaProvider implements AIProvider {
         body: JSON.stringify(body),
       },
       timeoutMs,
+      streaming,
     );
   }
 
   private async postNativeChat(
     body: unknown,
     timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
-  ): Promise<Response> {
+    streaming = false,
+  ): Promise<ChatFetchResult> {
     return this.fetchWithTimeout(
       `${this.baseUrl}/api/chat`,
       {
@@ -679,6 +720,7 @@ export class OllamaProvider implements AIProvider {
         body: JSON.stringify(body),
       },
       timeoutMs,
+      streaming,
     );
   }
 
@@ -686,29 +728,33 @@ export class OllamaProvider implements AIProvider {
     openAIBody: unknown,
     nativeBody: unknown,
     timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
-  ): Promise<{ mode: Exclude<OllamaApiMode, "unknown">; response: Response }> {
+    streaming = false,
+  ): Promise<ChatFetchResult & { mode: Exclude<OllamaApiMode, "unknown"> }> {
     if (this.apiMode === "native") {
-      const response = await this.postNativeChat(nativeBody, timeoutMs);
-      return { mode: "native", response };
+      const result = await this.postNativeChat(nativeBody, timeoutMs, streaming);
+      return { mode: "native", ...result };
     }
 
-    const openAIResponse = await this.postOpenAIChat(openAIBody, timeoutMs);
+    const openAIResult = await this.postOpenAIChat(openAIBody, timeoutMs, streaming);
+    const openAIResponse = openAIResult.response;
     if (openAIResponse.ok) {
       this.apiMode = "openai";
-      return { mode: "openai", response: openAIResponse };
+      return { mode: "openai", ...openAIResult };
     }
 
     // Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp server)
     // only expose /v1/* — never fall back to native /api/chat for them.
     if (this.openAiOnly || !shouldTryNativeAfterOpenAiStatus(openAIResponse.status)) {
-      return { mode: "openai", response: openAIResponse };
+      return { mode: "openai", ...openAIResult };
     }
 
-    const nativeResponse = await this.postNativeChat(nativeBody, timeoutMs);
-    if (nativeResponse.ok) {
+    // Discard the failed response before opening a replacement connection.
+    void openAIResponse.body?.cancel().catch(() => undefined);
+    const nativeResult = await this.postNativeChat(nativeBody, timeoutMs, streaming);
+    if (nativeResult.response.ok) {
       this.apiMode = "native";
     }
-    return { mode: "native", response: nativeResponse };
+    return { mode: "native", ...nativeResult };
   }
 
   async generateResponse(
@@ -718,7 +764,7 @@ export class OllamaProvider implements AIProvider {
     options?: GenerationOptions,
   ): Promise<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
-    const { mode, response } = await this.postChat(
+    const { mode, response, data: payload } = await this.postChat(
       {
         model: this.model,
         messages: openAIMessages,
@@ -743,10 +789,11 @@ export class OllamaProvider implements AIProvider {
     );
 
     if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
       throw new Error(`Local AI request failed (${response.status})`);
     }
 
-    const data = (await response.json()) as OpenAIChatResponse | NativeChatResponse;
+    const data = payload as OpenAIChatResponse | NativeChatResponse;
     const text =
       mode === "openai"
         ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""
@@ -861,9 +908,11 @@ export class OllamaProvider implements AIProvider {
         keep_alive: this.keepAlive,
       },
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
+      true,
     );
 
     if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
       const message = `Local AI stream failed (${response.status})`;
       throw new LocalAiStreamError(message, {
         switchToNative: shouldSwitchToNative(message),
@@ -871,7 +920,9 @@ export class OllamaProvider implements AIProvider {
     }
 
     if (!response.body) throw new Error("Ollama returned empty stream body");
-    const reader = response.body.getReader();
+    const chunks = this.streamChunks(response.body, () =>
+      this.nextStreamDeadline(firstContentDeadlineAt, lastDeltaAt),
+    );
     const decoder = new TextDecoder();
     let buffer = "";
     let yieldedContent = false;
@@ -891,12 +942,7 @@ export class OllamaProvider implements AIProvider {
       lastDeltaAt = Date.now();
     };
 
-    while (true) {
-      const { done, value } = await this.readStreamChunk(
-        reader,
-        this.nextStreamDeadline(firstContentDeadlineAt, lastDeltaAt),
-      );
-      if (done) break;
+    for await (const value of chunks) {
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
@@ -1192,6 +1238,25 @@ export class OllamaProvider implements AIProvider {
     );
   }
 
+  /** Own the reader across parser returns, errors, and consumer cancellation. */
+  private async *streamChunks(
+    body: ReadableStream<Uint8Array>,
+    deadline: () => StreamDeadline,
+  ): AsyncGenerator<Uint8Array> {
+    const reader = body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await this.readStreamChunk(reader, deadline());
+        if (done) return;
+        yield value;
+      }
+    } finally {
+      // A broken upstream cancel hook must not delay a timeout or disconnect.
+      void reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
+  }
+
   private async readStreamChunk(
     reader: ReadableStreamDefaultReader<Uint8Array>,
     deadline: StreamDeadline,
@@ -1203,7 +1268,7 @@ export class OllamaProvider implements AIProvider {
 
     const remainingMs = deadline.at - Date.now();
     if (remainingMs <= 0) {
-      await reader.cancel(cancelReason).catch(() => undefined);
+      void reader.cancel(cancelReason).catch(() => undefined);
       throw this.streamDeadlineError(deadline.kind);
     }
 
@@ -1259,6 +1324,8 @@ export class OllamaProvider implements AIProvider {
 
         const delay = STREAM_STARTUP_RETRY_DELAYS_MS[attempt];
         if (delay > 0) await sleep(delay);
+      } finally {
+        await hopGen.return({ toolCalls: [], usage: null });
       }
     }
 
@@ -1318,15 +1385,19 @@ export class OllamaProvider implements AIProvider {
       const accumulatedText: string[] = [];
       let hopResult: HopResult;
 
-      while (true) {
-        const next = await hopGen.next();
-        if (next.done) {
-          hopResult = next.value;
-          break;
+      try {
+        while (true) {
+          const next = await hopGen.next();
+          if (next.done) {
+            hopResult = next.value;
+            break;
+          }
+          accumulatedText.push(next.value);
+          outputChars += next.value.length;
+          yield { kind: "text", text: next.value };
         }
-        accumulatedText.push(next.value);
-        outputChars += next.value.length;
-        yield { kind: "text", text: next.value };
+      } finally {
+        await hopGen.return({ toolCalls: [], usage: null });
       }
 
       accumulated = accumulateHopUsage(accumulated, hopResult.usage);
@@ -1433,9 +1504,11 @@ export class OllamaProvider implements AIProvider {
       openAIBody,
       nativeBody,
       OllamaProvider.STREAM_FIRST_BYTE_TIMEOUT_MS,
+      true,
     );
 
     if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
       const message = `Local AI tool stream failed (${response.status})`;
       throw new LocalAiStreamError(message, {
         switchToNative: shouldSwitchToNative(message),
@@ -1443,7 +1516,9 @@ export class OllamaProvider implements AIProvider {
     }
     if (!response.body) throw new Error("Ollama returned empty stream body");
 
-    const reader = response.body.getReader();
+    const chunks = this.streamChunks(response.body, () =>
+      this.nextStreamDeadline(firstContentDeadlineAt, lastDeltaAt),
+    );
     const decoder = new TextDecoder();
     let buffer = "";
     const toolCalls = new Map<number, AccumulatedToolCall>();
@@ -1461,12 +1536,7 @@ export class OllamaProvider implements AIProvider {
       lastDeltaAt = Date.now();
     };
 
-    while (true) {
-      const { done, value } = await this.readStreamChunk(
-        reader,
-        this.nextStreamDeadline(firstContentDeadlineAt, lastDeltaAt),
-      );
-      if (done) break;
+    for await (const value of chunks) {
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
@@ -1619,7 +1689,7 @@ export class OllamaProvider implements AIProvider {
     options?: GenerationOptions,
   ): Promise<string> {
     const openAIMessages = toOpenAIMessages(systemPrompt, messages);
-    const { mode, response } = await this.postChat(
+    const { mode, response, data: payload } = await this.postChat(
       {
         model: this.model,
         messages: openAIMessages,
@@ -1646,10 +1716,11 @@ export class OllamaProvider implements AIProvider {
     );
 
     if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
       throw new Error(`Local AI structured request failed (${response.status})`);
     }
 
-    const data = (await response.json()) as OpenAIChatResponse | NativeChatResponse;
+    const data = payload as OpenAIChatResponse | NativeChatResponse;
     const text =
       mode === "openai"
         ? (data as OpenAIChatResponse).choices?.[0]?.message?.content ?? ""

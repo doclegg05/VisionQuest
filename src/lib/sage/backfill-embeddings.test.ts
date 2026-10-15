@@ -32,7 +32,7 @@ mock.module("@/lib/db", {
 
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
-    embedTexts: mockEmbedTexts,
+    embedTextsWithModel: async (...args: unknown[]) => ({ vectors: await mockEmbedTexts(...args), model: ACTIVE_MODEL }),
     toVectorLiteral: (vector: number[]) => `[${vector.join(",")}]`,
   },
 });

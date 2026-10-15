@@ -13,7 +13,7 @@
 
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
-import { embedTexts, toVectorLiteral } from "@/lib/ai/embeddings";
+import { embedTextsWithModel, toVectorLiteral } from "@/lib/ai/embeddings";
 import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
 import { extractPagesFromBuffer, containsPII } from "./extract";
 import { embedProgramDocument } from "./document-embedding";
@@ -331,18 +331,18 @@ export async function backfillSageMemoryEmbeddings(options: {
   for (let start = 0; start < rows.length; start += MEMORY_EMBED_BATCH) {
     const batch = rows.slice(start, start + MEMORY_EMBED_BATCH);
     try {
-      const vectors = await embedTexts(
+      const { vectors, model: batchModel } = await embedTextsWithModel(
         batch.map((row) => row.content),
         {
           taskType: "RETRIEVAL_DOCUMENT",
-          usage: { studentId: null, callSite: "sage_memory_reembed" },
+          usage: { studentId: null, callSite: "sage_memory_reembed", sensitivity: "student_record" },
         },
       );
       for (let i = 0; i < batch.length; i++) {
         await prisma.$executeRaw`
           UPDATE "visionquest"."SageMemory"
           SET embedding = ${toVectorLiteral(vectors[i])}::vector(768),
-              "embeddingModel" = ${activeModel}
+              "embeddingModel" = ${batchModel}
           WHERE id = ${batch[i].id}
         `;
         tally.embedded++;

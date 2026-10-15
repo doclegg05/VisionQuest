@@ -9,6 +9,7 @@ import { mockStudentSession } from "@/lib/test-helpers";
  */
 
 const student = mockStudentSession();
+const mockUploadFile = mock.fn(async () => undefined);
 
 const mockFileUploadCreate =
   mock.fn<(args: { data: Record<string, unknown> }) => Promise<Record<string, unknown>>>();
@@ -30,7 +31,7 @@ mock.module("@/lib/db", {
 mock.module("@/lib/storage", {
   namedExports: {
     generateStorageKey: (studentId: string) => `${studentId}/uuid.pdf`,
-    uploadFile: async () => undefined,
+    uploadFile: mockUploadFile,
     validateFile: () => null,
   },
 });
@@ -84,14 +85,26 @@ before(async () => {
 
 function uploadRequest(filename: string) {
   const form = new FormData();
-  form.set("file", new File([new Uint8Array([1, 2, 3])], filename, { type: "application/pdf" }));
+  form.set("file", new File(["%PDF-1.7\n"], filename, { type: "application/pdf" }));
   return new Request("http://localhost:3000/api/chat/upload", { method: "POST", body: form });
 }
 
 describe("POST /api/chat/upload — persisted filename", () => {
   beforeEach(() => {
+    mockUploadFile.mock.resetCalls();
     mockFileUploadCreate.mock.resetCalls();
     mockFileUploadCreate.mock.mockImplementation(async (args) => ({ id: "f1", ...args.data }));
+  });
+
+  it("rejects text fields and spoofed PDF bytes before any writes", async () => {
+    for (const value of ["not a file", new File(["<script>alert(1)</script>"], "attack.pdf", { type: "application/pdf" })]) {
+      const body = new FormData();
+      body.set("file", value);
+      const res = await route.POST(new Request("http://localhost/api/chat/upload", { method: "POST", body }));
+      assert.equal(res.status, 400);
+    }
+    assert.equal(mockUploadFile.mock.callCount(), 0);
+    assert.equal(mockFileUploadCreate.mock.callCount(), 0);
   });
 
   it("stores the basename of a traversal filename, not the path", async () => {

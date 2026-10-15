@@ -453,7 +453,7 @@ const lookupCertProgress: AgentTool = {
 const reviewPortfolio: AgentTool = {
   name: "review_portfolio",
   description:
-    "Review the student's portfolio: every item with its id and what backs it (file/link/description), plus whether they have a resume and a shared public page. Call this before coaching them on what to add, edit, or remove — it returns the portfolioItemId edit/delete need.",
+    "Review the student's portfolio when they ask for feedback or need help choosing what to change. Returns items and their ids for edit/delete, plus resume and sharing status. For an explicit request to add a named item, use add_portfolio_item directly. For an explicit resume text edit, use propose_resume_edit; that tool loads the current resume and presents the change for confirmation.",
   parameters: { type: "object", properties: {} },
   slashCommand: {
     command: "/portfolio",
@@ -812,7 +812,7 @@ const lookupProgramInfo: AgentTool = {
 const classifyAttachment: AgentTool = {
   name: "classify_attachment",
   description:
-    "Inspect a file the user uploaded in chat (image or PDF) and identify what it is — certificate, form, resume, receipt, etc. — plus extracted fields like the credential/form title, issuer, date, and whether it looks completed. Use the fileUploadId from the attached-files context.",
+    "Inspect an uploaded image or PDF when the user asks what it is, or its kind or needed fields are unknown. Extract the credential/form title, issuer, date, and whether it looks completed. Use the fileUploadId from the attached-files context. This is not a prerequisite for filing: when the user explicitly asks to submit a signed orientation form, file a document or certification evidence, or add a known item to their portfolio, call submit_form, file_document, or add_portfolio_item directly using the supplied identifiers. Those tools enforce their own validation and confirmation requirements.",
   parameters: {
     type: "object",
     properties: {

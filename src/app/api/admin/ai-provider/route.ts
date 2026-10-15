@@ -27,6 +27,7 @@ import {
   type AiRole,
 } from "@/lib/ai/roles";
 import {
+  DEFAULT_OLLAMA_MODEL,
   readLocalAiRoleMaxOutputTokensRaw,
   readLocalAiRoleModels,
   readLocalAiRoleModelSources,
@@ -133,7 +134,7 @@ export const GET = withAdminAuth(async () => {
   return NextResponse.json({
     provider: provider || "cloud",
     url: localConfig.url || "",
-    model: localConfig.model || "gemma4:26b",
+    model: DEFAULT_OLLAMA_MODEL,
     embeddingModel: localConfig.embeddingModel || "nomic-embed-text",
     authMode: localConfig.authMode,
     apiStyle: localConfig.apiStyle,
@@ -148,7 +149,7 @@ export const GET = withAdminAuth(async () => {
       latency: AI_ROLE_PROFILES[role].latency,
       // What this role will ACTUALLY use once the fallback is applied, so the
       // operator never has to work it out from a blank field.
-      effectiveModel: resolveRoleModel(role, roleModels, localConfig.model || "gemma4:26b"),
+      effectiveModel: resolveRoleModel(role, roleModels, DEFAULT_OLLAMA_MODEL),
       // An env-pinned role cannot be cleared from this screen — deleting the
       // config row just hands control back to the env var.
       source: roleModelSources[role],
@@ -164,6 +165,11 @@ export const PUT = withAdminAuth(async (session, req: NextRequest) => {
   const authMode = resolveLocalAiAuthMode(body.authMode);
   const apiStyle = resolveLocalAiApiStyle(body.apiStyle);
   const existingLocalConfig = await readLocalAiProviderConfig();
+
+  if ((body.model && body.model !== DEFAULT_OLLAMA_MODEL) ||
+      Object.values(body.roleModels ?? {}).some((model) => model && model !== DEFAULT_OLLAMA_MODEL)) {
+    throw badRequest("VisionQuest uses Gemma 4 12B (gemma4:12b) for every local AI job.");
+  }
 
   if (body.url !== undefined && !isSafeAiProviderUrl(body.url)) {
     throw badRequest(

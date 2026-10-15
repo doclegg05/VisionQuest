@@ -202,6 +202,24 @@ describe("getDocumentContext", () => {
     );
   });
 
+  it("starts passage retrieval without waiting for the independent snippet read", async () => {
+    let releaseSnippets!: (value: []) => void;
+    const snippets = new Promise<[]>((resolve) => { releaseSnippets = resolve; });
+    mockSnippetFindMany.mock.mockImplementation(() => snippets);
+    const subject = { studentId: "student-context" };
+    const pending = getDocumentContext("dress code", "student", 3, 4800, subject);
+    try {
+      // Drain the microtask queue without wall-clock timing assertions.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.equal(mockGetBestChunks.mock.callCount(), 1);
+      assert.deepEqual(mockGetBestChunks.mock.calls[0].arguments, [["doc-dress"], "dress code", 2, subject]);
+      assert.equal(mockHybridSearch.mock.calls[0].arguments[3], subject);
+    } finally {
+      releaseSnippets([]);
+      await pending;
+    }
+  });
+
   it("passes the caller role to hybrid search", async () => {
     await getDocumentContext("dress code", "staff");
     assert.equal(mockHybridSearch.mock.callCount(), 1);

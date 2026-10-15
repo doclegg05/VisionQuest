@@ -53,8 +53,14 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     return NextResponse.json({ error: "Invalid MFA code." }, { status: 401 });
   }
 
-  await prisma.student.update({
-    where: { id: student.id },
+  // Verify and mutate the same factor state; a concurrently spent code must fail.
+  const changed = await prisma.student.updateMany({
+    where: {
+      id: student.id,
+      mfaEnabled: true,
+      mfaSecret: student.mfaSecret,
+      mfaLastUsedCounter: student.mfaLastUsedCounter,
+    },
     data: {
       mfaSecret: null,
       mfaEnabled: false,
@@ -63,6 +69,10 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
       mfaLastUsedCounter: null,
     },
   });
+
+  if (changed.count !== 1) {
+    return NextResponse.json({ error: "Invalid MFA code. Please try again." }, { status: 401 });
+  }
 
   await logAuditEvent({
     actorId: student.id,
