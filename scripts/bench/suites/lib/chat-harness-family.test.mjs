@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { passRateFromBucket } from "./chat-harness-family.mjs";
+import {
+  CHAT_HARNESS_MODEL,
+  CHAT_HARNESS_PROVIDER,
+  chatHarnessArgs,
+  chatHarnessEnv,
+  passRateFromBucket,
+} from "./chat-harness-family.mjs";
 import { medianGrade } from "../sage-readability.mjs";
 
 test("passRateFromBucket: skipped cases are excluded from the denominator", () => {
@@ -34,4 +40,51 @@ test("medianGrade: non-numeric grades (skipped cases) are ignored", () => {
 
 test("medianGrade: empty input returns null, not NaN", () => {
   assert.equal(medianGrade([]), null);
+});
+
+// --- 2026-10-15: the three chat-harness suites run through OpenRouter -------
+// The repo's GEMINI_API_KEY secret was rejected by Google (API_KEY_INVALID),
+// so the nightly ran these suites and errored. They now call production's
+// model through OpenRouter, on the synthetic fixture only.
+
+test("chatHarnessArgs: spawns the harness on OpenRouter with the model pinned", () => {
+  assert.deepEqual(chatHarnessArgs("grounding"), [
+    "--families=grounding",
+    "--provider=openrouter",
+    "--model=google/gemini-3.1-flash-lite",
+  ]);
+  assert.equal(CHAT_HARNESS_PROVIDER, "openrouter");
+});
+
+test("CHAT_HARNESS_MODEL is production's Gemini model, as OpenRouter names it", async () => {
+  const { DEFAULT_GEMINI_MODEL } = await import("../../../../src/lib/gemini.ts");
+  assert.equal(CHAT_HARNESS_MODEL, `google/${DEFAULT_GEMINI_MODEL}`);
+});
+
+test("chatHarnessEnv: hands the child the OpenRouter key and keeps the caller's overlay", () => {
+  const env = chatHarnessEnv({ openrouterApiKey: "or-key", env: { SAGE_RAG_MODE: "keyword" } });
+  assert.equal(env.OPENROUTER_API_KEY, "or-key");
+  assert.equal(env.SAGE_RAG_MODE, "keyword");
+});
+
+test("chatHarnessEnv: the child gets no Google key, even when the caller passes one", () => {
+  const env = chatHarnessEnv({ openrouterApiKey: "or-key", env: { GEMINI_API_KEY: "google-key" } });
+  assert.equal(env.GEMINI_API_KEY, "");
+});
+
+test("chatHarnessEnv: replaces the prod read-only URL with a loopback value the OpenRouter guard accepts", () => {
+  // benchmarks.yml sets BENCH_PROD_READONLY_URL at job level. The harness never
+  // reads it, and --provider=openrouter refuses to start next to a non-local
+  // database URL (assertNoRemoteDatabase), so passing it through would turn
+  // the day the secret is set into the day these suites stop running.
+  const env = chatHarnessEnv({
+    openrouterApiKey: "or-key",
+    env: { BENCH_PROD_READONLY_URL: "postgresql://reader@db.example.com:5432/prod" },
+  });
+  assert.equal(new URL(env.BENCH_PROD_READONLY_URL).hostname, "127.0.0.1");
+});
+
+test("chatHarnessEnv: refuses to build a child env without an OpenRouter key", () => {
+  assert.throws(() => chatHarnessEnv({ openrouterApiKey: "" }), /OPENROUTER_API_KEY/);
+  assert.throws(() => chatHarnessEnv({}), /OPENROUTER_API_KEY/);
 });
