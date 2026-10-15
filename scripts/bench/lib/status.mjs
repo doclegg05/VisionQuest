@@ -20,7 +20,9 @@
  *             `lower` metric) but still inside the floor: report, never fail
  *   fail    — the floor was crossed, or an `exact` metric moved off its baseline
  *   info    — nothing to judge against (no floor, no baseline)
- *   skipped — no value was produced (unmet `requires`)
+ *   skipped — no value was produced (unmet `requires`, or the scorer marked
+ *             the metric `details.skipped: true` and the runner dropped its
+ *             placeholder value)
  *   error   — the scorer threw, or did not return a configured metric; set by
  *             the runner, never derived from a value
  *
