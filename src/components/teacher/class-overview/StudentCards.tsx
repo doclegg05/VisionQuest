@@ -49,7 +49,7 @@ export default function StudentCards({
                   <Link
                     href={links.record}
                     prefetch={false}
-                    className="break-words font-display text-base leading-5 text-[var(--ink-strong)] transition-colors hover:text-[var(--accent-secondary)]"
+                    className="inline-flex items-center break-words font-display text-base leading-5 text-[var(--ink-strong)] transition-colors hover:text-[var(--accent-secondary)] pointer-coarse:min-h-11"
                   >
                     {student.displayName}
                   </Link>
@@ -144,28 +144,28 @@ export default function StudentCards({
               <Link
                 href={links.record}
                 prefetch={false}
-                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+                className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Record
               </Link>
               <Link
                 href={links.orientation}
                 prefetch={false}
-                className="rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.14)]"
+                className="inline-flex items-center rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.14)]"
               >
                 Orientation
               </Link>
               <Link
                 href={links.forms}
                 prefetch={false}
-                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
+                className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Forms
               </Link>
               <Link
                 href={links.goals}
                 prefetch={false}
-                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
+                className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Goals
               </Link>

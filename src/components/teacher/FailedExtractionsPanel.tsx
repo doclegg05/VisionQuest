@@ -80,15 +80,15 @@ function FailureRow({
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 lg:flex-row lg:items-center">
-      <WarningCircle size={24} weight="duotone" className="shrink-0 text-amber-500" aria-hidden />
+      <WarningCircle size={24} weight="duotone" className="shrink-0 text-[var(--badge-warning-text)]" aria-hidden />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/teacher/students/${row.studentId}`}
-            className="truncate text-sm font-semibold text-[var(--ink-strong)] hover:underline"
+            className="inline-flex max-w-full items-center pointer-coarse:min-h-11 text-sm font-semibold text-[var(--ink-strong)] hover:underline"
           >
-            {row.student.displayName}
+            <span className="truncate">{row.student.displayName}</span>
           </Link>
           <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-medium text-[var(--ink-muted)]">
             {extractorLabel(row.extractorKey)}
@@ -108,7 +108,7 @@ function FailureRow({
             type="button"
             disabled={busy}
             onClick={() => onAction(row.id, "replay")}
-            className="flex items-center gap-1.5 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:opacity-50"
+            className="flex items-center gap-1.5 pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90 disabled:opacity-50"
           >
             <ArrowClockwise size={14} weight="bold" aria-hidden />
             {busy ? "Replaying..." : "Replay"}
@@ -118,7 +118,7 @@ function FailureRow({
           type="button"
           disabled={busy}
           onClick={() => onAction(row.id, "dismiss")}
-          className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] disabled:opacity-50"
+          className="flex items-center gap-1.5 pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] disabled:opacity-50"
         >
           <CheckCircle size={14} weight="regular" aria-hidden />
           Dismiss

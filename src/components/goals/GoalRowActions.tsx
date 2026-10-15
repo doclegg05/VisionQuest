@@ -1,11 +1,14 @@
 "use client";
 
-import { PencilSimple, X } from "@phosphor-icons/react";
+import { PencilSimple, Trash } from "@phosphor-icons/react";
 
 interface GoalRowActionsProps {
-  /** Row kind, used in the accessible names: "Edit Weekly", "Dismiss Weekly". */
+  /** Row kind, used in the accessible names: "Edit Weekly", "Remove Weekly". */
   label: string;
+  /** The goal's id, so Undo can return focus to this row's controls. */
+  goalId?: string;
   onEdit: () => void;
+  /** Removes the goal. The caller hides it and offers Undo before the request is sent (B-32). */
   onDismiss: () => void;
   iconSize?: number;
 }
@@ -14,14 +17,14 @@ const BUTTON_BASE =
   "inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors";
 
 /**
- * Edit and Dismiss controls for a goal row. Always visible in muted ink with
+ * Edit and Remove controls for a goal row. Always visible in muted ink with
  * real 44px targets, so a student on a phone can reach them; hover only adds
  * emphasis, it never reveals (F45 / UX-06). The negative vertical margin keeps
  * the row's layout height near the text line while the hit area stays 44px.
  */
-export function GoalRowActions({ label, onEdit, onDismiss, iconSize = 14 }: GoalRowActionsProps) {
+export function GoalRowActions({ label, goalId, onEdit, onDismiss, iconSize = 14 }: GoalRowActionsProps) {
   return (
-    <div className="-my-1.5 ml-2 flex shrink-0 gap-1">
+    <div data-goal-id={goalId} className="-my-1.5 ml-2 flex shrink-0 gap-1">
       <button
         type="button"
         onClick={onEdit}
@@ -33,10 +36,10 @@ export function GoalRowActions({ label, onEdit, onDismiss, iconSize = 14 }: Goal
       <button
         type="button"
         onClick={onDismiss}
-        aria-label={`Dismiss ${label}`}
+        aria-label={`Remove ${label}`}
         className={`${BUTTON_BASE} hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/40`}
       >
-        <X size={iconSize} aria-hidden="true" />
+        <Trash size={iconSize} aria-hidden="true" />
       </button>
     </div>
   );

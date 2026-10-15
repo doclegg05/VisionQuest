@@ -119,7 +119,7 @@ export default function CoursesHub() {
         <p className="text-red-600 mb-4">{error}</p>
         <button
           onClick={fetchPlatforms}
-          className="px-4 py-2 bg-[var(--accent-strong)] text-[var(--on-accent)] rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+          className="inline-flex min-h-11 items-center px-4 py-2 bg-[var(--accent-strong)] text-[var(--on-accent)] rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
         >
           Try Again
         </button>
@@ -175,7 +175,7 @@ export default function CoursesHub() {
               setSelectedCategory("all");
               setShowGoalMatch(false);
             }}
-            className="mt-4 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+            className="mt-4 inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
           >
             Show all platforms
           </button>

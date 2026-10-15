@@ -21,13 +21,15 @@ interface GoalSupportPlannerProps {
   onChanged: () => Promise<void>;
 }
 
+// Same status map as GoalTree, which renders beside this planner: proposed and in progress are info,
+// active, confirmed and completed are success, blocked is a warning.
 const GOAL_STATUS_STYLES: Record<string, string> = {
-  proposed: "bg-indigo-100 text-indigo-700",
-  active: "bg-emerald-100 text-emerald-700",
-  in_progress: "bg-sky-100 text-sky-700",
-  confirmed: "bg-teal-100 text-teal-700",
-  blocked: "bg-amber-100 text-amber-800",
-  completed: "bg-violet-100 text-violet-700",
+  proposed: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
+  active: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
+  in_progress: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
+  confirmed: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
+  blocked: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
+  completed: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
   abandoned: "bg-[var(--surface-interactive)] text-[var(--ink-strong)]",
 };
 
@@ -225,7 +227,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                               href={link.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                              className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
                             >
                               Open
                             </a>
@@ -248,7 +250,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                                 },
                               }))
                             }
-                            className="mt-1 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal uppercase tracking-normal text-[var(--ink-strong)] outline-none focus:border-sky-300"
+                            className="mt-1 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal uppercase tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-blue)]"
                           />
                         </label>
 
@@ -267,7 +269,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                             }
                             rows={2}
                             placeholder="Add context, a checkpoint, or the next expected move."
-                            className="mt-1 w-full resize-none theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-sky-300"
+                            className="mt-1 w-full resize-none theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-blue)]"
                           />
                         </label>
 
@@ -275,7 +277,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                           type="button"
                           onClick={() => handleSaveLink(link.id)}
                           disabled={savingLinkId === link.id}
-                          className="rounded-full border border-[var(--border-strong)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center justify-center pointer-coarse:min-h-11 rounded-full border border-[var(--border-strong)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {savingLinkId === link.id ? "Saving..." : "Save details"}
                         </button>
@@ -319,7 +321,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                               href={recommendation.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs font-semibold text-sky-700 hover:text-sky-900"
+                              className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-[var(--badge-info-text)] hover:text-[var(--ink-strong)]"
                             >
                               View
                             </a>
@@ -328,7 +330,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                             type="button"
                             onClick={() => handleAssign(goal.id, recommendation)}
                             disabled={alreadyLinked || assigningKey === assignKey}
-                            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
+                            className="inline-flex items-center pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90 disabled:cursor-not-allowed disabled:bg-[var(--border-strong)]"
                           >
                             {alreadyLinked ? "Assigned" : assigningKey === assignKey ? "Assigning..." : "Assign"}
                           </button>
@@ -351,7 +353,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                                   },
                                 }))
                               }
-                              className="mt-1 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal uppercase tracking-normal text-[var(--ink-strong)] outline-none focus:border-sky-300"
+                              className="mt-1 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal uppercase tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-blue)]"
                             />
                           </label>
 
@@ -370,7 +372,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                               }
                               rows={2}
                               placeholder="Optional context or next-step instruction."
-                              className="mt-1 w-full resize-none theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-sky-300"
+                              className="mt-1 w-full resize-none theme-card-subtle rounded-lg px-3 py-2 text-sm font-normal tracking-normal text-[var(--ink-strong)] outline-none focus:border-[var(--accent-blue)]"
                             />
                           </label>
                         </div>
