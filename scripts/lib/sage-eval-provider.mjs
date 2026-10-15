@@ -232,10 +232,16 @@ async function resolveOllamaProvider(modelOverride = null) {
  */
 const DATABASE_ENV_NAMES = ["DATABASE_URL", "DIRECT_URL", "ADMIN_DATABASE_URL", "BENCH_PROD_READONLY_URL"];
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+// Prisma connects to a `host` query parameter instead of the URL's host, and
+// libpq clients such as psql also honour `hostaddr`, so either one makes the
+// hostname check meaningless. Matched case-insensitively to fail closed.
+const HOST_OVERRIDE_PARAMS = new Set(["host", "hostaddr"]);
 
 function isLoopbackDatabaseUrl(value) {
   try {
-    return LOOPBACK_HOSTS.has(new URL(value).hostname);
+    const url = new URL(value);
+    const overridesHost = [...url.searchParams.keys()].some((key) => HOST_OVERRIDE_PARAMS.has(key.toLowerCase()));
+    return LOOPBACK_HOSTS.has(url.hostname) && !overridesHost;
   } catch {
     return false;
   }
