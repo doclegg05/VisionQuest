@@ -27,7 +27,7 @@ If you are about to connect OpenRouter to the app itself, stop. That is a FERPA 
 
 Every request the provider sends also carries `provider: { zdr: true, data_collection: "deny" }`, which asks for the same routing as the switches above. Two things only the account settings in step 2 decide: whether a zero-retention request may use endpoints that keep prompts for safety monitoring (the choice under each model group), and OpenRouter's own Input & Output Logging and 1% data discount.
 
-CI's `sage-evals` job uses its own key, stored as the `OPENROUTER_API_KEY` repository secret on GitHub. Setup and spending limits are in `docs/runbooks/sage-eval-budget.md`.
+CI's Sage Evals workflow uses its own key, stored as the `OPENROUTER_API_KEY` repository secret on GitHub, for every model call in the `sage-evals` and `sage-memory-eval` jobs. The rule above still holds: CI sends synthetic fixtures only, and the key goes in GitHub, never in Render. The memory job also embeds through the app's Gemini path, so its two model steps get `GEMINI_API_KEY` as well. Setup, spending limits and what each result means are in `docs/runbooks/sage-eval-budget.md`.
 
 ## Running
 
