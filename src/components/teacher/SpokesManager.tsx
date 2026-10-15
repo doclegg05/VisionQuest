@@ -667,7 +667,7 @@ export default function SpokesManager() {
                                 sortOrder: String(template.sortOrder),
                               });
                             }}
-                            className={`${ROW_ACTION} text-success hover:text-[var(--ink-strong)]`}
+                            className={`${ROW_ACTION} text-success hover:text-[var(--ink-strong)] hover:underline`}
                           >
                             Edit
                           </button>
@@ -829,7 +829,7 @@ export default function SpokesManager() {
                           sortOrder: String(template.sortOrder),
                         });
                       }}
-                      className={`${ROW_ACTION} text-success hover:text-[var(--ink-strong)]`}
+                      className={`${ROW_ACTION} text-success hover:text-[var(--ink-strong)] hover:underline`}
                     >
                       Edit
                     </button>

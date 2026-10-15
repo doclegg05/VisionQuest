@@ -423,7 +423,7 @@ export default function ProgressTab({
             {!showAllConversations && conversations.length > 20 && (
               <button
                 onClick={onShowAllConversations}
-                className="flex w-full items-center justify-center text-xs text-success hover:text-[var(--ink-strong)] py-2 pointer-coarse:min-h-11"
+                className="flex w-full items-center justify-center text-xs text-success hover:text-[var(--ink-strong)] hover:underline py-2 pointer-coarse:min-h-11"
               >
                 Show all {conversations.length} conversations
               </button>
@@ -458,7 +458,7 @@ function PublicCredentialBanner({
           href={`/credentials/${publicCredentialPage.slug}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center text-sm font-semibold text-success hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
+          className="mt-3 inline-flex items-center text-sm font-semibold text-success hover:text-[var(--ink-strong)] hover:underline pointer-coarse:min-h-11"
         >
           Open public credential {"\u2192"}
         </a>

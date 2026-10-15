@@ -504,7 +504,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
   return (
     <div className="space-y-6">
-      <Link href="/teacher" className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-info hover:text-[var(--ink-strong)]">
+      <Link href="/teacher" className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-info hover:text-[var(--ink-strong)] hover:underline">
         &larr; Back to Class Dashboard
       </Link>
 

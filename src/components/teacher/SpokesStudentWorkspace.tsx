@@ -576,7 +576,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <Link href={`/teacher/students/${studentId}`} className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-success hover:text-[var(--ink-strong)]">
+          <Link href={`/teacher/students/${studentId}`} className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-success hover:text-[var(--ink-strong)] hover:underline">
             ← Back to student detail
           </Link>
           <h1 className="mt-2 font-display text-3xl text-[var(--ink-strong)]">{payload.student.displayName}</h1>
@@ -1047,7 +1047,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                             notes: item.followUp?.notes || "",
                           })
                         }
-                        className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-success hover:text-[var(--ink-strong)]"
+                        className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-success hover:text-[var(--ink-strong)] hover:underline"
                       >
                         Edit
                       </button>

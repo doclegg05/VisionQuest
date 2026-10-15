@@ -115,7 +115,7 @@ export default function FormUploadButton({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="inline-flex min-h-11 items-center text-xs font-semibold text-success hover:text-[var(--ink-strong)]"
+            className="inline-flex min-h-11 items-center text-xs font-semibold text-success hover:text-[var(--ink-strong)] hover:underline"
           >
             {uploading ? "Uploading..." : "Re-upload"}
           </button>

@@ -347,7 +347,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
                 <a
                   href="/forgot-password"
-                  className="flex min-h-11 items-center justify-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)]"
+                  className="flex min-h-11 items-center justify-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
                 >
                   Forgot your password?
                 </a>
@@ -390,7 +390,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             <div className="mt-8 flex flex-col items-center gap-3 sm:gap-4">
               <a
                 href="/teacher-register"
-                className="inline-flex min-h-11 items-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)]"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
               >
                 Staff? Register here
               </a>

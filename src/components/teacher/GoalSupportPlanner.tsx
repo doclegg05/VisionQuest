@@ -227,7 +227,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                               href={link.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-success hover:text-[var(--ink-strong)]"
+                              className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-success hover:text-[var(--ink-strong)] hover:underline"
                             >
                               Open
                             </a>

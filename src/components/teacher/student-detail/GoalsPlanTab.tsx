@@ -134,7 +134,7 @@ export default function GoalsPlanTab({
                     ) : null}
                     <a
                       href={reviewActionForItem(item).href}
-                      className="mt-3 inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-success hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+                      className="mt-3 inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-success hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)] hover:underline"
                     >
                       {reviewActionForItem(item).label} {"\u2192"}
                     </a>
@@ -192,7 +192,7 @@ export default function GoalsPlanTab({
                                           href={link.url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="inline-flex items-center font-semibold text-success hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
+                                          className="inline-flex items-center font-semibold text-success hover:text-[var(--ink-strong)] hover:underline pointer-coarse:min-h-11"
                                         >
                                           Open resource
                                         </a>
