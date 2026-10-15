@@ -98,7 +98,7 @@ test("teacher pages", async ({ browser }) => {
       await setTheme(context, theme);
       await capture(page, "teacher-queue", "/teacher", theme);
       await capture(page, "student-detail", detail, theme, (p) =>
-        expect(p.getByRole("tab", { name: "Coach" })).toBeVisible({ timeout: 20_000 }),
+        expect(p.getByRole("tablist", { name: "Student sections" })).toBeVisible({ timeout: 20_000 }),
       );
     }
   });
