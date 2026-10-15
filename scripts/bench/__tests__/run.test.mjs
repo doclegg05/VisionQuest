@@ -249,6 +249,81 @@ test("a watch-tier null value stays informational rather than erroring", () => {
   }
 });
 
+// Issue #220: sage-latency's provider failed every call, so it measured zero
+// samples and reported p95 = 0 ms, which passed its 6000 ms floor every night.
+const latencyMetrics = [{ id: "p95_ms", unit: "ms", direction: "lower", floor: 6000, tolerance: 500 }];
+
+test("a nightly metric measured over zero samples is an error, not a pass", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      tier: "nightly",
+      metrics: latencyMetrics,
+      scorer: `export async function run() { return { metrics: [{ id: "p95_ms", value: 0, n: 0 }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    const result = readResult(root, "demo");
+    assert.equal(result.status, "error");
+    assert.match(result.error, /p95_ms/);
+    assert.match(result.error, /zero samples/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a gate metric with zero samples is an error too", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics,
+      scorer: `export async function run() { return { metrics: [{ id: "accuracy", value: 1, n: 0 }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.equal(readResult(root, "demo").status, "error");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a metric whose scorer says it skipped itself keeps its zero-sample value", () => {
+  // consent-scopes and migration-drift-schema return n: 0 with
+  // details.skipped when their opt-in is unset, and the PR gate tier runs them
+  // that way. The zero-samples rule is for a scorer that tried and got
+  // nothing, not for one that says plainly it did not try.
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics,
+      scorer:
+        `export async function run() { return { metrics: [{ id: "accuracy", value: 1, n: 0, ` +
+        `details: { skipped: true, reason: "opt-in is unset" } }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.notEqual(readResult(root, "demo").status, "error");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a watch-tier zero-sample metric stays informational rather than erroring", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      tier: "watch",
+      metrics: latencyMetrics,
+      scorer: `export async function run() { return { metrics: [{ id: "p95_ms", value: 0, n: 0 }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.notEqual(readResult(root, "demo").status, "error");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a secret in a scorer's error, skip note or details never reaches the result file", () => {
   const root = makeRepo();
   const secret = "postgresql://ro:hunter2isverylong@prod.host:5432/visionquest";
