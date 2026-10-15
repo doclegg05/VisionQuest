@@ -414,7 +414,8 @@ export default function InterventionQueuePanel({
     setActionIntent(null);
   }
 
-  const fetchQueue = useCallback(async () => {
+  /** Loads the queue. Returns the loaded rows, or null when the load failed. */
+  const fetchQueue = useCallback(async (): Promise<InterventionQueueEntry[] | null> => {
     try {
       const url = classId
         ? `/api/teacher/intervention-queue?classId=${encodeURIComponent(classId)}`
@@ -422,8 +423,10 @@ export default function InterventionQueuePanel({
       const data = await api.get<QueueResponse>(url);
       setQueue(data.queue);
       setError(null);
+      return data.queue;
     } catch {
       setError("Could not load the intervention queue.");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -468,6 +471,18 @@ export default function InterventionQueuePanel({
     } catch {
       setActionMessage("Could not update that issue. Try again.");
     }
+  }
+
+  /**
+   * Runs after an action in the inline panel has saved. The panel keeps its own message, but it cannot outlive its
+   * row, so the confirmation also goes to the status line. The panel then closes if the refresh failed or the student
+   * left the queue; if they are still in the queue it stays open, so a batch of reviews can continue.
+   */
+  async function handlePanelChanged(intent: DashboardActionIntent) {
+    setActionMessage(`Saved for ${intent.student.displayName}.`);
+    const loaded = await fetchQueue();
+    const stillQueued = loaded?.some((student) => student.studentId === intent.student.id) ?? false;
+    if (!stillQueued) setActionIntent((open) => (open === intent ? null : open));
   }
 
   function handleMainAction(student: InterventionQueueEntry) {
@@ -532,7 +547,11 @@ export default function InterventionQueuePanel({
 
       {panelHasNoRow && actionIntent ? (
         <div className="mb-3">
-          <InlineActionPanel intent={actionIntent} onClose={() => setActionIntent(null)} onChanged={fetchQueue} />
+          <InlineActionPanel
+            intent={actionIntent}
+            onClose={() => setActionIntent(null)}
+            onChanged={() => handlePanelChanged(actionIntent)}
+          />
         </div>
       ) : null}
 
@@ -564,7 +583,7 @@ export default function InterventionQueuePanel({
                     <InlineActionPanel
                       intent={actionIntent}
                       onClose={() => setActionIntent(null)}
-                      onChanged={fetchQueue}
+                      onChanged={() => handlePanelChanged(actionIntent)}
                     />
                   ) : null
                 }
