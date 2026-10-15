@@ -13,6 +13,9 @@
  * Default: no PDFs or embeddings. --answer-quality adds two test-only source
  * references. --embed explicitly calls the configured embedding provider for
  * this local/CI corpus so the answer calibration can exercise hybrid retrieval.
+ * --embed --provider=openrouter embeds through OpenRouter's
+ * google/gemini-embedding-001 instead (eval-only, OPENROUTER_API_KEY), the
+ * same provider the answer-quality eval then queries with.
  */
 
 import { createRequire } from "node:module";
@@ -56,7 +59,17 @@ function assertNotProduction(databaseUrl) {
   }
 }
 
+/** `--provider=openrouter` or nothing; anything else stops before a row is written. */
+function readEmbedProvider() {
+  const flag = process.argv.find((arg) => arg.startsWith("--provider="));
+  if (flag && flag !== "--provider=openrouter") {
+    throw new Error(`Unsupported ${flag}: only --provider=openrouter changes the embedding provider.`);
+  }
+  return flag ? "openrouter" : null;
+}
+
 async function main() {
+  const embedProvider = readEmbedProvider();
   const dryRun = process.argv.includes("--dry-run");
   const answerQuality = process.argv.includes("--answer-quality");
   const rows = answerQuality ? loadAnswerQualityCorpusRows() : loadCatalogCorpusRows();
@@ -86,6 +99,15 @@ async function main() {
   assertSafeE2eSeedTarget(databaseUrl, {
     allowRemote: process.argv.includes("--allow-remote"),
   });
+  if (embedProvider === "openrouter" && process.argv.includes("--embed")) {
+    // Before any write: the installer refuses a non-local database, and the
+    // check reads the variables bound here.
+    process.env.DATABASE_URL = databaseUrl;
+    process.env.DIRECT_URL = databaseUrl;
+    process.env.ADMIN_DATABASE_URL = databaseUrl;
+    const { installOpenRouterEvalEmbeddings } = await import("../lib/sage-eval-provider.mjs");
+    await installOpenRouterEvalEmbeddings();
+  }
 
   const result = await seedCatalogCorpus({
     databaseUrl,

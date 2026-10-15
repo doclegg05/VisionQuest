@@ -38,10 +38,40 @@ import {
   readAiCloudPolicy,
   type AiCloudPolicy,
 } from "./lanes";
+import { appServerMarker } from "./app-server";
+import { EVAL_EMBEDDING_OVERRIDE_KEY } from "./eval-embedding-override-key";
 import { GeminiEmbeddingProvider } from "./gemini-embedding-provider";
 import { OllamaEmbeddingProvider } from "./ollama-embedding-provider";
 import type { EmbeddingProvider } from "./embedding-types";
 import type { DataSensitivity } from "./types";
+
+function isEmbeddingProvider(value: unknown): value is EmbeddingProvider {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<EmbeddingProvider>;
+  return typeof candidate.name === "string" && typeof candidate.model === "string" && typeof candidate.embed === "function";
+}
+
+/**
+ * The eval-only embedding override, or null. The eval harness installs one
+ * for `--provider=openrouter` runs on synthetic data, because the memory and
+ * RAG evals embed through this resolver (src/lib/ai/eval-embedding-override-key.ts).
+ * App code never installs it, and an installed override inside the app
+ * server is refused outright rather than ignored, so the mistake is loud.
+ */
+function readEvalEmbeddingOverride(): EmbeddingProvider | null {
+  const value: unknown = Reflect.get(globalThis, EVAL_EMBEDDING_OVERRIDE_KEY);
+  if (value === undefined || value === null) return null;
+  const marker = appServerMarker();
+  if (marker) {
+    throw new Error(
+      `An eval-only embedding override is installed inside the app server (${marker} is set); refusing to embed.`,
+    );
+  }
+  if (!isEmbeddingProvider(value)) throw new Error("The eval embedding override is not an embedding provider.");
+  // Only OpenRouter: an override calling itself "ollama" would be audited as local.
+  if (value.name !== "openrouter") throw new Error("The eval embedding override must be the OpenRouter embedding provider.");
+  return value;
+}
 
 async function getConfiguredProviderType(): Promise<"local" | "cloud"> {
   const providerType = await getPlainConfigValue("ai_provider");
@@ -125,6 +155,19 @@ async function recordRouted(
 export async function resolveEmbeddingProvider(
   opts: ResolveEmbeddingProviderOptions,
 ): Promise<EmbeddingProvider> {
+  const override = readEvalEmbeddingOverride();
+  if (override) {
+    // OpenRouter is a cloud provider, so ai_cloud_policy still applies:
+    // local_only refuses it like any other cloud embedding.
+    const policy = await enforceCloudPolicy({
+      studentId: opts.studentId ?? null,
+      task: "embedding",
+      sensitivity: opts.sensitivity,
+    });
+    await recordRouted(opts, override, policy);
+    return override;
+  }
+
   const studentId = opts.studentId ?? null;
   const providerType = await getConfiguredProviderType();
 
@@ -154,6 +197,8 @@ export async function resolveEmbeddingProvider(
  * (await getActiveEmbeddingModel())`.
  */
 export async function getActiveEmbeddingModel(): Promise<string> {
+  const override = readEvalEmbeddingOverride();
+  if (override) return override.model;
   const providerType = await getConfiguredProviderType();
   if (providerType === "local") {
     const config = await readLocalAiProviderConfig();
