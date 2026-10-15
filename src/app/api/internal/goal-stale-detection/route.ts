@@ -1,32 +1,107 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRequest } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
-import { isGoalStale, type GoalForStalenessCheck } from "@/lib/stale-goal-rules";
+import { buildGoalStaleAlert, TERMINAL_GOAL_STATUSES, type GoalStaleAlert } from "@/lib/stale-goal-rules";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-function isAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const isDev = process.env.NODE_ENV === "development";
-  // No secret configured → allow only in development; deny in all other environments
-  if (!secret) return isDev;
-  const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
+// One transaction holds every upsert of a program-wide run, so Prisma's 5 s
+// default is too short. The pg_cron job waits 120 s (timeout_milliseconds in
+// 20261015120000_add_stall_detector_cron), longer than this.
+const TRANSACTION_OPTIONS = { timeout: 90_000, maxWait: 10_000 };
+
+type StaleGoalAlert = GoalStaleAlert & { studentId: string };
+
+async function findStaleGoalAlerts(now: Date): Promise<{ scanned: number; stale: StaleGoalAlert[] }> {
+  const goals = await prisma.goal.findMany({
+    where: { status: { notIn: [...TERMINAL_GOAL_STATUSES] } },
+    select: {
+      id: true,
+      studentId: true,
+      level: true,
+      status: true,
+      updatedAt: true,
+      lastReviewedAt: true,
+    },
+  });
+
+  const stale = goals.flatMap((goal) => {
+    const alert = buildGoalStaleAlert(goal, now);
+    return alert ? [{ ...alert, studentId: goal.studentId }] : [];
+  });
+  return { scanned: goals.length, stale };
+}
+
+/** Upserts the stale goals' alerts and resolves the rest; returns how many are new. */
+async function syncGoalStaleAlerts(stale: StaleGoalAlert[], now: Date): Promise<number> {
+  const staleGoalIds = new Set(stale.map((alert) => alert.sourceId));
+
+  return prisma.$transaction(async (tx) => {
+    const existingKeys = new Set(
+      (
+        await tx.studentAlert.findMany({
+          where: { alertKey: { in: stale.map((alert) => alert.alertKey) } },
+          select: { alertKey: true },
+        })
+      ).map((a) => a.alertKey),
+    );
+
+    for (const { studentId, ...alert } of stale) {
+      const fields = {
+        severity: alert.severity,
+        status: "open",
+        title: alert.title,
+        summary: alert.summary,
+        sourceType: alert.sourceType,
+        sourceId: alert.sourceId,
+      };
+      await tx.studentAlert.upsert({
+        where: { alertKey: alert.alertKey },
+        update: fields,
+        create: { studentId, alertKey: alert.alertKey, type: alert.type, ...fields },
+      });
+    }
+
+    // Resolve only "open" alerts, so snoozed and dismissed ones keep their state.
+    const openStaleAlerts = await tx.studentAlert.findMany({
+      where: { type: "goal_stale", status: "open" },
+      select: { id: true, sourceId: true },
+    });
+    const toResolve = openStaleAlerts
+      .filter((a) => a.sourceId && !staleGoalIds.has(a.sourceId))
+      .map((a) => a.id);
+    if (toResolve.length > 0) {
+      await tx.studentAlert.updateMany({
+        where: { id: { in: toResolve } },
+        data: { status: "resolved", resolvedAt: now },
+      });
+    }
+
+    return stale.filter((alert) => !existingKeys.has(alert.alertKey)).length;
+  }, TRANSACTION_OPTIONS);
 }
 
 /**
- * POST /api/cron/goal-stale-detection
+ * POST /api/internal/goal-stale-detection
  *
- * Cron endpoint that scans all active goals for staleness using
- * level-aware thresholds (daily: 3d, weekly: 7d, monthly: 14d, etc.).
+ * Daily (pg_cron job goal-stale-detection, 10:45 UTC). Scans every
+ * non-terminal goal with the level-aware rule the intervention queue uses
+ * (daily 3 days, weekly 7, monthly 14, quarterly 30, BHAG 60, measured from
+ * the last review, else the last update), opens a goal_stale StudentAlert for
+ * each stale goal, and resolves open ones whose goals are no longer stale.
+ * The alert sync builds the same alert on activity; this job covers students
+ * with no activity to trigger it.
  *
- * For each stale goal, creates or updates a StudentAlert with type "goal_stale".
- * Resolves alerts for goals that are no longer stale.
- *
- * Auth: Bearer CRON_SECRET
+ * Auth: Bearer CRON_SECRET.
  */
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  const authorized = isAuthorizedInternalRequest(
+    new URL(req.url).pathname,
+    req.headers.get("authorization"),
+    process.env.CRON_SECRET,
+  );
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -34,128 +109,17 @@ export async function POST(req: Request) {
   const now = new Date();
 
   try {
-    // Fetch all non-terminal goals with their student ID
-    const goals = await prisma.goal.findMany({
-      where: {
-        status: { notIn: ["completed", "archived", "cancelled", "abandoned"] },
-      },
-      select: {
-        id: true,
-        studentId: true,
-        level: true,
-        status: true,
-        updatedAt: true,
-        lastReviewedAt: true,
-      },
-    });
-
-    // Check each goal against level-aware staleness thresholds.
-    const staleGoals: Array<{ id: string; studentId: string; level: string; daysSinceUpdate: number }> = [];
-
-    for (const goal of goals) {
-      const check: GoalForStalenessCheck = {
-        level: goal.level,
-        status: goal.status,
-        updatedAt: goal.updatedAt,
-        lastReviewedAt: goal.lastReviewedAt,
-      };
-
-      if (isGoalStale(check, now)) {
-        const daysSinceUpdate = Math.floor(
-          (now.getTime() - goal.updatedAt.getTime()) / 86400000
-        );
-        staleGoals.push({
-          id: goal.id,
-          studentId: goal.studentId,
-          level: goal.level,
-          daysSinceUpdate,
-        });
-      }
-    }
-
-    // Upsert alerts for stale goals; resolve alerts for goals no longer stale
-    const staleGoalIds = new Set(staleGoals.map((g) => g.id));
-
-    let newAlerts = 0;
-
-    await prisma.$transaction(async (tx) => {
-      // Determine which alert keys already exist so we can count net-new ones
-      const staleAlertKeys = staleGoals.map((g) => `goal_stale:${g.id}`);
-      const existingKeys = new Set(
-        (
-          await tx.studentAlert.findMany({
-            where: { alertKey: { in: staleAlertKeys } },
-            select: { alertKey: true },
-          })
-        ).map((a) => a.alertKey),
-      );
-
-      // Create or reopen alerts for stale goals
-      for (const goal of staleGoals) {
-        const alertKey = `goal_stale:${goal.id}`;
-        const severity = goal.daysSinceUpdate >= 14 ? "high" : "medium";
-        const levelLabel = goal.level.charAt(0).toUpperCase() + goal.level.slice(1);
-
-        await tx.studentAlert.upsert({
-          where: { alertKey },
-          update: {
-            severity,
-            status: "open",
-            title: `${levelLabel} goal needs review`,
-            summary: `${levelLabel} goal has not been updated in ${goal.daysSinceUpdate} days.`,
-            sourceType: "goal",
-            sourceId: goal.id,
-          },
-          create: {
-            studentId: goal.studentId,
-            alertKey,
-            type: "goal_stale",
-            severity,
-            status: "open",
-            title: `${levelLabel} goal needs review`,
-            summary: `${levelLabel} goal has not been updated in ${goal.daysSinceUpdate} days.`,
-            sourceType: "goal",
-            sourceId: goal.id,
-          },
-        });
-
-        if (!existingKeys.has(alertKey)) {
-          newAlerts += 1;
-        }
-      }
-
-      // Resolve stale-goal alerts whose goals are no longer stale.
-      // Only resolve "open" alerts (preserve snoozed/dismissed state).
-      const openStaleAlerts = await tx.studentAlert.findMany({
-        where: {
-          type: "goal_stale",
-          status: "open",
-        },
-        select: { id: true, sourceId: true },
-      });
-
-      const toResolve = openStaleAlerts
-        .filter((a) => a.sourceId && !staleGoalIds.has(a.sourceId))
-        .map((a) => a.id);
-
-      if (toResolve.length > 0) {
-        await tx.studentAlert.updateMany({
-          where: { id: { in: toResolve } },
-          data: { status: "resolved", resolvedAt: now },
-        });
-      }
-    });
-
-    const durationMs = Date.now() - start;
+    const { scanned, stale } = await findStaleGoalAlerts(now);
+    const newAlerts = await syncGoalStaleAlerts(stale, now);
 
     logger.info("Stale goal detection complete", {
-      scanned: goals.length,
+      scanned,
       newAlerts,
-      durationMs,
+      durationMs: Date.now() - start,
     });
 
     return NextResponse.json({
-      scanned: goals.length,
+      scanned,
       newAlerts,
       timestamp: now.toISOString(),
     });

@@ -89,6 +89,8 @@ describe("pg_cron job registrations", () => {
     }
   });
 
+  // The scheduled-layer-drift benchmark checks the same names but reads only
+  // migration folders with "cron" in the name; this reads every migration.
   it("is what npm run cron:health expects, no more and no less", () => {
     assert.deepEqual([...EXPECTED_CRON_JOBS].sort(), [...jobs.keys()].sort());
   });

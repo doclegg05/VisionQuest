@@ -10,7 +10,7 @@ import {
 // 2026-09 repair re-registers, the three Sage jobs that already existed,
 // connect-nudges (2026-09-05, migration 20260905140000_add_connect_nudges_cron),
 // and the two stall detectors (2026-10-15, migration
-// 20261015120000_schedule_stall_detectors).
+// 20261015120000_add_stall_detector_cron).
 const ALL_TEN = [
   "appointment-reminders",
   "job-processor",
@@ -88,12 +88,19 @@ describe("evaluateCronHealth", () => {
   });
 
   it("reports every missing baseline job when none were ever registered (the F1 state)", () => {
-    // connect-nudges did not exist at the time of the 2026-09-01 F1 incident
-    // this replays — included here (as present) so this scenario keeps
-    // testing exactly "the four baseline jobs are missing", not incidentally
-    // also flagging a job the F1 state predates.
-    const sageAndConnect = ["sage-daily-briefing", "sage-memory-consolidate", "sage-wager-resolve", "connect-nudges"];
-    const result = evaluateCronHealth({ jobs: healthyJobs(sageAndConnect), latestRuns: healthyRuns(sageAndConnect) });
+    // connect-nudges and the two stall detectors did not exist at the time of
+    // the 2026-09-01 F1 incident this replays — included here (as present) so
+    // this scenario keeps testing exactly "the four baseline jobs are
+    // missing", not incidentally also flagging jobs the F1 state predates.
+    const laterJobs = [
+      "sage-daily-briefing",
+      "sage-memory-consolidate",
+      "sage-wager-resolve",
+      "connect-nudges",
+      "evidence-gap-detection",
+      "goal-stale-detection",
+    ];
+    const result = evaluateCronHealth({ jobs: healthyJobs(laterJobs), latestRuns: healthyRuns(laterJobs) });
     assert.equal(result.ok, false);
     assert.deepEqual(result.problems, [
       "appointment-reminders: missing from cron.job",
@@ -210,7 +217,7 @@ describe("formatCronHealthReport", () => {
       generatedAt: "2026-09-02T12:00:00.000Z",
     });
     const text = lines.join("\n");
-    assert.match(text, /PROBLEMS \(8\):/);
+    assert.match(text, /PROBLEMS \(10\):/);
     assert.match(text, /- job-processor: missing from cron.job/);
     assert.match(text, /BackgroundJob: \(no rows\)/);
     assert.match(text, /oldest pending createdAt=none/);

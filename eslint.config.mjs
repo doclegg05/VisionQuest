@@ -130,7 +130,7 @@ const openRouterEvalOnly = {
 // module that imports the app client is caught when a test exercises the
 // path under RLS_CONTEXT_STRICT=true (CI).
 const appPrismaImportWithoutSession = {
-  files: ["src/app/api/internal/**", "src/app/api/cron/**", "src/lib/jobs-registry.ts"],
+  files: ["src/app/api/internal/**", "src/lib/jobs-registry.ts"],
   rules: {
     "no-restricted-imports": [
       "error",
@@ -222,7 +222,6 @@ const eslintConfig = defineConfig([
       "src/components/teacher/**",
       "src/app/api/teacher/**",
       "src/app/api/internal/**",
-      "src/app/api/cron/**",
       "src/app/api/admin/**",
       "src/app/api/coordinator/**",
     ],

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
-// Scheduled daily by pg_cron (migration 20261015120000_schedule_stall_detectors).
+// Scheduled daily by pg_cron (migration 20261015120000_add_stall_detector_cron).
 // The intervention queue's evidenceGapCount counts the alerts this writes.
 
 const enrollmentFindMany = mock.fn() as any;
