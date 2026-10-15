@@ -186,7 +186,7 @@ export function JobFilters({
         aria-expanded={filtersOpen}
         aria-controls="job-filters-panel"
         onClick={() => setFiltersOpen((current) => !current)}
-        className="flex min-h-11 items-center gap-1.5 self-end rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:text-[var(--primary)]"
+        className="flex min-h-11 items-center gap-1.5 self-end rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:text-info"
       >
         Filters{activeSecondaryCount > 0 ? ` (${activeSecondaryCount})` : ""}
         <CaretDown

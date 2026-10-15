@@ -109,7 +109,7 @@ export function JobList({ jobs, onSave }: JobListProps) {
         <button
           type="button"
           onClick={() => setRevealedAll(true)}
-          className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:text-[var(--primary)]"
+          className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-colors hover:text-info"
         >
           Show {remaining} more jobs
         </button>

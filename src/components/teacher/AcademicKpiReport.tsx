@@ -330,7 +330,7 @@ export default function AcademicKpiReport() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
           Academic effectiveness
         </p>
         <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Goal-centric KPIs</h2>

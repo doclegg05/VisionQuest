@@ -450,7 +450,7 @@ export default function ResumeBuilder() {
             onClick={() => setActiveTab(tab)}
             className={`min-h-[44px] flex-1 rounded-lg px-4 text-sm font-semibold transition ${
               activeTab === tab
-                ? "bg-white text-[var(--accent-strong)] shadow-sm"
+                ? "bg-white text-success shadow-sm"
                 : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             }`}
           >
@@ -522,7 +522,7 @@ export default function ResumeBuilder() {
 
         {!uploading && dragOver && (
           <div className="mt-4 rounded-xl border-2 border-dashed border-[var(--accent-strong)] bg-[rgba(15,154,146,0.04)] px-4 py-8 text-center">
-            <p className="text-sm font-medium text-[var(--accent-strong)]">Drop your resume here</p>
+            <p className="text-sm font-medium text-success">Drop your resume here</p>
           </div>
         )}
 

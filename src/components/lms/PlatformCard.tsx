@@ -75,7 +75,7 @@ export default function PlatformCard({
             {platform.certifications.map((cert) => (
               <span
                 key={cert}
-                className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-secondary)]/15 text-[var(--accent-secondary)] font-medium"
+                className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-secondary)]/15 text-info font-medium"
               >
                 {cert.replace(/-/g, " ")}
               </span>
@@ -121,7 +121,7 @@ export default function PlatformCard({
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex min-h-11 items-center text-xs text-[var(--accent-secondary)] hover:underline"
+                className="flex min-h-11 items-center text-xs text-info hover:underline"
               >
                 {link.label} &nearr;
               </a>

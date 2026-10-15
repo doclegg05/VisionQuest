@@ -80,6 +80,24 @@ test("sign-in page", async ({ browser }) => {
   }
 });
 
+test("sign-in error carries an icon", async ({ browser }) => {
+  for (const theme of THEMES) {
+    const context = await browser.newContext();
+    await setTheme(context, theme);
+    await withPage(context, async (page) => {
+      await page.goto("/");
+      await page.getByLabel(/username or email/i).fill("nonexistent-user");
+      await page.getByLabel(/password/i).fill("wrongpassword");
+      await page.getByRole("button", { name: /sign in to see what to do today/i }).click();
+      const alert = page.getByRole("alert").first();
+      await expect(alert).toBeVisible();
+      // Dark-theme danger text is white (no SPOKES red passes on navy), so the icon carries "error".
+      expect(await alert.locator("svg").count(), `${theme}: the error alert has no icon`).toBeGreaterThan(0);
+      await page.screenshot({ path: `${OUT}/sign-in-error-${theme}.png` });
+    });
+  }
+});
+
 test("student pages", async ({ browser }) => {
   const context = await loginContext(browser, E2E_STUDENT);
   await withPage(context, async (page) => {

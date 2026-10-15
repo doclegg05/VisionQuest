@@ -42,7 +42,17 @@ describe("ProgramBadge", () => {
 
   it("supports the sm size variant", () => {
     const html = renderToString(<ProgramBadge programType="ietp" size="sm" />);
-    assert.ok(html.includes("text-[0.65rem]"));
+    assert.ok(html.includes("px-1.5"), "sm keeps its tighter padding");
+    assert.ok(html.includes("text-xs"));
+    assert.ok(!html.includes("text-[0.65rem]"), "sm text sits at the 12px floor, not below it");
+  });
+
+  it("outlines only the IETP badge, so the three differ without color", () => {
+    const ietp = renderToString(<ProgramBadge programType="ietp" />);
+    const spokes = renderToString(<ProgramBadge programType="spokes" />);
+    const ae = renderToString(<ProgramBadge programType="adult_ed" />);
+    assert.ok(ietp.includes("border-[var(--program-ietp-border)]"));
+    assert.ok(!spokes.includes("border-[var(") && !ae.includes("border-[var("));
   });
 });
 

@@ -15,7 +15,7 @@ const variantStyles: Record<NonNullable<AskSageLinkProps["variant"]>, string> = 
   subtle:
     "rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]",
   ghost:
-    "rounded-full px-3 py-2 text-sm text-[var(--accent-secondary)] hover:bg-[var(--surface-muted)]",
+    "rounded-full px-3 py-2 text-sm text-info hover:bg-[var(--surface-muted)]",
 };
 
 export default function AskSageLink({

@@ -141,7 +141,7 @@ export function SageActivityPanel({ studentId }: SageActivityPanelProps) {
 
   return (
     <div className="theme-card rounded-xl p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-secondary)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-info">
         Sage&apos;s activity
       </p>
       <p className="mt-1 text-xs text-[var(--ink-faint)]">
@@ -159,7 +159,7 @@ export function SageActivityPanel({ studentId }: SageActivityPanelProps) {
             <button
               onClick={loadMore}
               disabled={loadingMore}
-              className="mt-3 min-h-11 rounded-lg px-3 text-xs font-semibold text-[var(--accent-secondary)] hover:bg-[var(--surface-interactive)] disabled:opacity-50"
+              className="mt-3 min-h-11 rounded-lg px-3 text-xs font-semibold text-info hover:bg-[var(--surface-interactive)] disabled:opacity-50"
             >
               {loadingMore ? "Loading…" : "Load more"}
             </button>

@@ -58,7 +58,7 @@ export default function OrientationWelcomeVideo() {
       className="surface-section mb-6 overflow-hidden p-5 sm:p-6"
     >
       <div className="max-w-3xl">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--accent-secondary)]">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-info">
           Meet Sage
         </p>
         <h2 id="orientation-welcome-title" className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
@@ -102,12 +102,12 @@ export default function OrientationWelcomeVideo() {
         <a
           href="/media/sage-welcome-orientation.mp4"
           download
-          className="inline-flex min-h-11 items-center font-semibold text-[var(--accent-secondary)] hover:underline"
+          className="inline-flex min-h-11 items-center font-semibold text-info hover:underline"
         >
           Download the welcome video
         </a>
         <details className="text-[var(--ink-muted)]">
-          <summary className="cursor-pointer font-semibold text-[var(--accent-secondary)] hover:underline">
+          <summary className="cursor-pointer font-semibold text-info hover:underline">
             Read the welcome transcript
           </summary>
           <div className="mt-3 max-w-3xl space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6">
