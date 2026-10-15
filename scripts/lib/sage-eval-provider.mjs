@@ -233,7 +233,34 @@ async function resolveOpenRouterProvider(modelOverride = null) {
   const model = modelOverride || process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
   const costLog = process.env[COST_LOG_ENV]?.trim();
   const options = costLog ? { onCost: (costUsd) => appendFileSync(costLog, `${costUsd}\n`) } : {};
+  // The memory and RAG evals embed through the app's resolver, so an
+  // OpenRouter run embeds through OpenRouter too, never a direct Gemini key.
+  await installOpenRouterEvalEmbeddings({ apiKey, onCost: options.onCost });
   return { provider: new OpenRouterProvider(apiKey, model, options), model, label: `openrouter (${model})` };
+}
+
+/**
+ * Points the app's embedding resolver at OpenRouter's google/gemini-embedding-001
+ * for this eval process, through the eval-only override that
+ * resolveEmbeddingProvider and getActiveEmbeddingModel read
+ * (src/lib/ai/eval-embedding-override-key.ts). Synthetic data only: it refuses
+ * a non-local database, and the resolver refuses the override inside the app
+ * server. src/lib/ai/embedding-provider.eval-override.test.ts pins that this is
+ * the only place that installs it.
+ */
+export async function installOpenRouterEvalEmbeddings({ apiKey = process.env.OPENROUTER_API_KEY?.trim(), onCost } = {}) {
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY missing: required for OpenRouter embeddings.");
+  assertNoRemoteDatabase();
+  const [{ OpenRouterEmbeddingProvider }, { EVAL_EMBEDDING_OVERRIDE_KEY }] = await Promise.all([
+    import("../../src/lib/ai/openrouter-embedding-provider.ts"),
+    import("../../src/lib/ai/eval-embedding-override-key.ts"),
+  ]);
+  const provider = new OpenRouterEmbeddingProvider(apiKey, undefined, onCost ? { onCost } : {});
+  // False when the app server locked the slot at boot (src/instrumentation.ts).
+  if (!Reflect.set(globalThis, EVAL_EMBEDDING_OVERRIDE_KEY, provider)) {
+    throw new Error("The eval embedding override slot is locked: this process is the app server.");
+  }
+  return provider;
 }
 
 /**
@@ -371,6 +398,70 @@ function classifyAndRethrow(error, run) {
   if (isBudgetExhausted(status, bodyText)) throw new EvalBudgetExhaustedError(error);
   if (!run.reached && isNetworkFailure(error)) throw new EvalProviderUnreachableError(error, run.label);
   throw error;
+}
+
+const EMBEDDING_LABEL = "OpenRouter embeddings";
+
+/**
+ * The memory and answer-quality evals embed through OpenRouter, and the app
+ * swallows embedding errors, so scripts/sage-embedding-preflight.mjs checks
+ * the key with one call. Returns the not-run error for exhausted credits, a
+ * refused key or model, or a connection that never happened, and the
+ * original error for anything else.
+ */
+export function classifyEmbeddingFailure(error) {
+  if (error?.name !== "OpenRouterError") return error;
+  if (error.kind === "credits") return new EvalBudgetExhaustedError(error, EMBEDDING_LABEL);
+  if (error.kind === "network") return new EvalProviderUnreachableError(error, EMBEDDING_LABEL);
+  if (error.kind === "bad_request" && UNAVAILABLE_STATUSES.has(error.status)) {
+    return new EvalProviderUnavailableError(error, EMBEDDING_LABEL);
+  }
+  return error;
+}
+
+/**
+ * Remembers the first eval-abort error any call throws, even when the caller
+ * swallows it. Memory extraction never throws to its caller, so without this
+ * a drained OpenRouter wallet inside sage-memory-eval reads as a 0% retrieval
+ * hit rate (exit 1) instead of "not run" (exit 3). The eval calls
+ * `throwIfAborted()` after each extraction.
+ */
+export function trackEvalAborts(provider) {
+  let firstAbort = null;
+  const remember = (error) => {
+    if (firstAbort === null && isEvalAbort(error)) firstAbort = error;
+    throw error;
+  };
+  const call = (method) => async (...args) => {
+    try {
+      return await provider[method](...args);
+    } catch (error) {
+      remember(error);
+    }
+  };
+  const stream = (method) =>
+    async function* (...args) {
+      try {
+        yield* provider[method](...args);
+      } catch (error) {
+        remember(error);
+      }
+    };
+
+  const tracked = {
+    name: provider.name,
+    generateResponse: call("generateResponse"),
+    streamResponse: stream("streamResponse"),
+    generateStructuredResponse: call("generateStructuredResponse"),
+  };
+  if (provider.streamWithTools) tracked.streamWithTools = stream("streamWithTools");
+  if (provider.describeDocument) tracked.describeDocument = call("describeDocument");
+  return {
+    provider: tracked,
+    throwIfAborted() {
+      if (firstAbort !== null) throw firstAbort;
+    },
+  };
 }
 
 /**
