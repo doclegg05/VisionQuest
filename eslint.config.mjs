@@ -170,20 +170,21 @@ const appPrismaImportWithoutSession = {
 // messages in places.
 const RAW_ERROR_TEXT_MESSAGE =
   "No raw error text in internal-route logs: Prisma messages quote query arguments, including student ids. Log { error: errorForLog(error) } from @/lib/log-error.";
+// The raw error object is no better than its message: the logger runs
+// JSON.stringify on the entry, which drops `message` but keeps Prisma's
+// enumerable `meta`. A selector cannot tell which identifier a catch clause
+// bound, so the template-literal and `+` forms go by the usual names.
+// src/app/api/internal/error-log-guard.test.ts lints a probe of every form.
+const IN_LOGGER = "CallExpression[callee.object.name='logger']";
 const rawErrorTextInLogs = [
-  {
-    selector: "CallExpression[callee.object.name='logger'] MemberExpression[property.name=/^(message|stack)$/]",
-    message: RAW_ERROR_TEXT_MESSAGE,
-  },
-  {
-    selector: "CallExpression[callee.object.name='logger'] CallExpression[callee.name='String']",
-    message: RAW_ERROR_TEXT_MESSAGE,
-  },
-  {
-    selector: "CallExpression[callee.object.name='logger'] CallExpression[callee.property.name='toString']",
-    message: RAW_ERROR_TEXT_MESSAGE,
-  },
-];
+  `${IN_LOGGER} MemberExpression[property.name=/^(message|stack)$/]`,
+  `${IN_LOGGER} MemberExpression[property.value=/^(message|stack)$/]`,
+  `${IN_LOGGER} CallExpression[callee.name='String']`,
+  `${IN_LOGGER} CallExpression[callee.property.name='toString']`,
+  `${IN_LOGGER} CallExpression[callee.object.name='JSON'][callee.property.name='stringify']`,
+  `${IN_LOGGER} Property[key.name=/^(error|err|cause|reason)$/] > Identifier.value`,
+  `${IN_LOGGER} :matches(TemplateLiteral, BinaryExpression) > Identifier[name=/^(e|err|error)$|(Err|Error)$/]`,
+].map((selector) => ({ selector, message: RAW_ERROR_TEXT_MESSAGE }));
 
 // Comes after openRouterEvalOnly, whose no-restricted-syntax entry it would
 // otherwise lose, so it repeats that block's selectors.

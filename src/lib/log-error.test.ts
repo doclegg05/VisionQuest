@@ -45,6 +45,37 @@ describe("errorForLog", () => {
     assert.deepEqual(errorForLog(error), { name: "Error" });
   });
 
+  it("drops codes shaped like a phone number or a login id", () => {
+    for (const code of ["3045551234", "JSMITH01"]) {
+      assert.deepEqual(errorForLog(Object.assign(new Error("boom"), { code })), { name: "Error" }, code);
+    }
+  });
+
+  it("keeps Node error codes and Postgres SQLSTATEs", () => {
+    for (const code of ["ECONNREFUSED", "ERR_INVALID_URL", "42501"]) {
+      assert.deepEqual(errorForLog(Object.assign(new Error("boom"), { code })), { name: "Error", code }, code);
+    }
+  });
+
+  it("falls back to Error when a custom name carries text", () => {
+    const named = Object.assign(new Error("boom"), { name: `Student ${STUDENT_ID} failed` });
+    const objectNamed = Object.assign(new Error("boom"), { name: { studentId: STUDENT_ID } });
+
+    assert.deepEqual(errorForLog(named), { name: "Error" });
+    assert.deepEqual(errorForLog(objectNamed), { name: "Error" });
+  });
+
+  it("follows the cause one level, so 'fetch failed' still says ECONNREFUSED", () => {
+    const refused = Object.assign(new Error(`connect ECONNREFUSED for ${STUDENT_ID}`), { code: "ECONNREFUSED" });
+    const deeper = new TypeError("fetch failed", { cause: new Error("outer", { cause: refused }) });
+
+    assert.deepEqual(errorForLog(new TypeError("fetch failed", { cause: refused })), {
+      name: "TypeError",
+      cause: { name: "Error", code: "ECONNREFUSED" },
+    });
+    assert.deepEqual(errorForLog(deeper), { name: "TypeError", cause: { name: "Error" } });
+  });
+
   it("names the type of a thrown non-Error and never echoes its value", () => {
     assert.deepEqual(errorForLog(`failed for ${STUDENT_ID}`), { name: "string" });
     assert.deepEqual(errorForLog({ studentId: STUDENT_ID }), { name: "object" });
