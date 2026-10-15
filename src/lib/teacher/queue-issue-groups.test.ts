@@ -183,3 +183,27 @@ test("Sage prompts list every group and mark urgent ones", () => {
   const all = buildQueueSageMessage([{ name: "Sam Rivera", groups }]);
   assert.match(all, /2 open issues across 1 student\b/);
 });
+
+test("the Sage prioritize message says 'issue' for one", () => {
+  const groups = groupQueueIssues([alert("t1", "overdue_task")], STUDENT);
+  const all = buildQueueSageMessage([{ name: "Sam Rivera", groups }]);
+  assert.match(all, /1 open issue across 1 student\b/);
+  assert.doesNotMatch(all, /open issues/);
+});
+
+test("the Sage prioritize message counts each row's alerts, not its groups", () => {
+  const groups = groupQueueIssues(
+    [
+      alert("t1", "overdue_task", "high"),
+      alert("t2", "overdue_task", "high"),
+      alert("m1", "missed_appointment"),
+      alert("m2", "missed_appointment"),
+      alert("m3", "missed_appointment"),
+    ],
+    STUDENT,
+  );
+  assert.equal(groups.length, 2, "precondition: five alerts fold into two groups");
+  const all = buildQueueSageMessage([{ name: "Sam Rivera", groups }]);
+  assert.match(all, /5 open issues across 1 student\b/);
+  assert.match(all, /^Sam Rivera: 2 urgent, 5 total$/m);
+});

@@ -235,15 +235,20 @@ export function buildStudentSageMessage(name: string, groups: readonly QueueIssu
   ].join("\n");
 }
 
+/** How many alerts the groups hold. Every count in the prioritize message is in alerts, so the lines agree. */
+function alertCount(groups: readonly QueueIssueGroup[]): number {
+  return groups.reduce((sum, group) => sum + group.count, 0);
+}
+
 export function buildQueueSageMessage(rows: readonly { name: string; groups: readonly QueueIssueGroup[] }[]): string {
-  const issueCount = rows.reduce((sum, row) => sum + row.groups.reduce((n, group) => n + group.count, 0), 0);
+  const issueCount = rows.reduce((sum, row) => sum + alertCount(row.groups), 0);
   const body = rows.flatMap((row) => [
-    `${row.name}: ${row.groups.filter((group) => group.urgent).length} urgent, ${row.groups.length} total`,
+    `${row.name}: ${alertCount(row.groups.filter((group) => group.urgent))} urgent, ${alertCount(row.groups)} total`,
     ...row.groups.slice(0, 3).map((group) => `  - ${group.label}`),
     ...(row.groups.length > 3 ? [`  - ...and ${row.groups.length - 3} more`] : []),
   ]);
   return [
-    `I have ${issueCount} open issues across ${rows.length} student${rows.length === 1 ? "" : "s"}. Here's a summary:`,
+    `I have ${issueCount} open issue${issueCount === 1 ? "" : "s"} across ${rows.length} student${rows.length === 1 ? "" : "s"}. Here's a summary:`,
     "",
     ...body,
     "",
