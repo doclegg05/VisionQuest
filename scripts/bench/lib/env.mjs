@@ -7,7 +7,7 @@
  * (design §9.7), and a benchmark that reds a PR because a key was never set
  * teaches everyone to ignore the gate.
  *
- * The seven requirements map onto six variables — `postgres` and `cohort`
+ * The eight requirements map onto seven variables — `postgres` and `cohort`
  * share DATABASE_URL, because a seeded cohort is a state of that same
  * database (the runner's CI step seeds it via scripts/bench/seed-cohort.ts).
  */
@@ -17,6 +17,7 @@ export const REQUIREMENT_ENV = Object.freeze({
   cohort: "DATABASE_URL",
   gemini: "GEMINI_API_KEY",
   ollama: "OLLAMA_HOST",
+  openrouter: "OPENROUTER_API_KEY",
   browser: "PLAYWRIGHT",
   "prod-readonly": "BENCH_PROD_READONLY_URL",
   server: "BENCH_BASE_URL",
@@ -90,5 +91,6 @@ export function resolveEnv(env = process.env) {
     baseUrl: orNull(env, "BENCH_BASE_URL"),
     prodReadonlyUrl: orNull(env, "BENCH_PROD_READONLY_URL"),
     playwright: orNull(env, "PLAYWRIGHT"),
+    openrouterApiKey: orNull(env, "OPENROUTER_API_KEY"),
   };
 }
