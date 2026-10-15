@@ -31,7 +31,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
+    // eslint-disable-next-line spokes/no-off-palette-color -- the viewport API takes literal colors; this is a SPOKES palette value
     { media: "(prefers-color-scheme: light)", color: "#edf3f7" },
+    // eslint-disable-next-line spokes/no-off-palette-color -- the viewport API takes literal colors; this is a SPOKES palette value
     { media: "(prefers-color-scheme: dark)", color: "#00133f" },
   ],
 };
