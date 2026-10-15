@@ -47,6 +47,35 @@ ollama pull nomic-embed-text
 ollama list
 ```
 
+5. Set the server's context length to 8,192 tokens.
+
+   On a Windows host, `scripts/install-local-ai-services.ps1` does this. It
+   sets `OLLAMA_CONTEXT_LENGTH` on the Ollama service from its
+   `-ContextLength` parameter, which defaults to 8192. A host installed
+   before 2026-10-15 needs the installer re-run. On any other host, set it
+   before Ollama starts: in the Ollama app under Settings, Context length,
+   or for a plain server, `OLLAMA_CONTEXT_LENGTH=8192 ollama serve`.
+
+   Why it matters: Sage's chat calls go to Ollama's OpenAI-compatible `/v1`
+   endpoint, which ignores the `num_ctx` the app sends. Without this
+   setting, models load at Ollama's default for the hardware, which is
+   4,096 tokens on a machine with less than 24 GiB of VRAM, CPU-only
+   machines included. Sage's prompt is 7,000 to 7,500 tokens. When a prompt
+   is longer than the context, Ollama keeps the first few tokens and the
+   end, drops the rest, answers HTTP 200, and logs a `truncating input
+   prompt` warning. What it drops is the start of the system prompt, where
+   Sage's identity, guardrails and crisis rules live.
+
+   Keep the value equal to the app's context: `OllamaProvider.DEFAULT_NUM_CTX`
+   (8192), or the **Context window (num_ctx)** field from step 3 if an admin
+   set one. Ollama reloads a model whenever a request asks for a different
+   context than the one loaded, and the app's native `/api/chat` calls ask
+   for the app's value. `src/lib/ai/__tests__/local-host-context-length.test.ts`
+   fails if the installer default drifts from `DEFAULT_NUM_CTX`.
+
+   Check it: after one Sage chat turn, run `ollama ps` on the host. The
+   CONTEXT column for the chat model must read `8192`.
+
 ## 2. Tunnel
 
 Do not re-derive tunnel setup here — follow the existing recommendation in
@@ -93,9 +122,12 @@ downstream (tunnel, admin config) can work — fix Ollama first.
      These are used automatically when no encrypted config value is saved,
      and they survive a database encryption-key rotation that would
      otherwise break a saved-in-DB credential.
-   - **Context window (num_ctx)** — leave blank to use the default unless
-     you have a specific reason to raise it (longer agent transcripts need
-     more VRAM per concurrent request).
+   - **Context window (num_ctx).** Leave it blank to use the default
+     unless you have a specific reason to raise it. Longer agent
+     transcripts need more VRAM per concurrent request. If you change it, set the host to
+     the same number (step 1.5, or re-run the installer with
+     `-ContextLength <n>`). This field only reaches Ollama's native
+     `/api/chat` calls, so the host setting is what chat actually uses.
 4. Click **Save Provider Settings** first — Test Connection reads the saved
    config, not the unsaved form state.
 5. Click **Test Connection** — see step 4 below for reading the result.
@@ -248,6 +280,7 @@ should not regress meaningfully.
 |---|---|---|
 | Chat errors with `AI_STREAM_FAILED`, or Test Connection reports a `502`/`530` | Tunnel or Cloudflare Access edge, not the model or the app | On the local AI host: is `cloudflared` running? Is the "Sage Tunnel" scheduled task active? Then confirm `curl http://127.0.0.1:11434/api/tags` returns 200 locally — if localhost is healthy but the public hostname isn't, it's a tunnel/Access problem, not an Ollama problem (see the tunnel doc's 2026-05-13 follow-up). |
 | Test Connection shows the **Embeddings (768-dim)** row amber with a dimension-mismatch warning | Configured embedding model returns the wrong vector size (e.g. a 1024-dim model like `mxbai-embed-large`) | Switch **Embedding model name** to `nomic-embed-text` or `embeddinggemma`, save, re-test. If you already wrote vectors with the wrong model, you also need the full re-embed checklist in section 5. |
+| On local AI, Sage forgets its name or rules, or answers like a generic assistant. The Ollama log shows `truncating input prompt` | The host loads models with a context smaller than Sage's prompt, so Ollama cut off the start of the prompt | `ollama ps` on the host after a chat turn. CONTEXT must read `8192`. If it reads `4096`, set the context length (section 1, step 5) and restart Ollama. |
 | Chat streams back empty / no tokens | Configured model isn't actually pulled on the host | `ollama list` on the host — if it's missing, `ollama pull <model>`. Test Connection's warnings list will also say `<model> not pulled — run: ollama pull <model>` when this is the embedding model. |
 | First reply after idle time is very slow (20–45+ seconds) | Model was unloaded from VRAM (Ollama's default `keep_alive` idle timeout) — this is a cold load, not a hang | Expected behavior on first use after idle. The app calls `GET /api/chat/warmup` on chat page mount to pre-warm the model, and `scripts/warm-sage-model.ps1` is registered as the "Sage Model Warmup" scheduled task (logon + daily 07:30) to keep it resident during the workday. If mornings are still slow, confirm that scheduled task is enabled on the host. |
 | Test Connection succeeds but **Tool calling** or **JSON output** is amber | The model itself doesn't support function calling or structured JSON well | This is a model capability gap, not a config bug — try a different model, or accept degraded agent-loop behavior (goal extraction, career tools) on this model. |

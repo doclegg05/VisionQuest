@@ -199,6 +199,7 @@ Local AI note:
 - Student and staff Sage chat can be forced to the local Ollama provider for protected data.
 - If the local endpoint is protected by Cloudflare Access, set the service-token values in Render env vars or in Program Setup. Env vars are preferred for production because they survive database secret-encryption-key drift.
 - The local host must run Ollama, `scripts/ollama-relay.mjs`, and `cloudflared` as auto-starting services. Use `scripts/install-local-ai-services.ps1` from an elevated PowerShell on the local AI host.
+- The installer sets `OLLAMA_CONTEXT_LENGTH=8192` on the Ollama service. Sage's chat calls use Ollama's `/v1` endpoint, which ignores the app's `num_ctx`, so without it a host with less than 24 GiB of VRAM loads models at 4,096 tokens and silently cuts the front off Sage's 7,000 to 7,500-token prompt, guardrails included. After one chat turn, `ollama ps` on the host must show `8192` in the CONTEXT column. A host set up before 2026-10-15 needs the installer re-run. Keep the value equal to `OllamaProvider.DEFAULT_NUM_CTX`, or to `ai_provider_num_ctx` if Program Setup overrides it (`-ContextLength <n>`). Details are in `docs/plans/2026-07-02-local-ai-operator-runbook.md`.
 
 ## 6. First-Run Data Setup
 

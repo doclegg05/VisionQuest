@@ -10,15 +10,16 @@ import {
   resolveEnv,
 } from "../lib/env.mjs";
 
-test("the seven contract requirements map onto the six contract env vars", () => {
+test("the eight contract requirements map onto the seven contract env vars", () => {
   assert.deepEqual(
     [...REQUIREMENTS].sort(),
-    ["browser", "cohort", "gemini", "ollama", "postgres", "prod-readonly", "server"]
+    ["browser", "cohort", "gemini", "ollama", "openrouter", "postgres", "prod-readonly", "server"]
   );
   assert.equal(REQUIREMENT_ENV.postgres, "DATABASE_URL");
   assert.equal(REQUIREMENT_ENV.cohort, "DATABASE_URL");
   assert.equal(REQUIREMENT_ENV.gemini, "GEMINI_API_KEY");
   assert.equal(REQUIREMENT_ENV.ollama, "OLLAMA_HOST");
+  assert.equal(REQUIREMENT_ENV.openrouter, "OPENROUTER_API_KEY");
   assert.equal(REQUIREMENT_ENV.browser, "PLAYWRIGHT");
   assert.equal(REQUIREMENT_ENV["prod-readonly"], "BENCH_PROD_READONLY_URL");
   assert.equal(REQUIREMENT_ENV.server, "BENCH_BASE_URL");
@@ -56,6 +57,7 @@ test("resolveEnv exposes the contract ctx.env keys", () => {
     BENCH_BASE_URL: "http://localhost:3000",
     BENCH_PROD_READONLY_URL: "postgres://ro",
     PLAYWRIGHT: "1",
+    OPENROUTER_API_KEY: "ork",
   });
   assert.equal(env.databaseUrl, "postgres://db");
   assert.equal(env.geminiApiKey, "gk");
@@ -63,6 +65,7 @@ test("resolveEnv exposes the contract ctx.env keys", () => {
   assert.equal(env.baseUrl, "http://localhost:3000");
   assert.equal(env.prodReadonlyUrl, "postgres://ro");
   assert.equal(env.playwright, "1");
+  assert.equal(env.openrouterApiKey, "ork");
 });
 
 test("resolveEnv returns null, not undefined, for anything unset", () => {
@@ -71,4 +74,5 @@ test("resolveEnv returns null, not undefined, for anything unset", () => {
   assert.equal(env.geminiApiKey, null);
   assert.equal(env.ollamaHost, null);
   assert.equal(env.baseUrl, null);
+  assert.equal(env.openrouterApiKey, null);
 });

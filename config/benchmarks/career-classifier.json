@@ -1,0 +1,23 @@
+{
+  "suite": "career-classifier",
+  "title": "Career classifier bake-off: Gemini discovery extractor vs Jev",
+  "area": "sage-quality",
+  "tier": "manual",
+  "scorer": "scripts/bench/suites/career-classifier.mjs",
+  "fixture": "config/benchmarks/fixtures/career-classifier.json",
+  "requires": ["openrouter"],
+  "metrics": [
+    { "id": "gemini_spokes_top1", "unit": "ratio", "direction": "higher" },
+    { "id": "gemini_national_top1", "unit": "ratio", "direction": "higher" },
+    { "id": "gemini_failure_rate", "unit": "ratio", "direction": "lower" },
+    { "id": "gemini_spokes_brier", "unit": "ratio", "displayUnit": "Brier, 0 best to 2 worst", "direction": "lower" },
+    { "id": "gemini_p50_ms", "unit": "ms", "direction": "lower" },
+    { "id": "jev_spokes_top1", "unit": "ratio", "direction": "higher" },
+    { "id": "jev_national_top1", "unit": "ratio", "direction": "higher" },
+    { "id": "jev_failure_rate", "unit": "ratio", "direction": "lower" },
+    { "id": "jev_spokes_brier", "unit": "ratio", "displayUnit": "Brier, 0 best to 2 worst", "direction": "lower" },
+    { "id": "jev_p50_ms", "unit": "ms", "direction": "lower" },
+    { "id": "jev_order_flip_rate", "unit": "ratio", "direction": "lower" }
+  ],
+  "notes": "Decision instrument for adding TypeSafe's Jev classifier to career classification (2026-10-13). Manual tier with no floors. Both arms run through OpenRouter on one OPENROUTER_API_KEY: the Gemini arm runs the production extractDiscoverySignals on google/gemini-3.1-flash-lite (OpenRouter cannot send production's safety settings, which does not matter for classifying synthetic conversations); the Jev arm asks two Choice questions through OpenRouter's System One endpoint, twice, the second time with every option list reversed, so jev_order_flip_rate measures Jev's first-option bias. Information parity: on national clusters both arms see the 14 names only; on SPOKES pathways the extractor prompt lists ids only while Jev gets each pathway's production label and description. A failed case counts as wrong in every top-1 ratio. Each artifact row records the upstream provider OpenRouter reported. Fixture is synthetic, written by an AI agent from a written labeling rule; Spanish rows await native-speaker review. Never point this suite at real student conversations: OpenRouter is eval-only (docs/runbooks/openrouter-test-bench.md)."
+}
