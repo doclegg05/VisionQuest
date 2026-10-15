@@ -23,8 +23,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { embedTexts, toVectorLiteral } from "@/lib/ai/embeddings";
-import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
+import { embedTextsWithModel, toVectorLiteral } from "@/lib/ai/embeddings";
 import { TokenVault, type IdentityInput } from "@/lib/ai/deidentify";
 import { DEIDENTIFY_ALLOWLIST } from "@/lib/ai/deidentify-allowlist";
 import { loadIdentityInput } from "@/lib/ai/identity";
@@ -209,12 +208,11 @@ export async function storeMemoryCandidates(
     // cloud embeddings API — declared here rather than inferred by the
     // facade, so the write path cannot drift to "system" unnoticed.
     const sensitivity = subjectType === "teacher" ? "staff_entered" : "student_record";
-    const vectors = await embedTexts(
+    const { vectors, model: activeModel } = await embedTextsWithModel(
       fresh.map((candidate) => candidate.content),
       { taskType: "RETRIEVAL_DOCUMENT", usage: { ...usage, sensitivity } },
     );
-    // Provenance for the memory guard: same-model invariant as embedTexts above.
-    const activeModel = await getActiveEmbeddingModel();
+    // Preserve the producing model even if configuration changes in flight.
     const dupDistance = getDupDistance();
 
     let stored = 0;

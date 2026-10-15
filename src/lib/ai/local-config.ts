@@ -3,12 +3,11 @@ import { resolveLocalAiAuthMode } from "./local-auth";
 import {
   AI_ROLES,
   AI_ROLE_MAX_OUTPUT_CONFIG_KEYS,
-  AI_ROLE_MODEL_CONFIG_KEYS,
   type AiRole,
 } from "./roles";
 import type { LocalAIAuthConfig, LocalAIAuthMode, LocalAiApiStyle } from "./types";
 
-export const DEFAULT_OLLAMA_MODEL = "gemma4:26b";
+export const DEFAULT_OLLAMA_MODEL = "gemma4:12b";
 /** Native 768-dim local embedding model; matches EMBEDDING_DIMENSIONS. */
 export const DEFAULT_LOCAL_EMBEDDING_MODEL = "nomic-embed-text";
 
@@ -91,7 +90,6 @@ async function getSecretConfigOrEnv(
 export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig> {
   const [
     url,
-    model,
     embeddingModelConfig,
     authModeRaw,
     apiStyleConfig,
@@ -103,7 +101,6 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
     cloudflareAccessClientSecretResult,
   ] = await Promise.all([
     getPlainConfigValue("ai_provider_url"),
-    getPlainConfigValue("ai_provider_model"),
     getPlainConfigValue("ai_provider_embedding_model"),
     getPlainConfigValue("ai_provider_auth_mode"),
     getPlainConfigValue("ai_provider_api_style"),
@@ -123,7 +120,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
 
   return {
     url,
-    model,
+    model: DEFAULT_OLLAMA_MODEL,
     embeddingModel: embeddingModelConfig || firstEnvValue(EMBEDDING_MODEL_ENV_VARS),
     authMode: resolveLocalAiAuthMode(authModeRaw),
     apiStyle: resolveLocalAiApiStyle(apiStyleConfig || firstEnvValue(API_STYLE_ENV_VARS)),
@@ -171,34 +168,18 @@ export function toLocalAiAuthConfig(
   };
 }
 
-/**
- * Read the model override for one role, with an env fallback so an operator
- * can pin a role without a database write (`AI_PROVIDER_MODEL_CHAT`, …).
- *
- * Returns null when the role has no override — the caller must then fall back
- * to `ai_provider_model`. Null is the safe answer: an unconfigured role
- * behaves exactly as it did before roles existed.
- */
+/** Every local role uses the approved 12B model; old overrides remain stored but inactive. */
 export async function readLocalAiRoleModel(role: AiRole): Promise<string | null> {
   return (await readLocalAiRoleModelWithSource(role)).value;
 }
 
-/**
- * The role's model plus WHERE it came from.
- *
- * The source matters to the admin surface: clearing a role's field deletes its
- * SystemConfig row, but an `AI_PROVIDER_MODEL_<ROLE>` env var then takes over
- * rather than the main model. Without the source, the panel would show a
- * cleared-then-repopulated field in an editable box and the operator would
- * believe they had unset something they had not.
- */
+/** The model is fixed by VisionQuest policy, not a config or environment override. */
 export async function readLocalAiRoleModelWithSource(
   role: AiRole,
 ): Promise<{ value: string | null; source: "config" | "env" | null }> {
-  const configured = await getPlainConfigValue(AI_ROLE_MODEL_CONFIG_KEYS[role]);
-  if (configured?.trim()) return { value: configured.trim(), source: "config" };
-  const fromEnv = firstEnvValue([`AI_PROVIDER_MODEL_${role.toUpperCase()}`]);
-  return fromEnv ? { value: fromEnv, source: "env" } : { value: null, source: null };
+  // VisionQuest uses one local generative model; old overrides cannot reactivate larger models.
+  void role;
+  return { value: DEFAULT_OLLAMA_MODEL, source: null };
 }
 
 /** Which roles are pinned by an environment variable the admin UI cannot clear. */
@@ -212,7 +193,7 @@ export async function readLocalAiRoleModelSources(): Promise<
 }
 
 /**
- * Read every role's model override at once. Used by the admin surface, the
+ * Read every role's effective model at once. Used by the admin surface, the
  * AI-provider capability probe, and `sage:model:bakeoff` — anything that has
  * to show or verify the whole mapping rather than serve one call.
  */
@@ -237,7 +218,7 @@ export async function readLocalAiRoleMaxOutputTokensRaw(
 }
 
 /**
- * The model that will actually serve `role`, given the global default.
+ * The model that will actually serve `role`, regardless of historical overrides.
  * Centralized so the admin surface, the bake-off, and the provider factory
  * can never disagree about which model a role resolves to.
  */
@@ -246,6 +227,8 @@ export function resolveRoleModel(
   roleModels: Partial<Record<AiRole, string | null>>,
   globalModel: string,
 ): string {
-  if (!role) return globalModel;
-  return roleModels[role]?.trim() || globalModel;
+  void role;
+  void roleModels;
+  void globalModel;
+  return DEFAULT_OLLAMA_MODEL;
 }
