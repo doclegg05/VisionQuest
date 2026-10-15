@@ -37,6 +37,10 @@ param(
   [string] $RelayScript = "C:\Users\Instructor\Dev\VisionQuest\scripts\ollama-relay.mjs",
   [string] $RelayServiceName = "VisionQuest-OllamaRelay",
   [string] $CloudflaredExe = "C:\Program Files (x86)\cloudflared\cloudflared.exe",
+  # Context window Ollama loads models with. Keep it equal to
+  # OllamaProvider.DEFAULT_NUM_CTX (src/lib/ai/ollama-provider.ts), or to
+  # ai_provider_num_ctx if an admin set one in Program Setup. See Step 3.
+  [int] $ContextLength = 8192,
   [switch] $StopExistingProcesses
 )
 
@@ -332,12 +336,21 @@ New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 & $nssm set $OllamaServiceName AppExit Default    Restart                            | Out-Null
 & $nssm set $OllamaServiceName AppRestartDelay    5000                               | Out-Null
 & $nssm set $OllamaServiceName Start              SERVICE_AUTO_START                 | Out-Null
+# OLLAMA_CONTEXT_LENGTH sets the context every model loads with. Sage's chat
+# calls go to Ollama's OpenAI-compatible /v1 endpoint, which ignores the
+# num_ctx the app sends, so without this the host default applies: 4,096
+# tokens on any machine with less than 24 GiB of VRAM, CPU-only included.
+# Sage's prompt runs 7,000-7,500 tokens, and Ollama cuts an oversize prompt
+# from the front with no error, dropping Sage's identity and safety rules.
+# A value different from the app's num_ctx makes Ollama reload the model
+# whenever a native /api/chat call asks for the app's value.
 & $nssm set $OllamaServiceName AppEnvironmentExtra `
   "OLLAMA_HOST=127.0.0.1:11434" `
   "OLLAMA_MODELS=$OllamaModels" `
   "OLLAMA_KEEP_ALIVE=30m" `
   "OLLAMA_NUM_PARALLEL=4" `
-  "OLLAMA_MAX_QUEUE=100" | Out-Null
+  "OLLAMA_MAX_QUEUE=100" `
+  "OLLAMA_CONTEXT_LENGTH=$ContextLength" | Out-Null
 
 Start-ServiceIfNeeded $OllamaServiceName 30
 Wait-HttpOk "http://localhost:11434/api/tags" 60 "Ollama" | Out-Null
@@ -439,3 +452,5 @@ Write-Host "Next: in a browser logged in as admin on visionquest.onrender.com, r
 Write-Host "  fetch('/api/admin/ai-provider/test',{method:'POST',credentials:'include'})"
 Write-Host "    .then(r=>r.json()).then(console.log)"
 Write-Host "Expect: { success: true, ... }"
+Write-Host "Then, after one Sage chat turn, run 'ollama ps' on this machine."
+Write-Host "  Expect the CONTEXT column to read $ContextLength for the chat model."
