@@ -9,13 +9,19 @@ describe("SPOKES palette", () => {
   });
 
   it("accepts palette colors in any case, shorthand, alpha, or rgba form", () => {
-    for (const ok of ["#004071", "#004071CC", "#FFF", "rgba(0, 64, 113, 0.05)", "rgb(211, 178, 87)", "white", "transparent"]) {
+    for (const ok of ["#004071", "#004071CC", "#FFF", "rgba(0, 64, 113, 0.05)", "rgb(211, 178, 87)", "white", "transparent", "currentColor"]) {
       assert.ok(isPaletteColor(ok), ok);
     }
   });
 
+  it("accepts every palette color", () => {
+    for (const hex of SPOKES_COLORS.values()) {
+      assert.ok(isPaletteColor(hex), hex);
+    }
+  });
+
   it("rejects everything else", () => {
-    for (const bad of ["#c43c3c", "#4a4d54", "black", "rgba(0, 0, 0, 0.5)", "hsl(200 50% 50%)", "rgb(0 64 113 / 5%)"]) {
+    for (const bad of ["#c43c3c", "#4a4d54", "#004072", "", "black", "rgba(0, 0, 0, 0.5)", "hsl(200 50% 50%)", "rgb(0 64 113 / 5%)"]) {
       assert.equal(isPaletteColor(bad), false, bad);
     }
   });
@@ -23,6 +29,7 @@ describe("SPOKES palette", () => {
   it("orders six chart colors from the palette", () => {
     assert.equal(SPOKES_CHART_SERIES.length, 6);
     assert.ok(SPOKES_CHART_SERIES.every(isPaletteColor));
+    assert.deepEqual([...SPOKES_CHART_SERIES], ["#004071", "#d3b257", "#007baf", "#37b550", "#a7253f", "#60636b"]);
   });
 
   it("suggests the nearest palette color for a stray hex", () => {
