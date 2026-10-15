@@ -84,6 +84,22 @@ describe("eval runs that cannot evaluate exit with 'not run' codes", () => {
     assert.equal(code, 4, output.slice(-1500));
     assert.match(output, /provider or model unavailable/);
   });
+
+  it("sage-agent-eval.mjs exits 4 when OpenRouter does not know the model id", () => {
+    const { code, output } = runEval("scripts/sage-agent-eval.mjs", [], "unknown-model");
+    assert.equal(code, 4, output.slice(-1500));
+    assert.match(output, /provider or model unavailable/);
+  });
+
+  it("sage-quality-eval.mjs exits 1 and names the 400 when OpenRouter rejects the request shape", () => {
+    // Before 2026-10-15 every 400 read as "provider or model unavailable"
+    // (exit 4), which sends a developer to rotate a key instead of fixing
+    // the request.
+    const { code, output } = runEval("scripts/sage-quality-eval.mjs", [], 400);
+    assert.equal(code, 1, output.slice(-1500));
+    assert.match(output, /OpenRouter request failed \(400, bad_request\)/);
+    assert.doesNotMatch(output, /provider or model unavailable/);
+  });
 });
 
 describe("sage-memory-eval checks the provider before touching the database", () => {
@@ -151,6 +167,21 @@ describe("sage-embedding-preflight says whether OpenRouter embeddings work", () 
     const { code, output } = runPreflight("network");
     assert.equal(code, 4, output.slice(-1500));
     assert.match(output, /OpenRouter embeddings could not be reached/);
+  });
+
+  it("exits 4 when OpenRouter does not know the embedding model id", () => {
+    const { code, output } = runPreflight("unknown-model");
+    assert.equal(code, 4, output.slice(-1500));
+    assert.match(output, /OpenRouter embeddings provider or model unavailable/);
+  });
+
+  it("exits 1 and names the 400 when OpenRouter rejects the request shape", () => {
+    // A preflight that sends a body OpenRouter refuses is a bug in the
+    // request, not a refused key, so it must not read NOT RUN.
+    const { code, output } = runPreflight(400);
+    assert.equal(code, 1, output.slice(-1500));
+    assert.match(output, /OpenRouter request failed \(400, bad_request\)/);
+    assert.doesNotMatch(output, /provider or model unavailable/);
   });
 });
 

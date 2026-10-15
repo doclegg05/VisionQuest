@@ -4,15 +4,22 @@
 // does when the connection never happens. STUB_OPENROUTER_STATUS=ok answers
 // with a one-word reply whose usage bills STUB_OPENROUTER_COST USD (default
 // 0.0005), as OpenRouter's usage does, and an embeddings request with one
-// 768-dimension vector per input. Used by scripts/lib/eval-abort.e2e.test.mjs.
-const networkDown = process.env.STUB_OPENROUTER_STATUS === "network";
-const ok = process.env.STUB_OPENROUTER_STATUS === "ok";
-const status = Number(process.env.STUB_OPENROUTER_STATUS ?? "402");
+// 768-dimension vector per input. STUB_OPENROUTER_STATUS=unknown-model
+// answers chat and embeddings requests with the 400 OpenRouter sends for a
+// model id it does not know; a plain 400 is a request-shape rejection. Used by
+// scripts/lib/eval-abort.e2e.test.mjs.
+const mode = process.env.STUB_OPENROUTER_STATUS ?? "402";
+const networkDown = mode === "network";
+const ok = mode === "ok";
+const unknownModel = mode === "unknown-model";
+const status = unknownModel ? 400 : Number(mode);
 const cost = Number(process.env.STUB_OPENROUTER_COST ?? "0.0005");
 const bodies = {
+  400: { error: { code: 400, message: "messages.1.content: Expected string, received array" } },
   402: { error: { code: 402, message: "Insufficient credits" } },
   404: { error: { code: 404, message: "No endpoints found matching your data policy" } },
 };
+const UNKNOWN_MODEL_BODY = { error: { code: 400, message: "stub/no-such-model is not a valid model ID" } };
 
 /** An embeddings reply: one 768-dimension vector per input, as OpenRouter's /v1/embeddings returns. */
 function okEmbeddings(init) {
@@ -45,7 +52,8 @@ globalThis.fetch = async (input, init) => {
   if (!url.includes("openrouter.ai")) throw new Error(`stub fetch refused a non-OpenRouter request: ${url}`);
   if (networkDown) throw new TypeError("fetch failed");
   if (ok) return url.endsWith("/embeddings") ? okEmbeddings(init) : okReply(init);
-  return new Response(JSON.stringify(bodies[status] ?? { error: { code: status } }), {
+  const body = unknownModel ? UNKNOWN_MODEL_BODY : (bodies[status] ?? { error: { code: status } });
+  return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" },
   });
