@@ -10,6 +10,7 @@ import { getRlsContext, type RlsContext } from "@/lib/rls-context";
 const handlers = new Map<string, (payload: Record<string, unknown>) => Promise<void>>();
 mock.module("@/lib/jobs", {
   namedExports: {
+    enqueueJob: async () => "queued-job",
     registerJobHandler: (type: string, handler: (payload: Record<string, unknown>) => Promise<void>) => {
       handlers.set(type, handler);
     },
@@ -34,13 +35,22 @@ mock.module("@/lib/advising", {
   },
 });
 
+let emailConfigured = false;
+const sendEmailMock = mock.fn(async () => undefined);
+const sendSmsMock = mock.fn(async () => true);
 mock.module("@/lib/email", {
-  namedExports: { isEmailDeliveryConfigured: () => false, sendEmail: async () => undefined },
+  namedExports: { isEmailDeliveryConfigured: () => emailConfigured, sendEmail: sendEmailMock },
 });
+mock.module("@/lib/db", { namedExports: { prismaAdmin: {
+  student: { findUnique: async () => ({ isActive: true, email: "user@example.test" }) },
+  notificationPreference: { findFirst: async () => ({ enabled: true, destination: "private.recipient@example.test" }) },
+} } });
+mock.module("@/lib/nudges/sms-policy", { namedExports: {
+  sendPolicySms: async () => ({ status: await sendSmsMock() ? "sent" : "failed" }),
+} });
+const logMocks = { debug: mock.fn(), info: mock.fn(), warn: mock.fn(), error: mock.fn() };
 mock.module("@/lib/logger", {
-  namedExports: {
-    logger: { debug: mock.fn(), info: mock.fn(), warn: mock.fn(), error: mock.fn() },
-  },
+  namedExports: { logger: logMocks },
 });
 
 before(async () => {
@@ -61,6 +71,67 @@ describe("jobs-registry", () => {
   beforeEach(() => {
     postResponseCalls.length = 0;
     syncCalls.length = 0;
+    emailConfigured = false;
+    sendEmailMock.mock.resetCalls();
+    sendEmailMock.mock.mockImplementation(async () => undefined);
+    sendSmsMock.mock.resetCalls();
+    sendSmsMock.mock.mockImplementation(async () => true);
+    for (const log of Object.values(logMocks)) log.mock.resetCalls();
+  });
+
+  it("missing SMTP fails retryably without logging recipient or free-text content", async () => {
+    const payload = {
+      to: "private.recipient@example.test",
+      subject: "Private wellbeing subject",
+      text: "Private notification body",
+      html: "<p>Private HTML content</p>",
+    };
+    await assert.rejects(handler("send_email")(payload), (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.message, "Email delivery is not configured (SMTP_* env vars missing).");
+      return true;
+    });
+    assert.equal(sendEmailMock.mock.callCount(), 0);
+    assert.equal(logMocks.error.mock.callCount(), 1);
+    assert.deepEqual(logMocks.error.mock.calls[0].arguments, [
+      "Email job failed: SMTP is not configured",
+      { alert: "email_delivery_unconfigured" },
+    ]);
+    const logs = JSON.stringify(Object.values(logMocks).flatMap((log) => log.mock.calls.map((call) => call.arguments)));
+    for (const value of Object.values(payload)) assert.ok(!logs.includes(value));
+  });
+
+  it("channel jobs reject provider failures generically so the processor can retry", async () => {
+    emailConfigured = true;
+    const privateError = "private.recipient@example.test private message content";
+    sendEmailMock.mock.mockImplementation(async () => { throw new Error(privateError); });
+    const email = { to: "private.recipient@example.test", subject: "Private subject", text: "Private body" };
+    for (const run of [
+      () => handler("notification_channel_delivery")({ channel: "email", studentId: "student-a", ...email }),
+      () => handler("send_email")(email),
+    ]) await assert.rejects(run(), /^Error: Notification channel delivery failed\.$/);
+
+    const sms = { channel: "sms", studentId: "student-a", templateKey: "notification:test", body: "Private SMS" };
+    sendSmsMock.mock.mockImplementation(async () => false);
+    await assert.rejects(handler("notification_channel_delivery")(sms), /^Error: Notification channel delivery failed\.$/);
+    sendSmsMock.mock.mockImplementation(async () => { throw new Error(privateError); });
+    await assert.rejects(handler("notification_channel_delivery")(sms), /^Error: Notification channel delivery failed\.$/);
+    assert.ok(Object.values(logMocks).every((log) => log.mock.callCount() === 0));
+  });
+
+  it("channel jobs deliver both channels on retry success", async () => {
+    emailConfigured = true;
+    await handler("notification_channel_delivery")({ channel: "email", studentId: "student-a", to: "private.recipient@example.test", subject: "Subject", text: "Body" });
+    await handler("notification_channel_delivery")({ channel: "sms", studentId: "student-a", templateKey: "notification:test", body: "Body" });
+    assert.equal(sendEmailMock.mock.callCount(), 1);
+    assert.equal(sendSmsMock.mock.callCount(), 1);
+  });
+
+  it("channel jobs refuse invalid payloads without leaking their contents", async () => {
+    await assert.rejects(handler("notification_channel_delivery")({ channel: "private content", to: "user@example.test" }), /Notification channel delivery failed/);
+    await assert.rejects(handler("notification_channel_delivery")({ channel: "sms" }), /Notification channel delivery failed/);
+    assert.equal(sendEmailMock.mock.callCount(), 0);
+    assert.equal(sendSmsMock.mock.callCount(), 0);
   });
 
   it("chat_post_response replays as the student named in the payload", async () => {

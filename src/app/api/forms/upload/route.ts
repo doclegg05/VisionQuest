@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey, validateFile } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
+import { validateUploadContent } from "@/lib/file-security";
 import { logger } from "@/lib/logger";
 import { withAuth, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
@@ -29,7 +30,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     const formId = formData.get("formId") as string | null;
     const requestedStudentId = formData.get("studentId") as string | null;
 
-    if (!file || !formId) {
+    if (!(file instanceof File) || typeof formId !== "string" || !formId
+      || (requestedStudentId !== null && typeof requestedStudentId !== "string")) {
       return NextResponse.json({ error: "File and formId are required." }, { status: 400 });
     }
 
@@ -54,6 +56,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    const contentError = validateUploadContent(buffer, file.type);
+    if (contentError) return NextResponse.json({ error: contentError }, { status: 400 });
     // `File.name` is student-controlled and undici preserves it verbatim, so
     // the stored name must be a name and not a path — the retention archive
     // turns this column into a ZIP entry path.
@@ -99,6 +103,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
     return NextResponse.json({ submission, fileId: fileRecord.id });
   } catch (error) {
+    if (error instanceof Error && error.name === "ApiError") throw error;
     logger.error("Form upload error", { error: String(error) });
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }

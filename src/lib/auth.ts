@@ -130,9 +130,11 @@ export function verifyPasswordSafeWithStatus(
   password: string,
   stored: string | null | undefined,
 ): PasswordVerifyResult {
-  const target = stored && isKnownHashFormat(stored) ? stored : DUMMY_HASH;
+  const hasStoredHash = Boolean(stored && isKnownHashFormat(stored));
+  const target = hasStoredHash ? stored! : DUMMY_HASH;
   const result = verifyPasswordWithStatus(password, target);
-  return stored ? result : { valid: false, needsRehash: false };
+  // Dummy work equalizes timing; it must never authenticate a malformed hash.
+  return hasStoredHash ? result : { valid: false, needsRehash: false };
 }
 
 /** Boolean-only wrapper preserved for existing callers. */
@@ -222,7 +224,13 @@ export async function getMfaSessionToken(): Promise<string | null> {
 
 export async function clearMfaSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(MFA_COOKIE_NAME);
+  cookieStore.set(MFA_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 0,
+    path: "/api/auth/mfa",
+  });
 }
 
 // --- Normalize student ID ---

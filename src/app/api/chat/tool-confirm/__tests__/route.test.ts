@@ -145,6 +145,18 @@ describe("POST /api/chat/tool-confirm", () => {
     mockExecuteAgentTool.mock.mockImplementation(async () => successRecord());
   });
 
+  it("rejects malformed JSON before claiming or executing", async () => {
+    const req = new Request("http://localhost/api/chat/tool-confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+    const res = await route.POST(req);
+    assert.equal(res.status, 400);
+    assert.equal(mockClaimCreate.mock.callCount(), 0);
+    assert.equal(mockExecuteAgentTool.mock.callCount(), 0);
+  });
+
   it("executes a validly-confirmed tool call once", async () => {
     const res = await route.POST(confirmRequest(signedBody()));
     assert.equal(res.status, 200);
