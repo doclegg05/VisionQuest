@@ -67,8 +67,8 @@ for (const theme of ["light", "dark"] as const) {
     }
 
     for (const edge of ["--focus-outline", "--border-control", "--progress-edge"]) {
-      it(`${edge} clears 3:1 on the page, a card, and a muted panel`, () => {
-        assertOnGrounds((ground) => over(edge, theme, ground), [grounds[0], grounds[1], grounds[3]], 3);
+      it(`${edge} clears 3:1 on every ground`, () => {
+        assertOnGrounds((ground) => over(edge, theme, ground), grounds, 3);
       });
     }
 
@@ -84,3 +84,15 @@ for (const theme of ["light", "dark"] as const) {
     });
   });
 }
+
+const REQUIRED_IN_BOTH_THEMES = [
+  ...ROLES.flatMap((role) => ["fill", "on", "soft", "text", "border"].map((part) => `--${role}-${part}`)),
+  "--on-primary", "--focus-outline", "--focus-ring", "--border-control", "--progress-edge",
+];
+
+describe("SPOKES tokens", () => {
+  it("declares every role, focus, and edge token in both theme blocks", () => {
+    const missing = REQUIRED_IN_BOTH_THEMES.filter((name) => [...css.matchAll(new RegExp(`^\\s*${name}:`, "gm"))].length < 2);
+    assert.deepEqual(missing, []);
+  });
+});
