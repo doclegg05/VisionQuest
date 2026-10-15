@@ -96,10 +96,13 @@ describe("pg_cron job registrations", () => {
   });
 });
 
+// isAuthorizedInternalRequest (src/lib/csrf.ts) accepts only /api/internal
+// paths, and src/proxy.ts uses it to exempt a bearer call from the Origin
+// check. A bearer route anywhere else is unreachable by pg_cron.
 describe("bearer-authenticated routes", () => {
-  it("live under /api/internal, the only prefix the proxy lets a bearer call through", () => {
+  it("live under /api/internal", () => {
     const outside = routeFiles(API_DIR)
-      .filter((file) => readFileSync(file, "utf8").includes("CRON_SECRET"))
+      .filter((file) => /CRON_SECRET|isAuthorizedInternalRequest/.test(readFileSync(file, "utf8")))
       .map((file) => relative(REPO_ROOT, file))
       .filter((file) => !file.startsWith("src/app/api/internal/"));
     assert.deepEqual(outside, []);

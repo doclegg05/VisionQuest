@@ -9,11 +9,12 @@ const enrollmentFindMany = mock.fn() as any;
 const requirementFindMany = mock.fn() as any;
 const alertFindMany = mock.fn() as any;
 const alertUpsert = mock.fn() as any;
+const alertUpdate = mock.fn() as any;
 const alertUpdateMany = mock.fn() as any;
 const transaction = mock.fn() as any;
 
 const tx = {
-  studentAlert: { findMany: alertFindMany, upsert: alertUpsert, updateMany: alertUpdateMany },
+  studentAlert: { findMany: alertFindMany, upsert: alertUpsert, update: alertUpdate, updateMany: alertUpdateMany },
 };
 
 mock.module("@/lib/db", {
@@ -48,13 +49,26 @@ function request(auth?: string): Request {
   });
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function daysAgo(days: number): Date {
+  return new Date(Date.now() - days * DAY_MS);
+}
+
+const GAP_KEY = "evidence_gap:student-1:req-1";
+
+/** The pre-read finds these rows by alertKey; the resolve pass finds `open`. */
+function existingAlerts(byKey: object[], open: object[] = []) {
+  alertFindMany.mock.mockImplementation(async (args: any) => (args.where.alertKey ? byKey : open));
+}
+
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 
 describe("POST /api/internal/evidence-gap-detection", () => {
   beforeEach(() => {
     process.env.CRON_SECRET = "test-cron-secret";
     enrollmentFindMany.mock.mockImplementation(async () => [
-      { studentId: "student-1", classId: "class-1", enrolledAt: new Date("2026-10-10T00:00:00.000Z") },
+      { studentId: "student-1", classId: "class-1", enrolledAt: daysAgo(2) },
     ]);
     requirementFindMany.mock.mockImplementation(async () => [
       {
@@ -68,12 +82,13 @@ describe("POST /api/internal/evidence-gap-detection", () => {
     ]);
     alertFindMany.mock.mockImplementation(async () => []);
     alertUpsert.mock.mockImplementation(async () => ({}));
+    alertUpdate.mock.mockImplementation(async () => ({}));
     alertUpdateMany.mock.mockImplementation(async () => ({ count: 0 }));
     transaction.mock.mockImplementation(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx));
   });
 
   afterEach(() => {
-    for (const fn of [enrollmentFindMany, requirementFindMany, alertFindMany, alertUpsert, alertUpdateMany, transaction]) {
+    for (const fn of [enrollmentFindMany, requirementFindMany, alertFindMany, alertUpsert, alertUpdate, alertUpdateMany, transaction]) {
       fn.mock.resetCalls();
     }
     (process.env as Record<string, string | undefined>).NODE_ENV = ORIGINAL_NODE_ENV;
@@ -124,6 +139,75 @@ describe("POST /api/internal/evidence-gap-detection", () => {
     await POST(request("Bearer test-cron-secret"));
 
     assert.deepEqual(enrollmentFindMany.mock.calls[0].arguments[0].where, { status: "active" });
+  });
+
+  it("escalates a gap to high once the enrollment is 14 days old", async () => {
+    enrollmentFindMany.mock.mockImplementation(async () => [
+      { studentId: "student-1", classId: "class-1", enrolledAt: daysAgo(14) },
+    ]);
+
+    await POST(request("Bearer test-cron-secret"));
+
+    assert.equal(alertUpsert.mock.calls[0].arguments[0].create.severity, "high");
+  });
+
+  it("raises no gap for an optional item", async () => {
+    requirementFindMany.mock.mockImplementation(async () => [
+      { id: "req-1", classId: "class-1", title: "Food Handler", itemType: "certification", itemId: "food-handler", status: "optional" },
+    ]);
+
+    const body = await (await POST(request("Bearer test-cron-secret"))).json();
+
+    assert.equal(body.requirementsChecked, 0);
+    assert.equal(alertUpsert.mock.callCount(), 0);
+  });
+
+  it("resolves open gaps whose item is now met", async () => {
+    existingAlerts([], [
+      { id: "alert-still-open", alertKey: GAP_KEY },
+      { id: "alert-now-met", alertKey: "evidence_gap:student-1:req-done" },
+    ]);
+
+    const body = await (await POST(request("Bearer test-cron-secret"))).json();
+
+    assert.equal(body.resolvedAlerts, 1);
+    assert.deepEqual(alertUpdateMany.mock.calls[0].arguments[0].where, { id: { in: ["alert-now-met"] } });
+  });
+
+  // A teacher's dismiss means "won't reappear on resync" (PATCH
+  // /api/teacher/alerts/:id), and the alert sync honors it and unexpired
+  // snoozes (applyStudentAlertSyncPlan). A daily job must too.
+  it("refreshes a dismissed gap's text but leaves it dismissed", async () => {
+    existingAlerts([{ alertKey: GAP_KEY, status: "dismissed", snoozedUntil: null }]);
+
+    await POST(request("Bearer test-cron-secret"));
+
+    assert.equal(alertUpsert.mock.callCount(), 0);
+    const { where, data } = alertUpdate.mock.calls[0].arguments[0];
+    assert.equal(where.alertKey, GAP_KEY);
+    assert.equal(data.title, "Missing Certification: Food Handler");
+    assert.equal("status" in data, false);
+  });
+
+  it("leaves a gap snoozed until the snooze ends", async () => {
+    existingAlerts([{ alertKey: GAP_KEY, status: "snoozed", snoozedUntil: new Date(Date.now() + DAY_MS) }]);
+
+    await POST(request("Bearer test-cron-secret"));
+
+    assert.equal(alertUpsert.mock.callCount(), 0);
+    assert.equal("status" in alertUpdate.mock.calls[0].arguments[0].data, false);
+  });
+
+  it("reopens a gap whose snooze has ended, clearing the snooze and any old resolution", async () => {
+    existingAlerts([{ alertKey: GAP_KEY, status: "snoozed", snoozedUntil: daysAgo(1) }]);
+
+    await POST(request("Bearer test-cron-secret"));
+
+    const { update } = alertUpsert.mock.calls[0].arguments[0];
+    assert.equal(update.status, "open");
+    assert.equal(update.snoozedUntil, null);
+    assert.equal(update.snoozedBy, null);
+    assert.equal(update.resolvedAt, null);
   });
 
   it("gives its transaction room for a program-wide run, past Prisma's 5 second default", async () => {

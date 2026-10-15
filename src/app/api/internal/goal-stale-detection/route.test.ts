@@ -11,11 +11,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const goalFindMany = mock.fn() as any;
 const alertFindMany = mock.fn() as any;
 const alertUpsert = mock.fn() as any;
+const alertUpdate = mock.fn() as any;
 const alertUpdateMany = mock.fn() as any;
 const transaction = mock.fn() as any;
 
 const tx = {
-  studentAlert: { findMany: alertFindMany, upsert: alertUpsert, updateMany: alertUpdateMany },
+  studentAlert: { findMany: alertFindMany, upsert: alertUpsert, update: alertUpdate, updateMany: alertUpdateMany },
 };
 
 mock.module("@/lib/db", {
@@ -82,12 +83,13 @@ describe("POST /api/internal/goal-stale-detection", () => {
           ],
     );
     alertUpsert.mock.mockImplementation(async () => ({}));
+    alertUpdate.mock.mockImplementation(async () => ({}));
     alertUpdateMany.mock.mockImplementation(async () => ({ count: 1 }));
     transaction.mock.mockImplementation(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx));
   });
 
   afterEach(() => {
-    for (const fn of [goalFindMany, alertFindMany, alertUpsert, alertUpdateMany, transaction]) {
+    for (const fn of [goalFindMany, alertFindMany, alertUpsert, alertUpdate, alertUpdateMany, transaction]) {
       fn.mock.resetCalls();
     }
     (process.env as Record<string, string | undefined>).NODE_ENV = ORIGINAL_NODE_ENV;
@@ -95,6 +97,12 @@ describe("POST /api/internal/goal-stale-detection", () => {
 
   it("401s without the bearer secret", async () => {
     const res = await POST(request());
+    assert.equal(res.status, 401);
+    assert.equal(goalFindMany.mock.callCount(), 0);
+  });
+
+  it("401s a wrong bearer secret", async () => {
+    const res = await POST(request("Bearer not-the-secret"));
     assert.equal(res.status, 401);
     assert.equal(goalFindMany.mock.callCount(), 0);
   });
@@ -134,6 +142,56 @@ describe("POST /api/internal/goal-stale-detection", () => {
 
     assert.equal(alertUpdateMany.mock.callCount(), 1);
     assert.deepEqual(alertUpdateMany.mock.calls[0].arguments[0].where, { id: { in: ["alert-fresh"] } });
+  });
+
+  it("scans only goals that are not completed, archived, cancelled or abandoned", async () => {
+    await POST(request("Bearer test-cron-secret"));
+
+    assert.deepEqual(goalFindMany.mock.calls[0].arguments[0].where, {
+      status: { notIn: ["completed", "archived", "cancelled", "abandoned"] },
+    });
+  });
+
+  // A teacher's dismiss means "won't reappear on resync" (PATCH
+  // /api/teacher/alerts/:id), and the alert sync honors it and unexpired
+  // snoozes (applyStudentAlertSyncPlan). A daily job must too.
+  it("refreshes a dismissed alert's text but leaves it dismissed", async () => {
+    alertFindMany.mock.mockImplementation(async (args: any) =>
+      args.where.alertKey ? [{ alertKey: "goal_stale:goal-1", status: "dismissed", snoozedUntil: null }] : [],
+    );
+
+    await POST(request("Bearer test-cron-secret"));
+
+    assert.equal(alertUpsert.mock.callCount(), 0);
+    const { where, data } = alertUpdate.mock.calls[0].arguments[0];
+    assert.equal(where.alertKey, "goal_stale:goal-1");
+    assert.equal(data.summary, "Weekly goal has not been reviewed in 10 days.");
+    assert.equal("status" in data, false);
+  });
+
+  it("leaves an alert snoozed until the snooze ends", async () => {
+    alertFindMany.mock.mockImplementation(async (args: any) =>
+      args.where.alertKey
+        ? [{ alertKey: "goal_stale:goal-1", status: "snoozed", snoozedUntil: new Date(Date.now() + DAY_MS) }]
+        : [],
+    );
+
+    await POST(request("Bearer test-cron-secret"));
+
+    assert.equal(alertUpsert.mock.callCount(), 0);
+    assert.equal("status" in alertUpdate.mock.calls[0].arguments[0].data, false);
+  });
+
+  it("reopens a resolved alert and clears its old resolution", async () => {
+    alertFindMany.mock.mockImplementation(async (args: any) =>
+      args.where.alertKey ? [{ alertKey: "goal_stale:goal-1", status: "resolved", snoozedUntil: null }] : [],
+    );
+
+    await POST(request("Bearer test-cron-secret"));
+
+    const { update } = alertUpsert.mock.calls[0].arguments[0];
+    assert.equal(update.status, "open");
+    assert.equal(update.resolvedAt, null);
   });
 
   it("gives its transaction room for a program-wide run, past Prisma's 5 second default", async () => {
