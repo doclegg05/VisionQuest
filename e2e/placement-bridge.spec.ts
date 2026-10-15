@@ -192,7 +192,7 @@ test("verify → queue item → prefilled SPOKES save → provenance + resolved 
   // The employer field is prefilled from the application's opportunity —
   // but the start date is NOT. Verification time is not the employment
   // start date; fabricating one would corrupt grant and follow-up data.
-  await expect(page.getByPlaceholder("Employer name")).toHaveValue("E2E Mountain Diner");
+  await expect(page.getByLabel("Employer name")).toHaveValue("E2E Mountain Diner");
   await expect(page.getByLabel(/employment start date/i)).toHaveValue("");
 
   // Saving the link without a start date is refused by the route.

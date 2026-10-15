@@ -135,7 +135,7 @@ export default function StudentProfileFormStep({ onComplete }: StudentProfileFor
       <button
         type="submit"
         disabled={submitting}
-        className="primary-button px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        className="primary-button min-h-11 px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? "Saving..." : "Save & Continue →"}
       </button>

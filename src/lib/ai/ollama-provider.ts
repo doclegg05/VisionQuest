@@ -173,9 +173,35 @@ function payloadErrorMessage(payload: unknown): string | null {
   return "Local AI returned an error.";
 }
 
+/** Upstream statuses that mean Ollama or the tunnel was briefly unreachable. */
+const STARTUP_RETRY_STATUSES = [502, 503, 504, 520, 522, 523, 524, 525, 526, 527, 530];
+
+/**
+ * The HTTP status a stream error reports, or null when it reports none.
+ *
+ * Two messages carry one: the relay's `Ollama returned NNN[: cause]` line and
+ * this provider's own `Local AI [tool ]stream failed (NNN)`. The match is
+ * anchored at the start so the relay's cause, which is Ollama's own error
+ * text, can never stand in for the status.
+ */
+function reportedUpstreamStatus(message: string): number | null {
+  const match = /^(?:Ollama returned (\d{3})\b|Local AI (?:tool )?stream failed \((\d{3})\))/i.exec(
+    message,
+  );
+  if (!match) return null;
+  return Number(match[1] ?? match[2]);
+}
+
+/**
+ * A message that reports a status is judged by that status alone. A 500 whose
+ * cause reads "llama runner process has terminated" is a crash, not a dropped
+ * connection, so the transport words below apply only to other messages.
+ */
 function isRetryableStartupError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /Relay:|ECONNREFUSED|fetch failed|socket hang up|terminated|aborted|timed out|timeout|Local AI (?:tool )?stream failed \((?:502|503|504|520|522|523|524|525|526|527|530)\)|Ollama returned (?:502|503|504|520|522|523|524|525|526|527|530)/i.test(message);
+  const status = reportedUpstreamStatus(message);
+  if (status !== null) return STARTUP_RETRY_STATUSES.includes(status);
+  return /Relay:|ECONNREFUSED|fetch failed|socket hang up|terminated|aborted|timed out|timeout/i.test(message);
 }
 
 /**

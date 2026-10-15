@@ -215,9 +215,9 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       <Link
         key={item.href}
         href={item.href}
-        className={`premium-nav-link mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
+        className={`premium-nav-link mb-1 flex min-h-11 items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
           active
-            ? "premium-nav-link-active bg-gradient-to-r from-[#37b550] to-[#2a8a3c] text-white shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
+            ? "premium-nav-link-active bg-[var(--accent-green)] text-[var(--on-accent)] shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
             : "premium-nav-link-idle text-white/90 hover:text-white"
         }`}
         aria-current={active ? "page" : undefined}
@@ -303,10 +303,10 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {/* Tab 3: Sage — elevated center FAB */}
           <Link
             href="/chat"
-            className="flex flex-col items-center gap-0.5 px-3"
+            className="flex min-h-11 flex-col items-center gap-0.5 px-3"
             aria-label="Open Sage chat"
           >
-            <div className={`-mt-4 grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-[#37b550] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)] transition-transform active:scale-95 ${pathname === "/chat" ? "animate-glow-pulse" : ""}`}>
+            <div className={`-mt-4 grid h-11 w-11 place-items-center rounded-full bg-[var(--accent-green)] text-[var(--on-accent)] shadow-[0_4px_16px_var(--glow-green)] transition-transform active:scale-95 ${pathname === "/chat" ? "animate-glow-pulse" : ""}`}>
               <ChatCircle size={22} weight="fill" />
             </div>
             <span className={`text-xs font-medium ${pathname === "/chat" ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>Sage</span>
@@ -363,7 +363,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   key={item.href}
                   href={item.href}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     isActive(item.href)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
@@ -379,7 +379,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 <Link
                   href={settingsHref}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     isActive(settingsHref)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
@@ -440,7 +440,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 ref={profileButtonRef}
                 onClick={() => setProfileOpen(!profileOpen)}
                 type="button"
-                className="rounded-full border border-white/12 p-1.5 text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                className="inline-flex size-11 items-center justify-center rounded-full border border-white/12 text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                 aria-label="Profile menu"
                 aria-expanded={profileOpen}
                 aria-haspopup="menu"
@@ -464,7 +464,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 <Link
                   href={settingsHref}
                   onClick={() => setProfileOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                  className="flex min-h-11 items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                   role="menuitem"
                 >
                   <Gear size={16} weight="regular" />
@@ -481,7 +481,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   handleLogout();
                 }}
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                 role="menuitem"
               >
                 <SignOut size={16} weight="regular" />
@@ -498,7 +498,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           <button
             onClick={() => setSageMiniOpen((v) => !v)}
             type="button"
-            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl text-[#f0efe8] shadow-[0_8px_30px_var(--glow-green)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)]" : "bg-gradient-to-br from-[#37b550] to-[#2a8a3c]"}`}
+            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl shadow-[0_8px_30px_var(--glow-green)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)] text-[#f0efe8]" : "bg-[var(--accent-green)] text-[var(--on-accent)]"}`}
             aria-label={sageMiniOpen ? "Close Sage chat" : "Open Sage chat"}
             aria-expanded={sageMiniOpen}
           >

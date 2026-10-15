@@ -52,12 +52,12 @@ export default function ManageDashboard({ canViewAudit, canViewAiConfig }: Manag
 
   return (
     <div>
-      <div className="mb-6 flex gap-1 rounded-xl theme-segmented p-1">
+      <div className="mb-6 flex flex-wrap gap-1 rounded-xl theme-segmented p-1">
         {tabs.map((tabOption) => (
           <button
             key={tabOption.key}
             onClick={() => setTab(tabOption.key)}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors pointer-coarse:min-h-11 ${
               tab === tabOption.key
                 ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-sm"
                 : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
