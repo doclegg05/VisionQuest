@@ -667,6 +667,55 @@ describe("--provider=openrouter refuses a non-local database", () => {
     });
   });
 
+  // Prisma connects to a `host` query parameter instead of the URL's host
+  // (pinned below), so a loopback hostname proves nothing on its own.
+  // `hostaddr` is refused too: Prisma 6 ignores it, but psql and every other
+  // libpq client honour it, and the same URL is easily pasted into one.
+  it("refuses a loopback URL whose query string names another host", async () => {
+    const urls = [
+      "postgresql://u@127.0.0.1:5432/db?host=prod.example.com",
+      "postgresql://u@localhost/db?sslmode=require&hostaddr=203.0.113.7",
+      "postgresql://u@127.0.0.1:5432/db?ho%73t=prod.example.com",
+      "postgresql://u@127.0.0.1:5432/db?HOST=prod.example.com",
+    ];
+    for (const url of urls) {
+      await withDbEnv({ ADMIN_DATABASE_URL: url }, async () => {
+        await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), (err) => {
+          assert.match(err.message, /ADMIN_DATABASE_URL/, url);
+          assert.equal(err.message.includes("prod.example.com"), false, err.message);
+          assert.equal(err.message.includes("203.0.113.7"), false, err.message);
+          return true;
+        });
+      });
+    }
+  });
+
+  it("Prisma connects to a ?host= parameter, not the URL's host", async () => {
+    const { createServer } = await import("node:net");
+    const { PrismaClient } = await import("@prisma/client");
+    let connections = 0;
+    const server = createServer((socket) => {
+      connections += 1;
+      socket.destroy();
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address();
+    // Only the parameter names the listener's address: the URL's own host is
+    // IPv6 loopback, where nothing listens on this port.
+    const client = new PrismaClient({
+      datasourceUrl: `postgresql://none@[::1]:${port}/none?host=127.0.0.1&connect_timeout=3`,
+      log: [],
+    });
+    try {
+      // The listener drops the socket, so the connect fails; only where it went matters.
+      await client.$connect().catch(() => {});
+      assert.equal(connections, 1, "Prisma did not use the host query parameter");
+    } finally {
+      await client.$disconnect().catch(() => {});
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
   it("allows loopback and unset database URLs", async () => {
     for (const url of ["postgresql://none@127.0.0.1:1/none", "postgres://u@localhost/db", "postgres://u@[::1]:5432/db"]) {
       await withDbEnv({ DATABASE_URL: url }, async () => {
