@@ -18,14 +18,14 @@ If you are about to connect OpenRouter to the app itself, stop. That is a FERPA 
 
 1. On openrouter.ai, create a key named "VisionQuest evals" with a monthly spending limit.
 2. Signed in as the account that owns the key, set two settings pages (names as on OpenRouter's settings page and in its docs on 2026-10-15):
-   - Privacy, `openrouter.ai/settings/privacy`: turn off the switches that allow providers that may train on your data, for paid and for free models. Turn off "OpenRouter use of inputs/outputs". Under Zero Data Retention, each model group has its own switch:
+   - Privacy, `openrouter.ai/settings/privacy`: under Data Training, turn off all four switches: "Allow paid endpoints that train on request data", "Allow free endpoints that train on request data", "Allow free endpoints that publish prompts" and "Allow 1% data discount in workspaces". The last one is what would let OpenRouter use your inputs and outputs to improve its product. Under Zero Data Retention, each model group has its own switch:
      - "Google": on, with "Safety retention allowed". "Zero retention only" makes most Google models unavailable, and all of them from 2026-10-18, so the bench could no longer test the production model. With safety retention, Vertex may keep prompts to check for abuse but does not train on them; the bench sends synthetic data only.
      - "All other models": on, with "Zero retention only". It removes only endpoints that keep prompts for safety monitoring, such as open-weight models on Vertex. A model left with no endpoint reports "not run" (exit 4).
      - "Anthropic", "OpenAI" and "SpaceXAI": on only if you test those models.
-   - Observability, `openrouter.ai/settings/observability`: keep input and output logging off.
+   - Observability, `openrouter.ai/settings/observability`: keep "Input & Output Logging" off.
 3. Put the key in `/Users/brittlegg/MacDev/companies/education/VisionQuest/.env.local` as `OPENROUTER_API_KEY=`.
 
-Every request the provider sends also carries `provider: { zdr: true, data_collection: "deny" }`, which asks for the same routing as the switches above. Two things only the account settings in step 2 decide: whether a zero-retention request may use endpoints that keep prompts for safety monitoring (the choice under each model group), and OpenRouter's own logging and use of inputs and outputs.
+Every request the provider sends also carries `provider: { zdr: true, data_collection: "deny" }`, which asks for the same routing as the switches above. Two things only the account settings in step 2 decide: whether a zero-retention request may use endpoints that keep prompts for safety monitoring (the choice under each model group), and OpenRouter's own Input & Output Logging and 1% data discount.
 
 ## Running
 
