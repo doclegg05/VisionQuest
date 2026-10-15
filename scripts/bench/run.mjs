@@ -45,7 +45,7 @@ import {
 import { isMainModule } from "./lib/entry.mjs";
 import { checkRequires, describeUnmet, resolveEnv } from "./lib/env.mjs";
 import { describeHost, hostFingerprint, withOllama } from "./lib/host.mjs";
-import { redactDeep, redactSecrets } from "./lib/redact.mjs";
+import { redactDeep } from "./lib/redact.mjs";
 import { buildResult, validateResult } from "./lib/result.mjs";
 import { metricStatus } from "./lib/status.mjs";
 import { compareResults, formatTable, formatValue } from "./compare.mjs";
@@ -341,33 +341,34 @@ function measuredNothingError(tier, metrics) {
 /**
  * Write one result file, refusing to write anything the schema rejects.
  *
- * Everything a scorer authored — its error, its skip note, and every string
- * inside `details` — is redacted first. A scorer is handed live connection
- * strings through `ctx.env`, and `throw new Error(\`connect failed:
- * ${ctx.env.prodReadonlyUrl}\`)` is the natural thing to write; the result
- * file is then committed to main, uploaded as an artifact, printed in a step
+ * Every string in the result is redacted first, not only the fields a scorer
+ * is expected to fill. A scorer is handed live connection strings through
+ * `ctx.env`, and `throw new Error(\`connect failed:
+ * ${ctx.env.prodReadonlyUrl}\`)` is the natural thing to write; it can as
+ * easily land in `provider`, `model` or a metric's `reason`. The result file
+ * is then committed to main, uploaded as an artifact, printed in a step
  * summary and quoted into a public issue. Redaction happens BEFORE schema
  * validation so nothing unredacted is ever held in the object that gets
  * written.
+ *
+ * Returns the redacted copy; the caller prints and compares that copy, so
+ * `--json` output is redacted too.
  */
 function writeResult(repoRoot, result, out) {
-  if (typeof result.error === "string") result.error = redactSecrets(result.error);
-  if (typeof result.skipped === "string") result.skipped = redactSecrets(result.skipped);
-  for (const metric of result.metrics ?? []) {
-    if (metric.details !== undefined) metric.details = redactDeep(metric.details);
-  }
+  const redacted = redactDeep(result);
 
-  const errors = validateResult(result);
+  const errors = validateResult(redacted);
   if (errors.length > 0) {
     throw new Error(
-      `result for "${result.suite}" does not match config/benchmarks/result.schema.json:\n  ` +
+      `result for "${redacted.suite}" does not match config/benchmarks/result.schema.json:\n  ` +
         errors.join("\n  ")
     );
   }
-  const path = join(resolve(repoRoot, BENCH_LATEST_DIR), `${result.suite}.json`);
+  const path = join(resolve(repoRoot, BENCH_LATEST_DIR), `${redacted.suite}.json`);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(result, null, 2)}\n`);
-  out(`  wrote ${join(BENCH_LATEST_DIR, `${result.suite}.json`)}`);
+  writeFileSync(path, `${JSON.stringify(redacted, null, 2)}\n`);
+  out(`  wrote ${join(BENCH_LATEST_DIR, `${redacted.suite}.json`)}`);
+  return redacted;
 }
 
 /**
@@ -591,12 +592,11 @@ async function main() {
       out,
     });
     try {
-      writeResult(repoRoot, result, out);
+      results.push(writeResult(repoRoot, result, out));
     } catch (error) {
       console.error(`bench: ${error.message}`);
       process.exit(2);
     }
-    results.push(result);
   }
 
   out("");
