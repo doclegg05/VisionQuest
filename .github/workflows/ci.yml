@@ -401,10 +401,10 @@ jobs:
           npx tsx scripts/seed-e2e-users.ts >/dev/null
           npx playwright test e2e/a11y-authenticated.spec.ts --workers=1 --reporter=line --timeout=180000
 
-      # SPOKES design review screenshots. Not a gate yet: Task 12 removes
-      # continue-on-error once the first full run is clean. The seed re-runs
-      # first for the same login-budget reason as the step above.
       - name: SPOKES design review screenshots
+        # Not a gate yet. continue-on-error comes off once a full run is clean
+        # (docs/superpowers/plans/2026-10-15-spokes-design-system.md). The seed
+        # re-runs first for the same login-budget reason as the a11y gate above.
         continue-on-error: true
         run: |
           npx tsx scripts/seed-e2e-users.ts >/dev/null
