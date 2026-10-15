@@ -88,8 +88,12 @@ test("sign-in error carries an icon", async ({ browser }) => {
       await page.goto("/");
       await page.getByLabel(/username or email/i).fill("nonexistent-user");
       await page.getByLabel(/password/i).fill("wrongpassword");
+      // Registered before the click so the response cannot be missed.
+      const loginDone = page.waitForResponse((response) => response.url().includes("/api/auth/login"));
       await page.getByRole("button", { name: /sign in to see what to do today/i }).click();
-      const alert = page.getByRole("alert").first();
+      await loginDone;
+      // Scoped to the form: Next's route announcer is also a role="alert", 1px wide, appended to body.
+      const alert = page.locator('form[aria-label="Sign in"]').getByRole("alert");
       await expect(alert).toBeVisible();
       // Dark-theme danger text is white (no SPOKES red passes on navy), so the icon carries "error".
       expect(await alert.locator("svg").count(), `${theme}: the error alert has no icon`).toBeGreaterThan(0);

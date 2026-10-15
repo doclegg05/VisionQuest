@@ -231,7 +231,7 @@ export default function CredlyBadges() {
                 🏅
               </div>
             )}
-            <p className="text-xs font-semibold leading-4 text-[var(--ink-strong)] group-hover:text-info">
+            <p className="text-xs font-semibold leading-4 text-[var(--ink-strong)] group-hover:underline">
               {badge.name}
             </p>
             {badge.issuerName && (

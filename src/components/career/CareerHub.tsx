@@ -179,7 +179,7 @@ export default function CareerHub({
             <p className="text-xs text-[var(--ink-muted)]">Available</p>
           </div>
           <div className="surface-section rounded-xl p-4 text-center">
-            <MagnifyingGlass size={24} className="mx-auto mb-1 text-[var(--accent)]" />
+            <MagnifyingGlass size={24} className="mx-auto mb-1 text-success" />
             <p className="text-2xl font-bold text-[var(--ink-strong)]">{matchedCount}</p>
             <p className="text-xs text-[var(--ink-muted)]">Matched</p>
           </div>

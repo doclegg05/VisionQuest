@@ -27,7 +27,7 @@ export default function XpToast({ amount, label, onDone }: XpToastProps) {
       }`}
     >
       <div
-        className="flex items-center gap-2 rounded-2xl border border-[rgba(249,115,22,0.2)] bg-[rgba(255,255,255,0.92)] px-4 py-3 shadow-[0_20px_50px_rgba(249,115,22,0.15)]"
+        className="flex items-center gap-2 rounded-2xl border border-[rgba(249,115,22,0.2)] bg-[var(--surface-raised)] px-4 py-3 shadow-[0_20px_50px_rgba(249,115,22,0.15)]"
         role="status"
         aria-live="polite"
       >

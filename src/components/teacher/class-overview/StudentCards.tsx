@@ -49,7 +49,7 @@ export default function StudentCards({
                   <Link
                     href={links.record}
                     prefetch={false}
-                    className="inline-flex items-center break-words font-display text-base leading-5 text-[var(--ink-strong)] transition-colors hover:text-info pointer-coarse:min-h-11"
+                    className="inline-flex items-center break-words font-display text-base leading-5 text-[var(--ink-strong)] transition-colors hover:underline pointer-coarse:min-h-11"
                   >
                     {student.displayName}
                   </Link>

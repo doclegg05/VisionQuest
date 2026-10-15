@@ -178,7 +178,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                     aria-hidden="true"
                     size={18}
                     weight="fill"
-                    className="mt-0.5 shrink-0 text-warning"
+                    className="mt-0.5 shrink-0 text-[var(--gold)]"
                   />
                   <p>{highlight}</p>
                 </div>

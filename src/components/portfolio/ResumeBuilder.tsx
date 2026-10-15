@@ -450,7 +450,7 @@ export default function ResumeBuilder() {
             onClick={() => setActiveTab(tab)}
             className={`min-h-[44px] flex-1 rounded-lg px-4 text-sm font-semibold transition ${
               activeTab === tab
-                ? "bg-white text-success shadow-sm"
+                ? "bg-[var(--surface-raised)] text-success shadow-sm"
                 : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             }`}
           >

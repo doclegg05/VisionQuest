@@ -21,6 +21,8 @@ const TOKEN_TEXT_ROLE = Object.freeze({
   "--accent-blue": "info", "--primary": "info", "--accent-gold": "warning",
   // Legacy text aliases. Their dark values are fills too, so text moves onto the matching role.
   "--accent-strong": "success", "--accent-secondary": "info", "--accent-tertiary": "warning",
+  // The brand green is a fill (#37b550, 2.7:1 on white), so green text moves onto the success role.
+  "--accent": "success",
 });
 const NAMED_TEXT_ROLE = Object.freeze({ "accent-red": "danger", "accent-green": "success", "accent-blue": "info", "accent-gold": "warning" });
 const RADIUS_STEPS = Object.freeze([["sm", 6], ["md", 8], ["lg", 12], ["xl", 16], ["2xl", 20], ["3xl", 24]]);
