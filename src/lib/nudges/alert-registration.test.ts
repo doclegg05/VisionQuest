@@ -39,13 +39,13 @@ describe("every nudge alert type is registered where a queue reads one", () => {
   });
 
   it("gives every staff type a consolidation label", () => {
-    const queue = source("components/teacher/InterventionQueue.tsx");
-    const groups = queue.slice(
-      queue.indexOf("const CONSOLIDATION_GROUPS"),
-      queue.indexOf("interface ConsolidatedItem"),
-    );
+    const file = source("lib/teacher/queue-issue-groups.ts");
+    const start = file.indexOf("const GROUP_LABELS");
+    const end = file.indexOf("const DAY_MS");
+    assert.ok(start > -1 && end > start, "could not find GROUP_LABELS in queue-issue-groups.ts");
+    const groups = file.slice(start, end);
     for (const type of STAFF_TYPES) {
-      assert.ok(groups.includes(`${type}:`), `${type} has no CONSOLIDATION_GROUPS label`);
+      assert.ok(groups.includes(`${type}:`), `${type} has no GROUP_LABELS label`);
     }
   });
 
@@ -74,14 +74,15 @@ describe("every nudge alert type is registered where a queue reads one", () => {
     }
   });
 
-  it("keeps the student's own card OUT of the staff dashboard query", () => {
+  it("keeps the student's own card OUT of the staff queue query", () => {
     // It resolves when they open /career and there is nothing staff can do
     // about it; a row nobody can action teaches people to skim the queue.
-    const dashboard = source("lib/teacher/dashboard.ts");
-    assert.match(dashboard, /NUDGE_ALERT_TYPES\.weeklyJobsReady/);
+    // The ranked queue is the only staff list now, so its alert select is
+    // where the exclusion lives.
+    const select = source("lib/teacher/intervention-queue-select.ts");
     assert.ok(
-      dashboard.includes("notIn: [...ALL_INACTIVITY_ALERT_TYPES, NUDGE_ALERT_TYPES.weeklyJobsReady]"),
-      "the staff dashboard query must exclude connect_weekly_jobs_ready",
+      select.includes('where: { status: "open", type: { not: NUDGE_ALERT_TYPES.weeklyJobsReady } }'),
+      "the staff queue's alert select must exclude connect_weekly_jobs_ready",
     );
   });
 

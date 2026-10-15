@@ -11,14 +11,7 @@ import { getCertificationProgress } from "@/lib/certifications";
 import { prisma, prismaAdmin } from "@/lib/db";
 import { forbidden, type Session } from "@/lib/api-error";
 import { goalCountsTowardPlan } from "@/lib/goals";
-import {
-  ALL_INACTIVITY_ALERT_TYPES,
-  getInactivityStageByType,
-  getInactivityStageRank,
-  normalizeInactivityAlertType,
-} from "@/lib/inactivity";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
-import { NUDGE_ALERT_TYPES } from "@/lib/nudges/schedule-shared";
 import { fetchReadinessDataForStudents } from "@/lib/progression/fetch-readiness-data";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import {
@@ -74,24 +67,6 @@ export interface ManagedClassOption {
   programType: ProgramType;
 }
 
-export interface DashboardAlert {
-  id: string;
-  type: string;
-  severity: string;
-  title: string;
-  summary: string;
-  sourceType: string | null;
-  sourceId: string | null;
-  detectedAt: string;
-  student: {
-    id: string;
-    studentId: string;
-    displayName: string;
-  };
-}
-
-export type ReviewQueueItem = DashboardAlert;
-
 export interface UpcomingAppointment {
   id: string;
   title: string;
@@ -106,49 +81,15 @@ export interface UpcomingAppointment {
   };
 }
 
-export interface InactivityQueueItem extends DashboardAlert {
-  stageLabel: string;
-  nextStep: string;
-}
-
-function serializeDashboardAlert<T extends {
-  detectedAt: Date;
-  student: { id: string; studentId: string; displayName: string };
-}>(alert: T): Omit<T, "detectedAt"> & { detectedAt: string } {
-  return {
-    ...alert,
-    detectedAt: alert.detectedAt.toISOString(),
-  };
-}
-
-export interface InactivitySummary {
-  followUp14: number;
-  inactive30: number;
-  reengage60: number;
-  archiveReview90: number;
-}
-
 export interface TeacherDashboardPageData {
   classes: ManagedClassOption[];
   currentClassId: string | null;
   students: StudentOverview[];
-  alerts: DashboardAlert[];
-  inactivityQueue: InactivityQueueItem[];
-  inactivitySummary: InactivitySummary;
-  reviewQueue: ReviewQueueItem[];
   upcomingAppointments: UpcomingAppointment[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
-}
-
-function sortInactivityAlerts<T extends { type: string; detectedAt: Date }>(alerts: T[]) {
-  return alerts.sort((left, right) => {
-    const stageGap = getInactivityStageRank(right.type) - getInactivityStageRank(left.type);
-    if (stageGap !== 0) return stageGap;
-    return right.detectedAt.getTime() - left.detectedAt.getTime();
-  });
 }
 
 function latestDate(...values: Array<Date | null | undefined>) {
@@ -487,161 +428,33 @@ export async function getTeacherDashboardPage(
     };
   });
 
-  const [alerts, reviewQueue, upcomingAppointments, inactivityAlerts] =
-    await Promise.all([
-      prisma.studentAlert.findMany({
-        where: {
-          status: "open",
-          studentId: { in: managedStudentIds },
-          // Inactivity alerts have their own panel below. `connect_weekly_jobs_ready`
-          // is excluded for a different reason: it is the one alert type
-          // written FOR the student ("your jobs are ready"), it resolves the
-          // moment they open /career, and there is nothing an instructor can
-          // do about it. A queue row nobody can action is a queue row people
-          // learn to scroll past.
-          type: {
-            notIn: [...ALL_INACTIVITY_ALERT_TYPES, NUDGE_ALERT_TYPES.weeklyJobsReady],
-          },
-        },
+  const upcomingAppointments = await prisma.appointment.findMany({
+    where: {
+      studentId: { in: managedStudentIds },
+      status: "scheduled",
+      startsAt: {
+        gte: now,
+        lte: upcomingWindow,
+      },
+    },
+    select: {
+      id: true,
+      title: true,
+      startsAt: true,
+      endsAt: true,
+      locationType: true,
+      locationLabel: true,
+      student: {
         select: {
           id: true,
-          type: true,
-          severity: true,
-          title: true,
-          summary: true,
-          sourceType: true,
-          sourceId: true,
-          detectedAt: true,
-          student: {
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-            },
-          },
+          studentId: true,
+          displayName: true,
         },
-        orderBy: { detectedAt: "desc" },
-        take: 8,
-      }),
-      prisma.studentAlert.findMany({
-        where: {
-          status: "open",
-          studentId: { in: managedStudentIds },
-          type: {
-            in: [
-              "goal_needs_resource",
-              "goal_resource_stale",
-              "goal_review_pending",
-              "goal_platform_stale",
-              "goal_missing_confirmed",
-              "goal_missing_monthly",
-              "goal_review_stale",
-              "goal_unconfirmed",
-            ],
-          },
-        },
-        select: {
-          id: true,
-          type: true,
-          severity: true,
-          title: true,
-          summary: true,
-          sourceType: true,
-          sourceId: true,
-          detectedAt: true,
-          student: {
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-            },
-          },
-        },
-        orderBy: [{ severity: "asc" }, { detectedAt: "desc" }],
-        take: 8,
-      }),
-      prisma.appointment.findMany({
-        where: {
-          studentId: { in: managedStudentIds },
-          status: "scheduled",
-          startsAt: {
-            gte: now,
-            lte: upcomingWindow,
-          },
-        },
-        select: {
-          id: true,
-          title: true,
-          startsAt: true,
-          endsAt: true,
-          locationType: true,
-          locationLabel: true,
-          student: {
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-            },
-          },
-        },
-        orderBy: { startsAt: "asc" },
-        take: 6,
-      }),
-      prisma.studentAlert.findMany({
-        where: {
-          status: "open",
-          studentId: { in: managedStudentIds },
-          type: { in: [...ALL_INACTIVITY_ALERT_TYPES] },
-        },
-        select: {
-          id: true,
-          type: true,
-          severity: true,
-          title: true,
-          summary: true,
-          sourceType: true,
-          sourceId: true,
-          detectedAt: true,
-          student: {
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-            },
-          },
-        },
-        take: 12,
-      }),
-    ]);
-
-  const inactivityQueue = sortInactivityAlerts(inactivityAlerts).map((alert) => {
-    const stage = getInactivityStageByType(alert.type);
-    const normalizedType = normalizeInactivityAlertType(alert.type) || alert.type;
-
-    return {
-      ...serializeDashboardAlert(alert),
-      type: normalizedType,
-      stageLabel: stage?.label || "Follow-up",
-      nextStep: stage?.nextStep || alert.summary,
-    };
+      },
+    },
+    orderBy: { startsAt: "asc" },
+    take: 6,
   });
-
-  const inactivitySummary = inactivityQueue.reduce<InactivitySummary>(
-    (summary, item) => {
-      const normalizedType = normalizeInactivityAlertType(item.type);
-      if (normalizedType === "inactive_student_14") summary.followUp14 += 1;
-      if (normalizedType === "inactive_student_30") summary.inactive30 += 1;
-      if (normalizedType === "inactive_student_60") summary.reengage60 += 1;
-      if (normalizedType === "inactive_student_90") summary.archiveReview90 += 1;
-      return summary;
-    },
-    {
-      followUp14: 0,
-      inactive30: 0,
-      reengage60: 0,
-      archiveReview90: 0,
-    },
-  );
 
   const classOptions: ManagedClassOption[] = classes.map((item) => ({
     id: item.id,
@@ -655,10 +468,6 @@ export async function getTeacherDashboardPage(
     classes: classOptions,
     currentClassId: requestedClassId || null,
     students: overview,
-    alerts: alerts.map(serializeDashboardAlert),
-    inactivityQueue,
-    inactivitySummary,
-    reviewQueue: reviewQueue.map(serializeDashboardAlert),
     upcomingAppointments: upcomingAppointments.map((appointment) => ({
       ...appointment,
       startsAt: appointment.startsAt.toISOString(),

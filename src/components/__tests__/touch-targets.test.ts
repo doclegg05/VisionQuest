@@ -204,29 +204,6 @@ describe("D3 axe-authenticated — select-name", () => {
   });
 });
 
-describe("D3 axe-authenticated — nested-interactive", () => {
-  it("InterventionQueue's StudentAccordion no longer nests a button/Link inside its toggle button", () => {
-    const src = read("src/components/teacher/InterventionQueue.tsx");
-    // The toggle button's own className changed from the old row-wrapping
-    // shape to one that wraps only the chevron + name column; the quick
-    // actions (Ask Sage button, View student Link) moved to a sibling <div>
-    // after the toggle button's closing tag, not before it.
-    assert.ok(
-      src.includes('className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg py-1 text-left'),
-      "toggle button must wrap only the chevron+name column now",
-    );
-    const toggleButtonStart = src.indexOf("onClick={onToggle}");
-    const toggleButtonClose = src.indexOf("</button>", toggleButtonStart);
-    const toggleButtonBody = src.slice(toggleButtonStart, toggleButtonClose);
-    assert.ok(!toggleButtonBody.includes("Ask Sage"), "the toggle button must not contain the Ask Sage button");
-    assert.ok(!toggleButtonBody.includes("View student"), "the toggle button must not contain the View student link");
-    // And the quick actions must still exist, just outside it.
-    const afterToggle = src.slice(toggleButtonClose);
-    assert.ok(afterToggle.includes("Ask Sage"), "the Ask Sage button must still render, as a sibling");
-    assert.ok(afterToggle.includes("View student"), "the View student link must still render, as a sibling");
-  });
-});
-
 describe("D3 axe-authenticated — color-contrast (light-theme tokens)", () => {
   it("--ink-faint clears 4.5:1 (was rgba(0,0,0,0.25), measured 1.83:1)", () => {
     const css = read("src/app/globals.css");
