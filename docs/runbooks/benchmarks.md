@@ -95,6 +95,11 @@ await selfTest(import.meta.url, run); // inert unless run directly with --self-t
 - Return one entry per declared metric. A declared metric the scorer does not
   return is an `error`, not a silent pass; an undeclared metric is dropped with
   a warning.
+- To skip yourself (an opt-in variable is unset, a fixture was not seeded),
+  return every metric with `details: { skipped: true, reason: "…" }`. Only the
+  boolean `true` counts, so keep anything else out of `details.skipped`. A list
+  of students you could not score is evidence; give it its own key
+  (matching-quality uses `studentsSkippedSample`).
 - Optionally return `provider` and `model` alongside `metrics` — they land in
   the result and the baseline row.
 
@@ -210,11 +215,15 @@ whether or not the metric is `exact`.
 | `watch` | below `baseline − tolerance` (above `baseline + tolerance` for a `lower` metric) but still inside the floor |
 | `fail` | the floor was crossed, or an `exact` metric moved off its baseline |
 | `info` | nothing to judge against — no floor **and** no baseline |
-| `skipped` | no value: the suite's `requires` were unmet |
-| `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met, or measured zero samples (`n: 0`) for a floored gate/nightly metric. A metric the scorer marks `details.skipped` is a skip, not a zero-sample measurement. Issue #220: `sage-latency` passed its 6000 ms floor for a week with `p95_ms: 0` over no samples |
+| `skipped` | no value: the suite's `requires` were unmet, or the scorer marked the metric `details.skipped: true`. On every tier. The runner records a self-skipped metric's value as `null`, so the placeholder the scorer returned (often `0`) is never judged, shown or written to the baseline |
+| `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met, or measured zero samples (`n: 0`) for a floored gate/nightly metric. A metric the scorer marks `details.skipped: true` is `skipped`, not an error. Issue #220: `sage-latency` passed its 6000 ms floor for a week with `p95_ms: 0` over no samples |
 
 The suite's own `status` is the worst of its metrics, except `skipped` and
-`error`, which are facts about the run rather than about any metric.
+`error`, which are facts about the run rather than about any metric. A suite
+whose scorer skipped every metric is `skipped`, and its `skipped` note carries
+the scorer's `details.reason`. Before this rule, consent-scopes and
+migration-drift-schema reported `pass` in the PR gate tier while measuring
+nothing, and nudge-sweep's unseeded-cohort skip reported `error`.
 
 ---
 
@@ -267,7 +276,7 @@ in CI.
 | Deferred | Why | Where its baseline comes from |
 |---|---|---|
 | `crisis-latency`, `job-refresh`, `matching-scale`, `page-timing`, `sage-latency`, `nudge-sweep` (`sweep_ms`), `classroom-concurrency` | they report `ms`/`seconds`, so the number is a property of the machine, not of the code | the nightly `benchmarks.yml` run on `main`, whose commit-back seeds them from CI hardware |
-| `nudge-sweep`, `packet-privacy`, `query-plans`, `consent-scopes`, `migration-drift-schema` | need a migrated Postgres and the seeded cohort | the nightly run, or the `verify` job's hermetic pgvector service |
+| `nudge-sweep`, `packet-privacy`, `query-plans`, `consent-scopes`, `migration-drift-schema` | need a migrated Postgres and the seeded cohort | the nightly run, or the `verify` job's hermetic pgvector service. `consent-scopes` and `migration-drift-schema` also need an opt-in that no workflow sets yet (see Open items) |
 | `connect-journey`, `journey-day1`, `journey-teacher-loop`, `touch-targets`, `axe-authenticated` | need a browser and a running server | the `e2e` job's collectors |
 | `sage-grounding`, `sage-career`, `sage-readability`, `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when its key is present (`OPENROUTER_API_KEY` for the Sage model suites) |
 | `cron-health`, `cost-per-student`, `ferpa-routing`, `backup-drill` | need the prod read-only URL (an owner step) | once that secret exists |
@@ -465,6 +474,25 @@ that measured nothing, which is worse than no number because it reads as proof.
   shared, symlink-safe implementation is `isMainModule` in
   `scripts/bench/lib/entry.mjs`; those four were left to their author rather
   than edited underneath them.
+- **`consent-scopes` and `migration-drift-schema` have never measured in CI.**
+  Both are gate tier, and gate tier runs only in `ci.yml`'s "Gate-tier
+  benchmarks" step, which sets neither `RLS_TEST_ENABLED` nor
+  `SHADOW_DATABASE_URL`. The nightly workflow runs the nightly and watch tiers
+  only. Both scorers skip themselves without their opt-in and now record
+  `skipped` on every PR; until the self-skip rule they recorded `pass` over
+  zero samples. Giving the step the opt-in (a dedicated shadow database for the
+  drift diff, `RLS_TEST_ENABLED: "true"` for consent scopes) is what turns them
+  into gates.
+- **`nudge-sweep` reports one `n` for all nine metrics**: the number of
+  students with sends (50 in CI). That is the sample behind `daily_cap_exceeded`
+  and `duplicate_open_questions`, not behind `sweep_blocked` (3 sweeps) or
+  `concurrent_run_not_skipped` (2). It stays for now, because the zero-samples
+  error drops a suite's metrics and lists only the unsampled values. When no
+  student has a send, every metric has `n: 0` and that message is the only
+  place a blocked sweep's `sweep_blocked=3` shows. With a per-metric `n`,
+  `sweep_blocked` would have a sample of 3 and drop out of the message. Change
+  the two together: the error keeps every measured value, and each metric
+  reports its own sample.
 
 ## Owner steps
 
