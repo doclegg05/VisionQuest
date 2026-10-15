@@ -72,7 +72,7 @@ export function MemoryInspectorPanel({ studentId }: MemoryInspectorPanelProps) {
         removal takes effect immediately and is logged.
       </p>
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[var(--badge-error-text)]">{error}</p>}
 
       {memories === null ? (
         <p className="mt-3 text-sm text-[var(--ink-faint)]">Loading…</p>
@@ -94,7 +94,7 @@ export function MemoryInspectorPanel({ studentId }: MemoryInspectorPanelProps) {
                 onClick={() => remove(memory.id)}
                 disabled={removing === memory.id}
                 aria-label={`Remove memory: ${memory.content.slice(0, 60)}`}
-                className="min-h-11 shrink-0 rounded-lg px-3 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                className="min-h-11 shrink-0 rounded-lg px-3 text-xs font-semibold text-[var(--badge-error-text)] hover:bg-[var(--badge-error-bg)] disabled:opacity-50"
               >
                 {removing === memory.id ? "Removing…" : "Remove"}
               </button>

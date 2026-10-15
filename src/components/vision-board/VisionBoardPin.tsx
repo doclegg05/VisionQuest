@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { X } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VisionBoardItemData } from "./VisionBoard";
 
@@ -52,6 +53,53 @@ const WIDTH_BOUNDS: Record<VisionBoardItemData["type"], { min: number; max: numb
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+/** Width change, in percent of the board, for one arrow-key press on the resize handle. */
+const RESIZE_KEY_STEP = 2;
+
+type WidthLimits = { min: number; max: number };
+
+/**
+ * Slider keys for the resize handle. VoiceOver's swipe up/down on an ARIA
+ * slider reaches the page as arrow keys, so all four arrows must work.
+ */
+const RESIZE_KEYS: Partial<Record<string, (width: number, bounds: WidthLimits) => number>> = {
+  ArrowUp: (width) => width + RESIZE_KEY_STEP,
+  ArrowRight: (width) => width + RESIZE_KEY_STEP,
+  ArrowDown: (width) => width - RESIZE_KEY_STEP,
+  ArrowLeft: (width) => width - RESIZE_KEY_STEP,
+  Home: (_width, { min }) => min,
+  End: (_width, { max }) => max,
+};
+
+/** New pin width for a key press on the resize handle, or null when the key does not resize. */
+export function resizeWidthForKey(key: string, width: number, bounds: WidthLimits): number | null {
+  const next = RESIZE_KEYS[key];
+  if (!next) return null;
+  return clamp(next(width, bounds), bounds.min, bounds.max);
+}
+
+const LABEL_PREVIEW_CHARS = 40;
+
+type PinNameParts = Pick<VisionBoardItemData, "type" | "content">;
+
+/** Short spoken name for a pin: its kind plus the start of its text. */
+function pinName({ type, content }: PinNameParts): string {
+  const text = content?.replace(/\s+/g, " ").trim() ?? "";
+  if (!text) return `${type} pin`;
+  const preview = text.length > LABEL_PREVIEW_CHARS ? `${text.slice(0, LABEL_PREVIEW_CHARS).trimEnd()}…` : text;
+  return `${type} pin: ${preview}`;
+}
+
+/** Accessible name for a pin's remove button, so a screen reader says which pin goes. */
+export function removePinLabel(pin: PinNameParts): string {
+  return `Remove ${pinName(pin)}`;
+}
+
+/** Accessible name for a pin's resize handle, so a screen reader says which pin it sizes. */
+export function resizePinLabel(pin: PinNameParts): string {
+  return `Width of ${pinName(pin)}`;
 }
 
 export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) {
@@ -160,7 +208,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
     touchStartRef.current = null;
   }, [dispatchMove, isDragging, item.width, touchOffset]);
 
-  const handleResizeStart = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+  const handleResizeStart = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -174,6 +222,14 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
     };
     setIsResizing(true);
   }, [item.width]);
+
+  const handleResizeKey = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    const width = resizeWidthForKey(e.key, item.width, widthBounds);
+    if (width === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dispatchResize(width);
+  }, [dispatchResize, item.width, widthBounds]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -240,19 +296,23 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         <div className="absolute left-1/2 top-3 h-1 w-2 -translate-x-1/2 rounded-full bg-black/10 blur-[1px]" />
       </div>
 
-      {hovering ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(item.id);
-          }}
-          className="absolute -right-2 -top-3 z-20 grid h-6 w-6 place-items-center rounded-full bg-red-500 text-xs text-white shadow-md transition-colors hover:bg-red-600"
-          aria-label="Delete pin"
+      {/* Always in the page so keyboard and VoiceOver can reach it; shown on pin hover, focus, or touch. */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(item.id);
+        }}
+        className="group/remove absolute -right-4.5 -top-5.5 z-20 inline-flex size-11 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+        aria-label={removePinLabel(item)}
+      >
+        <span
+          aria-hidden="true"
+          className="grid size-6 place-items-center rounded-full bg-red-500 text-white shadow-md transition-colors group-hover/remove:bg-red-600"
         >
-          ×
-        </button>
-      ) : null}
+          <X size={12} weight="bold" />
+        </span>
+      </button>
 
       {item.type === "note" ? (
         <div
@@ -305,19 +365,32 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         </div>
       )}
 
-      <button
-        type="button"
+      {/* An adjustable control: arrow keys and VoiceOver swipe up/down change the width. */}
+      <div
+        role="slider"
+        tabIndex={0}
         data-resize-handle="true"
         onPointerDown={handleResizeStart}
-        className="absolute bottom-1.5 right-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/70 bg-[var(--surface-raised)]/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,0,0,0.12)] transition-opacity hover:opacity-100"
-        aria-label="Resize pin"
+        onKeyDown={handleResizeKey}
+        aria-label={resizePinLabel(item)}
+        aria-orientation="horizontal"
+        aria-valuemin={widthBounds.min}
+        aria-valuemax={widthBounds.max}
+        aria-valuenow={Math.round(item.width)}
+        aria-valuetext={`${Math.round(item.width)}% of board width`}
+        className="group/resize absolute -bottom-1 -right-1 z-20 inline-flex size-11 items-center justify-center rounded-full"
       >
         <span
-          // Decorative hatch pattern inside resize handle — intentional raw rgba.
-          // eslint-disable-next-line no-restricted-syntax
-          className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]"
-        />
-      </button>
+          aria-hidden="true"
+          className="flex size-6 items-center justify-center rounded-full border border-white/70 bg-[var(--surface-raised)]/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,0,0,0.12)] transition-opacity group-hover/resize:opacity-100"
+        >
+          <span
+            // Decorative hatch pattern inside resize handle — intentional raw rgba.
+            // eslint-disable-next-line no-restricted-syntax
+            className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]"
+          />
+        </span>
+      </div>
     </div>
   );
 }

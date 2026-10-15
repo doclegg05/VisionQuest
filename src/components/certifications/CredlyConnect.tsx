@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useId, useRef } from "react";
 
 interface CredlyState {
   readonly username: string | null;
@@ -22,6 +22,7 @@ interface CredlyConnectProps {
 
 export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps) {
   const [state, setState] = useState<CredlyState>(INITIAL_STATE);
+  const usernameInputId = useId();
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clean up the success-reset timer on unmount
@@ -147,8 +148,8 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
         className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
         style={{
           borderColor: "var(--border)",
-          backgroundColor: "var(--surface-elevated)",
-          color: "var(--text-primary)",
+          backgroundColor: "var(--surface-raised)",
+          color: "var(--ink-strong)",
         }}
       >
         <div>
@@ -158,6 +159,7 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
           <p className="mt-1 text-sm font-medium text-[var(--ink-strong)]">
             Connected as{" "}
             <a
+              data-inline-link
               href={`https://www.credly.com/users/${state.username}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -171,7 +173,7 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
           type="button"
           onClick={() => void handleDisconnect()}
           disabled={state.status === "saving"}
-          className="rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-11 items-center justify-center rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             borderColor: "var(--border)",
             color: "var(--ink-muted)",
@@ -191,8 +193,8 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
       className="rounded-xl border p-4"
       style={{
         borderColor: "var(--border)",
-        backgroundColor: "var(--surface-elevated)",
-        color: "var(--text-primary)",
+        backgroundColor: "var(--surface-raised)",
+        color: "var(--ink-strong)",
       }}
     >
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
@@ -202,8 +204,12 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
         Connect your Credly profile to display your digital badges here.
       </p>
 
-      <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+      <label htmlFor={usernameInputId} className="mt-3 mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
+        Credly username or profile URL
+      </label>
+      <div className="flex flex-col gap-3 sm:flex-row">
         <input
+          id={usernameInputId}
           type="text"
           placeholder="e.g., jane-doe or https://www.credly.com/users/jane-doe"
           value={state.inputValue}
@@ -218,7 +224,7 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
           className="field flex-1 px-4 py-3 text-sm"
           style={{
             borderColor: "var(--border)",
-            color: "var(--text-primary)",
+            color: "var(--ink-strong)",
           }}
         />
         <button

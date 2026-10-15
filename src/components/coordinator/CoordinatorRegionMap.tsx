@@ -127,7 +127,7 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-[var(--ink)]">West Virginia regions</h3>
+          <h3 className="text-sm font-semibold text-[var(--ink-strong)]">West Virginia regions</h3>
           <p className="text-xs text-[var(--ink-muted)]">
             Click a region to view its rollup. County-level routing is coming in a later phase.
           </p>
@@ -206,7 +206,7 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
             })}
           </g>
         </svg>
-        <ul className="flex flex-col gap-1.5 text-xs" aria-label="Region legend">
+        <ul className="flex flex-col gap-2 text-xs" aria-label="Region legend">
           {REGION_SHAPES.map((shape) => {
             const region = regionsByCode.get(shape.code);
             const isActive = activeCode === shape.code;
@@ -215,7 +215,7 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
               <li key={shape.code}>
                 <button
                   type="button"
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors ${
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors pointer-coarse:min-h-11 ${
                     isActive
                       ? "bg-[var(--surface-muted)] font-semibold"
                       : "hover:bg-[var(--surface-muted)]/50"

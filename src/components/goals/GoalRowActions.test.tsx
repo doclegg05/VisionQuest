@@ -7,12 +7,12 @@ function tags(html: string) {
   return html.match(/<button\b[^>]*>/g) ?? [];
 }
 
-describe("GoalRowActions (F45: touch-reachable edit/dismiss)", () => {
+describe("GoalRowActions (F45: touch-reachable edit/remove)", () => {
   const html = renderToString(<GoalRowActions label="Weekly" onEdit={() => {}} onDismiss={() => {}} />);
 
-  it("renders an Edit and a Dismiss button labelled for the row", () => {
+  it("renders an Edit and a Remove button labelled for the row (B-32 renamed Dismiss)", () => {
     const labels = tags(html).map((tag) => tag.match(/aria-label="([^"]*)"/)?.[1]);
-    assert.deepEqual(labels, ["Edit Weekly", "Dismiss Weekly"]);
+    assert.deepEqual(labels, ["Edit Weekly", "Remove Weekly"]);
   });
 
   it("is visible without hover: no opacity-0 anywhere in the markup", () => {

@@ -101,7 +101,7 @@ export default function BrandLockup({
   }
 
   return (
-    <Link href={href} className="inline-flex max-w-full">
+    <Link href={href} className="inline-flex min-h-11 max-w-full items-center">
       {content}
     </Link>
   );

@@ -314,7 +314,7 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
       async () => {
         await defineVision.click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
-        await page.getByPlaceholder(/ultimate dream career/i).fill(goalText, { timeout: ACTION_TIMEOUT_MS });
+        await page.getByLabel(/ultimate dream career/i).fill(goalText, { timeout: ACTION_TIMEOUT_MS });
         await page.getByRole("button", { name: /^add$/i }).click({ timeout: ACTION_TIMEOUT_MS });
         studentTaps += 1;
         await expect(page.getByText(goalText).first()).toBeVisible({ timeout: 30_000 });
