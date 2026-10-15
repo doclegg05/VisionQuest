@@ -77,6 +77,22 @@ describe("OllamaEmbeddingProvider", () => {
     assert.equal(result[0].length, 768);
   });
 
+  it("uses distinct EmbeddingGemma 2 query and document prefixes", async () => {
+    const inputs: string[][] = [];
+    global.fetch = (async (_url: any, init: any) => {
+      const body = JSON.parse(init.body);
+      inputs.push(body.input);
+      return Response.json({ embeddings: body.input.map(() => unitVector(768, 0)) });
+    }) as any;
+    const provider = new OllamaEmbeddingProvider("http://localhost:11436", "google/embeddinggemma-2");
+    await provider.embed(["interview help"], { taskType: "RETRIEVAL_QUERY" });
+    await provider.embed(["practice interview questions"], { taskType: "RETRIEVAL_DOCUMENT" });
+    assert.deepEqual(inputs, [
+      ["task: search result | query: interview help"],
+      ["title: none | text: practice interview questions"],
+    ]);
+  });
+
   it("falls back to /v1/embeddings on 404 from the native endpoint", async () => {
     const urls: string[] = [];
     global.fetch = (async (url: any, init: any) => {
