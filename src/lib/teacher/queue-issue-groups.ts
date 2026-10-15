@@ -193,6 +193,21 @@ export function visibleQueueRows<T extends { signals: { highSeverityAlertCount: 
   return rows.filter((row, index) => index < QUEUE_ROWS_SHOWN || row.signals.highSeverityAlertCount > 0);
 }
 
+/**
+ * The visible rows plus the pinned student's row, in queue order. A teacher with an action panel open under
+ * a row keeps that row on screen even when finishing the action drops it out of the first view.
+ */
+export function withPinnedRow<T extends { studentId: string }>(
+  visible: readonly T[],
+  all: readonly T[],
+  pinnedStudentId: string | null,
+): T[] {
+  if (pinnedStudentId === null || visible.some((row) => row.studentId === pinnedStudentId)) return [...visible];
+  if (!all.some((row) => row.studentId === pinnedStudentId)) return [...visible];
+  const shown = new Set(visible.map((row) => row.studentId));
+  return all.filter((row) => row.studentId === pinnedStudentId || shown.has(row.studentId));
+}
+
 export function buildStudentSageMessage(name: string, groups: readonly QueueIssueGroup[]): string {
   return [
     `I need help with interventions for ${name}. Here are their current issues:`,

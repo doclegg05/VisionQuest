@@ -11,6 +11,7 @@ import {
   groupQueueIssues,
   QUEUE_ROWS_SHOWN,
   visibleQueueRows,
+  withPinnedRow,
   type QueueIssueGroup,
 } from "@/lib/teacher/queue-issue-groups";
 import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
@@ -404,9 +405,13 @@ export default function InterventionQueuePanel({
   const classId = searchParams.get("classId")?.trim() || "";
 
   const [prevClassId, setPrevClassId] = useState(classId);
+  const [classSwitched, setClassSwitched] = useState(false);
   if (classId !== prevClassId) {
     setPrevClassId(classId);
+    setClassSwitched(true);
     setLoading(true);
+    setShowAll(false);
+    setActionIntent(null);
   }
 
   const fetchQueue = useCallback(async () => {
@@ -416,6 +421,7 @@ export default function InterventionQueuePanel({
         : "/api/teacher/intervention-queue";
       const data = await api.get<QueueResponse>(url);
       setQueue(data.queue);
+      setError(null);
     } catch {
       setError("Could not load the intervention queue.");
     } finally {
@@ -424,14 +430,23 @@ export default function InterventionQueuePanel({
   }, [classId]);
 
   useEffect(() => {
-    if (initialQueue !== undefined && !classId) return;
+    // The server-provided queue stands in for the first view with no class chosen. Any later class change, including
+    // a switch back to all classes, needs a fetch.
+    if (initialQueue !== undefined && !classId && !classSwitched) return;
     void (async () => {
       await fetchQueue();
     })();
-  }, [initialQueue, fetchQueue, classId]);
+  }, [initialQueue, fetchQueue, classId, classSwitched]);
 
-  const visible = visibleQueueRows(queue, showAll);
+  // The row with an open action panel stays on screen even when finishing the action drops it out of the first view.
+  const openPanelStudentId = actionIntent?.student.id ?? null;
+  const visible = withPinnedRow(visibleQueueRows(queue, showAll), queue, openPanelStudentId);
   const hiddenCount = queue.length - visible.length;
+  const listShown = !loading && !error && queue.length > 0;
+  // When no row is on screen for the open panel (the student left the queue, or the list is hidden by a failed
+  // refresh), the panel is shown above the list so the teacher still sees how their action ended.
+  const panelHasNoRow =
+    actionIntent !== null && !(listShown && queue.some((student) => student.studentId === openPanelStudentId));
   const urgentCount = queue.filter((student) => student.signals.highSeverityAlertCount > 0).length;
   const inactivityStages = useMemo(() => countInactivityStages(queue), [queue]);
 
@@ -515,6 +530,12 @@ export default function InterventionQueuePanel({
         {actionMessage ?? ""}
       </p>
 
+      {panelHasNoRow && actionIntent ? (
+        <div className="mb-3">
+          <InlineActionPanel intent={actionIntent} onClose={() => setActionIntent(null)} onChanged={fetchQueue} />
+        </div>
+      ) : null}
+
       {/* Body */}
       {loading && <QueueSkeleton />}
 
@@ -530,7 +551,7 @@ export default function InterventionQueuePanel({
         </p>
       )}
 
-      {!loading && !error && queue.length > 0 && (
+      {listShown && (
         <>
           <ul className="space-y-2">
             {visible.map((student) => (

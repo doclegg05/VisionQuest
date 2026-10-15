@@ -9,6 +9,7 @@ import {
   groupQueueIssues,
   openForLabel,
   visibleQueueRows,
+  withPinnedRow,
 } from "./queue-issue-groups";
 
 const STUDENT = "student-1";
@@ -128,6 +129,29 @@ test("the first view shows 10 rows plus any urgent row below them", () => {
   }));
   assert.deepEqual(visibleQueueRows(rows, false).map((row) => row.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12]);
   assert.equal(visibleQueueRows(rows, true).length, 14);
+});
+
+test("a pinned row beyond the first view is added back in queue order", () => {
+  const all = Array.from({ length: 14 }, (_, index) => ({ studentId: `s${index + 1}` }));
+  const visible = all.slice(0, 10);
+  const pinned = withPinnedRow(visible, all, "s13");
+  assert.deepEqual(pinned.map((row) => row.studentId), ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s13"]);
+  const between = withPinnedRow([all[0]!, all[11]!], all, "s6");
+  assert.deepEqual(between.map((row) => row.studentId), ["s1", "s6", "s12"]);
+});
+
+test("a pinned row that is already visible is not duplicated", () => {
+  const all = Array.from({ length: 12 }, (_, index) => ({ studentId: `s${index + 1}` }));
+  const visible = all.slice(0, 10);
+  const pinned = withPinnedRow(visible, all, "s4");
+  assert.deepEqual(pinned.map((row) => row.studentId), visible.map((row) => row.studentId));
+});
+
+test("no pinned id, or one that left the queue, changes nothing", () => {
+  const all = Array.from({ length: 12 }, (_, index) => ({ studentId: `s${index + 1}` }));
+  const visible = all.slice(0, 10);
+  assert.deepEqual(withPinnedRow(visible, all, null), visible);
+  assert.deepEqual(withPinnedRow(visible, all, "gone"), visible);
 });
 
 test("Sage prompts list every group and mark urgent ones", () => {
