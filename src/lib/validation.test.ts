@@ -46,6 +46,13 @@ describe("isSafeAiProviderUrl", () => {
     assert.ok(isSafeAiProviderUrl("https://llm.example.com"));
   });
 
+  it("rejects OpenRouter, which is eval-only and must never serve the app's local-model slot", () => {
+    assert.ok(!isSafeAiProviderUrl("https://openrouter.ai/api"));
+    assert.ok(!isSafeAiProviderUrl("https://us.openrouter.ai/api"));
+    assert.ok(!isSafeAiProviderUrl("https://OpenRouter.AI/api/v1"));
+    assert.ok(isSafeAiProviderUrl("https://openrouter.ai.example.com"));
+  });
+
   it("rejects private and link-local endpoints", () => {
     assert.ok(!isSafeAiProviderUrl("http://10.0.0.8:11434"));
     assert.ok(!isSafeAiProviderUrl("http://192.168.1.25:11434"));

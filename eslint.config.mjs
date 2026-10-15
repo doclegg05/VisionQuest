@@ -86,6 +86,40 @@ const studentAlertDirectRead = {
     "Student-facing code must not read StudentAlert directly; the table is the staff queue and RLS admits the student's own rows. Use listStudentVisibleAlerts / countStudentVisibleAlerts from src/lib/student-alerts.ts, the only sanctioned reader for student surfaces.",
 };
 
+// OpenRouter is an eval-only provider. Its data agreement does not cover
+// education records, so real student data must never reach it
+// (docs/superpowers/specs/2026-10-13-openrouter-test-bench-design.md).
+// The runtime check in OpenRouterProvider (assertNotAppServer) is the backstop;
+// these rules catch the import early. The regexes are unanchored so suffixed
+// specifiers (".js", "?raw", a trailing slash) still match, and the second
+// pattern stops app code re-exporting the eval chokepoint or the Jev client.
+// Flat config REPLACES a rule's options when two blocks set it for the same
+// file, so every block that sets no-restricted-imports or no-restricted-syntax
+// under src/ must include these too.
+const OPENROUTER_EVAL_ONLY_MESSAGE =
+  "OpenRouter is for evals and benchmarks on synthetic data only. Real student data must never reach OpenRouter. See docs/runbooks/openrouter-test-bench.md.";
+
+const openRouterEvalOnlyPatterns = [
+  { regex: "openrouter-provider", message: OPENROUTER_EVAL_ONLY_MESSAGE },
+  { regex: "(^|/)scripts/(lib/sage-eval-provider|bench/suites/)", message: OPENROUTER_EVAL_ONLY_MESSAGE },
+];
+
+// no-restricted-imports never sees `import()`, so dynamic imports need a
+// syntax rule of their own.
+const openRouterDynamicImport = {
+  selector: "ImportExpression[source.value=/openrouter-provider|scripts\\/(lib\\/sage-eval-provider|bench\\/suites\\/)/]",
+  message: OPENROUTER_EVAL_ONLY_MESSAGE,
+};
+
+const openRouterEvalOnly = {
+  files: ["src/**/*.{ts,tsx,js,jsx,mjs,mts,cts,cjs}"],
+  ignores: ["src/lib/ai/openrouter-provider.test.ts"],
+  rules: {
+    "no-restricted-imports": ["error", { patterns: openRouterEvalOnlyPatterns }],
+    "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, openRouterDynamicImport],
+  },
+};
+
 // Code with no request session: pg_cron reaches these routes with only a
 // bearer secret, and job handlers run from the processor. Nothing seeds an
 // RLS context, so the app client fails closed under vq_app (reads empty,
@@ -108,6 +142,7 @@ const appPrismaImportWithoutSession = {
             message:
               "No request session here, so the app prisma client has no RLS context and fails closed under vq_app. Import prismaAdmin for cross-student rows, and run per-student lib helpers inside withStudentRlsContext from @/lib/rls-context.",
           },
+          ...openRouterEvalOnlyPatterns,
         ],
       },
     ],
@@ -171,6 +206,7 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, ...rawPaletteSyntax],
     },
   },
+  openRouterEvalOnly,
   // Student-facing surfaces. Staff-only trees are excluded by name; the
   // staff readers (src/lib/teacher/**, src/lib/advising*.ts, src/lib/sage/**,
   // src/lib/reporting.ts, src/lib/inactivity.ts, src/lib/placement-bridge.ts)
@@ -191,7 +227,7 @@ const eslintConfig = defineConfig([
       "src/app/api/coordinator/**",
     ],
     rules: {
-      "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, studentAlertDirectRead],
+      "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, studentAlertDirectRead, openRouterDynamicImport],
     },
   },
   // Student files already moved onto theme tokens: no raw palette colors, so

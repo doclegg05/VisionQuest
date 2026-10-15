@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -9,6 +12,10 @@ import {
   wrapWithBudgetDetection,
   EvalBudgetExhaustedError,
   reportEvalFailure,
+  resolveEvalProvider,
+  EvalProviderUnavailableError,
+  EvalProviderUnreachableError,
+  isEvalAbort,
 } from "./sage-eval-provider.mjs";
 
 /**
@@ -213,6 +220,103 @@ describe("wrapWithBudgetDetection", () => {
  * Every eval script's `main().catch(reportEvalFailure)` — the shared
  * top-level handler the workflow's exit-code branching depends on.
  */
+/**
+ * A run whose provider was never reached evaluated nothing. Before
+ * 2026-10-14 every eval graded each such case as a miss: with OpenRouter
+ * unreachable the agent eval reported "0.0% (0/45)" and exited 0 without a
+ * floor (1 with CI's floor), so a dead connection read as "ran" in both.
+ * A network failure is "never reached" only if no call in the run has
+ * succeeded yet; after that it stays an ordinary, graded failure.
+ */
+describe("wrapWithBudgetDetection — a provider that was never reached", () => {
+  const openRouterNetwork = () =>
+    Object.assign(new Error("OpenRouter request failed (network)"), { name: "OpenRouterError", kind: "network", status: null });
+  const geminiFetchFailed = () =>
+    new Error("[GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/x: fetch failed");
+  const openRouterTimeout = () =>
+    Object.assign(new Error("OpenRouter request timed out after 30000ms"), { name: "OpenRouterError", kind: "unavailable", status: null });
+
+  function provider(name, failWith, { succeedFirst = false } = {}) {
+    let calls = 0;
+    return {
+      name,
+      async generateResponse() {
+        calls += 1;
+        if (succeedFirst && calls === 1) return "ok";
+        throw failWith();
+      },
+      async *streamResponse() {
+        yield "";
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+      async *streamWithTools() {
+        calls += 1;
+        if (succeedFirst && calls === 1) {
+          yield { kind: "text", text: "ok" };
+          return;
+        }
+        throw failWith();
+      },
+    };
+  }
+
+  it("aborts the run as unreachable when the first call cannot connect", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterNetwork));
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (error) => error instanceof EvalProviderUnreachableError && isEvalAbort(error) && /OpenRouter/.test(error.message),
+    );
+  });
+
+  it("recognises Gemini's 'fetch failed' the same way", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("gemini", geminiFetchFailed));
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (error) => error instanceof EvalProviderUnreachableError && /Gemini/.test(error.message),
+    );
+  });
+
+  it("aborts from streamWithTools too, the call every tool eval makes", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterNetwork));
+    await assert.rejects(async () => {
+      for await (const _event of wrapped.streamWithTools("sys", [], [], async () => ({}), {})) {
+        // drain
+      }
+    }, EvalProviderUnreachableError);
+  });
+
+  it("grades a network failure as an ordinary error once any call has succeeded", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterNetwork, { succeedFirst: true }));
+    assert.equal(await wrapped.generateResponse("sys", []), "ok");
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (error) => !isEvalAbort(error) && error.message === "OpenRouter request failed (network)",
+    );
+  });
+
+  it("counts a stream that delivered an event as reached", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterNetwork, { succeedFirst: true }));
+    for await (const _event of wrapped.streamWithTools("sys", [], [], async () => ({}), {})) {
+      // drain the successful first call
+    }
+    await assert.rejects(async () => {
+      for await (const _event of wrapped.streamWithTools("sys", [], [], async () => ({}), {})) {
+        // drain
+      }
+    }, (error) => !isEvalAbort(error));
+  });
+
+  it("never treats a timeout as unreachable", async () => {
+    const wrapped = wrapWithBudgetDetection(provider("openrouter", openRouterTimeout));
+    await assert.rejects(
+      () => wrapped.generateResponse("sys", []),
+      (error) => !isEvalAbort(error) && /timed out/.test(error.message),
+    );
+  });
+});
+
 describe("reportEvalFailure", () => {
   function withCapturedExitCodeAndConsoleError(fn) {
     const originalExitCode = process.exitCode;
@@ -239,6 +343,16 @@ describe("reportEvalFailure", () => {
     );
   });
 
+  it("sets exit code 4 and names the unreachable provider for a run that never connected", () => {
+    const unreachable = new EvalProviderUnreachableError(new Error("fetch failed"), "OpenRouter");
+    const { exitCode, loggedArgs } = withCapturedExitCodeAndConsoleError(() => reportEvalFailure(unreachable));
+    assert.equal(exitCode, 4);
+    assert.ok(
+      loggedArgs.some((args) => args[0] === "::error::OpenRouter could not be reached — evals not run"),
+      `expected the named ::error:: line, got: ${JSON.stringify(loggedArgs)}`,
+    );
+  });
+
   it("sets the ORDINARY exit code 1 for any other error, unchanged from today's behavior", () => {
     const ordinary = new Error("something else broke");
     const { exitCode, loggedArgs } = withCapturedExitCodeAndConsoleError(() => reportEvalFailure(ordinary));
@@ -247,5 +361,247 @@ describe("reportEvalFailure", () => {
       !loggedArgs.some((args) => args[0] === "::error::Gemini budget exhausted — evals not run"),
       "an ordinary failure must never print the budget-exhausted line",
     );
+  });
+});
+
+async function withEnv(name, value, fn) {
+  const previous = process.env[name];
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+  try {
+    return await fn();
+  } finally {
+    if (previous === undefined) delete process.env[name];
+    else process.env[name] = previous;
+  }
+}
+
+describe("--provider=openrouter", () => {
+  it("resolves an OpenRouter provider for the requested model", async () => {
+    await withEnv("OPENROUTER_API_KEY", "sk-or-test-key-0123456789", async () => {
+      const { provider, model, label } = await resolveEvalProvider([
+        "--provider=openrouter",
+        "--model=meta-llama/llama-3.3-70b-instruct",
+      ]);
+      assert.equal(provider.name, "openrouter");
+      assert.equal(model, "meta-llama/llama-3.3-70b-instruct");
+      assert.equal(label, "openrouter (meta-llama/llama-3.3-70b-instruct)");
+    });
+  });
+
+  it("defaults to the production model", async () => {
+    await withEnv("OPENROUTER_API_KEY", "sk-or-test-key-0123456789", async () => {
+      const { model } = await resolveEvalProvider(["--provider=openrouter"]);
+      assert.equal(model, "google/gemini-3.1-flash-lite");
+    });
+  });
+
+  it("appends each call's billed cost to the file SAGE_EVAL_COST_LOG names", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "vq-cost-log-"));
+    const file = path.join(dir, "costs.log");
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "hi" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 3, completion_tokens: 1, cost: 0.0031 },
+        }),
+        { status: 200 },
+      );
+    try {
+      await withEnv("OPENROUTER_API_KEY", "test-key", () =>
+        withEnv("SAGE_EVAL_COST_LOG", file, async () => {
+          const { provider } = await resolveEvalProvider(["--provider=openrouter"]);
+          await provider.generateResponse("sys", [{ role: "user", content: "q" }]);
+          await provider.generateResponse("sys", [{ role: "user", content: "q" }]);
+        }),
+      );
+      assert.equal(readFileSync(file, "utf8"), "0.0031\n0.0031\n");
+    } finally {
+      globalThis.fetch = realFetch;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("stops with a clear error when the key is missing", async () => {
+    await withEnv("OPENROUTER_API_KEY", undefined, async () => {
+      await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), /OPENROUTER_API_KEY missing/);
+    });
+  });
+
+  it("names all three providers when one is unknown", async () => {
+    await assert.rejects(resolveEvalProvider(["--provider=claude"]), /"gemini", "ollama" or "openrouter"/);
+  });
+});
+
+describe("OpenRouter credits", () => {
+  function failingProvider(error) {
+    return {
+      name: "openrouter",
+      async generateResponse() {
+        throw error;
+      },
+      async *streamResponse() {
+        throw error;
+      },
+      async generateStructuredResponse() {
+        throw error;
+      },
+    };
+  }
+
+  function openRouterError(kind, status) {
+    return Object.assign(new Error(`OpenRouter request failed (${status}, ${kind})`), {
+      name: "OpenRouterError",
+      kind,
+      status,
+    });
+  }
+
+  it("reports exhausted credits as budget exhausted", async () => {
+    const wrapped = wrapWithBudgetDetection(failingProvider(openRouterError("credits", 402)));
+    await assert.rejects(
+      wrapped.generateResponse("sys", [{ role: "user", content: "q" }]),
+      (err) => err instanceof EvalBudgetExhaustedError && err.providerLabel === "OpenRouter",
+    );
+  });
+
+  it("leaves a refused 403 as a real failure", async () => {
+    const refused = openRouterError("refused", 403);
+    const wrapped = wrapWithBudgetDetection(failingProvider(refused));
+    await assert.rejects(wrapped.generateResponse("sys", [{ role: "user", content: "q" }]), (err) => err === refused);
+  });
+
+  it("names OpenRouter in the not-run line and exits 3", () => {
+    const logged = [];
+    const originalError = console.error;
+    const originalExitCode = process.exitCode;
+    console.error = (...args) => logged.push(args[0]);
+    try {
+      reportEvalFailure(new EvalBudgetExhaustedError(undefined, "OpenRouter"));
+      assert.ok(logged.includes("::error::OpenRouter budget exhausted \u2014 evals not run"));
+      assert.equal(process.exitCode, 3);
+    } finally {
+      console.error = originalError;
+      process.exitCode = originalExitCode;
+    }
+  });
+});
+
+describe("OpenRouter unavailable models and keys", () => {
+  function failing(error) {
+    return {
+      name: "openrouter",
+      async generateResponse() {
+        throw error;
+      },
+      async *streamResponse() {
+        throw error;
+      },
+      async generateStructuredResponse() {
+        throw error;
+      },
+    };
+  }
+
+  function openRouterError(kind, status) {
+    return Object.assign(new Error(`OpenRouter request failed (${status}, ${kind})`), {
+      name: "OpenRouterError",
+      kind,
+      status,
+    });
+  }
+
+  for (const status of [400, 401, 404]) {
+    it(`reports a ${status} bad request as unavailable, not as a failed test`, async () => {
+      const wrapped = wrapWithBudgetDetection(failing(openRouterError("bad_request", status)));
+      await assert.rejects(
+        wrapped.generateResponse("sys", [{ role: "user", content: "q" }]),
+        (err) => err instanceof EvalProviderUnavailableError && err.providerLabel === "OpenRouter",
+      );
+    });
+  }
+
+  it("leaves a model's malformed tool-call JSON as a real failure", async () => {
+    const malformed = openRouterError("bad_request", null);
+    const wrapped = wrapWithBudgetDetection(failing(malformed));
+    await assert.rejects(wrapped.generateResponse("sys", [{ role: "user", content: "q" }]), (err) => err === malformed);
+  });
+
+  it("isEvalAbort is true only for not-run errors", () => {
+    assert.equal(isEvalAbort(new EvalBudgetExhaustedError(undefined, "OpenRouter")), true);
+    assert.equal(isEvalAbort(new EvalProviderUnavailableError(undefined, "OpenRouter")), true);
+    assert.equal(isEvalAbort(new Error("boom")), false);
+    assert.equal(isEvalAbort(undefined), false);
+  });
+
+  it("names the unavailable provider and exits 4", () => {
+    const logged = [];
+    const originalError = console.error;
+    const originalExitCode = process.exitCode;
+    console.error = (...args) => logged.push(args[0]);
+    try {
+      reportEvalFailure(new EvalProviderUnavailableError(undefined, "OpenRouter"));
+      assert.ok(logged.includes("::error::OpenRouter provider or model unavailable — evals not run"));
+      assert.equal(process.exitCode, 4);
+    } finally {
+      console.error = originalError;
+      process.exitCode = originalExitCode;
+    }
+  });
+});
+
+describe("--provider=openrouter refuses a non-local database", () => {
+  const DB_VARS = ["DATABASE_URL", "DIRECT_URL", "ADMIN_DATABASE_URL", "BENCH_PROD_READONLY_URL"];
+
+  async function withDbEnv(values, fn) {
+    const saved = Object.fromEntries([...DB_VARS, "OPENROUTER_API_KEY"].map((name) => [name, process.env[name]]));
+    for (const name of DB_VARS) delete process.env[name];
+    Object.assign(process.env, { OPENROUTER_API_KEY: "sk-or-test-key-0123456789" }, values);
+    try {
+      return await fn();
+    } finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  }
+
+  it("refuses a remote DATABASE_URL and names the variable without printing it", async () => {
+    await withDbEnv({ DATABASE_URL: "postgresql://app:hunter2secret@db.abcdef.supabase.co:5432/postgres" }, async () => {
+      await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), (err) => {
+        assert.match(err.message, /DATABASE_URL/);
+        assert.match(err.message, /non-local database/);
+        assert.equal(err.message.includes("supabase.co"), false, err.message);
+        assert.equal(err.message.includes("hunter2secret"), false, err.message);
+        return true;
+      });
+    });
+  });
+
+  it("checks every database variable, not just DATABASE_URL", async () => {
+    await withDbEnv({ BENCH_PROD_READONLY_URL: "postgres://ro:pw@prod.example.com/db" }, async () => {
+      await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), /BENCH_PROD_READONLY_URL/);
+    });
+  });
+
+  it("refuses a database URL it cannot parse", async () => {
+    await withDbEnv({ DIRECT_URL: "not a url" }, async () => {
+      await assert.rejects(resolveEvalProvider(["--provider=openrouter"]), /DIRECT_URL/);
+    });
+  });
+
+  it("allows loopback and unset database URLs", async () => {
+    for (const url of ["postgresql://none@127.0.0.1:1/none", "postgres://u@localhost/db", "postgres://u@[::1]:5432/db"]) {
+      await withDbEnv({ DATABASE_URL: url }, async () => {
+        const { provider } = await resolveEvalProvider(["--provider=openrouter"]);
+        assert.equal(provider.name, "openrouter");
+      });
+    }
+    await withDbEnv({}, async () => {
+      const { provider } = await resolveEvalProvider(["--provider=openrouter"]);
+      assert.equal(provider.name, "openrouter");
+    });
   });
 });
