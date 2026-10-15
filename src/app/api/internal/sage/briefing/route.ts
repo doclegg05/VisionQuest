@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { enqueueJob } from "@/lib/jobs";
 import { logger } from "@/lib/logger";
+import { errorForLog } from "@/lib/log-error";
 import { isAutopilotEnabled, utcPanelDate } from "@/lib/sage/briefing";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -69,7 +70,7 @@ async function handle(req: Request): Promise<NextResponse> {
     } catch (err) {
       logger.error("briefing: failed to enqueue", {
         student: studentLogKey(student.id),
-        error: err instanceof Error ? err.message : String(err),
+        error: errorForLog(err),
       });
     }
   }

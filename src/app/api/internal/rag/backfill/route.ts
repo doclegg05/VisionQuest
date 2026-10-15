@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
+import { errorForLog } from "@/lib/log-error";
 import {
   backfillProgramDocumentEmbeddings,
   backfillSageMemoryEmbeddings,
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, data: { ...tally, memory, durationMs } });
   } catch (error) {
     logger.error("RAG embedding backfill failed", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return NextResponse.json({ error: "Backfill failed" }, { status: 500 });
   }

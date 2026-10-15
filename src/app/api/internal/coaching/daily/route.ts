@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { errorForLog } from "@/lib/log-error";
 import { sendMultiChannelNotification } from "@/lib/notifications";
 import { gatherDailyPromptContext } from "@/lib/sage/daily-prompt-data";
 import { selectDailyPrompt } from "@/lib/sage/daily-prompts";
@@ -36,7 +37,7 @@ async function sendDailyPromptForStudent(studentId: string) {
       }
     }
   } catch (arcErr) {
-    logger.error("Arc advancement failed", { student: studentLogKey(studentId), error: String(arcErr) });
+    logger.error("Arc advancement failed", { student: studentLogKey(studentId), error: errorForLog(arcErr) });
   }
 
   const ctx = await gatherDailyPromptContext(studentId);
@@ -92,7 +93,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     } catch (err) {
       logger.error("Failed to send daily coaching prompt", {
         student: studentLogKey(student.id),
-        error: String(err),
+        error: errorForLog(err),
       });
     }
   }

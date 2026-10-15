@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { invalidateAllChatContext } from "@/lib/cache";
 import { logger } from "@/lib/logger";
+import { errorForLog } from "@/lib/log-error";
 
 function isAuthorized(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, data: { decayed, archived, durationMs } });
   } catch (error) {
     logger.error("Memory consolidation failed", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return NextResponse.json({ error: "Consolidation failed" }, { status: 500 });
   }

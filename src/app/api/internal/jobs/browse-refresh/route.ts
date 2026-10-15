@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { errorForLog } from "@/lib/log-error";
 import { runBrowseRefresh } from "@/lib/job-board/browse-scrape";
 
 function isAuthorized(req: Request) {
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, ...result, durationMs });
   } catch (error) {
     logger.error("browse-refresh failed", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return NextResponse.json({ error: "Browse refresh failed" }, { status: 500 });
   }

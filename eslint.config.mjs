@@ -161,6 +161,45 @@ const appPrismaImportWithoutSession = {
   },
 };
 
+// A caught error's text is not safe to log from a sessionless route. Prisma
+// messages echo the failed call's arguments, so an alertKey or a where clause
+// puts a student id in the log line, and the key-name selectors above cannot
+// see inside a message. Log errorForLog(error) from src/lib/log-error.ts,
+// which keeps the error's name and code (security audit on PR #240,
+// 2026-10-15). Scoped to /api/internal for now; the rest of src/ still logs
+// messages in places.
+const RAW_ERROR_TEXT_MESSAGE =
+  "No raw error text in internal-route logs: Prisma messages quote query arguments, including student ids. Log { error: errorForLog(error) } from @/lib/log-error.";
+const rawErrorTextInLogs = [
+  {
+    selector: "CallExpression[callee.object.name='logger'] MemberExpression[property.name=/^(message|stack)$/]",
+    message: RAW_ERROR_TEXT_MESSAGE,
+  },
+  {
+    selector: "CallExpression[callee.object.name='logger'] CallExpression[callee.name='String']",
+    message: RAW_ERROR_TEXT_MESSAGE,
+  },
+  {
+    selector: "CallExpression[callee.object.name='logger'] CallExpression[callee.property.name='toString']",
+    message: RAW_ERROR_TEXT_MESSAGE,
+  },
+];
+
+// Comes after openRouterEvalOnly, whose no-restricted-syntax entry it would
+// otherwise lose, so it repeats that block's selectors.
+const internalRouteErrorLogs = {
+  files: ["src/app/api/internal/**"],
+  rules: {
+    "no-restricted-syntax": [
+      "error",
+      ...restrictedSyntaxEverywhere,
+      openRouterDynamicImport,
+      openRouterRequire,
+      ...rawErrorTextInLogs,
+    ],
+  },
+};
+
 // The browser's own dialogs are not accessible, cannot be styled to the app,
 // and block the page. Use useConfirm (confirm/alert/prompt) or useUndo
 // (HIG review D-24, 2026-10-09). Scope-aware: a `confirm` destructured from
@@ -259,6 +298,7 @@ const eslintConfig = defineConfig([
     },
   },
   appPrismaImportWithoutSession,
+  internalRouteErrorLogs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

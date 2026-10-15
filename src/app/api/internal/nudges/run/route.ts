@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { logger } from "@/lib/logger";
+import { errorForLog } from "@/lib/log-error";
 import { runNudges } from "@/lib/nudges/schedule";
 
 /**
@@ -41,7 +42,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   } catch (error) {
     // A 500 here is what the cron-health monitor is watching for, so the
     // failure must surface rather than be swallowed into a 200.
-    logger.error("Nudge run failed", { error: String(error) });
+    logger.error("Nudge run failed", { error: errorForLog(error) });
     return NextResponse.json({ error: "Nudge run failed." }, { status: 500 });
   }
 }

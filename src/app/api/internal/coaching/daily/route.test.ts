@@ -128,10 +128,14 @@ describe("GET /api/internal/coaching/daily", () => {
     assert.deepEqual(seen.advance, [studentContext("student-a"), studentContext("student-b")]);
   });
 
+  // The thrown messages quote the student id, as Prisma messages do when they
+  // echo a query's arguments, so the log must carry the error's name and not
+  // its text.
   it("one student's failure does not stop the run or leak the student id into the log", async () => {
     gatherDailyPromptContextMock.mock.mockImplementation(async () => {
       seen.context.push(getRlsContext());
-      if (getRlsContext()?.studentId === "student-a") throw new Error("boom");
+      const id = getRlsContext()?.studentId;
+      if (id === "student-a") throw new Error(`no prompt context for ${id}`);
       return { displayName: "Sam" };
     });
 
@@ -142,5 +146,21 @@ describe("GET /api/internal/coaching/daily", () => {
     assert.equal(loggerErrorMock.mock.callCount(), 1);
     const payload = JSON.stringify(loggerErrorMock.mock.calls[0].arguments[1]);
     assert.ok(!payload.includes("student-a"), `log payload carries a raw student id: ${payload}`);
+  });
+
+  it("a failed arc advance logs without the student id and still sends the prompt", async () => {
+    arcStartedAt = new Date(Date.now() - 8 * ONE_DAY_MS);
+    advanceArcWeekMock.mock.mockImplementation(async (id: string) => {
+      throw new Error(`arc row missing for ${id}`);
+    });
+
+    const res = await route.GET(request("Bearer test-cron-secret"));
+    assert.deepEqual(await res.json(), { sent: 2, total: 2 });
+
+    assert.equal(loggerErrorMock.mock.callCount(), 2);
+    for (const call of loggerErrorMock.mock.calls) {
+      const payload = JSON.stringify(call.arguments[1]);
+      assert.ok(!/student-[ab]/.test(payload), `log payload carries a raw student id: ${payload}`);
+    }
   });
 });

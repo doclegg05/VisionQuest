@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { logger } from "@/lib/logger";
+import { errorForLog } from "@/lib/log-error";
 import { resolveDueWagers } from "@/lib/sage/wagers";
 import { enqueueJob } from "@/lib/jobs";
 
@@ -47,7 +48,7 @@ export async function POST(req: Request): Promise<Response> {
     });
   } catch (error) {
     logger.error("Wager resolution failed", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return NextResponse.json({ error: "Wager resolution failed" }, { status: 500 });
   }
