@@ -74,7 +74,7 @@ Decisions made during brainstorming:
 
 - **Palette.** VisionQuest's core tokens already carry the SPOKES colors under the same names: `--primary #007baf`, `--accent #37b550`, `--dark #004071`, `--light #ffffff`, `--muted #edf3f7`, `--gold #d3b257`, `--royal #00133f`, `--mauve #a7253f`, `--offwhite #d1d3d4`, `--muted-gold #ad8806`.
 - **Logo.** `public/spokes-logo.png` is the official mark and appears in `BrandLockup` and on the sign-in page.
-- **Touch and contrast.** HIG Phase 1 put every control at 44px or more and raised light-theme text above 4.5:1.
+- **Touch and contrast.** The 2026-09-07 accessibility work (#207, already on `main`) raised controls to 44px and light-theme text above 4.5:1. HIG Phase 1 (#222) and Phase 2 (#223) extend it and must both be on `main` before this build starts.
 
 ### 2. Color and themes
 
