@@ -37,6 +37,10 @@ const REQUIREMENT_CHECKS = {
     met: () => Boolean(process.env.OLLAMA_HOST || process.env.OLLAMA_URL),
     reason: () => "OLLAMA_HOST (or OLLAMA_URL) is not set",
   },
+  openrouter: {
+    met: () => Boolean(process.env.OPENROUTER_API_KEY),
+    reason: () => "OPENROUTER_API_KEY is not set",
+  },
   browser: {
     met: () => Boolean(process.env.PLAYWRIGHT),
     reason: () => "PLAYWRIGHT is not set",
@@ -58,7 +62,7 @@ const REQUIREMENT_CHECKS = {
   },
 };
 
-function checkRequirements(requires) {
+export function checkRequirements(requires) {
   const unmet = [];
   for (const req of requires ?? []) {
     const check = REQUIREMENT_CHECKS[req];
@@ -78,6 +82,7 @@ function buildEnv() {
     ollamaHost: process.env.OLLAMA_HOST || process.env.OLLAMA_URL || null,
     baseUrl: process.env.BENCH_BASE_URL || null,
     prodReadonlyUrl: process.env.BENCH_PROD_READONLY_URL || null,
+    openrouterApiKey: process.env.OPENROUTER_API_KEY || null,
   };
 }
 

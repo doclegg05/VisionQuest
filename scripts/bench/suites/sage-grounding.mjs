@@ -2,7 +2,7 @@
  * Benchmark: sage-grounding. See config/benchmarks/sage-grounding.json.
  *
  * Self-test:
- *   GEMINI_API_KEY=... DATABASE_URL=... node --import tsx scripts/bench/suites/sage-grounding.mjs --self-test
+ *   OPENROUTER_API_KEY=... DATABASE_URL=... node --import tsx scripts/bench/suites/sage-grounding.mjs --self-test
  */
 
 import { maybeRunSelfTest } from "./lib/self-test.mjs";
@@ -45,9 +45,9 @@ export async function ensureGroundingCorpus(databaseUrl, log = () => undefined) 
 }
 
 export async function run(ctx) {
-  const geminiApiKey = ctx.env?.geminiApiKey ?? process.env.GEMINI_API_KEY;
-  if (!geminiApiKey) {
-    throw new Error("sage-grounding requires GEMINI_API_KEY.");
+  const openrouterApiKey = ctx.env?.openrouterApiKey ?? process.env.OPENROUTER_API_KEY;
+  if (!openrouterApiKey) {
+    throw new Error("sage-grounding requires OPENROUTER_API_KEY.");
   }
 
   const databaseUrl = ctx.env?.databaseUrl ?? process.env.DATABASE_URL;
@@ -62,8 +62,8 @@ export async function run(ctx) {
   // scoring, which is how an empty corpus became pass_rate 0. Keyword mode is
   // production's documented kill switch and is enough for citation attachment;
   // rag-retrieval remains the hybrid-quality instrument (prod-readonly).
-  const { bucket, caseResults } = await runChatHarnessFamily("grounding", {
-    geminiApiKey,
+  const { report, bucket, caseResults } = await runChatHarnessFamily("grounding", {
+    openrouterApiKey,
     env: { SAGE_RAG_MODE: "keyword", DATABASE_URL: databaseUrl },
   });
   const { evaluated, passRate } = passRateFromBucket(bucket);
@@ -74,7 +74,7 @@ export async function run(ctx) {
         id: "pass_rate",
         value: passRate ?? 0,
         n: evaluated,
-        details: { failing: caseResults.filter((r) => r.pass === false).map((r) => ({ id: r.id, reason: r.reason })) },
+        details: { provider: report.provider, failing: caseResults.filter((r) => r.pass === false).map((r) => ({ id: r.id, reason: r.reason })) },
       },
     ],
   };

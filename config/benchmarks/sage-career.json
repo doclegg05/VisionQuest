@@ -5,7 +5,7 @@
   "tier": "watch",
   "scorer": "scripts/bench/suites/sage-career.mjs",
   "fixture": "config/sage-chat-eval.json",
-  "requires": ["gemini"],
+  "requires": ["openrouter"],
   "metrics": [{ "id": "pass_rate", "unit": "ratio", "direction": "higher" }],
-  "notes": "Promotes the existing `career` family of scripts/sage-chat-harness.mjs (5 cases today) to a reported metric — watch tier, NO floor, per the plan's explicit instruction: the family is deliberately not in the harness's CI --families list yet ('soaking', see the file header) and the design's 40-question corpus with CareerOneStop reference answers does not exist. Promote to gate with a floor once that corpus lands and COS credentials are live (design §4.2: 'gate once COS credentials land; watch before')."
+  "notes": "Promotes the existing `career` family of scripts/sage-chat-harness.mjs (5 cases today) to a reported metric — watch tier, NO floor, per the plan's explicit instruction: the family is deliberately not in the harness's CI --families list yet ('soaking', see the file header) and the design's 40-question corpus with CareerOneStop reference answers does not exist. Promote to gate with a floor once that corpus lands and COS credentials are live (design §4.2: 'gate once COS credentials land; watch before'). Spawned via `--families=career --provider=openrouter --model=google/gemini-3.1-flash-lite`. Since 2026-10-15 the harness calls production's model, google/gemini-3.1-flash-lite, through OpenRouter (OPENROUTER_API_KEY), because the repository's GEMINI_API_KEY secret was rejected by Google. The fixture is synthetic, so OpenRouter never sees student data (docs/runbooks/openrouter-test-bench.md). OpenRouter cannot pass production's Gemini safetySettings, so replies are the model on OpenRouter's defaults. The harness runs with an empty GEMINI_API_KEY, so it cannot call Google directly."
 }

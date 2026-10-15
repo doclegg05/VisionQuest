@@ -269,7 +269,8 @@ in CI.
 | `crisis-latency`, `job-refresh`, `matching-scale`, `page-timing`, `sage-latency`, `nudge-sweep` (`sweep_ms`), `classroom-concurrency` | they report `ms`/`seconds`, so the number is a property of the machine, not of the code | the nightly `benchmarks.yml` run on `main`, whose commit-back seeds them from CI hardware |
 | `nudge-sweep`, `packet-privacy`, `query-plans`, `consent-scopes`, `migration-drift-schema` | need a migrated Postgres and the seeded cohort | the nightly run, or the `verify` job's hermetic pgvector service |
 | `connect-journey`, `journey-day1`, `journey-teacher-loop`, `touch-targets`, `axe-authenticated` | need a browser and a running server | the `e2e` job's collectors |
-| `sage-grounding`, `sage-career`, `sage-readability`, `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when `GEMINI_API_KEY` is present |
+| `sage-grounding`, `sage-career`, `sage-readability` | need a model key; non-deterministic by nature | the nightly run when `OPENROUTER_API_KEY` is present |
+| `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when `GEMINI_API_KEY` is present |
 | `cron-health`, `cost-per-student`, `ferpa-routing`, `backup-drill` | need the prod read-only URL (an owner step) | once that secret exists |
 
 **A timing metric must never be baselined from a laptop or a build container.**
@@ -346,8 +347,17 @@ opens or updates one results PR (protected `main` rejects a direct push —
 GH006) with `[skip ci]` so the merge does not re-trigger full CI, and
 opens or updates the "Benchmark regression" issue on any failure.
 
-Suites needing `GEMINI_API_KEY` never run per-PR — only nightly, and only when
-the secret exists (nightly Gemini spend is an owner decision, design §9.4).
+Model-backed suites never run per-PR, only nightly, and only when their
+secret exists (nightly model spend is an owner decision, design §9.4).
+`sage-grounding`, `sage-readability` and `sage-career` call production's model,
+`google/gemini-3.1-flash-lite`, through OpenRouter (`OPENROUTER_API_KEY`) on the
+synthetic fixture `config/sage-chat-eval.json`. The key is mapped only on the
+two `npm run bench` steps, and the harness runs with an empty `GEMINI_API_KEY`,
+so it cannot call Google directly. `sage-latency` and `explain-faithfulness`
+stay on `GEMINI_API_KEY` on purpose: the latency floor is a bar for direct
+Gemini calls, and `explain-faithfulness` generates through the production
+resolver, which never returns OpenRouter. Both suites state why in their
+config notes.
 
 ---
 
@@ -455,6 +465,11 @@ These are the secrets the suite reports `skipped` for until they exist
 - `CRON_CHECK_DATABASE_URL` — the scheduled-layer health suite.
 - `BENCH_PROD_READONLY_URL` — a read-only production connection string for
   drift, cost-per-student and FERPA-routing suites.
-- `GEMINI_API_KEY` in the repository's secrets — the model-backed nightly
-  suites. Confirm a monthly ceiling first (the 2026-08-21 credit-drain
-  incident).
+- `OPENROUTER_API_KEY` in the repository's secrets, for `sage-grounding`,
+  `sage-readability` and `sage-career`. It is the same secret
+  `sage-evals.yml` uses. Set a monthly spending limit on the key first (the
+  2026-08-21 credit-drain incident).
+- `GEMINI_API_KEY` in the repository's secrets, for `sage-latency` and
+  `explain-faithfulness` only. While the secret holds a key Google rejects,
+  both suites run and error, and the nightly fails. Without the secret they
+  report `skipped`.
