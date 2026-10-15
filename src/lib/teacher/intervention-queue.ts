@@ -71,6 +71,17 @@ export interface InterventionQueueStudentRecord {
   }>;
 }
 
+export interface QueueAlert {
+  id: string;
+  type: string;
+  severity: string;
+  title: string;
+  summary: string;
+  sourceType: string | null;
+  sourceId: string | null;
+  detectedAt: string;
+}
+
 export interface InterventionQueueEntry {
   studentId: string;
   publicStudentId: string;
@@ -80,16 +91,9 @@ export interface InterventionQueueEntry {
   urgencyScore: number;
   /** Plain-language chips explaining the score (Phase 6). */
   urgencyReasons: string[];
-  primaryAlert: {
-    id: string;
-    type: string;
-    severity: string;
-    title: string;
-    summary: string;
-    sourceType: string | null;
-    sourceId: string | null;
-    detectedAt: string;
-  } | null;
+  primaryAlert: QueueAlert | null;
+  /** Every open alert, most urgent first. openAlerts[0] is primaryAlert. */
+  openAlerts: QueueAlert[];
   recommendedAction: {
     kind: DashboardQuickActionKind | null;
     label: string;
@@ -143,6 +147,10 @@ const ALERT_TYPE_PRIORITY: Record<string, number> = {
 
 type QueueAlertRecord = InterventionQueueStudentRecord["alerts"][number];
 
+function serializeQueueAlert(alert: QueueAlertRecord): QueueAlert {
+  return { ...alert, detectedAt: alert.detectedAt.toISOString() };
+}
+
 /** Most urgent first: severity, then alert-type priority, then newest. */
 export function compareQueueAlerts(left: QueueAlertRecord, right: QueueAlertRecord): number {
   const severityGap = alertSeverityRank(right.severity) - alertSeverityRank(left.severity);
@@ -152,10 +160,6 @@ export function compareQueueAlerts(left: QueueAlertRecord, right: QueueAlertReco
   if (priorityGap !== 0) return priorityGap;
 
   return right.detectedAt.getTime() - left.detectedAt.getTime();
-}
-
-function pickPrimaryAlert(alerts: InterventionQueueStudentRecord["alerts"]) {
-  return [...alerts].sort(compareQueueAlerts)[0] ?? null;
 }
 
 function fallbackAction(studentId: string, signals: StudentSignals) {
@@ -297,7 +301,8 @@ export function buildInterventionQueueEntry(input: {
   const activeEnrollment =
     enrollments.find((enrollment) => enrollment.status === "active") ?? enrollments[0];
   const programType = normalizeProgramType(activeEnrollment?.class.programType);
-  const primaryAlert = pickPrimaryAlert(student.alerts);
+  const openAlerts = [...student.alerts].sort(compareQueueAlerts).map(serializeQueueAlert);
+  const primaryAlert = openAlerts[0] ?? null;
   const quickAction = primaryAlert ? teacherDashboardAlertQuickAction(primaryAlert.type) : null;
   const alertAction = primaryAlert ? teacherDashboardAlertAction(primaryAlert.type, student.id) : null;
   const fallback = primaryAlert ? null : fallbackAction(student.id, signals);
@@ -310,18 +315,8 @@ export function buildInterventionQueueEntry(input: {
     programType,
     urgencyScore: computeUrgencyScore(signals),
     urgencyReasons: computeUrgencyReasons(signals),
-    primaryAlert: primaryAlert
-      ? {
-          id: primaryAlert.id,
-          type: primaryAlert.type,
-          severity: primaryAlert.severity,
-          title: primaryAlert.title,
-          summary: primaryAlert.summary,
-          sourceType: primaryAlert.sourceType,
-          sourceId: primaryAlert.sourceId,
-          detectedAt: primaryAlert.detectedAt.toISOString(),
-        }
-      : null,
+    primaryAlert,
+    openAlerts,
     recommendedAction: {
       kind: quickAction?.kind ?? fallback?.kind ?? null,
       label: quickAction?.label ?? alertAction?.label ?? fallback?.label ?? "Open student",

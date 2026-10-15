@@ -321,3 +321,21 @@ test("buildInterventionQueueEntry returns zero urgency for an active student wit
 
   assert.equal(entry.urgencyScore, 0);
 });
+
+test("each queue entry carries every open alert, most urgent first", () => {
+  const entry = buildInterventionQueueEntry({
+    student: makeStudent({
+      alerts: [
+        makeAlert({ id: "a-medium", severity: "medium", type: "overdue_task" }),
+        makeAlert({ id: "a-crisis", severity: "critical", type: "wellbeing_concern" }),
+        makeAlert({ id: "a-high", severity: "high", type: "goal_stale" }),
+      ],
+    }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.deepEqual(entry.openAlerts.map((alert) => alert.id), ["a-crisis", "a-high", "a-medium"]);
+  assert.equal(entry.primaryAlert?.id, entry.openAlerts[0]?.id);
+  assert.equal(entry.openAlerts[0]?.detectedAt, "2026-04-01T00:00:00.000Z");
+});
