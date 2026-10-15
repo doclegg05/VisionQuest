@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 import type { BrowserContext, Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { E2E_STUDENT, E2E_TEACHER } from "./fixtures";
-import { BASE_URL, loginContext } from "./helpers/auth";
+import { loginContext } from "./helpers/auth";
 
 /**
  * Screenshot set for the SPOKES design review
@@ -27,7 +27,6 @@ const STUDENT_PAGES = [
   ["career", "/career"],
 ] as const;
 
-test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
   mkdirSync(OUT, { recursive: true });
 });
@@ -37,10 +36,17 @@ async function setTheme(context: BrowserContext, theme: Theme): Promise<void> {
   await context.addCookies([{ name: "vq-theme", value: theme, url: origin }]);
 }
 
-async function capture(page: Page, name: string, path: string, theme: Theme): Promise<void> {
+async function capture(
+  page: Page,
+  name: string,
+  path: string,
+  theme: Theme,
+  ready?: (page: Page) => Promise<void>,
+): Promise<void> {
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto(path);
+    if (ready) await ready(page);
     await page.waitForTimeout(1_500);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect.soft(overflow, `${name} (${theme}, ${viewport.name}px) scrolls sideways by ${overflow}px`).toBeLessThanOrEqual(0);
@@ -68,9 +74,7 @@ async function withPage(context: BrowserContext, run: (page: Page) => Promise<vo
 
 test("sign-in page", async ({ browser }) => {
   for (const theme of THEMES) {
-    // baseURL is set here because browser.newContext() does not inherit the
-    // config's `use.baseURL`, and a relative goto("/") fails without it.
-    const context = await browser.newContext({ baseURL: BASE_URL });
+    const context = await browser.newContext();
     await setTheme(context, theme);
     await withPage(context, (page) => capture(page, "sign-in", "/", theme));
   }
@@ -93,7 +97,9 @@ test("teacher pages", async ({ browser }) => {
     for (const theme of THEMES) {
       await setTheme(context, theme);
       await capture(page, "teacher-queue", "/teacher", theme);
-      await capture(page, "student-detail", detail, theme);
+      await capture(page, "student-detail", detail, theme, (p) =>
+        expect(p.getByRole("tab", { name: "Coach" })).toBeVisible({ timeout: 20_000 }),
+      );
     }
   });
 });
