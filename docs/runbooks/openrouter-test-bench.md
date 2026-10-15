@@ -17,10 +17,12 @@ If you are about to connect OpenRouter to the app itself, stop. That is a FERPA 
 ## Setup
 
 1. On openrouter.ai, create a key named "VisionQuest evals" with a monthly spending limit.
-2. In OpenRouter's privacy settings, turn off prompt logging and "use of inputs/outputs", and turn on zero data retention.
+2. Signed in as the account that owns the key, set two settings pages (names as in OpenRouter's privacy docs on 2026-10-15):
+   - Privacy, `openrouter.ai/settings/privacy`: turn off the switches that allow providers that may train on your data, for paid and for free models. Turn off "OpenRouter use of inputs/outputs". Zero data retention has one switch per model group; turn on "Google" and "All other models", and "Anthropic" or "OpenAI" too if you test those models.
+   - Observability, `openrouter.ai/settings/observability`: keep input and output logging off.
 3. Put the key in `/Users/brittlegg/MacDev/companies/education/VisionQuest/.env.local` as `OPENROUTER_API_KEY=`.
 
-Every request the provider sends also carries `provider: { zdr: true, data_collection: "deny" }`, so the routing rule holds even if an account setting is missed.
+Every request the provider sends also carries `provider: { zdr: true, data_collection: "deny" }`, so the routing rule holds even if an account setting is missed. A request cannot turn off OpenRouter's own logging or its use of inputs and outputs. Only the account settings in step 2 do that.
 
 ## Running
 
