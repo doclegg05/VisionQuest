@@ -132,6 +132,7 @@ interface StreamChunk {
   choices?: Array<{
     delta?: { content?: string | null; tool_calls?: WireDeltaToolCall[]; reasoning_details?: unknown[] };
     finish_reason?: string | null;
+    native_finish_reason?: unknown;
   }>;
 }
 
@@ -139,7 +140,7 @@ interface CompletionJson {
   provider?: unknown;
   model?: unknown;
   usage?: WireUsage | null;
-  choices?: Array<{ message?: { content?: string | null }; finish_reason?: string | null }>;
+  choices?: Array<{ message?: { content?: string | null }; finish_reason?: string | null; native_finish_reason?: unknown }>;
 }
 
 export interface PartialToolCall {
@@ -161,6 +162,7 @@ interface HopResult {
   reasoning: unknown[];
   usage: TokenUsage | null;
   finishReason: string | null;
+  nativeFinishReason: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -301,10 +303,23 @@ function temperatureOf(options?: GenerationOptions | ToolStreamOptions): Record<
   return options?.temperature !== undefined ? { temperature: options.temperature } : {};
 }
 
-function emptyReplyError(finishReason: string | null | undefined): OpenRouterError {
+/**
+ * The upstream's own reason a reply ended, kept only when it is a short plain
+ * token. Google's MALFORMED_FUNCTION_CALL (the model wrote an invalid tool
+ * call) reaches OpenRouter clients as finish_reason "error" with no error
+ * object, so this is the only field that says what happened.
+ */
+const NATIVE_REASON_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
+
+function nativeReasonOf(value: unknown): string | null {
+  return typeof value === "string" && NATIVE_REASON_PATTERN.test(value) ? value : null;
+}
+
+function emptyReplyError(finishReason: string | null | undefined, nativeReason: string | null = null): OpenRouterError {
   const reason = finishReason ?? "unknown";
   const kind: OpenRouterErrorKind = reason === "content_filter" ? "refused" : "unavailable";
-  return new OpenRouterError(`OpenRouter returned no text (finish_reason: ${reason})`, kind);
+  const native = nativeReason ? `, native_finish_reason: ${nativeReason}` : "";
+  return new OpenRouterError(`OpenRouter returned no text (finish_reason: ${reason}${native})`, kind);
 }
 
 function assertMessages(messages: readonly ChatMessage[]): void {
@@ -371,7 +386,11 @@ function checkChunk(chunk: StreamChunk): StreamChunk {
   if (chunk.error === undefined && chunk.choices?.[0]?.finish_reason !== "error") return chunk;
   const code = errorCodeOf(chunk.error);
   const kind = code === null ? "unavailable" : classifyOpenRouterFailure(code, JSON.stringify(chunk.error));
-  throw new OpenRouterError(`OpenRouter reported an error mid-stream${code === null ? "" : ` (${code})`}`, kind, code);
+  const native = nativeReasonOf(chunk.choices?.[0]?.native_finish_reason);
+  const details = [code === null ? null : String(code), native === null ? null : `native_finish_reason: ${native}`].filter(
+    (detail) => detail !== null,
+  );
+  throw new OpenRouterError(`OpenRouter reported an error mid-stream${details.length > 0 ? ` (${details.join(", ")})` : ""}`, kind, code);
 }
 
 /** `data:` payload of one SSE line; null for blank lines and `: comment` keep-alives. */
@@ -538,16 +557,18 @@ export class OpenRouterProvider implements AIProvider {
     let usage: TokenUsage | null = null;
     let outputChars = 0;
     let finishReason: string | null = null;
+    let nativeReason: string | null = null;
     for await (const chunk of this.streamChunks(body)) {
       usage = toTokenUsage(chunk.usage) ?? usage;
       finishReason = chunk.choices?.[0]?.finish_reason ?? finishReason;
+      nativeReason = nativeReasonOf(chunk.choices?.[0]?.native_finish_reason) ?? nativeReason;
       const text = chunk.choices?.[0]?.delta?.content;
       if (typeof text === "string" && text.length > 0) {
         outputChars += text.length;
         yield text;
       }
     }
-    if (outputChars === 0) throw emptyReplyError(finishReason);
+    if (outputChars === 0) throw emptyReplyError(finishReason, nativeReason);
     reportUsage(onUsage, usage, systemPrompt, messages, outputChars);
   }
 
@@ -576,7 +597,7 @@ export class OpenRouterProvider implements AIProvider {
       usage = accumulateUsage(usage, result.usage);
       outputChars += result.text.length;
       if (result.calls.length === 0) {
-        if (result.text.length === 0) throw emptyReplyError(result.finishReason);
+        if (result.text.length === 0) throw emptyReplyError(result.finishReason, result.nativeFinishReason);
         reportUsage(options?.onUsage, usage, systemPrompt, messages, outputChars);
         yield { kind: "done", reason: "complete" };
         return;
@@ -607,7 +628,7 @@ export class OpenRouterProvider implements AIProvider {
     if (cost !== null) this.onCost?.(cost);
     const choice = json.choices?.[0];
     const text = typeof choice?.message?.content === "string" ? choice.message.content : "";
-    if (text.length === 0) throw emptyReplyError(choice?.finish_reason);
+    if (text.length === 0) throw emptyReplyError(choice?.finish_reason, nativeReasonOf(choice?.native_finish_reason));
     reportUsage(onUsage, toTokenUsage(json.usage), systemPrompt, messages, text.length);
     return text;
   }
@@ -617,10 +638,12 @@ export class OpenRouterProvider implements AIProvider {
     let reasoning: unknown[] = [];
     let usage: TokenUsage | null = null;
     let finishReason: string | null = null;
+    let nativeFinishReason: string | null = null;
     const partials = new Map<number, PartialToolCall>();
     for await (const chunk of this.streamChunks(body)) {
       usage = toTokenUsage(chunk.usage) ?? usage;
       finishReason = chunk.choices?.[0]?.finish_reason ?? finishReason;
+      nativeFinishReason = nativeReasonOf(chunk.choices?.[0]?.native_finish_reason) ?? nativeFinishReason;
       const delta = chunk.choices?.[0]?.delta;
       if (!delta) continue;
       if (typeof delta.content === "string" && delta.content.length > 0) {
@@ -631,7 +654,7 @@ export class OpenRouterProvider implements AIProvider {
       for (const part of delta.tool_calls ?? []) partials.set(part.index, mergeToolCallPart(partials.get(part.index), part));
     }
     const calls = [...partials.entries()].sort(([a], [b]) => a - b).map(([, partial]) => parseToolCall(partial));
-    return { text, calls, reasoning, usage, finishReason };
+    return { text, calls, reasoning, usage, finishReason, nativeFinishReason };
   }
 
   private async *streamChunks(body: Record<string, unknown>): AsyncGenerator<StreamChunk> {

@@ -290,6 +290,70 @@ describe("OpenRouterProvider stream errors", () => {
   });
 });
 
+describe("OpenRouterProvider names the upstream finish reason", () => {
+  // Google's MALFORMED_FUNCTION_CALL reaches OpenRouter clients as
+  // finish_reason "error" with no error object; only native_finish_reason
+  // says the model wrote an invalid tool call.
+  const ended = (finishReason: string, native: unknown) => ({
+    choices: [{ delta: {}, finish_reason: finishReason, native_finish_reason: native }],
+  });
+  const TOOLS: ToolDeclaration[] = [{ name: "lookup_goals", description: "List goals.", parameters: { type: "object", properties: {} } }];
+  const noopTool = async () => ({ response: {}, summary: "ok", status: "success" as const });
+
+  it("names it when a stream ends in error mid-way", async () => {
+    const { fetchImpl } = recordingFetch([() => sseResponse([textChunk("partial"), ended("error", "MALFORMED_FUNCTION_CALL")])]);
+    await assert.rejects(
+      drain(makeProvider(fetchImpl).streamResponse("sys", MESSAGES)),
+      /mid-stream \(native_finish_reason: MALFORMED_FUNCTION_CALL\)/,
+    );
+  });
+
+  it("names it after the retries when every attempt at a tool round ends in a malformed call", async () => {
+    const malformed = () => sseResponse([ended("error", "MALFORMED_FUNCTION_CALL")]);
+    const { fetchImpl, bodies } = recordingFetch([malformed, malformed, malformed]);
+    await assert.rejects(
+      drain(makeProvider(fetchImpl).streamWithTools("sys", [{ role: "user", content: "q" }], TOOLS, noopTool)),
+      /native_finish_reason: MALFORMED_FUNCTION_CALL/,
+    );
+    assert.equal(bodies.length, 3);
+  });
+
+  it("names it when a non-streamed reply has no text", async () => {
+    const reply = { ...completion(""), choices: [{ message: { content: "" }, finish_reason: "error", native_finish_reason: "MALFORMED_FUNCTION_CALL" }] };
+    const { fetchImpl } = recordingFetch([() => jsonResponse(200, reply)]);
+    await assert.rejects(
+      makeProvider(fetchImpl).generateResponse("sys", MESSAGES),
+      /no text \(finish_reason: error, native_finish_reason: MALFORMED_FUNCTION_CALL\)/,
+    );
+  });
+
+  it("names it when a streamed reply or a tool round has no text", async () => {
+    const { fetchImpl } = recordingFetch([() => sseResponse([ended("stop", "SAFETY")]), () => sseResponse([ended("stop", "SAFETY")])]);
+    const provider = makeProvider(fetchImpl);
+    await assert.rejects(drain(provider.streamResponse("sys", MESSAGES)), /no text \(finish_reason: stop, native_finish_reason: SAFETY\)/);
+    await assert.rejects(
+      drain(provider.streamWithTools("sys", [{ role: "user", content: "q" }], TOOLS, noopTool)),
+      /no text \(finish_reason: stop, native_finish_reason: SAFETY\)/,
+    );
+  });
+
+  it("leaves out a native reason that is not a short plain token", async () => {
+    const replies = ["MALFORMED FUNCTION CALL", "x".repeat(65), 42].map(
+      (native) => () =>
+        jsonResponse(200, { ...completion(""), choices: [{ message: { content: "" }, finish_reason: "error", native_finish_reason: native }] }),
+    );
+    const { fetchImpl } = recordingFetch(replies);
+    const provider = makeProvider(fetchImpl);
+    for (let i = 0; i < replies.length; i += 1) {
+      await assert.rejects(provider.generateResponse("sys", MESSAGES), (error) => {
+        assert.ok(error instanceof OpenRouterError);
+        assert.equal(error.message, "OpenRouter returned no text (finish_reason: error)");
+        return true;
+      });
+    }
+  });
+});
+
 describe("normalizeToolName", () => {
   const declared = new Set(["lookup_goals", "save_job"]);
 
