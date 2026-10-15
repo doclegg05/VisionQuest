@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { writeDetectedAlert } from "@/lib/alert-hold";
 import { isAuthorizedInternalRequest } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { buildGoalStaleAlert, TERMINAL_GOAL_STATUSES, type GoalStaleAlert } from "@/lib/stale-goal-rules";
@@ -38,29 +39,17 @@ async function syncGoalStaleAlerts(stale: StaleGoalAlert[], now: Date): Promise<
   const staleGoalIds = new Set(stale.map((alert) => alert.sourceId));
 
   return prisma.$transaction(async (tx) => {
-    const existingKeys = new Set(
+    const existing = new Map(
       (
         await tx.studentAlert.findMany({
           where: { alertKey: { in: stale.map((alert) => alert.alertKey) } },
-          select: { alertKey: true },
+          select: { alertKey: true, status: true, snoozedUntil: true },
         })
-      ).map((a) => a.alertKey),
+      ).map((a) => [a.alertKey, a]),
     );
 
-    for (const { studentId, ...alert } of stale) {
-      const fields = {
-        severity: alert.severity,
-        status: "open",
-        title: alert.title,
-        summary: alert.summary,
-        sourceType: alert.sourceType,
-        sourceId: alert.sourceId,
-      };
-      await tx.studentAlert.upsert({
-        where: { alertKey: alert.alertKey },
-        update: fields,
-        create: { studentId, alertKey: alert.alertKey, type: alert.type, ...fields },
-      });
+    for (const alert of stale) {
+      await writeDetectedAlert(tx, existing.get(alert.alertKey), alert, now);
     }
 
     // Resolve only "open" alerts, so snoozed and dismissed ones keep their state.
@@ -78,7 +67,7 @@ async function syncGoalStaleAlerts(stale: StaleGoalAlert[], now: Date): Promise<
       });
     }
 
-    return stale.filter((alert) => !existingKeys.has(alert.alertKey)).length;
+    return stale.filter((alert) => !existing.has(alert.alertKey)).length;
   }, TRANSACTION_OPTIONS);
 }
 

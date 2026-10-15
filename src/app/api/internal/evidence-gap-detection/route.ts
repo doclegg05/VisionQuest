@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { writeDetectedAlert } from "@/lib/alert-hold";
 import { isAuthorizedInternalRequest } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -172,30 +173,32 @@ async function syncEvidenceGapAlerts(
   const activeAlertKeys = new Set(gaps.map((gap) => gap.alertKey));
 
   return prisma.$transaction(async (tx) => {
-    const existingKeys = new Set(
+    const existing = new Map(
       (
         await tx.studentAlert.findMany({
           where: { alertKey: { in: [...activeAlertKeys] } },
-          select: { alertKey: true },
+          select: { alertKey: true, status: true, snoozedUntil: true },
         })
-      ).map((a) => a.alertKey),
+      ).map((a) => [a.alertKey, a]),
     );
 
     for (const gap of gaps) {
       const typeLabel = gap.itemType.charAt(0).toUpperCase() + gap.itemType.slice(1);
-      const fields = {
-        severity: gap.severity,
-        status: "open",
-        title: `Missing ${typeLabel}: ${gap.title}`,
-        summary: `Required ${gap.itemType} "${gap.title}" has not been completed.`,
-        sourceType: "class_requirement",
-        sourceId: gap.requirementId,
-      };
-      await tx.studentAlert.upsert({
-        where: { alertKey: gap.alertKey },
-        update: fields,
-        create: { studentId: gap.studentId, alertKey: gap.alertKey, type: "evidence_gap", ...fields },
-      });
+      await writeDetectedAlert(
+        tx,
+        existing.get(gap.alertKey),
+        {
+          studentId: gap.studentId,
+          alertKey: gap.alertKey,
+          type: "evidence_gap",
+          severity: gap.severity,
+          title: `Missing ${typeLabel}: ${gap.title}`,
+          summary: `Required ${gap.itemType} "${gap.title}" has not been completed.`,
+          sourceType: "class_requirement",
+          sourceId: gap.requirementId,
+        },
+        now,
+      );
     }
 
     const openEvidenceAlerts = await tx.studentAlert.findMany({
@@ -211,7 +214,7 @@ async function syncEvidenceGapAlerts(
     }
 
     return {
-      newAlerts: gaps.filter((gap) => !existingKeys.has(gap.alertKey)).length,
+      newAlerts: gaps.filter((gap) => !existing.has(gap.alertKey)).length,
       resolvedAlerts: toResolve.length,
     };
   }, TRANSACTION_OPTIONS);
