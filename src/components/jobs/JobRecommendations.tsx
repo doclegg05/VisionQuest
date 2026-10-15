@@ -38,7 +38,7 @@ export function JobRecommendations({ jobs, onSave }: JobRecommendationsProps) {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-3">
+      <h2 className="text-lg font-semibold text-[var(--ink-strong)] mb-3">
         Recommended for You
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface OrientationItem {
   id: string;
@@ -16,7 +17,9 @@ function WelcomeLetterSlot() {
   const [exists, setExists] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     fetch("/api/teacher/welcome-letter")
@@ -30,14 +33,15 @@ function WelcomeLetterSlot() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setActionError(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/teacher/welcome-letter", { method: "POST", body: fd });
       if (res.ok) setExists(true);
-      else alert((await res.json()).error || "Upload failed");
+      else setActionError((await res.json()).error || "Upload failed");
     } catch {
-      alert("Upload failed");
+      setActionError("Upload failed");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -45,12 +49,17 @@ function WelcomeLetterSlot() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete the current welcome letter?")) return;
+    if (!(await confirm({
+      title: "Delete the current welcome letter?",
+      message: "Students can no longer open it from the orientation checklist.",
+      confirmLabel: "Delete",
+    }))) return;
+    setActionError(null);
     try {
       const res = await fetch("/api/teacher/welcome-letter", { method: "DELETE" });
       if (res.ok) setExists(false);
     } catch {
-      alert("Delete failed");
+      setActionError("Delete failed");
     }
   }
 
@@ -68,20 +77,20 @@ function WelcomeLetterSlot() {
             href="/api/forms/download?formId=welcome-letter&mode=view"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+            className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-[var(--badge-info-text)] hover:underline"
           >
             View current letter
           </a>
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
+            className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-[var(--badge-info-text)] hover:underline disabled:opacity-50"
           >
             {uploading ? "Uploading..." : "Replace"}
           </button>
           <button
             onClick={handleDelete}
-            className="text-xs font-semibold text-red-500 hover:text-red-700"
+            className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-[var(--badge-error-text)] hover:underline"
           >
             Delete
           </button>
@@ -90,18 +99,25 @@ function WelcomeLetterSlot() {
         <button
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-[var(--badge-info-text)] hover:underline disabled:opacity-50"
         >
           {uploading ? "Uploading..." : "Upload Welcome Letter (PDF)"}
         </button>
+      )}
+      {actionError && (
+        <p role="alert" className="text-xs text-[var(--badge-error-text)]">
+          {actionError}
+        </p>
       )}
       <input
         ref={fileRef}
         type="file"
         accept=".pdf"
         onChange={handleUpload}
+        aria-label="Welcome letter PDF"
         className="hidden"
       />
+      {confirmDialog}
     </div>
   );
 }
@@ -125,28 +141,32 @@ function InlineEditForm({
   }, []);
 
   return (
-    <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 space-y-3">
-      <input
-        ref={labelRef}
-        type="text"
-        placeholder="Item label"
-        value={form.label}
-        onChange={(e) => setForm({ ...form, label: e.target.value })}
-        className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <input
-        type="text"
-        placeholder="Description (optional)"
-        value={form.description}
-        onChange={(e) => setForm({ ...form, description: e.target.value })}
-        className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
+    <div className="bg-[var(--badge-info-bg)]/50 rounded-xl border border-[var(--badge-info-bg)] p-4 space-y-3">
+      <label className="block space-y-1.5">
+        <span className="block text-sm font-medium text-[var(--ink-strong)]">Item label</span>
+        <input
+          ref={labelRef}
+          type="text"
+          value={form.label}
+          onChange={(e) => setForm({ ...form, label: e.target.value })}
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+        />
+      </label>
+      <label className="block space-y-1.5">
+        <span className="block text-sm font-medium text-[var(--ink-strong)]">Description (optional)</span>
+        <input
+          type="text"
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+        />
+      </label>
       <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
         <input
           type="checkbox"
           checked={form.required}
           onChange={(e) => setForm({ ...form, required: e.target.checked })}
-          className="rounded border-[var(--border-strong)] text-blue-600"
+          className="rounded border-[var(--border-strong)] accent-[var(--accent-blue)]"
         />
         Required for orientation completion
       </label>
@@ -154,13 +174,13 @@ function InlineEditForm({
         <button
           onClick={() => form.label.trim() && onSave(form)}
           disabled={!form.label.trim()}
-          className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          className="primary-button text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
         >
           Save
         </button>
         <button
           onClick={onCancel}
-          className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
+          className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]"
         >
           Cancel
         </button>
@@ -179,6 +199,7 @@ export default function OrientationManager() {
   const [addingNew, setAddingNew] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const fetchItems = useCallback(async () => {
     try {
@@ -223,7 +244,11 @@ export default function OrientationManager() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this orientation item? Student progress for it will also be removed.")) return;
+    if (!(await confirm({
+      title: "Delete this orientation item?",
+      message: "Student progress for it is also removed.",
+      confirmLabel: "Delete",
+    }))) return;
     try {
       const res = await fetch("/api/teacher/orientation", {
         method: "DELETE",
@@ -293,8 +318,8 @@ export default function OrientationManager() {
 
   if (error) return (
     <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchItems} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+      <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
+      <button onClick={fetchItems} className="primary-button px-4 py-2 rounded-lg pointer-coarse:min-h-11">
         Try Again
       </button>
     </div>
@@ -337,7 +362,7 @@ export default function OrientationManager() {
                 className={[
                   "bg-[var(--surface-raised)] rounded-xl border p-4 flex items-start justify-between gap-3 cursor-grab active:cursor-grabbing transition-all",
                   dragOverId === item.id
-                    ? "border-blue-400 bg-blue-50 scale-[1.01]"
+                    ? "border-[var(--accent-blue)] bg-[var(--badge-info-bg)]/50 scale-[1.01]"
                     : dragId === item.id
                       ? "opacity-50 border-[var(--border)]"
                       : "border-[var(--border)] hover:border-[var(--border-strong)]",
@@ -349,7 +374,7 @@ export default function OrientationManager() {
                     <p className="text-sm font-medium text-[var(--ink-strong)]">
                       {item.label}
                       {item.required && (
-                        <span className="ml-1.5 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">Required</span>
+                        <span className="ml-1.5 text-xs bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] px-1.5 py-0.5 rounded">Required</span>
                       )}
                     </p>
                     {item.description && (
@@ -357,16 +382,16 @@ export default function OrientationManager() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-1.5 shrink-0">
+                <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => setEditingId(item.id)}
-                    className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                    className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-info-text)] px-2 py-1 rounded hover:bg-[var(--badge-info-bg)] transition-colors"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                    className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-error-text)] px-2 py-1 rounded hover:bg-[var(--badge-error-bg)] transition-colors"
                   >
                     Delete
                   </button>
@@ -387,11 +412,12 @@ export default function OrientationManager() {
       ) : (
         <button
           onClick={() => { setEditingId(null); setAddingNew(true); }}
-          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-[var(--accent-blue)] hover:text-[var(--badge-info-text)] transition-colors"
         >
           + Add Orientation Item
         </button>
       )}
+      {confirmDialog}
     </div>
   );
 }

@@ -194,7 +194,7 @@ export function WorkAvailabilitySection() {
                           onClick={() => toggleCell(day, slot)}
                           className={`min-h-11 w-full rounded-lg border px-2 py-2 text-xs ${
                             on
-                              ? "border-[var(--accent-strong)] bg-[var(--accent-soft)] font-semibold text-[var(--ink-strong)]"
+                              ? "border-[var(--accent-strong)] bg-[var(--glow-green)] font-semibold text-[var(--ink-strong)]"
                               : "border-[var(--border)] text-[var(--ink-muted)]"
                           }`}
                         >

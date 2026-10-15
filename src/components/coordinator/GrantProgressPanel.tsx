@@ -55,7 +55,7 @@ export default function GrantProgressPanel({ goals, regionId, onChange }: GrantP
         <button
           type="button"
           onClick={() => setAdding((value) => !value)}
-          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold"
+          className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11"
         >
           {adding ? "Cancel" : "Add target"}
         </button>
@@ -197,7 +197,7 @@ function AddGoalForm({ regionId, onCancel, onCreated, onError }: AddGoalFormProp
     >
       <div className="grid gap-3 md:grid-cols-2">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Metric</span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Metric</span>
           <select
             value={metric}
             onChange={(event) => setMetric(event.target.value as typeof metric)}
@@ -211,7 +211,7 @@ function AddGoalForm({ regionId, onCancel, onCreated, onError }: AddGoalFormProp
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Program</span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Program</span>
           <select
             value={programType}
             onChange={(event) => setProgramType(event.target.value as typeof programType)}
@@ -225,7 +225,7 @@ function AddGoalForm({ regionId, onCancel, onCreated, onError }: AddGoalFormProp
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Target</span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Target</span>
           <input
             type="number"
             min={0}
@@ -236,7 +236,7 @@ function AddGoalForm({ regionId, onCancel, onCreated, onError }: AddGoalFormProp
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Period start</span>
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Period start</span>
             <input
               type="date"
               value={periodStart}
@@ -245,7 +245,7 @@ function AddGoalForm({ regionId, onCancel, onCreated, onError }: AddGoalFormProp
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Period end</span>
+            <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Period end</span>
             <input
               type="date"
               value={periodEnd}
@@ -255,7 +255,7 @@ function AddGoalForm({ regionId, onCancel, onCreated, onError }: AddGoalFormProp
           </label>
         </div>
         <label className="space-y-1 md:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Notes (optional)</span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Notes (optional)</span>
           <input
             type="text"
             value={notes}
@@ -268,14 +268,14 @@ function AddGoalForm({ regionId, onCancel, onCreated, onError }: AddGoalFormProp
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold"
+          className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="primary-button px-4 py-1.5 text-xs disabled:opacity-50"
+          className="primary-button px-4 py-1.5 text-xs disabled:opacity-50 pointer-coarse:min-h-11"
         >
           {saving ? "Saving…" : "Add target"}
         </button>

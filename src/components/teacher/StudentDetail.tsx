@@ -13,6 +13,7 @@ import OverviewTab from "./student-detail/OverviewTab";
 import GoalsPlanTab from "./student-detail/GoalsPlanTab";
 import ProgressTab from "./student-detail/ProgressTab";
 import OperationsTab from "./student-detail/OperationsTab";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled";
 
@@ -54,6 +55,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [reviewingFormId, setReviewingFormId] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [updatingAppointmentId, setUpdatingAppointmentId] = useState<string | null>(null);
+  const { confirm, prompt, confirmDialog } = useConfirm();
   const [appointmentForm, setAppointmentForm] = useState({
     title: "",
     description: "",
@@ -220,7 +222,15 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
   async function handleResetPassword() {
     if (!newPassword || newPassword.length < 6) return;
-    if (!confirm("Reset password for this student? They will need the new password to log in.")) return;
+    if (
+      !(await confirm({
+        title: "Reset this student's password?",
+        message: "They will need the new password to log in.",
+        confirmLabel: "Reset password",
+      }))
+    ) {
+      return;
+    }
     setResetStatus("saving");
     try {
       const res = await fetch(`/api/teacher/students/${studentId}/reset-password`, {
@@ -440,9 +450,13 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
   async function handleReviewForm(submissionId: string, status: "approved" | "rejected") {
     const notes = status === "rejected"
-      ? window.prompt("Optional note for the student:", "")
+      ? await prompt({
+          title: "Return this form to the student?",
+          label: "Note for the student (optional)",
+          confirmLabel: "Return form",
+        })
       : "";
-    if (status === "rejected" && notes === null) {
+    if (notes === null) {
       return;
     }
 
@@ -478,19 +492,19 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
-        <button onClick={loadData} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
+        <button onClick={loadData} className="primary-button px-4 py-2 pointer-coarse:min-h-11">
           Try Again
         </button>
       </div>
     );
   }
 
-  if (!data) return <p className="text-sm text-red-500">Student not found.</p>;
+  if (!data) return <p className="text-sm text-[var(--badge-error-text)]">Student not found.</p>;
 
   return (
     <div className="space-y-6">
-      <Link href="/teacher" className="text-sm text-[var(--accent-blue)] hover:text-[var(--ink-strong)]">
+      <Link href="/teacher" className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--accent-blue)] hover:text-[var(--ink-strong)]">
         &larr; Back to Class Dashboard
       </Link>
 
@@ -628,6 +642,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
           ),
         }}
       </StudentDetailTabs>
+      {confirmDialog}
     </div>
   );
 }
