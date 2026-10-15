@@ -124,15 +124,12 @@
       { "id": "orient-attendance", "label": "Sign Personal Attendance Contract" },
       { "id": "orient-media", "label": "Complete Media Release Form" }
     ],
-    "note": "submit_form needs an orientationItemId. Chat lists the student's open checklist items by id under the attached files (src/lib/chat/attachment-context.ts), and openOrientationItems puts the same block in front of the model here. Before 2026-10-14 nothing supplied the id, in the eval or in production.",
-    "expectedTool": "submit_form"
+    "note": "submit_form needs an orientationItemId. Chat lists the student's open checklist items by id under the attached files (src/lib/chat/attachment-context.ts), and openOrientationItems puts the same block in front of the model here. Before 2026-10-14 nothing supplied the id, in the eval or in production. expectedArgs checks the ids exactly, so a model cannot pass by inventing one.",
     "expectedTool": "submit_form",
-    "context": "ORIENTATION CHECKLIST:\n- orientationItemId orientation-dress-code: Signed Dress Code Policy",
     "expectedArgs": {
       "fileUploadId": "file-attach-1",
-      "orientationItemId": "orientation-dress-code"
-    },
-    "note": "The first-action test supplies the required record identifiers and checks them exactly; the model must not invent database IDs."
+      "orientationItemId": "orient-dress"
+    }
   },
   {
     "id": "submit-signed-rights",
@@ -148,15 +145,12 @@
       { "id": "orient-attendance", "label": "Sign Personal Attendance Contract" },
       { "id": "orient-media", "label": "Complete Media Release Form" }
     ],
-    "note": "submit_form needs an orientationItemId. Chat lists the student's open checklist items by id under the attached files (src/lib/chat/attachment-context.ts), and openOrientationItems puts the same block in front of the model here. Before 2026-10-14 nothing supplied the id, in the eval or in production.",
-    "expectedTool": "submit_form"
+    "note": "submit_form needs an orientationItemId. Chat lists the student's open checklist items by id under the attached files (src/lib/chat/attachment-context.ts), and openOrientationItems puts the same block in front of the model here. Before 2026-10-14 nothing supplied the id, in the eval or in production. expectedArgs checks the ids exactly, so a model cannot pass by inventing one.",
     "expectedTool": "submit_form",
-    "context": "ORIENTATION CHECKLIST:\n- orientationItemId orientation-rights-responsibilities: Signed Rights and Responsibilities",
     "expectedArgs": {
       "fileUploadId": "file-attach-2",
-      "orientationItemId": "orientation-rights-responsibilities"
-    },
-    "note": "The first-action test supplies the required record identifiers and checks them exactly; the model must not invent database IDs."
+      "orientationItemId": "orient-rights"
+    }
   },
   {
     "id": "file-cert-evidence",
@@ -209,27 +203,21 @@
     "id": "job-save",
     "message": "Save that CNA job at the Beckley hospital to my list",
     "context": "JOBS SAGE SHOWED THE STUDENT EARLIER IN THIS CONVERSATION (search_jobs results):\n- jobListingId job-cna-1: CNA at Beckley ARH (Beckley, WV)\n- jobListingId job-wh-2: Warehouse Lead at Mountaineer Distribution (Mount Hope, WV)",
-    "note": "save_job needs a jobListingId. In a real chat it comes from the search_jobs results Sage showed earlier, which this one-message eval stands in for with context. Without it every model tested searched again, which is the right move, and the only way to pass was to invent an id.",
-    "expectedTool": "save_job"
+    "note": "save_job needs a jobListingId. In a real chat it comes from the search_jobs results Sage showed earlier, which this one-message eval stands in for with context. Without it every model tested searched again, which is the right move, and the only way to pass was to invent an id. expectedArgs checks the ids exactly, so a model cannot pass by inventing one.",
     "expectedTool": "save_job",
-    "context": "PREVIOUS SEARCH RESULT:\n- jobListingId job-cna-1: CNA at Beckley hospital",
     "expectedArgs": {
       "jobListingId": "job-cna-1"
-    },
-    "note": "The first-action test supplies the required record identifiers and checks them exactly; the model must not invent database IDs."
+    }
   },
   {
     "id": "job-save-2",
     "message": "I like the warehouse lead position you showed me \u2014 keep it for me",
     "context": "JOBS SAGE SHOWED THE STUDENT EARLIER IN THIS CONVERSATION (search_jobs results):\n- jobListingId job-cna-1: CNA at Beckley ARH (Beckley, WV)\n- jobListingId job-wh-2: Warehouse Lead at Mountaineer Distribution (Mount Hope, WV)",
-    "note": "save_job needs a jobListingId. In a real chat it comes from the search_jobs results Sage showed earlier, which this one-message eval stands in for with context. Without it every model tested searched again, which is the right move, and the only way to pass was to invent an id.",
-    "expectedTool": "save_job"
+    "note": "save_job needs a jobListingId. In a real chat it comes from the search_jobs results Sage showed earlier, which this one-message eval stands in for with context. Without it every model tested searched again, which is the right move, and the only way to pass was to invent an id. expectedArgs checks the ids exactly, so a model cannot pass by inventing one.",
     "expectedTool": "save_job",
-    "context": "PREVIOUS SEARCH RESULT:\n- jobListingId job-wh-2: Warehouse Lead at Mountaineer Distribution",
     "expectedArgs": {
       "jobListingId": "job-wh-2"
-    },
-    "note": "The first-action test supplies the required record identifiers and checks them exactly; the model must not invent database IDs."
+    }
   },
   {
     "id": "portfolio-add",
