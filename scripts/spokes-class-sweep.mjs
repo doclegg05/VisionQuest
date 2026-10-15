@@ -1,27 +1,41 @@
 // scripts/spokes-class-sweep.mjs
 // node scripts/spokes-class-sweep.mjs --paths=<glob>[,<glob>...] [--rules=<rule>,...] [--write]
 // Dry run by default: prints every change and every item that needs a hand fix.
+// Exits 2 on bad input or when no files match, so a typo never looks like a clean sweep.
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import { ALL_RULES } from "./lib/spokes-class-map.mjs";
 import { rewriteSource } from "./lib/spokes-source-rewrite.mjs";
 
+const USAGE = "usage: node scripts/spokes-class-sweep.mjs --paths=<glob>[,<glob>...] [--rules=<rule>,...] [--write]";
+const KNOWN_FLAG = /^--(?:paths=|rules=|write$)/;
+
+function fail(message) {
+  console.error(message);
+  process.exit(2);
+}
+
+// Tests, declaration files, and installed packages are never swept.
+function isSweepable(file) {
+  return /\.tsx?$/.test(file)
+    && !/\.(test|spec)\.tsx?$/.test(file)
+    && !/\.d\.ts$/.test(file)
+    && !/(^|[\\/])node_modules[\\/]/.test(file);
+}
+
 const args = process.argv.slice(2);
 const option = (name) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+const stray = args.filter((a) => a.startsWith("--") && !KNOWN_FLAG.test(a));
+if (stray.length > 0) fail(`unknown argument(s): ${stray.join(", ")}\n${USAGE}`);
 const paths = option("paths");
-if (!paths) {
-  console.error("usage: node scripts/spokes-class-sweep.mjs --paths=<glob>[,<glob>...] [--rules=<rule>,...] [--write]");
-  process.exit(2);
-}
+if (!paths) fail(USAGE);
 const rules = option("rules")?.split(",") ?? ALL_RULES;
 const unknown = rules.filter((rule) => !ALL_RULES.includes(rule));
-if (unknown.length > 0) {
-  console.error(`unknown rule(s): ${unknown.join(", ")}; known: ${ALL_RULES.join(", ")}`);
-  process.exit(2);
-}
+if (unknown.length > 0) fail(`unknown rule(s): ${unknown.join(", ")}; known: ${ALL_RULES.join(", ")}`);
 const write = args.includes("--write");
 const files = [...new Set(paths.split(",").flatMap((glob) => globSync(glob)))]
-  .filter((file) => /\.tsx?$/.test(file) && !/\.(test|spec)\.tsx?$/.test(file))
+  .filter(isSweepable)
   .sort();
+if (files.length === 0) fail(`no files matched --paths=${paths}`);
 
 let rewritten = 0;
 let reviewCount = 0;

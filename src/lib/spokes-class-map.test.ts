@@ -166,3 +166,13 @@ describe("hover and focus colors that collapse onto their base", () => {
     assert.ok(result.review.some((r) => r.token === "hover:bg-blue-700"));
   });
 });
+
+describe("bracket variants are flagged, never skipped", () => {
+  for (const token of ["[&>svg]:rounded-[10px]", "data-[state=open]:text-[var(--error)]", "max-[400px]:text-[11px]"]) {
+    it(`${token} comes back unchanged with exactly one review item`, () => {
+      const result = rewriteClassList(token);
+      assert.equal(result.output, token);
+      assert.equal(result.review.length, 1);
+    });
+  }
+});

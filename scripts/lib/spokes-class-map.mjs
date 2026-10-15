@@ -5,6 +5,7 @@
  * Design 5.1). Pure: no I/O. scripts/lib/spokes-source-rewrite.mjs applies it to files.
  */
 export const HUES = "red|rose|pink|fuchsia|emerald|green|lime|amber|yellow|orange|blue|sky|cyan|teal|indigo|violet|purple|slate|gray|zinc|neutral|stone";
+export const HUE_PREFIX = "bg|text|border(?:-[xytrbl])?|from|via|to|ring|fill|stroke|outline|divide|decoration|accent|caret|placeholder|shadow";
 export const ALL_RULES = Object.freeze(["hue", "token-text", "display-family", "radius", "small-text", "display-weight"]);
 
 const ROLE_BY_HUE = Object.freeze({
@@ -32,7 +33,7 @@ const DARK_REVIEW_REASON = "dark: color removed but the list keeps a fixed color
 const STATE_REVIEW_REASON = "state color now matches the base color; choose a visibly different state, for example /90";
 
 const V = "((?:[a-z0-9-]+:)*)";
-const HUE_RE = new RegExp(`^${V}(bg|text|border(?:-[xytrbl])?|from|via|to|ring|fill|stroke|outline|divide|decoration|accent|caret|placeholder|shadow)-(${HUES})-(\\d{2,3})(\\/\\d{1,3})?$`);
+const HUE_RE = new RegExp(`^${V}(${HUE_PREFIX})-(${HUES})-(\\d{2,3})(\\/\\d{1,3})?$`);
 const TOKEN_TEXT_RE = new RegExp(`^${V}text-\\[var\\((--[a-z-]+)\\)\\]$`);
 const NAMED_TEXT_RE = new RegExp(`^${V}text-(accent-red|accent-green|accent-blue|accent-gold)(\\/\\d{1,3})?$`);
 const RADIUS_RE = new RegExp(`^${V}rounded(-(?:tl|tr|bl|br|ss|se|es|ee|[trblse]))?-\\[(\\d*\\.?\\d+)(rem|px)\\]$`);
@@ -90,10 +91,21 @@ export function mapClass(token) {
   return null;
 }
 
+const BRACKET_REASON = "bracket variant; rewrite by hand";
+
+// `[&>svg]:rounded-[10px]` and `data-[state=open]:bg-red-50` carry a variant the map cannot parse. The class after
+// the last `]:` is the one it would have changed, so a mappable class there is flagged rather than skipped.
+function bracketVariantRule(token) {
+  if (!token.includes("]:")) return null;
+  return mapClass(token.slice(token.lastIndexOf("]:") + 2))?.rule ?? null;
+}
+
 function classify(token, usesDisplay, enabled) {
   if (usesDisplay && HEAVY.has(token)) return enabled.has("display-weight") ? { to: null } : {};
   const mapped = mapClass(token);
   if (mapped && enabled.has(mapped.rule)) return "review" in mapped ? { review: mapped.review } : { to: mapped.to };
+  const bracketRule = mapped ? null : bracketVariantRule(token);
+  if (bracketRule && enabled.has(bracketRule)) return { review: BRACKET_REASON };
   if (!mapped && enabled.has("hue") && HUE_ANYWHERE.test(token)) return { review: "unrecognized variant around an off-palette hue" };
   return {};
 }
