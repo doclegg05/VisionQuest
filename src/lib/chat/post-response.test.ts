@@ -24,8 +24,11 @@ const mockRecordInsight = mock.fn<(args: unknown) => Promise<unknown>>(async () 
   status: "created",
   insightId: "insight-1",
 }));
+// Carries one signal on purpose: an all-empty extraction no longer reaches the
+// CareerDiscovery write (see post-response.discovery-failure.test.ts), and the
+// discovery-stage test below asserts that write happens.
 const mockExtractDiscoverySignals = mock.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
-  interests: [],
+  interests: ["fixing cars"],
   strengths: [],
   subjects: [],
   problems: [],
