@@ -10,10 +10,17 @@ name: Benchmarks
 #                              fails (design §3)
 #
 # Suites whose `requires` are unmet report `skipped` and are never a failure:
-# the Gemini-backed suites run only when GEMINI_API_KEY exists, the
+# the model suites run only when OPENROUTER_API_KEY exists, the
 # prod-read-only ones only when BENCH_PROD_READONLY_URL does. Those secrets
 # are owner steps (design §9.7), so an unconfigured repository stays green and
 # says so in the results rather than going quiet.
+#
+# Model calls go through OpenRouter to production's model,
+# google/gemini-3.1-flash-lite, on synthetic fixtures only, the same route as
+# sage-evals.yml. The repo holds no Gemini key (issue #220: a revoked
+# GEMINI_API_KEY failed every call from 2026-10-07), so sage-latency, whose
+# floor is production's direct-to-Google p95 bar, reports skipped. Pinned by
+# src/lib/ci-benchmarks-openrouter.test.ts.
 #
 # "A number nobody reads is not a benchmark" (design §6): every run uploads
 # its results, main runs land them so the trend is in git, and any failure
@@ -66,12 +73,15 @@ jobs:
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
       # Presence is what the runner's `requires` check reads. An unset secret
-      # is an empty string here, so gemini/prod-readonly suites report
+      # is an empty string here, so openrouter/prod-readonly suites report
       # `skipped` instead of failing. Values that reach a scorer through
       # ctx.env are redacted out of every result file by
       # scripts/bench/lib/redact.mjs before it is written.
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # The model key is mapped on the two steps that run suites, not here.
       BENCH_PROD_READONLY_URL: ${{ secrets.BENCH_PROD_READONLY_URL }}
+      # What the model suites measure: production's model, through OpenRouter.
+      # Pinned to DEFAULT_GEMINI_MODEL by src/lib/ci-benchmarks-openrouter.test.ts.
+      OPENROUTER_MODEL: google/gemini-3.1-flash-lite
 
     steps:
       - uses: actions/checkout@v4
@@ -125,11 +135,15 @@ jobs:
         # issue is still filed; the job's own verdict is re-applied at the end.
         continue-on-error: true
         run: npm run bench -- --tier=nightly --compare
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Watch-tier benchmarks
         # No --compare: watch numbers are reported, never enforced.
         continue-on-error: true
         run: npm run bench -- --tier=watch
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Benchmark summary
         if: always()
