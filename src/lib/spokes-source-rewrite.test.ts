@@ -84,6 +84,36 @@ describe("rewriteSource: a class touching a template expression", () => {
   });
 });
 
+describe("rewriteSource: every class at a template edge is judged like any other class", () => {
+  const edgeCases: ReadonlyArray<readonly [string, string]> = [
+    ["`${a}data-[state=open]:bg-red-50 p-2`", "data-[state=open]:bg-red-50"],
+    ["`${a}[&>svg]:rounded-[10px] p-2`", "[&>svg]:rounded-[10px]"],
+    ["`${a}group-hover/remove:bg-red-600 p-2`", "group-hover/remove:bg-red-600"],
+    ["`${a}font-bold font-display`", "font-bold"],
+  ];
+  for (const [expression, token] of edgeCases) {
+    it(`${expression} stays unchanged and reviews ${token}`, () => {
+      const source = `const c = ${expression};`;
+      const { output, review } = rewriteSource(source, "x.ts");
+      assert.equal(output, source);
+      assert.ok(review.some((r) => r.token === token), JSON.stringify(review));
+    });
+  }
+
+  it("reports no edge review when the active rules cannot change the edge class", () => {
+    const { review } = rewriteSource("const c = `bg-red-50${s}`;", "x.ts", ["radius"]);
+    assert.equal(review.length, 0);
+  });
+});
+
+describe("rewriteSource: the template-built check applies only before an expression", () => {
+  it("does not report a static class at the end of a template tail", () => {
+    const { output, review } = rewriteSource("const c = `p-2 ${x} bg-red-50`;", "x.ts");
+    assert.equal(output, "const c = `p-2 ${x} bg-danger-soft`;");
+    assert.equal(review.length, 0);
+  });
+});
+
 describe("rewriteSource: one file with several edits", () => {
   it("rewrites a JSX className, a clsx key, and a template tail together", () => {
     const source = [

@@ -7,7 +7,7 @@
  * a template expression is never rewritten, because the expression can extend it.
  */
 import ts from "typescript";
-import { ALL_RULES, HUE_PREFIX, HUES, mapClass, rewriteClassList } from "./spokes-class-map.mjs";
+import { ALL_RULES, HUE_PREFIX, HUES, rewriteClassList } from "./spokes-class-map.mjs";
 
 const TEMPLATE_BUILT = [
   new RegExp(`(?:^|[\\s"'\`:])(?:${HUE_PREFIX})-$`),
@@ -15,10 +15,10 @@ const TEMPLATE_BUILT = [
 ];
 const TEMPLATE_REASON = "class name built from a template expression";
 const EDGE_REASON = "class touches a template expression; rewrite by hand";
-const PLAIN = Object.freeze({ template: false, touchLeft: false, touchRight: false });
-const TEMPLATE_HEAD = Object.freeze({ template: true, touchLeft: false, touchRight: true });
-const TEMPLATE_MIDDLE = Object.freeze({ template: true, touchLeft: true, touchRight: true });
-const TEMPLATE_TAIL = Object.freeze({ template: true, touchLeft: true, touchRight: false });
+const PLAIN = Object.freeze({ touchLeft: false, touchRight: false });
+const TEMPLATE_HEAD = Object.freeze({ touchLeft: false, touchRight: true });
+const TEMPLATE_MIDDLE = Object.freeze({ touchLeft: true, touchRight: true });
+const TEMPLATE_TAIL = Object.freeze({ touchLeft: true, touchRight: false });
 
 // A piece's first class continues the expression before it when no whitespace separates them, and its last
 // class continues the expression after it. Those edge tokens are returned with their offsets, not rewritten.
@@ -39,6 +39,18 @@ function splitPiece(raw, touchLeft, touchRight) {
   };
 }
 
+// An edge class is judged with its whole piece, because a rule can depend on the rest of the list
+// (display-weight needs the display font in the same list). Only the verdict is kept; the output is discarded.
+function edgeIsFlagged(raw, token, rules) {
+  const result = rewriteClassList(raw, rules);
+  return result.changes.some((change) => change.from === token) || result.review.some((item) => item.token === token);
+}
+
+// A class is built from an expression only when an expression follows it, and only a hue rule could change it.
+function isBuiltBeforeExpression(raw, touchRight, rules) {
+  return touchRight && !/\s$/.test(raw) && rules.includes("hue") && TEMPLATE_BUILT.some((re) => re.test(raw));
+}
+
 export function rewriteSource(source, fileName, rules = ALL_RULES) {
   const kind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
@@ -51,13 +63,13 @@ export function rewriteSource(source, fileName, rules = ALL_RULES) {
     const raw = source.slice(start, end);
     const lineAt = (offset) => lineOf(start + offset);
     const lineOfToken = (token) => lineAt(Math.max(0, raw.indexOf(token)));
-    if (kindOfPiece.template && TEMPLATE_BUILT.some((re) => re.test(raw))) {
+    if (isBuiltBeforeExpression(raw, kindOfPiece.touchRight, rules)) {
       const token = raw.trim().slice(-40);
       review.push({ line: lineOfToken(token), token, reason: TEMPLATE_REASON });
     }
     const split = splitPiece(raw, kindOfPiece.touchLeft, kindOfPiece.touchRight);
     for (const edge of split.edges) {
-      if (mapClass(edge.token)) review.push({ line: lineAt(edge.offset), token: edge.token, reason: EDGE_REASON });
+      if (edgeIsFlagged(raw, edge.token, rules)) review.push({ line: lineAt(edge.offset), token: edge.token, reason: EDGE_REASON });
     }
     const result = rewriteClassList(split.middle, rules);
     for (const change of result.changes) changes.push({ line: lineOfToken(change.from), ...change });
