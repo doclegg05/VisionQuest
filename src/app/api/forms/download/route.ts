@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { detectedFileType } from "@/lib/file-security";
 import { getSession } from "@/lib/auth";
 import { downloadFile, getPresignedDownloadUrl, storageObjectExists } from "@/lib/storage";
 import { canViewForm, FORMS, getFormById } from "@/lib/spokes/forms";
@@ -66,6 +67,7 @@ export async function GET(req: Request) {
 
   const presigned = await getPresignedDownloadUrl(form.storageKey, {
     contentDisposition: disposition,
+    contentType: "application/pdf",
   });
   if (presigned) {
     // Redirect only when the object is actually in the bucket — a presigned
@@ -94,7 +96,8 @@ export async function GET(req: Request) {
 
   return new NextResponse(new Uint8Array(result.buffer), {
     headers: {
-      "Content-Type": result.mimeType || "application/pdf",
+      "Content-Type": detectedFileType(result.buffer) || "application/octet-stream",
+      "X-Content-Type-Options": "nosniff",
       "Content-Disposition": disposition,
       "Cache-Control": "private, max-age=3600",
     },

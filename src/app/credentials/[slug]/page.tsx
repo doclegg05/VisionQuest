@@ -27,9 +27,7 @@ export default async function PublicCredentialPage({
       student: {
         select: {
           displayName: true,
-          portfolioItems: {
-            select: { id: true },
-          },
+          _count: { select: { portfolioItems: true } },
           certifications: {
             // D7 (2026-09-07): Ready-to-Work FAMILY, not an exact
             // "ready-to-work" match — see src/lib/certifications.ts.
@@ -90,7 +88,7 @@ export default async function PublicCredentialPage({
           </div>
           <div className="surface-section p-5">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Evidence</p>
-            <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{page.student.portfolioItems.length}</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{page.student._count.portfolioItems}</p>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">Portfolio items on file</p>
           </div>
         </div>

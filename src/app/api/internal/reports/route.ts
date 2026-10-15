@@ -4,6 +4,8 @@ import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-dat
 import { withStudentRlsContext } from "@/lib/rls-context";
 import { logger } from "@/lib/logger";
 
+let reportRunning = false;
+
 function isAuthorized(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
@@ -28,6 +30,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (reportRunning) return NextResponse.json({ error: "Report already running" }, { status: 409 });
+  reportRunning = true;
+  try {
+    return await generateReport();
+  } finally {
+    reportRunning = false;
+  }
+}
+
+async function generateReport() {
   const start = Date.now();
   const now = new Date();
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -59,20 +71,24 @@ export async function POST(req: Request) {
 
     const buckets: Record<string, number> = { "0-25": 0, "26-50": 0, "51-75": 0, "76-100": 0 };
 
-    const readinessResults = await Promise.all(
-      students.map((student) =>
-        withStudentRlsContext(student.id, () => fetchStudentReadinessData(student.id)),
-      ),
-    );
-
     let readinessSum = 0;
-    for (const readinessData of readinessResults) {
-      const score = readinessData.readiness.score;
-      readinessSum += score;
-      if (score <= 25) buckets["0-25"]++;
-      else if (score <= 50) buckets["26-50"]++;
-      else if (score <= 75) buckets["51-75"]++;
-      else buckets["76-100"]++;
+    // Readiness itself fans out into multiple queries; never launch a whole
+    // class at once or retain every student's readiness object for the report.
+    for (let offset = 0; offset < students.length; offset += 4) {
+      const readinessResults = await Promise.allSettled(
+        students.slice(offset, offset + 4).map((student) =>
+          withStudentRlsContext(student.id, () => fetchStudentReadinessData(student.id)),
+        ),
+      );
+      for (const result of readinessResults) {
+        if (result.status === "rejected") throw result.reason;
+        const score = result.value.readiness.score;
+        readinessSum += score;
+        if (score <= 25) buckets["0-25"]++;
+        else if (score <= 50) buckets["26-50"]++;
+        else if (score <= 75) buckets["51-75"]++;
+        else buckets["76-100"]++;
+      }
     }
 
     const avgReadiness = Math.round(readinessSum / students.length);

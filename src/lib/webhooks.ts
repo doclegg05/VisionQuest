@@ -2,6 +2,12 @@ import crypto from "crypto";
 import { prismaAdmin as prisma } from "./db";
 import { cached, invalidatePrefix } from "./cache";
 import { logger } from "./logger";
+import { safeOutboundPost } from "./safe-outbound-request";
+
+// Bound concurrent dispatches without an unbounded in-memory waiting queue.
+let activeDispatches = 0;
+const MAX_DISPATCHES = 4;
+const DELIVERY_CONCURRENCY = 4;
 
 export type WebhookEventType =
   | "student.enrolled"
@@ -34,6 +40,16 @@ export async function dispatchWebhookEvent(
   eventType: WebhookEventType,
   data: Record<string, unknown>,
 ): Promise<void> {
+  if (activeDispatches >= MAX_DISPATCHES) throw new Error("Webhook dispatch capacity reached");
+  activeDispatches++;
+  try {
+    await dispatch(eventType, data);
+  } finally {
+    activeDispatches--;
+  }
+}
+
+async function dispatch(eventType: WebhookEventType, data: Record<string, unknown>): Promise<void> {
   const subscriptions = await loadActiveSubscriptions();
   const matching = subscriptions.filter(
     (s) => s.eventTypes.length === 0 || s.eventTypes.includes(eventType),
@@ -48,31 +64,27 @@ export async function dispatchWebhookEvent(
   };
   const body = JSON.stringify(payload);
 
-  const deliveries = matching.map(async (sub) => {
-    try {
-      const signature = signPayload(body, sub.secret);
-      await fetch(sub.url, {
-        method: "POST",
-        headers: {
+  let next = 0;
+  const deliver = async () => {
+    while (next < matching.length) {
+      const sub = matching[next++];
+      try {
+        const signature = signPayload(body, sub.secret);
+        await safeOutboundPost(sub.url, body, {
           "Content-Type": "application/json",
           "X-VisionQuest-Signature": signature,
           "X-VisionQuest-Event": eventType,
-        },
-        body,
-        signal: AbortSignal.timeout(10_000),
-      });
-    } catch (err) {
-      logger.error("Webhook delivery failed", {
-        subscriptionId: sub.id,
-        url: sub.url,
-        eventType,
-        error: String(err),
-      });
+        });
+      } catch {
+        logger.error("Webhook delivery failed", {
+          subscriptionId: sub.id,
+          eventType,
+        });
+      }
     }
-  });
+  };
 
-  // Fire-and-forget — don't block the caller
-  await Promise.allSettled(deliveries);
+  await Promise.all(Array.from({ length: Math.min(DELIVERY_CONCURRENCY, matching.length) }, deliver));
 }
 
 export function invalidateWebhookCache(): void {

@@ -12,7 +12,7 @@ import { mockRequest, mockStudentSession } from "@/lib/test-helpers";
 
 // requiresSignature: true in src/lib/spokes/forms.ts
 const FORM_ID = "attendance-contract";
-const SIGNATURE = `data:image/png;base64,${Buffer.from("fake-png-bytes").toString("base64")}`;
+const SIGNATURE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGioAAAAASUVORK5CYII=";
 
 const student = mockStudentSession();
 let currentSession: Session | null = student;
@@ -214,6 +214,33 @@ describe("POST /api/forms/sign", () => {
     assert.equal((await res.json()).error, "Signature must be a PNG data URL.");
     assert.equal(mockUploadFile.mock.callCount(), 0);
     assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
+  });
+
+  it("rejects non-PNG bytes disguised as a PNG data URL", async () => {
+    const res = await post({ formId: FORM_ID, signature: `data:image/png;base64,${Buffer.from("<script>alert(1)</script>").toString("base64")}` });
+    assert.equal(res.status, 400);
+    assert.equal(mockUploadFile.mock.callCount(), 0);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
+  });
+
+  it("rejects a file belonging to another student before any writes", async () => {
+    mockFileUploadFindFirst.mock.mockImplementation(async () => null);
+    const fileId = "cm12345678901234567890123";
+    const res = await post({ formId: FORM_ID, signature: SIGNATURE, fileId });
+    assert.equal(res.status, 400);
+    assert.deepEqual(mockFileUploadFindFirst.mock.calls[0].arguments[0], {
+      where: { id: fileId, studentId: student.id }, select: { id: true },
+    });
+    assert.equal(mockUploadFile.mock.callCount(), 0);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
+  });
+
+  it("accepts an existing file owned by the target student", async () => {
+    const fileId = "cm12345678901234567890123";
+    mockFileUploadFindFirst.mock.mockImplementation(async () => ({ id: fileId }));
+    const res = await post({ formId: FORM_ID, signature: SIGNATURE, fileId });
+    assert.equal(res.status, 200);
+    assert.equal(mockFormSubmissionUpsert.mock.calls[0].arguments[0].create.fileId, fileId);
   });
 
   it("returns 401 with no session and writes nothing", async () => {

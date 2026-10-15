@@ -7,6 +7,8 @@
 - **Repo**: https://github.com/doclegg05/VisionQuest.git · Live: https://visionquest.onrender.com
 
 ## Current Status
+**2026-10-15 desktop app / per-classroom models: shelved.** A timing test on a real classroom PC missed the 10 s first-word target by about 6x on CPU-only hardware, and only the smallest model fit. Classes stay on the hosted app and the shared local AI host. Results and reasoning are in Last Session and the decision log.
+
 **2026-10-09 HIG Phase 2 on `fix/hig-phase-2` (stacked on #222's `fix/hig-phase-1`; draft PR #223 targets that branch, so CI, which runs only on PRs to `main`, has not run on it).** Built in two fan-out rounds (10 + 8 file groups in isolated worktrees, each built, reviewed through two lenses and fixed), then two independent reviews of the shared code.
 
 Shared pieces:
@@ -42,6 +44,8 @@ Phase 1 shipped test-first on #222:
 - The theme follows the device when nothing is saved, and the axe specs scan both themes.
 
 Local result: `npm test` 6,025/6,025, and tsc, eslint, readability, platform:validate and `next build` are clean. Not run locally: `a11y-authenticated.spec.ts`, which now scans light for the first time in CI.
+
+**2026-09-23 security/performance release preparation (not deployed):** Ported only the ten-agent sweep delta from the divergent `codex/Supabasedesign` checkout onto fresh main `925b2dfa`, branch `fix/security-performance-release-2026-09-23`, sibling worktree `VisionQuest-security-release`. Current main's privacy/SMS-policy/Connect/grounding protections preserved; old-branch intake/export/dev-login features intentionally not imported. Local gates: 6,176/6,176 CI-mode tests, production build/typecheck/lint (0 errors), dependency audit 0, API audit clean, 115 runner + 253 scorer tests. Full migrations + 254/254 RLS integration cases pass on isolated PostgreSQL17/pgvector, including new restrictive Student DELETE policy. Report: `docs/audits/2026-09-23-security-performance-release.md`. **Release gates:** missing `CRON_CHECK_DATABASE_URL` (Sept23 Cron Health 35858856215 is green but explicitly NOT RUN), absent `GEMINI_EVAL_BUDGET_OK`, and no live Render/migration verification. Cron Health now fails when unconfigured. #187 was already merged and historical backlog expiration already recorded; do not repeat either or send stale jobs. Original dirty checkout preserved. No production changes.
 
 **2026-09-12 sage-grounding rights/responsibilities regression (issue #217, `cursor/sage-grounding-rights-8bc1`).** Nightly Benchmarks on `main` @ `44ec49a` (run 34687308524) failed `sage-grounding.pass_rate` 2/3 against floor 1.0. Retrieval still found `orientation/SPOKES_Rights_and_Responsibilities_FY26_Fillable.pdf` (no `expected citation … not found`); the reply omitted both fixture terms. Notes-only keyword context was formatted as a bare `Summary:` that #213's grounding instruction treats as non-evidence, the seeded note never contained "responsibilities", and the harness `present_form` stub returned no title so a "where can I find" turn became "I've opened that". Fix: title in `buildDocNote`, identity passage when chunks are missing, one-sentence RAG clarification (`SAGE_PROMPT_REVISION` `2026-09-12.1`), production-shaped form-tool stub in the grounding harness. Floor, other suites, and commit-results plumbing left alone.
 
@@ -98,6 +102,34 @@ Shipped workflow surface: `/ci-pipeline` (#121–#125) and `/a11y-pipeline` (#12
 Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#117); see `docs/MATURITY_REVIEW.md`.
 
 ## Last Session
+- **Date**: 2026-10-15
+- **What we worked on**: Britt asked whether VisionQuest should become a downloadable desktop app with bundled local models, so an instructor outside the team could install it. Three findings:
+  - **Secrets.** A desktop app that connects straight to Supabase would ship `DATABASE_URL`, `JWT_SECRET` and the storage keys inside every install.
+  - **Onboarding needs no download.** A same-program instructor already fits: teacher registration plus a class created with them as instructor and a region (`/api/teacher/classes`).
+  - **AI routing is program-wide.** `ai_provider_url` is one `SystemConfig` value, so every class shares one local AI host today.
+- **Per-computer test**: Britt then proposed that each classroom PC run its own model, with students using only classroom PCs. A throwaway PowerShell timing kit sent Sage's real compact prompt plus the 19 readonly student tools. Britt ran it on classroom PC J4LTC14, guided by a remote Claude session, and carried the files on the T9 drive.
+- **Results** (gemma4:e2b-it-qat, 8 scenarios, each with a follow-up):
+
+  | Measure | Result |
+  |---|---|
+  | Hardware | i5-13500T, 7.7 GB RAM, Intel UHD 770, so the model ran 100% on CPU |
+  | Models that fit | only gemma4:e2b, because e4b needs 16 GB |
+  | First message | 55 to 58 s to first word, about 60 s full, 0 of 8 within targets |
+  | Follow-up | 0.4 s to first word, 2.4 to 3.9 s full, 8 of 8 |
+  | Prompt read speed | about 93 tokens/s over 5,200 to 5,400 tokens (about 3,000 base plus 2,300 for tools) |
+  | Reply write speed | about 11 tokens/s |
+  | Model load | 13 to 18 s |
+  | Mac baseline | M4, 32 GB, gemma4:e4b: 22 to 24 s to first word on a first message |
+
+  Replies were safe but weaker. They repeated the scripted check-in opener, asked "How did your IC3 test go?" after Sam said they passed, and ignored the certification facts supplied in the prompt.
+- **What we decided**: shelve per-computer models and keep classes on the shared host. See the decision log.
+- **Where we left off**:
+  - **Shared host follow-up.** The follow-up numbers are a best case, because the test kept the prompt identical between turns. Production appends per-message RAG, memory and recent activity to the end of the system prompt, so the shared host likely re-reads the conversation history on every turn. Session "Measure Sage prompt-cache reuse on local AI" is measuring this, read-only.
+  - **Where the kit lives.** The kit and results exist only in `scratch/classroom-ai-test/` (gitignored, on this Mac, results in `results-from-classroom/`) and on the T9.
+  - **Script bug.** In PowerShell 5.1 the script's `$PSScriptRoot` param defaults come out empty under `-File`, so pass `-PromptFile` and `-OutDir` on the command line.
+  - **No product code changed.**
+
+## Prior Session (2026-10-09, Apple HIG review and Phases 1 and 2)
 - **Date**: 2026-10-09
 - **What we worked on**:
   - The Apple HIG review (205 findings, report artifact above).
@@ -236,6 +268,9 @@ Prior state stable: eval-gate stabilization (#118), maturity repair deployed (#1
 - **Where we left off**: PR #149 open against `main`, rebased onto #147/#148 (MEMORY.md conflict resolved by keeping both entries). Note for whoever runs local evals next: the 26b model was unloaded to free the GPU (`ollama stop gemma4:26b-a4b-it-qat`) because 15 GB + 9.6 GB do not co-reside, and requests stall swapping models.
 
 ## Open Items
+- [ ] **Prompt-cache reuse on the shared local AI host (measurement running, 2026-10-15)**: `/api/chat/send` appends per-message RAG passages, memory recall and recent activity to the end of the system prompt, so each turn likely re-reads the whole conversation history. The session "Measure Sage prompt-cache reuse on local AI" is measuring it read-only. Change nothing in the chat route until its report is reviewed.
+- [ ] **USER: classroom PC J4LTC14 cleanup**: Ollama 0.40.4 (starts with Windows, local-only), gemma4:e2b-it-qat (4.3 GB) and `C:\VisionQuestTest` are still installed for more tests. When testing is over, run `ollama rm gemma4:e2b-it-qat` and uninstall Ollama.
+- [ ] **Shared host capacity before a second class joins**: record the host's hardware and measure response times with both classes using it. This also covers the host record asked for in the per-role bake-off item below.
 - [ ] **PR #222 (HIG Phase 1)**: finish the test plan in the PR body (CI authenticated axe in both themes, phone light/dark check, signed-in Print and Preview), then Britt reviews and merges.
 - [ ] **HIG Phase 2, draft PR #223** (`fix/hig-phase-2`, stacked on #222): Britt reviews. Merge #222 first, then retarget #223 to `main`; CI first runs then.
 - [ ] **USER, design calls from the Phase 2 reviews**:
@@ -376,6 +411,7 @@ Single home for engineering decisions. Product **scope** decisions live in `docs
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-10-15 | Shelve the desktop-app port and per-classroom-PC local models. New same-program instructors join the hosted app as a class and use the shared local AI host | A desktop app that connects to Supabase would ship DB and JWT secrets in every install. The classroom PC test (J4LTC14: i5-13500T, 7.7 GB, CPU-only) got 0 of 8 first messages under 10 s, with a 57 s median to first word. Only gemma4:e2b fit in memory, and its replies missed what students said. Revisit only if classroom PCs get at least 16 GB and a graphics card Ollama can use. Prompt warming and a cache-stable prompt would also be needed, and neither fixes the small model's quality |
 | 2026-10-09 | Undo has no timer. A removal is sent on Dismiss, the next removal, unmount, pagehide or a hidden tab. | A 6s window was a WCAG 2.2.1 time limit: it did not pause on focus, and assistive-tech users could not reach Undo in time. HIG accessibility: "Prefer dismissing views with an explicit action". The removals had dropped their confirm because undo existed, so an unreachable undo made them unconfirmed and irreversible. |
 | 2026-10-09 | HIG guards are failing-first tests and lint, then agents fan out over disjoint file groups. Shared files are fenced off from builders. | Guards define done for every builder and stay as CI protection. Fences kept parallel worktrees conflict-free across 18 groups; the shared-code bugs builders found came back as reports and were fixed by the orchestrator. |
 | 2026-10-09 | The touch-target check estimates rendered height and judges each conditional class combination on its own. | Padding heuristics passed 34-36px `py-2 text-sm` buttons, and merged branches made the result depend on branch order. A rendered audit of 248 controls agreed with the estimate within 0.23px on average, with no false flags in isolation. |
@@ -527,6 +563,7 @@ Single home for engineering decisions. Product **scope** decisions live in `docs
 - Evals are hard gates — run all three before merging Sage-affecting changes
 
 ## Known Issues
+- **Claude Code sessions on this Mac run in a Bash sandbox** that blocks `git push`/`gh`, reading `.env.local`, the `tsx` CLI, `git worktree add` and writes to external drives such as the T9. Commands that need those go into a prepared script run in the Terminal panel. Harness auto-memory holds the detail (`session-sandbox-blocks-push-and-live-evals`)
 - **`src/lib/sage/agent/explain-faithfulness.test.ts` timing-ratio tests flake under full parallelism on the 10-core Mac.** A different one fails each run. They pass alone and at `--test-concurrency=4`, and CI has passed them. Rerun at lower concurrency before treating one as a regression.
 - **Flat-config ESLint replaces a rule entry; it does not merge.** A later block with `no-restricted-syntax` for overlapping files silently drops earlier selectors. Check with `npx eslint --print-config <file>` after any edit.
 - **Safari does not focus a button on mouse click.** A test of focus return must open the dialog by keyboard.
