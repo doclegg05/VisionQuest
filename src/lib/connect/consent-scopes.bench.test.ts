@@ -176,16 +176,22 @@ if (!SHOULD_RUN) {
       // --- Readiness fixture for studentBatch (score must be >= 70 = READY_TO_WORK_SCORE,
       // so selectBatchStudents excludes them for lack of CONSENT specifically,
       // not for being unready — readiness is checked first in that function). ---
+      // Readiness divides by every OrientationItem in the database, not only
+      // this fixture's own. Migration 20260731150000 seeds a welcome-video
+      // item, and completing just the fixture item scored 66, so the batch
+      // export dropped this student as not ready before consent was ever
+      // checked. A ready student has completed all of them.
       await prismaAdmin.orientationItem.create({
         data: { id: ids.orientationItemId, label: `Consent Scopes Fixture Item ${suffix}` },
       });
-      await prismaAdmin.orientationProgress.create({
-        data: {
+      const orientationItems = await prismaAdmin.orientationItem.findMany({ select: { id: true } });
+      await prismaAdmin.orientationProgress.createMany({
+        data: orientationItems.map((item) => ({
           studentId: ids.studentBatch,
-          itemId: ids.orientationItemId,
+          itemId: item.id,
           completed: true,
           completedAt: new Date(),
-        },
+        })),
       });
       await prismaAdmin.goal.create({
         data: {
@@ -232,9 +238,7 @@ if (!SHOULD_RUN) {
       await prismaAdmin.resumeData.deleteMany({ where: { studentId: ids.studentBatch } });
       await prismaAdmin.publicCredentialPage.deleteMany({ where: { studentId: ids.studentBatch } });
       await prismaAdmin.goal.deleteMany({ where: { id: ids.bhagGoalId } });
-      await prismaAdmin.orientationProgress.deleteMany({
-        where: { studentId: ids.studentBatch, itemId: ids.orientationItemId },
-      });
+      await prismaAdmin.orientationProgress.deleteMany({ where: { studentId: ids.studentBatch } });
       await prismaAdmin.orientationItem.deleteMany({ where: { id: ids.orientationItemId } });
       await prismaAdmin.notificationPreference.deleteMany({ where: { studentId: ids.studentSms } });
       await prismaAdmin.studentClassEnrollment.deleteMany({ where: { classId: ids.classId } });
