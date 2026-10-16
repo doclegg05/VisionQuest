@@ -15,7 +15,8 @@
  *   0  every suite passed, watched, or was skipped — and every run without
  *      --compare, which measures rather than judges
  *   1  with --compare: a gate- or nightly-tier metric under its floor, or a
- *      suite whose scorer threw
+ *      suite whose scorer threw or measured nothing (a null value, or zero
+ *      samples behind a floored metric)
  *   2  a usage or config error (unknown suite/tier, unparseable config,
  *      --update-baseline without --reason)
  *
@@ -224,9 +225,14 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
   const metrics = config.metrics.map((metric) => {
     const measured = returned.get(metric.id);
     const committed = baselineValue(baseline, config.suite, metric.id);
+    // A scorer that skipped itself returns a placeholder (0, or null), not a
+    // measurement. Dropping it makes status.mjs call the metric `skipped`, and
+    // no reader can show it or write it into the baseline as the number the
+    // next real run is held to.
+    const value = isSelfSkipped(measured) ? null : (measured.value ?? null);
     return {
       id: metric.id,
-      value: measured.value ?? null,
+      value,
       unit: metric.unit,
       // `displayUnit` and `reason` are the config's words; the runner carries
       // them through untouched for the dashboard and never interprets them.
@@ -238,19 +244,13 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
       tolerance: metric.tolerance ?? null,
       ...(metric.exact !== undefined ? { exact: metric.exact } : {}),
       baseline: committed,
-      status: metricStatus(metric, measured.value, committed),
+      status: metricStatus(metric, value, committed),
       ...(measured.details !== undefined ? { details: measured.details } : {}),
     };
   });
 
-  // A null value from a scorer that actually RAN is a broken measurement, not
-  // a skip: `skipped` already has a meaning here (unmet `requires`, reported
-  // above). On a gate or nightly tier that distinction is load-bearing — a
-  // null slips past every floor, so the suite would report green while
-  // measuring nothing. `status.mjs` stays untouched: it answers about one
-  // metric, and this is a fact about the run.
-  const nulled = metrics.filter((metric) => metric.value === null).map((metric) => metric.id);
-  if (nulled.length > 0 && ["gate", "nightly"].includes(config.tier)) {
+  const measuredNothing = measuredNothingError(config.tier, metrics);
+  if (measuredNothing) {
     return buildResult({
       ...common,
       durationMs: Date.now() - started,
@@ -258,9 +258,7 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
       model: output.model ?? null,
       metrics: [],
       status: "error",
-      error:
-        `the scorer ran but returned no value for ${config.tier}-tier metric(s): ${nulled.join(", ")} — ` +
-        "a null on a floored metric would pass every floor while measuring nothing",
+      error: measuredNothing,
     });
   }
 
@@ -270,7 +268,74 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
     provider: output.provider ?? null,
     model: output.model ?? null,
     metrics,
+    // buildResult folds the metrics, so an all-skipped suite is already
+    // `skipped`; this only says why, the way an unmet `requires` does.
+    ...selfSkipNote(metrics),
   });
+}
+
+/**
+ * True when the scorer declared this metric skipped. Only the boolean counts:
+ * anything else under `details.skipped` is the scorer's evidence, not a
+ * declaration, and the metric is judged as usual.
+ */
+function isSelfSkipped(metric) {
+  return metric.details?.skipped === true;
+}
+
+/** The scorer's own reasons, when it skipped every metric it was asked for. */
+function selfSkipNote(metrics) {
+  if (metrics.length === 0 || !metrics.every(isSelfSkipped)) return {};
+  const reasons = [
+    ...new Set(metrics.map((metric) => metric.details.reason).filter((reason) => typeof reason === "string")),
+  ];
+  return { skipped: reasons.join("; ") || "the scorer skipped every metric" };
+}
+
+/**
+ * Why a gate- or nightly-tier run measured nothing, or null when it measured
+ * something. On those tiers a broken measurement must be an error, because it
+ * would otherwise pass every floor while the suite reports green.
+ *
+ * - A null value from a scorer that actually RAN is a broken measurement,
+ *   unless the scorer declared the skip itself (details.skipped === true).
+ * - Zero samples is the same thing with a number on it (issue #220):
+ *   sage-latency's provider failed every call, and p95 = 0 ms over no samples
+ *   passed its 6000 ms floor every night.
+ *
+ * Both rules are for a scorer that tried and got nothing. One that says
+ * plainly it did not try is reporting a skip, and its metric is `skipped`.
+ *
+ * `status.mjs` stays untouched: it answers about one metric, and this is a
+ * fact about the run.
+ */
+function measuredNothingError(tier, metrics) {
+  if (!["gate", "nightly"].includes(tier)) return null;
+  const nulled = metrics
+    .filter((metric) => metric.value === null && !isSelfSkipped(metric))
+    .map((metric) => metric.id);
+  if (nulled.length > 0) {
+    return (
+      `the scorer ran but returned no value for ${tier}-tier metric(s): ${nulled.join(", ")} — ` +
+      "a null on a floored metric would pass every floor while measuring nothing"
+    );
+  }
+  const unsampled = metrics
+    .filter((metric) => metric.floor !== null && metric.n === 0 && !isSelfSkipped(metric))
+    .map((metric) => metric.id);
+  if (unsampled.length > 0) {
+    // The error result carries no metrics, so every value rides in the
+    // message, sampled or not: nudge-sweep's blocked-sweep count has its own
+    // sample and is the one number that says why the others have none. One
+    // line, because the nightly regression issue quotes only the first.
+    const reported = metrics.map((metric) => `${metric.id}=${metric.value} (n=${metric.n})`);
+    return (
+      `the scorer ran but measured zero samples for ${tier}-tier metric(s): ${unsampled.join(", ")} — ` +
+      "a value over no samples would pass its floor while measuring nothing. " +
+      `Every value it reported: ${reported.join(", ")}`
+    );
+  }
+  return null;
 }
 
 /**

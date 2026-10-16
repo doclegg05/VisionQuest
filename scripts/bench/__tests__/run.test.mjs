@@ -249,6 +249,267 @@ test("a watch-tier null value stays informational rather than erroring", () => {
   }
 });
 
+// Issue #220: sage-latency's provider failed every call, so it measured zero
+// samples and reported p95 = 0 ms, which passed its 6000 ms floor every night.
+const latencyMetrics = [{ id: "p95_ms", unit: "ms", direction: "lower", floor: 6000, tolerance: 500 }];
+
+test("a nightly metric measured over zero samples is an error, not a pass", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      tier: "nightly",
+      metrics: latencyMetrics,
+      scorer: `export async function run() { return { metrics: [{ id: "p95_ms", value: 0, n: 0 }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    const result = readResult(root, "demo");
+    assert.equal(result.status, "error");
+    assert.match(result.error, /zero samples/);
+    // The error result drops its metrics, so the values ride in the message:
+    // a blocked nudge-sweep must still say what it saw.
+    assert.match(result.error, /p95_ms=0\b/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a gate metric with zero samples is an error too", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics,
+      scorer: `export async function run() { return { metrics: [{ id: "accuracy", value: 1, n: 0 }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.equal(readResult(root, "demo").status, "error");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a zero-sample error keeps every value the scorer reported, sampled or not", () => {
+  // nudge-sweep's shape when every sweep is blocked: no student got a text, so
+  // the per-student metrics have no sample, while sweep_blocked has its own
+  // sample of three sweeps and reads 3. The error result carries no metrics,
+  // so a message listing only the unsampled values would hide the one number
+  // that says why. The nightly regression issue quotes only the first line.
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics: [
+        { id: "sweep_blocked", unit: "count", direction: "lower", floor: 0, exact: true },
+        { id: "daily_cap_exceeded", unit: "count", direction: "lower", floor: 0, exact: true },
+        { id: "sweep_duration_ms", unit: "ms", direction: "lower", floor: null, reason: "tracked" },
+      ],
+      scorer: `export async function run() { return { metrics: [
+        { id: "sweep_blocked", value: 3, n: 3 },
+        { id: "daily_cap_exceeded", value: 0, n: 0 },
+        { id: "sweep_duration_ms", value: 412, n: 1 },
+      ] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    const result = readResult(root, "demo");
+    assert.equal(result.status, "error");
+    const firstLine = result.error.split("\n")[0];
+    assert.match(firstLine, /zero samples for gate-tier metric\(s\): daily_cap_exceeded\b/);
+    assert.match(firstLine, /sweep_blocked=3 \(n=3\)/);
+    assert.match(firstLine, /daily_cap_exceeded=0 \(n=0\)/);
+    assert.match(firstLine, /sweep_duration_ms=412 \(n=1\)/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// A scorer that skips itself says so with `details.skipped: true`. consent-
+// scopes and migration-drift-schema do it in the PR gate tier (no
+// RLS_TEST_ENABLED, no SHADOW_DATABASE_URL) with value 0 and n 0, and that
+// used to read as PASS. nudge-sweep does it with null values, which used to
+// read as ERROR. Neither is true: nothing was measured.
+const selfSkip = (fields) =>
+  JSON.stringify({ ...fields, details: { skipped: true, reason: "opt-in is unset" } });
+
+test("a gate metric whose scorer skipped itself records skipped, not pass", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics,
+      scorer: `export async function run() { return { metrics: [${selfSkip({ id: "accuracy", value: 1, n: 0 })}] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    const result = readResult(root, "demo");
+    assert.equal(result.metrics[0].status, "skipped");
+    // The placeholder is not a measurement, so no reader can show or judge it.
+    assert.equal(result.metrics[0].value, null);
+    assert.equal(result.metrics[0].details.reason, "opt-in is unset");
+    assert.equal(result.status, "skipped");
+    assert.equal(result.skipped, "opt-in is unset");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("compare.mjs keeps a self-skipped metric skipped when it re-reads the result", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics,
+      scorer: `export async function run() { return { metrics: [${selfSkip({ id: "accuracy", value: 1, n: 0 })}] }; }`,
+    });
+    bench(root, ["--suite=demo"]);
+    const out = spawnSync(process.execPath, [COMPARE], {
+      encoding: "utf8",
+      env: { ...process.env, BENCH_REPO_ROOT: root },
+    });
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /accuracy\s.*SKIPPED/);
+    assert.doesNotMatch(out.stdout, /PASS/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a self-skipped metric with a null value is skipped, not an error", () => {
+  // nudge-sweep's unseeded-cohort path: floored metrics at 0, tracked ones null.
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics: [
+        ...metrics,
+        { id: "duration_ms", unit: "ms", direction: "lower", floor: null, reason: "tracked" },
+      ],
+      scorer:
+        `export async function run() { return { metrics: [` +
+        `${selfSkip({ id: "accuracy", value: 0, n: 0 })}, ` +
+        `${selfSkip({ id: "duration_ms", value: null, n: 0 })}] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    const result = readResult(root, "demo");
+    assert.equal(result.status, "skipped");
+    assert.deepEqual(
+      result.metrics.map((metric) => metric.status),
+      ["skipped", "skipped"]
+    );
+    assert.equal(result.skipped, "opt-in is unset", "two identical reasons read as one");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a watch-tier metric whose scorer skipped itself is skipped too", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      tier: "watch",
+      metrics,
+      scorer: `export async function run() { return { metrics: [${selfSkip({ id: "accuracy", value: 1, n: 0 })}] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.equal(readResult(root, "demo").metrics[0].status, "skipped");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a suite with one self-skipped metric takes its verdict from the measured ones", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics: [...metrics, { id: "recall", unit: "ratio", direction: "higher", floor: 0.5 }],
+      scorer:
+        `export async function run() { return { metrics: [` +
+        `{ id: "accuracy", value: 1, n: 3 }, ` +
+        `${selfSkip({ id: "recall", value: 1, n: 0 })}] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--update-baseline", "--reason=first run"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    const result = readResult(root, "demo");
+    assert.equal(result.status, "pass");
+    assert.equal(result.skipped, undefined, "only an all-skipped suite carries a skip note");
+    assert.equal(result.metrics[1].status, "skipped");
+    // A placeholder written as a baseline would become the number the next
+    // real measurement is judged against.
+    assert.deepEqual(Object.keys(readBaseline(root).demo), ["accuracy"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The real scorers, through the real runner, in the environment CI's
+// "Gate-tier benchmarks" step gives them: a DATABASE_URL, but no
+// RLS_TEST_ENABLED and no SHADOW_DATABASE_URL. nudge-sweep's no-DATABASE_URL
+// branch emits the same shape as its unseeded-cohort branch, which needs a
+// database to reach. `requires` is emptied so the scorer's own guard runs.
+const REAL_SELF_SKIPS = [
+  { suite: "consent-scopes", env: { DATABASE_URL: "postgresql://bench@127.0.0.1:1/none", RLS_TEST_ENABLED: "" } },
+  { suite: "migration-drift-schema", env: { SHADOW_DATABASE_URL: "" } },
+  { suite: "nudge-sweep", env: { DATABASE_URL: "" } },
+];
+
+for (const { suite, env } of REAL_SELF_SKIPS) {
+  test(`${suite}'s own skip records skipped in the gate tier`, () => {
+    const root = makeRepo();
+    try {
+      const real = JSON.parse(
+        readFileSync(join(HERE, "..", "..", "..", "config", "benchmarks", `${suite}.json`), "utf8")
+      );
+      const scorerUrl = new URL(`../suites/${suite}.mjs`, import.meta.url).href;
+      addSuite(root, suite, {
+        metrics: real.metrics,
+        scorer: `export { run } from ${JSON.stringify(scorerUrl)};`,
+      });
+      const out = bench(root, [`--suite=${suite}`, "--compare"], env);
+      assert.equal(out.status, 0, out.stdout + out.stderr);
+      const result = readResult(root, suite);
+      assert.equal(result.status, "skipped", result.error ?? "");
+      assert.ok(result.metrics.every((metric) => metric.status === "skipped"));
+      assert.ok(result.skipped.length > 0, "the scorer's reason is carried to the suite");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test("only details.skipped === true counts as a skip", () => {
+  // matching-quality used to put an array of skipped students there. A truthy
+  // non-boolean is evidence, not a declaration, so the metric is still judged.
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics,
+      scorer:
+        `export async function run() { return { metrics: [` +
+        `{ id: "accuracy", value: 1, n: 3, details: { skipped: [{ studentId: "s1" }] } }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.equal(readResult(root, "demo").metrics[0].status, "pass");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a watch-tier zero-sample metric stays informational rather than erroring", () => {
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      tier: "watch",
+      metrics: latencyMetrics,
+      scorer: `export async function run() { return { metrics: [{ id: "p95_ms", value: 0, n: 0 }] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.notEqual(readResult(root, "demo").status, "error");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a secret in a scorer's error, skip note or details never reaches the result file", () => {
   const root = makeRepo();
   const secret = "postgresql://ro:hunter2isverylong@prod.host:5432/visionquest";
