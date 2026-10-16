@@ -11,6 +11,7 @@ import { prisma, prismaAdmin } from "@/lib/db";
 import { isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { enqueueJobWithCooldown, processJobById } from "@/lib/jobs";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { parsePanelSpec, type PanelSpec } from "./panel-spec";
 
@@ -92,7 +93,7 @@ export async function requestPanelRefresh(studentId: string): Promise<"queued" |
   void processJobById(jobId).catch((err) => {
     logger.error("panel-data: inline refresh processing failed (job remains queued)", {
       jobId,
-      error: err instanceof Error ? err.message : String(err),
+      error: errorForLog(err),
     });
   });
   return "queued";

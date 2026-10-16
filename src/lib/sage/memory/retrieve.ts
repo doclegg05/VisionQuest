@@ -11,6 +11,7 @@
 
 import { prisma } from "@/lib/db";
 import { embedTextsWithModel, toVectorLiteral } from "@/lib/ai/embeddings";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sanitizeForPrompt } from "../system-prompts";
 import { looksLikeStudentReference } from "./staff-privacy";
@@ -98,7 +99,7 @@ export async function retrieveMemories(
     logger.warn("Memory retrieval failed (non-fatal)", {
       subjectType,
       subjectId,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return [];
   }

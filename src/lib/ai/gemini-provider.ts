@@ -2,6 +2,7 @@ import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type 
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
 import { GEMINI_MODEL as MODEL } from "@/lib/gemini";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import type {
   AIProvider,
@@ -179,7 +180,7 @@ async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promi
         label,
         attempt: attempt + 1,
         maxAttempts: RETRY_DELAYS_MS.length + 1,
-        error: String(error),
+        error: errorForLog(error),
       });
       await sleep(RETRY_DELAYS_MS[attempt]);
     }

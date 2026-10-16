@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { embedTextsWithModel, toVectorLiteral } from "@/lib/ai/embeddings";
 import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
@@ -216,7 +217,7 @@ export async function hybridSearchDocuments(
     queryModel = query.model;
   } catch (error) {
     logger.warn("Hybrid retrieval: query embedding failed, falling back to keyword scoring", {
-      error: String(error),
+      error: errorForLog(error),
     });
     return null;
   }
@@ -334,7 +335,7 @@ export async function hybridSearchDocuments(
       }));
   } catch (error) {
     logger.warn("Hybrid retrieval: SQL search failed, falling back to keyword scoring", {
-      error: String(error),
+      error: errorForLog(error),
     });
     return null;
   }
@@ -410,7 +411,7 @@ export async function getBestChunks(
     return map;
   } catch (error) {
     logger.warn("getBestChunks failed; falling back to summary injection", {
-      error: String(error),
+      error: errorForLog(error),
     });
     return new Map();
   }

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
+// Moved from src/app/api/cron/evidence-gap-detection/route.test.ts when the
+// detector moved to this module (#240, #247). The certification rule is
+// isCertificationRequirementMet in src/lib/certifications.ts (#254).
+
 const STUDENT_ID = "student-1";
 const CLASS_ID = "class-1";
 
@@ -25,6 +29,7 @@ const tx = {
       upsertedAlertKeys.push(args.where.alertKey);
       return {};
     },
+    update: async () => ({}),
     updateMany: async () => ({ count: 0 }),
   },
 };
@@ -53,22 +58,14 @@ mock.module("@/lib/db", {
   },
 });
 
-let POST: typeof import("./route").POST;
+let runEvidenceGapDetection: typeof import("./evidence-gap-detection").runEvidenceGapDetection;
 
 before(async () => {
-  ({ POST } = await import("./route"));
+  ({ runEvidenceGapDetection } = await import("./evidence-gap-detection"));
 });
 
-function cronRequest() {
-  return new Request("http://localhost/api/cron/evidence-gap-detection", {
-    method: "POST",
-    headers: { authorization: "Bearer test-secret" },
-  });
-}
-
-describe("POST /api/cron/evidence-gap-detection: certification requirements", () => {
+describe("runEvidenceGapDetection: certification requirements", () => {
   beforeEach(() => {
-    process.env.CRON_SECRET = "test-secret";
     upsertedAlertKeys.length = 0;
     certRows = [];
   });
@@ -76,9 +73,8 @@ describe("POST /api/cron/evidence-gap-detection: certification requirements", ()
   it("keeps the WorkKeys NCRC gap open when only Ready to Work is complete", async () => {
     certRows = [{ studentId: STUDENT_ID, certType: "ready-to-work", status: "completed" }];
 
-    const res = await POST(cronRequest());
+    await runEvidenceGapDetection(new Date("2026-10-16T12:00:00Z"));
 
-    assert.equal(res.status, 200);
     assert.deepEqual(upsertedAlertKeys, [
       `evidence_gap:${STUDENT_ID}:req-workkeys-ncrc`,
       `evidence_gap:${STUDENT_ID}:req-ic3`,
@@ -88,9 +84,8 @@ describe("POST /api/cron/evidence-gap-detection: certification requirements", ()
   it("opens no Ready to Work gap when the student's Ready to Work row is labelled workkeys-ncrc", async () => {
     certRows = [{ studentId: STUDENT_ID, certType: "workkeys-ncrc", status: "completed" }];
 
-    const res = await POST(cronRequest());
+    await runEvidenceGapDetection(new Date("2026-10-16T12:00:00Z"));
 
-    assert.equal(res.status, 200);
     assert.deepEqual(upsertedAlertKeys, [`evidence_gap:${STUDENT_ID}:req-ic3`]);
   });
 });

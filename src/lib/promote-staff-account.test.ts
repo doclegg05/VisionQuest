@@ -101,7 +101,7 @@ describe("promoteTeacherToAdmin", () => {
     assert.match(String(message), /audit/i);
     assert.equal(typeof meta.alert, "string");
     assert.equal(meta.target, studentLogKey(ACCOUNT_ID));
-    assert.equal(meta.error, "audit table unavailable");
+    assert.deepEqual(meta.error, { name: "Error" });
     assert.doesNotMatch(JSON.stringify([message, meta]), /tch-1/, "raw account id must not reach server logs");
   });
 
