@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { errorForLog } from "@/lib/log-error";
 import { retireStaleScrapeRuns, scrapeRunInProgressWhere } from "./scrape-runs";
@@ -23,8 +24,10 @@ interface RunScrapeOptions {
  * How one class's scrape ended, for the weekly sweep's counts. Only
  * "completed" refreshed listings; "no_sources" is a class whose sources all
  * need an API key that is not set, expected until those keys exist.
+ * "retired" is a run retireStaleScrapeRuns failed while it was still going:
+ * its listings were written, but the run stays failed.
  */
-type ScrapeOutcome = "completed" | "all_sources_failed" | "no_sources" | "config_missing";
+type ScrapeOutcome = "completed" | "all_sources_failed" | "no_sources" | "config_missing" | "retired";
 
 interface ScrapeResult {
   outcome: ScrapeOutcome;
@@ -64,16 +67,33 @@ async function createOrStartScrapeRun(
   });
 }
 
+type ScrapeRunResult = Prisma.JobScrapeRunUpdateManyMutationInput & { status: "completed" | "failed" };
+
+/**
+ * Write a run's result, only while the run is still open (queued or
+ * processing). retireStaleScrapeRuns fails a run that has gone two hours,
+ * and a slow scrape can still be alive when it does; writing anyway would
+ * turn the retired run back into "completed" beside the replacement that
+ * Refresh queued, or swap the retirement's error for the scrape's. Returns
+ * whether the write landed.
+ */
+async function finishScrapeRun(scrapeRunId: string, result: ScrapeRunResult): Promise<boolean> {
+  const { count } = await prisma.jobScrapeRun.updateMany({
+    where: { id: scrapeRunId, status: { in: ["queued", "processing"] } },
+    data: result,
+  });
+  if (count === 0) {
+    logger.warn("Scrape run already finished; its result was not written", {
+      scrapeRunId,
+      status: result.status,
+    });
+  }
+  return count > 0;
+}
+
 async function markScrapeRunFailed(scrapeRunId: string | null, error: string): Promise<void> {
   if (!scrapeRunId) return;
-  await prisma.jobScrapeRun.update({
-    where: { id: scrapeRunId },
-    data: {
-      status: "failed",
-      error,
-      completedAt: new Date(),
-    },
-  });
+  await finishScrapeRun(scrapeRunId, { status: "failed", error, completedAt: new Date() });
 }
 
 async function startSourceResult(scrapeRunId: string, source: string): Promise<void> {
@@ -393,20 +413,18 @@ async function scrapeConfig(configId: string, options: RunScrapeOptions): Promis
       });
     }
 
-    await prisma.jobScrapeRun.update({
-      where: { id: scrapeRunId },
-      data: {
-        status: finalStatus,
-        completedSources,
-        failedSources,
-        totalFetched: allJobs.length,
-        totalUpserted,
-        error: finalError,
-        completedAt: new Date(),
-      },
+    const finished = await finishScrapeRun(scrapeRunId, {
+      status: finalStatus,
+      completedSources,
+      failedSources,
+      totalFetched: allJobs.length,
+      totalUpserted,
+      error: finalError,
+      completedAt: new Date(),
     });
 
     logger.info("Scrape complete", { configId, totalUpserted });
+    if (!finished) return { outcome: "retired", totalUpserted };
     return { outcome: finalStatus === "failed" ? "all_sources_failed" : "completed", totalUpserted };
   } catch (error) {
     const message = errorMessage(error);

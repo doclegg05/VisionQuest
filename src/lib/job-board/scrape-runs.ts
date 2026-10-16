@@ -69,7 +69,8 @@ export function scrapeJobDedupeKey(classConfigId: string, sources: string[] = []
  *
  * This cannot stop a handler that is still alive. The processor writes a
  * job's result only while its claim holds the row (finishClaimedJob in
- * src/lib/jobs.ts), so a late handler leaves the retired job failed.
+ * src/lib/jobs.ts), and the scrape engine writes a run's result only while
+ * the run is open (finishScrapeRun), so a late handler leaves both failed.
  */
 export async function retireStaleScrapeRuns(
   classConfigId: string,

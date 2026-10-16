@@ -60,7 +60,11 @@ mock.module("@/lib/db", {
       jobScrapeRun: {
         findFirst: async ({ where }: { where: Record<string, unknown> }) =>
           runs.find((run) => matchesWhere({ ...run }, where)) ? { id: "run-busy" } : null,
-        create: async () => ({ id: "run-new" }),
+        create: async ({ data }: { data: Omit<RunRow, "id" | "createdAt"> }) => {
+          const run: RunRow = { id: `run-new-${data.classConfigId}`, createdAt: new Date(), ...data };
+          runs.push(run);
+          return run;
+        },
         update: async () => ({}),
         updateMany: async ({ where, data }: { where: Record<string, unknown>; data: { status: string } }) => {
           const matched = runs.filter((run) => matchesWhere({ ...run }, where));
