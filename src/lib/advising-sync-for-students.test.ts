@@ -35,9 +35,10 @@ mock.module("@/lib/advising-interventions", {
   namedExports: { syncInterventionNotifications: syncInterventionNotificationsMock },
 });
 mock.module("@/lib/db", { namedExports: { prisma: {}, prismaAdmin: {} } });
+const loggerErrorMock = mock.fn() as any;
 mock.module("@/lib/logger", {
   namedExports: {
-    logger: { debug: mock.fn(), info: mock.fn(), warn: mock.fn(), error: mock.fn() },
+    logger: { debug: mock.fn(), info: mock.fn(), warn: mock.fn(), error: loggerErrorMock },
   },
 });
 
@@ -56,6 +57,7 @@ describe("syncAlertsForStudents", () => {
     planSignals = null;
     applyPlanMock.mock.resetCalls();
     syncInterventionNotificationsMock.mock.resetCalls();
+    loggerErrorMock.mock.resetCalls();
     inFlight = 0;
     maxInFlight = 0;
     loadStudentAlertSyncContextMock.mock.resetCalls();
@@ -101,6 +103,28 @@ describe("syncAlertsForStudents", () => {
 
     assert.equal(applyPlanMock.mock.callCount(), 2, "alerts are still written");
     assert.equal(syncInterventionNotificationsMock.mock.callCount(), 0, "no nudges from the sweep");
+  });
+
+  // One student's failure must not cost every later batch its sync for the
+  // day. The log names the failure by Prisma code and a one-way student key.
+  it("keeps syncing the other students when one fails, and logs neither id nor message", async () => {
+    loadStudentAlertSyncContextMock.mock.mockImplementation(async (studentId: string) => {
+      if (studentId === "student-b") {
+        throw Object.assign(
+          new Error('Invalid `prisma.studentTask.findMany()` invocation: where { studentId: "student-b" }'),
+          { code: "P2024" },
+        );
+      }
+      return { existing: [] };
+    });
+
+    const result = await advising.syncAlertsForStudents(["student-a", "student-b", "student-c", "student-d", "student-e"], 2);
+
+    assert.deepEqual(result, { synced: 4, failed: 1 });
+    assert.equal(applyPlanMock.mock.callCount(), 4, "students after the failure were still synced");
+    const logged = JSON.stringify(loggerErrorMock.mock.calls.map((call: any) => call.arguments));
+    assert.ok(logged.includes("P2024"), "the failure is logged by its code");
+    assert.ok(!logged.includes("student-b"), "no raw student id or message text in the log");
   });
 });
 

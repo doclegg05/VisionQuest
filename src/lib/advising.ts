@@ -3,6 +3,7 @@ import {
   buildBookableAdvisorSlots,
 } from "./advising-scheduling";
 import { prisma } from "./db";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { withStudentRlsContext } from "./rls-context";
 import { studentLogKey } from "@/lib/log-keys";
@@ -214,17 +215,40 @@ export async function syncStudentAlerts(
  *
  * The sweep writes alerts only. It exists for students who have gone quiet,
  * whose time-based alerts (inactivity, overdue tasks) no activity-triggered
- * sync will ever write. Nudges stay with those activity syncs: sent from a
- * daily sweep they would reach each instructor once per affected student
- * every morning (docs/plans/2026-10-15-unscheduled-internal-routes.md).
+ * sync will ever write. Nudges stay with those activity syncs, both the
+ * instructor nudges and the student's own reminders (in-app and email):
+ * sent from a daily sweep, each instructor would get one email per affected
+ * student every morning, and a student who stopped coming would get a daily
+ * email until they returned (docs/plans/2026-10-15-unscheduled-internal-routes.md).
+ *
+ * One student's failure is logged with a one-way key and counted; the other
+ * students still sync.
  */
-export async function syncAlertsForStudents(studentIds: string[], batchSize: number = 4) {
+export interface AlertSweepSummary {
+  synced: number;
+  failed: number;
+}
+
+export async function syncAlertsForStudents(
+  studentIds: string[],
+  batchSize: number = 4,
+): Promise<AlertSweepSummary> {
+  let failed = 0;
   for (let index = 0; index < studentIds.length; index += batchSize) {
     const batch = studentIds.slice(index, index + batchSize);
-    await Promise.all(
+    const results = await Promise.allSettled(
       batch.map((studentId) =>
         withStudentRlsContext(studentId, () => syncStudentAlerts(studentId, { notify: false })),
       ),
     );
+    results.forEach((result, position) => {
+      if (result.status === "fulfilled") return;
+      failed += 1;
+      logger.error("Scheduled alert sync failed for a student", {
+        student: studentLogKey(batch[position]),
+        error: errorForLog(result.reason),
+      });
+    });
   }
+  return { synced: studentIds.length - failed, failed };
 }
