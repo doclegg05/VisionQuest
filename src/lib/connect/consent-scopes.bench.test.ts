@@ -28,12 +28,16 @@
  *
  * Prerequisites (auto-skipped if missing, same gate as rls.test.ts):
  *   - DATABASE_URL / ADMIN_DATABASE_URL point at a Postgres with every
- *     Connect migration applied (20260905100000-20260905140000) and RLS
- *     enforced for the DATABASE_URL role (i.e. it is `vq_app`, not a
- *     BYPASSRLS superuser — RLS is not evaluated at all for a role with
- *     BYPASSRLS, so this suite is meaningless against one).
+ *     Connect migration applied (20260905100000-20260905140000).
  *   - RLS_TEST_ENABLED=true — opt-in because this test writes real fixture
  *     rows to the configured DB, same convention as rls.test.ts.
+ *
+ * The role behind DATABASE_URL does not change what this measures. CI's
+ * gate step connects as the `postgres` superuser, which RLS does not apply
+ * to, and that is the stricter case for these assertions: no policy can hide
+ * the student, connection or enrollment a guarded function reads, so each
+ * refusal can only come from the missing consent. Whether the policies
+ * themselves hold is src/lib/rls.test.ts's job.
  */
 
 import { after, before, describe, it } from "node:test";
