@@ -1,4 +1,5 @@
 import { prismaAdmin as prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { matchJobToClusters } from "./cluster-matcher";
 import { filterQualityJobs } from "./job-quality";
@@ -405,18 +406,70 @@ export async function runScrapeForConfig(
   }
 }
 
+export interface AutoRefreshSummary {
+  totalJobs: number;
+  scrapedConfigs: number;
+  /** Classes with a recent run already queued or processing. */
+  skippedConfigs: number;
+  /** Classes whose scrape threw; logged and recorded, the sweep went on. */
+  failedConfigs: number;
+}
+
 /**
- * Run scrape for all auto-refresh configs. Called by cron.
+ * A run older than this is treated as crashed, not in progress. Nothing moves
+ * a run that died mid-scrape out of "processing", and one class's scrape
+ * takes minutes, so two hours is generous without letting a dead run block
+ * the class's weekly refresh for good.
  */
-export async function runAllAutoRefreshScrapes(): Promise<number> {
+const IN_PROGRESS_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+async function hasRunInProgress(configId: string, now: Date): Promise<boolean> {
+  const run = await prisma.jobScrapeRun.findFirst({
+    where: {
+      classConfigId: configId,
+      status: { in: ["queued", "processing"] },
+      createdAt: { gte: new Date(now.getTime() - IN_PROGRESS_WINDOW_MS) },
+    },
+    select: { id: true },
+  });
+  return run !== null;
+}
+
+/**
+ * Run scrape for all auto-refresh configs. Called weekly by the pg_cron job
+ * `job-board-scrape` through POST /api/internal/jobs/scrape.
+ *
+ * One class's failure is logged and counted, and the sweep moves on to the
+ * next class. A class whose teacher just pressed Refresh is skipped, as the
+ * manual route does (src/app/api/teacher/jobs/refresh/route.ts).
+ */
+export async function runAllAutoRefreshScrapes(): Promise<AutoRefreshSummary> {
   const configs = await prisma.jobClassConfig.findMany({
     where: { autoRefresh: true },
     select: { id: true },
   });
 
-  let total = 0;
+  const summary: AutoRefreshSummary = {
+    totalJobs: 0,
+    scrapedConfigs: 0,
+    skippedConfigs: 0,
+    failedConfigs: 0,
+  };
   for (const config of configs) {
-    total += await runScrapeForConfig(config.id);
+    try {
+      if (await hasRunInProgress(config.id, new Date())) {
+        summary.skippedConfigs++;
+        continue;
+      }
+      summary.totalJobs += await runScrapeForConfig(config.id);
+      summary.scrapedConfigs++;
+    } catch (error) {
+      summary.failedConfigs++;
+      logger.error("Auto-refresh scrape failed for class config", {
+        configId: config.id,
+        error: errorForLog(error),
+      });
+    }
   }
-  return total;
+  return summary;
 }
