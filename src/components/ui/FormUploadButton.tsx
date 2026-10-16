@@ -115,7 +115,7 @@ export default function FormUploadButton({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+            className="inline-flex min-h-11 items-center text-xs font-semibold text-success hover:text-[var(--ink-strong)] hover:underline"
           >
             {uploading ? "Uploading..." : "Re-upload"}
           </button>
@@ -139,7 +139,7 @@ export default function FormUploadButton({
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.12)] disabled:opacity-50"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[rgba(15,154,146,0.12)] disabled:opacity-50"
       >
         <span aria-hidden="true">📎</span>
         <span>{uploading ? "Uploading..." : "Upload Form"}</span>

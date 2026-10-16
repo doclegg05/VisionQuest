@@ -112,7 +112,7 @@ export default function SageInsightList({
           </p>
         </div>
         {insights.length > 0 ? (
-          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-success">
             {insights.length} active
           </span>
         ) : null}

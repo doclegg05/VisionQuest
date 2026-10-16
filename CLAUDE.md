@@ -71,6 +71,7 @@ The live handoff — current status, last session, open items, engineering decis
 
 ## Design Context
 - **Full design context**: See [.impeccable.md](./.impeccable.md) for complete design principles, color system, typography, and accessibility requirements
+- **Brand source of truth**: the SPOKES Design System (https://claude.ai/artifact/5cF3cJB5x5K4qj4wb9G2dh). VisionQuest follows it strictly with three approved exceptions, listed in `.impeccable.md`
 - **Brand personality**: Bold, Supportive, Practical — direct, action-oriented ally
 - **Emotional goals**: Confidence, Momentum, Safety, Pride
 - **Reference**: Khan Academy — warm, educational, progress-focused, not childish

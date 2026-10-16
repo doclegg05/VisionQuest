@@ -68,7 +68,7 @@ export default async function StudentFormsPage() {
                     </p>
                   </div>
                   {actionable && (
-                    <span className="shrink-0 rounded-full border border-[var(--accent-green)] px-3 py-1 text-xs font-semibold text-[var(--accent-green)]">
+                    <span className="shrink-0 rounded-full border border-[var(--accent-green)] px-3 py-1 text-xs font-semibold text-success">
                       Open
                     </span>
                   )}

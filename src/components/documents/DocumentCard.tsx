@@ -139,7 +139,7 @@ export default function DocumentCard({
             href={viewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)] sm:flex-none"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium text-info transition-colors hover:bg-[var(--surface-muted)] sm:flex-none"
             aria-label={`View ${doc.title}`}
           >
             View
@@ -148,7 +148,7 @@ export default function DocumentCard({
             type="button"
             onClick={handleDownload}
             disabled={downloading}
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)] disabled:opacity-40 sm:flex-none"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium text-info transition-colors hover:bg-[var(--surface-muted)] disabled:opacity-40 sm:flex-none"
             aria-label={`Download ${doc.title}`}
           >
             {downloading ? "..." : downloadError ? "Failed" : "Download"}

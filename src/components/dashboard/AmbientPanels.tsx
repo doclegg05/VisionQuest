@@ -47,7 +47,7 @@ function Card({
       href={href}
       className="block rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 transition-colors hover:bg-[var(--surface-interactive)]"
     >
-      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-info">
         {eyebrow}
       </p>
       <div className="mt-1.5 text-sm text-[var(--ink-strong)]">{children}</div>

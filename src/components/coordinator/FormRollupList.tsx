@@ -74,7 +74,7 @@ export default function FormRollupList({ regionId }: { regionId: string }) {
       </header>
 
       {error && (
-        <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--error)]" role="alert">
+        <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
