@@ -124,7 +124,9 @@ describe("POST /api/internal/goal-stale-detection", () => {
     assert.equal(alertUpsert.mock.callCount(), 1);
     const upsert = alertUpsert.mock.calls[0].arguments[0];
     assert.equal(upsert.where.alertKey, "goal_stale:goal-1");
-    assert.deepEqual(upsert.create, {
+    const { detectedAt, ...created } = upsert.create;
+    assert.ok(detectedAt instanceof Date, "a new alert is stamped with its detection time");
+    assert.deepEqual(created, {
       studentId: "student-1",
       alertKey: "goal_stale:goal-1",
       type: "goal_stale",

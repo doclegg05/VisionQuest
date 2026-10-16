@@ -33,6 +33,10 @@ export interface DetectedAlert {
  * Writes one alert a scheduled detector found. A held alert gets fresh text
  * only; anything else is opened, clearing an old resolution or an expired
  * snooze, the same as the alert sync does.
+ *
+ * detectedAt marks when the current spell of the alert began: queue ordering
+ * and the instructor resolution-time metric read it. A new or reopened alert
+ * starts a spell at `now`; an alert that is already open keeps its date.
  */
 export async function writeDetectedAlert(
   tx: Prisma.TransactionClient,
@@ -53,9 +57,24 @@ export async function writeDetectedAlert(
     return;
   }
 
+  const reopening = prev?.status !== "open";
   await tx.studentAlert.upsert({
     where: { alertKey: alert.alertKey },
-    update: { ...text, status: "open", resolvedAt: null, snoozedUntil: null, snoozedBy: null },
-    create: { studentId: alert.studentId, alertKey: alert.alertKey, type: alert.type, ...text, status: "open" },
+    update: {
+      ...text,
+      status: "open",
+      ...(reopening ? { detectedAt: now } : {}),
+      resolvedAt: null,
+      snoozedUntil: null,
+      snoozedBy: null,
+    },
+    create: {
+      studentId: alert.studentId,
+      alertKey: alert.alertKey,
+      type: alert.type,
+      ...text,
+      status: "open",
+      detectedAt: now,
+    },
   });
 }
