@@ -57,6 +57,7 @@ const mockCheckTokenQuota = mock.fn() as any;
 const mockWithUsageLogging = mock.fn() as any;
 const mockGetStudentProgramType = mock.fn() as any;
 const mockPrismaStudentFindUnique = mock.fn() as any;
+const mockFileUploadFindMany = mock.fn() as any;
 const mockFormatClustersForPrompt = mock.fn() as any;
 const mockRunAgentTurn = mock.fn() as any;
 const mockExecuteSlashCommand = mock.fn() as any;
@@ -262,12 +263,21 @@ mock.module("@/lib/db", {
       student: {
         findUnique: mockPrismaStudentFindUnique,
       },
+      fileUpload: {
+        findMany: mockFileUploadFindMany,
+      },
     },
     prismaAdmin: {
       student: {
         findUnique: mockPrismaStudentFindUnique,
       },
     },
+  },
+});
+
+mock.module("@/lib/chat/open-orientation-items", {
+  namedExports: {
+    loadOpenOrientationItems: async () => [],
   },
 });
 
@@ -390,6 +400,7 @@ function resetMocks() {
     mockWithUsageLogging,
     mockGetStudentProgramType,
     mockPrismaStudentFindUnique,
+    mockFileUploadFindMany,
     mockFormatClustersForPrompt,
     mockRunAgentTurn,
     mockExecuteSlashCommand,
@@ -480,6 +491,7 @@ function resetMocks() {
   mockShouldAttemptStaffStudentContext.mock.mockImplementation(() => false);
   mockGetStudentProgramType.mock.mockImplementation(async () => null);
   mockPrismaStudentFindUnique.mock.mockImplementation(async () => ({ classroomConfirmedAt: null }));
+  mockFileUploadFindMany.mock.mockImplementation(async () => []);
   mockAwardEvent.mock.mockImplementation(async () => undefined);
   mockFormatClustersForPrompt.mock.mockImplementation(() => "");
   mockRunAgentTurn.mock.mockImplementation(async function* () {
@@ -1984,6 +1996,54 @@ describe("POST /api/chat/send — de-identification round trip (AC3)", () => {
     };
     assert.equal(request.sessionRole, session.role);
     assert.equal(request.sessionDisplayName, session.displayName);
+  });
+});
+
+describe("POST /api/chat/send — attachment-only tools follow the turn's files", () => {
+  // The agent loop drops tools that need a fileUploadId unless the turn
+  // carries a file (toolsForTurn). The route decides that, and only a file
+  // this student owns counts, so a forged attachment id unlocks nothing.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_MODE = "full";
+    delete process.env.SAGE_AGENT_ENABLED;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  const FILE_ID = "cjld2cjxh0000qzrmn831i7rn";
+
+  async function hasAttachmentFor(body: { message: string; attachmentIds?: string[] }) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+    assert.equal(mockRunAgentTurn.mock.callCount(), 1, "the agent loop should run once");
+    return mockRunAgentTurn.mock.calls[0].arguments[0].hasAttachment;
+  }
+
+  it("a turn with a file this student owns offers the file tools", async () => {
+    mockFileUploadFindMany.mock.mockImplementation(async () => [
+      { id: FILE_ID, filename: "signed-dress-code.pdf", gist: "A signed dress code form." },
+    ]);
+    assert.equal(await hasAttachmentFor({ message: "File this for me", attachmentIds: [FILE_ID] }), true);
+  });
+
+  it("attachment ids that match no file of this student's do not", async () => {
+    mockFileUploadFindMany.mock.mockImplementation(async () => []);
+    assert.equal(await hasAttachmentFor({ message: "File this for me", attachmentIds: [FILE_ID] }), false);
+  });
+
+  it("a turn with no attachment does not", async () => {
+    assert.equal(await hasAttachmentFor({ message: "Put my food handler card in my portfolio" }), false);
   });
 });
 

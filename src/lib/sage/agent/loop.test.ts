@@ -110,6 +110,7 @@ async function collect(provider: AIProvider): Promise<AgentEvent[]> {
     session: { id: "stu-1", role: "student" } as never,
     conversationId: "conv-1",
     toolNames: [SLOW_TOOL, FAST_TOOL],
+    hasAttachment: false,
   })) {
     events.push(event);
   }
@@ -195,5 +196,54 @@ describe("runAgentTurn — tool results matched by callId", () => {
     const stop = stopEvent(events);
     assert.ok(stop);
     assert.ok(events.indexOf(b) < events.indexOf(stop), "error result precedes agent_stop");
+  });
+});
+
+describe("runAgentTurn — attachment-only tools", () => {
+  /** Records the tool names the turn declared to the provider, then ends. */
+  function declaringProvider(seen: string[][]): AIProvider {
+    return {
+      name: "fake",
+      generateResponse: async () => "",
+      generateStructuredResponse: async () => "{}",
+      streamResponse: async function* (): AsyncGenerator<string> {
+        throw new Error("plain stream must not be used when streamWithTools exists");
+      },
+      streamWithTools: async function* (_system, _messages, tools): AsyncGenerator<ToolStreamEvent> {
+        seen.push(tools.map((tool) => tool.name));
+        yield { kind: "text", text: "ok" };
+        yield { kind: "done", reason: "complete" };
+      },
+    };
+  }
+
+  async function declaredFor(hasAttachment: boolean): Promise<string[]> {
+    const seen: string[][] = [];
+    for await (const _event of runAgentTurn({
+      provider: declaringProvider(seen),
+      systemPrompt: "sys",
+      messages: [{ role: "user", content: "Put my food handler card in my portfolio" }],
+      session: { id: "stu-1", role: "student" } as never,
+      conversationId: "conv-1",
+      hasAttachment,
+    })) {
+      // drain
+    }
+    return seen[0] ?? [];
+  }
+
+  it("does not offer the file tools on a turn with no attachment", async () => {
+    const declared = await declaredFor(false);
+    for (const name of ["file_document", "submit_form", "classify_attachment"]) {
+      assert.ok(!declared.includes(name), `${name} was offered with no file attached`);
+    }
+    assert.ok(declared.includes("add_portfolio_item"));
+  });
+
+  it("offers them on a turn that carries an attachment", async () => {
+    const declared = await declaredFor(true);
+    for (const name of ["file_document", "submit_form", "classify_attachment"]) {
+      assert.ok(declared.includes(name), `${name} missing on a turn with a file`);
+    }
   });
 });
