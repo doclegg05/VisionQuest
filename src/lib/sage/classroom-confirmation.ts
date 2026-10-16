@@ -1,5 +1,6 @@
 import type { AIProvider } from "@/lib/ai";
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { retryWithBackoff } from "./retry";
 import { studentLogKey } from "@/lib/log-keys";
@@ -131,7 +132,7 @@ export async function detectAndRecordClassroomConfirmation(
     // Never bubble — this is a background extractor. Log and move on.
     logger.error("Classroom confirmation detection failed", {
       student: studentLogKey(studentId),
-      error: String(err),
+      error: errorForLog(err),
     });
     return { confirmed: false, mismatch: false, noSignal: true };
   }
@@ -256,7 +257,7 @@ async function raiseAlert(
     logger.error("Failed to raise classroom-confirmation alert", {
       student: studentLogKey(studentId),
       type,
-      error: String(err),
+      error: errorForLog(err),
     });
   }
 }

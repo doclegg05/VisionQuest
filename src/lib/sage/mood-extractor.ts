@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { AIProvider } from "@/lib/ai";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { recordWellbeingConcern } from "./crisis-detection";
 import { retryWithBackoff } from "./retry";
@@ -72,7 +73,7 @@ export async function extractMoodFromConversation(
     result = parsed as ExtractionResult;
   } catch (err) {
     logger.error("Mood extraction: failed to parse Gemini response", {
-      error: String(err),
+      error: errorForLog(err),
     });
     return;
   }
@@ -97,7 +98,7 @@ export async function extractMoodFromConversation(
       logger.error("Mood extraction: failed to save MoodEntry", {
         student: studentLogKey(studentId),
         score,
-        error: String(err),
+        error: errorForLog(err),
       });
     }
 
@@ -109,7 +110,7 @@ export async function extractMoodFromConversation(
         logger.error("Mood extraction: failed to record wellbeing concern", {
           student: studentLogKey(studentId),
           score,
-          error: String(err),
+          error: errorForLog(err),
         });
       }
     }

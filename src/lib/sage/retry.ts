@@ -1,3 +1,4 @@
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { recordFailedExtraction } from "./failed-extraction";
 
@@ -67,7 +68,7 @@ export async function retryWithBackoff<T>(
         attempt,
         maxAttempts,
         ...context,
-        error: String(error),
+        error: errorForLog(error),
       });
       if (attempt < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
@@ -92,7 +93,7 @@ export async function retryWithBackoff<T>(
   logger.error(`${label} failed after retries`, {
     attempts: maxAttempts,
     ...context,
-    error: String(lastError),
+    error: errorForLog(lastError),
     alert: alertKey,
   });
   throw lastError;

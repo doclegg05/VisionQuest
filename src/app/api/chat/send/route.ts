@@ -23,6 +23,7 @@ import type { ChatSseEvent } from "@/lib/chat/sse";
 import type { AgentToolCallRecord } from "@/lib/sage/agent/types";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { isStaffRole } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
@@ -400,7 +401,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     const errorMsg = err instanceof Error ? err.message : "AI provider unavailable";
     const isOffline = errorMsg.includes("Local AI server") || errorMsg.includes("not configured");
 
-    logger.error("AI provider initialization failed", { error: errorMsg, student: studentLogKey(session.id) });
+    logger.error("AI provider initialization failed", {
+      error: errorForLog(err),
+      offline: isOffline,
+      student: studentLogKey(session.id),
+    });
     await logAiAuditEvent({
       actorId: session.id,
       actorRole: session.role,
@@ -882,7 +887,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           logger.warn("Chat SSE stream closed before enqueue", {
             conversationId: conversation.id,
             label,
-            error: String(error),
+            error: errorForLog(error),
           });
           return false;
         }
@@ -912,7 +917,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         } catch (error) {
           logger.warn("Chat SSE stream was already closed", {
             conversationId: conversation.id,
-            error: String(error),
+            error: errorForLog(error),
           });
         } finally {
           streamClosed = true;
@@ -1204,7 +1209,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
         // Rolling summary compaction (fire-and-forget, both teacher and student)
         void maybeUpdateSummary(conversation.id, session.id).catch((err) =>
-          logger.error("Summary compaction failed", { conversationId: conversation.id, error: String(err) }),
+          logger.error("Summary compaction failed", { conversationId: conversation.id, error: errorForLog(err) }),
         );
 
         // Student-only post-processing: XP, goal extraction, stage updates
@@ -1219,7 +1224,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
               mutate: (state) => recordChatSession(state),
             });
           } catch (err) {
-            logger.error("Failed to award chat XP", { error: String(err) });
+            logger.error("Failed to award chat XP", { error: errorForLog(err) });
           }
 
           handlePostResponse({
@@ -1233,7 +1238,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             userMessage,
             programType: studentProgramType,
             classroomConfirmedAt: studentClassroomConfirmedAt,
-          }).catch((err) => logger.error("Post-response error", { error: String(err) }));
+          }).catch((err) => logger.error("Post-response error", { error: errorForLog(err) }));
         } else {
           // Staff post-processing is memory extraction and nothing else.
           // handlePostResponse is student-shaped end to end (goal
@@ -1250,7 +1255,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             conversationId: conversation.id,
             messages: [...allMessages, { role: "model" as const, content: fullResponse }],
           }).catch((err) =>
-            logger.error("Staff memory extraction error", { error: String(err) }),
+            logger.error("Staff memory extraction error", { error: errorForLog(err) }),
           );
         }
 

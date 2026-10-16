@@ -18,6 +18,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { generateStorageKey, uploadFile } from "@/lib/storage";
@@ -327,7 +328,7 @@ async function buildTailoredDocuments(input: TailoringInput): Promise<{
     // rather than letting them consent to a blank.
     logger.warn("Packet tailoring failed", {
       student: studentLogKey(input.studentId),
-      error: String(error),
+      error: errorForLog(error),
     });
     return { resumeVersionId: null, coverLetterId: null };
   }
@@ -434,7 +435,7 @@ export async function renderPacketPdf(
     // student id in a log is PII (src/lib/log-keys.ts).
     logger.warn("Packet PDF render failed", {
       student: studentLogKey(studentId),
-      error: String(error),
+      error: errorForLog(error),
     });
     return null;
   }

@@ -1,3 +1,4 @@
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import type { NormalizedJob } from "../types";
 
@@ -53,7 +54,7 @@ export async function fetchJson<T>(
     }
     return (await response.json()) as T;
   } catch (error) {
-    logger.warn("Job source request errored", { url: logUrl, error: String(error) });
+    logger.warn("Job source request errored", { url: logUrl, error: errorForLog(error) });
     return null;
   }
 }
@@ -75,7 +76,7 @@ export async function fetchText(url: string, init: RequestInit = {}): Promise<st
     }
     return response.text();
   } catch (error) {
-    logger.warn("Job source request errored", { url, error: String(error) });
+    logger.warn("Job source request errored", { url, error: errorForLog(error) });
     return null;
   }
 }

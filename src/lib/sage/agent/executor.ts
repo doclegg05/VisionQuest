@@ -6,6 +6,7 @@
 // =============================================================================
 
 import { randomUUID } from "crypto";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { logAuditEvent } from "@/lib/audit";
 import { isStaffRole, type Session } from "@/lib/api-error";
@@ -124,7 +125,7 @@ export async function executeAgentTool(
         targetStudentId: targetStudentId ?? null,
       },
     }).catch((err) => {
-      logger.warn("agent.executor: rate-limit audit log failed", { err: String(err), toolName });
+      logger.warn("agent.executor: rate-limit audit log failed", { err: errorForLog(err), toolName });
     });
     return errorRecord(
       callId,
@@ -166,7 +167,7 @@ export async function executeAgentTool(
         actionKind: result.action?.action ?? null,
       },
     }).catch((err) => {
-      logger.warn("agent.executor: audit log failed", { err: String(err), toolName });
+      logger.warn("agent.executor: audit log failed", { err: errorForLog(err), toolName });
     });
 
     return { callId, tool: toolName, args: validation.args, result, startedAt, finishedAt };

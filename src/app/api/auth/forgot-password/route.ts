@@ -8,6 +8,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { isValidEmail } from "@/lib/validation";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody, forgotPasswordSchema } from "@/lib/schemas";
+import { errorForLog } from "@/lib/log-error";
+import { providerErrorText } from "@/lib/log-redaction";
 import { logger } from "@/lib/logger";
 
 function getAppBaseUrl(req: NextRequest): string {
@@ -96,7 +98,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ].join(""),
     });
   } catch (error) {
-    logger.error("Password reset email failed", { error: String(error) });
+    // Only sendEmail runs in this try, so the SMTP text carries no student
+    // id; its address is masked.
+    logger.error("Password reset email failed", {
+      error: errorForLog(error),
+      providerText: providerErrorText(error),
+    });
     await prisma.passwordResetToken.deleteMany({
       where: { studentId: student.id, tokenHash },
     });

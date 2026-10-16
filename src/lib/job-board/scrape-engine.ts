@@ -225,7 +225,7 @@ async function scrapeConfig(configId: string, options: RunScrapeOptions): Promis
 
     const allJobs: NormalizedJob[] = [];
     let failedSources = 0;
-    for (const result of adapterResults) {
+    for (const [index, result] of adapterResults.entries()) {
       if (result.status === "fulfilled") {
         logger.info("Adapter fetched jobs", {
           source: result.value.source,
@@ -234,7 +234,11 @@ async function scrapeConfig(configId: string, options: RunScrapeOptions): Promis
         allJobs.push(...result.value.jobs);
       } else {
         failedSources++;
-        logger.error("Adapter failed", { reason: errorMessage(result.reason) });
+        // The source row (failSourceResult above) keeps the message.
+        logger.error("Adapter failed", {
+          source: activeAdapters[index].source,
+          reason: errorForLog(result.reason),
+        });
       }
     }
 
@@ -410,7 +414,7 @@ async function scrapeConfig(configId: string, options: RunScrapeOptions): Promis
     return { outcome: finalStatus === "failed" ? "all_sources_failed" : "completed", totalUpserted };
   } catch (error) {
     const message = errorMessage(error);
-    logger.error("Scrape failed", { configId, scrapeRunId, error: message });
+    logger.error("Scrape failed", { configId, scrapeRunId, error: errorForLog(error) });
     await markScrapeRunFailed(scrapeRunId, message);
     throw error;
   }

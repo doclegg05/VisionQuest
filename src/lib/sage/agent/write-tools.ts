@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { describeSaveError } from "@/lib/job-board/save-error";
 import {
@@ -801,7 +802,7 @@ const bookAppointment: AgentTool = {
       try {
         await sendAppointmentConfirmation(appointment.id);
       } catch (error) {
-        logger.error("book_appointment: confirmation send failed", { error: String(error) });
+        logger.error("book_appointment: confirmation send failed", { error: errorForLog(error) });
       }
 
       return {

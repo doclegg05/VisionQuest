@@ -1,4 +1,5 @@
 import { logAuditEvent } from "@/lib/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { SAGE_PROMPT_REVISION } from "@/lib/sage/prompt-revision";
 import type { AiTask, DataSensitivity, PromptTier } from "./types";
@@ -129,7 +130,7 @@ export async function logAiAuditEvent(input: AiAuditEventInput): Promise<void> {
     logger.warn("AI audit event could not be written", {
       task: input.task,
       status: input.status,
-      error: String(error),
+      error: errorForLog(error),
     });
   }
 }

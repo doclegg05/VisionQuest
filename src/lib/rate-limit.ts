@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prismaAdmin as prisma } from "./db";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { rateLimitKeyFamily, rateLimitStorageKey } from "./rate-limit-key";
 
@@ -175,7 +176,7 @@ export async function rateLimit(
     keyFamily: rateLimitKeyFamily(key),
     limit,
     attempts: MAX_ATTEMPTS,
-    error: String(lastError),
+    error: errorForLog(lastError),
   });
 
   return {
@@ -211,7 +212,7 @@ export async function refundRateLimit(key: string, resetTime: number): Promise<v
   } catch (error) {
     logger.warn("Rate limit refund failed — unit stays consumed", {
       keyFamily: rateLimitKeyFamily(key),
-      error: String(error),
+      error: errorForLog(error),
     });
   }
 }
@@ -314,7 +315,7 @@ function maybePurgeExpired(now: Date): void {
 
   void purgeExpiredRateLimitEntries().catch((error: unknown) => {
     logger.warn("Rate limit purge failed — expired rows stay for now", {
-      error: String(error),
+      error: errorForLog(error),
     });
   });
 }

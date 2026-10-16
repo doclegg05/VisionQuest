@@ -21,6 +21,7 @@
 // Report side: src/lib/pathway-outcomes.ts.
 // =============================================================================
 
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { studentLogKey } from "./log-keys";
 
@@ -86,7 +87,7 @@ export async function resolvePathwayProvenance(
     // over. Loud in the server log, invisible to the student.
     logger.warn("Pathway provenance read failed; application recorded without a pathway", {
       student: studentLogKey(studentId),
-      error: String(error),
+      error: errorForLog(error),
     });
     return NO_PATHWAY_PROVENANCE;
   }
