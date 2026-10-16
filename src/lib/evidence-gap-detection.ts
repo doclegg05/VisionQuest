@@ -54,8 +54,17 @@ async function loadActiveEnrollments(): Promise<Map<string, Enrollment>> {
     where: { status: "active" },
     select: { studentId: true, classId: true, enrolledAt: true },
   });
-  // A student should have one active enrollment; if there are more, the last wins.
-  return new Map(enrollments.map((e) => [e.studentId, { classId: e.classId, enrolledAt: e.enrolledAt }]));
+  // A student should have one active enrollment, but the schema allows more.
+  // Keep the most recent, the class checkStudentCompliance answers for, so a
+  // student never gets two different requirement answers.
+  const latest = new Map<string, Enrollment>();
+  for (const e of enrollments) {
+    const kept = latest.get(e.studentId);
+    if (!kept || e.enrolledAt > kept.enrolledAt) {
+      latest.set(e.studentId, { classId: e.classId, enrolledAt: e.enrolledAt });
+    }
+  }
+  return latest;
 }
 
 /** Required items only; optional ones never raise a gap. */

@@ -141,6 +141,26 @@ describe("POST /api/internal/evidence-gap-detection", () => {
     assert.deepEqual(enrollmentFindMany.mock.calls[0].arguments[0].where, { status: "active" });
   });
 
+  // The schema allows a student to be active in two classes. The sync's
+  // requirement_noncompliant alert (checkStudentCompliance) answers for the
+  // most recently enrolled one, so this scan must pick the same class, not
+  // whichever row the database happens to return last.
+  it("checks a student active in two classes against the most recent enrollment only", async () => {
+    enrollmentFindMany.mock.mockImplementation(async () => [
+      { studentId: "student-1", classId: "class-2", enrolledAt: daysAgo(2) },
+      { studentId: "student-1", classId: "class-1", enrolledAt: daysAgo(20) },
+    ]);
+    requirementFindMany.mock.mockImplementation(async () => [
+      { id: "req-1", classId: "class-1", title: "Food Handler", itemType: "certification", itemId: "food-handler", status: "required" },
+      { id: "req-2", classId: "class-2", title: "Forklift", itemType: "certification", itemId: "forklift", status: "required" },
+    ]);
+
+    await POST(request("Bearer test-cron-secret"));
+
+    const keys = alertUpsert.mock.calls.map((call: any) => call.arguments[0].where.alertKey);
+    assert.deepEqual(keys, ["evidence_gap:student-1:req-2"]);
+  });
+
   it("escalates a gap to high once the enrollment is 14 days old", async () => {
     enrollmentFindMany.mock.mockImplementation(async () => [
       { studentId: "student-1", classId: "class-1", enrolledAt: daysAgo(14) },
