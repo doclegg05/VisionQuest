@@ -33,7 +33,8 @@ mock.module("./db", { namedExports: { prismaAdmin: {
       created.push(data);
       return { id: `queued-${created.length}` };
     },
-    update: async (args: { data: { status: string; error?: string } }) => { updates.push(args); return {}; },
+    // The processor writes a job's result with updateMany guarded by its claim; count 1 = the claim held.
+    updateMany: async (args: { data: { status: string; error?: string } }) => { updates.push(args); return { count: 1 }; },
   },
 } } });
 mock.module("./email", { namedExports: { isEmailDeliveryConfigured: () => true, sendEmail: async () => { emailSends++; await deliveryGate; } } });
