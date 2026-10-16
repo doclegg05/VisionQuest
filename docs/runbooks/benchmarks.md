@@ -225,6 +225,16 @@ the scorer's `details.reason`. Before this rule, consent-scopes and
 migration-drift-schema reported `pass` in the PR gate tier while measuring
 nothing, and nudge-sweep's unseeded-cohort skip reported `error`.
 
+A zero-sample error carries no metrics, so its message does that work. It
+names the metrics with no sample, then lists every value the scorer reported
+with its `n`, all on the first line, because the nightly regression issue
+quotes only that line. `nudge-sweep` gives each metric its own sample:
+students texted for `daily_cap_exceeded` and `duplicate_open_questions`, the
+three sweeps for `sweep_blocked` and `send_errors`, the concurrent pair for
+`concurrent_run_not_skipped`, probe attempts for `send_error_detector_blind`,
+and the one timed sweep for the rest. When every sweep is blocked and nobody
+gets a text, the error still shows `sweep_blocked=3 (n=3)`.
+
 ---
 
 ## Updating a baseline
@@ -486,16 +496,6 @@ that measured nothing, which is worse than no number because it reads as proof.
   shared, symlink-safe implementation is `isMainModule` in
   `scripts/bench/lib/entry.mjs`; those four were left to their author rather
   than edited underneath them.
-- **`nudge-sweep` reports one `n` for all nine metrics**: the number of
-  students with sends (50 in CI). That is the sample behind `daily_cap_exceeded`
-  and `duplicate_open_questions`, not behind `sweep_blocked` (3 sweeps) or
-  `concurrent_run_not_skipped` (2). It stays for now, because the zero-samples
-  error drops a suite's metrics and lists only the unsampled values. When no
-  student has a send, every metric has `n: 0` and that message is the only
-  place a blocked sweep's `sweep_blocked=3` shows. With a per-metric `n`,
-  `sweep_blocked` would have a sample of 3 and drop out of the message. Change
-  the two together: the error keeps every measured value, and each metric
-  reports its own sample.
 
 ## Owner steps
 
