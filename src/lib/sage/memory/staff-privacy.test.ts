@@ -34,6 +34,27 @@ describe("looksLikeStudentReference", () => {
     }
   });
 
+  it("passes the fixed subject \"This instructor\" whatever verb follows it", () => {
+    // Verbs the 2026-10-16 memory eval diagnosis measured the extractor using.
+    // None is on the allowlist, so each one alone reads as a name; behind the
+    // fixed subject it is lowercase and never reaches the proper-noun scan.
+    const verbs = ["Lacks", "Translates", "Conducts", "Relays", "Operates", "Communicates", "Targets", "Adapts"];
+    for (const verb of verbs) {
+      const rest = "program updates to the coordinator every week.";
+      assert.equal(looksLikeStudentReference(`${verb} ${rest}`), true, `bare ${verb} is still read as a name`);
+      assert.equal(
+        looksLikeStudentReference(`This instructor ${verb.toLowerCase()} ${rest}`),
+        false,
+        `framed ${verb} should pass`,
+      );
+    }
+  });
+
+  it("still rejects a named person behind the fixed subject", () => {
+    assert.equal(looksLikeStudentReference("This instructor says Jasmine needs a bus pass."), true);
+    assert.equal(looksLikeStudentReference("This instructor is worried about Ángel missing class."), true);
+  });
+
   it("rejects a named person anywhere in the sentence", () => {
     assert.equal(looksLikeStudentReference("Worried about Maria missing class again."), true);
     assert.equal(looksLikeStudentReference("Maria keeps missing the Tuesday session."), true);
