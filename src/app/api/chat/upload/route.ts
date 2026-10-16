@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, validateFile } from "@/lib/storage";
 import { validateUploadContent } from "@/lib/file-security";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { ApiError, withAuth, badRequest, rateLimited } from "@/lib/api-error";
 import { hasActiveConsent } from "@/lib/consent";
@@ -47,7 +48,7 @@ export const POST = withAuth(async (session, req: Request) => {
   try {
     await uploadFile(storageKey, buffer, file.type);
   } catch (err) {
-    logger.error("Chat file upload failed", { error: String(err) });
+    logger.error("Chat file upload failed", { error: errorForLog(err) });
     throw new ApiError(500, "Failed to upload file to storage");
   }
 
@@ -85,7 +86,7 @@ export const POST = withAuth(async (session, req: Request) => {
     cloudAllowed: false,
     buffer,
   }).catch((err) => {
-    logger.warn("Upload baseline classification failed", { error: String(err) });
+    logger.warn("Upload baseline classification failed", { error: errorForLog(err) });
   });
 
   await logAiAuditEvent({

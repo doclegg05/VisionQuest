@@ -11,6 +11,7 @@ import {
   logAiAuditEvent,
   policyDecisionForProvider,
 } from "@/lib/ai/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 /**
@@ -62,7 +63,7 @@ export const GET = withRegistry("sage.warmup", async (session, _req, _ctx, _tool
   // a stuck Ollama can't hold up the response, swallow errors so a
   // warmup failure never surfaces to the chat UI.
   void pingLocalModelIfApplicable(session.id).catch((err) => {
-    logger.warn("warmup model ping failed", { err: String(err) });
+    logger.warn("warmup model ping failed", { err: errorForLog(err) });
   });
 
   return new Response(null, { status: 204 });

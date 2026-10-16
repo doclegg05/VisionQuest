@@ -13,6 +13,7 @@ import {
 } from "@/lib/portfolio";
 import { recordCertificationEarned, recordPortfolioItem } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { syncStudentAlerts } from "@/lib/advising";
 
@@ -163,7 +164,7 @@ export const POST = withAuth(async (session, req: Request) => {
           mutate: (state) => recordCertificationEarned(state),
         });
       } catch (err) {
-        logger.error("Failed to record certification earned", { error: String(err) });
+        logger.error("Failed to record certification earned", { error: errorForLog(err) });
       }
     }
   }
@@ -180,7 +181,7 @@ export const POST = withAuth(async (session, req: Request) => {
       mutate: (state) => recordPortfolioItem(state, portfolioType),
     });
   } catch (err) {
-    logger.error("Failed to record portfolio progression", { error: String(err) });
+    logger.error("Failed to record portfolio progression", { error: errorForLog(err) });
   }
 
   await syncStudentAlerts(session.id);

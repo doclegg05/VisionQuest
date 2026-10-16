@@ -23,6 +23,7 @@ import { extractionTranscript } from "../extraction-transcript";
 
 import { logAiAuditEvent, getProviderClass, policyDecisionForProvider } from "@/lib/ai/audit";
 import { rateLimitDaily } from "@/lib/rate-limit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import type { AIProvider } from "@/lib/ai/types";
 import {
@@ -220,7 +221,7 @@ export async function extractAndStoreStaffMemories({
   } catch (error) {
     logger.error("Staff memory extraction failed (non-fatal)", {
       conversationId,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return empty;
   }

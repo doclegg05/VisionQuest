@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import type { Session } from "@/lib/api-error";
 import { getTool } from "@/lib/registry";
 import { logAuditEvent } from "@/lib/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { ApiError, rlsContextFor } from "@/lib/api-error";
 import { withRlsContext } from "@/lib/rls-context";
@@ -114,20 +115,16 @@ export function withRegistry(toolId: string, handler: RegistryHandler) {
           { status: err.statusCode },
         );
       }
-      const errDetails =
-        err instanceof Error
-          ? { message: err.message, stack: err.stack, name: err.name }
-          : { message: String(err) };
-      logger.error("Unhandled error in registry middleware", {
-        toolId,
-        ...errDetails,
-      });
-      // Surface the error message to admins so they can read it in the UI
-      // without digging through Render logs. Non-admins still get a generic
-      // 500 so we don't leak internals.
+      logger.error("Unhandled error in registry middleware", { toolId, error: errorForLog(err) });
+      // Surface the error message to admins so they can read it in the UI;
+      // the log line above carries only its name and code. Non-admins still
+      // get a generic 500 so we don't leak internals.
       const body =
         session?.role === "admin"
-          ? { error: `Internal server error: ${errDetails.message}`, code: "INTERNAL_ERROR" }
+          ? {
+              error: `Internal server error: ${err instanceof Error ? err.message : String(err)}`,
+              code: "INTERNAL_ERROR",
+            }
           : { error: "Internal server error" };
       return NextResponse.json(body, { status: 500 });
     }

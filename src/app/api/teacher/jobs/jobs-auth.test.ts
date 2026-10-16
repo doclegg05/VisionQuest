@@ -295,6 +295,25 @@ describe("teacher job route authorization", () => {
     assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-existing"]);
   });
 
+  // A run that crashed mid-scrape stays "processing" forever. Treating it as
+  // in progress would answer "Scrape already in progress" to every Refresh
+  // from then on, so only a run from the last two hours counts (the same
+  // window the weekly sweep uses, src/lib/job-board/scrape-runs.ts).
+  it("treats only a run from the last two hours as already in progress", async () => {
+    const before = Date.now();
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1" },
+    });
+
+    await refreshRoute.POST(req as never);
+
+    const where = (mockScrapeRunFindFirst.mock.calls[0]?.arguments[0] as { where: Record<string, unknown> }).where;
+    assert.deepEqual(where.status, { in: ["queued", "processing"] });
+    const since = (where.createdAt as { gte: Date }).gte.getTime();
+    assert.ok(Math.abs(before - 2 * 60 * 60 * 1000 - since) < 5_000, "the window is the last two hours");
+  });
+
   it("returns scrape status after checking class ownership", async () => {
     mockScrapeRunFindMany.mock.mockImplementationOnce(async () => [{
       id: "run-2",

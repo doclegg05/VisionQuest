@@ -5,9 +5,11 @@ import { prisma } from "@/lib/db";
 import { enqueueJob, processJobById } from "@/lib/jobs";
 import "@/lib/jobs-registry";
 import { logAuditEvent } from "@/lib/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { serializeScrapeRun } from "@/lib/job-board/scrape-status";
 import { isValidJobSource } from "@/lib/job-board/source-options";
+import { scrapeRunInProgressWhere } from "@/lib/job-board/scrape-runs";
 
 /**
  * POST /api/teacher/jobs/refresh
@@ -28,7 +30,7 @@ function kickOffScrapeJob(jobId: string | null, classConfigId: string) {
       logger.error("Manual job refresh processor failed to start", {
         jobId,
         classConfigId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorForLog(error),
       });
     });
 }
@@ -59,11 +61,10 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
   }
   const sortedSourceAllowlist = [...new Set(sourceAllowlist)].sort();
 
+  // Only a recent run counts: a run that crashed mid-scrape stays
+  // "processing" forever and would otherwise block every Refresh after it.
   const existingRun = await prisma.jobScrapeRun.findFirst({
-    where: {
-      classConfigId: config.id,
-      status: { in: ["queued", "processing"] },
-    },
+    where: scrapeRunInProgressWhere(config.id, new Date()),
     orderBy: { createdAt: "desc" },
     include: { sourceResults: { orderBy: { source: "asc" } } },
   });

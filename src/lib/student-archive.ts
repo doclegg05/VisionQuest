@@ -4,6 +4,7 @@ import { Writable } from "stream";
 import { prisma } from "./db";
 import { downloadFile, uploadFile } from "./storage";
 import { FORMS } from "./spokes/forms";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { safeUploadName } from "./upload-name";
 import { studentLogKey } from "@/lib/log-keys";
@@ -888,7 +889,7 @@ export async function generateStudentArchive(
       logger.error("Archive: failed to download file", {
         fileId,
         storageKey: fileRecord.storageKey,
-        error: String(err),
+        error: errorForLog(err),
       });
       return false;
     }

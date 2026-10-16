@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { invalidateSessionCache } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { generateStudentArchive } from "@/lib/student-archive";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -51,7 +52,7 @@ export const PATCH = withTeacherAuth(async (
   // Auto-archive on deactivation (fire-and-forget)
   if (!isActive) {
     generateStudentArchive(id, session.id).catch((err) =>
-      logger.error("Auto-archive on deactivation failed", { student: studentLogKey(id), error: String(err) }),
+      logger.error("Auto-archive on deactivation failed", { student: studentLogKey(id), error: errorForLog(err) }),
     );
   }
 

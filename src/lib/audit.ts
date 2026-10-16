@@ -1,4 +1,5 @@
 import { prismaAdmin as prisma } from "./db";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 
 interface AuditEventInput {
@@ -49,7 +50,7 @@ export async function tryLogAuditEvent(
       actorId: input.actorId ?? null,
       actorRole: input.actorRole ?? null,
       action: input.action,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return { audited: false };
   }
@@ -113,7 +114,7 @@ export async function recordStudentView(input: StudentViewInput): Promise<void> 
       actorId: input.actorId,
       actorRole: input.actorRole,
       surface: input.surface,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
   }
 }

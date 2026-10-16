@@ -66,7 +66,7 @@ describe("recordFailedExtraction", () => {
 
     await assert.doesNotReject(() => recordFailedExtraction(baseInput));
     assert.equal(mockWarn.mock.callCount(), 1);
-    assert.match(String(mockWarn.mock.calls[0].arguments[1].error), /db down/);
+    assert.deepEqual(mockWarn.mock.calls[0].arguments[1].error, { name: "Error" });
   });
 
   it("caps the persisted payload at the 8000-char limit", async () => {

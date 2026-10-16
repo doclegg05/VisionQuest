@@ -133,8 +133,12 @@ describe("sendSms logging", () => {
   });
 
   it("logs no recipient number when the request throws", async () => {
+    // undici's shape: a TypeError whose cause carries the socket error code.
     global.fetch = (async () => {
-      throw new Error(`socket hang up while sending to ${TO_NUMBER}`);
+      const socketError = Object.assign(new Error(`socket hang up while sending to ${TO_NUMBER}`), {
+        code: "ECONNRESET",
+      });
+      throw new TypeError("fetch failed", { cause: socketError });
     }) as unknown as typeof fetch;
 
     const sent = await sms.sendSms(TO_NUMBER, "hello");
@@ -142,6 +146,7 @@ describe("sendSms logging", () => {
     assert.equal(sent, false);
     const logged = loggedText();
     assert.ok(!logged.includes(TO_NUMBER), `thrown-error log leaked the number: ${logged}`);
-    assert.ok(logged.includes("socket hang up"), "dropped the failure reason");
+    assert.ok(!logged.includes("socket hang up"), `thrown-error log kept the message: ${logged}`);
+    assert.ok(logged.includes("TypeError") && logged.includes("ECONNRESET"), "dropped the failure reason");
   });
 });

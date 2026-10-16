@@ -1,4 +1,5 @@
 import { prismaAdmin as prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { matchJobToClusters } from "./cluster-matcher";
 import { filterQualityJobs } from "./job-quality";
@@ -33,11 +34,11 @@ export async function runBrowseRefresh(
 
   const allJobs: NormalizedJob[] = [];
   let failedSources = 0;
-  for (const r of settled) {
+  for (const [index, r] of settled.entries()) {
     if (r.status === "fulfilled") allJobs.push(...r.value);
     else {
       failedSources++;
-      logger.error("Browse adapter failed", { reason: String(r.reason) });
+      logger.error("Browse adapter failed", { source: adapters[index].source, reason: errorForLog(r.reason) });
     }
   }
 
