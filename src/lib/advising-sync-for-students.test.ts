@@ -13,22 +13,26 @@ let inFlight = 0;
 let maxInFlight = 0;
 
 const loadStudentAlertSyncContextMock = mock.fn() as any;
+const applyPlanMock = mock.fn(async () => undefined) as any;
+const syncInterventionNotificationsMock = mock.fn(async () => undefined) as any;
+// A non-null studentSignals is what makes syncStudentAlerts send nudges.
+let planSignals: { displayName: string; studentId: string; email: string } | null = null;
 mock.module("@/lib/advising-sync-context", {
   namedExports: { loadStudentAlertSyncContext: loadStudentAlertSyncContextMock },
 });
 mock.module("@/lib/advising-sync", {
   namedExports: {
     buildStudentAlertSyncPlan: () => ({
-      studentSignals: null,
+      studentSignals: planSignals,
       goalEvidenceEntries: [],
       goalReviewItems: [],
       desiredAlerts: [],
     }),
-    applyStudentAlertSyncPlan: async () => undefined,
+    applyStudentAlertSyncPlan: applyPlanMock,
   },
 });
 mock.module("@/lib/advising-interventions", {
-  namedExports: { syncInterventionNotifications: async () => undefined },
+  namedExports: { syncInterventionNotifications: syncInterventionNotificationsMock },
 });
 mock.module("@/lib/db", { namedExports: { prisma: {}, prismaAdmin: {} } });
 mock.module("@/lib/logger", {
@@ -49,6 +53,9 @@ function studentContext(studentId: string): RlsContext {
 describe("syncAlertsForStudents", () => {
   beforeEach(() => {
     seen.length = 0;
+    planSignals = null;
+    applyPlanMock.mock.resetCalls();
+    syncInterventionNotificationsMock.mock.resetCalls();
     inFlight = 0;
     maxInFlight = 0;
     loadStudentAlertSyncContextMock.mock.resetCalls();
@@ -81,5 +88,42 @@ describe("syncAlertsForStudents", () => {
     assert.equal(loadStudentAlertSyncContextMock.mock.callCount(), 6);
     assert.ok(maxInFlight <= 4, `expected at most 4 in flight, saw ${maxInFlight}`);
     assert.ok(maxInFlight > 1, "batch still runs students concurrently");
+  });
+
+  // The scheduled sweep exists to write alerts for students who have gone
+  // quiet. Nudges belong to activity: a daily sweep that nudged would email
+  // each instructor once per affected student every morning, with no stop
+  // condition (docs/plans/2026-10-15-unscheduled-internal-routes.md).
+  it("writes alerts but sends no nudges", async () => {
+    planSignals = { displayName: "Sam", studentId: "sam01", email: "sam@example.test" };
+
+    await advising.syncAlertsForStudents(["student-a", "student-b"]);
+
+    assert.equal(applyPlanMock.mock.callCount(), 2, "alerts are still written");
+    assert.equal(syncInterventionNotificationsMock.mock.callCount(), 0, "no nudges from the sweep");
+  });
+});
+
+describe("syncStudentAlerts", () => {
+  beforeEach(() => {
+    planSignals = { displayName: "Sam", studentId: "sam01", email: "sam@example.test" };
+    applyPlanMock.mock.resetCalls();
+    syncInterventionNotificationsMock.mock.resetCalls();
+    loadStudentAlertSyncContextMock.mock.resetCalls();
+    loadStudentAlertSyncContextMock.mock.mockImplementation(async () => ({ existing: [] }));
+  });
+
+  it("still nudges by default, after a student or teacher acts", async () => {
+    await advising.syncStudentAlerts("student-a");
+
+    assert.equal(applyPlanMock.mock.callCount(), 1);
+    assert.equal(syncInterventionNotificationsMock.mock.callCount(), 1);
+  });
+
+  it("skips nudges when asked to", async () => {
+    await advising.syncStudentAlerts("student-a", { notify: false });
+
+    assert.equal(applyPlanMock.mock.callCount(), 1, "alerts are still written");
+    assert.equal(syncInterventionNotificationsMock.mock.callCount(), 0);
   });
 });

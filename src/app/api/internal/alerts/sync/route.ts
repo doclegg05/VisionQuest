@@ -7,9 +7,11 @@ import { logger } from "@/lib/logger";
 /**
  * POST /api/internal/alerts/sync
  *
- * Cron endpoint that syncs alerts for all active students.
- * Runs periodically (e.g., every 15 minutes) to keep alerts fresh
- * without blocking page renders.
+ * Cron endpoint that syncs alerts for all active students, daily at 10:25 UTC
+ * (pg_cron job `alert-sync`). Activity already syncs a student's alerts; this
+ * sweep writes the ones that turn on only because days pass (inactivity,
+ * overdue tasks, missed appointments). It sends no nudges; see
+ * syncAlertsForStudents.
  *
  * Auth: Bearer CRON_SECRET. No session: the roster read uses prismaAdmin,
  * and syncAlertsForStudents runs each student's sync as that student.

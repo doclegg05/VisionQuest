@@ -148,7 +148,19 @@ export async function listBookableAdvisors({
   });
 }
 
-export async function syncStudentAlerts(studentId: string) {
+export interface SyncStudentAlertsOptions {
+  /**
+   * Send intervention nudges (in-app plus queued email) for the alerts this
+   * sync finds. Default true: syncs that follow a student's or teacher's
+   * action are when a nudge is timely. The scheduled sweep passes false.
+   */
+  notify?: boolean;
+}
+
+export async function syncStudentAlerts(
+  studentId: string,
+  { notify = true }: SyncStudentAlertsOptions = {},
+) {
   const [{ loadStudentAlertSyncContext }, { applyStudentAlertSyncPlan, buildStudentAlertSyncPlan }] =
     await Promise.all([import("./advising-sync-context"), import("./advising-sync")]);
   const now = new Date();
@@ -172,7 +184,7 @@ export async function syncStudentAlerts(studentId: string) {
     desiredAlerts,
   });
 
-  if (studentSignals) {
+  if (notify && studentSignals) {
     try {
       await syncInterventionNotifications({
         studentId,
@@ -198,13 +210,21 @@ export async function syncStudentAlerts(studentId: string) {
  * session. Each student's sync runs as that student: the StudentAlert rows
  * and the student's own nudge Notification are the student's own rows, and
  * the app client behind syncStudentAlerts fails closed with no context
- * (review F5/F62, 2026-09-01). Staff nudges inside already use prismaAdmin.
+ * (review F5/F62, 2026-09-01).
+ *
+ * The sweep writes alerts only. It exists for students who have gone quiet,
+ * whose time-based alerts (inactivity, overdue tasks) no activity-triggered
+ * sync will ever write. Nudges stay with those activity syncs: sent from a
+ * daily sweep they would reach each instructor once per affected student
+ * every morning (docs/plans/2026-10-15-unscheduled-internal-routes.md).
  */
 export async function syncAlertsForStudents(studentIds: string[], batchSize: number = 4) {
   for (let index = 0; index < studentIds.length; index += batchSize) {
     const batch = studentIds.slice(index, index + batchSize);
     await Promise.all(
-      batch.map((studentId) => withStudentRlsContext(studentId, () => syncStudentAlerts(studentId))),
+      batch.map((studentId) =>
+        withStudentRlsContext(studentId, () => syncStudentAlerts(studentId, { notify: false })),
+      ),
     );
   }
 }
