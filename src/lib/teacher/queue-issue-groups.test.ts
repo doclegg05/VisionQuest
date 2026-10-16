@@ -207,3 +207,13 @@ test("the Sage prioritize message counts each row's alerts, not its groups", () 
   assert.match(all, /5 open issues across 1 student\b/);
   assert.match(all, /^Sam Rivera: 2 urgent, 5 total$/m);
 });
+
+test("the Sage prioritize message counts urgent alerts by their own severity, not their group's", () => {
+  // One overdue task is 48 hours late (high), the other 12 (medium). They fold
+  // into one group, which reads as urgent because its top alert is, but only one
+  // alert in it is urgent, and Sage compares students by this number.
+  const groups = groupQueueIssues([alert("t1", "overdue_task", "high"), alert("t2", "overdue_task", "medium")], STUDENT);
+  assert.equal(groups.length, 1, "precondition: both tasks fold into one group");
+  const all = buildQueueSageMessage([{ name: "Sam Rivera", groups }]);
+  assert.match(all, /^Sam Rivera: 1 urgent, 2 total$/m);
+});
