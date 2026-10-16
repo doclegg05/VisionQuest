@@ -23,9 +23,9 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     >
       <span className="flex size-9 items-center justify-center rounded-full border border-[var(--border)] transition-colors group-hover:bg-[var(--surface-overlay)]">
         {theme === "dark" ? (
-          <Sun aria-hidden="true" size={18} weight="bold" className="text-[var(--accent-gold)]" />
+          <Sun aria-hidden="true" size={18} weight="bold" className="text-warning" />
         ) : (
-          <Moon aria-hidden="true" size={18} weight="bold" className="text-[var(--accent-blue)]" />
+          <Moon aria-hidden="true" size={18} weight="bold" className="text-info" />
         )}
       </span>
     </button>

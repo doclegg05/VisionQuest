@@ -9,6 +9,7 @@ import {
 import { enqueueJobWithCooldown } from "./jobs";
 import { sendNotificationWithCooldown } from "./notifications";
 import { isEmailDeliveryConfigured } from "./email";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { studentLogKey } from "./log-keys";
 import {
@@ -229,7 +230,7 @@ async function resolveAssignedInstructors(studentId: string): Promise<StaffRecip
     logger.error("Nudge: instructor resolution failed; falling back to all active teachers", {
       student: studentLogKey(studentId),
       alert: "intervention_nudge_instructor_resolution_failed",
-      error: String(err),
+      error: errorForLog(err),
     });
     return [];
   }

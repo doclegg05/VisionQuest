@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { syncStudentAlerts } from "@/lib/advising";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { awardEvent } from "@/lib/progression/events";
 import { withTeacherAuth } from "@/lib/api-error";
@@ -96,7 +97,7 @@ export const PATCH = withTeacherAuth(async (
         mutate: (state) => { state.xp += 20; },
       });
     } catch (err) {
-      logger.error("Failed to award form approval XP", { error: String(err) });
+      logger.error("Failed to award form approval XP", { error: errorForLog(err) });
     }
   }
 

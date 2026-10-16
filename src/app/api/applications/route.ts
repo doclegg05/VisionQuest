@@ -5,6 +5,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
 import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { deleteFile } from "@/lib/storage";
 import { NO_PATHWAY_PROVENANCE, resolvePathwayProvenance } from "@/lib/pathway-provenance";
@@ -55,7 +56,7 @@ async function cleanupDetachedGeneratedResumeFile(
       student: studentLogKey(studentId),
       fileId: generatedFile.id,
       storageKey: generatedFile.storageKey,
-      error: String(error),
+      error: errorForLog(error),
     });
   }
 

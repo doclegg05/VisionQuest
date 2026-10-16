@@ -1,5 +1,6 @@
 import { type StudentStatusSignals } from "./student-status";
 import { getDaysSinceActivity, getInactivityStage } from "./inactivity";
+import { buildGoalStaleAlert } from "./stale-goal-rules";
 
 export interface AlertDescriptor {
   alertKey: string;
@@ -282,22 +283,20 @@ export function buildStudentAlertDescriptors({
     }
   }
 
-  if (signals?.goals && signals.goals.length > 0) {
-    const activeGoals = signals.goals.filter((goal) => goal.status === "active" || goal.status === "in_progress");
-    for (const goal of activeGoals) {
-      const daysSinceUpdate = (now.getTime() - goal.updatedAt.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSinceUpdate >= 7) {
-        alerts.push({
-          alertKey: `goal_stale:${goal.id}`,
-          type: "goal_stale",
-          severity: daysSinceUpdate >= 14 ? "high" : "medium",
-          title: `${goal.level.charAt(0).toUpperCase() + goal.level.slice(1)} goal needs review`,
-          summary: `${goal.level.charAt(0).toUpperCase() + goal.level.slice(1)} goal has not been updated in ${Math.round(daysSinceUpdate)} days.`,
-          sourceType: "goal",
-          sourceId: goal.id,
-        });
-      }
-    }
+  // Same alert, same rule as the daily goal-stale-detection job; see
+  // buildGoalStaleAlert for why the two writers must agree.
+  for (const goal of signals?.goals ?? []) {
+    const staleAlert = buildGoalStaleAlert(
+      {
+        id: goal.id,
+        level: goal.level,
+        status: goal.status,
+        updatedAt: goal.updatedAt,
+        lastReviewedAt: goal.lastReviewedAt ?? null,
+      },
+      now,
+    );
+    if (staleAlert) alerts.push(staleAlert);
   }
 
   if (signals?.studentCreatedAt && signals.orientationComplete !== true) {

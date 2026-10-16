@@ -315,7 +315,7 @@ describe("POST /api/appointments/book", () => {
       }
     });
 
-    it("redacts contact info from a failed side effect before logging it", async () => {
+    it("logs a failed side effect by name, never the provider text it quotes", async () => {
       mockSendAppointmentConfirmation.mock.mockImplementation(async () => {
         throw new Error(
           "550 5.1.1 <student.a@example.org>: recipient rejected; callback +15551234567",
@@ -327,10 +327,10 @@ describe("POST /api/appointments/book", () => {
       assert.equal(result.status, 201);
       assert.equal(mockLoggerWarn.mock.callCount(), 1);
       const [, context] = mockLoggerWarn.mock.calls[0].arguments;
-      const loggedError = String(context?.error);
-      assert.doesNotMatch(loggedError, /student\.a@example\.org|5551234567/);
-      assert.match(loggedError, /\[email redacted\]/);
-      assert.match(loggedError, /\[phone redacted\]/);
+      // The effect may be a Prisma write as easily as the email, so the
+      // message stays out entirely; the step name is in the log message.
+      assert.deepEqual(context?.error, { name: "Error" });
+      assert.doesNotMatch(JSON.stringify(context), /student\.a@example\.org|5551234567|recipient rejected/);
     });
   });
 

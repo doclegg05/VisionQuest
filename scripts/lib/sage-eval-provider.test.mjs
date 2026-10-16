@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -17,6 +18,9 @@ import {
   EvalProviderUnavailableError,
   EvalProviderUnreachableError,
   isEvalAbort,
+  classifyEmbeddingFailure,
+  installOpenRouterEvalEmbeddings,
+  trackEvalAborts,
 } from "./sage-eval-provider.mjs";
 
 /**
@@ -536,7 +540,7 @@ describe("OpenRouter unavailable models and keys", () => {
     });
   }
 
-  for (const status of [400, 401, 404]) {
+  for (const status of [401, 404]) {
     it(`reports a ${status} bad request as unavailable, not as a failed test`, async () => {
       const wrapped = wrapWithBudgetDetection(failing(openRouterError("bad_request", status)));
       await assert.rejects(
@@ -545,6 +549,22 @@ describe("OpenRouter unavailable models and keys", () => {
       );
     });
   }
+
+  it("reports an unknown model id as unavailable, not as a failed test", async () => {
+    const wrapped = wrapWithBudgetDetection(failing(openRouterError("unknown_model", 400)));
+    await assert.rejects(
+      wrapped.generateResponse("sys", [{ role: "user", content: "q" }]),
+      (err) => err instanceof EvalProviderUnavailableError && err.providerLabel === "OpenRouter",
+    );
+  });
+
+  it("leaves a request-shape 400 as a real failure, so a schema bug does not read as a refused key", async () => {
+    // Every 400 used to read as "key, model or connection unavailable", which
+    // sent a developer to rotate a key instead of fixing the request.
+    const rejected = openRouterError("bad_request", 400);
+    const wrapped = wrapWithBudgetDetection(failing(rejected));
+    await assert.rejects(wrapped.generateResponse("sys", [{ role: "user", content: "q" }]), (err) => err === rejected);
+  });
 
   it("leaves a model's malformed tool-call JSON as a real failure", async () => {
     const malformed = openRouterError("bad_request", null);
@@ -627,5 +647,160 @@ describe("--provider=openrouter refuses a non-local database", () => {
       const { provider } = await resolveEvalProvider(["--provider=openrouter"]);
       assert.equal(provider.name, "openrouter");
     });
+  });
+});
+
+describe("classifyEmbeddingFailure", () => {
+  let OpenRouterError;
+  const failure = (kind, status = null) => new OpenRouterError(`OpenRouter request failed (${status}, ${kind})`, kind, status);
+
+  it("loads the OpenRouter error class", async () => {
+    ({ OpenRouterError } = await import("../../src/lib/ai/openrouter-provider.ts"));
+  });
+
+  it("reads exhausted credits as budget exhausted", () => {
+    const error = classifyEmbeddingFailure(failure("credits", 402));
+    assert.ok(error instanceof EvalBudgetExhaustedError);
+    assert.equal(error.providerLabel, "OpenRouter embeddings");
+  });
+
+  it("reads a refused key or no endpoint (401, 404) as unavailable", () => {
+    for (const status of [401, 404]) {
+      const error = classifyEmbeddingFailure(failure("bad_request", status));
+      assert.ok(error instanceof EvalProviderUnavailableError, String(status));
+      assert.equal(error.providerLabel, "OpenRouter embeddings");
+    }
+  });
+
+  it("reads an unknown model id as unavailable", () => {
+    const error = classifyEmbeddingFailure(failure("unknown_model", 400));
+    assert.ok(error instanceof EvalProviderUnavailableError);
+    assert.equal(error.providerLabel, "OpenRouter embeddings");
+  });
+
+  it("leaves a request-shape 400 alone, as the chat evals do", () => {
+    const rejected = failure("bad_request", 400);
+    assert.equal(classifyEmbeddingFailure(rejected), rejected);
+  });
+
+  it("reads a connection that never happened as unreachable", () => {
+    assert.ok(classifyEmbeddingFailure(failure("network")) instanceof EvalProviderUnreachableError);
+  });
+
+  it("leaves server errors, rate limits, refusals and non-OpenRouter errors alone", () => {
+    for (const error of [failure("unavailable", 503), failure("rate_limited", 429), failure("refused", 403), new Error("boom")]) {
+      assert.equal(classifyEmbeddingFailure(error), error);
+    }
+  });
+});
+
+describe("installOpenRouterEvalEmbeddings", () => {
+  const KEY = Symbol.for("visionquest.evalEmbeddingProvider");
+  const NAMES = ["DATABASE_URL", "DIRECT_URL", "ADMIN_DATABASE_URL", "BENCH_PROD_READONLY_URL", "OPENROUTER_API_KEY"];
+
+  async function withEnvValues(values, fn) {
+    const saved = Object.fromEntries(NAMES.map((name) => [name, process.env[name]]));
+    for (const name of NAMES) delete process.env[name];
+    Object.assign(process.env, values);
+    try {
+      return await fn();
+    } finally {
+      Reflect.deleteProperty(globalThis, KEY);
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  }
+
+  it("installs OpenRouter's gemini-embedding-001 where the app's resolver looks", async () => {
+    await withEnvValues({ OPENROUTER_API_KEY: "test-key" }, async () => {
+      const provider = await installOpenRouterEvalEmbeddings();
+      assert.equal(Reflect.get(globalThis, KEY), provider);
+      assert.equal(provider.name, "openrouter");
+      assert.equal(provider.model, "google/gemini-embedding-001");
+    });
+  });
+
+  it("refuses a non-local database and a missing key, and installs nothing", async () => {
+    await withEnvValues({ OPENROUTER_API_KEY: "test-key", DATABASE_URL: "postgresql://app@db.example.com:5432/postgres" }, async () => {
+      await assert.rejects(installOpenRouterEvalEmbeddings(), /non-local database in DATABASE_URL/);
+      assert.equal(Reflect.get(globalThis, KEY), undefined);
+    });
+    await withEnvValues({}, async () => {
+      await assert.rejects(installOpenRouterEvalEmbeddings(), /OPENROUTER_API_KEY missing/);
+      assert.equal(Reflect.get(globalThis, KEY), undefined);
+    });
+  });
+
+  it("fails, and installs nothing, once the app server has locked the slot at boot", () => {
+    // A child process: the lock is permanent for the process that takes it.
+    const code = `
+      const { lockEvalEmbeddingOverride } = await import("./src/lib/ai/eval-embedding-override-key.ts");
+      const { installOpenRouterEvalEmbeddings } = await import("./scripts/lib/sage-eval-provider.mjs");
+      lockEvalEmbeddingOverride();
+      try { await installOpenRouterEvalEmbeddings({ apiKey: "test-key" }); console.log("INSTALLED"); }
+      catch (error) { console.log("REFUSED " + error.message); }
+    `;
+    const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", code], {
+      cwd: path.resolve(import.meta.dirname, "..", ".."),
+      encoding: "utf8",
+      env: { ...process.env, DATABASE_URL: "", DIRECT_URL: "", ADMIN_DATABASE_URL: "", BENCH_PROD_READONLY_URL: "" },
+    });
+    assert.match(result.stdout, /^REFUSED .*locked/m, `${result.stdout}\n${result.stderr}`);
+  });
+
+  it("is installed by every --provider=openrouter eval", async () => {
+    await withEnvValues({ OPENROUTER_API_KEY: "test-key" }, async () => {
+      await resolveEvalProvider(["--provider=openrouter"]);
+      assert.equal(Reflect.get(globalThis, KEY)?.model, "google/gemini-embedding-001");
+    });
+  });
+});
+
+describe("trackEvalAborts", () => {
+  const abort = new EvalBudgetExhaustedError(undefined, "OpenRouter");
+
+  function provider(failWith) {
+    return {
+      name: "openrouter",
+      generateResponse: async () => "ok",
+      generateStructuredResponse: async () => {
+        if (failWith) throw failWith;
+        return "{}";
+      },
+      async *streamResponse() {
+        if (failWith) throw failWith;
+        yield "ok";
+      },
+    };
+  }
+
+  it("remembers an abort even when the caller swallows it, as memory extraction does", async () => {
+    const tracked = trackEvalAborts(provider(abort));
+    await tracked.provider.generateStructuredResponse("system", []).catch(() => undefined);
+    assert.throws(() => tracked.throwIfAborted(), (error) => error === abort);
+  });
+
+  it("remembers an abort thrown from a stream", async () => {
+    const tracked = trackEvalAborts(provider(abort));
+    await (async () => {
+      for await (const chunk of tracked.provider.streamResponse("system", [])) void chunk;
+    })().catch(() => undefined);
+    assert.throws(() => tracked.throwIfAborted(), (error) => error === abort);
+  });
+
+  it("does not treat an ordinary failure as an abort", async () => {
+    const tracked = trackEvalAborts(provider(new Error("model returned bad JSON")));
+    await tracked.provider.generateStructuredResponse("system", []).catch(() => undefined);
+    assert.doesNotThrow(() => tracked.throwIfAborted());
+  });
+
+  it("passes results through and keeps optional capabilities truthful", async () => {
+    const tracked = trackEvalAborts(provider(null));
+    assert.equal(await tracked.provider.generateResponse("system", []), "ok");
+    assert.equal(tracked.provider.name, "openrouter");
+    assert.equal("streamWithTools" in tracked.provider, false);
+    assert.doesNotThrow(() => tracked.throwIfAborted());
   });
 });

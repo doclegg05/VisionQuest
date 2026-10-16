@@ -25,6 +25,7 @@
  */
 
 import { extractTextFromBuffer } from "./extract";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { logLlmCall } from "@/lib/llm-usage";
 import { resolveAiProvider } from "@/lib/ai/provider";
@@ -171,7 +172,7 @@ export async function buildFileGist(params: {
       if (gist) return { gist, method: "cloud" };
     } catch (error) {
       logger.warn("Cloud gist threw; falling back to local extraction", {
-        error: error instanceof Error ? error.message : String(error),
+        error: errorForLog(error),
       });
     }
   }

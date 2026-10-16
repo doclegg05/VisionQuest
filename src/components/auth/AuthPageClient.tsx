@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Books, Briefcase, CheckCircle, Target } from "@phosphor-icons/react";
+import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { lookupErrorMessage } from "./error-message-lookup";
 
@@ -177,7 +178,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                     aria-hidden="true"
                     size={18}
                     weight="fill"
-                    className="mt-0.5 shrink-0 text-[var(--accent-tertiary)]"
+                    className="mt-0.5 shrink-0 text-white"
                   />
                   <p>{highlight}</p>
                 </div>
@@ -233,8 +234,9 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             {oauthErrorMessage && (
               <div
                 role="alert"
-                className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                className="mb-5 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
               >
+                <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
                 {oauthErrorMessage}
               </div>
             )}
@@ -271,7 +273,10 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 )}
 
                 {error && (
-                  <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+                  <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
+                    {error}
+                  </p>
                 )}
 
                 <button
@@ -326,7 +331,10 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                 </div>
 
                 {error && (
-                  <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+                  <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
+                    {error}
+                  </p>
                 )}
 
                 <button
@@ -339,7 +347,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
 
                 <a
                   href="/forgot-password"
-                  className="flex min-h-11 items-center justify-center text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+                  className="flex min-h-11 items-center justify-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
                 >
                   Forgot your password?
                 </a>
@@ -382,7 +390,7 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
             <div className="mt-8 flex flex-col items-center gap-3 sm:gap-4">
               <a
                 href="/teacher-register"
-                className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
               >
                 Staff? Register here
               </a>

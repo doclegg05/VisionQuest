@@ -53,7 +53,7 @@ export default async function LearningPage() {
         href="/resources"
         className="mt-4 block rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 transition-colors hover:bg-[var(--surface-interactive)]"
       >
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-info">
           Resource Center
         </p>
         <p className="mt-1 text-sm text-[var(--ink-strong)]">

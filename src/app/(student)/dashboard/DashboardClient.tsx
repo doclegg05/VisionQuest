@@ -217,7 +217,7 @@ export default function DashboardClient({
                 <NextStepIcon size={22} weight="bold" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-info">
                   Next action
                 </p>
                 <p className="mt-0.5 text-sm text-[var(--ink-muted)]">{nextStep.detail}</p>
@@ -286,7 +286,7 @@ export default function DashboardClient({
                       prefetch={false}
                       className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
                     >
-                      <ActionIcon size={16} weight="bold" className="text-[var(--accent-blue)]" />
+                      <ActionIcon size={16} weight="bold" className="text-info" />
                       {action.label}
                       <ArrowRight size={14} weight="bold" className="text-[var(--ink-faint)]" />
                     </Link>
@@ -341,7 +341,7 @@ export default function DashboardClient({
 
             {/* Achievement count */}
             <div className="flex items-center gap-2">
-              <Star size={24} weight="fill" className="text-[var(--accent-gold)]" />
+              <Star size={24} weight="fill" className="text-warning" />
               <div>
                 <p className="text-lg font-bold text-[var(--ink-strong)]">{achievements.length}</p>
                 <p className="text-xs text-[var(--ink-muted)]">achievements</p>
@@ -354,7 +354,7 @@ export default function DashboardClient({
             <div className="mt-4 space-y-2 border-t border-[var(--border)] pt-4">
               {recentAchievements.map((a) => (
                 <div key={a.key} className="flex items-center gap-2.5 text-sm">
-                  <Star size={16} weight="fill" className="shrink-0 text-[var(--accent-gold)]" />
+                  <Star size={16} weight="fill" className="shrink-0 text-warning" />
                   <span className="font-medium text-[var(--ink-strong)]">{a.label}</span>
                   <span className="text-xs text-[var(--ink-muted)]">{a.desc}</span>
                 </div>
@@ -386,7 +386,7 @@ export default function DashboardClient({
                 Appointments and follow-ups.
               </p>
             </div>
-            <Link href="/appointments" prefetch={false} className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-green)]">
+            <Link href="/appointments" prefetch={false} className="inline-flex min-h-11 items-center text-sm font-semibold text-success">
               Open
             </Link>
           </div>
@@ -395,7 +395,7 @@ export default function DashboardClient({
             <div>
               {nextAppointment ? (
                 <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4">
-                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-blue)]">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-info">
                     <CalendarDots size={14} weight="bold" />
                     Next Appointment
                   </p>
@@ -418,7 +418,7 @@ export default function DashboardClient({
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Follow-ups</p>
                 {alertCount > 0 && (
-                  <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-red)]">
+                  <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-2.5 py-1 text-xs font-semibold text-danger">
                     {alertCount} alert{alertCount === 1 ? "" : "s"}
                   </span>
                 )}
@@ -433,10 +433,10 @@ export default function DashboardClient({
                         <p className="text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                           task.priority === "high"
-                            ? "bg-[rgba(224,85,85,0.12)] text-[var(--accent-red)]"
+                            ? "bg-[rgba(224,85,85,0.12)] text-danger"
                             : task.priority === "low"
                               ? "bg-[var(--surface-overlay)] text-[var(--ink-muted)]"
-                              : "bg-[rgba(211,178,87,0.12)] text-[var(--accent-gold)]"
+                              : "bg-[rgba(211,178,87,0.12)] text-warning"
                         }`}>
                           {task.priority}
                         </span>

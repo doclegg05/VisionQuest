@@ -1,0 +1,120 @@
+import { NextResponse } from "next/server";
+import { writeDetectedAlert } from "@/lib/alert-hold";
+import { isAuthorizedInternalRequest } from "@/lib/csrf";
+import { prismaAdmin as prisma } from "@/lib/db";
+import { buildGoalStaleAlert, TERMINAL_GOAL_STATUSES, type GoalStaleAlert } from "@/lib/stale-goal-rules";
+import { errorForLog } from "@/lib/log-error";
+import { logger } from "@/lib/logger";
+
+export const dynamic = "force-dynamic";
+
+// One transaction holds every upsert of a program-wide run, so Prisma's 5 s
+// default is too short. The pg_cron job waits 120 s (timeout_milliseconds in
+// 20261015120000_add_stall_detector_cron), longer than this.
+const TRANSACTION_OPTIONS = { timeout: 90_000, maxWait: 10_000 };
+
+type StaleGoalAlert = GoalStaleAlert & { studentId: string };
+
+async function findStaleGoalAlerts(now: Date): Promise<{ scanned: number; stale: StaleGoalAlert[] }> {
+  const goals = await prisma.goal.findMany({
+    where: { status: { notIn: [...TERMINAL_GOAL_STATUSES] } },
+    select: {
+      id: true,
+      studentId: true,
+      level: true,
+      status: true,
+      updatedAt: true,
+      lastReviewedAt: true,
+    },
+  });
+
+  const stale = goals.flatMap((goal) => {
+    const alert = buildGoalStaleAlert(goal, now);
+    return alert ? [{ ...alert, studentId: goal.studentId }] : [];
+  });
+  return { scanned: goals.length, stale };
+}
+
+/** Upserts the stale goals' alerts and resolves the rest; returns how many are new. */
+async function syncGoalStaleAlerts(stale: StaleGoalAlert[], now: Date): Promise<number> {
+  const staleGoalIds = new Set(stale.map((alert) => alert.sourceId));
+
+  return prisma.$transaction(async (tx) => {
+    const existing = new Map(
+      (
+        await tx.studentAlert.findMany({
+          where: { alertKey: { in: stale.map((alert) => alert.alertKey) } },
+          select: { alertKey: true, status: true, snoozedUntil: true },
+        })
+      ).map((a) => [a.alertKey, a]),
+    );
+
+    for (const alert of stale) {
+      await writeDetectedAlert(tx, existing.get(alert.alertKey), alert, now);
+    }
+
+    // Resolve only "open" alerts, so snoozed and dismissed ones keep their state.
+    const openStaleAlerts = await tx.studentAlert.findMany({
+      where: { type: "goal_stale", status: "open" },
+      select: { id: true, sourceId: true },
+    });
+    const toResolve = openStaleAlerts
+      .filter((a) => a.sourceId && !staleGoalIds.has(a.sourceId))
+      .map((a) => a.id);
+    if (toResolve.length > 0) {
+      await tx.studentAlert.updateMany({
+        where: { id: { in: toResolve } },
+        data: { status: "resolved", resolvedAt: now },
+      });
+    }
+
+    return stale.filter((alert) => !existing.has(alert.alertKey)).length;
+  }, TRANSACTION_OPTIONS);
+}
+
+/**
+ * POST /api/internal/goal-stale-detection
+ *
+ * Daily (pg_cron job goal-stale-detection, 10:45 UTC). Scans every
+ * non-terminal goal with the level-aware rule the intervention queue uses
+ * (daily 3 days, weekly 7, monthly 14, quarterly 30, BHAG 60, measured from
+ * the last review, else the last update), opens a goal_stale StudentAlert for
+ * each stale goal, and resolves open ones whose goals are no longer stale.
+ * The alert sync builds the same alert on activity; this job covers students
+ * with no activity to trigger it.
+ *
+ * Auth: Bearer CRON_SECRET.
+ */
+export async function POST(req: Request) {
+  const authorized = isAuthorizedInternalRequest(
+    new URL(req.url).pathname,
+    req.headers.get("authorization"),
+    process.env.CRON_SECRET,
+  );
+  if (!authorized) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const start = Date.now();
+  const now = new Date();
+
+  try {
+    const { scanned, stale } = await findStaleGoalAlerts(now);
+    const newAlerts = await syncGoalStaleAlerts(stale, now);
+
+    logger.info("Stale goal detection complete", {
+      scanned,
+      newAlerts,
+      durationMs: Date.now() - start,
+    });
+
+    return NextResponse.json({
+      scanned,
+      newAlerts,
+      timestamp: now.toISOString(),
+    });
+  } catch (error: unknown) {
+    logger.error("Stale goal detection failed", { error: errorForLog(error) });
+    return NextResponse.json({ error: "Stale goal detection failed" }, { status: 500 });
+  }
+}

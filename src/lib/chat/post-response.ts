@@ -48,7 +48,11 @@ import { recordInsight } from "@/lib/sage/record-insight";
 import { proposeGoal } from "@/lib/sage/propose-goal";
 import { maybeCreateGoalProposalWager } from "@/lib/sage/propose-goal-wager";
 import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
-import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-extractor";
+import {
+  extractDiscoverySignals,
+  topClusterIds,
+  type DiscoveryResult,
+} from "@/lib/sage/discovery-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
 import { extractAndStoreMemories } from "@/lib/sage/memory/extract";
@@ -61,6 +65,7 @@ import {
 } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { upsertDiscoveryFromExtraction } from "@/lib/career-discovery";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { generateConversationTitle } from "./conversation";
@@ -78,6 +83,39 @@ const DEFAULT_MEMORY_EXTRACT_DAILY_LIMIT = 200;
 function getMemoryExtractDailyLimit(): number {
   const raw = Number.parseInt(process.env.SAGE_MEMORY_EXTRACT_DAILY_LIMIT ?? "", 10);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MEMORY_EXTRACT_DAILY_LIMIT;
+}
+
+/**
+ * True when a parsed discovery extraction recorded nothing at all: no list
+ * entry, no score above zero, no summary text, and no completion. Each pass
+ * replaces the stored CareerDiscovery fields wholesale, so writing an empty
+ * pass can only erase what earlier turns found. The model returns this
+ * shape when it has nothing yet (the prompt asks for it), and a local model
+ * in JSON mode can return a bare `{}`. Neither is a failure, so neither is
+ * dead-lettered; the turn simply writes nothing. A missing row means the
+ * teacher's Career Discovery card reads "Not Started" until a turn carries
+ * a signal, which is what that card already shows when no row exists.
+ */
+function isEmptyDiscoveryResult(result: DiscoveryResult): boolean {
+  const lists = [
+    result.interests,
+    result.strengths,
+    result.subjects,
+    result.problems,
+    result.values,
+    result.circumstances,
+    result.national_career_clusters,
+    result.transferable_skills,
+    result.work_values,
+  ];
+  return (
+    !result.stage_complete &&
+    lists.every((list) => list.length === 0) &&
+    Object.values(result.cluster_scores).every((score) => score <= 0) &&
+    Object.values(result.riasec_scores).every((score) => score <= 0) &&
+    result.summary.trim() === "" &&
+    result.assessment_summary.trim() === ""
+  );
 }
 
 // ─── Per-turn model-call budget (priority order + optional cap) ─────────────
@@ -303,7 +341,7 @@ async function runPostResponse(
       });
     }
   } catch (err) {
-    logger.error("Readability check failed", { conversationId, error: String(err) });
+    logger.error("Readability check failed", { conversationId, error: errorForLog(err) });
   }
 
   const provider = await resolveAiProvider({
@@ -366,7 +404,7 @@ async function runPostResponse(
     ).catch((err) =>
       logger.error("Classroom confirmation extractor failed", {
         student: studentLogKey(studentId),
-        error: String(err),
+        error: errorForLog(err),
       }),
     );
   }
@@ -414,7 +452,7 @@ async function runPostResponse(
       }).catch((err) =>
         logger.error("Memory extraction failed", {
           student: studentLogKey(studentId),
-          error: String(err),
+          error: errorForLog(err),
         }),
       );
     }
@@ -437,7 +475,7 @@ async function runPostResponse(
           {
             label: "Discovery extraction",
             alertKey: "discovery_extraction_exhausted",
-            context: { conversationId, studentId },
+            context: { conversationId, student: studentLogKey(studentId) },
             studentId,
             conversationId,
             failurePayload: () => JSON.stringify(discoveryWindow),
@@ -484,12 +522,19 @@ async function runPostResponse(
             sourceId: conversationId,
             xp: 25,
             mutate: () => {},
-          }).catch((err) => logger.error("Failed to award discovery XP", { error: String(err) }));
+          }).catch((err) => logger.error("Failed to award discovery XP", { error: errorForLog(err) }));
+        } else if (isEmptyDiscoveryResult(discoveryResult)) {
+          // Writing an empty pass would erase what earlier turns found. The
+          // log line is the only trace if a model keeps replying with nothing.
+          logger.info("Discovery extraction found no signals; CareerDiscovery left unchanged", {
+            student: studentLogKey(studentId),
+            conversationId,
+          });
         } else {
           await upsertDiscoveryFromExtraction(studentId, upsertData);
         }
       } catch (err) {
-        logger.error("Discovery extraction failed", { error: String(err) });
+        logger.error("Discovery extraction failed", { error: errorForLog(err) });
       }
     }
 
@@ -497,7 +542,7 @@ async function runPostResponse(
     try {
       await generateConversationTitle(conversationId, fullResponse, conversationTitle);
     } catch (err) {
-      logger.error("Failed to generate conversation title", { error: String(err) });
+      logger.error("Failed to generate conversation title", { error: errorForLog(err) });
     }
 
     // Rolling summary compaction is now handled by maybeUpdateSummary in the route
@@ -570,7 +615,7 @@ async function runPostResponse(
         .catch((err) =>
           logger.error("Failed to record Sage insight", {
             conversationId,
-            error: String(err),
+            error: errorForLog(err),
           }),
         );
     }
@@ -610,7 +655,7 @@ async function runPostResponse(
             logger.warn("Goal proposal rejected", { level: goal.level, reason: result.reason });
           }
         } catch (err) {
-          logger.error("Failed to propose goal", { level: goal.level, error: String(err) });
+          logger.error("Failed to propose goal", { level: goal.level, error: errorForLog(err) });
         }
       }
     }
@@ -637,7 +682,7 @@ async function runPostResponse(
           data: { stage: newStage },
         });
       } catch (err) {
-        logger.error("Failed to update conversation stage", { error: String(err) });
+        logger.error("Failed to update conversation stage", { error: errorForLog(err) });
       }
     }
   }
@@ -664,7 +709,7 @@ async function runPostResponse(
         }
       }
     } catch (err) {
-      logger.error("Failed to record review XP", { error: String(err) });
+      logger.error("Failed to record review XP", { error: errorForLog(err) });
     }
   }
 
@@ -676,7 +721,7 @@ async function runPostResponse(
     plan.markRan("mood");
     const moodMessages = [...allMessages, { role: "model" as const, content: fullResponse }];
     extractMoodFromConversation(conversationId, studentId, moodMessages, moodProvider).catch((err) =>
-      logger.error("Mood extraction failed", { conversationId, error: String(err) })
+      logger.error("Mood extraction failed", { conversationId, error: errorForLog(err) })
     );
   }
 
@@ -684,7 +729,7 @@ async function runPostResponse(
   try {
     await generateConversationTitle(conversationId, fullResponse, conversationTitle);
   } catch (err) {
-    logger.error("Failed to generate conversation title", { error: String(err) });
+    logger.error("Failed to generate conversation title", { error: errorForLog(err) });
   }
 
   // Summary compaction is now handled by maybeUpdateSummary in the route

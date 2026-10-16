@@ -32,6 +32,16 @@
  * applied at write time. Layer 3 is the same function applied at render time
  * in retrieve.ts, so a row written by some other path — a manual correction, a
  * future importer — still cannot reach a prompt.
+ *
+ * Since 2026-10-16 every extracted staff fact opens with the fixed subject
+ * "This instructor" (STAFF_FACT_SUBJECT in staff-extract.ts), and the
+ * extractor rejects items that don't. So the opener this guard sees is always
+ * "This", and the verb after it is lowercase and never reaches the
+ * proper-noun scan. Before that, the prompt asked for a bare opening verb, and
+ * every verb missing from SAFE_CAPITALIZED_TOKENS read as a name: the memory
+ * eval diagnosis measured 31 to 35% of staff facts dropped that way, all for
+ * their opening verb ("Lacks", "Translates", "Conducts"). The scan itself did
+ * not change. Every capitalized word after the frame is still checked.
  */
 
 /**
@@ -41,10 +51,11 @@
  *
  * Sentence-initial capitals are NOT exempt: "Jasmine needs a bus pass" would
  * sail through any position-aware scan, and that is exactly the sentence this
- * guard exists to stop. The cost is that staff memories must open with an
- * ordinary verb or adverb ("Prefers…", "Reviews…", "Usually…"), which is the
- * shape the extraction prompt asks for and the shape student memories already
- * have ("Wants to become a CNA.").
+ * guard exists to stop. The cost is that a staff memory must open with a
+ * listed token. Extracted facts open with "This instructor" for that reason
+ * (see the module header). Rows stored before 2026-10-16 open with a bare
+ * verb or adverb ("Prefers…", "Reviews…", "Usually…"), so the verbs below
+ * stay listed for them.
  *
  * Deliberately EXCLUDED even though they are ordinary words: Mark, Grace,
  * Will, May, June, Bill, Rose, Hope, Faith — every one of them is also a
@@ -60,7 +71,8 @@
  */
 const SAFE_CAPITALIZED_TOKENS = new Set(
   [
-    // Sentence-opening verbs the extraction prompt asks for.
+    // Sentence-opening verbs the extraction prompt asked for before 2026-10-16.
+    // Rows stored in that shape still pass through this guard at render time.
     "Prefers", "Wants", "Needs", "Uses", "Works", "Runs", "Keeps", "Reviews",
     "Checks", "Asks", "Likes", "Avoids", "Schedules", "Starts", "Ends",
     "Blocks", "Sets", "Plans", "Tracks", "Handles", "Follows", "Prioritizes",
@@ -148,6 +160,20 @@ function isSafeWhenCapitalized(token: string): boolean {
 const PRONOUN_RE = /\b(his|hers?|theirs?|him|she|he|they)\b/iu;
 
 /**
+ * The fixed subject every extracted staff fact opens with. staff-extract.ts
+ * puts it in the prompt and checks for it; the guard uses it to recognize a
+ * framed fact. It lives here so the extractor can import it without a cycle.
+ */
+export const STAFF_FACT_SUBJECT = "This instructor";
+
+/**
+ * Third-person gendered pronouns. In a fact about "this instructor" they point
+ * at a third person. "they" and "their" are left out: the extractor uses them
+ * for the instructor and for learners in general.
+ */
+const GENDERED_PRONOUN_RE = /\b(he|she|him|his|her|hers)\b/iu;
+
+/**
  * True when `content` must not be stored as (or rendered from) a
  * teacher-subject memory. See the module header for the drop-biased rationale.
  */
@@ -191,6 +217,12 @@ export function looksLikeStudentReference(content: string): boolean {
   // unrecognized lowercase word) risks rejecting ordinary staff prose that
   // simply forgot to capitalize a non-name word, which is a worse failure
   // mode for a drop-biased guard than the documented residual miss.
+  //
+  // Facts from staff-extract.ts open with "This instructor", so this check
+  // never fires on them, and a lowercase name sits later in the sentence
+  // ("This instructor says jasmine…"). The framed-fact check below covers the
+  // pronoun half of that case. A lowercase name with no pronoun still passes,
+  // the same residual as before.
   const firstToken = tokens[0];
   if (
     firstToken !== undefined &&
@@ -198,6 +230,18 @@ export function looksLikeStudentReference(content: string): boolean {
     !isSafeWhenCapitalized(firstToken) &&
     PRONOUN_RE.test(content)
   ) {
+    return true;
+  }
+
+  // Framed-fact check: a "This instructor …" fact is about the instructor, so
+  // a gendered pronoun in it refers to someone else, most likely a student.
+  // Drop-biased: an instructor's own "her caseload" is dropped too, which the
+  // prompt avoids by asking for "they". Measured on 66 stored facts in the
+  // 2026-10-16 A/B: 0 contained one. Running the lowercase-name check above on
+  // the text after the frame was measured too and rejected: it dropped 8 of
+  // the 66, mostly "This instructor performs their review pass…", because
+  // any verb missing from the allowlist plus "their" fires it.
+  if (content.startsWith(STAFF_FACT_SUBJECT) && GENDERED_PRONOUN_RE.test(content)) {
     return true;
   }
 

@@ -42,13 +42,18 @@ function runEval(script, extraArgs, status) {
 const SCRIPTS = [
   ["scripts/sage-redteam-eval.mjs", []],
   ["scripts/sage-chat-harness.mjs", ["--families=guardrail"]],
+  // Each of these families had its own catch that graded a drained wallet as
+  // a failed case, and the run exited 0 without --strict (2026-10-15).
+  ["scripts/sage-chat-harness.mjs", ["--families=readability"]],
+  ["scripts/sage-chat-harness.mjs", ["--families=activity"]],
+  ["scripts/sage-chat-harness.mjs", ["--families=career"]],
   ["scripts/sage-agent-eval.mjs", []],
   ["scripts/sage-quality-eval.mjs", []],
 ];
 
 describe("eval runs that cannot evaluate exit with 'not run' codes", () => {
   for (const [script, args] of SCRIPTS) {
-    it(`${path.basename(script)} exits 3 when OpenRouter credits run out`, () => {
+    it(`${path.basename(script)} ${args.join(" ")} exits 3 when OpenRouter credits run out`, () => {
       const { code, output } = runEval(script, args, 402);
       assert.equal(code, 3, output.slice(-1500));
       assert.match(output, /OpenRouter budget exhausted/);
@@ -56,7 +61,7 @@ describe("eval runs that cannot evaluate exit with 'not run' codes", () => {
   }
 
   for (const [script, args] of SCRIPTS) {
-    it(`${path.basename(script)} exits 4 when OpenRouter cannot be reached at all`, () => {
+    it(`${path.basename(script)} ${args.join(" ")} exits 4 when OpenRouter cannot be reached at all`, () => {
       // Before 2026-10-14 every case was graded as a miss: the agent eval
       // printed "0.0% (0/45)" and exited 0, and the run took two minutes of
       // retries against a dead connection.
@@ -66,10 +71,34 @@ describe("eval runs that cannot evaluate exit with 'not run' codes", () => {
     });
   }
 
+  it("sage-quality-eval.mjs exits 1 when no scenario produced a reply", () => {
+    // Every call fails with a 500, which is not a not-run error. Before
+    // 2026-10-15 the eval printed "Replies generated: 0/8" and exited 0.
+    const { code, output } = runEval("scripts/sage-quality-eval.mjs", [], 500);
+    assert.equal(code, 1, output.slice(-1500));
+    assert.match(output, /No scenario produced a reply/);
+  });
+
   it("sage-agent-eval.mjs exits 4 when the model is unavailable", () => {
     const { code, output } = runEval("scripts/sage-agent-eval.mjs", [], 404);
     assert.equal(code, 4, output.slice(-1500));
     assert.match(output, /provider or model unavailable/);
+  });
+
+  it("sage-agent-eval.mjs exits 4 when OpenRouter does not know the model id", () => {
+    const { code, output } = runEval("scripts/sage-agent-eval.mjs", [], "unknown-model");
+    assert.equal(code, 4, output.slice(-1500));
+    assert.match(output, /provider or model unavailable/);
+  });
+
+  it("sage-quality-eval.mjs exits 1 and names the 400 when OpenRouter rejects the request shape", () => {
+    // Before 2026-10-15 every 400 read as "provider or model unavailable"
+    // (exit 4), which sends a developer to rotate a key instead of fixing
+    // the request.
+    const { code, output } = runEval("scripts/sage-quality-eval.mjs", [], 400);
+    assert.equal(code, 1, output.slice(-1500));
+    assert.match(output, /OpenRouter request failed \(400, bad_request\)/);
+    assert.doesNotMatch(output, /provider or model unavailable/);
   });
 });
 
@@ -93,6 +122,66 @@ describe("sage-memory-eval checks the provider before touching the database", ()
     assert.match(output, /refuses to run with a non-local database in DATABASE_URL/, output.slice(-1500));
     assert.doesNotMatch(output, /PrismaClient|Can't reach database|P1001/, output.slice(-1500));
     assert.notEqual(result.status, 0);
+  });
+});
+
+/** Runs the embedding preflight under the OpenRouter stub. node --import tsx, so it also runs where the tsx CLI cannot. */
+function runPreflight(status) {
+  const result = spawnSync(process.execPath, ["--import", "tsx", "--import", PRELOAD, "scripts/sage-embedding-preflight.mjs"], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    timeout: 120_000,
+    env: {
+      ...process.env,
+      STUB_OPENROUTER_STATUS: String(status),
+      OPENROUTER_API_KEY: "stub-openrouter-key",
+      DATABASE_URL: LOOPBACK_DB,
+      DIRECT_URL: LOOPBACK_DB,
+      ADMIN_DATABASE_URL: LOOPBACK_DB,
+      BENCH_PROD_READONLY_URL: LOOPBACK_DB,
+    },
+  });
+  return { code: result.status, output: `${result.stdout}\n${result.stderr}` };
+}
+
+describe("sage-embedding-preflight says whether OpenRouter embeddings work", () => {
+  it("exits 0 when OpenRouter embeds", () => {
+    const { code, output } = runPreflight("ok");
+    assert.equal(code, 0, output.slice(-1500));
+    assert.match(output, /OpenRouter embeddings reachable \(google\/gemini-embedding-001\)/);
+  });
+
+  it("exits 3 when credits run out", () => {
+    const { code, output } = runPreflight(402);
+    assert.equal(code, 3, output.slice(-1500));
+    assert.match(output, /OpenRouter embeddings budget exhausted/);
+  });
+
+  it("exits 4 when the model has no endpoint that meets the retention rule", () => {
+    const { code, output } = runPreflight(404);
+    assert.equal(code, 4, output.slice(-1500));
+    assert.match(output, /OpenRouter embeddings provider or model unavailable/);
+  });
+
+  it("exits 4 when OpenRouter cannot be reached", () => {
+    const { code, output } = runPreflight("network");
+    assert.equal(code, 4, output.slice(-1500));
+    assert.match(output, /OpenRouter embeddings could not be reached/);
+  });
+
+  it("exits 4 when OpenRouter does not know the embedding model id", () => {
+    const { code, output } = runPreflight("unknown-model");
+    assert.equal(code, 4, output.slice(-1500));
+    assert.match(output, /OpenRouter embeddings provider or model unavailable/);
+  });
+
+  it("exits 1 and names the 400 when OpenRouter rejects the request shape", () => {
+    // A preflight that sends a body OpenRouter refuses is a bug in the
+    // request, not a refused key, so it must not read NOT RUN.
+    const { code, output } = runPreflight(400);
+    assert.equal(code, 1, output.slice(-1500));
+    assert.match(output, /OpenRouter request failed \(400, bad_request\)/);
+    assert.doesNotMatch(output, /provider or model unavailable/);
   });
 });
 

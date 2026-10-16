@@ -228,7 +228,7 @@ export default function FileManager() {
                       href={`/api/files/download?id=${file.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)]"
+                      className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[var(--surface-muted)]"
                     >
                       View
                     </a>

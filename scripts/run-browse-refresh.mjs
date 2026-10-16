@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// DEPRECATED as of Phase 1 (pg_cron migration). The scheduled run is handled
-// by the `browse-refresh` job in Supabase pg_cron. This script is kept as a
-// manual trigger for debugging and as a rollback fallback.
-// See docs/plans/pg-cron-setup-runbook.md.
+// Manual trigger for POST /api/internal/jobs/browse-refresh. No pg_cron job
+// calls that route, and none has ever been registered: the browse pool always
+// pulls the hardcoded big-tech ATS boards, so it stays manual until the
+// VQ-R-015 decision (docs/plans/2026-10-15-unscheduled-internal-routes.md).
+// Needs APP_BASE_URL and CRON_SECRET.
 
 function required(name) {
   const value = process.env[name];

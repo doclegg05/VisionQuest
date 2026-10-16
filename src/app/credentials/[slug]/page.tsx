@@ -81,7 +81,7 @@ export default async function PublicCredentialPage({
           </div>
           <div className="surface-section p-5">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Verified on</p>
-            <p className="mt-2 text-2xl font-bold text-[var(--accent-secondary)]">
+            <p className="mt-2 text-2xl font-bold text-info">
               {certification.completedAt ? new Date(certification.completedAt).toLocaleDateString() : "Verified"}
             </p>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">Certification completion date</p>
@@ -108,7 +108,7 @@ export default async function PublicCredentialPage({
             </div>
             <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Verification status</p>
-              <p className="mt-2 text-3xl font-bold text-[var(--accent-secondary)]">Completed</p>
+              <p className="mt-2 text-3xl font-bold text-info">Completed</p>
             </div>
           </div>
         </section>

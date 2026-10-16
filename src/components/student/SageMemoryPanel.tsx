@@ -58,7 +58,7 @@ export function SageMemoryPanel() {
   return (
     <div>
       {error && (
-        <p className="theme-card mb-4 rounded-xl p-4 text-sm text-[var(--error)]">{error}</p>
+        <p className="theme-card mb-4 rounded-xl p-4 text-sm text-danger">{error}</p>
       )}
 
       {memories === null ? (

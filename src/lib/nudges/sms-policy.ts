@@ -19,9 +19,9 @@
 // =============================================================================
 
 import { prismaAdmin } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
-import { redactContactInfo } from "@/lib/log-redaction";
 import { sendSms } from "@/lib/sms";
 
 import { takeSendLock } from "./advisory-locks";
@@ -183,7 +183,7 @@ export async function sendPolicySms(input: SendPolicySmsInput): Promise<SmsSendR
       channel: "sms",
       templateKey: input.templateKey,
       student: studentLogKey(input.studentId),
-      error: redactContactInfo(String(error)),
+      error: errorForLog(error),
     });
     return { status: "refused", reason: "send_error" };
   }

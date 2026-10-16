@@ -1,4 +1,5 @@
 import { adminClientIsPrivileged } from "@/lib/nudges/admin-guard";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 
 /**
@@ -96,7 +97,7 @@ function startAdminClientProbe(): void {
           "or the database did not answer the probe.",
       });
     } catch (error) {
-      logger.error("boot_probe_admin_client_failed", { error: String(error) });
+      logger.error("boot_probe_admin_client_failed", { error: errorForLog(error) });
     }
   })();
 }

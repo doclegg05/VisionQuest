@@ -576,7 +576,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <Link href={`/teacher/students/${studentId}`} className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--accent-strong)] hover:text-[var(--ink-strong)]">
+          <Link href={`/teacher/students/${studentId}`} className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-success hover:text-[var(--ink-strong)] hover:underline">
             ← Back to student detail
           </Link>
           <h1 className="mt-2 font-display text-3xl text-[var(--ink-strong)]">{payload.student.displayName}</h1>
@@ -627,7 +627,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
       <section className="surface-section p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Intake</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Intake</p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Referral, enrollment, and outcomes</h2>
           </div>
           <button
@@ -847,7 +847,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <section className="surface-section p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Checklist</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Checklist</p>
           <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Orientation and program files</h2>
           <div className="mt-5 space-y-4">
             {renderChecklistSection("Orientation items", orientationTemplates)}
@@ -856,7 +856,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         </section>
 
         <section className="surface-section p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Modules</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Modules</p>
           <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Certifications & SPOKES modules</h2>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">
             Click a category to expand. Mark each certification complete with the date earned.
@@ -1000,7 +1000,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
       <section className="surface-section p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Exit follow-through</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Exit follow-through</p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Employment follow-up</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               Record the 1-, 3-, and 6-month check-ins required after unsubsidized employment.
@@ -1047,7 +1047,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                             notes: item.followUp?.notes || "",
                           })
                         }
-                        className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                        className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-success hover:text-[var(--ink-strong)] hover:underline"
                       >
                         Edit
                       </button>

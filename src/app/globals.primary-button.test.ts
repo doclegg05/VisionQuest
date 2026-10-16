@@ -12,6 +12,8 @@ import { join } from "node:path";
  * already carried --on-accent for this; the button never used it. axe reports
  * gradient backgrounds as "incomplete", not as violations, which is how the
  * authenticated contrast gate stayed green (HIG review A-2).
+ *
+ * 2026-10-15: SPOKES makes the primary button solid --primary (spec Design 2.6), so its ink is --on-primary.
  */
 
 const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
@@ -56,10 +58,13 @@ function primaryButtonRule(): { color: string; stops: string[] } {
   const rule = css.match(/\.primary-button\s*\{([^}]*)\}/);
   assert.ok(rule, ".primary-button rule not found");
   const color = rule[1].match(/(?:^|;)\s*color:\s*([^;]+);/)?.[1].trim() ?? "";
-  const gradient = rule[1].match(/background:\s*linear-gradient\((.*)\);/)?.[1] ?? "";
-  const stops = splitTopLevel(gradient)
-    .slice(1)
-    .map((stop) => stop.trim().replace(/\s+\d+%$/, ""));
+  const background = rule[1].match(/(?:^|;)\s*background:\s*([^;]+);/)?.[1].trim() ?? "";
+  const gradient = background.match(/^linear-gradient\((.*)\)$/)?.[1];
+  // A solid fill is one stop; a gradient is every stop after its angle.
+  const stops =
+    gradient === undefined
+      ? background ? [background] : []
+      : splitTopLevel(gradient).slice(1).map((stop) => stop.trim().replace(/\s+\d+%$/, ""));
   return { color, stops };
 }
 
@@ -82,8 +87,8 @@ function splitTopLevel(list: string): string[] {
 }
 
 describe(".primary-button contrast", () => {
-  it("takes its ink from --on-accent", () => {
-    assert.equal(primaryButtonRule().color, "var(--on-accent)");
+  it("takes its ink from --on-primary", () => {
+    assert.equal(primaryButtonRule().color, "var(--on-primary)");
   });
 
   for (const theme of ["light", "dark"] as const) {

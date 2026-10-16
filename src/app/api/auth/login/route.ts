@@ -14,6 +14,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody, loginSchema } from "@/lib/schemas";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -97,7 +98,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
       }
     } catch (err) {
-      logger.warn("Password rehash failed", { student: studentLogKey(student.id), error: String(err) });
+      logger.warn("Password rehash failed", { student: studentLogKey(student.id), error: errorForLog(err) });
     }
   }
 

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
 import { validateUploadContent } from "@/lib/file-security";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
@@ -153,7 +154,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     });
   } catch (error) {
     if (error instanceof Error && error.name === "ApiError") throw error;
-    logger.error("Signature submission error", { error: String(error) });
+    logger.error("Signature submission error", { error: errorForLog(error) });
     return NextResponse.json({ error: "Signature submission failed." }, { status: 500 });
   }
 });

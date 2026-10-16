@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { inspect } from "node:util";
 import {
   OPENROUTER_PRIVACY,
   OpenRouterError,
@@ -18,6 +19,10 @@ const MESSAGES: ChatMessage[] = [
   { role: "user", content: "q2" },
 ];
 const encoder = new TextEncoder();
+/** OpenRouter's reply when the model id does not exist. */
+const UNKNOWN_MODEL_BODY = { error: { message: "acme/no-such-model is not a valid model ID", code: 400 }, user_id: "user_1" };
+/** A request-shape rejection: the caller sent a body OpenRouter's schema refuses. */
+const REQUEST_SHAPE_BODY = { error: { message: "messages.1.content: Expected string, received array", code: 400 } };
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -99,6 +104,23 @@ describe("classifyOpenRouterFailure", () => {
     assert.equal(classifyOpenRouterFailure(503, ""), "unavailable");
     assert.equal(classifyOpenRouterFailure(400, ""), "bad_request");
     assert.equal(classifyOpenRouterFailure(401, ""), "bad_request");
+  });
+
+  it("reads a 400 whose body rejects the model id as an unknown model", () => {
+    assert.equal(classifyOpenRouterFailure(400, JSON.stringify(UNKNOWN_MODEL_BODY)), "unknown_model");
+    assert.equal(classifyOpenRouterFailure(400, '{"error":{"message":"Model acme/old-model not found","code":400}}'), "unknown_model");
+  });
+
+  it("keeps a 400 about the request shape a bad request, even when it names the model field", () => {
+    // The evals read unknown_model as "not run"; a schema bug that mentions
+    // the model field must still read as a failed run.
+    assert.equal(classifyOpenRouterFailure(400, JSON.stringify(REQUEST_SHAPE_BODY)), "bad_request");
+    assert.equal(classifyOpenRouterFailure(400, '{"error":{"message":"model: Expected string, received number","code":400}}'), "bad_request");
+  });
+
+  it("reads the model wording only on a 400", () => {
+    assert.equal(classifyOpenRouterFailure(401, JSON.stringify(UNKNOWN_MODEL_BODY)), "bad_request");
+    assert.equal(classifyOpenRouterFailure(404, JSON.stringify(UNKNOWN_MODEL_BODY)), "bad_request");
   });
 });
 
@@ -214,6 +236,27 @@ describe("OpenRouterProvider non-streaming", () => {
     });
     assert.equal(bodies.length, 1);
   });
+
+  it("names an unknown model id without retrying and keeps the body out of the message", async () => {
+    const { fetchImpl, bodies } = recordingFetch([() => jsonResponse(400, UNKNOWN_MODEL_BODY)]);
+    await assert.rejects(makeProvider(fetchImpl).generateResponse("sys", MESSAGES), (error) => {
+      assert.ok(error instanceof OpenRouterError);
+      assert.equal(error.kind, "unknown_model");
+      assert.equal(error.status, 400);
+      assert.equal(error.message.includes("no-such-model"), false);
+      assert.equal(error.message.includes("valid model"), false);
+      return true;
+    });
+    assert.equal(bodies.length, 1);
+  });
+
+  it("keeps a request-shape 400 a bad request", async () => {
+    const { fetchImpl } = recordingFetch([() => jsonResponse(400, REQUEST_SHAPE_BODY)]);
+    await assert.rejects(
+      makeProvider(fetchImpl).generateResponse("sys", MESSAGES),
+      (error) => error instanceof OpenRouterError && error.kind === "bad_request" && error.status === 400,
+    );
+  });
 });
 
 describe("OpenRouterProvider streaming", () => {
@@ -286,6 +329,20 @@ describe("OpenRouterProvider stream errors", () => {
       drain(makeProvider(fetchImpl).streamResponse("sys", MESSAGES)),
       (error) => error instanceof OpenRouterError && error.kind === "credits",
     );
+    assert.equal(bodies.length, 1);
+  });
+
+  it("names an unknown model reported in the first stream event, without retrying", async () => {
+    const { fetchImpl, bodies } = recordingFetch([
+      () => sseResponse([UNKNOWN_MODEL_BODY]),
+      () => sseResponse([textChunk("should not be fetched")]),
+    ]);
+    await assert.rejects(drain(makeProvider(fetchImpl).streamResponse("sys", MESSAGES)), (error) => {
+      assert.ok(error instanceof OpenRouterError);
+      assert.equal(error.kind, "unknown_model");
+      assert.equal(error.message.includes("no-such-model"), false);
+      return true;
+    });
     assert.equal(bodies.length, 1);
   });
 });
@@ -569,4 +626,12 @@ describe("OpenRouterProvider refuses the app server", () => {
       }
     });
   }
+});
+
+describe("OpenRouterProvider key handling", () => {
+  it("never exposes the key when the provider is logged or serialized", () => {
+    const provider = new OpenRouterProvider("sk-or-secret-value", MODEL);
+    assert.doesNotMatch(JSON.stringify(provider), /sk-or-secret-value/);
+    assert.doesNotMatch(inspect(provider, { showHidden: true, depth: 5 }), /sk-or-secret-value/);
+  });
 });

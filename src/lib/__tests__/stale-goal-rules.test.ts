@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isGoalStale } from "../stale-goal-rules";
+import { buildGoalStaleAlert, isGoalStale } from "../stale-goal-rules";
 import type { GoalForStalenessCheck } from "../stale-goal-rules";
 
 function daysAgo(days: number, from: Date = new Date()): Date {
@@ -132,4 +132,40 @@ test("uses correct thresholds per level", () => {
   // unknown level defaults to 14
   assert.equal(isGoalStale(makeGoal("unknown", 14), NOW), true);
   assert.equal(isGoalStale(makeGoal("unknown", 13), NOW), false);
+});
+
+// The one goal_stale alert both writers upsert: the alert sync
+// (src/lib/advising-alerts.ts) and the daily goal-stale-detection job.
+test("buildGoalStaleAlert returns null for a goal inside its threshold", () => {
+  const goal = { id: "goal-1", level: "weekly", status: "active", updatedAt: daysAgo(6, NOW), lastReviewedAt: null };
+
+  assert.equal(buildGoalStaleAlert(goal, NOW), null);
+});
+
+test("buildGoalStaleAlert describes a stale goal, keyed by goal id", () => {
+  const goal = { id: "goal-1", level: "weekly", status: "active", updatedAt: daysAgo(8, NOW), lastReviewedAt: null };
+
+  assert.deepEqual(buildGoalStaleAlert(goal, NOW), {
+    alertKey: "goal_stale:goal-1",
+    type: "goal_stale",
+    severity: "medium",
+    title: "Weekly goal needs review",
+    summary: "Weekly goal has not been updated in 8 days.",
+    sourceType: "goal",
+    sourceId: "goal-1",
+  });
+});
+
+test("buildGoalStaleAlert raises severity at 14 days since the review it is measured from", () => {
+  const goal = {
+    id: "goal-1",
+    level: "monthly",
+    status: "active",
+    updatedAt: daysAgo(1, NOW),
+    lastReviewedAt: daysAgo(14, NOW),
+  };
+
+  const alert = buildGoalStaleAlert(goal, NOW);
+  assert.equal(alert?.severity, "high");
+  assert.equal(alert?.summary, "Monthly goal has not been reviewed in 14 days.");
 });

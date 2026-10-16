@@ -42,7 +42,7 @@ export function CareerDnaHighlights({ topInterests, profileSource }: CareerDnaHi
             <div className="flex items-center justify-between gap-2">
               <span
                 aria-hidden="true"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-interactive)] text-xs font-bold text-[var(--primary)]"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-interactive)] text-xs font-bold text-info"
               >
                 {idx + 1}
               </span>

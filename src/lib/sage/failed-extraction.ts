@@ -1,3 +1,4 @@
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -65,7 +66,7 @@ export async function recordFailedExtraction(input: FailedExtractionInput): Prom
     logger.warn("Failed to record failed extraction", {
       student: studentLogKey(input.studentId),
       extractorKey: input.extractorKey,
-      error: String(error),
+      error: errorForLog(error),
     });
   }
 }

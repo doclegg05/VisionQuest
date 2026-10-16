@@ -33,6 +33,10 @@ const REQUIREMENT_CHECKS = {
     met: () => Boolean(process.env.GEMINI_API_KEY),
     reason: () => "GEMINI_API_KEY is not set",
   },
+  openrouter: {
+    met: () => Boolean(process.env.OPENROUTER_API_KEY),
+    reason: () => "OPENROUTER_API_KEY is not set",
+  },
   ollama: {
     met: () => Boolean(process.env.OLLAMA_HOST || process.env.OLLAMA_URL),
     reason: () => "OLLAMA_HOST (or OLLAMA_URL) is not set",
@@ -75,6 +79,7 @@ function buildEnv() {
   return {
     databaseUrl: process.env.DATABASE_URL || null,
     geminiApiKey: process.env.GEMINI_API_KEY || null,
+    openrouterApiKey: process.env.OPENROUTER_API_KEY || null,
     ollamaHost: process.env.OLLAMA_HOST || process.env.OLLAMA_URL || null,
     baseUrl: process.env.BENCH_BASE_URL || null,
     prodReadonlyUrl: process.env.BENCH_PROD_READONLY_URL || null,

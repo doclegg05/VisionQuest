@@ -80,7 +80,7 @@ export function ConsentSection({
     <div className="surface-section mb-6 p-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="max-w-xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-info">
             {eyebrow}
           </p>
           <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">{title}</p>

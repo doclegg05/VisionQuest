@@ -84,7 +84,7 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
                     )}
                     {item.type === "goal" && (
                       <div>
-                        <span className="mb-1 inline-block rounded-full bg-[var(--accent-green)]/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-[var(--accent-green)]">Goal</span>
+                        <span className="mb-1 inline-block rounded-full bg-[var(--accent-green)]/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-success">Goal</span>
                         <p className="text-sm font-medium text-[var(--ink-strong)] break-words">{item.content}</p>
                       </div>
                     )}

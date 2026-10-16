@@ -6,7 +6,7 @@ export default function NotFound() {
       id="main-content"
       className="flex min-h-screen flex-col items-center justify-center px-4 text-center"
     >
-      <h1 className="font-[family-name:var(--font-display)] text-6xl font-bold text-[var(--ink-strong)]">
+      <h1 className="font-display text-6xl font-bold text-[var(--ink-strong)]">
         404
       </h1>
       <p className="mt-3 text-lg text-[var(--ink-muted)]">
@@ -14,8 +14,8 @@ export default function NotFound() {
       </p>
       <Link
         href="/"
-        className="mt-6 inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-[var(--on-accent)]
-                   transition hover:bg-[var(--accent-strong)]"
+        className="mt-6 inline-flex min-h-11 items-center justify-center rounded-full bg-success px-6 py-2.5 text-sm font-semibold text-on-success
+                   transition hover:brightness-95"
       >
         Back to Home
       </Link>

@@ -56,7 +56,7 @@ function SkillCard({ skill }: { skill: SkillGapItem }) {
 
       {skill.status === "need" && skill.recommendedAction && (
         <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
-          <span className="font-medium text-[var(--primary)]">Next step:</span>{" "}
+          <span className="font-medium text-info">Next step:</span>{" "}
           {skill.recommendedAction}
         </p>
       )}
