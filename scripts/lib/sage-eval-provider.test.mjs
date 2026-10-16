@@ -516,7 +516,7 @@ describe("OpenRouter unavailable models and keys", () => {
     });
   }
 
-  for (const status of [400, 401, 404]) {
+  for (const status of [401, 404]) {
     it(`reports a ${status} bad request as unavailable, not as a failed test`, async () => {
       const wrapped = wrapWithBudgetDetection(failing(openRouterError("bad_request", status)));
       await assert.rejects(
@@ -525,6 +525,22 @@ describe("OpenRouter unavailable models and keys", () => {
       );
     });
   }
+
+  it("reports an unknown model id as unavailable, not as a failed test", async () => {
+    const wrapped = wrapWithBudgetDetection(failing(openRouterError("unknown_model", 400)));
+    await assert.rejects(
+      wrapped.generateResponse("sys", [{ role: "user", content: "q" }]),
+      (err) => err instanceof EvalProviderUnavailableError && err.providerLabel === "OpenRouter",
+    );
+  });
+
+  it("leaves a request-shape 400 as a real failure, so a schema bug does not read as a refused key", async () => {
+    // Every 400 used to read as "key, model or connection unavailable", which
+    // sent a developer to rotate a key instead of fixing the request.
+    const rejected = openRouterError("bad_request", 400);
+    const wrapped = wrapWithBudgetDetection(failing(rejected));
+    await assert.rejects(wrapped.generateResponse("sys", [{ role: "user", content: "q" }]), (err) => err === rejected);
+  });
 
   it("leaves a model's malformed tool-call JSON as a real failure", async () => {
     const malformed = openRouterError("bad_request", null);
@@ -624,12 +640,23 @@ describe("classifyEmbeddingFailure", () => {
     assert.equal(error.providerLabel, "OpenRouter embeddings");
   });
 
-  it("reads a refused key, an unknown model or no endpoint (400, 401, 404) as unavailable", () => {
-    for (const status of [400, 401, 404]) {
+  it("reads a refused key or no endpoint (401, 404) as unavailable", () => {
+    for (const status of [401, 404]) {
       const error = classifyEmbeddingFailure(failure("bad_request", status));
       assert.ok(error instanceof EvalProviderUnavailableError, String(status));
       assert.equal(error.providerLabel, "OpenRouter embeddings");
     }
+  });
+
+  it("reads an unknown model id as unavailable", () => {
+    const error = classifyEmbeddingFailure(failure("unknown_model", 400));
+    assert.ok(error instanceof EvalProviderUnavailableError);
+    assert.equal(error.providerLabel, "OpenRouter embeddings");
+  });
+
+  it("leaves a request-shape 400 alone, as the chat evals do", () => {
+    const rejected = failure("bad_request", 400);
+    assert.equal(classifyEmbeddingFailure(rejected), rejected);
   });
 
   it("reads a connection that never happened as unreachable", () => {
