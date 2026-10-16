@@ -248,7 +248,7 @@ Remapping Tailwind's color names to SPOKES colors in config was considered and r
 #### 5.2 The codemod
 
 - `scripts/lib/spokes-class-map.mjs` holds the mapping as a pure function, with unit tests in `src/lib/spokes-class-map.test.ts`. `scripts/lib/spokes-source-rewrite.mjs` applies it to files through the TypeScript AST.
-- `scripts/spokes-color-sweep.mjs --paths=<globs> [--write]` rewrites class strings in `.tsx` and `.ts` files, including the status-color maps in `src/lib`. Without `--write` it prints every change and changes nothing.
+- `scripts/spokes-class-sweep.mjs --paths=<globs> [--write]` rewrites class strings in `.tsx` and `.ts` files, including the status-color maps in `src/lib`. Without `--write` it prints every change and changes nothing.
 - Anything it cannot map with certainty goes on a printed hand-review list instead of being guessed: a hue inside a gradient, a computed or concatenated class name, an arbitrary value.
 
 The student sweep does a few files by hand first, then runs the script on the same files and diffs the two results. The script is trusted only after that diff is empty.
