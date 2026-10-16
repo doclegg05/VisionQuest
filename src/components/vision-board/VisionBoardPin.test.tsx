@@ -56,6 +56,26 @@ describe("VisionBoardPin remove button", () => {
   });
 });
 
+describe("VisionBoardPin goal card", () => {
+  // The goal card is always light, like the paper notes, so its text cannot
+  // follow the theme: dark-theme ink and info text are white.
+  const html = renderToString(<VisionBoardPin item={GOAL_ITEM} onDelete={() => {}} />);
+
+  it("keeps the Linked goal label navy in both themes", () => {
+    const label = html.match(/<p class="([^"]*)">Linked goal<\/p>/)?.[1];
+    assert.ok(label, "expected the Linked goal label");
+    assert.match(label, /\btext-brand-dark/);
+    assert.doesNotMatch(label, /\btext-info\b/);
+  });
+
+  it("keeps the goal text navy in both themes", () => {
+    const text = html.match(/<p class="([^"]*)">Get a CDL<\/p>/)?.[1];
+    assert.ok(text, "expected the goal text");
+    assert.match(text, /\btext-brand-dark/);
+    assert.doesNotMatch(text, /--ink-strong/);
+  });
+});
+
 describe("resizePinLabel", () => {
   it("names the pin the handle resizes", () => {
     assert.equal(resizePinLabel({ type: "goal", content: "Get a CDL" }), "Width of goal pin: Get a CDL");

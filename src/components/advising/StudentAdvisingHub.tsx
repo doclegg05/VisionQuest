@@ -164,7 +164,7 @@ export default function StudentAdvisingHub({
               Pick an open time with a teacher. You do not have to wait for someone to set it up.
             </p>
           </div>
-          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-info">
             {bookableAdvisors.reduce((sum, advisor) => sum + advisor.slots.length, 0)} open slots
           </span>
         </div>
@@ -264,7 +264,7 @@ export default function StudentAdvisingHub({
             </div>
 
             <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-info">
                 Selected slot
               </p>
               {selectedSlot && selectedAdvisor ? (
@@ -279,7 +279,7 @@ export default function StudentAdvisingHub({
                     {selectedSlot.locationLabel || selectedSlot.locationType.replace("_", " ")}
                   </p>
                   {selectedSlot.meetingUrl ? (
-                    <p className="mt-3 text-sm text-[var(--accent-strong)]">Link will be included in your confirmation.</p>
+                    <p className="mt-3 text-sm text-success">Link will be included in your confirmation.</p>
                   ) : null}
                 </>
               ) : (
@@ -307,7 +307,7 @@ export default function StudentAdvisingHub({
                 Meetings your advisors have scheduled with you.
               </p>
             </div>
-            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs font-semibold text-info">
               {upcomingAppointments.length} upcoming
             </span>
           </div>
@@ -346,7 +346,7 @@ export default function StudentAdvisingHub({
                         href={appointment.meetingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center font-semibold text-[var(--accent-strong)]"
+                        className="inline-flex min-h-11 items-center font-semibold text-success"
                       >
                         Join meeting
                       </a>
@@ -369,7 +369,7 @@ export default function StudentAdvisingHub({
                 Items that need a response so nothing slips.
               </p>
             </div>
-            <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+            <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-success">
               {alerts.length} open
             </span>
           </div>

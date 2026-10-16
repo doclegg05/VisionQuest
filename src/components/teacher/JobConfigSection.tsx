@@ -83,7 +83,7 @@ export function CareerOneStopUnconfiguredNotice({
   if (!shouldShowCareerOneStopNudge(sources, sourceHealth)) return null;
   return (
     <p
-      className="rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-[var(--error)]"
+      className="rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-danger"
       role="alert"
     >
       WV Local Jobs is not on yet. Ask your admin to add the CareerOneStop keys.
@@ -330,7 +330,7 @@ export function JobConfigSection() {
             <div
               className={`rounded-lg border px-3 py-2 text-sm ${
                 jobBoardError
-                  ? "border-[var(--error)]/40 text-[var(--error)]"
+                  ? "border-[var(--error)]/40 text-danger"
                   : "border-[var(--border)] text-[var(--ink-muted)]"
               }`}
             >
@@ -352,7 +352,7 @@ export function JobConfigSection() {
                     {scrapeRun.totalFetched} fetched, {scrapeRun.totalUpserted} saved
                   </p>
                   {scrapeRun.error && (
-                    <p className="mt-2 text-xs text-[var(--error)]">{scrapeRun.error}</p>
+                    <p className="mt-2 text-xs text-danger">{scrapeRun.error}</p>
                   )}
                 </div>
                 <p className="text-xs text-[var(--ink-muted)]">
@@ -378,7 +378,7 @@ export function JobConfigSection() {
                         {source.fetchedCount} fetched, {source.upsertedCount} saved
                       </p>
                       {source.error && (
-                        <p className="mt-1 text-xs text-[var(--error)]">{source.error}</p>
+                        <p className="mt-1 text-xs text-danger">{source.error}</p>
                       )}
                     </div>
                   ))}
@@ -407,7 +407,7 @@ export function JobConfigSection() {
                   </p>
                 </div>
                 {selectedUnavailableSources.length > 0 && (
-                  <p className="text-xs text-[var(--error)]">
+                  <p className="text-xs text-danger">
                     {selectedUnavailableSources.length} selected source
                     {selectedUnavailableSources.length === 1 ? "" : "s"} need configuration.
                   </p>
@@ -421,7 +421,7 @@ export function JobConfigSection() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-xs font-medium text-[var(--ink-strong)]">{source.label}</span>
-                      <span className={`text-xs ${source.configured ? "text-[var(--ink-muted)]" : "text-[var(--error)]"}`}>
+                      <span className={`text-xs ${source.configured ? "text-[var(--ink-muted)]" : "text-danger"}`}>
                         {source.configured ? "configured" : "missing key"}
                       </span>
                     </div>
@@ -433,7 +433,7 @@ export function JobConfigSection() {
                       {source.lastFetchedCount} fetched, {source.lastUpsertedCount} saved
                     </p>
                     {source.lastError && (
-                      <p className="mt-1 text-xs text-[var(--error)]">{source.lastError}</p>
+                      <p className="mt-1 text-xs text-danger">{source.lastError}</p>
                     )}
                   </div>
                 ))}
@@ -581,7 +581,7 @@ export function JobConfigSection() {
                                 sources.includes(opt.value) &&
                                 !source.configured,
                             ) && (
-                              <span className="px-1 text-xs text-[var(--error)]">Unavailable</span>
+                              <span className="px-1 text-xs text-danger">Unavailable</span>
                             )}
                           </div>
                         ))}

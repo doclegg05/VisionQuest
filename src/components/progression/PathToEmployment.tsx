@@ -93,7 +93,7 @@ export function PathToEmployment({
             </span>
           )}
         </span>
-        <span className="flex shrink-0 items-center text-[var(--accent-strong)]">
+        <span className="flex shrink-0 items-center text-success">
           <span className="sr-only">{actionLabel}</span>
           <ArrowRight size={20} weight="bold" aria-hidden="true" />
         </span>

@@ -91,12 +91,12 @@ export default function DetailedQueues({
             <div className="rounded-[1.15rem] border border-[var(--border)] p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
                     Needs attention
                   </p>
                   <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Open student alerts</h3>
                 </div>
-                <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+                <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-success">
                   {alerts.length} open
                 </span>
               </div>
@@ -181,12 +181,12 @@ export default function DetailedQueues({
             <div className="rounded-[1.15rem] border border-[var(--border)] p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-info">
                     Goal review
                   </p>
                   <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Review queue</h3>
                 </div>
-                <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+                <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-info">
                   {reviewQueue.length} open
                 </span>
               </div>
@@ -255,12 +255,12 @@ export default function DetailedQueues({
             <div className="rounded-[1.15rem] border border-[var(--border)] p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-info">
                     This week
                   </p>
                   <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Upcoming appointments</h3>
                 </div>
-                <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+                <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-info">
                   {upcomingAppointments.length} scheduled
                 </span>
               </div>
@@ -284,7 +284,7 @@ export default function DetailedQueues({
                             {appointment.student.displayName} &bull; {appointment.student.studentId}
                           </p>
                         </div>
-                        <span className="max-w-full rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-center text-xs leading-4 font-semibold text-[var(--accent-secondary)] whitespace-normal">
+                        <span className="max-w-full rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-center text-xs leading-4 font-semibold text-info whitespace-normal">
                           {appointment.locationLabel || appointment.locationType.replace("_", " ")}
                         </span>
                       </div>
@@ -301,7 +301,7 @@ export default function DetailedQueues({
           <div className="rounded-[1.15rem] border border-[var(--border)] p-5">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
                   Re-engagement
                 </p>
                 <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Inactivity follow-up queue</h3>
@@ -309,7 +309,7 @@ export default function DetailedQueues({
                   Use 14-day follow-up, 30-day inactive, 60-day re-engagement, and 90-day archive review as staff checkpoints instead of automatic archiving.
                 </p>
               </div>
-              <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+              <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-success">
                 {inactivityQueue.length} queued
               </span>
             </div>

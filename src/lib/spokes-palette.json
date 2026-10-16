@@ -1,0 +1,17 @@
+{
+  "colors": {
+    "primary": "#007baf",
+    "accent": "#37b550",
+    "dark": "#004071",
+    "light": "#ffffff",
+    "muted": "#edf3f7",
+    "gray": "#60636b",
+    "gold": "#d3b257",
+    "royal": "#00133f",
+    "mauve": "#a7253f",
+    "offwhite": "#d1d3d4",
+    "muted-gold": "#ad8806",
+    "accent-text": "#1e7a2e"
+  },
+  "chartSeries": ["dark", "gold", "primary", "accent", "mauve", "gray"]
+}

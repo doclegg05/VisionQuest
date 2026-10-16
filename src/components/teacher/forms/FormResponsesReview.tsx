@@ -135,7 +135,7 @@ export default function FormResponsesReview() {
   return (
     <div className="space-y-4">
       {error && (
-        <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--error)]" role="alert">
+        <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
@@ -280,7 +280,7 @@ export function ReviewDrawer({ response, onClose, onReview }: ReviewDrawerProps)
             type="button"
             disabled={submitting || !canReview || !notes.trim()}
             onClick={() => void submitReview("needs_changes", notes.trim())}
-            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-red)] disabled:opacity-50 pointer-coarse:min-h-11"
+            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-danger disabled:opacity-50 pointer-coarse:min-h-11"
           >
             Needs changes
           </button>
