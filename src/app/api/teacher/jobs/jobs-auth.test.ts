@@ -265,6 +265,44 @@ describe("teacher job route authorization", () => {
     assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-1"]);
   });
 
+  // The body goes through parseBody (.claude/rules/api-conventions.md), so a
+  // bad body is a 400 before any class or queue work.
+  it("answers 400 for a body that is not JSON", async () => {
+    const req = new Request("http://localhost:3000/api/teacher/jobs/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not json",
+    });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.equal(mockAssertStaffCanManageClass.mock.callCount(), 0);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
+  it("answers 400 when sources is not a list of source names", async () => {
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1", sources: "jsearch" },
+    });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
+  it("answers 400 without a classId", async () => {
+    const req = mockRequest("/api/teacher/jobs/refresh", { method: "POST", body: {} });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.match(JSON.stringify(await res.json()), /classId is required/);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
   it("queues a retry for requested enabled sources", async () => {
     const req = mockRequest("/api/teacher/jobs/refresh", {
       method: "POST",

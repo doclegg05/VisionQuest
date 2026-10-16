@@ -125,6 +125,20 @@ export const opportunityApplicationSchema = z.object({
   resumeFileId: z.string().default(""),
 });
 
+// ─── Teacher Job Board Refresh ──────────────────────────────────────────────
+// Unknown or disabled source names pass here; the route drops them against
+// the class's own configured sources.
+
+export const jobRefreshSchema = z.object({
+  classId: z.string({ error: "classId is required" }).min(1, "classId is required").max(100),
+  sources: z
+    .array(z.string({ error: "Each source must be a name." }).max(50), {
+      error: "sources must be a list of job source names.",
+    })
+    .max(20)
+    .optional(),
+});
+
 // ─── Appointment Booking Schema ─────────────────────────────────────────────
 
 export const bookAppointmentSchema = z.object({
