@@ -16,6 +16,8 @@
 // site changes.
 // =============================================================================
 
+import { NUDGE_ALERT_TYPES } from "@/lib/nudges/schedule-shared";
+
 /**
  * Select for the intervention-queue student query. A builder rather than a
  * constant because `now` is embedded in the overdue-task filter. `as const`
@@ -37,7 +39,10 @@ export function interventionQueueStudentSelect(now: Date) {
       select: { completed: true, completedAt: true },
     },
     alerts: {
-      where: { status: "open" },
+      // The weekly-jobs nudge is written FOR the student and resolves when they
+      // open /career. A teacher cannot act on it, so it must not put a student
+      // in the queue (the old class-overview list excluded it for the same reason).
+      where: { status: "open", type: { not: NUDGE_ALERT_TYPES.weeklyJobsReady } },
       select: {
         id: true,
         type: true,

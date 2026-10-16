@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
+import { readFileSync } from "node:fs";
 
 import { QuickAppointmentModal, QuickNoteModal, QuickTaskModal } from "./InterventionQueuePanel";
 
@@ -73,3 +74,22 @@ for (const { name, element, title, labels } of cases) {
     });
   });
 }
+
+describe("InterventionQueuePanel refresh after a class switch", () => {
+  // An alert action or panel save refreshes the queue after its PATCH resolves,
+  // through the fetchQueue it captured at click time. If that fetch built its URL
+  // from the captured classId, a teacher who switched class mid-save would get
+  // the previous class's rows, and the new class's own load would be dropped as
+  // stale. The queue URL must come from the class on screen now.
+  const source = readFileSync("src/components/teacher/InterventionQueuePanel.tsx", "utf8");
+  const fetchQueueBody = source.slice(source.indexOf("const fetchQueue = useCallback"), source.indexOf("}, [", source.indexOf("const fetchQueue = useCallback")));
+
+  it("builds the queue URL from the current class, not the one captured at click time", () => {
+    assert.match(fetchQueueBody, /const classIdNow = classIdRef\.current;/);
+    assert.doesNotMatch(fetchQueueBody, /encodeURIComponent\(classId\)/);
+  });
+
+  it("updates the current class in the same layout effect that retires in-flight requests", () => {
+    assert.match(source, /useLayoutEffect\(\(\) => \{\s*classIdRef\.current = classId;\s*latestRequest\.current \+= 1;\s*\}, \[classId\]\);/);
+  });
+});
