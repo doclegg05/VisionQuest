@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { scoreDiff, scriptFromDiffFailure } from "./migration-drift-schema.mjs";
+import { assertDisposableShadow, run, scoreDiff, scriptFromDiffFailure } from "./migration-drift-schema.mjs";
 
 const REPO_ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..", "..");
 
@@ -84,5 +84,40 @@ test("the suite reads its own exemption list, not migration-drift's RLS one", ()
   assert.ok(Array.isArray(fixture.exemptions));
   for (const entry of fixture.exemptions) {
     assert.ok(entry.statement && entry.reason, JSON.stringify(entry));
+  }
+});
+
+// The replay resets whatever SHADOW_DATABASE_URL names, so the scorer refuses
+// one that could be anything but a throwaway database on this machine.
+const HERMETIC = "postgresql://postgres:pw@localhost:5432/visionquest_ci";
+const runWith = (shadowDatabaseUrl) =>
+  run({ env: { databaseUrl: HERMETIC, shadowDatabaseUrl }, fixture: exempting(), log: () => {} });
+
+test("a shadow URL naming the app's own database is refused before anything runs", async () => {
+  await assert.rejects(() => runWith(HERMETIC), /same database as DATABASE_URL/);
+});
+
+test("the same database through another loopback spelling is still refused", async () => {
+  await assert.rejects(
+    () => runWith("postgresql://postgres:pw@127.0.0.1:5432/visionquest_ci"),
+    /same database as DATABASE_URL/
+  );
+});
+
+test("a shadow URL on a remote host is refused", async () => {
+  await assert.rejects(
+    () => runWith("postgresql://postgres:pw@db.example.supabase.co:5432/postgres"),
+    /loopback/
+  );
+});
+
+test("a separate database on loopback is allowed", () => {
+  for (const host of ["localhost", "127.0.0.1", "[::1]"]) {
+    assert.doesNotThrow(() =>
+      assertDisposableShadow(`postgresql://postgres:pw@${host}:5432/visionquest_shadow`, {
+        DATABASE_URL: HERMETIC,
+        DIRECT_URL: HERMETIC,
+      })
+    );
   }
 });

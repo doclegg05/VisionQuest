@@ -58,6 +58,12 @@ export async function run(ctx) {
     };
   }
 
+  assertDisposableShadow(shadowUrl, {
+    DATABASE_URL: ctx?.env?.databaseUrl ?? process.env.DATABASE_URL,
+    DIRECT_URL: process.env.DIRECT_URL,
+    ADMIN_DATABASE_URL: process.env.ADMIN_DATABASE_URL,
+  });
+
   const args = [
     "prisma",
     "migrate",
@@ -83,6 +89,32 @@ export async function run(ctx) {
     script = scriptFromDiffFailure(error);
   }
   return { metrics: [scoreDiff(script, ctx?.fixture)] };
+}
+
+// Prisma resets the shadow database before replaying into it, so only a
+// throwaway database on this machine qualifies: a loopback host, and not the
+// database any app URL names. The only Supabase project is production.
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+function databaseKey(url) {
+  const parsed = new URL(url);
+  const host = LOOPBACK_HOSTS.has(parsed.hostname) ? "loopback" : parsed.hostname;
+  return `${host}:${parsed.port || "5432"}/${decodeURIComponent(parsed.pathname.slice(1))}`;
+}
+
+export function assertDisposableShadow(shadowUrl, appUrls) {
+  const shadowHost = new URL(shadowUrl).hostname;
+  if (!LOOPBACK_HOSTS.has(shadowHost)) {
+    throw new Error(
+      `SHADOW_DATABASE_URL points at ${shadowHost}, not a loopback host. The replay resets that database, ` +
+        "so it must be a throwaway one on this machine."
+    );
+  }
+  for (const [name, url] of Object.entries(appUrls)) {
+    if (url && databaseKey(url) === databaseKey(shadowUrl)) {
+      throw new Error(`SHADOW_DATABASE_URL names the same database as ${name}, which the replay would reset.`);
+    }
+  }
 }
 
 // --exit-code makes a non-empty diff exit 2 with its script on stdout. Any
