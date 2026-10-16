@@ -1,5 +1,6 @@
 import { prismaAdmin as prisma } from "@/lib/db";
 import { errorForLog } from "@/lib/log-error";
+import { scrapeRunInProgressWhere } from "./scrape-runs";
 import { logger } from "@/lib/logger";
 import { matchJobToClusters } from "./cluster-matcher";
 import { filterQualityJobs } from "./job-quality";
@@ -16,6 +17,18 @@ interface RunScrapeOptions {
   requestedById?: string | null;
   backgroundJobId?: string | null;
   sourceAllowlist?: string[];
+}
+
+/**
+ * How one class's scrape ended, for the weekly sweep's counts. Only
+ * "completed" refreshed listings; "no_sources" is a class whose sources all
+ * need an API key that is not set, expected until those keys exist.
+ */
+type ScrapeOutcome = "completed" | "all_sources_failed" | "no_sources" | "config_missing";
+
+interface ScrapeResult {
+  outcome: ScrapeOutcome;
+  totalUpserted: number;
 }
 
 function errorMessage(error: unknown): string {
@@ -158,10 +171,7 @@ async function expireDuplicateActiveListings(configId: string): Promise<number> 
  * 4. Upsert into database
  * 5. Expire stale jobs not seen in 2 consecutive cycles
  */
-export async function runScrapeForConfig(
-  configId: string,
-  options: RunScrapeOptions = {},
-): Promise<number> {
+async function scrapeConfig(configId: string, options: RunScrapeOptions): Promise<ScrapeResult> {
   const config = await prisma.jobClassConfig.findUnique({
     where: { id: configId },
   });
@@ -169,7 +179,7 @@ export async function runScrapeForConfig(
   if (!config) {
     logger.error("JobClassConfig not found", { configId });
     await markScrapeRunFailed(options.scrapeRunId ?? null, "JobClassConfig not found");
-    return 0;
+    return { outcome: "config_missing", totalUpserted: 0 };
   }
 
   const scrapeRun = await createOrStartScrapeRun(configId, options);
@@ -189,7 +199,7 @@ export async function runScrapeForConfig(
   if (activeAdapters.length === 0) {
     logger.warn("No active adapters for config", { configId, sources: config.sources });
     await markScrapeRunFailed(scrapeRunId, "No active job sources are configured for this class.");
-    return 0;
+    return { outcome: "no_sources", totalUpserted: 0 };
   }
 
   try {
@@ -397,7 +407,7 @@ export async function runScrapeForConfig(
     });
 
     logger.info("Scrape complete", { configId, totalUpserted });
-    return totalUpserted;
+    return { outcome: finalStatus === "failed" ? "all_sources_failed" : "completed", totalUpserted };
   } catch (error) {
     const message = errorMessage(error);
     logger.error("Scrape failed", { configId, scrapeRunId, error: message });
@@ -406,33 +416,63 @@ export async function runScrapeForConfig(
   }
 }
 
+/** Scrape one class and return how many listings it upserted. */
+export async function runScrapeForConfig(configId: string, options: RunScrapeOptions = {}): Promise<number> {
+  return (await scrapeConfig(configId, options)).totalUpserted;
+}
+
 export interface AutoRefreshSummary {
   totalJobs: number;
   scrapedConfigs: number;
   /** Classes with a recent run already queued or processing. */
   skippedConfigs: number;
-  /** Classes whose scrape threw; logged and recorded, the sweep went on. */
+  /** Classes whose scrape threw or whose every source failed; logged, and the sweep went on. */
   failedConfigs: number;
+  /** Classes with no source that can run (an API key is not set). Not a failure. */
+  unconfiguredConfigs: number;
 }
-
-/**
- * A run older than this is treated as crashed, not in progress. Nothing moves
- * a run that died mid-scrape out of "processing", and one class's scrape
- * takes minutes, so two hours is generous without letting a dead run block
- * the class's weekly refresh for good.
- */
-const IN_PROGRESS_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 async function hasRunInProgress(configId: string, now: Date): Promise<boolean> {
   const run = await prisma.jobScrapeRun.findFirst({
-    where: {
-      classConfigId: configId,
-      status: { in: ["queued", "processing"] },
-      createdAt: { gte: new Date(now.getTime() - IN_PROGRESS_WINDOW_MS) },
-    },
+    where: scrapeRunInProgressWhere(configId, now),
     select: { id: true },
   });
   return run !== null;
+}
+
+const EMPTY_SUMMARY: AutoRefreshSummary = {
+  totalJobs: 0,
+  scrapedConfigs: 0,
+  skippedConfigs: 0,
+  failedConfigs: 0,
+  unconfiguredConfigs: 0,
+};
+
+function withOutcome(summary: AutoRefreshSummary, configId: string, result: ScrapeResult): AutoRefreshSummary {
+  const totalJobs = summary.totalJobs + result.totalUpserted;
+  if (result.outcome === "completed") {
+    return { ...summary, totalJobs, scrapedConfigs: summary.scrapedConfigs + 1 };
+  }
+  if (result.outcome === "no_sources") {
+    return { ...summary, totalJobs, unconfiguredConfigs: summary.unconfiguredConfigs + 1 };
+  }
+  logger.error("Auto-refresh scrape failed for class config", { configId, outcome: result.outcome });
+  return { ...summary, totalJobs, failedConfigs: summary.failedConfigs + 1 };
+}
+
+async function refreshOneConfig(summary: AutoRefreshSummary, configId: string): Promise<AutoRefreshSummary> {
+  try {
+    if (await hasRunInProgress(configId, new Date())) {
+      return { ...summary, skippedConfigs: summary.skippedConfigs + 1 };
+    }
+    return withOutcome(summary, configId, await scrapeConfig(configId, {}));
+  } catch (error) {
+    logger.error("Auto-refresh scrape failed for class config", {
+      configId,
+      error: errorForLog(error),
+    });
+    return { ...summary, failedConfigs: summary.failedConfigs + 1 };
+  }
 }
 
 /**
@@ -441,7 +481,10 @@ async function hasRunInProgress(configId: string, now: Date): Promise<boolean> {
  *
  * One class's failure is logged and counted, and the sweep moves on to the
  * next class. A class whose teacher just pressed Refresh is skipped, as the
- * manual route does (src/app/api/teacher/jobs/refresh/route.ts).
+ * manual route does (src/app/api/teacher/jobs/refresh/route.ts). A class
+ * whose sources all lack an API key is counted apart from failures, so the
+ * job does not read as broken while the CareerOneStop and Talroo keys are
+ * pending.
  */
 export async function runAllAutoRefreshScrapes(): Promise<AutoRefreshSummary> {
   const configs = await prisma.jobClassConfig.findMany({
@@ -449,27 +492,9 @@ export async function runAllAutoRefreshScrapes(): Promise<AutoRefreshSummary> {
     select: { id: true },
   });
 
-  const summary: AutoRefreshSummary = {
-    totalJobs: 0,
-    scrapedConfigs: 0,
-    skippedConfigs: 0,
-    failedConfigs: 0,
-  };
+  let summary = EMPTY_SUMMARY;
   for (const config of configs) {
-    try {
-      if (await hasRunInProgress(config.id, new Date())) {
-        summary.skippedConfigs++;
-        continue;
-      }
-      summary.totalJobs += await runScrapeForConfig(config.id);
-      summary.scrapedConfigs++;
-    } catch (error) {
-      summary.failedConfigs++;
-      logger.error("Auto-refresh scrape failed for class config", {
-        configId: config.id,
-        error: errorForLog(error),
-      });
-    }
+    summary = await refreshOneConfig(summary, config.id);
   }
   return summary;
 }

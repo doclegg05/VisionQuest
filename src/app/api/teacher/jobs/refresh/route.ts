@@ -8,6 +8,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { serializeScrapeRun } from "@/lib/job-board/scrape-status";
 import { isValidJobSource } from "@/lib/job-board/source-options";
+import { scrapeRunInProgressWhere } from "@/lib/job-board/scrape-runs";
 
 /**
  * POST /api/teacher/jobs/refresh
@@ -59,11 +60,10 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
   }
   const sortedSourceAllowlist = [...new Set(sourceAllowlist)].sort();
 
+  // Only a recent run counts: a run that crashed mid-scrape stays
+  // "processing" forever and would otherwise block every Refresh after it.
   const existingRun = await prisma.jobScrapeRun.findFirst({
-    where: {
-      classConfigId: config.id,
-      status: { in: ["queued", "processing"] },
-    },
+    where: scrapeRunInProgressWhere(config.id, new Date()),
     orderBy: { createdAt: "desc" },
     include: { sourceResults: { orderBy: { source: "asc" } } },
   });
