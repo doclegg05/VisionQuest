@@ -35,45 +35,66 @@
  */
 
 /**
+ * The words a staff fact may start with. The extraction prompt in
+ * staff-extract.ts lists exactly these and requires each fact to open with one,
+ * and every one of them is in SAFE_CAPITALIZED_TOKENS below, so a fact the
+ * model writes as asked is never rejected for its first word. Before the
+ * prompt named them it asked for "an ordinary verb or adverb", and the model's
+ * picks ("Conducts", "Translates", "Lacks") cost about a third of all staff
+ * facts.
+ *
+ * Adding a word here adds it to the filter's allowlist too, so the
+ * MAINTENANCE RULE on SAFE_CAPITALIZED_TOKENS applies: "Lacks" stays out
+ * because it is a surname, however natural the opener.
+ */
+export const STAFF_FACT_OPENERS: readonly string[] = [
+  // Verbs.
+  "Prefers", "Wants", "Needs", "Uses", "Works", "Runs", "Keeps", "Reviews",
+  "Checks", "Asks", "Likes", "Avoids", "Schedules", "Starts", "Ends",
+  "Blocks", "Sets", "Plans", "Tracks", "Handles", "Follows", "Prioritizes",
+  "Teaches", "Meets", "Sends", "Reads", "Writes", "Prints", "Flags", "Logs",
+  "Relies", "Tends", "Struggles", "Finds", "Focuses", "Prepares", "Requests",
+  "Expects", "Reports", "Holds", "Splits", "Batches", "Answers", "Coaches",
+  "Manages", "Opens", "Closes", "Limits", "Caps", "Requires", "Wraps",
+  "Prefer", "Does", "Doesn't", "Has", "Is", "Was", "Believes", "Treats",
+  "Defers", "Escalates", "Routes", "Confirms", "Approves", "Declines",
+  "Delegates", "Records", "Documents", "Sorts", "Filters", "Groups",
+  "Repeats", "Rechecks", "Waits", "Sticks", "Leaves", "Pulls", "Adds",
+  // Modals and negations that open a constraint sentence. None is a name.
+  "Cannot", "Can", "Can't", "Must", "Won't", "Has to", "Have",
+  // Frequency adverbs.
+  "Often", "Usually", "Always", "Never", "Typically", "Generally", "Rarely",
+  "Sometimes", "Mostly",
+];
+
+/**
  * Capitalized tokens a staff working-preference sentence may legitimately
  * contain. Everything else that starts with a capital is treated as a proper
  * noun, i.e. probably a person.
  *
  * Sentence-initial capitals are NOT exempt: "Jasmine needs a bus pass" would
  * sail through any position-aware scan, and that is exactly the sentence this
- * guard exists to stop. The cost is that staff memories must open with an
- * ordinary verb or adverb ("Prefers…", "Reviews…", "Usually…"), which is the
- * shape the extraction prompt asks for and the shape student memories already
- * have ("Wants to become a CNA.").
+ * guard exists to stop. The cost is that staff memories must open with one of
+ * STAFF_FACT_OPENERS ("Prefers…", "Reviews…", "Usually…"), which the
+ * extraction prompt lists word for word, the same shape student memories
+ * already have ("Wants to become a CNA.").
  *
  * Deliberately EXCLUDED even though they are ordinary words: Mark, Grace,
  * Will, May, June, Bill, Rose, Hope, Faith — every one of them is also a
  * common first name, and this list is the only thing standing between a name
  * and the prompt.
  *
- * MAINTENANCE RULE for anyone adding to this list: the only admissible test
- * is "could this token ever be a person's given or family name?" If yes, it
- * does not go in, however inconvenient. Modals and role nouns qualify because
- * nobody is named Cannot or Coordinator; ordinary-sounding words do not.
- * Every entry below was added against a specific measured false rejection,
- * not speculatively — an over-wide list is the one way this guard fails open.
+ * MAINTENANCE RULE for anyone adding to this list (STAFF_FACT_OPENERS
+ * included): the only admissible test is "could this token ever be a
+ * person's given or family name?" If yes, it does not go in, however
+ * inconvenient. Modals and role nouns qualify because nobody is named Cannot
+ * or Coordinator; ordinary-sounding words do not. Every entry below was added
+ * against a specific measured false rejection, not speculatively — an
+ * over-wide list is the one way this guard fails open.
  */
 const SAFE_CAPITALIZED_TOKENS = new Set(
   [
-    // Sentence-opening verbs the extraction prompt asks for.
-    "Prefers", "Wants", "Needs", "Uses", "Works", "Runs", "Keeps", "Reviews",
-    "Checks", "Asks", "Likes", "Avoids", "Schedules", "Starts", "Ends",
-    "Blocks", "Sets", "Plans", "Tracks", "Handles", "Follows", "Prioritizes",
-    "Teaches", "Meets", "Sends", "Reads", "Writes", "Prints", "Flags", "Logs",
-    "Relies", "Tends", "Struggles", "Finds", "Focuses", "Prepares", "Requests",
-    "Expects", "Reports", "Holds", "Splits", "Batches", "Answers", "Coaches",
-    "Manages", "Opens", "Closes", "Limits", "Caps", "Requires", "Wraps",
-    "Prefer", "Does", "Doesn't", "Has", "Is", "Was", "Believes", "Treats",
-    "Defers", "Escalates", "Routes", "Confirms", "Approves", "Declines",
-    "Delegates", "Records", "Documents", "Sorts", "Filters", "Groups",
-    "Repeats", "Rechecks", "Waits", "Sticks", "Leaves", "Pulls", "Adds",
-    // Modals and negations that open a constraint sentence. None is a name.
-    "Cannot", "Can", "Can't", "Must", "Won't", "Needs", "Has to", "Have",
+    ...STAFF_FACT_OPENERS,
     // Role nouns. A student is never referred to by any of these, so they
     // carry no identifying power, and staff constraints name them constantly
     // ("Escalates placement approvals to the Coordinator").
@@ -81,8 +102,7 @@ const SAFE_CAPITALIZED_TOKENS = new Set(
     "Teachers", "Advisor", "Advisors", "Administrator", "Admin", "Staff",
     "Program", "Manager", "Supervisor", "Director", "Counselor", "Caseworker",
     // Adverbs and function words that can open a sentence.
-    "Often", "Usually", "Always", "Never", "Typically", "Generally", "Rarely",
-    "Sometimes", "Mostly", "Only", "Still", "Also", "Then", "When", "After",
+    "Only", "Still", "Also", "Then", "When", "After",
     "Before", "During", "If", "Because", "The", "A", "An", "In", "On", "At",
     "To", "For", "With", "And", "But", "So", "As", "By", "Per", "This",
     "That", "They", "Their", "Every", "Each", "Most", "Some",

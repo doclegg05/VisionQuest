@@ -1,7 +1,38 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { looksLikeStudentReference } from "./staff-privacy";
+import { looksLikeStudentReference, STAFF_FACT_OPENERS } from "./staff-privacy";
+
+describe("STAFF_FACT_OPENERS", () => {
+  it("is a non-empty list of sentence openers", () => {
+    assert.ok(
+      Array.isArray(STAFF_FACT_OPENERS) && STAFF_FACT_OPENERS.length > 0,
+      "expected an exported, non-empty opener list",
+    );
+  });
+
+  it("every opener passes the filter at the start of a staff fact", () => {
+    // The extraction prompt requires each staff fact to start with one of
+    // these words. An opener the filter rejects drops every fact the model
+    // writes with it: the 2026-10-16 replay lost 29 of 82 staff facts to
+    // openers missing from the allowlist, and none of the 29 was about a
+    // student.
+    for (const opener of STAFF_FACT_OPENERS) {
+      const fact = `${opener} the weekly review pass before class.`;
+      assert.equal(looksLikeStudentReference(fact), false, `filter rejects the opener in: ${fact}`);
+    }
+  });
+
+  it("leaves out Lacks, which is a surname, so the filter still rejects it", () => {
+    assert.equal(STAFF_FACT_OPENERS.includes("Lacks"), false);
+    assert.equal(
+      looksLikeStudentReference(
+        "Lacks the authority to approve placements independently and must route all such requests to the coordinator.",
+      ),
+      true,
+    );
+  });
+});
 
 describe("looksLikeStudentReference", () => {
   it("accepts ordinary staff working-pattern facts", () => {

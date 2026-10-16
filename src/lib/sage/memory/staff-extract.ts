@@ -30,7 +30,7 @@ import {
   parseExtractionItems,
   type MemoryCandidate,
 } from "./schema";
-import { looksLikeStudentReference } from "./staff-privacy";
+import { looksLikeStudentReference, STAFF_FACT_OPENERS } from "./staff-privacy";
 import { storeMemoryCandidates } from "./store";
 import {
   logEstimatedExtractionCost,
@@ -46,7 +46,9 @@ const DEFAULT_STAFF_EXTRACT_DAILY_LIMIT = 100;
  * written so the model has no reason to reach for a student fact: it is told
  * what to collect, told the hard rule, and given the return-[] escape hatch
  * for the very common case of a conversation that was entirely about
- * individual students.
+ * individual students. It also names the only words a fact may start with,
+ * built from the filter's own STAFF_FACT_OPENERS, so a fact written as asked
+ * is never dropped by layer 2 for its first word.
  */
 const STAFF_EXTRACTION_PROMPT = `You are a memory extractor for Sage, an AI assistant that supports instructors in the SPOKES workforce-development program.
 
@@ -60,7 +62,7 @@ HARD PRIVACY RULE — this is not student-record storage:
 - Never include anything a student disclosed, or any personal circumstance of any student.
 - If the conversation was only about individual students, return [].
 
-Write each fact as one self-contained sentence starting with an ordinary verb or adverb about the staff member — "Prefers three-bullet answers with the action first.", "Reviews flagged students every Monday before class." Do not start a sentence with a name.
+Write each fact as one self-contained sentence about the staff member — "Prefers three-bullet answers with the action first.", "Reviews flagged students every Monday before class." Start every sentence with one of these words, exactly as written: ${STAFF_FACT_OPENERS.join(", ")}. If the verb you would naturally use is not on that list, rephrase the sentence so it starts with one that is. Never start a sentence with a name or with any other word.
 
 Respond with ONLY a JSON array (no prose). Each element:
 {

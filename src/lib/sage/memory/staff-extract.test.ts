@@ -190,6 +190,30 @@ describe("extractAndStoreStaffMemories", () => {
     assert.equal(mockCreate.mock.callCount(), 0);
   });
 
+  it("lists the privacy filter's openers in the prompt and asks for one at the start of each fact", async () => {
+    const { STAFF_FACT_OPENERS } = await import("./staff-privacy");
+    assert.ok(
+      Array.isArray(STAFF_FACT_OPENERS) && STAFF_FACT_OPENERS.length > 0,
+      "expected staff-privacy to export a non-empty opener list",
+    );
+    const provider = providerReturning("[]");
+    await extractAndStoreStaffMemories({
+      provider,
+      staffId: "teacher-1",
+      staffRole: "teacher",
+      conversationId: "conv-staff-6",
+      messages: STAFF_MESSAGES,
+    });
+    const systemPrompt: string = provider.generateStructuredResponse.mock.calls[0].arguments[0];
+    assert.ok(
+      systemPrompt.includes(STAFF_FACT_OPENERS.join(", ")),
+      "expected the prompt to carry the filter's exact opener list",
+    );
+    // An open vocabulary is what let the model pick openers the filter
+    // rejects ("Conducts", "Translates", "Lacks").
+    assert.doesNotMatch(systemPrompt, /ordinary verb or adverb/);
+  });
+
   it("records an AI audit event under staff_entered sensitivity", async () => {
     await extractAndStoreStaffMemories({
       provider: providerReturning(STAFF_JSON),
