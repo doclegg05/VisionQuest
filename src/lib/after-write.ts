@@ -1,5 +1,5 @@
+import { errorForLog } from "./log-error";
 import { studentLogKey } from "./log-keys";
-import { redactContactInfo } from "./log-redaction";
 import { logger } from "./logger";
 
 interface AfterWriteContext {
@@ -25,9 +25,9 @@ interface AfterWriteContext {
  * Only for effects the record stays consistent without. An effect the write
  * depends on belongs before the write, not here.
  *
- * The error text is passed through redactContactInfo: effects such as
- * syncStudentAlerts reach email and SMS delivery, whose errors quote the
- * recipient's address or number.
+ * The error is logged by name and code only (errorForLog): the usual effect
+ * is syncStudentAlerts, whose Prisma errors quote the alertKey and with it the
+ * student id, and whose email and SMS delivery errors quote the recipient.
  */
 export async function afterWrite(
   effect: () => Promise<unknown> | unknown,
@@ -36,12 +36,11 @@ export async function afterWrite(
   try {
     await effect();
   } catch (error) {
-    const log = context.level === "error" ? logger.error : logger.warn;
-    log("Side effect failed after a saved write", {
+    logger[context.level === "error" ? "error" : "warn"]("Side effect failed after a saved write", {
       surface: context.surface,
       effect: context.effect,
       student: studentLogKey(context.studentId),
-      error: redactContactInfo(String(error)),
+      error: errorForLog(error),
     });
   }
 }

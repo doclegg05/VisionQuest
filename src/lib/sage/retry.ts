@@ -1,5 +1,5 @@
 import { errorForLog } from "@/lib/log-error";
-import { logger } from "@/lib/logger";
+import { logger, type LogContext } from "@/lib/logger";
 import { recordFailedExtraction } from "./failed-extraction";
 
 interface RetryOptions {
@@ -14,8 +14,12 @@ interface RetryOptions {
   alertKey: string;
   /** Total attempts including the first. Defaults to 3. */
   maxAttempts?: number;
-  /** Extra structured context merged into every log line (ids, etc.). */
-  context?: Record<string, unknown>;
+  /**
+   * Extra structured context merged into every log line. Spread in, so no
+   * ESLint key selector sees it; LogContext refuses a raw student id, so pass
+   * `student: studentLogKey(id)` from @/lib/log-keys.
+   */
+  context?: LogContext;
   /**
    * When set, an exhausted failure is dead-lettered to the FailedExtraction
    * table (see src/lib/sage/failed-extraction.ts) for staff review. Call

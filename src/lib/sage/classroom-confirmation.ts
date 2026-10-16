@@ -86,7 +86,7 @@ export async function detectAndRecordClassroomConfirmation(
       {
         label: "Classroom confirmation extraction",
         alertKey: "classroom_confirmation_exhausted",
-        context: { studentId },
+        context: { student: studentLogKey(studentId) },
         // Dead-letter on exhaustion so the input survives for staff review.
         studentId,
         failurePayload: () => `Sage: ${sageReply}\n\nStudent: ${userMessage}`,

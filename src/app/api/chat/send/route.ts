@@ -1262,15 +1262,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         sendEvent({ done: true, conversationId: conversation.id }, "done");
         closeStream();
       } catch (error) {
+        // For the audit row and the client's error event below; the log lines
+        // carry the name and code only, with one level of cause.
         const msg = error instanceof Error ? error.message : String(error);
         const cause = error instanceof Error && error.cause ? String(error.cause) : undefined;
         const clientClosed = error instanceof ChatSseClientClosedError || streamClosed;
         const errorCode = clientClosed ? "CLIENT_STREAM_CLOSED" : "AI_STREAM_FAILED";
-        const logPayload = { error: msg, cause, provider: provider.name };
         if (clientClosed) {
-          logger.warn("Chat SSE client disconnected", logPayload);
+          logger.warn("Chat SSE client disconnected", { error: errorForLog(error), provider: provider.name });
         } else {
-          logger.error("Stream error", logPayload);
+          logger.error("Stream error", { error: errorForLog(error), provider: provider.name });
         }
         // 988 for the student in the moment, on the error event and in the
         // persisted partial alike; skipped when the streamed text already

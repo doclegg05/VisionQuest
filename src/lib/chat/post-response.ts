@@ -475,7 +475,7 @@ async function runPostResponse(
           {
             label: "Discovery extraction",
             alertKey: "discovery_extraction_exhausted",
-            context: { conversationId, studentId },
+            context: { conversationId, student: studentLogKey(studentId) },
             studentId,
             conversationId,
             failurePayload: () => JSON.stringify(discoveryWindow),

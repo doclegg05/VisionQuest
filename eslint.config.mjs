@@ -132,24 +132,40 @@ const RAW_ERROR_TEXT_MESSAGE =
 // JSON.stringify on the entry, which drops `message` but keeps Prisma's
 // enumerable `meta`. A selector cannot tell which identifier a catch clause
 // bound, so the raw-object, template-literal and `+` forms go by the usual
-// names. `reason` is also an ordinary enum field, so under that key only an
-// error-named value counts, and `+` is the only binary operator that builds
-// text (`err instanceof Error` is a BinaryExpression too). A local helper that
+// names (`msg` and `message` too, in a template). Any identifier under an
+// error/err/cause key counts, since that is where a saved message lands;
+// under other keys only an error-named one does, because `reason` and the
+// like are ordinary enum fields. `+` is the only binary operator that builds
+// text (`err instanceof Error` is a BinaryExpression too). A helper that
 // returns the message, like scrape-engine's errorMessage(), goes by name.
 // src/lib/error-log-guard.test.ts lints a probe of every form.
 const IN_LOGGER = "CallExpression[callee.object.name='logger']";
 const ERROR_NAME = "/^(e|err|error)$|(Err|Error)$/";
+const TEXT_NAME = "/^(e|err|error|msg|errMsg|errorMsg|message)$|(Err|Error)$/";
 const rawErrorTextInLogs = [
   `${IN_LOGGER} MemberExpression[property.name=/^(message|stack)$/]`,
   `${IN_LOGGER} MemberExpression[property.value=/^(message|stack)$/]`,
   `${IN_LOGGER} CallExpression[callee.name='String']`,
   `${IN_LOGGER} CallExpression[callee.property.name='toString']`,
   `${IN_LOGGER} CallExpression[callee.object.name='JSON'][callee.property.name='stringify']`,
-  `${IN_LOGGER} CallExpression[callee.name=/[eE]rrorMessage$|^messageOf$/]`,
-  `${IN_LOGGER} Property[key.name=/^(error|err|cause)$/] > Identifier.value`,
-  `${IN_LOGGER} Property[key.name='reason'] > Identifier.value[name=${ERROR_NAME}]`,
-  `${IN_LOGGER} :matches(TemplateLiteral, BinaryExpression[operator='+']) > Identifier[name=${ERROR_NAME}]`,
+  `${IN_LOGGER} CallExpression:matches([callee.name='inspect'], [callee.object.name='util'])`,
+  `${IN_LOGGER} CallExpression:matches([callee.name=/[eE]rrorMessage$|^messageOf$/], [callee.property.name=/[eE]rrorMessage$|^messageOf$/])`,
+  `${IN_LOGGER} Property[key.name=/^(error|err|cause)$/] > :matches(Identifier, TSAsExpression, TSNonNullExpression).value`,
+  `${IN_LOGGER} Property > Identifier.value[name=${ERROR_NAME}]`,
+  `${IN_LOGGER} :matches(TemplateLiteral, BinaryExpression[operator='+']) > Identifier[name=${TEXT_NAME}]`,
 ].map((selector) => ({ selector, message: RAW_ERROR_TEXT_MESSAGE }));
+
+// These hide a log call or its fields from every selector above: a context
+// object built before the call, and a logger method held in a variable or
+// passed along. Spread fields stay allowed (counts objects use them); the
+// LogContext type in src/lib/logger.ts refuses a raw student id in a spread.
+const HIDDEN_LOG_CALL_MESSAGE =
+  "Call logger.<level>() directly with an inline context object, so the no-PII log rules can see the fields. Log { error: errorForLog(error) } from @/lib/log-error.";
+const hiddenLogCalls = [
+  `${IN_LOGGER}[arguments.1.type='Identifier']`,
+  ":matches(VariableDeclarator, AssignmentExpression, ConditionalExpression, LogicalExpression, ArrayExpression, Property) > MemberExpression[object.name='logger']",
+  "CallExpression > MemberExpression.arguments[object.name='logger']",
+].map((selector) => ({ selector, message: HIDDEN_LOG_CALL_MESSAGE }));
 
 const SRC_FILES = ["src/**/*.{ts,tsx,js,jsx,mjs,mts,cts,cjs}"];
 
@@ -160,7 +176,7 @@ const SRC_FILES = ["src/**/*.{ts,tsx,js,jsx,mjs,mts,cts,cjs}"];
 // way). src/lib/error-log-guard.test.ts lints a probe of each group at a path
 // owned by each block.
 function srcRestrictedSyntax(...extras) {
-  return ["error", ...restrictedSyntaxEverywhere, ...rawErrorTextInLogs, ...extras];
+  return ["error", ...restrictedSyntaxEverywhere, ...rawErrorTextInLogs, ...hiddenLogCalls, ...extras];
 }
 
 const openRouterEvalOnly = {
