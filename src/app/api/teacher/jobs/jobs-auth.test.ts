@@ -16,6 +16,9 @@ const mockScrapeRunUpdate = mock.fn() as any;
 const mockEnqueueJob = mock.fn() as any;
 const mockProcessJobById = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
+const mockAdminRunUpdateMany = mock.fn(async () => ({ count: 0 })) as any;
+const mockAdminJobUpdateMany = mock.fn(async () => ({ count: 0 })) as any;
+const writeOrder: string[] = [];
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -74,6 +77,20 @@ mock.module("@/lib/classroom", {
 
 mock.module("@/lib/db", {
   namedExports: {
+    prismaAdmin: {
+      jobScrapeRun: {
+        updateMany: (...args: unknown[]) => {
+          writeOrder.push("retire-runs");
+          return mockAdminRunUpdateMany(...args);
+        },
+      },
+      backgroundJob: {
+        updateMany: (...args: unknown[]) => {
+          writeOrder.push("retire-jobs");
+          return mockAdminJobUpdateMany(...args);
+        },
+      },
+    },
     prisma: {
       jobClassConfig: {
         findUnique: mockFindUnique,
@@ -85,7 +102,10 @@ mock.module("@/lib/db", {
       jobScrapeRun: {
         findFirst: mockScrapeRunFindFirst,
         findMany: mockScrapeRunFindMany,
-        create: mockScrapeRunCreate,
+        create: (...args: unknown[]) => {
+          writeOrder.push("create-run");
+          return mockScrapeRunCreate(...args);
+        },
         update: mockScrapeRunUpdate,
       },
     },
@@ -312,6 +332,26 @@ describe("teacher job route authorization", () => {
     assert.deepEqual(where.status, { in: ["queued", "processing"] });
     const since = (where.createdAt as { gte: Date }).gte.getTime();
     assert.ok(Math.abs(before - 2 * 60 * 60 * 1000 - since) < 5_000, "the window is the last two hours");
+  });
+
+  // A crashed refresh leaves its run and its scrape_jobs job "processing".
+  // enqueueJob would hand the replacement run that dead job (same dedupe key)
+  // and processJobById claims only pending jobs, so nothing would start.
+  it("retires a stuck run and its background job before queuing a replacement", async () => {
+    writeOrder.length = 0;
+    mockAdminRunUpdateMany.mock.resetCalls();
+    mockAdminJobUpdateMany.mock.resetCalls();
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1" },
+    });
+
+    await refreshRoute.POST(req as never);
+
+    assert.deepEqual(writeOrder.slice(0, 3), ["retire-runs", "retire-jobs", "create-run"]);
+    const jobWhere = mockAdminJobUpdateMany.mock.calls[0]?.arguments[0].where;
+    assert.deepEqual(jobWhere.OR, [{ dedupeKey: "scrape:config-1" }, { dedupeKey: { startsWith: "scrape:config-1:" } }]);
+    assert.equal(mockEnqueueJob.mock.calls.at(-1)?.arguments[0].dedupeKey, "scrape:config-1");
   });
 
   it("returns scrape status after checking class ownership", async () => {

@@ -69,6 +69,19 @@ mock.module("@/lib/db", {
           runs.find((run) => matchesInProgress(run, where)) ? { id: "run-busy" } : null,
         create: async () => ({ id: "run-new" }),
         update: async () => ({}),
+        updateMany: async ({ where, data }: { where: Record<string, unknown>; data: { status: string } }) => {
+          const before = (where.createdAt as { lt: Date }).lt;
+          const status = where.status as { in: string[] };
+          const stale = runs.filter(
+            (run) =>
+              run.classConfigId === where.classConfigId && status.in.includes(run.status) && run.createdAt < before,
+          );
+          for (const run of stale) run.status = data.status;
+          return { count: stale.length };
+        },
+      },
+      backgroundJob: {
+        updateMany: async () => ({ count: 0 }),
       },
       jobScrapeSourceResult: {
         upsert: async () => ({}),
@@ -166,6 +179,13 @@ describe("runAllAutoRefreshScrapes", () => {
     await runAllAutoRefreshScrapes();
 
     assert.ok(configReads.includes(STALE_RUN_CONFIG), "a crashed run does not block the class");
+  });
+
+  it("marks that crashed run failed, and leaves a recent run alone", async () => {
+    await runAllAutoRefreshScrapes();
+
+    assert.equal(runs.find((run) => run.classConfigId === STALE_RUN_CONFIG)?.status, "failed");
+    assert.equal(runs.find((run) => run.classConfigId === BUSY_CONFIG)?.status, "processing");
   });
 
   it("logs a thrown class by error name and code, never the message text", async () => {

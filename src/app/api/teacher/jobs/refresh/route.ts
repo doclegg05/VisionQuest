@@ -8,7 +8,11 @@ import { logAuditEvent } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { serializeScrapeRun } from "@/lib/job-board/scrape-status";
 import { isValidJobSource } from "@/lib/job-board/source-options";
-import { scrapeRunInProgressWhere } from "@/lib/job-board/scrape-runs";
+import {
+  retireStaleScrapeRuns,
+  scrapeJobDedupeKey,
+  scrapeRunInProgressWhere,
+} from "@/lib/job-board/scrape-runs";
 
 /**
  * POST /api/teacher/jobs/refresh
@@ -60,10 +64,14 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
   }
   const sortedSourceAllowlist = [...new Set(sourceAllowlist)].sort();
 
-  // Only a recent run counts: a run that crashed mid-scrape stays
-  // "processing" forever and would otherwise block every Refresh after it.
+  // A run that crashed mid-scrape stays "processing" forever, with its
+  // background job. Fail both once they are past the window, so the dedupe
+  // key frees up and the replacement run gets a job that can start.
+  const now = new Date();
+  await retireStaleScrapeRuns(config.id, now);
+
   const existingRun = await prisma.jobScrapeRun.findFirst({
-    where: scrapeRunInProgressWhere(config.id, new Date()),
+    where: scrapeRunInProgressWhere(config.id, now),
     orderBy: { createdAt: "desc" },
     include: { sourceResults: { orderBy: { source: "asc" } } },
   });
@@ -94,9 +102,7 @@ export const POST = withTeacherAuth(async (session: Session, req: Request) => {
       scrapeRunId: scrapeRun.id,
       sources: sortedSourceAllowlist.length > 0 ? sortedSourceAllowlist : undefined,
     },
-    dedupeKey: sortedSourceAllowlist.length > 0
-      ? `scrape:${config.id}:${sortedSourceAllowlist.join(",")}`
-      : `scrape:${config.id}`,
+    dedupeKey: scrapeJobDedupeKey(config.id, sortedSourceAllowlist),
   });
 
   const runWithJob = await prisma.jobScrapeRun.update({
