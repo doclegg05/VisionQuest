@@ -440,13 +440,22 @@ test("a suite with one self-skipped metric takes its verdict from the measured o
   }
 });
 
-// The real scorers, through the real runner, in the environment CI's
-// "Gate-tier benchmarks" step gives them: a DATABASE_URL, but no
-// RLS_TEST_ENABLED and no SHADOW_DATABASE_URL. nudge-sweep's no-DATABASE_URL
+// The real scorers, through the real runner, without their opt-ins: a
+// DATABASE_URL, but no RLS_TEST_ENABLED and no SHADOW_DATABASE_URL (a local
+// run; CI's "Gate-tier benchmarks" step sets both, pinned by
+// ci-gate-opt-ins.test.mjs). nudge-sweep's no-DATABASE_URL
 // branch emits the same shape as its unseeded-cohort branch, which needs a
 // database to reach. `requires` is emptied so the scorer's own guard runs.
 const REAL_SELF_SKIPS = [
-  { suite: "consent-scopes", env: { DATABASE_URL: "postgresql://bench@127.0.0.1:1/none", RLS_TEST_ENABLED: "" } },
+  // RLS_TEST_ENABLED alone must not start it: the scorer has its own switch.
+  {
+    suite: "consent-scopes",
+    env: {
+      DATABASE_URL: "postgresql://bench@127.0.0.1:1/none",
+      RLS_TEST_ENABLED: "true",
+      CONSENT_SCOPES_BENCH_ENABLED: "",
+    },
+  },
   { suite: "migration-drift-schema", env: { SHADOW_DATABASE_URL: "" } },
   { suite: "nudge-sweep", env: { DATABASE_URL: "" } },
 ];

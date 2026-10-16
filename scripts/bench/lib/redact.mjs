@@ -37,6 +37,7 @@ export const SECRET_ENV_NAMES = Object.freeze([
   "CRON_CHECK_DATABASE_URL",
   "TWILIO_AUTH_TOKEN",
   "OPENROUTER_API_KEY",
+  "SHADOW_DATABASE_URL",
 ]);
 
 /** Shorter than this and a value is too generic to use as a search needle. */
