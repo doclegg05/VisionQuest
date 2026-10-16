@@ -251,7 +251,7 @@ export default function OpportunitiesHub({
                   <p className="mt-4 break-words text-sm leading-7 text-[var(--ink-muted)]">{opportunity.description}</p>
                 ) : null}
 
-                <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[rgba(255,255,255,0.55)] p-4">
+                <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Resume</p>

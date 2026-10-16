@@ -89,7 +89,7 @@ export default function OrientationWelcomeVideo() {
 
       <div className="mt-3" aria-live="polite">
         {completed ? (
-          <p className="text-sm font-semibold text-emerald-700">
+          <p className="text-sm font-semibold text-success">
             {awarded ? `Welcome video complete — ${WELCOME_VIDEO_XP} XP added.` : "Welcome video complete."}
           </p>
         ) : (
