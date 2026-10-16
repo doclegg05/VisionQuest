@@ -11,6 +11,7 @@ import {
   toGoalResourceLinkView,
 } from "@/lib/goal-resource-links";
 import { goalCountsTowardPlan } from "@/lib/goals";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
 
@@ -134,7 +135,7 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
       body: dueAt
         ? `"${title}" was added to your plan and is due ${dueAt.toLocaleDateString()}.`
         : `"${title}" was added to your current goal plan.`,
-    }).catch((error) => logger.error("Failed to send goal plan notification", { error: String(error) }));
+    }).catch((error) => logger.error("Failed to send goal plan notification", { error: errorForLog(error) }));
   }
 
   await afterWrite(() => syncStudentAlerts(goal.studentId), {

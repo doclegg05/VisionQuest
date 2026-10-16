@@ -30,7 +30,22 @@ function formatEntry(entry: LogEntry): string {
   return `${timestamp} [${level.toUpperCase()}] ${message}${ctx}`;
 }
 
-function log(level: LogLevel, message: string, context?: Record<string, unknown>) {
+/**
+ * A log line's structured fields. The raw student-identifier keys are typed
+ * `never`, so a context object that carries one fails to compile even when it
+ * is built elsewhere and spread in, where the ESLint key selectors cannot see
+ * it (.claude/rules/security.md, Data Privacy). Log studentLogKey(id) from
+ * src/lib/log-keys.ts instead. `message` is the entry's own field, which a
+ * context key would overwrite.
+ */
+export type LogContext = Record<string, unknown> & {
+  studentId?: never;
+  targetStudentId?: never;
+  userId?: never;
+  message?: never;
+};
+
+function log(level: LogLevel, message: string, context?: LogContext) {
   if (!shouldLog(level)) return;
 
   const entry: LogEntry = {
@@ -49,10 +64,10 @@ function log(level: LogLevel, message: string, context?: Record<string, unknown>
 }
 
 export const logger = {
-  debug: (message: string, context?: Record<string, unknown>) => log("debug", message, context),
-  info: (message: string, context?: Record<string, unknown>) => log("info", message, context),
-  warn: (message: string, context?: Record<string, unknown>) => log("warn", message, context),
-  error: (message: string, context?: Record<string, unknown>) => log("error", message, context),
+  debug: (message: string, context?: LogContext) => log("debug", message, context),
+  info: (message: string, context?: LogContext) => log("info", message, context),
+  warn: (message: string, context?: LogContext) => log("warn", message, context),
+  error: (message: string, context?: LogContext) => log("error", message, context),
 };
 
 let counter = 0;

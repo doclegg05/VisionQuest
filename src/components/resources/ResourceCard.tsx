@@ -47,7 +47,7 @@ export default function ResourceCard({
                 href={buildFormDownloadUrl(form, "view")}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+                className="inline-flex min-h-11 items-center text-sm font-semibold text-info transition-colors hover:opacity-80"
               >
                 Open PDF
               </a>
@@ -59,7 +59,7 @@ export default function ResourceCard({
               </a>
             </>
           ) : (
-            <span className="text-xs text-[var(--accent-strong)]">
+            <span className="text-xs text-success">
               PDF not connected yet
             </span>
           )}
@@ -68,12 +68,12 @@ export default function ResourceCard({
 
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {form.fillable && (
-          <span className="rounded-full bg-[var(--accent-secondary)]/15 px-2.5 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
+          <span className="rounded-full bg-[var(--accent-secondary)]/15 px-2.5 py-0.5 text-xs font-semibold text-info">
             Fillable
           </span>
         )}
         {form.required && (
-          <span className="rounded-full bg-[var(--accent-strong)]/15 px-2.5 py-0.5 text-xs font-semibold text-[var(--accent-strong)]">
+          <span className="rounded-full bg-[var(--accent-strong)]/15 px-2.5 py-0.5 text-xs font-semibold text-success">
             Required
           </span>
         )}
@@ -101,7 +101,7 @@ export default function ResourceCard({
           <Link
             href={helperHref}
             prefetch={false}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-info transition-colors hover:opacity-80"
           >
             {helperLabel}
           </Link>
@@ -117,7 +117,7 @@ export default function ResourceCard({
           <Link
             href={helperHref}
             prefetch={false}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-info transition-colors hover:opacity-80"
           >
             {helperLabel}
           </Link>

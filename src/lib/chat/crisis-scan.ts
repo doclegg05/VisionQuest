@@ -33,6 +33,7 @@ import {
 } from "@/lib/sage/crisis-detection";
 import { rateLimit } from "@/lib/rate-limit";
 import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -56,7 +57,7 @@ async function recordAllowed(studentId: string): Promise<boolean> {
   } catch (err) {
     logger.warn("Crisis record limiter failed; recording anyway", {
       student: studentLogKey(studentId),
-      error: String(err),
+      error: errorForLog(err),
     });
     return true;
   }
@@ -99,7 +100,7 @@ export async function scanStudentMessageForCrisis({
       student: studentLogKey(studentId),
       category,
       alert: "wellbeing_detection_failed",
-      error: String(err),
+      error: errorForLog(err),
     });
   }
 }

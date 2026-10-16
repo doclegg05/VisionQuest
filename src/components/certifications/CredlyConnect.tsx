@@ -163,7 +163,7 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
               href={`https://www.credly.com/users/${state.username}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-[var(--accent-secondary)] hover:underline"
+              className="font-semibold text-info hover:underline"
             >
               {state.username}
             </a>
@@ -182,7 +182,7 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
           {state.status === "saving" ? "Disconnecting..." : "Disconnect"}
         </button>
         {state.status === "error" && (
-          <p className="w-full text-sm text-[var(--error)]">{state.errorMessage}</p>
+          <p className="w-full text-sm text-danger">{state.errorMessage}</p>
         )}
       </div>
     );
@@ -238,10 +238,10 @@ export default function CredlyConnect({ onConnectionChange }: CredlyConnectProps
       </div>
 
       {state.status === "success" && (
-        <p className="mt-2 text-sm text-[var(--success)]">Credly profile connected!</p>
+        <p className="mt-2 text-sm text-success">Credly profile connected!</p>
       )}
       {state.status === "error" && (
-        <p className="mt-2 text-sm text-[var(--error)]">{state.errorMessage}</p>
+        <p className="mt-2 text-sm text-danger">{state.errorMessage}</p>
       )}
     </div>
   );

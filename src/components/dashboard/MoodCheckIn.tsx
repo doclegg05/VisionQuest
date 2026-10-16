@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/auth";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { hasMoodEntryToday } from "@/lib/mood";
 import { MoodCheckInCard } from "./MoodCheckInCard";
@@ -21,7 +22,7 @@ export async function MoodCheckIn() {
   } catch (err) {
     logger.error("Mood check-in gate: lookup failed", {
       student: studentLogKey(session.id),
-      error: String(err),
+      error: errorForLog(err),
     });
     return null;
   }

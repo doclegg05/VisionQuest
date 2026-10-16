@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { enqueueJob, processJobById } from "@/lib/jobs";
 import "@/lib/jobs-registry";
 import { logAuditEvent } from "@/lib/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { serializeScrapeRun } from "@/lib/job-board/scrape-status";
 import { isValidJobSource } from "@/lib/job-board/source-options";
@@ -29,7 +30,7 @@ function kickOffScrapeJob(jobId: string | null, classConfigId: string) {
       logger.error("Manual job refresh processor failed to start", {
         jobId,
         classConfigId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorForLog(error),
       });
     });
 }

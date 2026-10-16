@@ -1,18 +1,20 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
-import { Manrope, Sora } from "next/font/google";
+import { DM_Serif_Display, Outfit } from "next/font/google";
 import { MotionProvider } from "@/components/ui/MotionProvider";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { getThemePreferenceFromCookie, THEME_BOOT_SCRIPT, THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
-const manrope = Manrope({
+const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-body",
 });
 
-const sora = Sora({
+// One weight only: .font-display turns off synthetic bold (globals.css).
+const dmSerifDisplay = DM_Serif_Display({
   subsets: ["latin"],
+  weight: "400",
   variable: "--font-display",
 });
 
@@ -29,8 +31,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f3f7f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a1628" },
+    // eslint-disable-next-line spokes/no-off-palette-color -- the viewport API takes literal colors; this is a SPOKES palette value
+    { media: "(prefers-color-scheme: light)", color: "#edf3f7" },
+    // eslint-disable-next-line spokes/no-off-palette-color -- the viewport API takes literal colors; this is a SPOKES palette value
+    { media: "(prefers-color-scheme: dark)", color: "#00133f" },
   ],
 };
 
@@ -48,7 +52,7 @@ export default async function RootLayout({
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} suppressHydrationWarning />
       </head>
-      <body className={`${manrope.variable} ${sora.variable} antialiased`}>
+      <body className={`${outfit.variable} ${dmSerifDisplay.variable} antialiased`}>
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100]

@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { estimateTokens } from "./llm-usage-estimate";
 import { SAGE_PROMPT_REVISION } from "./sage/prompt-revision";
@@ -48,7 +49,7 @@ export async function logLlmCall(params: LogLlmCallParams): Promise<void> {
     });
   } catch (error) {
     // Token logging is non-critical; log and continue
-    logger.error("Failed to log LLM call", { error: String(error) });
+    logger.error("Failed to log LLM call", { error: errorForLog(error) });
   }
 }
 

@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import spokesPalette from "./eslint-rules/spokes-palette.mjs";
 
 // Selectors that apply to every linted file. ESLint flat config replaces a
 // rule's options wholesale when a later block sets the same rule, so any
@@ -117,8 +118,70 @@ const openRouterRequire = {
   message: OPENROUTER_EVAL_ONLY_MESSAGE,
 };
 
+const openRouterSyntax = [openRouterDynamicImport, openRouterRequire];
+
+// A caught error's text is not safe to log. Prisma messages echo the failed
+// call's arguments, so an alertKey or a where clause puts a student id in the
+// log line, and the key-name selectors above cannot see inside a message. Log
+// errorForLog(error) from src/lib/log-error.ts, which keeps the error's name
+// and code (security audit on PR #240, 2026-10-15; all of src/ since the
+// follow-up). A catch whose try block calls only a mail or SMS provider may
+// add providerErrorText(error) from src/lib/log-redaction.ts.
+const RAW_ERROR_TEXT_MESSAGE =
+  "No raw error text in server logs: Prisma messages quote query arguments, including student ids. Log { error: errorForLog(error) } from @/lib/log-error.";
+// The raw error object is no better than its message: the logger runs
+// JSON.stringify on the entry, which drops `message` but keeps Prisma's
+// enumerable `meta`. A selector cannot tell which identifier a catch clause
+// bound, so the raw-object, template-literal and `+` forms go by the usual
+// names (`msg` and `message` too, in a template). Any identifier under an
+// error/err/cause key counts, since that is where a saved message lands;
+// under other keys only an error-named one does, because `reason` and the
+// like are ordinary enum fields. `+` is the only binary operator that builds
+// text (`err instanceof Error` is a BinaryExpression too). A helper that
+// returns the message, like scrape-engine's errorMessage(), goes by name.
+// src/lib/error-log-guard.test.ts lints a probe of every form.
+const IN_LOGGER = "CallExpression[callee.object.name='logger']";
+const ERROR_NAME = "/^(e|err|error)$|(Err|Error)$/";
+const TEXT_NAME = "/^(e|err|error|msg|errMsg|errorMsg|message)$|(Err|Error)$/";
+const rawErrorTextInLogs = [
+  `${IN_LOGGER} MemberExpression[property.name=/^(message|stack)$/]`,
+  `${IN_LOGGER} MemberExpression[property.value=/^(message|stack)$/]`,
+  `${IN_LOGGER} CallExpression[callee.name='String']`,
+  `${IN_LOGGER} CallExpression[callee.property.name='toString']`,
+  `${IN_LOGGER} CallExpression[callee.object.name='JSON'][callee.property.name='stringify']`,
+  `${IN_LOGGER} CallExpression:matches([callee.name='inspect'], [callee.object.name='util'])`,
+  `${IN_LOGGER} CallExpression:matches([callee.name=/[eE]rrorMessage$|^messageOf$/], [callee.property.name=/[eE]rrorMessage$|^messageOf$/])`,
+  `${IN_LOGGER} Property[key.name=/^(error|err|cause)$/] > :matches(Identifier, TSAsExpression, TSNonNullExpression).value`,
+  `${IN_LOGGER} Property > Identifier.value[name=${ERROR_NAME}]`,
+  `${IN_LOGGER} :matches(TemplateLiteral, BinaryExpression[operator='+']) > Identifier[name=${TEXT_NAME}]`,
+].map((selector) => ({ selector, message: RAW_ERROR_TEXT_MESSAGE }));
+
+// These hide a log call or its fields from every selector above: a context
+// object built before the call, and a logger method held in a variable or
+// passed along. Spread fields stay allowed (counts objects use them); the
+// LogContext type in src/lib/logger.ts refuses a raw student id in a spread.
+const HIDDEN_LOG_CALL_MESSAGE =
+  "Call logger.<level>() directly with an inline context object, so the no-PII log rules can see the fields. Log { error: errorForLog(error) } from @/lib/log-error.";
+const hiddenLogCalls = [
+  `${IN_LOGGER}[arguments.1.type='Identifier']`,
+  ":matches(VariableDeclarator, AssignmentExpression, ConditionalExpression, LogicalExpression, ArrayExpression, Property) > MemberExpression[object.name='logger']",
+  "CallExpression > MemberExpression.arguments[object.name='logger']",
+].map((selector) => ({ selector, message: HIDDEN_LOG_CALL_MESSAGE }));
+
+const SRC_FILES = ["src/**/*.{ts,tsx,js,jsx,mjs,mts,cts,cjs}"];
+
+// Every block under src/ that sets no-restricted-syntax builds its list here.
+// Flat config replaces a rule's options when a later block sets the same rule,
+// so a block that listed its selectors by hand silently dropped the groups it
+// forgot (the OpenRouter block switched off the teacher raw-palette rule that
+// way). src/lib/error-log-guard.test.ts lints a probe of each group at a path
+// owned by each block.
+function srcRestrictedSyntax(...extras) {
+  return ["error", ...restrictedSyntaxEverywhere, ...rawErrorTextInLogs, ...hiddenLogCalls, ...extras];
+}
+
 const openRouterEvalOnly = {
-  files: ["src/**/*.{ts,tsx,js,jsx,mjs,mts,cts,cjs}"],
+  files: SRC_FILES,
   // The eval-only OpenRouter family itself: the embedding provider reuses the
   // chat provider's transport helpers, and each has its own test.
   ignores: [
@@ -128,7 +191,7 @@ const openRouterEvalOnly = {
   ],
   rules: {
     "no-restricted-imports": ["error", { patterns: openRouterEvalOnlyPatterns }],
-    "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, openRouterDynamicImport, openRouterRequire],
+    "no-restricted-syntax": srcRestrictedSyntax(...openRouterSyntax),
   },
 };
 
@@ -157,46 +220,6 @@ const appPrismaImportWithoutSession = {
           ...openRouterEvalOnlyPatterns,
         ],
       },
-    ],
-  },
-};
-
-// A caught error's text is not safe to log from a sessionless route. Prisma
-// messages echo the failed call's arguments, so an alertKey or a where clause
-// puts a student id in the log line, and the key-name selectors above cannot
-// see inside a message. Log errorForLog(error) from src/lib/log-error.ts,
-// which keeps the error's name and code (security audit on PR #240,
-// 2026-10-15). Scoped to /api/internal for now; the rest of src/ still logs
-// messages in places.
-const RAW_ERROR_TEXT_MESSAGE =
-  "No raw error text in internal-route logs: Prisma messages quote query arguments, including student ids. Log { error: errorForLog(error) } from @/lib/log-error.";
-// The raw error object is no better than its message: the logger runs
-// JSON.stringify on the entry, which drops `message` but keeps Prisma's
-// enumerable `meta`. A selector cannot tell which identifier a catch clause
-// bound, so the template-literal and `+` forms go by the usual names.
-// src/app/api/internal/error-log-guard.test.ts lints a probe of every form.
-const IN_LOGGER = "CallExpression[callee.object.name='logger']";
-const rawErrorTextInLogs = [
-  `${IN_LOGGER} MemberExpression[property.name=/^(message|stack)$/]`,
-  `${IN_LOGGER} MemberExpression[property.value=/^(message|stack)$/]`,
-  `${IN_LOGGER} CallExpression[callee.name='String']`,
-  `${IN_LOGGER} CallExpression[callee.property.name='toString']`,
-  `${IN_LOGGER} CallExpression[callee.object.name='JSON'][callee.property.name='stringify']`,
-  `${IN_LOGGER} Property[key.name=/^(error|err|cause|reason)$/] > Identifier.value`,
-  `${IN_LOGGER} :matches(TemplateLiteral, BinaryExpression) > Identifier[name=/^(e|err|error)$|(Err|Error)$/]`,
-].map((selector) => ({ selector, message: RAW_ERROR_TEXT_MESSAGE }));
-
-// Comes after openRouterEvalOnly, whose no-restricted-syntax entry it would
-// otherwise lose, so it repeats that block's selectors.
-const internalRouteErrorLogs = {
-  files: ["src/app/api/internal/**"],
-  rules: {
-    "no-restricted-syntax": [
-      "error",
-      ...restrictedSyntaxEverywhere,
-      openRouterDynamicImport,
-      openRouterRequire,
-      ...rawErrorTextInLogs,
     ],
   },
 };
@@ -231,6 +254,53 @@ const rawPaletteSyntax = [
   },
 ];
 
+// Folders not yet swept onto SPOKES role utilities (spec Design 6.4). The rule
+// only warns here. Each sweep PR deletes its entries; the last deletes the list.
+const SPOKES_UNSWEPT = [
+  "src/app/(coordinator)/coordinator/*",
+  "src/app/(student)/dashboard/*",
+  "src/app/(student)/forms/*",
+  "src/app/(student)/learning/*",
+  "src/app/(student)/welcome/*",
+  "src/app/forgot-password/*",
+  "src/app/reset-password/*",
+  "src/components/advising/*",
+  "src/components/auth/*",
+  "src/components/career/*",
+  "src/components/certifications/*",
+  "src/components/chat/*",
+  "src/components/connect/*",
+  "src/components/coordinator/*",
+  "src/components/dashboard/*",
+  "src/components/dashboard/sage/*",
+  "src/components/documents/*",
+  "src/components/goals/*",
+  "src/components/library/*",
+  "src/components/lms/*",
+  "src/components/orientation/*",
+  "src/components/portfolio/*",
+  "src/components/progression/*",
+  "src/components/sage/*",
+  "src/components/settings/*",
+  "src/components/spokes/*",
+  "src/components/student/*",
+  "src/components/teacher/*",
+  "src/components/teacher/class-overview/*",
+  "src/components/teacher/forms/*",
+  "src/components/teacher/student-detail/*",
+  "src/components/ui/*",
+  "src/components/vision-board/*",
+];
+
+// Document renderers outside the SPOKES spec (Design 9: PDFs, email, resume print).
+const SPOKES_OUT_OF_SCOPE = [
+  "src/lib/certificate-generator.ts",
+  "src/lib/email-templates.ts",
+  "src/lib/resume.ts",
+  "src/lib/resume-layout.ts",
+  "src/app/api/forms/orientation-packet/route.ts",
+];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -249,16 +319,22 @@ const eslintConfig = defineConfig([
       "no-restricted-properties": ["error", ...nativeDialogProperties],
     },
   },
-  // Staff surfaces: no raw palette colors. Spreads restrictedSyntaxEverywhere
-  // because a flat-config rule entry replaces, rather than merges with, the
-  // one above.
+  // All of src/, the OpenRouter files that openRouterEvalOnly exempts included.
   {
-    files: ["src/components/teacher/**", "src/app/(teacher)/**"],
+    files: SRC_FILES,
     rules: {
-      "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, ...rawPaletteSyntax],
+      "no-restricted-syntax": srcRestrictedSyntax(),
     },
   },
   openRouterEvalOnly,
+  // Staff surfaces: no raw palette colors. Comes after openRouterEvalOnly,
+  // which matches these files too and would otherwise replace this entry.
+  {
+    files: ["src/components/teacher/**", "src/app/(teacher)/**"],
+    rules: {
+      "no-restricted-syntax": srcRestrictedSyntax(...openRouterSyntax, ...rawPaletteSyntax),
+    },
+  },
   // Student-facing surfaces. Staff-only trees are excluded by name; the
   // staff readers (src/lib/teacher/**, src/lib/advising*.ts, src/lib/sage/**,
   // src/lib/reporting.ts, src/lib/inactivity.ts, src/lib/placement-bridge.ts)
@@ -278,13 +354,7 @@ const eslintConfig = defineConfig([
       "src/app/api/coordinator/**",
     ],
     rules: {
-      "no-restricted-syntax": [
-        "error",
-        ...restrictedSyntaxEverywhere,
-        studentAlertDirectRead,
-        openRouterDynamicImport,
-        openRouterRequire,
-      ],
+      "no-restricted-syntax": srcRestrictedSyntax(studentAlertDirectRead, ...openRouterSyntax),
     },
   },
   // Student files already moved onto theme tokens: no raw palette colors, so
@@ -294,11 +364,29 @@ const eslintConfig = defineConfig([
   {
     files: ["src/components/certifications/CertTracker.tsx"],
     rules: {
-      "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, studentAlertDirectRead, ...rawPaletteSyntax],
+      "no-restricted-syntax": srcRestrictedSyntax(studentAlertDirectRead, ...openRouterSyntax, ...rawPaletteSyntax),
     },
   },
+  {
+    plugins: { spokes: { rules: { "no-off-palette-color": spokesPalette } } },
+  },
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: ["src/**/*.test.ts", "src/**/*.test.tsx", ...SPOKES_OUT_OF_SCOPE],
+    rules: { "spokes/no-off-palette-color": "error" },
+  },
+  // Spread only while folders remain: ESLint can reject an empty `files` array,
+  // and the last sweep task deletes the list.
+  ...(SPOKES_UNSWEPT.length > 0
+    ? [
+        {
+          files: SPOKES_UNSWEPT,
+          ignores: ["src/**/*.test.ts", "src/**/*.test.tsx", ...SPOKES_OUT_OF_SCOPE],
+          rules: { "spokes/no-off-palette-color": "warn" },
+        },
+      ]
+    : []),
   appPrismaImportWithoutSession,
-  internalRouteErrorLogs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

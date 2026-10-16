@@ -172,19 +172,19 @@ export default function CareerHub({
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="surface-section rounded-xl p-4 text-center">
-            <Briefcase size={24} className="mx-auto mb-1 text-[var(--primary)]" />
+            <Briefcase size={24} className="mx-auto mb-1 text-info" />
             <p className="text-2xl font-bold text-[var(--ink-strong)]">
               {jobsData?.totalActive ?? 0}
             </p>
             <p className="text-xs text-[var(--ink-muted)]">Available</p>
           </div>
           <div className="surface-section rounded-xl p-4 text-center">
-            <MagnifyingGlass size={24} className="mx-auto mb-1 text-[var(--accent)]" />
+            <MagnifyingGlass size={24} className="mx-auto mb-1 text-success" />
             <p className="text-2xl font-bold text-[var(--ink-strong)]">{matchedCount}</p>
             <p className="text-xs text-[var(--ink-muted)]">Matched</p>
           </div>
           <div className="surface-section rounded-xl p-4 text-center">
-            <BookmarkSimple size={24} className="mx-auto mb-1 text-[var(--accent-gold)]" />
+            <BookmarkSimple size={24} className="mx-auto mb-1 text-warning" />
             <p className="text-2xl font-bold text-[var(--ink-strong)]">
               {jobsData?.totalSaved ?? 0}
             </p>

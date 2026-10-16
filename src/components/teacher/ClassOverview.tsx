@@ -124,7 +124,7 @@ export default function ClassOverview({
 
   function getSortIcon(col: SortKey) {
     if (sortBy !== col) return <span className="ml-1 text-[var(--ink-faint)]">↕</span>;
-    return <span className="ml-1 text-[var(--accent-blue)]">{sortDir === "asc" ? "↑" : "↓"}</span>;
+    return <span className="ml-1 text-info">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
   function formatAppointment(dateStr: string) {
@@ -247,7 +247,7 @@ export default function ClassOverview({
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
-              className="h-4 w-4 rounded border-[var(--border-strong)] text-[var(--accent-secondary)]"
+              className="h-4 w-4 rounded border-[var(--border-strong)] text-info"
             />
             Show inactive students
           </label>

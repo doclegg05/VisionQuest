@@ -206,18 +206,19 @@ describe("D3 axe-authenticated — select-name", () => {
   });
 });
 
+// 2026-10-15: SPOKES token values (docs/superpowers/specs/2026-10-15-spokes-design-system-design.md); contrast ratios are asserted in src/app/globals.contrast.test.ts and src/app/globals.badge-contrast.test.ts.
 describe("D3 axe-authenticated — color-contrast (light-theme tokens)", () => {
   it("--ink-faint clears 4.5:1 (was rgba(0,0,0,0.25), measured 1.83:1)", () => {
     const css = read("src/app/globals.css");
-    assert.ok(css.includes("--ink-faint: rgba(0, 0, 0, 0.55);"), "light-theme --ink-faint must be darkened to 0.55 alpha");
+    assert.ok(css.includes("--ink-faint: rgba(0, 64, 113, 0.75);"), "light-theme --ink-faint is SPOKES dark at 75% (4.5:1 checked in globals.contrast.test.ts)");
     assert.ok(!css.match(/--ink-faint: rgba\(0, 0, 0, 0\.25\);/), "the old 0.25-alpha (1.83:1) value must be gone");
   });
 
   it("--badge-warning-text / --urgency-high-text / --toast-celebration-text clear 4.5:1 (were #8a6d05, measured 4.34:1)", () => {
     const css = read("src/app/globals.css");
-    assert.ok(css.includes("--badge-warning-text: #7a5f04;"));
-    assert.ok(css.includes("--urgency-high-text: #7a5f04;"));
-    assert.ok(css.includes("--toast-celebration-text: #7a5f04;"));
+    assert.ok(css.includes("--badge-warning-text: #004071;"));
+    assert.ok(css.includes("--urgency-high-text: #004071;"));
+    assert.ok(css.includes("--toast-celebration-text: #004071;"));
     // The old value is still named in explanatory comments (":root" section
     // only — dark theme's own #8a6d06-adjacent values are untouched and
     // fine); check the actual DECLARATION line is gone, not the whole file.
@@ -226,7 +227,7 @@ describe("D3 axe-authenticated — color-contrast (light-theme tokens)", () => {
 
   it("--program-ietp-text clears 4.5:1 (was #c2410c, measured 4.47:1)", () => {
     const css = read("src/app/globals.css");
-    assert.ok(css.includes("--program-ietp-text: #a53509;"));
+    assert.ok(css.includes("--program-ietp-text: #004071;"));
     assert.ok(!css.includes(": #c2410c;"), "the old just-failing hex must be gone as a declared value");
   });
 });

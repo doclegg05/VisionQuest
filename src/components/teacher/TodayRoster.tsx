@@ -31,7 +31,7 @@ export default function TodayRoster({ roster }: { roster: TodayRosterEntry[] }) 
   return (
     <section className="surface-section p-5">
       <header className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
           In class today
         </p>
         <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Roster</h2>

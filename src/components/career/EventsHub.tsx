@@ -64,7 +64,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
         </div>
         <div className="surface-section p-5">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Registered</p>
-          <p className="mt-2 text-3xl font-bold text-[var(--accent-secondary)]">{registeredCount}</p>
+          <p className="mt-2 text-3xl font-bold text-info">{registeredCount}</p>
           <p className="mt-2 text-sm text-[var(--ink-muted)]">Events you&apos;ve committed to attending.</p>
         </div>
         <div className="surface-section p-5">

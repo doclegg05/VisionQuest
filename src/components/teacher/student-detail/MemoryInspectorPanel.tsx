@@ -64,7 +64,7 @@ export function MemoryInspectorPanel({ studentId }: MemoryInspectorPanelProps) {
 
   return (
     <div className="theme-card rounded-xl p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-secondary)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-info">
         Sage&apos;s memory
       </p>
       <p className="mt-1 text-xs text-[var(--ink-faint)]">

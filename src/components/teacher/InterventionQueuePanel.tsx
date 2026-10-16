@@ -101,7 +101,7 @@ export function QuickTaskModal({
   return (
     <FormDialog title={`Quick task for ${studentName}`} dirty={dirty} onClose={onClose} widthClass="max-w-md">
       <form onSubmit={handleSubmit} className="space-y-3">
-        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         <label className="block space-y-1.5">
           <span className="block text-sm font-medium text-[var(--ink-strong)]">What needs to be done?</span>
           <input
@@ -193,7 +193,7 @@ export function QuickNoteModal({
   return (
     <FormDialog title={`Quick note for ${studentName}`} dirty={dirty} onClose={onClose} widthClass="max-w-md">
       <form onSubmit={handleSubmit} className="space-y-3">
-        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         {/* Note comes first: showModal() focuses the dialog's first focusable
             field, and React's autoFocus cannot reach a field inside a dialog
             that is still closed at commit time. */}
@@ -306,7 +306,7 @@ export function QuickAppointmentModal({
     >
       <form onSubmit={handleSubmit} className="space-y-3">
         <p className="text-xs text-[var(--ink-muted)]">Duration defaults to 30 minutes.</p>
-        {error && <p className="text-sm text-[var(--error)]">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         <label className="block space-y-1.5">
           <span className="block text-sm font-medium text-[var(--ink-strong)]">Appointment title</span>
           <input
@@ -580,7 +580,7 @@ export default function InterventionQueuePanel({
       {body.kind === "loading" && <QueueSkeleton />}
 
       {body.kind === "error" && (
-        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--error)]" role="alert">
+        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-danger" role="alert">
           {error}
         </p>
       )}

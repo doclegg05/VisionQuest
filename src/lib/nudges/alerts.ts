@@ -18,6 +18,7 @@
 // =============================================================================
 
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 import { NUDGE_ALERT_TYPES, type NudgeAlertPlan } from "./schedule-shared";
@@ -80,7 +81,7 @@ export async function resolveWeeklyJobsAlertOnView(studentId: string): Promise<v
     });
   } catch (error) {
     // A page render must never fail over a housekeeping write.
-    logger.warn("Could not resolve the weekly-jobs alert on view", { error: String(error) });
+    logger.warn("Could not resolve the weekly-jobs alert on view", { error: errorForLog(error) });
   }
 }
 

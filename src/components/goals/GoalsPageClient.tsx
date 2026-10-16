@@ -489,10 +489,10 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
           disabled={rowLocked}
           aria-describedby={rowLocked ? "orphan-proposed-hint" : undefined}
           aria-label={item.status === "completed" ? "Mark incomplete" : "Mark complete"}
-          className="-mx-3.5 -my-2.5 inline-flex size-11 shrink-0 items-center justify-center text-[var(--ink-muted)] hover:text-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="-mx-3.5 -my-2.5 inline-flex size-11 shrink-0 items-center justify-center text-[var(--ink-muted)] hover:text-success disabled:cursor-not-allowed disabled:opacity-40"
         >
           {item.status === "completed" ? (
-            <CheckSquare size={16} weight="fill" className="text-[var(--accent-strong)]" />
+            <CheckSquare size={16} weight="fill" className="text-success" />
           ) : (
             <Square size={16} />
           )}
@@ -515,7 +515,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                 autoFocus
               />
-              <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+              <button type="submit" className={`${INLINE_FORM_BUTTON} text-success font-semibold`}>Save</button>
               <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
             </form>
           ) : (
@@ -734,7 +734,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-dashed border-[var(--border)] pb-2">
                   <div className="min-w-0 grow basis-44">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)]">
+                      <span className="text-xs font-bold uppercase tracking-wider text-success">
                         Monthly Plan
                       </span>
                       {isMProposed && (
@@ -807,7 +807,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         className="min-w-0 flex-1 px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                         autoFocus
                       />
-                      <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                      <button type="submit" className={`${INLINE_FORM_BUTTON} text-success font-semibold`}>Save</button>
                       <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                     </form>
                   )}
@@ -877,11 +877,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                           onClick={(e) => handleToggleGoalStatus(weekly.id, weekly.status, e)}
                           disabled={wLocked}
                           aria-describedby={wLocked ? proposedHintId : undefined}
-                          className="size-11 -ml-4.5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="size-11 -ml-4.5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-success transition-colors shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label={weekly.status === "completed" ? "Mark incomplete" : "Mark complete"}
                         >
                           {weekly.status === "completed" ? (
-                            <CheckSquare size={18} weight="fill" className="text-[var(--accent-strong)] animate-scale-pop" />
+                            <CheckSquare size={18} weight="fill" className="text-success animate-scale-pop" />
                           ) : (
                             <Square size={18} />
                           )}
@@ -904,7 +904,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                 autoFocus
                               />
-                              <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                              <button type="submit" className={`${INLINE_FORM_BUTTON} text-success font-semibold`}>Save</button>
                               <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                             </form>
                           ) : (
@@ -939,11 +939,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 onClick={(e) => handleToggleGoalStatus(task.id, task.status, e)}
                                 disabled={tLocked}
                                 aria-describedby={tLocked ? proposedHintId : undefined}
-                                className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] transition-colors shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-success transition-colors shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={task.status === "completed" ? "Mark incomplete" : "Mark complete"}
                               >
                                 {task.status === "completed" ? (
-                                  <CheckSquare size={16} weight="fill" className="text-[var(--accent-strong)] animate-scale-pop" />
+                                  <CheckSquare size={16} weight="fill" className="text-success animate-scale-pop" />
                                 ) : (
                                   <Square size={16} />
                                 )}
@@ -966,7 +966,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                       className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                       autoFocus
                                     />
-                                    <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                                    <button type="submit" className={`${INLINE_FORM_BUTTON} text-success font-semibold`}>Save</button>
                                     <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                                   </form>
                                 ) : (
@@ -1012,7 +1012,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                 className="min-w-0 flex-1 px-2 py-0.5 text-xs border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                                 autoFocus
                               />
-                              <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Add</button>
+                              <button type="submit" className={`${INLINE_FORM_BUTTON} text-success font-semibold`}>Add</button>
                               <button type="button" onClick={() => setAddingTaskToParentId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                             </form>
                           ) : (
@@ -1044,11 +1044,11 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         onClick={(e) => handleToggleGoalStatus(item.id, item.status, e)}
                         disabled={itemLocked}
                         aria-describedby={itemLocked ? proposedHintId : undefined}
-                        className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-[var(--accent-strong)] shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="size-11 -ml-5 -mr-2 -mt-1.5 text-[var(--ink-muted)] hover:text-success shrink-0 flex items-center justify-end pr-2 disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label={item.status === "completed" ? "Mark incomplete" : "Mark complete"}
                       >
                         {item.status === "completed" ? (
-                          <CheckSquare size={16} weight="fill" className="text-[var(--accent-strong)] animate-scale-pop" />
+                          <CheckSquare size={16} weight="fill" className="text-success animate-scale-pop" />
                         ) : (
                           <Square size={16} />
                         )}
@@ -1071,7 +1071,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                               className="min-w-0 flex-1 px-2 py-0.5 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                               autoFocus
                             />
-                            <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Save</button>
+                            <button type="submit" className={`${INLINE_FORM_BUTTON} text-success font-semibold`}>Save</button>
                             <button type="button" onClick={() => setEditingGoalId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)]`}>Cancel</button>
                           </form>
                         ) : (
@@ -1117,7 +1117,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                         className="min-w-0 flex-1 px-2.5 py-1 text-sm border border-[var(--border)] rounded bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none"
                         autoFocus
                       />
-                      <button type="submit" className={`${INLINE_FORM_BUTTON} text-[var(--accent-strong)] font-semibold`}>Add</button>
+                      <button type="submit" className={`${INLINE_FORM_BUTTON} text-success font-semibold`}>Add</button>
                       <button type="button" onClick={() => setAddingWeeklyToParentId(null)} className={`${INLINE_FORM_BUTTON} text-[var(--ink-muted)] font-medium`}>Cancel</button>
                     </form>
                   ) : (
@@ -1177,7 +1177,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                                   href={link.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex min-h-11 shrink-0 items-center text-[var(--accent-blue)] hover:underline font-semibold"
+                                  className="inline-flex min-h-11 shrink-0 items-center text-info hover:underline font-semibold"
                                 >
                                   Open ↗
                                 </a>
