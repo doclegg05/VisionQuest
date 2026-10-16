@@ -29,9 +29,8 @@ export async function POST(req: Request) {
   const start = Date.now();
   try {
     const summary = await runAllAutoRefreshScrapes();
-    const durationMs = Date.now() - start;
-    const data = { ...summary, durationMs };
-    logger.info("Cron job scrape complete", { ...summary, durationMs });
+    const data = { ...summary, durationMs: Date.now() - start };
+    logger.info("Cron job scrape complete", { ...data });
 
     if (summary.failedConfigs > 0) {
       Sentry.captureMessage(`Weekly job board scrape: ${summary.failedConfigs} class(es) failed`, {
