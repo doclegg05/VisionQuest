@@ -1,3 +1,4 @@
+import { isUrgentSeverity } from "./alert-severity";
 import { prisma } from "./db";
 import { classifyOutcomeVerification } from "./outcome-verification";
 
@@ -231,7 +232,7 @@ export async function getTeacherOutcomeReport(studentIds?: string[]) {
       studentId: student.studentId,
       displayName: student.displayName,
       openAlertCount: student.alerts.length,
-      highSeverityAlertCount: student.alerts.filter((alert) => alert.severity === "high").length,
+      highSeverityAlertCount: student.alerts.filter((alert) => isUrgentSeverity(alert.severity)).length,
       topAlertTitle: student.alerts[0]?.title || null,
       lastActivityAt,
       daysSinceActivity: lastActivityAt ? countDaysSince(lastActivityAt, now) : null,
