@@ -1,0 +1,4 @@
+{
+  "_read_me": "migration-drift-schema suite (config/benchmarks/migration-drift-schema.json). Each entry is one statement `prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --script` prints for an object that exists only as raw SQL because schema.prisma cannot declare it. List a statement ONLY when it appeared in a real CI run of this suite and the reason names the migration that created the object and why the schema language cannot express it. A statement that drops or changes anything schema.prisma could declare is real drift: fix the schema or add the migration instead of listing it here. Statements are compared with comments dropped and whitespace collapsed.",
+  "exemptions": []
+}
