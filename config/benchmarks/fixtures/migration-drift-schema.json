@@ -1,4 +1,26 @@
 {
   "_read_me": "migration-drift-schema suite (config/benchmarks/migration-drift-schema.json). Each entry is one statement `prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --script` prints for an object that exists only as raw SQL because schema.prisma cannot declare it. List a statement ONLY when it appeared in a real CI run of this suite and the reason names the migration that created the object and why the schema language cannot express it. A statement that drops or changes anything schema.prisma could declare is real drift: fix the schema or add the migration instead of listing it here. Statements are compared with comments dropped and whitespace collapsed.",
-  "exemptions": []
+  "_measured_at": "2026-10-16, CI run 38900587238 on commit 08de5301",
+  "exemptions": [
+    {
+      "statement": "DROP INDEX \"visionquest\".\"DocumentChunk_embedding_hnsw_idx\";",
+      "reason": "HNSW index on DocumentChunk.embedding, created by migration 20260610120100_add_document_embeddings for vector search. schema.prisma models the column as Unsupported(\"vector(768)\") and Prisma's @@index has no HNSW type, so the index cannot be declared."
+    },
+    {
+      "statement": "DROP INDEX \"visionquest\".\"DocumentChunk_fts_gin_idx\";",
+      "reason": "GIN index on the generated DocumentChunk.fts column, created by migration 20260624120000_add_chunk_provenance for the full-text leg of hybrid search. schema.prisma models fts as Unsupported(\"tsvector\"), and Prisma cannot declare an index on an Unsupported field."
+    },
+    {
+      "statement": "DROP INDEX \"visionquest\".\"ProgramDocument_embedding_hnsw_idx\";",
+      "reason": "HNSW index on ProgramDocument.embedding, created by migration 20260610120100_add_document_embeddings for vector search. schema.prisma models the column as Unsupported(\"vector(768)\") and Prisma's @@index has no HNSW type, so the index cannot be declared."
+    },
+    {
+      "statement": "DROP INDEX \"visionquest\".\"SageMemory_embedding_hnsw_idx\";",
+      "reason": "HNSW index on SageMemory.embedding, created by migration 20260610200000_add_sage_memory_and_operations for memory recall. schema.prisma models the column as Unsupported(\"vector(768)\") and Prisma's @@index has no HNSW type, so the index cannot be declared."
+    },
+    {
+      "statement": "ALTER TABLE \"visionquest\".\"DocumentChunk\" ALTER COLUMN \"fts\" DROP DEFAULT;",
+      "reason": "DocumentChunk.fts is GENERATED ALWAYS AS (to_tsvector('english', \"content\")) STORED, from migration 20260624120000_add_chunk_provenance. Prisma reads the generation expression as a default that Unsupported(\"tsvector\") cannot carry, and proposes dropping it."
+    }
+  ]
 }
