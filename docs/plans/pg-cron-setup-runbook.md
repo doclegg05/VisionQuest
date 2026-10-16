@@ -281,32 +281,62 @@ pool always pulls the hardcoded big-tech company boards.
 
 | Job | Schedule | Route | Does |
 |-----|----------|-------|------|
-| `alert-sync` | `25 10 * * *` (10:25 UTC daily) | `POST /api/internal/alerts/sync` | Rebuilds every active student's `StudentAlert` rows, so the inactivity ladder, overdue tasks and missed appointments appear for students who stopped coming. Sends no nudges. |
+| `alert-sync` | `25 10 * * *` (10:25 UTC daily) | `POST /api/internal/alerts/sync` | Rebuilds every active student's `StudentAlert` rows, so the inactivity ladder, overdue tasks and missed appointments appear for students who stopped coming. Sends no nudges: no instructor nudges and no student reminders, in-app or email. Activity-triggered syncs still send both. |
 | `job-board-scrape` | `5 10 * * 1` (Mondays 10:05 UTC) | `POST /api/internal/jobs/scrape` | Refreshes and expires `JobListing` rows for every class with auto-refresh on. |
 
 Migration `20261016100000_add_alert_sync_and_job_scrape_cron` registers both
 with the guarded pattern above. Each request waits up to 5 minutes
-(`timeout_milliseconds := 300000`). Neither route has been timed in
-production, so time one manual call before trusting the schedule:
+(`timeout_milliseconds := 300000`).
+
+### How a failure shows up
+
+Both routes answer 500 and send a Sentry event tagged with the job name
+(`jobname:alert-sync` or `jobname:job-board-scrape`) when anything fails.
+Watch Sentry for these jobs, not the health checks:
+
+- `cron.job_run_details` records every run as succeeded whatever the app
+  answered (pg_net is asynchronous), and `cron-health-monitor` reads only
+  that table.
+- The nightly `npm run cron:health` (06:41 UTC) reads `net._http_response`,
+  which pg_net keeps for six hours, so it never sees a 10:25 or Monday 10:05
+  response. Run `npm run cron:health` by hand within six hours of a run to
+  check its status code. The same gap applies to `daily-coaching`,
+  `sage-daily-briefing` and the stall detectors.
+
+The alert sweep counts `synced` and `failed`. One student's failure is
+logged with a one-way key and the rest still sync.
+
+The scrape counts `totalJobs`, `scrapedConfigs`, `skippedConfigs` (a run
+queued or processing in the last two hours), `failedConfigs` (the scrape
+threw, or every source the class uses failed) and `unconfiguredConfigs`
+(every source the class uses needs an API key that is not set). Only
+`failedConfigs` makes it a 500. Until the CareerOneStop and Talroo keys
+exist, most classes land in `unconfiguredConfigs`, and each of those still
+records a failed run in the teacher's scrape history.
+
+A run that crashed mid-scrape stays `processing`. After two hours it no
+longer blocks the weekly scrape or the teacher's Refresh button.
+
+### Before trusting the schedule
+
+Neither route has been timed in production. Time one manual call of each:
 
 ```bash
 curl -X POST https://visionquest.onrender.com/api/internal/alerts/sync -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-A 200 response reports `synced` (active students) and `durationMs`. If
-`durationMs` is above about 240000, the sweep needs a deadline before it is
-left on the schedule, or pg_net will record timeouts.
-
 ```bash
 curl -X POST https://visionquest.onrender.com/api/internal/jobs/scrape -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-The scrape reports `totalJobs`, `scrapedConfigs`, `skippedConfigs`
-(classes with a run already queued or processing in the last two hours) and
-`failedConfigs`. It answers 500 when any class failed, after the others ran,
-so `npm run cron:health` reports it. A class whose sources have no API key
-counts as scraped and records a failed run in its scrape history; until the
-CareerOneStop and Talroo keys exist, that is most classes.
+Both responses carry `durationMs`. If either is above about 240000, that
+route needs a deadline before it stays on the schedule, or pg_net will
+record timeouts.
+
+After the deploy, `npm run cron:health` reports `job-board-scrape` as never
+run until its first Monday slot, so the nightly Cron Health workflow fails
+until then. That red is expected; `alert-sync` clears after its first 10:25
+run.
 
 Prerequisites are the same as for the stall detectors: `pg_cron` and
 `pg_net` enabled and the Vault `CRON_SECRET` row matching Render's.

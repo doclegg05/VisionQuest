@@ -92,10 +92,10 @@ describe("evaluateCronHealth", () => {
 
   it("reports every missing baseline job when none were ever registered (the F1 state)", () => {
     // connect-nudges, the two stall detectors, alert-sync and job-board-scrape
-    // did not exist at the time of the 2026-09-01 F1 incident this replays —
-    // included here (as present) so
-    // this scenario keeps testing exactly "the four baseline jobs are
-    // missing", not incidentally also flagging jobs the F1 state predates.
+    // did not exist at the time of the 2026-09-01 F1 incident this replays.
+    // They are included here (as present) so this scenario keeps testing
+    // exactly "the four baseline jobs are missing", not incidentally also
+    // flagging jobs the F1 state predates.
     const laterJobs = [
       "sage-daily-briefing",
       "sage-memory-consolidate",

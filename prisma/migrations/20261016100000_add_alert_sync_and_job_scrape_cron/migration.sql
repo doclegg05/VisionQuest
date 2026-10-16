@@ -8,8 +8,8 @@
 --   Activity already syncs a student's alerts. This sweep writes the ones
 --   that turn on only because days pass, which no activity sync ever writes
 --   for a student who has stopped coming: the 14/30/60/90-day inactivity
---   ladder, overdue tasks, missed appointments. It sends no nudges
---   (syncAlertsForStudents passes notify: false). Daily, because every
+--   ladder, overdue tasks, missed appointments. It sends no nudges, to staff
+--   or students (syncAlertsForStudents passes notify: false). Daily, because every
 --   threshold counts days. 10:25 UTC is 6:25 a.m. Eastern in summer and 5:25
 --   in winter: before classrooms open, ahead of the stall detectors (10:35,
 --   10:45) and of sage-daily-briefing (11:00), which reads alerts.
@@ -18,13 +18,20 @@
 --   The teacher's job settings promise "Auto-refresh every Monday at 6 AM"
 --   (on by default), and listings expire only inside a scrape. pg_cron runs
 --   in UTC, so this is 6:05 a.m. Eastern from March to November and 5:05 in
---   winter. A class whose sources have no API key records a failed run and
---   changes nothing until the key exists.
+--   winter. A class whose sources have no API key records a failed run in
+--   its scrape history and is counted as unconfigured, not failed, until the
+--   key exists.
 --
 -- Minutes: :25 and :05 are free of every other job: appointment-reminders
 -- (:00), job-processor (every ten minutes from :00), cron-health-monitor
 -- (:15), connect-nudges (:30), the stall detectors (10:35, 10:45).
--- cron-health-monitor's 10:15 and 11:15 runs report either job if it failed.
+--
+-- Failure reporting: both routes answer 500 and call Sentry.captureMessage
+-- when a student or class fails. Nothing else would see it. pg_net is
+-- asynchronous, so cron.job_run_details records succeeded whatever the app
+-- answered, and cron-health-monitor reads only that table. The nightly
+-- cron:health check (06:41 UTC) reads net._http_response, which pg_net keeps
+-- for six hours, so it cannot see a 10:25 or Monday 10:05 response either.
 --
 -- `timeout_milliseconds := 300000` (5 minutes): pg_net's default is 5
 -- seconds. The alert sweep runs every active student four at a time, and the
