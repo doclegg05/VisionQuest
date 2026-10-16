@@ -131,13 +131,13 @@ async function countPiiEslintViolations() {
       timeout: ESLINT_TIMEOUT_MS,
       maxBuffer: 50 * 1024 * 1024,
     });
-    return { violations: tallyPiiMessages(stdout) };
+    return tallyPiiMessages(stdout);
   } catch (error) {
     // eslint exits 1 when it finds ANY lint error — that is the expected,
     // successful outcome for "some violations exist", not a tooling failure.
     // stdout still carries the JSON report in that case.
     if (typeof error?.stdout === "string" && error.stdout.length > 0) {
-      return { violations: tallyPiiMessages(error.stdout) };
+      return tallyPiiMessages(error.stdout);
     }
     return {
       toolingError: error?.killed
@@ -147,7 +147,11 @@ async function countPiiEslintViolations() {
   }
 }
 
-function tallyPiiMessages(jsonText) {
+/**
+ * `filesLinted` is the sample size behind the count: a clean tree is many
+ * files with zero violations, never zero samples.
+ */
+export function tallyPiiMessages(jsonText) {
   const report = JSON.parse(jsonText);
   const violations = [];
   for (const fileResult of report) {
@@ -157,7 +161,23 @@ function tallyPiiMessages(jsonText) {
       }
     }
   }
-  return violations;
+  return { violations, filesLinted: report.length };
+}
+
+/**
+ * The eslint metric from `countPiiEslintViolations()`'s result. `n` is the
+ * files checked: a tooling failure checked none, so it reads as zero samples
+ * and the runner reports it as an error, never as a clean tree.
+ */
+export function eslintMetric(eslintResult) {
+  return {
+    id: "pii_eslint_violations",
+    value: eslintResult.violations?.length ?? 0,
+    n: eslintResult.filesLinted ?? 0,
+    details: eslintResult.toolingError
+      ? { toolingError: eslintResult.toolingError }
+      : { violations: eslintResult.violations.slice(0, 20) },
+  };
 }
 
 /**
@@ -172,7 +192,6 @@ export async function run(_ctx) {
 
   const hits = grepLoggerLines(loggerLines, fixtureCuids);
   const eslintResult = await countPiiEslintViolations();
-  const eslintCount = eslintResult.violations?.length ?? 0;
 
   return {
     metrics: [
@@ -186,14 +205,7 @@ export async function run(_ctx) {
           hits: hits.slice(0, 20),
         },
       },
-      {
-        id: "pii_eslint_violations",
-        value: eslintCount,
-        n: eslintCount,
-        details: eslintResult.toolingError
-          ? { toolingError: eslintResult.toolingError }
-          : { violations: eslintResult.violations.slice(0, 20) },
-      },
+      eslintMetric(eslintResult),
     ],
   };
 }
