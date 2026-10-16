@@ -18,7 +18,7 @@
  */
 
 /**
- * The ten jobs the scheduled layer must carry
+ * The twelve jobs the scheduled layer must carry
  * (docs/plans/pg-cron-setup-runbook.md; connect-nudges added 2026-09-05,
  * migration 20260905140000_add_connect_nudges_cron, schedule "30 * * * *" —
  * hourly on the half hour, per that migration's own header). Found missing
@@ -28,7 +28,9 @@
  * exists" drift class the 2026-09-01 review found with the four baseline
  * jobs. evidence-gap-detection and goal-stale-detection added 2026-10-15,
  * migration 20261015120000_add_stall_detector_cron (daily, 10:35 and 10:45
- * UTC).
+ * UTC). alert-sync and job-board-scrape added 2026-10-16, migration
+ * 20261016100000_add_alert_sync_and_job_scrape_cron (daily 10:25 UTC; Mondays
+ * 10:05 UTC).
  */
 export const EXPECTED_CRON_JOBS = Object.freeze([
   "appointment-reminders",
@@ -41,6 +43,8 @@ export const EXPECTED_CRON_JOBS = Object.freeze([
   "connect-nudges",
   "evidence-gap-detection",
   "goal-stale-detection",
+  "alert-sync",
+  "job-board-scrape",
 ]);
 
 const IN_PROGRESS_STATUSES = new Set(["starting", "running", "sending", "connecting"]);

@@ -74,6 +74,29 @@ describe("pg_cron job registrations", () => {
     }
   });
 
+  // The two F6 leftovers that were approved for scheduling
+  // (docs/plans/2026-10-15-unscheduled-internal-routes.md). reports was
+  // deleted and browse-refresh stays manual until VQ-R-015 is decided.
+  it("registers the alert sweep daily and the job scrape weekly", () => {
+    const expected = [
+      { name: "alert-sync", schedule: "25 10 * * *", path: "/api/internal/alerts/sync" },
+      { name: "job-board-scrape", schedule: "5 10 * * 1", path: "/api/internal/jobs/scrape" },
+    ];
+    for (const { name, schedule, path } of expected) {
+      const job = jobs.get(name);
+      assert.ok(job, `no migration registers ${name}`);
+      assert.equal(job.method, "POST");
+      assert.equal(job.schedule, schedule);
+      assert.equal(job.path, path);
+    }
+  });
+
+  it("does not schedule the routes left manual or deleted", () => {
+    const paths = [...jobs.values()].map((job) => job.path);
+    assert.ok(!paths.includes("/api/internal/jobs/browse-refresh"), "browse-refresh stays manual until VQ-R-015");
+    assert.ok(!paths.includes("/api/internal/reports"), "reports was deleted");
+  });
+
   it("points every job at a route that exists and exports the job's method", () => {
     for (const job of jobs.values()) {
       const file = `${REPO_ROOT}src/app${job.path}/route.ts`;

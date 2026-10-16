@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Read-only health check for the scheduled layer: the ten Supabase pg_cron
+ * Read-only health check for the scheduled layer: the twelve Supabase pg_cron
  * jobs and the BackgroundJob queue they drain.
  *
  * Reports, per expected job: present in cron.job, active, schedule, and the
@@ -110,7 +110,7 @@ async function fetchLatestRuns(prisma, names) {
 
 /**
  * pg_net keeps a row per HTTP response for its ttl (default 6 hours), so the
- * window is the whole table in practice; LIMIT 500 is a safety cap (the ten
+ * window is the whole table in practice; LIMIT 500 is a safety cap (the twelve
  * jobs produce about fifty responses per window). Absent or unreadable table
  * (no pg_net, no grant): reported, never fatal.
  */

@@ -95,7 +95,7 @@ api/
 ├── health/             public — Render uses as healthcheck
 ├── internal/           cron-hit routes — auth via CRON_SECRET (alerts,
 │                       appointments, coaching, evidence-gap-detection,
-│                       goal-stale-detection, jobs, reports)
+│                       goal-stale-detection, jobs, ...)
 ├── jobs/               job board (student view)
 ├── lms/                LMS integration stubs
 ├── mood/               mood entries

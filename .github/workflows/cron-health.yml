@@ -1,6 +1,6 @@
 name: Cron Health
 
-# Nightly read-only check of the scheduled layer: the ten Supabase pg_cron
+# Nightly read-only check of the scheduled layer: the twelve Supabase pg_cron
 # jobs and the BackgroundJob queue they drain (scripts/cron-health-check.mjs).
 #
 # Needs the CRON_CHECK_DATABASE_URL repository secret, a postgres-role

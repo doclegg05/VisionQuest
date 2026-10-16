@@ -118,7 +118,7 @@ before the Vault secret exists: `job-processor` starts within ten minutes of
 registration, and a missing `CRON_SECRET` makes every HTTP call 401 while
 `cron.job_run_details` still shows succeeded.
 
-### 4. Verify all ten jobs
+### 4. Verify all twelve jobs
 
 ```sql
 SELECT jobname, schedule, active
@@ -133,15 +133,19 @@ WHERE jobname IN (
   'sage-wager-resolve',
   'connect-nudges',
   'evidence-gap-detection',
-  'goal-stale-detection'
+  'goal-stale-detection',
+  'alert-sync',
+  'job-board-scrape'
 )
 ORDER BY jobname;
 ```
 
-Expected: 10 rows, all `active = true`. The repair migration registers the
-first seven; `connect-nudges` comes from `20260905140000_add_connect_nudges_cron`
-and the two stall detectors from `20261015120000_add_stall_detector_cron`
-(see "Stall detectors, 2026-10" below). After an hour, the latest run of each:
+Expected: 12 rows, all `active = true`. The repair migration registers the
+first seven; `connect-nudges` comes from `20260905140000_add_connect_nudges_cron`,
+the two stall detectors from `20261015120000_add_stall_detector_cron` (see
+"Stall detectors, 2026-10" below), and `alert-sync` and `job-board-scrape`
+from `20261016100000_add_alert_sync_and_job_scrape_cron` (see "Alert sweep
+and job scrape, 2026-10" below). After an hour, the latest run of each:
 
 ```sql
 SELECT DISTINCT ON (j.jobname)
@@ -152,9 +156,10 @@ ORDER BY j.jobname, d.start_time DESC;
 ```
 
 Expected: `status = 'succeeded'` for every job that has had a scheduled slot
-(`daily-coaching` runs at 13:00 UTC, the Sage jobs daily or weekly, and the
-stall detectors at 10:35 and 10:45 UTC, so their rows appear when their slot
-passes). A `return_message` of `unrecognized
+(`daily-coaching` runs at 13:00 UTC, the Sage jobs daily or weekly,
+`alert-sync` at 10:25 UTC, the stall detectors at 10:35 and 10:45 UTC, and
+`job-board-scrape` on Mondays at 10:05 UTC, so their rows appear when their
+slot passes). A `return_message` of `unrecognized
 configuration parameter "app.base_url"` means the job command is still the
 pre-repair `current_setting('app.base_url')` form; confirm this migration
 finished on the ledger and that `cron.job.command` contains `current_setting('app.base_url', true)`.
@@ -187,8 +192,8 @@ catches it.
 CRON_CHECK_DATABASE_URL='<postgres-role connection string>' npm run cron:health
 ```
 
-Exit 0: all ten expected jobs (including the later `connect-nudges` job and
-the two stall detectors) are present, active, have run, and last succeeded, and every
+Exit 0: all twelve expected jobs (including the later `connect-nudges` job,
+the two stall detectors, `alert-sync` and `job-board-scrape`) are present, active, have run, and last succeeded, and every
 `net._http_response` row in the last 6 hours is a 200. Exit 1: problems,
 listed one per line. Exit 2: the check did not run (no connection string, or
 the queries failed). If `net._http_response` is absent or not readable the
@@ -213,7 +218,7 @@ green workflow runs are not evidence of scheduled-layer health.
   database with `pg_cron`/`pg_net` enabled before `migrate deploy` (see
   "What was found"); `docs/runbooks/backup-restore.md` section 4.2 still
   prescribes that order.
-- pg_cron does not purge `cron.job_run_details`: the ten jobs write about 220
+- pg_cron does not purge `cron.job_run_details`: the twelve jobs write about 220
   rows a day, unbounded. Supabase recommends a scheduled
   `DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days'`.
   Whether `postgres` may DELETE from that table on Supabase is unverified;
@@ -263,6 +268,48 @@ curl -X POST https://visionquest.onrender.com/api/internal/evidence-gap-detectio
 A 200 response reports `studentsScanned`, `requirementsChecked`,
 `newAlerts` and `resolvedAlerts`. The goal-stale route reports `scanned`
 and `newAlerts`.
+
+## Alert sweep and job scrape, 2026-10
+
+Two of the four routes review F6 left unscheduled now run on pg_cron
+(approved 2026-10-16; reasoning in
+`docs/plans/2026-10-15-unscheduled-internal-routes.md`). The other two do
+not: `/api/internal/reports` was deleted, and
+`/api/internal/jobs/browse-refresh` stays a manual call
+(`scripts/run-browse-refresh.mjs`) until VQ-R-015 is decided, because its
+pool always pulls the hardcoded big-tech company boards.
+
+| Job | Schedule | Route | Does |
+|-----|----------|-------|------|
+| `alert-sync` | `25 10 * * *` (10:25 UTC daily) | `POST /api/internal/alerts/sync` | Rebuilds every active student's `StudentAlert` rows, so the inactivity ladder, overdue tasks and missed appointments appear for students who stopped coming. Sends no nudges. |
+| `job-board-scrape` | `5 10 * * 1` (Mondays 10:05 UTC) | `POST /api/internal/jobs/scrape` | Refreshes and expires `JobListing` rows for every class with auto-refresh on. |
+
+Migration `20261016100000_add_alert_sync_and_job_scrape_cron` registers both
+with the guarded pattern above. Each request waits up to 5 minutes
+(`timeout_milliseconds := 300000`). Neither route has been timed in
+production, so time one manual call before trusting the schedule:
+
+```bash
+curl -X POST https://visionquest.onrender.com/api/internal/alerts/sync -H "Authorization: Bearer $CRON_SECRET"
+```
+
+A 200 response reports `synced` (active students) and `durationMs`. If
+`durationMs` is above about 240000, the sweep needs a deadline before it is
+left on the schedule, or pg_net will record timeouts.
+
+```bash
+curl -X POST https://visionquest.onrender.com/api/internal/jobs/scrape -H "Authorization: Bearer $CRON_SECRET"
+```
+
+The scrape reports `totalJobs`, `scrapedConfigs`, `skippedConfigs`
+(classes with a run already queued or processing in the last two hours) and
+`failedConfigs`. It answers 500 when any class failed, after the others ran,
+so `npm run cron:health` reports it. A class whose sources have no API key
+counts as scraped and records a failed run in its scrape history; until the
+CareerOneStop and Talroo keys exist, that is most classes.
+
+Prerequisites are the same as for the stall detectors: `pg_cron` and
+`pg_net` enabled and the Vault `CRON_SECRET` row matching Render's.
 
 ## Prerequisites
 
@@ -335,16 +382,20 @@ WHERE jobname IN (
   'sage-wager-resolve',
   'connect-nudges',
   'evidence-gap-detection',
-  'goal-stale-detection'
+  'goal-stale-detection',
+  'alert-sync',
+  'job-board-scrape'
 )
 ORDER BY jobname;
 ```
 
-Expected: 10 rows, all `active = true`. The three Sage jobs come from their
+Expected: 12 rows, all `active = true`. The three Sage jobs come from their
 own migrations (`20260625001000`, `20260701140000`, `20260708121000`); the
 four baseline names come from `20260902120000_reregister_baseline_cron_jobs`;
-`connect-nudges` from `20260905140000_add_connect_nudges_cron`; and the two
-stall detectors from `20261015120000_add_stall_detector_cron`.
+`connect-nudges` from `20260905140000_add_connect_nudges_cron`; the two
+stall detectors from `20261015120000_add_stall_detector_cron`; and
+`alert-sync` and `job-board-scrape` from
+`20261016100000_add_alert_sync_and_job_scrape_cron`.
 
 ## Manual Smoke Test
 
