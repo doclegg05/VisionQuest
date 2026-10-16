@@ -19,10 +19,10 @@
 //
 // Counts come from the closing TAP summary (`# pass 3`), which counts tests.
 // The reporter is named because Node 24 prints its spec report by default,
-// even through a pipe, and spec output has no TAP lines at all. A run with no
-// summary, a cancelled test (fixture setup failed) or the test file skipping
-// itself despite the opt-in measured nothing, so each one throws and the
-// runner records an error rather than 0 writes.
+// even through a pipe, and spec output has no TAP lines at all. Anything
+// short of all three write paths reaching a verdict throws, and so does a
+// non-zero exit with no failing test (a hook failed), so the runner records
+// an error rather than 0 writes over a partial run.
 
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -34,16 +34,18 @@ const TEST_FILE = "src/lib/connect/consent-scopes.bench.test.ts";
 const RUN_TIMEOUT_MS = 60_000;
 export const CHILD_ARGS = ["tsx", "--test", "--test-reporter=tap", TEST_FILE];
 
-const SUMMARY_LINE = /^# (tests|pass|fail|cancelled) (\d+)\s*$/;
-const SKIPPED_ITSELF = /# Subtest: consent scopes \(integration\) — SKIPPED/;
+// The three write paths consent-scopes.bench.test.ts exercises. A run that
+// reached a verdict on fewer did not measure them all. Adding a write path
+// there means raising this.
+export const EXPECTED_TESTS = 3;
+
+const SUMMARY_LINE = /^# (tests|pass|fail|cancelled|skipped|todo) (\d+)\s*$/;
 const NOT_OK = /^\s*not ok \d+ - (.*)$/;
 
 function parseTap(tapText) {
   const counts = {};
   const failures = [];
-  let skippedItself = false;
   for (const line of tapText.split("\n")) {
-    if (SKIPPED_ITSELF.test(line)) skippedItself = true;
     // The last count wins: node:test echoes a test process's stray stdout as
     // `# ...` comments, and the closing summary always comes after them.
     const count = line.match(SUMMARY_LINE);
@@ -52,7 +54,13 @@ function parseTap(tapText) {
     if (notOk) failures.push(notOk[1]);
   }
   const hasSummary = ["tests", "pass", "fail"].every((key) => key in counts);
-  return { hasSummary, counts, skippedItself, failures };
+  return { hasSummary, counts, failures };
+}
+
+function describeCounts(counts) {
+  return ["tests", "pass", "fail", "cancelled", "skipped", "todo"]
+    .map((key) => `${key} ${counts[key] ?? 0}`)
+    .join(", ");
 }
 
 export async function run(ctx) {
@@ -77,7 +85,7 @@ export async function run(ctx) {
     };
   }
 
-  const tapText = await new Promise((resolve, reject) => {
+  const { tapText, exitCode } = await new Promise((resolve, reject) => {
     const chunks = [];
     const child = spawn("npx", CHILD_ARGS, {
       cwd: REPO_ROOT,
@@ -90,34 +98,34 @@ export async function run(ctx) {
       clearTimeout(timer);
       reject(err);
     });
-    child.on("close", () => {
+    child.on("close", (code) => {
       clearTimeout(timer);
-      resolve(Buffer.concat(chunks).toString("utf8"));
+      resolve({ tapText: Buffer.concat(chunks).toString("utf8"), exitCode: code });
     });
   });
 
-  return { metrics: [scoreTap(tapText)] };
+  return { metrics: [scoreTap(tapText, exitCode)] };
 }
 
-export function scoreTap(tapText) {
+export function scoreTap(tapText, exitCode) {
   const parsed = parseTap(tapText);
   const tail = tapText.slice(-4000);
   if (!parsed.hasSummary) {
     throw new Error(`${TEST_FILE} produced no TAP summary, so nothing was measured. Output tail:\n${tail}`);
   }
-  if (parsed.skippedItself) {
+  const { tests, pass, fail } = parsed.counts;
+  if (tests !== EXPECTED_TESTS || pass + fail !== EXPECTED_TESTS) {
     throw new Error(
-      `${TEST_FILE} skipped itself although the scorer saw RLS_TEST_ENABLED=true and a DATABASE_URL, so nothing was measured`
+      `expected ${EXPECTED_TESTS} tests in ${TEST_FILE} to reach a verdict, got ${describeCounts(parsed.counts)}, ` +
+        `so not every write path was exercised. Output tail:\n${tail}`
     );
   }
-  const cancelled = parsed.counts.cancelled ?? 0;
-  if (cancelled > 0) {
+  if (fail === 0 && exitCode !== 0) {
     throw new Error(
-      `${cancelled} test(s) in ${TEST_FILE} were cancelled, usually because fixture setup failed, ` +
-        `so those write paths were never exercised. Output tail:\n${tail}`
+      `${TEST_FILE} exited ${exitCode} with no failing test, which means a hook failed ` +
+        `(fixture cleanup runs in one). Output tail:\n${tail}`
     );
   }
-  const { pass, fail } = parsed.counts;
   return {
     id: "writes_without_scope",
     value: fail,
