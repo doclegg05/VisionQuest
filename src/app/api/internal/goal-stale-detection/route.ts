@@ -3,6 +3,7 @@ import { writeDetectedAlert } from "@/lib/alert-hold";
 import { isAuthorizedInternalRequest } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { buildGoalStaleAlert, TERMINAL_GOAL_STATUSES, type GoalStaleAlert } from "@/lib/stale-goal-rules";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -113,15 +114,7 @@ export async function POST(req: Request) {
       timestamp: now.toISOString(),
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    logger.error("Stale goal detection failed", { error: message });
-
-    return NextResponse.json(
-      {
-        error: "Stale goal detection failed",
-        detail: process.env.NODE_ENV === "development" ? message : undefined,
-      },
-      { status: 500 },
-    );
+    logger.error("Stale goal detection failed", { error: errorForLog(error) });
+    return NextResponse.json({ error: "Stale goal detection failed" }, { status: 500 });
   }
 }

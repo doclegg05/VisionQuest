@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { writeDetectedAlert } from "@/lib/alert-hold";
 import { isAuthorizedInternalRequest } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -271,15 +272,7 @@ export async function POST(req: Request) {
     logger.info("Evidence gap detection complete", { ...summary, durationMs: Date.now() - start });
     return NextResponse.json({ ...summary, timestamp: now.toISOString() });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    logger.error("Evidence gap detection failed", { error: message });
-
-    return NextResponse.json(
-      {
-        error: "Evidence gap detection failed",
-        detail: process.env.NODE_ENV === "development" ? message : undefined,
-      },
-      { status: 500 },
-    );
+    logger.error("Evidence gap detection failed", { error: errorForLog(error) });
+    return NextResponse.json({ error: "Evidence gap detection failed" }, { status: 500 });
   }
 }
