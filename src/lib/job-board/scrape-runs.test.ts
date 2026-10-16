@@ -12,12 +12,14 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 
 const runUpdateMany = mock.fn(async () => ({ count: 1 })) as any;
 const jobUpdateMany = mock.fn(async () => ({ count: 1 })) as any;
+const transaction = mock.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)) as any;
 
 mock.module("@/lib/db", {
   namedExports: {
     prismaAdmin: {
       jobScrapeRun: { updateMany: runUpdateMany },
       backgroundJob: { updateMany: jobUpdateMany },
+      $transaction: transaction,
     },
   },
 });
@@ -33,6 +35,7 @@ const CUTOFF = new Date("2026-10-19T08:05:00.000Z");
 beforeEach(() => {
   runUpdateMany.mock.resetCalls();
   jobUpdateMany.mock.resetCalls();
+  transaction.mock.resetCalls();
 });
 
 describe("scrapeJobDedupeKey", () => {
@@ -69,6 +72,15 @@ describe("retireStaleScrapeRuns", () => {
     });
     assert.equal(data.status, "failed");
     assert.equal(data.completedAt, NOW);
+  });
+
+  // Failing the runs but not their jobs would leave the dead job holding the
+  // dedupe key, which is the state this function exists to clear.
+  it("writes both updates in one transaction", async () => {
+    await scrapeRuns.retireStaleScrapeRuns("cfg-1", NOW);
+
+    assert.equal(transaction.mock.callCount(), 1);
+    assert.equal(transaction.mock.calls[0].arguments[0].length, 2);
   });
 
   it("reports how many runs and jobs it retired", async () => {

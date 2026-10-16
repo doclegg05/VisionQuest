@@ -78,6 +78,7 @@ mock.module("@/lib/classroom", {
 mock.module("@/lib/db", {
   namedExports: {
     prismaAdmin: {
+      $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
       jobScrapeRun: {
         updateMany: (...args: unknown[]) => {
           writeOrder.push("retire-runs");

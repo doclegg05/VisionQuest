@@ -83,6 +83,7 @@ mock.module("@/lib/db", {
       backgroundJob: {
         updateMany: async () => ({ count: 0 }),
       },
+      $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
       jobScrapeSourceResult: {
         upsert: async () => ({}),
         update: async () => ({}),
