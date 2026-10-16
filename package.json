@@ -14,6 +14,7 @@
     "test:joblisting": "tsx --test src/lib/job-board/job-listing-unique.db.test.ts",
     "test:api": "tsx --test --experimental-test-module-mocks src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",
     "test:forms:delivery": "tsx --test --experimental-test-module-mocks src/lib/spokes/forms-delivery.test.ts src/lib/spokes/forms-delivery.s3fallback.test.ts src/lib/spokes/forms-delivery.route.test.ts",
+    "test:relay": "node --test scripts/__tests__/ollama-relay.test.mjs",
     "test:smoke": "node scripts/run-smoke-public-routes.mjs",
     "test:smoke:api": "python scripts/smoke_api_routes.py",
     "test:e2e": "playwright test",

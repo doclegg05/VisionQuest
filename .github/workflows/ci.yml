@@ -128,6 +128,11 @@ jobs:
         # `**` one level and silently runs 47 of the 153 cases.
         run: npm run bench:suites:test
 
+      - name: Ollama relay tests
+        # Starts scripts/ollama-relay.mjs against a fake Ollama on random
+        # ports. Outside `npm test`'s src/** glob, so it needs its own step.
+        run: npm run test:relay
+
       - name: Catalog integrity (hard gate — DB-free checks only)
         # catalog:validate needs a live DB ONLY for the program_document node
         # type (fetching ProgramDocument rows to diff title/audience/category
