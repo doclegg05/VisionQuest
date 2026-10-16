@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { passRateFromBucket } from "./chat-harness-family.mjs";
+import { passRateFromBucket, runChatHarnessFamily } from "./chat-harness-family.mjs";
 import { medianGrade } from "../sage-readability.mjs";
 
 test("passRateFromBucket: skipped cases are excluded from the denominator", () => {
@@ -34,4 +34,30 @@ test("medianGrade: non-numeric grades (skipped cases) are ignored", () => {
 
 test("medianGrade: empty input returns null, not NaN", () => {
   assert.equal(medianGrade([]), null);
+});
+
+// Issue #220: the repo's Gemini key was revoked, so every family run through
+// --provider=gemini failed each call and read pass_rate 0. Sage evals reach
+// Gemini models through OpenRouter now, never with a Gemini key.
+test("runChatHarnessFamily runs the harness through OpenRouter with the OpenRouter key", async () => {
+  const calls = [];
+  const runScript = async (script, args, opts) => {
+    calls.push({ script, args, opts });
+    return { byFamily: { readability: { total: 2, passed: 2, failed: 0, skipped: 0 } }, results: [] };
+  };
+  const { bucket } = await runChatHarnessFamily("readability", {
+    openrouterApiKey: "sk-or-test-key-123",
+    env: { SAGE_RAG_MODE: "keyword" },
+    runScript,
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].script, "scripts/sage-chat-harness.mjs");
+  assert.ok(calls[0].args.includes("--families=readability"), calls[0].args.join(" "));
+  assert.ok(calls[0].args.includes("--provider=openrouter"), calls[0].args.join(" "));
+  assert.ok(!calls[0].args.some((arg) => arg === "--provider=gemini"), calls[0].args.join(" "));
+  assert.equal(calls[0].opts.env.OPENROUTER_API_KEY, "sk-or-test-key-123");
+  assert.equal(calls[0].opts.env.SAGE_RAG_MODE, "keyword");
+  assert.equal("GEMINI_API_KEY" in calls[0].opts.env, false, "no Gemini key is handed to the harness");
+  assert.equal(bucket.passed, 2);
 });

@@ -15,6 +15,15 @@
 // contract's `requires` env checks, precisely so this never fires by
 // accident against a shared database). No SHADOW_DATABASE_URL => skip, same
 // as any other unmet `requires`.
+//
+// The metric counts the statements the diff would run to turn the replayed
+// history into schema.prisma. Some objects exist only as raw SQL because the
+// schema language cannot declare them (HNSW and GIN indexes, a generated
+// column), so the diff always proposes dropping them. Each of those is listed,
+// verbatim and with its reason, in
+// config/benchmarks/fixtures/migration-drift-schema.json; any other statement
+// is drift. A diff that could not run throws, so the runner records an error
+// instead of drift that was never compared.
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -49,6 +58,12 @@ export async function run(ctx) {
     };
   }
 
+  assertDisposableShadow(shadowUrl, {
+    DATABASE_URL: ctx?.env?.databaseUrl ?? process.env.DATABASE_URL,
+    DIRECT_URL: process.env.DIRECT_URL,
+    ADMIN_DATABASE_URL: process.env.ADMIN_DATABASE_URL,
+  });
+
   const args = [
     "prisma",
     "migrate",
@@ -63,45 +78,92 @@ export async function run(ctx) {
     "--exit-code",
   ];
 
+  let script;
   try {
-    const { stdout } = await execFileAsync("npx", args, {
+    ({ stdout: script } = await execFileAsync("npx", args, {
       cwd: REPO_ROOT,
       timeout: DIFF_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
-    });
-    // --exit-code makes an EMPTY diff exit 0; a non-empty diff exits 2 and
-    // lands in the catch block below. Reaching here with a non-empty script
-    // would be surprising, but treat it as drift rather than trust the exit
-    // code alone.
-    const trimmed = stdout.trim();
-    return {
-      metrics: [
-        {
-          id: "schema_migration_drift",
-          value: trimmed.length === 0 ? 0 : 1,
-          n: 1,
-          details: trimmed.length === 0 ? {} : { script: trimmed.slice(0, 4000) },
-        },
-      ],
-    };
+    }));
   } catch (error) {
-    // exit-code 2 = non-empty diff (real drift); anything else is a tooling
-    // failure, reported the same way so it is visible rather than swallowed.
-    const stdout = typeof error?.stdout === "string" ? error.stdout : "";
-    const isDrift = error?.code === 2 && stdout.trim().length > 0;
-    return {
-      metrics: [
-        {
-          id: "schema_migration_drift",
-          value: 1,
-          n: 1,
-          details: isDrift
-            ? { script: stdout.trim().slice(0, 4000) }
-            : { toolingError: String(error?.message ?? error) },
-        },
-      ],
-    };
+    script = scriptFromDiffFailure(error);
   }
+  return { metrics: [scoreDiff(script, ctx?.fixture)] };
+}
+
+// Prisma resets the shadow database before replaying into it, so only a
+// throwaway database on this machine qualifies: a loopback host, and not the
+// database any app URL names. The only Supabase project is production.
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+function databaseKey(url) {
+  const parsed = new URL(url);
+  const host = LOOPBACK_HOSTS.has(parsed.hostname) ? "loopback" : parsed.hostname;
+  return `${host}:${parsed.port || "5432"}/${decodeURIComponent(parsed.pathname.slice(1))}`;
+}
+
+export function assertDisposableShadow(shadowUrl, appUrls) {
+  const shadowHost = new URL(shadowUrl).hostname;
+  if (!LOOPBACK_HOSTS.has(shadowHost)) {
+    throw new Error(
+      `SHADOW_DATABASE_URL points at ${shadowHost}, not a loopback host. The replay resets that database, ` +
+        "so it must be a throwaway one on this machine."
+    );
+  }
+  for (const [name, url] of Object.entries(appUrls)) {
+    if (url && databaseKey(url) === databaseKey(shadowUrl)) {
+      throw new Error(`SHADOW_DATABASE_URL names the same database as ${name}, which the replay would reset.`);
+    }
+  }
+}
+
+// --exit-code makes a non-empty diff exit 2 with its script on stdout. Any
+// other failure means nothing was compared.
+export function scriptFromDiffFailure(error) {
+  const stdout = typeof error?.stdout === "string" ? error.stdout : "";
+  if (error?.code === 2 && stdout.trim().length > 0) return stdout;
+  const stderr = typeof error?.stderr === "string" ? error.stderr.trim().slice(-2000) : "";
+  throw new Error(
+    `prisma migrate diff did not finish, so nothing was measured: ${error?.message ?? error}` +
+      (stderr ? `\n${stderr}` : "")
+  );
+}
+
+// One entry per statement, comments dropped and whitespace collapsed, so a
+// statement compares equal however Prisma wraps it.
+function diffStatements(script) {
+  return script
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n")
+    .split(/;\s*(?:\n|$)/)
+    .map((statement) => statement.replace(/\s+/g, " ").replace(/\s*,\s*/g, ", ").trim())
+    .filter((statement) => statement.length > 0)
+    .map((statement) => `${statement};`);
+}
+
+function exemptionsFrom(fixture) {
+  const entries = Array.isArray(fixture?.exemptions) ? fixture.exemptions : [];
+  for (const entry of entries) {
+    if (typeof entry?.reason !== "string" || entry.reason.trim().length === 0) {
+      throw new Error(`exemption ${JSON.stringify(entry?.statement)} has no reason, and an unexplained exemption hides drift`);
+    }
+  }
+  return new Set(entries.map((entry) => diffStatements(entry.statement).join(" ")));
+}
+
+export function scoreDiff(script, fixture) {
+  const exempt = exemptionsFrom(fixture);
+  const statements = diffStatements(script);
+  const unexplained = statements.filter((statement) => !exempt.has(statement));
+  const exempted = statements.filter((statement) => exempt.has(statement));
+  const staleExemptions = [...exempt].filter((statement) => !statements.includes(statement));
+  return {
+    id: "schema_migration_drift",
+    value: unexplained.length,
+    n: 1,
+    details: { unexplained: unexplained.slice(0, 50), exempted, staleExemptions },
+  };
 }
 
 if (process.argv.includes("--self-test")) {
