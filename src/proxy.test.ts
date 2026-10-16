@@ -209,6 +209,23 @@ test("signed SMS webhook keeps its exact-path Origin exemption", () => {
   }
 });
 
+// pg_cron sends no Origin, so the bearer is the only way an internal POST
+// passes the CSRF check. Near-miss secrets of every length stay out.
+test("the cron bearer lets an origin-less internal POST through, and nothing close to it does", () => {
+  const previous = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "proxy-test-secret";
+  try {
+    assert.equal(proxy(request("/api/internal/jobs/process", { authorization: "Bearer proxy-test-secret" })).status, 200);
+    for (const authorization of ["Bearer wrong", "Bearer proxy-test-secre", "Bearer proxy-test-secretX", ""]) {
+      const headers: Record<string, string> = authorization ? { authorization } : {};
+      assert.equal(proxy(request("/api/internal/jobs/process", headers)).status, 403, authorization);
+    }
+  } finally {
+    if (previous === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previous;
+  }
+});
+
 test("file-looking gated pages still redirect unauthenticated requests", () => {
   const response = perimeter.proxy(request("/teacher/hostile.jpg", {}, "GET"));
   assert.equal(response.status, 307);

@@ -161,6 +161,46 @@ const appPrismaImportWithoutSession = {
   },
 };
 
+// A caught error's text is not safe to log from a sessionless route. Prisma
+// messages echo the failed call's arguments, so an alertKey or a where clause
+// puts a student id in the log line, and the key-name selectors above cannot
+// see inside a message. Log errorForLog(error) from src/lib/log-error.ts,
+// which keeps the error's name and code (security audit on PR #240,
+// 2026-10-15). Scoped to /api/internal for now; the rest of src/ still logs
+// messages in places.
+const RAW_ERROR_TEXT_MESSAGE =
+  "No raw error text in internal-route logs: Prisma messages quote query arguments, including student ids. Log { error: errorForLog(error) } from @/lib/log-error.";
+// The raw error object is no better than its message: the logger runs
+// JSON.stringify on the entry, which drops `message` but keeps Prisma's
+// enumerable `meta`. A selector cannot tell which identifier a catch clause
+// bound, so the template-literal and `+` forms go by the usual names.
+// src/app/api/internal/error-log-guard.test.ts lints a probe of every form.
+const IN_LOGGER = "CallExpression[callee.object.name='logger']";
+const rawErrorTextInLogs = [
+  `${IN_LOGGER} MemberExpression[property.name=/^(message|stack)$/]`,
+  `${IN_LOGGER} MemberExpression[property.value=/^(message|stack)$/]`,
+  `${IN_LOGGER} CallExpression[callee.name='String']`,
+  `${IN_LOGGER} CallExpression[callee.property.name='toString']`,
+  `${IN_LOGGER} CallExpression[callee.object.name='JSON'][callee.property.name='stringify']`,
+  `${IN_LOGGER} Property[key.name=/^(error|err|cause|reason)$/] > Identifier.value`,
+  `${IN_LOGGER} :matches(TemplateLiteral, BinaryExpression) > Identifier[name=/^(e|err|error)$|(Err|Error)$/]`,
+].map((selector) => ({ selector, message: RAW_ERROR_TEXT_MESSAGE }));
+
+// Comes after openRouterEvalOnly, whose no-restricted-syntax entry it would
+// otherwise lose, so it repeats that block's selectors.
+const internalRouteErrorLogs = {
+  files: ["src/app/api/internal/**"],
+  rules: {
+    "no-restricted-syntax": [
+      "error",
+      ...restrictedSyntaxEverywhere,
+      openRouterDynamicImport,
+      openRouterRequire,
+      ...rawErrorTextInLogs,
+    ],
+  },
+};
+
 // The browser's own dialogs are not accessible, cannot be styled to the app,
 // and block the page. Use useConfirm (confirm/alert/prompt) or useUndo
 // (HIG review D-24, 2026-10-09). Scope-aware: a `confirm` destructured from
@@ -258,6 +298,7 @@ const eslintConfig = defineConfig([
     },
   },
   appPrismaImportWithoutSession,
+  internalRouteErrorLogs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

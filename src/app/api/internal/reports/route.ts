@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { withStudentRlsContext } from "@/lib/rls-context";
 import { logger } from "@/lib/logger";
 
 let reportRunning = false;
-
-function isAuthorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
-}
 
 /**
  * POST /api/internal/reports
@@ -26,7 +20,7 @@ function isAuthorized(req: Request) {
  * (review F5, 2026-09-01).
  */
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
