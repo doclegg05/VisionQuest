@@ -6,8 +6,8 @@
  */
 
 export interface StudentSignals {
-  /** Days since the student last had a goal review session */
-  daysSinceLastGoalReview: number;
+  /** Days since an active goal was last reviewed; null when the student has no active goals */
+  daysSinceLastGoalReview: number | null;
   /** Days since the student last logged in */
   daysSinceLastLogin: number;
   /** Whether the student has completed orientation */
@@ -16,7 +16,7 @@ export interface StudentSignals {
   orientationProgress: number;
   /** Total number of open alerts (includes high-severity) */
   openAlertCount: number;
-  /** Number of open alerts classified as high severity */
+  /** Number of open alerts a teacher must see first (severity critical or high) */
   highSeverityAlertCount: number;
   /** Number of overdue tasks */
   overdueTaskCount: number;
@@ -82,11 +82,12 @@ export function computeUrgencyScore(signals: StudentSignals): number {
   );
   score += loginDaysOver * POINTS_PER_LOGIN_DAY_OVER_THRESHOLD;
 
-  // Goal review staleness (days over threshold)
-  const goalReviewDaysOver = Math.max(
-    0,
-    signals.daysSinceLastGoalReview - GOAL_REVIEW_STALENESS_THRESHOLD_DAYS,
-  );
+  // Goal review staleness (days over threshold). No active goals means there
+  // is nothing to review, which is not a staleness signal.
+  const goalReviewDaysOver =
+    signals.daysSinceLastGoalReview === null
+      ? 0
+      : Math.max(0, signals.daysSinceLastGoalReview - GOAL_REVIEW_STALENESS_THRESHOLD_DAYS);
   score += goalReviewDaysOver * POINTS_PER_GOAL_REVIEW_DAY_OVER_THRESHOLD;
 
   // Overdue tasks
@@ -121,7 +122,7 @@ export function computeUrgencyReasons(signals: StudentSignals): string[] {
 
   if (signals.highSeverityAlertCount > 0) {
     reasons.push(
-      `${signals.highSeverityAlertCount} critical alert${signals.highSeverityAlertCount === 1 ? "" : "s"}`,
+      `${signals.highSeverityAlertCount} urgent alert${signals.highSeverityAlertCount === 1 ? "" : "s"}`,
     );
   }
   const nonHighAlertCount = Math.max(0, signals.openAlertCount - signals.highSeverityAlertCount);
@@ -134,7 +135,10 @@ export function computeUrgencyReasons(signals: StudentSignals): string[] {
   if (signals.stalledGoalCount > 0) {
     reasons.push(`${signals.stalledGoalCount} stalled goal${signals.stalledGoalCount === 1 ? "" : "s"}`);
   }
-  if (signals.daysSinceLastGoalReview > GOAL_REVIEW_STALENESS_THRESHOLD_DAYS) {
+  if (
+    signals.daysSinceLastGoalReview !== null &&
+    signals.daysSinceLastGoalReview > GOAL_REVIEW_STALENESS_THRESHOLD_DAYS
+  ) {
     reasons.push(`goals unreviewed for ${signals.daysSinceLastGoalReview} days`);
   }
   if (signals.overdueTaskCount > 0) {

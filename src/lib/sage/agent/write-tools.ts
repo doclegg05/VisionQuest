@@ -201,6 +201,7 @@ const submitForm: AgentTool = {
     },
     required: ["fileUploadId", "orientationItemId"],
   },
+  requiresAttachment: true,
   requiredRoles: ["student", "teacher", "admin"],
   riskTier: "mutate_consequential",
   enabled: true,
@@ -269,8 +270,19 @@ const FILE_CATEGORIES = ["general", "resume", "portfolio", "cert_evidence", "ori
 
 const fileDocument: AgentTool = {
   name: "file_document",
+  // Measured wording, keep it. On 2026-10-14 two narrower descriptions ("into
+  // one of their document categories") scored the same on every eval case,
+  // but sent "put my WorkKeys certificate with my certification records" to
+  // file_document (a label) instead of lookup_cert_progress, which leads to
+  // mark_certification_complete and actually counts the file. Re-measure
+  // before changing it.
   description:
     "File an uploaded chat document into the right place: a document category, or as evidence for a certification requirement. Requires user confirmation.",
+  // No requirement id here, deliberately. A requirement parameter on this
+  // tool (first a template id no tool returned, then the requirementId) drew
+  // unrelated portfolio requests to file_document in the 2026-10-14 A/B probe,
+  // and the model attaches a file to a requirement with
+  // mark_certification_complete anyway. See file-document.test.ts.
   parameters: {
     type: "object",
     properties: {
@@ -280,22 +292,16 @@ const fileDocument: AgentTool = {
         enum: FILE_CATEGORIES,
         description: "Where the document belongs.",
       },
-      certRequirementTemplateId: {
-        type: "string",
-        description: "Only with category cert_evidence: the certification requirement template this file evidences.",
-      },
     },
     required: ["fileUploadId", "category"],
   },
+  requiresAttachment: true,
   requiredRoles: ["student", "teacher", "admin"],
   riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const fileUploadId = String(args.fileUploadId ?? "");
     const category = String(args.category ?? "");
-    const templateId = args.certRequirementTemplateId
-      ? String(args.certRequirementTemplateId)
-      : undefined;
     const studentId = ctx.targetStudentId ?? ctx.session.id;
 
     if (!(FILE_CATEGORIES as ReadonlyArray<string>).includes(category)) {
@@ -307,37 +313,30 @@ const fileDocument: AgentTool = {
     });
     if (!file) return { status: "error", summary: "That uploaded file was not found on this account." };
 
-    const gateArgs: Record<string, unknown> = templateId
-      ? { fileUploadId, category, certRequirementTemplateId: templateId }
-      : { fileUploadId, category };
+    const gateArgs: Record<string, unknown> = { fileUploadId, category };
     const gate = await confirmationGate(
       "file_document",
       gateArgs,
       ctx,
-      category === "cert_evidence"
-        ? `Attach "${file.filename}" as certification evidence?`
-        : `File "${file.filename}" under ${category.replace("_", " ")}?`,
+      `File "${file.filename}" under ${category.replace("_", " ")}?`,
       `File "${file.filename}"`,
     );
     if (gate) return gate;
 
     return executeAndLedger("file_document", gateArgs, ctx, async () => {
       await prisma.fileUpload.update({ where: { id: fileUploadId }, data: { category } });
-
-      if (category === "cert_evidence" && templateId) {
-        const cert = await prisma.certification.findFirst({
-          where: { studentId },
-          select: { id: true },
-        });
-        if (cert) {
-          // Attach evidence only — completion/verification stays with the teacher.
-          await prisma.certRequirement.updateMany({
-            where: { certificationId: cert.id, templateId },
-            data: { fileId: fileUploadId },
-          });
-        }
-      }
-      return { summary: `Filed "${file.filename}" under ${category.replace("_", " ")}.` };
+      const filed = `Filed "${file.filename}" under ${category.replace("_", " ")}.`;
+      // A category label does not touch the Ready-to-Work checklist; say so,
+      // or the student hears "filed" and assumes the requirement is covered.
+      // The student reads this (ConfirmToolCard shows it after a confirm), so
+      // it names no tools. Sage sees a file's id only on the turn that carries
+      // it, so the next step works only if the student attaches it again.
+      return {
+        summary:
+          category === "cert_evidence"
+            ? `${filed} It does not count toward your Ready-to-Work checklist yet. To count it, attach the file again and ask Sage to mark that checklist item done.`
+            : filed,
+      };
     });
   },
 };

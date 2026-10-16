@@ -51,12 +51,10 @@ test("teacher works the loop: queue → student detail → anchors → verificat
 
     // 1. Teacher dashboard renders the intervention queue with the student.
     await page.goto(`/teacher?classId=${fixtureClass.id}`);
-    // Two queue surfaces render an "Intervention Queue" heading (the
-    // dashboard panel and the class-overview variant) — either proves the
-    // queue rendered.
+    // The teacher home has exactly one intervention queue (issue #39).
     await expect(
-      page.getByRole("heading", { name: /intervention queue/i }).first(),
-    ).toBeVisible({ timeout: 20_000 });
+      page.getByRole("heading", { name: /intervention queue/i }),
+    ).toHaveCount(1, { timeout: 20_000 });
     // Scope to the queue panel (eyebrow "Needs attention") — other dashboard
     // surfaces (roster, class overview) also link the student, by public id.
     const queuePanel = page

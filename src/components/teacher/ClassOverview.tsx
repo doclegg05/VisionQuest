@@ -1,36 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
-import InterventionQueue from "./InterventionQueue";
-import DetailedQueues from "./class-overview/DetailedQueues";
 import SummaryCards from "./class-overview/SummaryCards";
 import StudentCards from "./class-overview/StudentCards";
 import StudentTable from "./class-overview/StudentTable";
+import { UpcomingAppointments } from "./class-overview/UpcomingAppointments";
 import { apiFetch } from "@/lib/api";
-import { type TeacherDashboardPageData } from "@/lib/teacher/dashboard";
-import {
-  teacherDashboardAlertQuickAction,
-  teacherDashboardReviewQuickAction,
-} from "@/lib/intervention-notifications";
 import type {
-  DashboardAlert,
-  InactivityQueueItem,
-  InactivitySummary,
   ManagedClassOption,
-  ReviewQueueItem,
   StudentOverview,
+  TeacherDashboardPageData,
   UpcomingAppointment,
 } from "@/lib/teacher/dashboard";
 
 type SortKey = "displayName" | "lastActive" | "xp" | "certDone" | "orientationDone" | "readinessScore";
-
-const EMPTY_INACTIVITY_SUMMARY: InactivitySummary = {
-  followUp14: 0,
-  inactive30: 0,
-  reengage60: 0,
-  archiveReview90: 0,
-};
 
 export default function ClassOverview({
   initialData,
@@ -40,17 +23,6 @@ export default function ClassOverview({
   const [classes, setClasses] = useState<ManagedClassOption[]>(initialData?.classes ?? []);
   const [currentClassId, setCurrentClassId] = useState(initialData?.currentClassId ?? "");
   const [students, setStudents] = useState<StudentOverview[]>(initialData?.students ?? []);
-  const [alerts, setAlerts] = useState<DashboardAlert[]>(initialData?.alerts ?? []);
-  const [inactivityQueue, setInactivityQueue] = useState<InactivityQueueItem[]>(
-    initialData?.inactivityQueue ?? [],
-  );
-  const [inactivitySummary, setInactivitySummary] = useState<InactivitySummary>(initialData?.inactivitySummary ?? {
-    followUp14: 0,
-    inactive30: 0,
-    reengage60: 0,
-    archiveReview90: 0,
-  });
-  const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>(initialData?.reviewQueue ?? []);
   const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>(
     initialData?.upcomingAppointments ?? [],
   );
@@ -63,18 +35,12 @@ export default function ClassOverview({
   const [totalPages, setTotalPages] = useState(initialData?.totalPages ?? 1);
   const [showInactive, setShowInactive] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
-  const [actionIntent, setActionIntent] = useState<DashboardActionIntent | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const skipInitialFetchRef = useRef(initialData !== undefined);
 
   const applyStudentPage = useCallback((data: {
     classes?: ManagedClassOption[];
     currentClassId?: string | null;
     students?: StudentOverview[];
-    alerts?: DashboardAlert[];
-    inactivityQueue?: InactivityQueueItem[];
-    inactivitySummary?: InactivitySummary;
-    reviewQueue?: ReviewQueueItem[];
     upcomingAppointments?: UpcomingAppointment[];
     totalPages?: number;
     page?: number;
@@ -82,10 +48,6 @@ export default function ClassOverview({
     setClasses(data.classes || []);
     setCurrentClassId(data.currentClassId || "");
     setStudents(data.students || []);
-    setAlerts(data.alerts || []);
-    setInactivityQueue(data.inactivityQueue || []);
-    setInactivitySummary(data.inactivitySummary || EMPTY_INACTIVITY_SUMMARY);
-    setReviewQueue(data.reviewQueue || []);
     setUpcomingAppointments(data.upcomingAppointments || []);
     setTotalPages(data.totalPages || 1);
     setPage(data.page || 1);
@@ -145,7 +107,6 @@ export default function ClassOverview({
   // Summary stats
   const totalStudents = students.length;
   const pendingVerifications = students.reduce((sum, s) => sum + s.certPendingVerify, 0);
-  const studentsNeedingAttention = students.filter((s) => s.openAlertCount > 0).length;
   const avgXp = totalStudents > 0 ? Math.round(students.reduce((sum, s) => sum + s.xp, 0) / totalStudents) : 0;
 
   const [renderedAt] = useState(() => Date.now());
@@ -192,60 +153,6 @@ export default function ClassOverview({
     };
   }
 
-  function buildAlertQuickIntent(alert: DashboardAlert): DashboardActionIntent | null {
-    const quickAction = teacherDashboardAlertQuickAction(alert.type);
-    if (!quickAction) return null;
-    if (quickAction.kind === "assign_support" && alert.sourceType !== "goal") return null;
-
-    return {
-      kind: quickAction.kind,
-      title: alert.title,
-      summary: alert.summary,
-      severity: alert.severity,
-      student: alert.student,
-      alertId: alert.id,
-      goalId: alert.sourceType === "goal" ? alert.sourceId : null,
-      linkId: alert.sourceType === "goal_resource_link" ? alert.sourceId : null,
-    };
-  }
-
-  function buildReviewQuickIntent(item: ReviewQueueItem): DashboardActionIntent | null {
-    const quickAction = teacherDashboardReviewQuickAction(item.type);
-    if (!quickAction) return null;
-    if (quickAction.kind === "assign_support" && item.sourceType !== "goal") return null;
-
-    return {
-      kind: quickAction.kind,
-      title: item.title,
-      summary: item.summary,
-      severity: item.severity,
-      student: item.student,
-      alertId: item.id,
-      goalId: item.sourceType === "goal" ? item.sourceId : null,
-      linkId: item.sourceType === "goal_resource_link" ? item.sourceId : null,
-    };
-  }
-
-  const snoozeAlert = useCallback(async (alertId: string) => {
-    const res = await fetch(`/api/teacher/alerts/${alertId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "snooze", hours: 24 }),
-    });
-    if (!res.ok) return;
-    setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
-  }, []);
-
-  const dismissAlert = useCallback(async (alertId: string) => {
-    const res = await fetch(`/api/teacher/alerts/${alertId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "dismiss" }),
-    });
-    if (!res.ok) return;
-    setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
-  }, []);
-
   if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading class data...</p>;
 
   if (error) return (
@@ -259,57 +166,13 @@ export default function ClassOverview({
 
   return (
     <div className="space-y-6">
-      {actionIntent ? (
-        <DashboardActionPanel
-          intent={actionIntent}
-          onClose={() => setActionIntent(null)}
-          onChanged={() => fetchStudents(page)}
-        />
-      ) : null}
-
-      {/* ── Primary View: Students Needing Attention ────────────────────── */}
-      <InterventionQueue
-        alerts={alerts}
-        inactivityQueue={inactivityQueue}
-        reviewQueue={reviewQueue}
-        onAction={(intent) => setActionIntent({
-          kind: "create_task",
-          title: intent.type,
-          summary: intent.studentName,
-          severity: "medium",
-          student: {
-            id: intent.studentId,
-            studentId: intent.studentId,
-            displayName: intent.studentName,
-          },
-          alertId: intent.alertId,
-        })}
-      />
-
       <SummaryCards
         totalStudents={totalStudents}
         pendingVerifications={pendingVerifications}
-        studentsNeedingAttention={studentsNeedingAttention}
         avgXp={avgXp}
       />
 
-      <DetailedQueues
-        detailsOpen={detailsOpen}
-        alerts={alerts}
-        reviewQueue={reviewQueue}
-        upcomingAppointments={upcomingAppointments}
-        inactivityQueue={inactivityQueue}
-        inactivitySummary={inactivitySummary}
-        currentClassId={currentClassId}
-        onToggle={() => setDetailsOpen((prev) => !prev)}
-        onSetActionIntent={setActionIntent}
-        onSnoozeAlert={snoozeAlert}
-        onDismissAlert={dismissAlert}
-        relativeTime={relativeTime}
-        formatAppointment={formatAppointment}
-        buildAlertQuickIntent={buildAlertQuickIntent}
-        buildReviewQuickIntent={buildReviewQuickIntent}
-      />
+      <UpcomingAppointments appointments={upcomingAppointments} formatAppointment={formatAppointment} />
 
       {/* ── All Students ────────────────────────────────────────────────── */}
       <div className="border-t-2 border-[var(--border)] pt-6">

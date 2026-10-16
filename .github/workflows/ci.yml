@@ -426,6 +426,17 @@ jobs:
           npx tsx scripts/seed-e2e-users.ts >/dev/null
           npx playwright test e2e/a11y-authenticated.spec.ts --workers=1 --reporter=line --timeout=180000
 
+      # Gating, in its own step so it starts with a fresh login budget: the
+      # seed clears the login rate-limit buckets, the spec above has already
+      # used part of the per-account budget on e2e-a11y-teacher (5 logins / 15
+      # min, retries included), and the shared gate step before it used up the
+      # per-IP one. This spec logs the teacher in again, so it must not share
+      # either invocation.
+      - name: "E2E: one intervention queue on the teacher home"
+        run: |
+          npx tsx scripts/seed-e2e-users.ts >/dev/null
+          npx playwright test e2e/teacher-queue.spec.ts --workers=1 --reporter=line --timeout=180000
+
       - name: SPOKES design review screenshots
         # Fails the job when a page scrolls sideways or the sign-in error loses
         # its icon. The seed re-runs first for the same login-budget reason as

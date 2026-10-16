@@ -3,16 +3,14 @@
 export default function SummaryCards({
   totalStudents,
   pendingVerifications,
-  studentsNeedingAttention,
   avgXp,
 }: {
   totalStudents: number;
   pendingVerifications: number;
-  studentsNeedingAttention: number;
   avgXp: number;
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-3">
       <div className="surface-section p-4 sm:p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
           Students
@@ -27,14 +25,6 @@ export default function SummaryCards({
         </p>
         <p className="mt-3 text-3xl font-bold text-[var(--badge-warning-text)]">
           {pendingVerifications}
-        </p>
-      </div>
-      <div className="surface-section p-4 sm:p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
-          Need Attention
-        </p>
-        <p className="mt-3 text-3xl font-bold text-[var(--badge-error-text)]">
-          {studentsNeedingAttention}
         </p>
       </div>
       <div className="surface-section p-4 sm:p-5">

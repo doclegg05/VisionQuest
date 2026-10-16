@@ -3,6 +3,8 @@ import test from "node:test";
 import { computeUrgencyScore } from "../intervention-scoring";
 import {
   buildInterventionQueueEntry,
+  compareQueueEntries,
+  urgencyLevel,
   type InterventionQueueStudentRecord,
 } from "../teacher/intervention-queue";
 import { buildReadinessSnapshot } from "../teacher/readiness-snapshot";
@@ -31,6 +33,104 @@ function makeStudent(
     resumeData: null,
     publicCredentialPage: null,
     ...overrides,
+  };
+}
+
+const NOW = new Date("2026-04-02T12:00:00.000Z");
+
+function makeAlert(
+  overrides: Partial<InterventionQueueStudentRecord["alerts"][number]> = {},
+): InterventionQueueStudentRecord["alerts"][number] {
+  return {
+    id: "alert-1",
+    type: "overdue_task",
+    severity: "medium",
+    title: "Overdue task",
+    summary: "A task is past due.",
+    sourceType: null,
+    sourceId: null,
+    detectedAt: new Date("2026-04-01T00:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+test("a critical crisis alert is the primary alert and counts as urgent", () => {
+  const entry = buildInterventionQueueEntry({
+    student: makeStudent({
+      alerts: [
+        makeAlert({ id: "a-high", type: "connect_retention_lost", severity: "high" }),
+        makeAlert({ id: "a-crisis", type: "wellbeing_concern", severity: "critical", title: "Wellbeing check-in needed" }),
+      ],
+    }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.equal(entry.primaryAlert?.id, "a-crisis");
+  assert.equal(entry.signals.highSeverityAlertCount, 2);
+  assert.equal(urgencyLevel(entry), "critical");
+});
+
+test("a student with no active goals gets no goal-review points or reason", () => {
+  const entry = buildInterventionQueueEntry({
+    // Active today, so login inactivity adds nothing and the score is only readiness.
+    student: makeStudent({ goals: [], conversations: [{ updatedAt: NOW }] }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.equal(entry.signals.daysSinceLastGoalReview, null);
+  assert.ok(!entry.urgencyReasons.some((reason) => reason.startsWith("goals unreviewed")));
+  assert.ok(entry.urgencyScore < 100, `expected a small score, got ${entry.urgencyScore}`);
+});
+
+test("a student in crisis sorts above a long-absent student with a higher score", () => {
+  const crisis = buildInterventionQueueEntry({
+    student: makeStudent({
+      id: "s-crisis",
+      studentId: "S-CRISIS",
+      conversations: [{ updatedAt: NOW }],
+      alerts: [makeAlert({ type: "wellbeing_concern", severity: "critical" })],
+    }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+  const absent = buildInterventionQueueEntry({
+    student: makeStudent({
+      id: "s-absent",
+      studentId: "S-ABSENT",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.ok(absent.urgencyScore > crisis.urgencyScore, "precondition: score alone puts the absent student first");
+  assert.deepEqual(
+    [absent, crisis].sort(compareQueueEntries).map((entry) => entry.studentId),
+    ["s-crisis", "s-absent"],
+  );
+});
+
+test("a crisis alert makes the badge critical whatever the score", () => {
+  assert.equal(
+    urgencyLevel({ urgencyScore: 5, primaryAlert: { ...serialAlert(), severity: "critical" } }),
+    "critical",
+  );
+  assert.equal(urgencyLevel({ urgencyScore: 30, primaryAlert: null }), "high");
+  assert.equal(urgencyLevel({ urgencyScore: 10, primaryAlert: null }), "medium");
+});
+
+function serialAlert() {
+  return {
+    id: "a",
+    type: "wellbeing_concern",
+    severity: "critical",
+    title: "Wellbeing check-in needed",
+    summary: "",
+    sourceType: null,
+    sourceId: null,
+    detectedAt: "2026-04-01T00:00:00.000Z",
   };
 }
 
@@ -220,4 +320,63 @@ test("buildInterventionQueueEntry returns zero urgency for an active student wit
   });
 
   assert.equal(entry.urgencyScore, 0);
+});
+
+test("each queue entry carries every open alert, most urgent first", () => {
+  const entry = buildInterventionQueueEntry({
+    student: makeStudent({
+      alerts: [
+        makeAlert({ id: "a-medium", severity: "medium", type: "overdue_task" }),
+        makeAlert({ id: "a-crisis", severity: "critical", type: "wellbeing_concern" }),
+        makeAlert({ id: "a-high", severity: "high", type: "goal_stale" }),
+      ],
+    }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.deepEqual(entry.openAlerts.map((alert) => alert.id), ["a-crisis", "a-high", "a-medium"]);
+  assert.equal(entry.primaryAlert?.id, entry.openAlerts[0]?.id);
+  assert.equal(entry.openAlerts[0]?.detectedAt, "2026-04-01T00:00:00.000Z");
+});
+
+test("a queue alert carries only its eight fields, whatever the record holds", () => {
+  // The record type is hand-written, so a wider select still typechecks. The
+  // cast stands in for a field someone later adds to the shared alerts select.
+  const widened = { ...makeAlert(), studentId: "student-1" } as unknown as InterventionQueueStudentRecord["alerts"][number];
+  const entry = buildInterventionQueueEntry({
+    student: makeStudent({ alerts: [widened] }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.deepEqual(
+    Object.keys(entry.openAlerts[0] ?? {}).sort(),
+    ["detectedAt", "id", "severity", "sourceId", "sourceType", "summary", "title", "type"],
+  );
+});
+
+test("a student with no alerts has no open alerts and no primary alert", () => {
+  const entry = buildInterventionQueueEntry({
+    student: makeStudent({ alerts: [] }),
+    now: NOW,
+    orientationTotalCount: 0,
+  });
+
+  assert.deepEqual(entry.openAlerts, []);
+  assert.equal(entry.primaryAlert, null);
+});
+
+test("building an entry leaves the student's alert order alone", () => {
+  const student = makeStudent({
+    alerts: [
+      makeAlert({ id: "a-medium", severity: "medium" }),
+      makeAlert({ id: "a-crisis", severity: "critical", type: "wellbeing_concern" }),
+      makeAlert({ id: "a-high", severity: "high" }),
+    ],
+  });
+
+  buildInterventionQueueEntry({ student, now: NOW, orientationTotalCount: 0 });
+
+  assert.deepEqual(student.alerts.map((alert) => alert.id), ["a-medium", "a-crisis", "a-high"]);
 });

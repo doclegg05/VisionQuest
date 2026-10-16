@@ -75,6 +75,15 @@ export interface AgentTool {
   /** Sage will not call this tool unless the env feature flag enables it. */
   enabled: boolean;
 
+  /**
+   * The tool acts on a file the student attached, by its fileUploadId. That
+   * id reaches the model only on the turn carrying the file, so the agent loop
+   * does not offer the tool on any other turn (toolsForTurn in tools.ts).
+   * Set it on every tool whose parameters require a fileUploadId;
+   * attachment-tools.test.ts fails otherwise.
+   */
+  requiresAttachment?: true;
+
   /** Server-side handler. Receives parsed args + session + a request scope. */
   execute(
     args: Record<string, unknown>,
