@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
-import { mockTeacherSession, mockRequest } from "@/lib/test-helpers";
+import { matchesWhere, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
 
 const session = mockTeacherSession();
 
@@ -356,10 +356,12 @@ describe("teacher job route authorization", () => {
 
   // A run that crashed mid-scrape stays "processing" forever. Treating it as
   // in progress would answer "Scrape already in progress" to every Refresh
-  // from then on, so only a run from the last two hours counts (the same
-  // window the weekly sweep uses, src/lib/job-board/scrape-runs.ts).
-  it("treats only a run from the last two hours as already in progress", async () => {
-    const before = Date.now();
+  // from then on, so only a run that started, or was queued, in the last two
+  // hours counts (the same window the weekly sweep uses,
+  // src/lib/job-board/scrape-runs.ts).
+  it("treats only a run started or queued in the last two hours as already in progress", async () => {
+    const now = Date.now();
+    const hoursAgo = (hours: number) => new Date(now - hours * 60 * 60 * 1000);
     const req = mockRequest("/api/teacher/jobs/refresh", {
       method: "POST",
       body: { classId: "class-1" },
@@ -368,9 +370,21 @@ describe("teacher job route authorization", () => {
     await refreshRoute.POST(req as never);
 
     const where = (mockScrapeRunFindFirst.mock.calls[0]?.arguments[0] as { where: Record<string, unknown> }).where;
-    assert.deepEqual(where.status, { in: ["queued", "processing"] });
-    const since = (where.createdAt as { gte: Date }).gte.getTime();
-    assert.ok(Math.abs(before - 2 * 60 * 60 * 1000 - since) < 5_000, "the window is the last two hours");
+    const inProgress = (status: string, createdHoursAgo: number, startedHoursAgo: number | null) =>
+      matchesWhere(
+        {
+          classConfigId: "config-1",
+          status,
+          createdAt: hoursAgo(createdHoursAgo),
+          startedAt: startedHoursAgo === null ? null : hoursAgo(startedHoursAgo),
+        },
+        where,
+      );
+    assert.equal(inProgress("processing", 3, 3), false, "a run that started three hours ago has crashed");
+    assert.equal(inProgress("processing", 3, 0.5), true, "a run queued long ago but started recently is live");
+    assert.equal(inProgress("queued", 0.5, null), true, "a run queued half an hour ago is waiting");
+    assert.equal(inProgress("queued", 2.1, null), false, "a run queued over two hours ago is dead");
+    assert.equal(inProgress("completed", 0.5, 0.5), false, "a finished run is not in progress");
   });
 
   // A crashed refresh leaves its run and its scrape_jobs job "processing".
@@ -389,7 +403,15 @@ describe("teacher job route authorization", () => {
 
     assert.deepEqual(writeOrder.slice(0, 3), ["retire-runs", "retire-jobs", "create-run"]);
     const jobWhere = mockAdminJobUpdateMany.mock.calls[0]?.arguments[0].where;
-    assert.deepEqual(jobWhere.OR, [{ dedupeKey: "scrape:config-1" }, { dedupeKey: { startsWith: "scrape:config-1:" } }]);
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const deadJob = (dedupeKey: string) =>
+      matchesWhere(
+        { type: "scrape_jobs", dedupeKey, status: "processing", createdAt: threeHoursAgo, startedAt: threeHoursAgo },
+        jobWhere,
+      );
+    assert.equal(deadJob("scrape:config-1"), true, "the class's whole-class refresh job");
+    assert.equal(deadJob("scrape:config-1:talroo"), true, "the class's partial refresh job");
+    assert.equal(deadJob("scrape:config-10"), false, "another class's job");
     assert.equal(mockEnqueueJob.mock.calls.at(-1)?.arguments[0].dedupeKey, "scrape:config-1");
   });
 

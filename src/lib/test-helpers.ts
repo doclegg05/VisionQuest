@@ -132,3 +132,54 @@ export async function assertCsvResponse(
   }
   return response.text();
 }
+
+// ---------------------------------------------------------------------------
+// Prisma where evaluation for in-memory fakes
+// ---------------------------------------------------------------------------
+
+type WhereClause = Record<string, unknown>;
+
+function sameValue(value: unknown, expected: unknown): boolean {
+  if (value instanceof Date && expected instanceof Date) return value.getTime() === expected.getTime();
+  return value === expected;
+}
+
+function applyOperator(value: unknown, operator: string, operand: unknown): boolean {
+  if (operator === "in") return (operand as unknown[]).some((candidate) => sameValue(value, candidate));
+  // A comparison against NULL is never true in SQL, and Prisma sends these as SQL.
+  if (value === null || value === undefined) return false;
+  const left = value instanceof Date ? value.getTime() : value;
+  const right = operand instanceof Date ? operand.getTime() : operand;
+  switch (operator) {
+    case "lt": return (left as number) < (right as number);
+    case "lte": return (left as number) <= (right as number);
+    case "gt": return (left as number) > (right as number);
+    case "gte": return (left as number) >= (right as number);
+    case "startsWith": return typeof value === "string" && value.startsWith(String(operand));
+    default: throw new Error(`matchesWhere does not support the "${operator}" operator`);
+  }
+}
+
+function matchesField(value: unknown, condition: unknown): boolean {
+  if (condition === null || typeof condition !== "object" || condition instanceof Date) {
+    return sameValue(value, condition);
+  }
+  return Object.entries(condition).every(([operator, operand]) => applyOperator(value, operator, operand));
+}
+
+/**
+ * Evaluate a Prisma where clause against an in-memory row, for fakes that
+ * stand in for updateMany or findFirst. Supports equality (dates and null
+ * included), lt / lte / gt / gte / in / startsWith, and AND / OR. Anything
+ * else throws, so a fake never matches a filter it does not understand.
+ */
+export function matchesWhere(row: Record<string, unknown>, where: WhereClause): boolean {
+  return Object.entries(where).every(([key, condition]) => {
+    if (key === "OR") return (condition as WhereClause[]).some((clause) => matchesWhere(row, clause));
+    if (key === "AND") {
+      const clauses = Array.isArray(condition) ? condition : [condition];
+      return (clauses as WhereClause[]).every((clause) => matchesWhere(row, clause));
+    }
+    return matchesField(row[key], condition);
+  });
+}
