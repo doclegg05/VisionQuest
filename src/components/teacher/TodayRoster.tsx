@@ -70,7 +70,7 @@ export default function TodayRoster({ roster }: { roster: TodayRosterEntry[] }) 
               {entry.highSeverityAlertCount > 0 && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full bg-[var(--badge-error-bg)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--badge-error-text)]"
-                  title={`${entry.highSeverityAlertCount} high-severity alert${entry.highSeverityAlertCount === 1 ? "" : "s"}`}
+                  title={`${entry.highSeverityAlertCount} urgent alert${entry.highSeverityAlertCount === 1 ? "" : "s"}`}
                 >
                   <Warning size={12} weight="fill" aria-hidden />
                   {entry.highSeverityAlertCount}
