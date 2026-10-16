@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   try {
     const summary = await syncAlertsForStudents(await listAlertSweepStudentIds());
     const data = { ...summary, durationMs: Date.now() - start };
-    logger.info("Alert sync complete", data);
+    logger.info("Alert sync complete", { ...data });
 
     if (summary.failed > 0) {
       Sentry.captureMessage(`Daily alert sync: ${summary.failed} student sync(s) failed`, {

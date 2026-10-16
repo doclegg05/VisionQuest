@@ -134,3 +134,14 @@ describe("retryWithBackoff", () => {
     assert.match(input.payload, /payload unavailable/);
   });
 });
+
+// Compile-time only (tsc fails on an unused @ts-expect-error): retry spreads
+// `context` into its log lines, where no key selector can see it, so the type
+// has to refuse a raw student id.
+export function _retryContextTypeChecks(studentId: string): Parameters<typeof import("./retry").retryWithBackoff>[1] {
+  return {
+    ...opts,
+    // @ts-expect-error a raw student id never reaches a retry log line
+    context: { conversationId: "conv-1", studentId },
+  };
+}

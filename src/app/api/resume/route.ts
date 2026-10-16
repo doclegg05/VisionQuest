@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { syncStudentAlerts } from "@/lib/advising";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { withAuth } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
@@ -45,7 +46,7 @@ export const POST = withAuth(async (session, req: Request) => {
     logger.warn("Failed to record resume progression", {
       student: studentLogKey(session.id),
       resumeId: stored.id,
-      error: String(err),
+      error: errorForLog(err),
     });
   }
 

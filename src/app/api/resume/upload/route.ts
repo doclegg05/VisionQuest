@@ -4,6 +4,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { extractTextFromFile, extractResumeFromText } from "@/lib/resume-extract";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 // FERPA review §2.c.3 (2026-09-06): the raw résumé text is the payload and
@@ -108,7 +109,7 @@ export const POST = withAuth(async (session, req: Request) => {
   try {
     rawText = await extractTextFromFile(buffer, file.type);
   } catch (err) {
-    logger.error("Resume text extraction failed", { error: String(err) });
+    logger.error("Resume text extraction failed", { error: errorForLog(err) });
     throw badRequest("Could not read the document. Make sure it is a valid PDF or Word file.");
   }
 
@@ -141,7 +142,7 @@ export const POST = withAuth(async (session, req: Request) => {
     });
     return NextResponse.json(result);
   } catch (err) {
-    logger.error("Resume AI extraction failed", { error: String(err) });
+    logger.error("Resume AI extraction failed", { error: errorForLog(err) });
     await logAiAuditEvent({
       actorId: session.id,
       actorRole: session.role,

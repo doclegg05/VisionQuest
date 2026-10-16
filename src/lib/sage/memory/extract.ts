@@ -19,6 +19,7 @@ import { extractionTranscript } from "../extraction-transcript";
  */
 
 import { logLlmCall } from "@/lib/llm-usage";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import {
   getProviderClass,
@@ -199,7 +200,7 @@ export async function extractAndStoreMemories({
   } catch (error) {
     logger.error("Memory extraction failed (non-fatal)", {
       conversationId,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return empty;
   }

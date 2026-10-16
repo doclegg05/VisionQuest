@@ -116,7 +116,7 @@ describe("recordStudentView", () => {
     assert.equal(mockCreate.mock.callCount(), 0);
     assert.equal(mockWarn.mock.callCount(), 1);
     assert.equal(mockWarn.mock.calls[0].arguments[0], "recordStudentView failed");
-    assert.equal(mockWarn.mock.calls[0].arguments[1].error, "db down");
+    assert.deepEqual(mockWarn.mock.calls[0].arguments[1].error, { name: "Error" });
   });
 
   it("swallows a thrown prisma error from the write with a warning", async () => {
@@ -126,7 +126,7 @@ describe("recordStudentView", () => {
 
     await assert.doesNotReject(audit.recordStudentView(baseInput));
     assert.equal(mockWarn.mock.callCount(), 1);
-    assert.equal(mockWarn.mock.calls[0].arguments[1].error, "insert failed");
+    assert.deepEqual(mockWarn.mock.calls[0].arguments[1].error, { name: "Error" });
   });
 
   it("failure-path warning contains no student identifier (no PII in server logs)", async () => {
@@ -146,7 +146,7 @@ describe("recordStudentView", () => {
     const payload = mockWarn.mock.calls[0].arguments[1];
     assert.equal(payload.surface, "student_detail");
     assert.equal(payload.actorId, "teacher-1");
-    assert.equal(payload.error, "db down");
+    assert.deepEqual(payload.error, { name: "Error" });
   });
 });
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, deleteFile, validateFile } from "@/lib/storage";
 import { validateUploadContent } from "@/lib/file-security";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { ApiError, withAuth, badRequest, notFound } from "@/lib/api-error";
 import { parseBody, deleteFileSchema } from "@/lib/schemas";
@@ -40,7 +41,7 @@ export const POST = withAuth(async (session, req: Request) => {
   try {
     await uploadFile(storageKey, buffer, file.type);
   } catch (err) {
-    logger.error("File upload failed", { error: String(err) });
+    logger.error("File upload failed", { error: errorForLog(err) });
     throw new ApiError(500, "Failed to upload file to storage");
   }
 
@@ -78,7 +79,7 @@ export const DELETE = withAuth(async (session, req: Request) => {
   } catch (err) {
     logger.error("Failed to delete file from storage; aborting DB delete", {
       storageKey: file.storageKey,
-      error: String(err),
+      error: errorForLog(err),
     });
     throw new ApiError(500, "Failed to delete file. Please try again.");
   }

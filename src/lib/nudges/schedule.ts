@@ -34,6 +34,7 @@ import {
 import { rankLeadsForStudent } from "@/lib/connect/matching";
 import { isConnectionStatus, type ConnectionStatus } from "@/lib/connect/pipeline-shared";
 import { prismaAdmin } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { withStudentRlsContext } from "@/lib/rls-context";
@@ -456,7 +457,7 @@ async function countNewLeadsForStudent(
     // text. Counting zero means they are skipped, which is the quiet direction.
     logger.error("Weekly lead count failed for a student", {
       student: studentLogKey(studentId),
-      error: String(error),
+      error: errorForLog(error),
     });
     return 0;
   }
@@ -698,7 +699,7 @@ async function runUnderRunLock(
     if (completed !== null) {
       logger.warn("nudges_run_lock_commit_failed", {
         lockKey: RUN_LOCK_KEY,
-        error: String(error),
+        error: errorForLog(error),
         hint: "the sweep completed; the lock transaction failed to commit afterwards",
       });
       // Named, not silent: the counts are real, so the response must not look
@@ -711,7 +712,7 @@ async function runUnderRunLock(
     // A database that cannot open this transaction cannot run the sweep
     // either; skipping is the same answer as losing the lock race, and the log
     // line is what tells them apart.
-    logger.error("nudges_run_lock_failed", { lockKey: RUN_LOCK_KEY, error: String(error) });
+    logger.error("nudges_run_lock_failed", { lockKey: RUN_LOCK_KEY, error: errorForLog(error) });
     result.skipped = "run lock unavailable";
     return result;
   }
@@ -853,7 +854,7 @@ async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
       logger.error("Nudge alert write failed", {
         student: studentLogKey(plan.studentId),
         alertType: plan.type,
-        error: String(error),
+        error: errorForLog(error),
       });
     }
   }
@@ -882,7 +883,7 @@ async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
       } catch (error) {
         logger.error("Nudge alert resolve failed", {
           student: studentLogKey(studentId),
-          error: String(error),
+          error: errorForLog(error),
         });
       }
     }
@@ -911,7 +912,7 @@ async function runNudgesBody(ctx: RunBodyContext): Promise<NudgeRunResult> {
       logger.error("Nudge send threw", {
         templateKey: plan.templateKey,
         student: studentLogKey(plan.studentId),
-        error: String(error),
+        error: errorForLog(error),
       });
     }
   }

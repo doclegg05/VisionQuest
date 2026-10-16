@@ -109,8 +109,8 @@ describe("deferAfterResponse", () => {
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(mockLogError.mock.callCount(), 1);
     const payload = mockLogError.mock.calls[0].arguments[1] ?? {};
-    assert.ok(String(payload.error).includes("sync blew up"));
-    assert.ok(!String(payload.error).includes("someone@example.com"), "contact info is redacted from the log line");
+    assert.deepEqual(payload.error, { name: "Error" });
+    assert.ok(!JSON.stringify(payload).includes("sync blew up"), "the message stays out of the log line");
   });
 
   it("never throws to the caller, on either path", () => {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "./auth";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { withRlsContext, type RlsContext } from "./rls-context";
 
@@ -104,7 +105,9 @@ export function withErrorHandler<
         return errorResponse(err.statusCode, err.message, err.code);
       }
 
-      logger.error("Unhandled API error", { error: String(err) });
+      // Name and code only: a Prisma message quotes the failed call's
+      // arguments, student ids included (src/lib/log-error.ts).
+      logger.error("Unhandled API error", { error: errorForLog(err) });
       return errorResponse(500, "Internal server error", "INTERNAL_ERROR");
     }
   };

@@ -9,6 +9,7 @@ import {
 import { logAuditEvent } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
 
@@ -107,7 +108,7 @@ export const POST = withTeacherAuth(async (
   try {
     await sendAppointmentConfirmation(appointment.id);
   } catch (error) {
-    logger.error("Failed to send appointment confirmation", { error: String(error) });
+    logger.error("Failed to send appointment confirmation", { error: errorForLog(error) });
   }
 
   // Push in-app notification to student
@@ -115,7 +116,7 @@ export const POST = withTeacherAuth(async (
     type: "appointment",
     title: "New appointment scheduled",
     body: `"${title}" on ${startsAt.toLocaleDateString()}`,
-  }).catch((err) => logger.error("Failed to send notification", { error: String(err) }));
+  }).catch((err) => logger.error("Failed to send notification", { error: errorForLog(err) }));
 
   return NextResponse.json({ appointment });
 });

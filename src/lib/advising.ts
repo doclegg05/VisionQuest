@@ -200,7 +200,7 @@ export async function syncStudentAlerts(
     } catch (error) {
       logger.error("Failed to sync intervention notifications", {
         student: studentLogKey(studentId),
-        error: String(error),
+        error: errorForLog(error),
       });
     }
   }

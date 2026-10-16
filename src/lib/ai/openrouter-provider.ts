@@ -42,13 +42,28 @@ const DEFAULT_MAX_HOPS = 5;
 /** Never sent: they identify a person or route content to third-party plugins. */
 const FORBIDDEN_BODY_KEYS = new Set(["user", "session_id", "plugins", "provider"]);
 const KEY_LIMIT_PATTERN = /key[_\s-]?limit/i;
+/**
+ * A 400 body that rejects the model id ("<id> is not a valid model ID"). Not
+ * just the word "model": a request-shape error can name the model field.
+ */
+const UNKNOWN_MODEL_PATTERN =
+  /not a valid model|\bmodel\b[^.\n]{0,60}\b(?:not found|does not exist|is not available|no longer available)/i;
 
 /**
  * "network" is a connection that never happened (fetch threw before any
  * response); the evals use it to tell an unreachable provider from a slow or
  * failing one. "unavailable" covers timeouts, 5xx and broken replies.
+ * "unknown_model" is a 400 that rejects the model id; every other 400 is
+ * "bad_request", a request the caller built wrong.
  */
-export type OpenRouterErrorKind = "credits" | "refused" | "rate_limited" | "unavailable" | "network" | "bad_request";
+export type OpenRouterErrorKind =
+  | "credits"
+  | "refused"
+  | "rate_limited"
+  | "unavailable"
+  | "network"
+  | "unknown_model"
+  | "bad_request";
 
 export class OpenRouterError extends Error {
   readonly kind: OpenRouterErrorKind;
@@ -167,12 +182,16 @@ interface HopResult {
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-/** An HTTP failure's kind. The body is read only to spot a key spending limit and never reaches a message. */
+/**
+ * An HTTP failure's kind. The body is read only to spot a key spending limit
+ * or an unknown model id, and never reaches a message.
+ */
 export function classifyOpenRouterFailure(status: number, bodyText: string): OpenRouterErrorKind {
   if (status === 402) return "credits";
   if (status === 403) return KEY_LIMIT_PATTERN.test(bodyText) ? "credits" : "refused";
   if (status === 429) return "rate_limited";
   if (status === 408 || status >= 500) return "unavailable";
+  if (status === 400 && UNKNOWN_MODEL_PATTERN.test(bodyText)) return "unknown_model";
   return "bad_request";
 }
 
@@ -347,8 +366,9 @@ export function isRetryable(error: unknown): boolean {
 }
 
 export async function failureFromResponse(response: Response): Promise<OpenRouterError> {
-  // The body only refines 403 into credits vs refused. If it cannot be read,
-  // the status alone still classifies the failure.
+  // The body only refines 403 into credits vs refused and 400 into an unknown
+  // model vs a bad request. If it cannot be read, the status alone still
+  // classifies the failure.
   const bodyText = await response.text().catch(() => "");
   const kind = classifyOpenRouterFailure(response.status, bodyText);
   return new OpenRouterError(`OpenRouter request failed (${response.status}, ${kind})`, kind, response.status);

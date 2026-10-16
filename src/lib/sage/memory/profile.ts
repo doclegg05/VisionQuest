@@ -13,6 +13,7 @@
 
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sanitizeForPrompt } from "../system-prompts";
 import { studentLogKey } from "@/lib/log-keys";
@@ -74,7 +75,7 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
   } catch (err) {
     logger.warn("Student profile load failed; continuing without it", {
       student: studentLogKey(studentId),
-      error: err instanceof Error ? err.message : String(err),
+      error: errorForLog(err),
     });
     return { block: "", contents: [] };
   }

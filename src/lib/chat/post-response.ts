@@ -65,6 +65,7 @@ import {
 } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { upsertDiscoveryFromExtraction } from "@/lib/career-discovery";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { generateConversationTitle } from "./conversation";
@@ -340,7 +341,7 @@ async function runPostResponse(
       });
     }
   } catch (err) {
-    logger.error("Readability check failed", { conversationId, error: String(err) });
+    logger.error("Readability check failed", { conversationId, error: errorForLog(err) });
   }
 
   const provider = await resolveAiProvider({
@@ -403,7 +404,7 @@ async function runPostResponse(
     ).catch((err) =>
       logger.error("Classroom confirmation extractor failed", {
         student: studentLogKey(studentId),
-        error: String(err),
+        error: errorForLog(err),
       }),
     );
   }
@@ -451,7 +452,7 @@ async function runPostResponse(
       }).catch((err) =>
         logger.error("Memory extraction failed", {
           student: studentLogKey(studentId),
-          error: String(err),
+          error: errorForLog(err),
         }),
       );
     }
@@ -474,7 +475,7 @@ async function runPostResponse(
           {
             label: "Discovery extraction",
             alertKey: "discovery_extraction_exhausted",
-            context: { conversationId, studentId },
+            context: { conversationId, student: studentLogKey(studentId) },
             studentId,
             conversationId,
             failurePayload: () => JSON.stringify(discoveryWindow),
@@ -521,7 +522,7 @@ async function runPostResponse(
             sourceId: conversationId,
             xp: 25,
             mutate: () => {},
-          }).catch((err) => logger.error("Failed to award discovery XP", { error: String(err) }));
+          }).catch((err) => logger.error("Failed to award discovery XP", { error: errorForLog(err) }));
         } else if (isEmptyDiscoveryResult(discoveryResult)) {
           // Writing an empty pass would erase what earlier turns found. The
           // log line is the only trace if a model keeps replying with nothing.
@@ -533,7 +534,7 @@ async function runPostResponse(
           await upsertDiscoveryFromExtraction(studentId, upsertData);
         }
       } catch (err) {
-        logger.error("Discovery extraction failed", { error: String(err) });
+        logger.error("Discovery extraction failed", { error: errorForLog(err) });
       }
     }
 
@@ -541,7 +542,7 @@ async function runPostResponse(
     try {
       await generateConversationTitle(conversationId, fullResponse, conversationTitle);
     } catch (err) {
-      logger.error("Failed to generate conversation title", { error: String(err) });
+      logger.error("Failed to generate conversation title", { error: errorForLog(err) });
     }
 
     // Rolling summary compaction is now handled by maybeUpdateSummary in the route
@@ -614,7 +615,7 @@ async function runPostResponse(
         .catch((err) =>
           logger.error("Failed to record Sage insight", {
             conversationId,
-            error: String(err),
+            error: errorForLog(err),
           }),
         );
     }
@@ -654,7 +655,7 @@ async function runPostResponse(
             logger.warn("Goal proposal rejected", { level: goal.level, reason: result.reason });
           }
         } catch (err) {
-          logger.error("Failed to propose goal", { level: goal.level, error: String(err) });
+          logger.error("Failed to propose goal", { level: goal.level, error: errorForLog(err) });
         }
       }
     }
@@ -681,7 +682,7 @@ async function runPostResponse(
           data: { stage: newStage },
         });
       } catch (err) {
-        logger.error("Failed to update conversation stage", { error: String(err) });
+        logger.error("Failed to update conversation stage", { error: errorForLog(err) });
       }
     }
   }
@@ -708,7 +709,7 @@ async function runPostResponse(
         }
       }
     } catch (err) {
-      logger.error("Failed to record review XP", { error: String(err) });
+      logger.error("Failed to record review XP", { error: errorForLog(err) });
     }
   }
 
@@ -720,7 +721,7 @@ async function runPostResponse(
     plan.markRan("mood");
     const moodMessages = [...allMessages, { role: "model" as const, content: fullResponse }];
     extractMoodFromConversation(conversationId, studentId, moodMessages, moodProvider).catch((err) =>
-      logger.error("Mood extraction failed", { conversationId, error: String(err) })
+      logger.error("Mood extraction failed", { conversationId, error: errorForLog(err) })
     );
   }
 
@@ -728,7 +729,7 @@ async function runPostResponse(
   try {
     await generateConversationTitle(conversationId, fullResponse, conversationTitle);
   } catch (err) {
-    logger.error("Failed to generate conversation title", { error: String(err) });
+    logger.error("Failed to generate conversation title", { error: errorForLog(err) });
   }
 
   // Summary compaction is now handled by maybeUpdateSummary in the route

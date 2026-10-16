@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { withdrawConnectionsForConsentRevocation } from "@/lib/connect/connections";
 import { generateStudentArchive } from "@/lib/student-archive";
 import { logAuditEvent } from "@/lib/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -111,7 +112,7 @@ export const POST = withAdminAuth(
     } catch (error) {
       logger.error("Offboarding archive generation failed", {
         student: studentLogKey(studentId),
-        error: String(error),
+        error: errorForLog(error),
       });
       return NextResponse.json(
         {
@@ -143,7 +144,7 @@ export const POST = withAdminAuth(
       withdrawalFailed = true;
       logger.error("Offboarding could not withdraw employer introductions", {
         student: studentLogKey(studentId),
-        error: String(error),
+        error: errorForLog(error),
       });
     }
 
