@@ -21,6 +21,11 @@ const PRELUDE = [
   "declare function providerErrorText(e: unknown): string;",
   "declare function errorMessage(e: unknown): string;",
   "declare function getErrorMessage(e: unknown): string;",
+  "declare function each(f: unknown): void;",
+  "declare const util: { inspect: (v: unknown) => string };",
+  "declare const utils: { errorMessage: (e: unknown) => string };",
+  "declare const result: { reason: string };",
+  "declare const flag: boolean;",
   "declare const sent: number;",
   "",
 ].join("\n");
@@ -53,6 +58,22 @@ const REJECTED: Record<string, string> = {
   "the error concatenated into a string": inCatch("arcErr", 'logger.error("failed: " + arcErr);'),
   "an errorMessage() helper": inCatch("err", 'logger.error("x", { error: errorMessage(err) });'),
   "a getErrorMessage() helper": inCatch("err", 'logger.error("x", { error: getErrorMessage(err) });'),
+  "a member errorMessage() helper": inCatch("err", 'logger.error("x", { error: utils.errorMessage(err) });'),
+  "util.inspect(error)": inCatch("err", 'logger.error("x", { error: util.inspect(err) });'),
+  "the raw error under any key": inCatch("err", 'logger.error("x", { failure: err });'),
+  "the raw error as a one-letter shorthand": inCatch("e", 'logger.error("x", { e });'),
+  "the raw error behind a type cast": inCatch("err", 'logger.error("x", { error: err as Error });'),
+  "a message variable in a template literal": inCatch("err", "const msg = String(err);\n    logger.error(`failed: ${msg}`);"),
+  // These hide the call or its fields from every selector above.
+  "a context object built before the call": inCatch(
+    "err",
+    'const payload = { error: String(err) };\n    logger.error("x", payload);',
+  ),
+  "a logger method held in a variable": inCatch(
+    "err",
+    'const log = flag ? logger.error : logger.info;\n    log("x", { error: String(err) });',
+  ),
+  "a logger method passed as an argument": `${PRELUDE}export function probe() {\n  each(logger.error);\n}\n`,
 };
 
 const ALLOWED: Record<string, string> = {
@@ -66,6 +87,7 @@ const ALLOWED: Record<string, string> = {
     'logger.error("x", { errorName: err instanceof Error ? err.name : typeof err });',
   ),
   "a reason enum, shorthand": `${PRELUDE}export function probe(reason: "low_mood" | "chat") {\n  logger.error("x", { reason });\n}\n`,
+  "a reason field read off a result": `${PRELUDE}export function probe() {\n  logger.info("x", { reason: result.reason });\n}\n`,
   "a count in a template literal": `${PRELUDE}export function probe() {\n  logger.info(\`sent \${sent}\`);\n}\n`,
   "shorthand counts": `${PRELUDE}export function probe(scanned: number) {\n  logger.info("done", { scanned, sent });\n}\n`,
 };
