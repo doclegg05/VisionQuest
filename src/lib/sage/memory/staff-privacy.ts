@@ -32,6 +32,16 @@
  * applied at write time. Layer 3 is the same function applied at render time
  * in retrieve.ts, so a row written by some other path — a manual correction, a
  * future importer — still cannot reach a prompt.
+ *
+ * Since 2026-10-16 every extracted staff fact opens with the fixed subject
+ * "This instructor" (STAFF_FACT_SUBJECT in staff-extract.ts), and the
+ * extractor rejects items that don't. So the opener this guard sees is always
+ * "This", and the verb after it is lowercase and never reaches the
+ * proper-noun scan. Before that, the prompt asked for a bare opening verb, and
+ * every verb missing from SAFE_CAPITALIZED_TOKENS read as a name: the memory
+ * eval diagnosis measured 31 to 35% of staff facts dropped that way, all for
+ * their opening verb ("Lacks", "Translates", "Conducts"). The scan itself did
+ * not change. Every capitalized word after the frame is still checked.
  */
 
 /**
@@ -41,10 +51,11 @@
  *
  * Sentence-initial capitals are NOT exempt: "Jasmine needs a bus pass" would
  * sail through any position-aware scan, and that is exactly the sentence this
- * guard exists to stop. The cost is that staff memories must open with an
- * ordinary verb or adverb ("Prefers…", "Reviews…", "Usually…"), which is the
- * shape the extraction prompt asks for and the shape student memories already
- * have ("Wants to become a CNA.").
+ * guard exists to stop. The cost is that a staff memory must open with a
+ * listed token. Extracted facts open with "This instructor" for that reason
+ * (see the module header). Rows stored before 2026-10-16 open with a bare
+ * verb or adverb ("Prefers…", "Reviews…", "Usually…"), so the verbs below
+ * stay listed for them.
  *
  * Deliberately EXCLUDED even though they are ordinary words: Mark, Grace,
  * Will, May, June, Bill, Rose, Hope, Faith — every one of them is also a
@@ -60,7 +71,8 @@
  */
 const SAFE_CAPITALIZED_TOKENS = new Set(
   [
-    // Sentence-opening verbs the extraction prompt asks for.
+    // Sentence-opening verbs the extraction prompt asked for before 2026-10-16.
+    // Rows stored in that shape still pass through this guard at render time.
     "Prefers", "Wants", "Needs", "Uses", "Works", "Runs", "Keeps", "Reviews",
     "Checks", "Asks", "Likes", "Avoids", "Schedules", "Starts", "Ends",
     "Blocks", "Sets", "Plans", "Tracks", "Handles", "Follows", "Prioritizes",
@@ -191,6 +203,12 @@ export function looksLikeStudentReference(content: string): boolean {
   // unrecognized lowercase word) risks rejecting ordinary staff prose that
   // simply forgot to capitalize a non-name word, which is a worse failure
   // mode for a drop-biased guard than the documented residual miss.
+  //
+  // Facts from staff-extract.ts open with "This instructor", so this check
+  // never fires on them: the extractor's frame check already rejects a
+  // lowercase name in the opening position. A lowercase name later in a
+  // framed fact ("This instructor says jasmine…") falls in the same residual
+  // as any mid-sentence lowercase name, which this check never covered.
   const firstToken = tokens[0];
   if (
     firstToken !== undefined &&

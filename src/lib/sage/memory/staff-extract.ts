@@ -28,6 +28,7 @@ import type { AIProvider } from "@/lib/ai/types";
 import {
   memoryCandidateSchema,
   parseExtractionItems,
+  type ExtractionItem,
   type MemoryCandidate,
 } from "./schema";
 import { looksLikeStudentReference } from "./staff-privacy";
@@ -40,6 +41,19 @@ import {
 
 const MAX_STAFF_MEMORIES_PER_CONVERSATION = 3;
 const DEFAULT_STAFF_EXTRACT_DAILY_LIMIT = 100;
+
+/**
+ * Every staff fact opens with this fixed subject. The privacy guard reads any
+ * capitalized word missing from its allowlist as a name, so a fact that opens
+ * with a verb of the model's choosing ("Lacks", "Translates", "Conducts") is
+ * dropped as if it named a student. Behind the fixed subject the verb is
+ * lowercase and the opener is always "This", which the guard allows. A fact
+ * without the frame is rejected, not repaired, so a model that ignores the
+ * instruction fails closed. The frame is stored as written: retrieve.ts runs
+ * the guard again at render time, and a stripped "Lacks…" row would fail it.
+ */
+const STAFF_FACT_SUBJECT = "This instructor";
+const STAFF_FACT_FRAME_RE = new RegExp(`^${STAFF_FACT_SUBJECT}\\b`);
 
 /**
  * Layer 1 of the privacy design (the code guard is layer 2). The prompt is
@@ -60,7 +74,7 @@ HARD PRIVACY RULE — this is not student-record storage:
 - Never include anything a student disclosed, or any personal circumstance of any student.
 - If the conversation was only about individual students, return [].
 
-Write each fact as one self-contained sentence starting with an ordinary verb or adverb about the staff member — "Prefers three-bullet answers with the action first.", "Reviews flagged students every Monday before class." Do not start a sentence with a name.
+Start every fact with "${STAFF_FACT_SUBJECT}" followed by a lowercase verb, as one self-contained sentence: "${STAFF_FACT_SUBJECT} prefers three-bullet answers with the action first.", "${STAFF_FACT_SUBJECT} reviews flagged students every Monday before class.", "${STAFF_FACT_SUBJECT} cannot approve placements and routes them to the coordinator." A fact that does not start with "${STAFF_FACT_SUBJECT}" is discarded. Never put a name anywhere in the sentence.
 
 Respond with ONLY a JSON array (no prose). Each element:
 {
@@ -91,6 +105,32 @@ function memoryEnabled(): boolean {
 function staffExtractDailyLimit(): number {
   const raw = Number.parseInt(process.env.SAGE_STAFF_MEMORY_EXTRACT_DAILY_LIMIT ?? "", 10);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_STAFF_EXTRACT_DAILY_LIMIT;
+}
+
+/**
+ * Keeps the items that open with STAFF_FACT_SUBJECT and pass the privacy
+ * guard (layer 2), which drops anything that reads as student data before it
+ * can be written. Rejections are counted and logged, not thrown: the model
+ * producing a student fact is an expected outcome of a conversation about
+ * students, not an error condition.
+ */
+function keepFramedStaffSafeItems(
+  items: ExtractionItem[],
+  conversationId: string,
+): { safe: ExtractionItem[]; rejected: number } {
+  const framed = items.filter((item) => STAFF_FACT_FRAME_RE.test(item.content));
+  const frameRejected = items.length - framed.length;
+  if (frameRejected > 0) {
+    logger.info("sage.staff_memory.frame_rejected", { conversationId, rejected: frameRejected });
+  }
+
+  const safe = framed.filter((item) => !looksLikeStudentReference(item.content));
+  const privacyRejected = framed.length - safe.length;
+  if (privacyRejected > 0) {
+    logger.info("sage.staff_memory.privacy_rejected", { conversationId, rejected: privacyRejected });
+  }
+
+  return { safe, rejected: frameRejected + privacyRejected };
 }
 
 export async function extractAndStoreStaffMemories({
@@ -153,21 +193,9 @@ export async function extractAndStoreStaffMemories({
     });
 
     const { accepted, rejected: schemaRejected } = parseExtractionItems(parseModelJson(raw));
+    const { safe, rejected: filterRejected } = keepFramedStaffSafeItems(accepted, conversationId);
 
-    // Layer 2: drop anything that reads as student data before it can be
-    // written. Rejections are counted, not thrown — the model producing a
-    // student fact is an expected outcome of a conversation about students,
-    // not an error condition.
-    const safe = accepted.filter((item) => !looksLikeStudentReference(item.content));
-    const privacyRejected = accepted.length - safe.length;
-    if (privacyRejected > 0) {
-      logger.info("sage.staff_memory.privacy_rejected", {
-        conversationId,
-        rejected: privacyRejected,
-      });
-    }
-
-    const rejected = schemaRejected + privacyRejected;
+    const rejected = schemaRejected + filterRejected;
     if (safe.length === 0) return { ...empty, rejected };
 
     const candidates: MemoryCandidate[] = safe
