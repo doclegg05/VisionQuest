@@ -66,7 +66,7 @@ describe("sage red-team eval — tools offered per turn", () => {
   const ATTACHMENT_ONLY = ["file_document", "submit_form", "classify_attachment"];
 
   function declaredNames(scenario: object): string[] {
-    return redteamDeclarations(scenario, getEnabledTools("student"), toolsForTurn).map((d) => d.name);
+    return redteamDeclarations(scenario, getEnabledTools("student"), toolsForTurn).map((d: { name: string }) => d.name);
   }
 
   it("leaves the attachment-only tools out of a turn with no file, as /api/chat/send does", () => {
