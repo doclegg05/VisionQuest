@@ -157,6 +157,38 @@ async function resolveGeminiProvider(modelOverride = null) {
   return { provider, model, label: `gemini (${model})` };
 }
 
+/**
+ * OLLAMA_NUM_CTX: the context window for a local eval run.
+ *
+ * Ollama endpoints run at the provider's `num_ctx` (8192 by default) and send
+ * truncate:false, so a prompt longer than the window is refused with a 400
+ * rather than cut from the front. An eval that sends a bigger prompt than
+ * production does (the red-team eval builds the "full" tier) needs a bigger
+ * window. Unset means the provider default; anything but a positive integer
+ * throws, so a typo never runs silently at the default.
+ */
+export function readOllamaNumCtx(env = process.env) {
+  const raw = env.OLLAMA_NUM_CTX?.trim();
+  if (!raw) return undefined;
+  const value = Number(raw);
+  // Digits alone are not enough: a long run converts to Infinity, and past
+  // MAX_SAFE_INTEGER the value is no longer the one typed.
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`OLLAMA_NUM_CTX must be a positive integer, got "${raw}".`);
+  }
+  return value;
+}
+
+/**
+ * AI_PROVIDER_API_STYLE, the same setting the app reads (src/lib/ai/local-config.ts).
+ * "openai" means an OpenAI-style server (LM Studio, vLLM) that only exposes
+ * /v1/chat/completions; anything else leaves the provider on Ollama's native
+ * /api/chat.
+ */
+export function readOllamaApiStyle(env = process.env) {
+  return env.AI_PROVIDER_API_STYLE?.trim() === "openai" ? "openai" : undefined;
+}
+
 async function resolveOllamaProvider(modelOverride = null) {
   const url = process.env.OLLAMA_URL?.trim();
   const model = modelOverride || process.env.OLLAMA_MODEL?.trim();
@@ -169,8 +201,12 @@ async function resolveOllamaProvider(modelOverride = null) {
   const { resolveLocalAiAuthMode } = await import("../../src/lib/ai/local-auth.ts");
 
   const authMode = resolveLocalAiAuthMode(process.env.OLLAMA_AUTH_MODE ?? null);
+  const numCtx = readOllamaNumCtx();
+  const apiStyle = readOllamaApiStyle();
   const authConfig = {
     authMode,
+    ...(numCtx ? { numCtx } : {}),
+    ...(apiStyle ? { apiStyle } : {}),
     apiKey: process.env.AI_PROVIDER_API_KEY || process.env.OLLAMA_API_KEY || null,
     cloudflareAccessClientId:
       process.env.AI_PROVIDER_CLOUDFLARE_ACCESS_CLIENT_ID ||
@@ -185,7 +221,8 @@ async function resolveOllamaProvider(modelOverride = null) {
   };
 
   const provider = new OllamaProvider(url, model, authConfig);
-  return { provider, model, url, label: `ollama (${model} @ ${url})` };
+  const ctxNote = numCtx ? `, num_ctx ${numCtx}` : "";
+  return { provider, model, url, label: `ollama (${model} @ ${url}${ctxNote})` };
 }
 
 /**

@@ -73,16 +73,18 @@ describe("OllamaProvider mid-stream stall", { concurrency: false }, () => {
     });
   });
 
-  function stallingProvider(stallMs: number): OllamaProvider {
+  /** Ollama endpoints stream native NDJSON; `openai` servers stream SSE. */
+  function stallingProvider(stallMs: number, apiStyle?: "openai"): OllamaProvider {
     return new OllamaProvider("http://localhost:11434", "gemma4:latest", {
       authMode: "none",
       streamStallTimeoutMs: stallMs,
+      ...(apiStyle ? { apiStyle } : {}),
     });
   }
 
   it("streamResponse fails once the model goes quiet after its first token", async () => {
     const stream = streamThenSilence([
-      `data: ${JSON.stringify({ choices: [{ delta: { content: "You've " } }] })}\n\n`,
+      JSON.stringify({ message: { content: "You've " }, done: false }) + "\n",
     ]);
     mockFetch.mock.mockImplementationOnce(
       async () => new Response(stream.body, { status: 200 }),
@@ -102,18 +104,15 @@ describe("OllamaProvider mid-stream stall", { concurrency: false }, () => {
     assert.match(await stream.cancelled, /stall/i);
   });
 
-  it("streamResponse fails on a stalled native stream too", async () => {
+  it("streamResponse fails on a stalled OpenAI-compatible stream too", async () => {
     const stream = streamThenSilence([
-      JSON.stringify({ message: { content: "You've " }, done: false }) + "\n",
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "You've " } }] })}\n\n`,
     ]);
-    let calls = 0;
-    mockFetch.mock.mockImplementation(async () => {
-      calls += 1;
-      if (calls === 1) return new Response("Not Found", { status: 404 });
-      return new Response(stream.body, { status: 200 });
-    });
+    mockFetch.mock.mockImplementationOnce(
+      async () => new Response(stream.body, { status: 200 }),
+    );
 
-    const provider = stallingProvider(120);
+    const provider = stallingProvider(120, "openai");
     const chunks: string[] = [];
     await assert.rejects(async () => {
       for await (const chunk of provider.streamResponse("sys", [
@@ -128,7 +127,7 @@ describe("OllamaProvider mid-stream stall", { concurrency: false }, () => {
 
   it("streamWithTools fails when a hop stalls after its first token", async () => {
     const stream = streamThenSilence([
-      `data: ${JSON.stringify({ choices: [{ delta: { content: "Checking" } }] })}\n\n`,
+      JSON.stringify({ message: { content: "Checking" }, done: false }) + "\n",
     ]);
     mockFetch.mock.mockImplementationOnce(
       async () => new Response(stream.body, { status: 200 }),
@@ -156,9 +155,9 @@ describe("OllamaProvider mid-stream stall", { concurrency: false }, () => {
         new Response(
           streamWithGaps(
             [
-              `data: ${JSON.stringify({ choices: [{ delta: { content: "You" } }] })}\n\n`,
-              `data: ${JSON.stringify({ choices: [{ delta: { content: "'ve got this" } }] })}\n\n`,
-              "data: [DONE]\n\n",
+              JSON.stringify({ message: { content: "You" }, done: false }) + "\n",
+              JSON.stringify({ message: { content: "'ve got this" }, done: false }) + "\n",
+              JSON.stringify({ message: { content: "" }, done: true, done_reason: "stop" }) + "\n",
             ],
             40,
           ),

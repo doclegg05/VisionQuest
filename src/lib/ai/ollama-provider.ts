@@ -63,7 +63,7 @@ interface AccumulatedToolCall {
  * Mutable out-param streaming methods write into when they observe real
  * usage on a chunk. AsyncGenerators can't both yield values to a `for await`
  * loop and return a final value cleanly through every early-return path in
- * this file's retry/fallback logic, so a shared sink is the least invasive
+ * this file's retry logic, so a shared sink is the least invasive
  * way to surface usage from deep inside the SSE parsing loop.
  */
 interface UsageSink {
@@ -128,7 +128,7 @@ interface NativeChatResponse {
   eval_count?: number;
 }
 
-type OllamaApiMode = "unknown" | "openai" | "native";
+type OllamaApiMode = "openai" | "native";
 
 interface ChatFetchResult {
   response: Response;
@@ -144,16 +144,11 @@ interface StreamDeadline {
 }
 
 class LocalAiStreamError extends Error {
-  readonly switchToNative: boolean;
   readonly retryable: boolean;
 
-  constructor(
-    message: string,
-    options: { switchToNative?: boolean; retryable?: boolean } = {},
-  ) {
+  constructor(message: string, options: { retryable?: boolean } = {}) {
     super(message);
     this.name = "LocalAiStreamError";
-    this.switchToNative = options.switchToNative ?? false;
     this.retryable = options.retryable ?? true;
   }
 }
@@ -209,15 +204,22 @@ function isRetryableStartupError(error: unknown): boolean {
   return /Relay:|ECONNREFUSED|fetch failed|socket hang up|terminated|aborted|timed out|timeout/i.test(message);
 }
 
-function shouldSwitchToNative(message: string): boolean {
-  const status = reportedUpstreamStatus(message);
-  return status !== null && shouldTryNativeAfterOpenAiStatus(status);
-}
-
-function shouldTryNativeAfterOpenAiStatus(status: number): boolean {
-  return [404, 502, 503, 504, 520, 522, 523, 524, 525, 526, 527, 530].includes(
-    status,
-  );
+/**
+ * An upstream error the relay framed as SSE inside a native stream.
+ *
+ * scripts/ollama-relay.mjs sends headers and a heartbeat before Ollama
+ * answers, so an Ollama non-200 can only reach us as a
+ * `data: {"error":"Ollama returned NNN"}` line inside a 200 stream. Native
+ * lines are bare JSON, so without this check that line fails to parse, is
+ * skipped, and the turn ends empty instead of failing.
+ */
+function relayErrorLine(line: string): string | null {
+  if (!line.startsWith("data: ")) return null;
+  try {
+    return payloadErrorMessage(JSON.parse(line.slice(6)));
+  } catch {
+    return null;
+  }
 }
 
 function streamChunkContent(parsed: OpenAIStreamChunk): string | undefined {
@@ -327,7 +329,7 @@ type EmptyCompletionCause =
  * doing.
  */
 function classifyEmptyCompletion(
-  mode: Exclude<OllamaApiMode, "unknown">,
+  mode: OllamaApiMode,
   data: OpenAIChatResponse | NativeChatResponse,
 ): EmptyCompletionCause {
   if (mode === "openai") {
@@ -444,7 +446,25 @@ export class OllamaProvider implements AIProvider {
    * fallback — because those routes don't exist on the target server.
    */
   private readonly openAiOnly: boolean;
-  private apiMode: OllamaApiMode = "unknown";
+  /**
+   * The one surface this instance talks to, fixed at construction: /v1 for an
+   * `apiStyle: "openai"` server, native /api/chat for Ollama.
+   *
+   * Ollama is never sent to /v1, and nothing falls back to it. That endpoint
+   * ignores `num_ctx`, `keep_alive` and `truncate` (Ollama 0.40.3, measured
+   * 2026-10-15), so a call there runs at the host's default context, 4,096
+   * tokens under 24 GiB of VRAM, and a longer prompt is cut from the front
+   * with HTTP 200. Sage's prompt is 7,000 to 7,500 tokens, and its front is
+   * the identity, guardrails and crisis rules. Native honors the app's
+   * context and, with `truncate: false`, refuses an oversize prompt with a
+   * 400 that the caller sees.
+   *
+   * The cost: native hides `finish_reason`, so a turn that ends in an
+   * undeclared tool call comes back empty with no stated cause.
+   * `assertVisibleContent` and the stream paths turn that into an error
+   * rather than an empty reply (see .claude/MEMORY.md Known Issues).
+   */
+  private readonly apiMode: OllamaApiMode;
 
   /**
    * Timeout for non-streaming requests (full generation must complete).
@@ -489,11 +509,10 @@ export class OllamaProvider implements AIProvider {
    * stays warm between messages instead of unloading after each idle gap.
    * Pair with the "Sage Model Warmup" scheduled task to pre-load on login.
    *
-   * REACHES THE SERVER ONLY ON THE NATIVE SURFACE. Ollama's OpenAI-compatible
-   * /v1/chat/completions ignores `keep_alive` (ollama/ollama#11458), and
-   * `postChat` tries /v1 first, so on a stock Ollama this value is inert
-   * unless the instance is pinned to native — see `pinnedToNativeForKeepAlive`.
-   * Residency there is governed by the host's OLLAMA_KEEP_ALIVE instead.
+   * Only native /api/chat applies it; /v1 ignores `keep_alive`
+   * (ollama/ollama#11458). Until Ollama endpoints moved to native-only
+   * (2026-10-15) this value never reached the server, and the host's
+   * OLLAMA_KEEP_ALIVE (30m from the installer) governed residency instead.
    */
   private static readonly KEEP_ALIVE = "8h";
 
@@ -512,18 +531,6 @@ export class OllamaProvider implements AIProvider {
   static readonly SECONDARY_KEEP_ALIVE = "5m";
 
   private readonly keepAlive: string;
-  /**
-   * True when this instance was given an explicit keep-alive and must
-   * therefore talk to /api/chat, the only surface that applies it.
-   *
-   * The cost is real and worth stating: the native surface hides
-   * `finish_reason`, so a turn that ends in an undeclared tool call comes back
-   * as an empty string with no signal (see .claude/MEMORY.md). That is
-   * acceptable for the background roles this applies to — their prompts
-   * advertise no tools — and `done_reason: "length"` still surfaces
-   * truncation, which is the failure mode those roles actually hit.
-   */
-  private readonly pinnedToNativeForKeepAlive: boolean;
   private readonly structuredMaxOutputTokens: number;
 
   /**
@@ -532,6 +539,12 @@ export class OllamaProvider implements AIProvider {
    * tool_calls + tool results across hops) more headroom before clipping.
    * Most modern open-weights chat models support 32K-128K context, so
    * 8K is conservative; admins can override via `ai_provider_num_ctx`.
+   *
+   * Native requests send `truncate: false`, so a prompt longer than this is
+   * refused with a 400 rather than cut. Keep the host's OLLAMA_CONTEXT_LENGTH
+   * (set by scripts/install-local-ai-services.ps1) equal to the value in use:
+   * Ollama reloads a model whenever a request asks for a different context
+   * than the loaded one, and the host's health and warmup probes send none.
    */
   static readonly DEFAULT_NUM_CTX = 8192;
   private readonly numCtx: number;
@@ -583,9 +596,7 @@ export class OllamaProvider implements AIProvider {
       typeof authConfigOrApiKey === "object" &&
       authConfigOrApiKey !== null &&
       authConfigOrApiKey.apiStyle === "openai";
-    if (this.openAiOnly) {
-      this.apiMode = "openai";
-    }
+    this.apiMode = this.openAiOnly ? "openai" : "native";
     const structuredConfig =
       typeof authConfigOrApiKey === "object" && authConfigOrApiKey !== null
         ? authConfigOrApiKey
@@ -603,16 +614,6 @@ export class OllamaProvider implements AIProvider {
         : OllamaProvider.STREAM_STALL_TIMEOUT_MS;
     const explicitKeepAlive = structuredConfig?.keepAlive?.trim();
     this.keepAlive = explicitKeepAlive || OllamaProvider.KEEP_ALIVE;
-    // A caller that asked for a specific residency gets the only surface that
-    // honors it. /v1 silently drops `keep_alive`, which would leave a
-    // background role's model resident on the host default and holding memory
-    // against the model students are waiting on — the starvation this option
-    // exists to prevent. Skipped for `apiStyle: "openai"` endpoints (LM Studio,
-    // vLLM), which have no /api/chat at all and no residency semantics to fix.
-    this.pinnedToNativeForKeepAlive = Boolean(explicitKeepAlive) && !this.openAiOnly;
-    if (this.pinnedToNativeForKeepAlive) {
-      this.apiMode = "native";
-    }
     const explicitStructuredMax = structuredConfig?.structuredMaxOutputTokens;
     this.structuredMaxOutputTokens =
       typeof explicitStructuredMax === "number" && explicitStructuredMax > 0
@@ -621,25 +622,13 @@ export class OllamaProvider implements AIProvider {
   }
 
   /**
-   * Reasoning controls for the OpenAI-compat surface.
+   * Reasoning control for the native /api/chat surface.
    *
-   * The two Ollama surfaces take DIFFERENT knobs and each silently ignores
-   * the other's — verified against Ollama 0.32.4, where `/v1` honors only
-   * `reasoning_effort` and ignores `think` without error. Sending the wrong
-   * one looks like a fix and changes nothing.
-   *
-   * Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp) are left
-   * untouched: their reasoning controls vary and an unknown value can 400
-   * the request, which would break setups that work today.
+   * The /v1 bodies carry no reasoning control: only `apiStyle: "openai"`
+   * servers (LM Studio, vLLM, llama.cpp) get them, their reasoning knobs
+   * vary, and an unknown value can 400 the request.
    */
-  private get openAiReasoningParams(): Record<string, unknown> {
-    if (this.openAiOnly || this.reasoningEnabled) return {};
-    return { reasoning_effort: "none" };
-  }
-
-  /** Reasoning control for the native /api/chat surface. */
   private get nativeReasoningParams(): Record<string, unknown> {
-    if (this.openAiOnly) return {};
     return { think: this.reasoningEnabled };
   }
 
@@ -647,18 +636,6 @@ export class OllamaProvider implements AIProvider {
     return buildLocalAiHeaders(this.authConfig, {
       "Content-Type": "application/json",
     });
-  }
-
-  /**
-   * Honor a stream error's request to switch to the native /api/* path —
-   * unless this endpoint is configured as OpenAI-only, in which case native
-   * routes must never be attempted and we stay on the /v1/* path.
-   */
-  private requestSwitchToNative(error: unknown): boolean {
-    if (this.openAiOnly) return false;
-    if (!(error instanceof LocalAiStreamError) || !error.switchToNative) return false;
-    this.apiMode = "native";
-    return true;
   }
 
   /**
@@ -751,37 +728,40 @@ export class OllamaProvider implements AIProvider {
     );
   }
 
+  /**
+   * Sends to this instance's one surface. There is no cross-surface
+   * fallback: an Ollama failure retried on /v1 would land on the endpoint
+   * that silently cuts oversize prompts (see `apiMode`).
+   */
   private async postChat(
     openAIBody: unknown,
     nativeBody: unknown,
     timeoutMs = OllamaProvider.GENERATE_TIMEOUT_MS,
     streaming = false,
-  ): Promise<ChatFetchResult & { mode: Exclude<OllamaApiMode, "unknown"> }> {
-    if (this.apiMode === "native") {
-      const result = await this.postNativeChat(nativeBody, timeoutMs, streaming);
-      return { mode: "native", ...result };
-    }
+  ): Promise<ChatFetchResult & { mode: OllamaApiMode }> {
+    const mode = this.apiMode;
+    const result =
+      mode === "native"
+        ? await this.postNativeChat(nativeBody, timeoutMs, streaming)
+        : await this.postOpenAIChat(openAIBody, timeoutMs, streaming);
+    return { mode, ...result };
+  }
 
-    const openAIResult = await this.postOpenAIChat(openAIBody, timeoutMs, streaming);
-    const openAIResponse = openAIResult.response;
-    if (openAIResponse.ok) {
-      this.apiMode = "openai";
-      return { mode: "openai", ...openAIResult };
-    }
-
-    // Generic OpenAI-compatible servers (LM Studio, vLLM, llama.cpp server)
-    // only expose /v1/* — never fall back to native /api/chat for them.
-    if (this.openAiOnly || !shouldTryNativeAfterOpenAiStatus(openAIResponse.status)) {
-      return { mode: "openai", ...openAIResult };
-    }
-
-    // Discard the failed response before opening a replacement connection.
-    void openAIResponse.body?.cancel().catch(() => undefined);
-    const nativeResult = await this.postNativeChat(nativeBody, timeoutMs, streaming);
-    if (nativeResult.response.ok) {
-      this.apiMode = "native";
-    }
-    return { mode: "native", ...nativeResult };
+  /**
+   * Adds the likely cause to a native 400.
+   *
+   * Native bodies carry `truncate: false`, so Ollama answers a prompt longer
+   * than the context window with a 400 ("exceeds the available context
+   * size") instead of cutting the prompt's start. Through the relay only the
+   * status survives, so the message has to say where to look.
+   */
+  private describeRejection(message: string): string {
+    if (this.apiMode !== "native" || !/\b400\b/.test(message)) return message;
+    return (
+      `${message}. Ollama returns 400 when the prompt is longer than the ` +
+      `${this.numCtx}-token context window (ai_provider_num_ctx), because ` +
+      `requests send truncate:false; the Ollama server log has the token counts.`
+    );
   }
 
   async generateResponse(
@@ -798,13 +778,13 @@ export class OllamaProvider implements AIProvider {
         stream: false,
         max_tokens: this.maxOutputTokens,
         num_ctx: this.numCtx,
-        ...this.openAiReasoningParams,
         ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: false,
+        truncate: false,
         ...this.nativeReasoningParams,
         options: {
           num_ctx: this.numCtx,
@@ -817,7 +797,7 @@ export class OllamaProvider implements AIProvider {
 
     if (!response.ok) {
       void response.body?.cancel().catch(() => undefined);
-      throw new Error(`Local AI request failed (${response.status})`);
+      throw new Error(this.describeRejection(`Local AI request failed (${response.status})`));
     }
 
     const data = payload as OpenAIChatResponse | NativeChatResponse;
@@ -858,7 +838,7 @@ export class OllamaProvider implements AIProvider {
    * the all-or-nothing case throws.
    */
   private assertVisibleContent(
-    mode: Exclude<OllamaApiMode, "unknown">,
+    mode: OllamaApiMode,
     data: OpenAIChatResponse | NativeChatResponse,
     text: string,
     budget: number,
@@ -880,24 +860,23 @@ export class OllamaProvider implements AIProvider {
    * Error for a stream that closed without yielding any visible text.
    *
    * When reasoning tokens were seen, this is a budget problem, not a
-   * transport one: retrying or switching API surfaces re-runs the same
-   * doomed generation and only doubles the wall-clock before failing.
+   * transport one: retrying re-runs the same doomed generation and only
+   * doubles the wall-clock before failing.
    */
   private streamEndedWithoutContentError(
-    mode: Exclude<OllamaApiMode, "unknown">,
+    mode: OllamaApiMode,
     reasoningChars: number,
   ): LocalAiStreamError {
     if (reasoningChars > 0) {
       return new LocalAiStreamError(
         noVisibleContentError(this.model, this.maxOutputTokens, reasoningChars).message,
-        { retryable: false, switchToNative: false },
+        { retryable: false },
       );
     }
     return new LocalAiStreamError(
       mode === "openai"
         ? "OpenAI-compatible local AI stream ended without content."
         : "Local AI stream ended without content.",
-      { switchToNative: mode === "openai" },
     );
   }
 
@@ -919,13 +898,13 @@ export class OllamaProvider implements AIProvider {
         max_tokens: this.maxOutputTokens,
         num_ctx: this.numCtx,
         stream_options: { include_usage: true },
-        ...this.openAiReasoningParams,
         ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: true,
+        truncate: false,
         ...this.nativeReasoningParams,
         options: {
           num_ctx: this.numCtx,
@@ -940,10 +919,9 @@ export class OllamaProvider implements AIProvider {
 
     if (!response.ok) {
       void response.body?.cancel().catch(() => undefined);
-      const message = `Local AI stream failed (${response.status})`;
-      throw new LocalAiStreamError(message, {
-        switchToNative: shouldSwitchToNative(message),
-      });
+      throw new LocalAiStreamError(
+        this.describeRejection(`Local AI stream failed (${response.status})`),
+      );
     }
 
     if (!response.body) throw new Error("Ollama returned empty stream body");
@@ -1025,9 +1003,7 @@ export class OllamaProvider implements AIProvider {
           }
           const upstreamError = payloadErrorMessage(parsed);
           if (upstreamError) {
-            throw new LocalAiStreamError(upstreamError, {
-              switchToNative: shouldSwitchToNative(upstreamError),
-            });
+            throw new LocalAiStreamError(upstreamError);
           }
           if (usageSink) {
             const usage = usageFromOpenAI(parsed.usage);
@@ -1048,6 +1024,8 @@ export class OllamaProvider implements AIProvider {
           continue;
         }
 
+        const relayError = relayErrorLine(trimmed);
+        if (relayError) throw new LocalAiStreamError(this.describeRejection(relayError));
         let parsed: NativeChatResponse;
         try {
           parsed = JSON.parse(trimmed);
@@ -1056,7 +1034,7 @@ export class OllamaProvider implements AIProvider {
         }
         const upstreamError = payloadErrorMessage(parsed);
         if (upstreamError) {
-          throw new LocalAiStreamError(upstreamError);
+          throw new LocalAiStreamError(this.describeRejection(upstreamError));
         }
         const thinking = parsed.message?.thinking;
         if (thinking) {
@@ -1134,9 +1112,7 @@ export class OllamaProvider implements AIProvider {
       }
       const upstreamError = payloadErrorMessage(parsed);
       if (upstreamError) {
-        throw new LocalAiStreamError(upstreamError, {
-          switchToNative: shouldSwitchToNative(upstreamError),
-        });
+        throw new LocalAiStreamError(upstreamError);
       }
       if (usageSink) {
         const usage = usageFromOpenAI(parsed.usage);
@@ -1151,6 +1127,8 @@ export class OllamaProvider implements AIProvider {
       return;
     }
 
+    const relayError = relayErrorLine(finalChunk);
+    if (relayError) throw new LocalAiStreamError(this.describeRejection(relayError));
     let parsed: NativeChatResponse;
     try {
       parsed = JSON.parse(finalChunk) as NativeChatResponse;
@@ -1162,7 +1140,7 @@ export class OllamaProvider implements AIProvider {
     }
     const upstreamError = payloadErrorMessage(parsed);
     if (upstreamError) {
-      throw new LocalAiStreamError(upstreamError);
+      throw new LocalAiStreamError(this.describeRejection(upstreamError));
     }
     reasoningChars += (parsed.message?.thinking ?? "").length;
     const content = parsed.message?.content;
@@ -1206,13 +1184,11 @@ export class OllamaProvider implements AIProvider {
         throw new LocalAiStreamError("Local AI stream ended without content.");
       } catch (error) {
         lastError = error;
-        const switchedToNative = this.requestSwitchToNative(error);
-
         const canRetry =
           !yieldedAny &&
           attempt < STREAM_STARTUP_RETRY_DELAYS_MS.length &&
           (!(error instanceof LocalAiStreamError) || error.retryable) &&
-          (switchedToNative || isRetryableStartupError(error));
+          isRetryableStartupError(error);
 
         if (!canRetry) throw error;
 
@@ -1339,13 +1315,11 @@ export class OllamaProvider implements AIProvider {
         }
       } catch (error) {
         lastError = error;
-        const switchedToNative = this.requestSwitchToNative(error);
-
         const canRetry =
           !yieldedAny &&
           attempt < STREAM_STARTUP_RETRY_DELAYS_MS.length &&
           (!(error instanceof LocalAiStreamError) || error.retryable) &&
-          (switchedToNative || isRetryableStartupError(error));
+          isRetryableStartupError(error);
 
         if (!canRetry) throw error;
 
@@ -1371,9 +1345,9 @@ export class OllamaProvider implements AIProvider {
    *      tool messages onto the conversation, and stream the next hop.
    *   5. If no tool calls: emit done(complete) and return.
    *
-   * Supports both API modes the rest of the provider already handles —
-   * OpenAI-compat at /v1/chat/completions and native at /api/chat.
-   * Both Ollama paths support tool calling natively.
+   * Works on either surface this instance uses: native /api/chat for
+   * Ollama, /v1/chat/completions for an `apiStyle: "openai"` server. Both
+   * support tool calling.
    */
   async *streamWithTools(
     systemPrompt: string,
@@ -1494,8 +1468,8 @@ export class OllamaProvider implements AIProvider {
 
   /**
    * Stream a single hop with tools attached. Yields text deltas and
-   * returns the accumulated tool-call list. Switches between OpenAI
-   * and native API modes the same way streamResponseOnce does.
+   * returns the accumulated tool-call list. Parses whichever surface this
+   * instance uses, the same way streamResponseOnce does.
    */
   private async *streamHopOnce(
     conversation: OpenAIMessage[],
@@ -1510,13 +1484,13 @@ export class OllamaProvider implements AIProvider {
       max_tokens: this.maxOutputTokens,
       num_ctx: this.numCtx,
       stream_options: { include_usage: true },
-      ...this.openAiReasoningParams,
       ...(temperature !== undefined ? { temperature } : {}),
     };
     const nativeBody = {
       model: this.model,
       messages: conversation,
       stream: true,
+      truncate: false,
       tools: ollamaTools,
       ...this.nativeReasoningParams,
       options: {
@@ -1536,10 +1510,9 @@ export class OllamaProvider implements AIProvider {
 
     if (!response.ok) {
       void response.body?.cancel().catch(() => undefined);
-      const message = `Local AI tool stream failed (${response.status})`;
-      throw new LocalAiStreamError(message, {
-        switchToNative: shouldSwitchToNative(message),
-      });
+      throw new LocalAiStreamError(
+        this.describeRejection(`Local AI tool stream failed (${response.status})`),
+      );
     }
     if (!response.body) throw new Error("Ollama returned empty stream body");
 
@@ -1588,9 +1561,7 @@ export class OllamaProvider implements AIProvider {
           }
           const upstreamError = payloadErrorMessage(parsed);
           if (upstreamError) {
-            throw new LocalAiStreamError(upstreamError, {
-              switchToNative: shouldSwitchToNative(upstreamError),
-            });
+            throw new LocalAiStreamError(upstreamError);
           }
 
           const parsedUsage = usageFromOpenAI(parsed.usage);
@@ -1624,7 +1595,10 @@ export class OllamaProvider implements AIProvider {
           continue;
         }
 
-        // Native mode: each line is a complete JSON object.
+        // Native mode: each line is a complete JSON object, except an error
+        // the relay framed as SSE.
+        const relayError = relayErrorLine(trimmed);
+        if (relayError) throw new LocalAiStreamError(this.describeRejection(relayError));
         let parsed: NativeChatResponse;
         try {
           parsed = JSON.parse(trimmed);
@@ -1632,7 +1606,7 @@ export class OllamaProvider implements AIProvider {
           continue;
         }
         const upstreamError = payloadErrorMessage(parsed);
-        if (upstreamError) throw new LocalAiStreamError(upstreamError);
+        if (upstreamError) throw new LocalAiStreamError(this.describeRejection(upstreamError));
 
         const thinking = parsed.message?.thinking;
         if (thinking) {
@@ -1705,7 +1679,7 @@ export class OllamaProvider implements AIProvider {
     if (!state.sawTruncation) return;
     throw new LocalAiStreamError(
       noVisibleContentError(this.model, this.maxOutputTokens, state.reasoningChars).message,
-      { retryable: false, switchToNative: false },
+      { retryable: false },
     );
   }
 
@@ -1724,13 +1698,13 @@ export class OllamaProvider implements AIProvider {
         response_format: { type: "json_object" },
         max_tokens: this.structuredMaxOutputTokens,
         num_ctx: this.numCtx,
-        ...this.openAiReasoningParams,
         ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       },
       {
         model: this.model,
         messages: openAIMessages,
         stream: false,
+        truncate: false,
         format: "json",
         ...this.nativeReasoningParams,
         options: {
@@ -1744,7 +1718,9 @@ export class OllamaProvider implements AIProvider {
 
     if (!response.ok) {
       void response.body?.cancel().catch(() => undefined);
-      throw new Error(`Local AI structured request failed (${response.status})`);
+      throw new Error(
+        this.describeRejection(`Local AI structured request failed (${response.status})`),
+      );
     }
 
     const data = payload as OpenAIChatResponse | NativeChatResponse;
