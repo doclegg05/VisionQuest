@@ -69,7 +69,7 @@ interface UpcomingEvent {
   registrationCount: number;
 }
 
-interface ReportPayload {
+export interface ReportPayload {
   summary: OutcomeSummary;
   funnel: FunnelItem[];
   attentionQueue: AttentionStudent[];
@@ -126,6 +126,11 @@ export default function OutcomesReport() {
     );
   }
 
+  return <OutcomesReportView data={data} />;
+}
+
+/** The loaded report, split from the fetch so it renders from a fixed payload. */
+export function OutcomesReportView({ data }: { data: ReportPayload }) {
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -186,7 +191,7 @@ export default function OutcomesReport() {
               <p className="text-sm font-semibold text-[var(--urgency-high-text)]">Open alerts</p>
               <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.openAlerts}</p>
               <p className="mt-1 text-xs text-[var(--urgency-high-text)]">
-                {data.summary.highSeverityAlerts} high-severity issues
+                {data.summary.highSeverityAlerts} urgent alert{data.summary.highSeverityAlerts === 1 ? "" : "s"}
               </p>
             </div>
             <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] p-4">
@@ -244,7 +249,7 @@ export default function OutcomesReport() {
                     <div className="flex gap-2 flex-wrap">
                       {student.highSeverityAlertCount > 0 ? (
                         <span className="rounded-full bg-[var(--badge-error-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--badge-error-text)]">
-                          {student.highSeverityAlertCount} high
+                          {student.highSeverityAlertCount} urgent
                         </span>
                       ) : null}
                       {student.openAlertCount > 0 ? (
