@@ -289,6 +289,40 @@ test("a gate metric with zero samples is an error too", () => {
   }
 });
 
+test("a zero-sample error keeps every value the scorer reported, sampled or not", () => {
+  // nudge-sweep's shape when every sweep is blocked: no student got a text, so
+  // the per-student metrics have no sample, while sweep_blocked has its own
+  // sample of three sweeps and reads 3. The error result carries no metrics,
+  // so a message listing only the unsampled values would hide the one number
+  // that says why. The nightly regression issue quotes only the first line.
+  const root = makeRepo();
+  try {
+    addSuite(root, "demo", {
+      metrics: [
+        { id: "sweep_blocked", unit: "count", direction: "lower", floor: 0, exact: true },
+        { id: "daily_cap_exceeded", unit: "count", direction: "lower", floor: 0, exact: true },
+        { id: "sweep_duration_ms", unit: "ms", direction: "lower", floor: null, reason: "tracked" },
+      ],
+      scorer: `export async function run() { return { metrics: [
+        { id: "sweep_blocked", value: 3, n: 3 },
+        { id: "daily_cap_exceeded", value: 0, n: 0 },
+        { id: "sweep_duration_ms", value: 412, n: 1 },
+      ] }; }`,
+    });
+    const out = bench(root, ["--suite=demo", "--compare"]);
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    const result = readResult(root, "demo");
+    assert.equal(result.status, "error");
+    const firstLine = result.error.split("\n")[0];
+    assert.match(firstLine, /zero samples for gate-tier metric\(s\): daily_cap_exceeded\b/);
+    assert.match(firstLine, /sweep_blocked=3 \(n=3\)/);
+    assert.match(firstLine, /daily_cap_exceeded=0 \(n=0\)/);
+    assert.match(firstLine, /sweep_duration_ms=412 \(n=1\)/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // A scorer that skips itself says so with `details.skipped: true`. consent-
 // scopes and migration-drift-schema do it in the PR gate tier (no
 // RLS_TEST_ENABLED, no SHADOW_DATABASE_URL) with value 0 and n 0, and that
