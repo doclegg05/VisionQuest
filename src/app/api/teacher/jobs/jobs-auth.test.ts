@@ -16,6 +16,9 @@ const mockScrapeRunUpdate = mock.fn() as any;
 const mockEnqueueJob = mock.fn() as any;
 const mockProcessJobById = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
+const mockAdminRunUpdateMany = mock.fn(async () => ({ count: 0 })) as any;
+const mockAdminJobUpdateMany = mock.fn(async () => ({ count: 0 })) as any;
+const writeOrder: string[] = [];
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -74,6 +77,21 @@ mock.module("@/lib/classroom", {
 
 mock.module("@/lib/db", {
   namedExports: {
+    prismaAdmin: {
+      $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
+      jobScrapeRun: {
+        updateMany: (...args: unknown[]) => {
+          writeOrder.push("retire-runs");
+          return mockAdminRunUpdateMany(...args);
+        },
+      },
+      backgroundJob: {
+        updateMany: (...args: unknown[]) => {
+          writeOrder.push("retire-jobs");
+          return mockAdminJobUpdateMany(...args);
+        },
+      },
+    },
     prisma: {
       jobClassConfig: {
         findUnique: mockFindUnique,
@@ -85,7 +103,10 @@ mock.module("@/lib/db", {
       jobScrapeRun: {
         findFirst: mockScrapeRunFindFirst,
         findMany: mockScrapeRunFindMany,
-        create: mockScrapeRunCreate,
+        create: (...args: unknown[]) => {
+          writeOrder.push("create-run");
+          return mockScrapeRunCreate(...args);
+        },
         update: mockScrapeRunUpdate,
       },
     },
@@ -244,6 +265,44 @@ describe("teacher job route authorization", () => {
     assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-1"]);
   });
 
+  // The body goes through parseBody (.claude/rules/api-conventions.md), so a
+  // bad body is a 400 before any class or queue work.
+  it("answers 400 for a body that is not JSON", async () => {
+    const req = new Request("http://localhost:3000/api/teacher/jobs/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not json",
+    });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.equal(mockAssertStaffCanManageClass.mock.callCount(), 0);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
+  it("answers 400 when sources is not a list of source names", async () => {
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1", sources: "jsearch" },
+    });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
+  it("answers 400 without a classId", async () => {
+    const req = mockRequest("/api/teacher/jobs/refresh", { method: "POST", body: {} });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.match(JSON.stringify(await res.json()), /classId is required/);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
   it("queues a retry for requested enabled sources", async () => {
     const req = mockRequest("/api/teacher/jobs/refresh", {
       method: "POST",
@@ -312,6 +371,26 @@ describe("teacher job route authorization", () => {
     assert.deepEqual(where.status, { in: ["queued", "processing"] });
     const since = (where.createdAt as { gte: Date }).gte.getTime();
     assert.ok(Math.abs(before - 2 * 60 * 60 * 1000 - since) < 5_000, "the window is the last two hours");
+  });
+
+  // A crashed refresh leaves its run and its scrape_jobs job "processing".
+  // enqueueJob would hand the replacement run that dead job (same dedupe key)
+  // and processJobById claims only pending jobs, so nothing would start.
+  it("retires a stuck run and its background job before queuing a replacement", async () => {
+    writeOrder.length = 0;
+    mockAdminRunUpdateMany.mock.resetCalls();
+    mockAdminJobUpdateMany.mock.resetCalls();
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1" },
+    });
+
+    await refreshRoute.POST(req as never);
+
+    assert.deepEqual(writeOrder.slice(0, 3), ["retire-runs", "retire-jobs", "create-run"]);
+    const jobWhere = mockAdminJobUpdateMany.mock.calls[0]?.arguments[0].where;
+    assert.deepEqual(jobWhere.OR, [{ dedupeKey: "scrape:config-1" }, { dedupeKey: { startsWith: "scrape:config-1:" } }]);
+    assert.equal(mockEnqueueJob.mock.calls.at(-1)?.arguments[0].dedupeKey, "scrape:config-1");
   });
 
   it("returns scrape status after checking class ownership", async () => {
