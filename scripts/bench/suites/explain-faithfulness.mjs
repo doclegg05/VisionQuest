@@ -21,18 +21,21 @@
 // what the product sends. A copied prompt drifts, and then the number describes
 // a system nobody ships.
 //
-//   GEMINI_API_KEY=… DATABASE_URL=… \
+// THE MODEL IS PRODUCTION'S, REACHED THROUGH OPENROUTER. The repo has no
+// Gemini key (issue #220), and the app's resolveAiProvider never returns
+// OpenRouter by design, so this suite generates through the eval resolver
+// every Sage eval uses. It still measures the shipped prompt and the shipped
+// guard; it no longer exercises production's provider routing.
+//
+//   OPENROUTER_API_KEY=… \
 //     node --import tsx scripts/bench/suites/explain-faithfulness.mjs --self-test
 // =============================================================================
 
 import { selfTest } from "../lib/self-test.mjs";
 
 export async function run(ctx) {
-  if (!ctx.env.geminiApiKey) {
-    return { skipped: "no GEMINI_API_KEY — this suite generates with a real model" };
-  }
-  if (!ctx.env.databaseUrl) {
-    return { skipped: "no DATABASE_URL — provider resolution reads its configuration" };
+  if (!ctx.env.openrouterApiKey) {
+    return { skipped: "no OPENROUTER_API_KEY — this suite generates with a real model" };
   }
 
   const { EXPLAIN_SYSTEM_PROMPT, explainGrounding } = await import(
@@ -41,17 +44,11 @@ export async function run(ctx) {
   const { checkExplanationFaithfulness } = await import(
     "../../../src/lib/sage/agent/explain-faithfulness.ts"
   );
-  const { resolveAiProvider } = await import("../../../src/lib/ai/provider.ts");
+  const { resolveEvalProvider } = await import("../../lib/sage-eval-provider.mjs");
   const { assessReadability } = await import("../../../src/lib/sage/readability.ts");
   const { percentile } = await import("../../../src/lib/percentile.ts");
 
-  // No studentId: the fixture postings belong to nobody, and passing a real one
-  // would put a benchmark run into that student's usage ledger and quota.
-  const provider = await resolveAiProvider({
-    studentId: null,
-    task: "explain_job",
-    sensitivity: "public",
-  });
+  const { provider, model } = await resolveEvalProvider(["--provider=openrouter"]);
 
   const results = [];
   let empty = 0;
@@ -96,6 +93,7 @@ export async function run(ctx) {
 
   return {
     provider: provider.name,
+    model,
     metrics: [
       {
         id: "faithful_explanations",

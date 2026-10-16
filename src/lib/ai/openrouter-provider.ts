@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
+import { appServerMarker } from "./app-server";
 import type {
   AIProvider,
   ChatMessage,
@@ -33,8 +34,8 @@ export const OPENROUTER_DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
 export const OPENROUTER_PRIVACY = Object.freeze({ zdr: true, data_collection: "deny" } as const);
 
 /** Same ladder as GeminiProvider: 3 attempts, 500ms then 1500ms. */
-const RETRY_DELAYS_MS = [500, 1_500];
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+export const RETRY_DELAYS_MS = [500, 1_500];
+export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_STREAM_ESTABLISH_TIMEOUT_MS = 20_000;
 const DEFAULT_STREAM_STALL_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_HOPS = 5;
@@ -61,16 +62,13 @@ export class OpenRouterError extends Error {
   }
 }
 
-/** The Next.js server sets NEXT_RUNTIME; Render sets RENDER. OpenRouter must run in neither. */
-const APP_SERVER_MARKERS = ["NEXT_RUNTIME", "RENDER"] as const;
-
 /**
  * Runtime half of the eval-only rule. The lint guard can be sidestepped by an
  * import shape it does not know; this check cannot, because it runs wherever
  * the provider is constructed.
  */
 export function assertNotAppServer(env: NodeJS.ProcessEnv = process.env): void {
-  const marker = APP_SERVER_MARKERS.find((name) => Boolean(env[name]?.trim()));
+  const marker = appServerMarker(env);
   if (marker) {
     throw new OpenRouterError(
       `OpenRouter is eval-only and refuses to run inside the app server (${marker} is set).`,
@@ -333,7 +331,7 @@ function serializeToolResponse(response: unknown, summary: string): Record<strin
   return { result: response, _summary: summary };
 }
 
-function transportError(error: unknown, timeoutMs: number): OpenRouterError {
+export function transportError(error: unknown, timeoutMs: number): OpenRouterError {
   const name = error instanceof Error ? error.name : "";
   if (name === "TimeoutError" || name === "AbortError") {
     return new OpenRouterError(`OpenRouter request timed out after ${timeoutMs}ms`, "unavailable");
@@ -341,14 +339,14 @@ function transportError(error: unknown, timeoutMs: number): OpenRouterError {
   return new OpenRouterError("OpenRouter request failed (network)", "network");
 }
 
-function isRetryable(error: unknown): boolean {
+export function isRetryable(error: unknown): boolean {
   return (
     error instanceof OpenRouterError &&
     (error.kind === "rate_limited" || error.kind === "unavailable" || error.kind === "network")
   );
 }
 
-async function failureFromResponse(response: Response): Promise<OpenRouterError> {
+export async function failureFromResponse(response: Response): Promise<OpenRouterError> {
   // The body only refines 403 into credits vs refused. If it cannot be read,
   // the status alone still classifies the failure.
   const bodyText = await response.text().catch(() => "");
@@ -500,7 +498,8 @@ function assistantTurn(hop: HopResult): WireMessage {
 export class OpenRouterProvider implements AIProvider {
   readonly name = "openrouter";
   readonly model: string;
-  private readonly apiKey: string;
+  // A private field, so logging or serializing the provider never shows the key.
+  readonly #apiKey: string;
   private readonly url: string;
   private readonly fetchImpl: typeof fetch;
   private readonly requestTimeoutMs: number;
@@ -513,7 +512,7 @@ export class OpenRouterProvider implements AIProvider {
   constructor(apiKey: string, model: string = OPENROUTER_DEFAULT_MODEL, options: OpenRouterProviderOptions = {}) {
     assertNotAppServer();
     if (!apiKey) throw new OpenRouterError("OPENROUTER_API_KEY is not set", "bad_request");
-    this.apiKey = apiKey;
+    this.#apiKey = apiKey;
     this.model = model;
     this.url = `${(options.baseUrl ?? OPENROUTER_DEFAULT_BASE).replace(/\/+$/, "")}/v1/chat/completions`;
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
@@ -720,7 +719,7 @@ export class OpenRouterProvider implements AIProvider {
     try {
       response = await this.fetchImpl(this.url, {
         method: "POST",
-        headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${this.#apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal,
       });

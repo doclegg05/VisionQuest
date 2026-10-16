@@ -9,18 +9,24 @@
 import { runScriptForJsonReport } from "./run-cli.mjs";
 
 /**
+ * Production's model is reached through OpenRouter, never with a Gemini key
+ * (issue #220). OPENROUTER_MODEL, when the workflow sets it, reaches the
+ * harness through the inherited environment.
+ *
  * @param {string} family - "grounding" | "career" | "readability"
  * @param {object} [opts]
- * @param {string} [opts.geminiApiKey]
+ * @param {string} [opts.openrouterApiKey]
  * @param {NodeJS.ProcessEnv} [opts.env]
+ * @param {typeof runScriptForJsonReport} [opts.runScript] - test seam
  */
 export async function runChatHarnessFamily(family, opts = {}) {
   const env = { ...(opts.env ?? {}) };
-  if (opts.geminiApiKey) env.GEMINI_API_KEY = opts.geminiApiKey;
+  if (opts.openrouterApiKey) env.OPENROUTER_API_KEY = opts.openrouterApiKey;
+  const runScript = opts.runScript ?? runScriptForJsonReport;
 
-  const report = await runScriptForJsonReport(
+  const report = await runScript(
     "scripts/sage-chat-harness.mjs",
-    [`--families=${family}`, "--provider=gemini"],
+    [`--families=${family}`, "--provider=openrouter"],
     { env, timeoutMs: 300_000 },
   );
 
