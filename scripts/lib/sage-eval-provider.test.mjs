@@ -14,6 +14,7 @@ import {
   EvalBudgetExhaustedError,
   reportEvalFailure,
   readOllamaNumCtx,
+  readOllamaApiStyle,
   resolveEvalProvider,
   EvalProviderUnavailableError,
   EvalProviderUnreachableError,
@@ -43,6 +44,36 @@ describe("readOllamaNumCtx", () => {
     for (const bad of ["0", "-1", "8k", "1.5", "abc"]) {
       assert.throws(() => readOllamaNumCtx({ OLLAMA_NUM_CTX: bad }), /OLLAMA_NUM_CTX/);
     }
+  });
+
+  it("throws on digits that overflow to Infinity or past a safe integer", () => {
+    for (const bad of ["1" + "0".repeat(400), "9007199254740993"]) {
+      assert.throws(() => readOllamaNumCtx({ OLLAMA_NUM_CTX: bad }), /OLLAMA_NUM_CTX/);
+    }
+  });
+});
+
+/**
+ * An eval aimed at an OpenAI-style local server (LM Studio, vLLM) must reach
+ * /v1/chat/completions. The provider sends Ollama endpoints to native
+ * /api/chat only, so the resolver has to pass the API style the app reads
+ * (AI_PROVIDER_API_STYLE) or those servers get a route they do not expose.
+ */
+describe("readOllamaApiStyle", () => {
+  it("returns openai when AI_PROVIDER_API_STYLE says so", () => {
+    assert.equal(readOllamaApiStyle({ AI_PROVIDER_API_STYLE: "openai" }), "openai");
+    assert.equal(readOllamaApiStyle({ AI_PROVIDER_API_STYLE: " openai " }), "openai");
+  });
+
+  it("returns undefined otherwise, so the provider's native default applies", () => {
+    assert.equal(readOllamaApiStyle({}), undefined);
+    assert.equal(readOllamaApiStyle({ AI_PROVIDER_API_STYLE: "ollama" }), undefined);
+    assert.equal(readOllamaApiStyle({ AI_PROVIDER_API_STYLE: "" }), undefined);
+  });
+
+  it("the Ollama resolver passes it into the provider's config", () => {
+    const source = readFileSync(new URL("./sage-eval-provider.mjs", import.meta.url), "utf8");
+    assert.ok(source.includes("...(apiStyle ? { apiStyle } : {})"), "resolveOllamaProvider must forward apiStyle");
   });
 });
 

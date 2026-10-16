@@ -170,10 +170,23 @@ async function resolveGeminiProvider(modelOverride = null) {
 export function readOllamaNumCtx(env = process.env) {
   const raw = env.OLLAMA_NUM_CTX?.trim();
   if (!raw) return undefined;
-  if (!/^\d+$/.test(raw) || Number(raw) <= 0) {
+  const value = Number(raw);
+  // Digits alone are not enough: a long run converts to Infinity, and past
+  // MAX_SAFE_INTEGER the value is no longer the one typed.
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`OLLAMA_NUM_CTX must be a positive integer, got "${raw}".`);
   }
-  return Number(raw);
+  return value;
+}
+
+/**
+ * AI_PROVIDER_API_STYLE, the same setting the app reads (src/lib/ai/local-config.ts).
+ * "openai" means an OpenAI-style server (LM Studio, vLLM) that only exposes
+ * /v1/chat/completions; anything else leaves the provider on Ollama's native
+ * /api/chat.
+ */
+export function readOllamaApiStyle(env = process.env) {
+  return env.AI_PROVIDER_API_STYLE?.trim() === "openai" ? "openai" : undefined;
 }
 
 async function resolveOllamaProvider(modelOverride = null) {
@@ -189,9 +202,11 @@ async function resolveOllamaProvider(modelOverride = null) {
 
   const authMode = resolveLocalAiAuthMode(process.env.OLLAMA_AUTH_MODE ?? null);
   const numCtx = readOllamaNumCtx();
+  const apiStyle = readOllamaApiStyle();
   const authConfig = {
     authMode,
     ...(numCtx ? { numCtx } : {}),
+    ...(apiStyle ? { apiStyle } : {}),
     apiKey: process.env.AI_PROVIDER_API_KEY || process.env.OLLAMA_API_KEY || null,
     cloudflareAccessClientId:
       process.env.AI_PROVIDER_CLOUDFLARE_ACCESS_CLIENT_ID ||
