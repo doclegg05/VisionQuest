@@ -342,8 +342,8 @@ export function WorkAvailabilitySection() {
         >
           {status === "saving" ? "Saving..." : "Save"}
         </button>
-        {status === "success" && <p className="text-sm text-[var(--success)]">Saved.</p>}
-        {status === "error" && <p className="text-sm text-[var(--error)]">{errorMsg}</p>}
+        {status === "success" && <p className="text-sm text-success">Saved.</p>}
+        {status === "error" && <p className="text-sm text-danger">{errorMsg}</p>}
       </div>
     </div>
   );

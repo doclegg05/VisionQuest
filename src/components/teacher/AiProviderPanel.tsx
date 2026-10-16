@@ -407,7 +407,7 @@ export default function AiProviderPanel() {
           onClick={() => setProvider("local")}
           className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
             provider === "local"
-              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-[var(--accent-strong)]"
+              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-success"
               : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
           }`}
         >
@@ -418,7 +418,7 @@ export default function AiProviderPanel() {
           onClick={() => setProvider("cloud")}
           className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
             provider === "cloud"
-              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-[var(--accent-strong)]"
+              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-success"
               : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
           }`}
         >
@@ -809,7 +809,7 @@ function CapabilityRow({ label, ok }: { label: string; ok: boolean }) {
     <div className="flex items-center gap-2 text-sm">
       <span
         aria-hidden="true"
-        className={ok ? "text-[var(--accent-strong)]" : "text-[var(--badge-warning-text)]"}
+        className={ok ? "text-success" : "text-[var(--badge-warning-text)]"}
       >
         {ok ? "✓" : "⚠"}
       </span>

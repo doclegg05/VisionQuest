@@ -63,8 +63,8 @@ export default function FormFillClient({ templateId }: { templateId: string }) {
   if (error || !data) {
     return (
       <div className="page-shell space-y-3">
-        <p className="text-sm text-[var(--error)]">{error}</p>
-        <Link href="/forms" className="inline-flex min-h-11 items-center text-sm text-[var(--accent-green)]">
+        <p className="text-sm text-danger">{error}</p>
+        <Link href="/forms" className="inline-flex min-h-11 items-center text-sm text-success">
           ← Back to forms
         </Link>
       </div>
@@ -143,7 +143,7 @@ export default function FormFillClient({ templateId }: { templateId: string }) {
   return (
     <div className="page-shell space-y-5">
       <div>
-        <Link href="/forms" className="inline-flex min-h-11 items-center text-sm text-[var(--accent-green)]">
+        <Link href="/forms" className="inline-flex min-h-11 items-center text-sm text-success">
           ← Back to forms
         </Link>
         <h1 className="mt-2 font-display text-3xl text-[var(--ink-strong)]">{template.title}</h1>
@@ -171,7 +171,7 @@ export default function FormFillClient({ templateId }: { templateId: string }) {
       {message && (
         <p
           role="status"
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm text-[var(--accent-green)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3 text-sm text-success"
         >
           {message}
         </p>
@@ -179,7 +179,7 @@ export default function FormFillClient({ templateId }: { templateId: string }) {
       {error && (
         <p
           role="alert"
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--error)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-danger"
         >
           {error}
         </p>
@@ -273,7 +273,7 @@ export function FieldInput({ field, value, onChange, disabled }: FieldInputProps
       <div>
         <label id={labelId} htmlFor={inputId} className="block text-sm font-semibold text-[var(--ink-strong)]">
           {field.label}
-          {field.required && <span className="ml-1 text-[var(--accent-red)]">*</span>}
+          {field.required && <span className="ml-1 text-danger">*</span>}
         </label>
         {field.helpText && (
           <span id={helpId} className="mt-0.5 block text-xs text-[var(--ink-muted)]">{field.helpText}</span>
@@ -463,7 +463,7 @@ function AttachmentField({
         />
       )}
       {uploading && <p className="text-xs text-[var(--ink-muted)]">Uploading…</p>}
-      {uploadError && <p className="text-xs text-[var(--error)]">{uploadError}</p>}
+      {uploadError && <p className="text-xs text-danger">{uploadError}</p>}
     </div>
   );
 }

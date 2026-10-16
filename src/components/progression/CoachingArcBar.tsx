@@ -26,7 +26,7 @@ export function CoachingArcBar({ currentWeek, totalWeeks = 6 }: CoachingArcBarPr
 
   return (
     <div className="surface-section p-5">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-success">
         Your 6-Week Journey
       </p>
       <p className="mt-1 font-semibold text-[var(--ink-strong)]">
@@ -97,7 +97,7 @@ export function CoachingArcBar({ currentWeek, totalWeeks = 6 }: CoachingArcBarPr
                   className={[
                     "text-xs font-medium leading-tight",
                     isCurrent
-                      ? "text-[var(--accent-strong)]"
+                      ? "text-success"
                       : "text-[var(--ink-muted)]",
                   ].join(" ")}
                 >

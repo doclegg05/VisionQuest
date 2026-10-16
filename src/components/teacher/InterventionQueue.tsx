@@ -350,7 +350,7 @@ function StudentAccordion({
           <button
             type="button"
             onClick={() => openSageWithMessage(buildSageMessage(group))}
-            className="inline-flex min-h-11 items-center rounded-full border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:brightness-110"
+            className="inline-flex min-h-11 items-center rounded-full border border-[var(--chat-bubble-assistant-border)] bg-[var(--chat-bubble-assistant-bg)] px-3 py-1.5 text-xs font-semibold text-success transition-colors hover:brightness-110"
           >
             Ask Sage
           </button>
@@ -473,7 +473,7 @@ export default function InterventionQueue({ alerts, inactivityQueue, reviewQueue
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
             Needs attention
           </p>
           <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>

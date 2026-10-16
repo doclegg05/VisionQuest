@@ -169,12 +169,12 @@ export default function LmsManager() {
                     {link.description && (
                       <p className="mt-0.5 text-xs leading-5 text-[var(--ink-muted)]">{link.description}</p>
                     )}
-                    <p className="mt-1 break-all text-xs leading-5 text-[var(--accent-secondary)]">{link.url}</p>
+                    <p className="mt-1 break-all text-xs leading-5 text-info">{link.url}</p>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                     <button
                       onClick={() => startEdit(link)}
-                      className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)]"
+                      className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[var(--surface-muted)]"
                     >
                       Edit
                     </button>
@@ -268,7 +268,7 @@ export default function LmsManager() {
       ) : (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full rounded-xl border-2 border-dashed border-[var(--border)] p-3 text-sm text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)]"
+          className="w-full rounded-xl border-2 border-dashed border-[var(--border)] p-3 text-sm text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-info"
         >
           + Add Course Link
         </button>

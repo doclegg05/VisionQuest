@@ -403,7 +403,7 @@ export default function ProgressTab({
                       </p>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
+                      <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
                         {conv.stage}
                       </span>
                       <span className="text-xs text-[var(--ink-muted)]">
@@ -423,7 +423,7 @@ export default function ProgressTab({
             {!showAllConversations && conversations.length > 20 && (
               <button
                 onClick={onShowAllConversations}
-                className="flex w-full items-center justify-center text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)] py-2 pointer-coarse:min-h-11"
+                className="flex w-full items-center justify-center text-xs text-success hover:text-[var(--ink-strong)] hover:underline py-2 pointer-coarse:min-h-11"
               >
                 Show all {conversations.length} conversations
               </button>
@@ -445,7 +445,7 @@ function PublicCredentialBanner({
 }) {
   return (
     <div className="mt-4 rounded-lg border border-[rgba(15,154,146,0.14)] bg-[rgba(15,154,146,0.07)] p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-secondary)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-info">
         Public credential
       </p>
       <p className="mt-2 text-sm text-[var(--ink-strong)]">
@@ -458,7 +458,7 @@ function PublicCredentialBanner({
           href={`/credentials/${publicCredentialPage.slug}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center text-sm font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
+          className="mt-3 inline-flex items-center text-sm font-semibold text-success hover:text-[var(--ink-strong)] hover:underline pointer-coarse:min-h-11"
         >
           Open public credential {"\u2192"}
         </a>

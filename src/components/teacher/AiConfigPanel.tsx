@@ -261,7 +261,7 @@ export default function AiConfigPanel() {
             href="https://aistudio.google.com/apikey"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-[var(--accent-strong)] underline"
+            className="font-medium text-success underline"
           >
             Google AI Studio
           </a>
