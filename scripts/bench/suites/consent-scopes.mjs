@@ -24,6 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../../../");
 const TEST_FILE = "src/lib/connect/consent-scopes.bench.test.ts";
 const RUN_TIMEOUT_MS = 60_000;
+export const CHILD_ARGS = ["tsx", "--test", TEST_FILE];
 
 function parseTap(tapText) {
   const lines = tapText.split("\n");
@@ -71,7 +72,7 @@ export async function run(ctx) {
 
   const tapText = await new Promise((resolve, reject) => {
     const chunks = [];
-    const child = spawn("npx", ["tsx", "--test", TEST_FILE], {
+    const child = spawn("npx", CHILD_ARGS, {
       cwd: REPO_ROOT,
       env: process.env,
     });
@@ -88,23 +89,22 @@ export async function run(ctx) {
     });
   });
 
-  const parsed = parseTap(tapText);
+  return { metrics: [scoreTap(tapText)] };
+}
 
+export function scoreTap(tapText) {
+  const parsed = parseTap(tapText);
   return {
-    metrics: [
-      {
-        id: "writes_without_scope",
-        value: parsed.fail,
-        n: parsed.pass + parsed.fail,
-        details: {
-          skippedAtRuntime: parsed.skipped,
-          assertionsPassed: parsed.pass,
-          assertionsFailed: parsed.fail,
-          failures: parsed.failures.slice(0, 20),
-          rawTapTail: parsed.fail > 0 ? tapText.slice(-4000) : undefined,
-        },
-      },
-    ],
+    id: "writes_without_scope",
+    value: parsed.fail,
+    n: parsed.pass + parsed.fail,
+    details: {
+      skippedAtRuntime: parsed.skipped,
+      assertionsPassed: parsed.pass,
+      assertionsFailed: parsed.fail,
+      failures: parsed.failures.slice(0, 20),
+      rawTapTail: parsed.fail > 0 ? tapText.slice(-4000) : undefined,
+    },
   };
 }
 
