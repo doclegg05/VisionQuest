@@ -334,45 +334,100 @@ describe("a wage written out in words is still a wage", () => {
 // that breaks it".
 //
 // What they pin is GROWTH, not a stopwatch reading: a wall-clock threshold on a
-// shared CI runner would flake, but across a 4x input a quadratic pattern grows
-// ~16x and a linear one ~4x, and no amount of machine noise closes that gap.
+// shared CI runner would flake, while across a 4x input a quadratic pattern
+// grows ~16x and a linear one ~4x. That gap is wide, but the first version of
+// this block still let noise close it. It took the best of three readings of
+// the small input, then the best of three of the large one, and CI run
+// 38903365392 (2026-10-16) read the bounded CITY_STATE at 13.0x. Logging the
+// raw readings locally showed two kinds of noise, and the old shape was open to
+// both:
+//
+// - On a loaded machine something (preemption, most likely) adds a fixed 0.3
+//   to 2.5 ms to whatever reading it lands in. A 0.3 ms large-input reading
+//   catches it far more often than a 0.08 ms small one, so three tries were
+//   often not enough for the large input to get a single clean reading.
+// - The machine can change speed partway through. All three large-input
+//   readings then ran ~2.5x slow together while the small ones, timed in an
+//   earlier batch, did not.
+//
+// So each round now times the small input and then the large one, back to
+// back, and the answer is the median round's ratio. A round's two readings
+// share one stretch of machine speed, so noise can only skew the rounds it
+// lands in, and the median ignores a minority of skewed rounds however far off
+// they are. Two other shapes were measured and lost:
+//
+// - The median of only 9 rounds failed twice as often as best-of-three. Nine
+//   rounds fit inside one stretch of heavy preemption, so most of them were
+//   skewed together. Fifty do not.
+// - Each size's fastest reading, over interleaved rounds, let a single
+//   too-fast reading set the ratio alone: one small-input reading at 0.018 ms,
+//   half the 0.038 ms of the rest, read a bounded pattern at 8.7x. More rounds
+//   only give that more chances to happen.
 // =============================================================================
 
 /**
- * Big enough that the quadratic signal dwarfs timer noise. The fixed patterns
- * cost well under a millisecond at 40 KB, so this is cheap until it regresses,
- * which is exactly when it should stop being cheap.
+ * Four-fold apart, and big enough that the quadratic signal dwarfs timer
+ * noise. The fixed patterns cost well under a millisecond at 40 KB, so this is
+ * cheap until it regresses, which is exactly when it should stop being cheap.
  */
-const REDOS_SIZES = [10_000, 20_000, 40_000];
+const REDOS_SMALL = 10_000;
+const REDOS_LARGE = 40_000;
+
+/**
+ * Enough rounds that a stretch of heavy preemption skews only a minority of
+ * them. All seven bounded cases together take about 80 ms at 50 rounds on a
+ * laptop.
+ */
+const REDOS_ROUNDS = 50;
+
+/**
+ * Stop adding rounds once the readings add up to this, after at least
+ * REDOS_MIN_ROUNDS. Only a regressed pattern ever gets here: its readings run
+ * to hundreds of milliseconds, which that noise cannot move by enough to
+ * matter, so a few rounds measure it precisely and the failing test finishes
+ * in seconds rather than minutes. This caps the sampling, never the verdict.
+ */
+const REDOS_BUDGET_MILLIS = 2_000;
+const REDOS_MIN_ROUNDS = 3;
 
 function repeatTo(unit: string, n: number): string {
   return unit.repeat(Math.ceil(n / unit.length)).slice(0, n);
 }
 
-/** Best of three, so a scheduler hiccup cannot manufacture a failure. */
-function bestMatchAllMillis(pattern: RegExp, input: string): number {
-  const probe = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
-  let best = Infinity;
-  for (let i = 0; i < 3; i += 1) {
-    const started = process.hrtime.bigint();
-    // Counted, not discarded: iterating is the work being measured, and an
-    // unused loop body is the kind of thing an optimiser is entitled to drop.
-    let _seen = 0;
-    for (const _match of input.matchAll(probe)) _seen += 1;
-    best = Math.min(best, Number(process.hrtime.bigint() - started) / 1e6);
-  }
-  return best;
+function matchAllMillis(probe: RegExp, input: string): number {
+  const started = process.hrtime.bigint();
+  // Counted, not discarded: iterating is the work being measured, and an
+  // unused loop body is the kind of thing an optimiser is entitled to drop.
+  let _seen = 0;
+  for (const _match of input.matchAll(probe)) _seen += 1;
+  return Number(process.hrtime.bigint() - started) / 1e6;
+}
+
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
 }
 
 /**
  * How much slower the pattern gets when its input grows four-fold.
  *
- * Linear is 4, quadratic is 16. The floor on the baseline keeps a
- * sub-microsecond first reading from turning into a meaningless ratio.
+ * Linear is 4, quadratic is 16. The floor on the small reading keeps a
+ * near-zero reading from turning into a meaningless ratio.
  */
 function growthRatio(pattern: RegExp, attack: (n: number) => string): number {
-  const times = REDOS_SIZES.map((n) => bestMatchAllMillis(pattern, attack(n)));
-  return times[times.length - 1] / Math.max(times[0], 0.01);
+  const probe = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
+  const small = attack(REDOS_SMALL);
+  const large = attack(REDOS_LARGE);
+  const ratios: number[] = [];
+  let spentMillis = 0;
+  while (ratios.length < REDOS_ROUNDS) {
+    if (ratios.length >= REDOS_MIN_ROUNDS && spentMillis >= REDOS_BUDGET_MILLIS) break;
+    const smallMillis = matchAllMillis(probe, small);
+    const largeMillis = matchAllMillis(probe, large);
+    ratios.push(largeMillis / Math.max(smallMillis, 0.01));
+    spentMillis += smallMillis + largeMillis;
+  }
+  return median(ratios);
 }
 
 /** Above linear (4) with headroom, far below the ~16 a quadratic pattern hits. */
