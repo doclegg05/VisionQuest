@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { cleanPassageText } from "./passage-text";
 
@@ -66,7 +67,7 @@ export async function extractTextFromBuffer(
     }
   } catch (error) {
     logger.error(`Extraction failed for buffer (${normalizedExt})`, {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return null;
   }
@@ -95,7 +96,7 @@ export async function extractText(
     return await extractTextFromBuffer(buffer, ext, { maxChars });
   } catch (error) {
     logger.error(`Extraction failed for ${filePath}`, {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return null;
   }
@@ -182,7 +183,7 @@ export async function extractPagesFromBuffer(
     }
   } catch (error) {
     logger.error(`Page extraction failed (${normalizedExt})`, {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return null;
   }

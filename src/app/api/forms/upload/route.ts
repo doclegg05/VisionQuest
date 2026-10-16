@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey, validateFile } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
 import { validateUploadContent } from "@/lib/file-security";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { withAuth, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
@@ -104,7 +105,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     return NextResponse.json({ submission, fileId: fileRecord.id });
   } catch (error) {
     if (error instanceof Error && error.name === "ApiError") throw error;
-    logger.error("Form upload error", { error: String(error) });
+    logger.error("Form upload error", { error: errorForLog(error) });
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
 });

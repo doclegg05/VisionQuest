@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import {
   parseStoredResumeData,
@@ -149,7 +150,7 @@ export const POST = withAuth(async (session, req: Request) => {
   } catch (error) {
     logger.error("Resume assist failed", {
       student: studentLogKey(session.id),
-      error: String(error),
+      error: errorForLog(error),
     });
     await logAiAuditEvent({
       actorId: session.id,

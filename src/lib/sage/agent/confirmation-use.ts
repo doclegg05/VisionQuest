@@ -28,6 +28,7 @@
 
 import { createHash } from "node:crypto";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { confirmationTokenExpiry, TOKEN_TTL_MS } from "./confirmation";
 
@@ -73,7 +74,7 @@ export async function claimConfirmationToken(
   void prisma.sageConfirmationUse
     .deleteMany({ where: { expiresAt: { lt: clock } } })
     .catch((err) => {
-      logger.warn("confirmation-use: expired-claim sweep failed", { err: String(err) });
+      logger.warn("confirmation-use: expired-claim sweep failed", { err: errorForLog(err) });
     });
 
   return "claimed";

@@ -19,9 +19,10 @@ import { Prisma } from "@prisma/client";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma, prismaAdmin } from "@/lib/db";
 import { sendEmail, isEmailDeliveryConfigured } from "@/lib/email";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
-import { redactContactInfo } from "@/lib/log-redaction";
 import { studentLogKey } from "@/lib/log-keys";
+import { providerErrorText } from "@/lib/log-redaction";
 import { rateLimit, refundRateLimit } from "@/lib/rate-limit";
 import { sendNotification } from "@/lib/notifications";
 import { sanitizeForPrompt } from "@/lib/sage/system-prompts";
@@ -688,7 +689,7 @@ async function rollBackFailedSend(
     logger.error("Send rollback failed", {
       actorId,
       alert: "connect_send_rollback_failed",
-      error: String(error),
+      error: errorForLog(error),
     });
     return { rolledBack: false };
   }
@@ -866,7 +867,8 @@ export async function sendConnection(
     logger.error("Employer packet email failed", {
       actorId: options.senderId,
       student: studentLogKey(connection.studentId),
-      error: redactContactInfo(String(error)),
+      error: errorForLog(error),
+      providerText: providerErrorText(error),
     });
 
     // Roll the claim back so the instructor can try again, and clear the token
@@ -1104,7 +1106,7 @@ export async function withdrawConnectionsForConsentRevocation(
       logger.warn("Connection not withdrawn on consent revocation", {
         actorId,
         student: studentLogKey(studentId),
-        error: String(error),
+        error: errorForLog(error),
       });
     }
   }

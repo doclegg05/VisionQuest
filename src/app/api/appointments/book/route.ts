@@ -4,7 +4,7 @@ import { createStudentBooking } from "@/lib/appointment-booking";
 import { logAuditEvent } from "@/lib/audit";
 import { withAuth } from "@/lib/api-error";
 import { studentLogKey } from "@/lib/log-keys";
-import { redactContactInfo } from "@/lib/log-redaction";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { parseBody, bookAppointmentSchema } from "@/lib/schemas";
 
@@ -95,7 +95,7 @@ async function afterBooking(
   } catch (error) {
     logger.warn(`Appointment saved but ${step} failed`, {
       ...context,
-      error: redactContactInfo(String(error)),
+      error: errorForLog(error),
     });
   }
 }

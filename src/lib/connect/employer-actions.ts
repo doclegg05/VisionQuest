@@ -24,6 +24,7 @@
 import { logAuditEvent } from "@/lib/audit";
 import { invalidateChatContext } from "@/lib/cache";
 import { prismaAdmin } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
 import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
@@ -424,7 +425,7 @@ export async function recordHired(input: HiredInput) {
       syncStudentAlerts(connection.studentId),
     );
   } catch (error) {
-    logger.warn("Placement alert sync after hire failed", { error: String(error) });
+    logger.warn("Placement alert sync after hire failed", { error: errorForLog(error) });
   }
 
   await notifyStudent(connection.studentId, {
@@ -561,7 +562,7 @@ async function notifyStudent(
   try {
     await withStudentRlsContext(studentId, () => sendNotification(studentId, payload));
   } catch (error) {
-    logger.warn("Connect notification to student not delivered", { error: String(error) });
+    logger.warn("Connect notification to student not delivered", { error: errorForLog(error) });
   }
 }
 
@@ -574,7 +575,7 @@ async function notifyStaff(
   } catch (error) {
     logger.warn("Connect notification to staff not delivered", {
       actorId: userId,
-      error: String(error),
+      error: errorForLog(error),
     });
   }
 }

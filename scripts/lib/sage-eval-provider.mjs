@@ -297,10 +297,11 @@ export class EvalBudgetExhaustedError extends Error {
 
 /**
  * Thrown by `wrapWithBudgetDetection` when the provider refuses the model or
- * the key itself, so nothing could be evaluated: an OpenRouter 400 (unknown
- * model id), 401 (bad key) or 404 (no endpoint satisfies the zero-retention
- * routing rule). Exit code 4, so sage:models:compare and a human can tell
- * "this model is not available here" from "this model failed Sage's evals".
+ * the key itself, so nothing could be evaluated: an OpenRouter 400 whose body
+ * names an unknown model id, 401 (bad key) or 404 (no endpoint satisfies the
+ * zero-retention routing rule). Exit code 4, so sage:models:compare and a
+ * human can tell "this model is not available here" from "this model failed
+ * Sage's evals".
  */
 export class EvalProviderUnavailableError extends Error {
   constructor(cause, providerLabel = "OpenRouter") {
@@ -348,7 +349,19 @@ export function isEvalAbort(error) {
   return error instanceof EvalBudgetExhaustedError || error instanceof EvalProviderUnavailableError;
 }
 
-const UNAVAILABLE_STATUSES = new Set([400, 401, 404]);
+/**
+ * An OpenRouter failure that means the key or model was refused: a model id
+ * OpenRouter does not know (its own kind, read from the 400's body), a bad
+ * key (401) or no endpoint that meets the routing rule (404). Any other 400
+ * is a request the harness built wrong and stays a failed run, so a schema
+ * bug is not read as a refused key.
+ */
+const UNAVAILABLE_STATUSES = new Set([401, 404]);
+
+function isOpenRouterUnavailable(error) {
+  if (error?.name !== "OpenRouterError") return false;
+  return error.kind === "unknown_model" || (error.kind === "bad_request" && UNAVAILABLE_STATUSES.has(error.status));
+}
 
 /**
  * True only for the specific "prepaid wallet is empty" 429 shape, never for
@@ -391,9 +404,7 @@ function classifyAndRethrow(error, run) {
   if (error?.name === "OpenRouterError" && error.kind === "credits") {
     throw new EvalBudgetExhaustedError(error, "OpenRouter");
   }
-  if (error?.name === "OpenRouterError" && error.kind === "bad_request" && UNAVAILABLE_STATUSES.has(error.status)) {
-    throw new EvalProviderUnavailableError(error, "OpenRouter");
-  }
+  if (isOpenRouterUnavailable(error)) throw new EvalProviderUnavailableError(error, "OpenRouter");
   const { status, bodyText } = describeProviderError(error);
   if (isBudgetExhausted(status, bodyText)) throw new EvalBudgetExhaustedError(error);
   if (!run.reached && isNetworkFailure(error)) throw new EvalProviderUnreachableError(error, run.label);
@@ -413,9 +424,7 @@ export function classifyEmbeddingFailure(error) {
   if (error?.name !== "OpenRouterError") return error;
   if (error.kind === "credits") return new EvalBudgetExhaustedError(error, EMBEDDING_LABEL);
   if (error.kind === "network") return new EvalProviderUnreachableError(error, EMBEDDING_LABEL);
-  if (error.kind === "bad_request" && UNAVAILABLE_STATUSES.has(error.status)) {
-    return new EvalProviderUnavailableError(error, EMBEDDING_LABEL);
-  }
+  if (isOpenRouterUnavailable(error)) return new EvalProviderUnavailableError(error, EMBEDDING_LABEL);
   return error;
 }
 

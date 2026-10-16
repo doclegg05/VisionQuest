@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { after } from "next/server";
-import { redactContactInfo } from "./log-redaction";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 
 /**
@@ -42,7 +42,7 @@ export function deferAfterResponse(effect: () => Promise<void>): void {
   const guarded = AsyncLocalStorage.bind(() =>
     effect().catch((error: unknown) => {
       logger.error("Deferred effect rejected after the response was sent", {
-        error: redactContactInfo(String(error)),
+        error: errorForLog(error),
       });
     }),
   );

@@ -14,6 +14,7 @@
 
 import { prisma } from "@/lib/db";
 import { downloadFile } from "@/lib/storage";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import {
   classifyAttachment,
@@ -111,7 +112,7 @@ export async function ensureClassification(params: {
   } catch (error) {
     logger.warn("Failed to persist attachment classification", {
       fileUploadId: file.id,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
   }
 

@@ -70,7 +70,7 @@ Setting the repository variable `SAGE_EVAL_SOFT_FAIL=1` turns every NOT RUN exit
 `resolveEvalProvider` in `scripts/lib/sage-eval-provider.mjs` wraps the provider. The wrapper rethrows these errors as not-run errors and passes every other error through unchanged:
 
 - An OpenRouter `credits` error (402, or a 403 naming the key limit) is exit 3.
-- An OpenRouter 400, 401 or 404 is exit 4. Any other 403 is an ordinary failure.
+- An OpenRouter 401 or 404 is exit 4, and so is a 400 whose body says the model id is not valid (`OpenRouterError` kind `unknown_model`). Any other 400 means the harness sent a request OpenRouter's schema refuses: it stays an ordinary failure, and the log names it as `(400, bad_request)`. Fix the request, not the key. The embedding preflight reads embedding failures by the same rule. Any other 403 is also an ordinary failure.
 - A network failure before any call has succeeded is exit 4.
 - For a local `--provider=gemini` run, a Gemini 429 whose body names the drained-wallet shape (`prepayment`, credits depleted, quota exhausted) is exit 3. An ordinary per-minute rate limit is also a 429, and it stays a normal failure.
 

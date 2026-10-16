@@ -1,6 +1,7 @@
 import { prismaAdmin as prisma } from "./db";
 import { invalidateSessionCache } from "./auth";
 import { logAuditEvent } from "./audit";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { studentLogKey } from "./log-keys";
 
@@ -73,7 +74,7 @@ export async function promoteTeacherToAdmin({
       alert: "audit_write_failed",
       action: "auth.promote_to_admin",
       target: studentLogKey(promoted.id),
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
   }
 

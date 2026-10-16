@@ -36,3 +36,18 @@ export function redactContactInfo(text: string): string {
 
   return text.replace(EMAIL_PATTERN, REDACTED_EMAIL).replace(PHONE_PATTERN, REDACTED_PHONE);
 }
+
+/**
+ * A provider's own error text, contact details masked, for a log line that has
+ * no other diagnostic: an SMTP rejection says whether the login, the relay or
+ * the recipient was refused, and errorForLog's name and code do not.
+ *
+ * Only for a catch whose try block calls the provider and nothing else. A
+ * Prisma message quotes query arguments, student ids included, and this does
+ * not remove those; anywhere a database call can throw, log errorForLog from
+ * src/lib/log-error.ts instead. The ESLint guard on logger calls cannot see
+ * inside this helper, so the restriction rests on the call site.
+ */
+export function providerErrorText(error: unknown): string {
+  return redactContactInfo(error instanceof Error ? error.message : String(error));
+}

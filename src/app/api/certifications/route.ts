@@ -14,6 +14,7 @@ import { withAuth, badRequest, notFound } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { recordCertificationStarted, recordCertificationEarned } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { OUTCOME_VERIFICATION } from "@/lib/outcome-verification";
 
@@ -90,7 +91,7 @@ export const GET = withAuth(async (session, req: Request) => {
         mutate: (state) => recordCertificationStarted(state),
       });
     } catch (err) {
-      logger.error("Failed to record certification started", { error: String(err) });
+      logger.error("Failed to record certification started", { error: errorForLog(err) });
     }
   }
 
@@ -259,7 +260,7 @@ export const POST = withAuth(async (session, req: Request) => {
       // so surfacing the error lets the request retry and reconcile rather
       // than silently diverging. (Full atomicity would wrap update+recompute
       // +award in a single $transaction; tracked as a follow-up.)
-      logger.error("Failed to record certification earned", { error: String(err) });
+      logger.error("Failed to record certification earned", { error: errorForLog(err) });
       throw err;
     }
   }

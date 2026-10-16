@@ -22,6 +22,7 @@
  * throws, so a memory failure can never fail the teacher's action.
  */
 
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import {
   looksLikeInstructionToSage,
@@ -127,7 +128,7 @@ async function recordOperationMemory({
   } catch (error) {
     logger.error("Operation memory write failed (non-fatal)", {
       sourceId,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return "skipped";
   }

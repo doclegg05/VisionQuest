@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prismaAdmin as prisma } from "./db";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { studentLogKey } from "./log-keys";
 
@@ -213,7 +214,9 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
     } catch (err) {
       const rawMessage = err instanceof Error ? err.message : String(err);
       const errorMsg = redactPayloadStudentIds(rawMessage, payload);
-      logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts, error: errorMsg });
+      // The redacted message goes to BackgroundJob.error below; the log line
+      // keeps the name and code.
+      logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts, error: errorForLog(err) });
 
       await finishClaimedJob(job, {
         status: job.attempts >= 3 ? "failed" : "pending",
