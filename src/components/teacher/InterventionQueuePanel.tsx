@@ -419,9 +419,13 @@ export default function InterventionQueuePanel({
 
   // Only the newest request may change state, so a slow answer cannot overwrite a newer one.
   const latestRequest = useRef(0);
+  // The class on screen now. A refresh that an alert action or panel save starts after its PATCH resolves uses the
+  // fetchQueue captured at click time; reading the class here keeps it from loading the class the teacher left.
+  const classIdRef = useRef(classId);
   // A class switch also retires any request still in flight for the class being left. This runs at commit, before
   // the effect below starts the new class's request, so an old answer landing in between is ignored too.
   useLayoutEffect(() => {
+    classIdRef.current = classId;
     latestRequest.current += 1;
   }, [classId]);
 
@@ -434,8 +438,9 @@ export default function InterventionQueuePanel({
     const request = latestRequest.current;
     const isLatest = () => request === latestRequest.current;
     try {
-      const url = classId
-        ? `/api/teacher/intervention-queue?classId=${encodeURIComponent(classId)}`
+      const classIdNow = classIdRef.current;
+      const url = classIdNow
+        ? `/api/teacher/intervention-queue?classId=${encodeURIComponent(classIdNow)}`
         : "/api/teacher/intervention-queue";
       const data = await api.get<QueueResponse>(url);
       if (isLatest()) {
@@ -449,7 +454,7 @@ export default function InterventionQueuePanel({
     } finally {
       if (isLatest()) setLoading(false);
     }
-  }, [classId]);
+  }, []);
 
   useEffect(() => {
     // The server-provided queue stands in for the first view with no class chosen. Any later class change, including

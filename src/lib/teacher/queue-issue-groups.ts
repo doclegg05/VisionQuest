@@ -240,10 +240,21 @@ function alertCount(groups: readonly QueueIssueGroup[]): number {
   return groups.reduce((sum, group) => sum + group.count, 0);
 }
 
+/**
+ * How many of the groups' alerts are urgent by their own severity. A group reads as urgent from its top alert,
+ * and the alerts folded under it can be less severe, so counting whole urgent groups overstates it.
+ */
+function urgentAlertCount(groups: readonly QueueIssueGroup[]): number {
+  return groups.reduce(
+    (sum, group) => sum + group.alerts.filter((alert) => isUrgentSeverity(alert.severity)).length,
+    0,
+  );
+}
+
 export function buildQueueSageMessage(rows: readonly { name: string; groups: readonly QueueIssueGroup[] }[]): string {
   const issueCount = rows.reduce((sum, row) => sum + alertCount(row.groups), 0);
   const body = rows.flatMap((row) => [
-    `${row.name}: ${alertCount(row.groups.filter((group) => group.urgent))} urgent, ${alertCount(row.groups)} total`,
+    `${row.name}: ${urgentAlertCount(row.groups)} urgent, ${alertCount(row.groups)} total`,
     ...row.groups.slice(0, 3).map((group) => `  - ${group.label}`),
     ...(row.groups.length > 3 ? [`  - ...and ${row.groups.length - 3} more`] : []),
   ]);
