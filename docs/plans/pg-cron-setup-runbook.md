@@ -267,9 +267,9 @@ responses. To run one before its slot, call it the way the job does:
 curl -X POST https://visionquest.onrender.com/api/internal/evidence-gap-detection -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-A 200 response reports `studentsScanned`, `requirementsChecked`,
-`newAlerts` and `resolvedAlerts`. The goal-stale route reports `scanned`
-and `newAlerts`.
+A 200 response is `{ success: true, data }`, where `data` reports
+`studentsScanned`, `requirementsChecked`, `newAlerts` and `resolvedAlerts`.
+The goal-stale route's `data` reports `scanned` and `newAlerts`.
 
 ## Alert sweep and job scrape, 2026-10
 
@@ -331,9 +331,10 @@ curl -X POST https://visionquest.onrender.com/api/internal/alerts/sync -H "Autho
 curl -X POST https://visionquest.onrender.com/api/internal/jobs/scrape -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-Both responses carry `durationMs`. If either is above about 240000, that
-route needs a deadline before it stays on the schedule, or pg_net will
-record timeouts.
+Both responses carry `data.durationMs`, on a 200 and on a 500 that some
+students or classes failed. If either is above about 240000, that route
+needs a deadline before it stays on the schedule, or pg_net will record
+timeouts.
 
 After the deploy, `npm run cron:health` reports `job-board-scrape` as never
 run until its first Monday slot, so the nightly Cron Health workflow fails

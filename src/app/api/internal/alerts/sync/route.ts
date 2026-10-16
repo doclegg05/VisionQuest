@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { isAuthorizedInternalRoute } from "@/lib/csrf";
-import { prismaAdmin as prisma } from "@/lib/db";
-import { syncAlertsForStudents } from "@/lib/advising";
+import { listAlertSweepStudentIds, syncAlertsForStudents } from "@/lib/advising";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
@@ -21,8 +20,9 @@ const SENTRY_TAGS = { jobname: "alert-sync" };
  * succeeded, and the nightly cron:health check reads only the last six hours
  * of HTTP statuses, so a 10:25 failure would otherwise reach nobody.
  *
- * Auth: Bearer CRON_SECRET. No session: the roster read uses prismaAdmin,
- * and syncAlertsForStudents runs each student's sync as that student.
+ * Auth: Bearer CRON_SECRET. No session: listAlertSweepStudentIds reads the
+ * roster as admin, and syncAlertsForStudents runs each student's sync as that
+ * student.
  */
 export async function POST(req: Request) {
   if (!isAuthorizedInternalRoute(req)) {
@@ -31,23 +31,22 @@ export async function POST(req: Request) {
 
   const start = Date.now();
   try {
-    const students = await prisma.student.findMany({
-      where: { role: "student", isActive: true },
-      select: { id: true },
-    });
-
-    const summary = await syncAlertsForStudents(students.map((s) => s.id));
-    const durationMs = Date.now() - start;
-    logger.info("Alert sync complete", { ...summary, durationMs });
+    const summary = await syncAlertsForStudents(await listAlertSweepStudentIds());
+    const data = { ...summary, durationMs: Date.now() - start };
+    logger.info("Alert sync complete", data);
 
     if (summary.failed > 0) {
       Sentry.captureMessage(`Daily alert sync: ${summary.failed} student sync(s) failed`, {
         level: "error",
         tags: SENTRY_TAGS,
-        extra: { ...summary, durationMs },
+        extra: data,
       });
+      return NextResponse.json(
+        { success: false, error: "Alert sync finished with failures", data },
+        { status: 500 },
+      );
     }
-    return NextResponse.json({ ...summary, durationMs }, { status: summary.failed > 0 ? 500 : 200 });
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     logger.error("Alert sync failed", { error: errorForLog(error) });
     Sentry.captureMessage("Daily alert sync failed before it finished", {

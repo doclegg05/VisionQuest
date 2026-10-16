@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   try {
     const summary = await runEvidenceGapDetection(now);
     logger.info("Evidence gap detection complete", { ...summary, durationMs: Date.now() - start });
-    return NextResponse.json({ ...summary, timestamp: now.toISOString() });
+    return NextResponse.json({ success: true, data: { ...summary, timestamp: now.toISOString() } });
   } catch (error: unknown) {
     logger.error("Evidence gap detection failed", { error: errorForLog(error) });
     return NextResponse.json({ error: "Evidence gap detection failed" }, { status: 500 });

@@ -121,6 +121,10 @@ describe("POST /api/internal/goal-stale-detection", () => {
     const res = await POST(request("Bearer test-cron-secret"));
 
     assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(body.data.scanned, 2);
+    assert.equal(body.data.newAlerts, 1);
     assert.equal(alertUpsert.mock.callCount(), 1);
     const upsert = alertUpsert.mock.calls[0].arguments[0];
     assert.equal(upsert.where.alertKey, "goal_stale:goal-1");

@@ -34,7 +34,10 @@ mock.module("@/lib/advising-sync", {
 mock.module("@/lib/advising-interventions", {
   namedExports: { syncInterventionNotifications: syncInterventionNotificationsMock },
 });
-mock.module("@/lib/db", { namedExports: { prisma: {}, prismaAdmin: {} } });
+const studentFindManyMock = mock.fn(async () => [{ id: "s1" }, { id: "s2" }]) as any;
+mock.module("@/lib/db", {
+  namedExports: { prisma: {}, prismaAdmin: { student: { findMany: studentFindManyMock } } },
+});
 const loggerErrorMock = mock.fn() as any;
 mock.module("@/lib/logger", {
   namedExports: {
@@ -50,6 +53,19 @@ before(async () => {
 function studentContext(studentId: string): RlsContext {
   return { userId: studentId, role: "student", studentId };
 }
+
+// The sweep is sessionless, so its roster is a program-wide admin read.
+describe("listAlertSweepStudentIds", () => {
+  it("lists every active student, read as admin", async () => {
+    const ids = await advising.listAlertSweepStudentIds();
+
+    assert.deepEqual(ids, ["s1", "s2"]);
+    assert.deepEqual(studentFindManyMock.mock.calls[0].arguments[0], {
+      where: { role: "student", isActive: true },
+      select: { id: true },
+    });
+  });
+});
 
 describe("syncAlertsForStudents", () => {
   beforeEach(() => {

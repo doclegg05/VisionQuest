@@ -2,7 +2,7 @@ import { syncInterventionNotifications } from "./advising-interventions";
 import {
   buildBookableAdvisorSlots,
 } from "./advising-scheduling";
-import { prisma } from "./db";
+import { prisma, prismaAdmin } from "./db";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { withStudentRlsContext } from "./rls-context";
@@ -204,6 +204,18 @@ export async function syncStudentAlerts(
       });
     }
   }
+}
+
+/**
+ * The roster for the /api/internal/alerts/sync sweep: every active student.
+ * The sweep carries no session, so this is a program-wide admin read.
+ */
+export async function listAlertSweepStudentIds(): Promise<string[]> {
+  const students = await prismaAdmin.student.findMany({
+    where: { role: "student", isActive: true },
+    select: { id: true },
+  });
+  return students.map((student) => student.id);
 }
 
 /**

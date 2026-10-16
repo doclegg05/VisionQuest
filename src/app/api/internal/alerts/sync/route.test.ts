@@ -3,7 +3,7 @@ import { afterEach, before, describe, it, mock } from "node:test";
 
 let POST: (req: Request) => Promise<Response>;
 
-let roster: () => Promise<Array<{ id: string }>> = async () => [{ id: "s1" }, { id: "s2" }, { id: "s3" }];
+let roster: () => Promise<string[]> = async () => ["s1", "s2", "s3"];
 let sweep: (ids: string[]) => Promise<{ synced: number; failed: number }> = async (ids) => ({
   synced: ids.length,
   failed: 0,
@@ -11,11 +11,11 @@ let sweep: (ids: string[]) => Promise<{ synced: number; failed: number }> = asyn
 const captureMessage = mock.fn();
 const errorLogs: unknown[] = [];
 
-mock.module("@/lib/db", {
-  namedExports: { prismaAdmin: { student: { findMany: () => roster() } } },
-});
 mock.module("@/lib/advising", {
-  namedExports: { syncAlertsForStudents: (ids: string[]) => sweep(ids) },
+  namedExports: {
+    listAlertSweepStudentIds: () => roster(),
+    syncAlertsForStudents: (ids: string[]) => sweep(ids),
+  },
 });
 mock.module("@sentry/nextjs", { namedExports: { captureMessage } });
 mock.module("@/lib/logger", {
@@ -35,7 +35,7 @@ before(async () => {
 });
 
 afterEach(() => {
-  roster = async () => [{ id: "s1" }, { id: "s2" }, { id: "s3" }];
+  roster = async () => ["s1", "s2", "s3"];
   sweep = async (ids) => ({ synced: ids.length, failed: 0 });
   captureMessage.mock.resetCalls();
   errorLogs.length = 0;
@@ -58,8 +58,10 @@ describe("POST /api/internal/alerts/sync", () => {
     const res = await POST(authorizedRequest());
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.synced, 3);
-    assert.equal(body.failed, 0);
+    assert.equal(body.success, true);
+    assert.equal(body.data.synced, 3);
+    assert.equal(body.data.failed, 0);
+    assert.equal(typeof body.data.durationMs, "number");
     assert.equal(captureMessage.mock.callCount(), 0);
   });
 
@@ -71,8 +73,10 @@ describe("POST /api/internal/alerts/sync", () => {
     const res = await POST(authorizedRequest());
     assert.equal(res.status, 500);
     const body = await res.json();
-    assert.equal(body.synced, 2);
-    assert.equal(body.failed, 1);
+    assert.equal(body.success, false);
+    assert.equal(body.error, "Alert sync finished with failures");
+    assert.equal(body.data.synced, 2);
+    assert.equal(body.data.failed, 1);
     assert.equal(captureMessage.mock.callCount(), 1);
     const [, context] = captureMessage.mock.calls[0].arguments as [string, { tags: Record<string, string> }];
     assert.equal(context.tags.jobname, "alert-sync");

@@ -42,9 +42,8 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({
-      scanned,
-      newAlerts,
-      timestamp: now.toISOString(),
+      success: true,
+      data: { scanned, newAlerts, timestamp: now.toISOString() },
     });
   } catch (error: unknown) {
     logger.error("Stale goal detection failed", { error: errorForLog(error) });

@@ -120,7 +120,8 @@ describe("POST /api/internal/evidence-gap-detection", () => {
 
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.newAlerts, 1);
+    assert.equal(body.success, true);
+    assert.equal(body.data.newAlerts, 1);
     assert.equal(alertUpsert.mock.callCount(), 1);
     const upsert = alertUpsert.mock.calls[0].arguments[0];
     assert.equal(upsert.where.alertKey, "evidence_gap:student-1:req-1");
@@ -162,8 +163,11 @@ describe("POST /api/internal/evidence-gap-detection", () => {
   });
 
   it("escalates a gap to high once the enrollment is 14 days old", async () => {
+    // Fixed before the request: computed inside the mock, it would run after
+    // the route captures `now`, and a millisecond's drift floors the age to 13.
+    const enrolledAt = daysAgo(14);
     enrollmentFindMany.mock.mockImplementation(async () => [
-      { studentId: "student-1", classId: "class-1", enrolledAt: daysAgo(14) },
+      { studentId: "student-1", classId: "class-1", enrolledAt },
     ]);
 
     await POST(request("Bearer test-cron-secret"));
@@ -178,7 +182,7 @@ describe("POST /api/internal/evidence-gap-detection", () => {
 
     const body = await (await POST(request("Bearer test-cron-secret"))).json();
 
-    assert.equal(body.requirementsChecked, 0);
+    assert.equal(body.data.requirementsChecked, 0);
     assert.equal(alertUpsert.mock.callCount(), 0);
   });
 
@@ -190,7 +194,7 @@ describe("POST /api/internal/evidence-gap-detection", () => {
 
     const body = await (await POST(request("Bearer test-cron-secret"))).json();
 
-    assert.equal(body.resolvedAlerts, 1);
+    assert.equal(body.data.resolvedAlerts, 1);
     assert.deepEqual(alertUpdateMany.mock.calls[0].arguments[0].where, { id: { in: ["alert-now-met"] } });
   });
 
@@ -202,8 +206,8 @@ describe("POST /api/internal/evidence-gap-detection", () => {
 
     const body = await (await POST(request("Bearer test-cron-secret"))).json();
 
-    assert.equal(body.studentsScanned, 0);
-    assert.equal(body.resolvedAlerts, 1);
+    assert.equal(body.data.studentsScanned, 0);
+    assert.equal(body.data.resolvedAlerts, 1);
     assert.deepEqual(alertUpdateMany.mock.calls[0].arguments[0].where, { id: { in: ["alert-left-class"] } });
   });
 
