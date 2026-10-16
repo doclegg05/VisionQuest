@@ -15,7 +15,8 @@
  *   0  every suite passed, watched, or was skipped — and every run without
  *      --compare, which measures rather than judges
  *   1  with --compare: a gate- or nightly-tier metric under its floor, or a
- *      suite whose scorer threw
+ *      suite whose scorer threw or measured nothing (a null value, or zero
+ *      samples behind a floored metric)
  *   2  a usage or config error (unknown suite/tier, unparseable config,
  *      --update-baseline without --reason)
  *
@@ -243,14 +244,8 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
     };
   });
 
-  // A null value from a scorer that actually RAN is a broken measurement, not
-  // a skip: `skipped` already has a meaning here (unmet `requires`, reported
-  // above). On a gate or nightly tier that distinction is load-bearing — a
-  // null slips past every floor, so the suite would report green while
-  // measuring nothing. `status.mjs` stays untouched: it answers about one
-  // metric, and this is a fact about the run.
-  const nulled = metrics.filter((metric) => metric.value === null).map((metric) => metric.id);
-  if (nulled.length > 0 && ["gate", "nightly"].includes(config.tier)) {
+  const measuredNothing = measuredNothingError(config.tier, metrics);
+  if (measuredNothing) {
     return buildResult({
       ...common,
       durationMs: Date.now() - started,
@@ -258,9 +253,7 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
       model: output.model ?? null,
       metrics: [],
       status: "error",
-      error:
-        `the scorer ran but returned no value for ${config.tier}-tier metric(s): ${nulled.join(", ")} — ` +
-        "a null on a floored metric would pass every floor while measuring nothing",
+      error: measuredNothing,
     });
   }
 
@@ -271,6 +264,43 @@ export async function runSuite({ config, repoRoot, baseline, host, commit, env, 
     model: output.model ?? null,
     metrics,
   });
+}
+
+/**
+ * Why a gate- or nightly-tier run measured nothing, or null when it measured
+ * something. On those tiers a broken measurement must be an error, because it
+ * would otherwise pass every floor while the suite reports green.
+ *
+ * - A null value from a scorer that actually RAN is a broken measurement, not
+ *   a skip: `skipped` already has a meaning here (unmet `requires`).
+ * - Zero samples is the same thing with a number on it (issue #220):
+ *   sage-latency's provider failed every call, and p95 = 0 ms over no samples
+ *   passed its 6000 ms floor every night. A scorer that says it skipped
+ *   itself (details.skipped) is reporting a skip, not a measurement.
+ *
+ * `status.mjs` stays untouched: it answers about one metric, and this is a
+ * fact about the run.
+ */
+function measuredNothingError(tier, metrics) {
+  if (!["gate", "nightly"].includes(tier)) return null;
+  const nulled = metrics.filter((metric) => metric.value === null).map((metric) => metric.id);
+  if (nulled.length > 0) {
+    return (
+      `the scorer ran but returned no value for ${tier}-tier metric(s): ${nulled.join(", ")} — ` +
+      "a null on a floored metric would pass every floor while measuring nothing"
+    );
+  }
+  // The error result carries no metrics, so each value rides in the message.
+  const unsampled = metrics
+    .filter((metric) => metric.floor !== null && metric.n === 0 && metric.details?.skipped !== true)
+    .map((metric) => `${metric.id}=${metric.value}`);
+  if (unsampled.length > 0) {
+    return (
+      `the scorer ran but measured zero samples for ${tier}-tier metric(s): ${unsampled.join(", ")} — ` +
+      "a value over no samples would pass its floor while measuring nothing"
+    );
+  }
+  return null;
 }
 
 /**

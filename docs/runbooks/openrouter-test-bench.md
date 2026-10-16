@@ -28,7 +28,7 @@ If you are about to connect OpenRouter to the app itself, stop. That is a FERPA 
 
 Every request the provider sends also carries `provider: { zdr: true, data_collection: "deny" }`, which asks for the same routing as the switches above. Two things only the account settings in step 2 decide: whether a zero-retention request may use endpoints that keep prompts for safety monitoring (the choice under each model group), and OpenRouter's own Input & Output Logging and 1% data discount.
 
-CI's Sage Evals workflow uses its own key, stored as the `OPENROUTER_API_KEY` repository secret on GitHub, for every model call in the `sage-evals` and `sage-memory-eval` jobs, embeddings included (`google/gemini-embedding-001` at 768 dimensions, through guard 3 above). The rule above still holds: CI sends synthetic fixtures only, and the key goes in GitHub, never in Render. No step uses a direct Gemini key. Setup, spending limits and what each result means are in `docs/runbooks/sage-eval-budget.md`.
+CI's Sage Evals workflow uses its own key, stored as the `OPENROUTER_API_KEY` repository secret on GitHub, for every model call in the `sage-evals` and `sage-memory-eval` jobs, embeddings included (`google/gemini-embedding-001` at 768 dimensions, through guard 3 above). The rule above still holds: CI sends synthetic fixtures only, and the key goes in GitHub, never in Render. No step uses a direct Gemini key. Setup, spending limits and what each result means are in `docs/runbooks/sage-eval-budget.md`. The nightly Benchmarks workflow (`.github/workflows/benchmarks.yml`) uses the same secret for its Sage model suites: `sage-grounding`, `sage-readability`, `sage-career` and `explain-faithfulness`. It too sends synthetic fixtures only and maps no Gemini key.
 
 ## Running
 
