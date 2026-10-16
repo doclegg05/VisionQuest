@@ -6,6 +6,7 @@
 // translates into SSE frames.
 // =============================================================================
 
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import type { AIProvider, ChatMessage, ToolDeclaration } from "@/lib/ai/types";
 import type { Session } from "@/lib/api-error";
@@ -120,7 +121,7 @@ export async function* runAgentTurn(
     }
   } catch (err) {
     logger.error("agent.loop: provider stream failed", {
-      err: err instanceof Error ? err.message : String(err),
+      err: errorForLog(err),
     });
     yield* settleUnresultedCalls(pendingCalls, records);
     yield {

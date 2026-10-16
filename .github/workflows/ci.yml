@@ -128,6 +128,11 @@ jobs:
         # `**` one level and silently runs 47 of the 153 cases.
         run: npm run bench:suites:test
 
+      - name: Ollama relay tests
+        # Starts scripts/ollama-relay.mjs against a fake Ollama on random
+        # ports. Outside `npm test`'s src/** glob, so it needs its own step.
+        run: npm run test:relay
+
       - name: Catalog integrity (hard gate — DB-free checks only)
         # catalog:validate needs a live DB ONLY for the program_document node
         # type (fetching ProgramDocument rows to diff title/audience/category
@@ -420,6 +425,22 @@ jobs:
         run: |
           npx tsx scripts/seed-e2e-users.ts >/dev/null
           npx playwright test e2e/a11y-authenticated.spec.ts --workers=1 --reporter=line --timeout=180000
+
+      - name: SPOKES design review screenshots
+        # Fails the job when a page scrolls sideways or the sign-in error loses
+        # its icon. The seed re-runs first for the same login-budget reason as
+        # the a11y gate above.
+        run: |
+          npx tsx scripts/seed-e2e-users.ts >/dev/null
+          npx playwright test e2e/spokes-visual.spec.ts --workers=1 --reporter=line --timeout=180000
+
+      - name: Upload SPOKES review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spokes-visual
+          path: spokes-visual/
+          if-no-files-found: warn
 
       # --- Browser-collected benchmarks -----------------------------------
       - name: Collect browser benchmark data (non-blocking)

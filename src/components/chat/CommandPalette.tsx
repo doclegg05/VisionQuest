@@ -88,7 +88,7 @@ export function CommandPalette({
                   : "text-[var(--ink-strong)]",
               )}
             >
-              <span className="font-mono text-[13px] font-semibold text-[var(--accent-strong)]">
+              <span className="font-mono text-[13px] font-semibold text-success">
                 {cmd.slash}
               </span>
               <span className="font-medium">{cmd.label}</span>

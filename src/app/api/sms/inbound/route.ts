@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isSignedWebhookPath } from "@/lib/csrf";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { adminClientIsPrivileged } from "@/lib/nudges/admin-guard";
 import { handleInboundSms } from "@/lib/nudges/replies";
@@ -150,7 +151,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   } catch (error) {
     // Never surface a failure to the sender, and never a non-2xx: Twilio would
     // retry, and a retried STOP that half-applied is worse than a logged one.
-    logger.error("Inbound SMS handling failed", { channel: "sms", error: String(error) });
+    logger.error("Inbound SMS handling failed", { channel: "sms", error: errorForLog(error) });
   }
 
   return twiml();

@@ -4,6 +4,7 @@ import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { tryLogAuditEvent } from "@/lib/audit";
 import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { generateStudentArchive } from "@/lib/student-archive";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -37,7 +38,7 @@ export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unkn
   } catch (error) {
     logger.error("Archive generation failed", {
       student: studentLogKey(studentId),
-      error: String(error),
+      error: errorForLog(error),
     });
     return NextResponse.json(
       { error: "Failed to generate archive. Please try again." },

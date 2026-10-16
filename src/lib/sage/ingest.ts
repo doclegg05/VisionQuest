@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { GeminiProvider } from "@/lib/ai/gemini-provider";
 import { extractText, extractTextFromBuffer, containsPII } from "@/lib/sage/extract";
 import { embedProgramDocument } from "@/lib/sage/document-embedding";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { invalidatePrefix } from "@/lib/cache";
 import { isObjectStorageConfigured, mapLocalPathToStorageKey, storageObjectExists } from "@/lib/storage";
@@ -174,7 +175,7 @@ async function generateSummary(
     return result?.trim() || null;
   } catch (error) {
     logger.error("Gemini summarization failed", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return null;
   }
@@ -427,12 +428,12 @@ export async function syncSageDocuments(
       } catch (error) {
         const msg = `${relativePath}: embedding failed — ${error instanceof Error ? error.message : String(error)}`;
         result.errors.push(msg);
-        logger.error(`Ingestion embedding error: ${msg}`);
+        logger.error("Ingestion embedding error", { error: errorForLog(error) });
       }
     } catch (error) {
       const msg = `${relativePath}: ${error instanceof Error ? error.message : String(error)}`;
       result.errors.push(msg);
-      logger.error(`Ingestion error: ${msg}`);
+      logger.error("Ingestion error", { error: errorForLog(error) });
     }
 
     if ((i + 1) % 10 === 0) {

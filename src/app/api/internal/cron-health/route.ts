@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
-
-function isAuthorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 interface CronFailure {
   jobid: number;
@@ -35,7 +30,7 @@ interface CronFailure {
  * Revisit once we have a week of production data.
  */
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

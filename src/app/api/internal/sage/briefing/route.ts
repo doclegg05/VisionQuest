@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedInternalRoute } from "@/lib/csrf";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { enqueueJob } from "@/lib/jobs";
 import { logger } from "@/lib/logger";
+import { errorForLog } from "@/lib/log-error";
 import { isAutopilotEnabled, utcPanelDate } from "@/lib/sage/briefing";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -11,13 +13,6 @@ import { studentLogKey } from "@/lib/log-keys";
  * never silent.
  */
 const MAX_STUDENTS_PER_RUN = 50;
-
-function isAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
-}
 
 /**
  * POST /api/internal/sage/briefing
@@ -30,7 +25,7 @@ function isAuthorized(req: Request): boolean {
  * SAGE_AGENT_MODE), also re-checked inside each job.
  */
 async function handle(req: Request): Promise<NextResponse> {
-  if (!isAuthorized(req)) {
+  if (!isAuthorizedInternalRoute(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -69,7 +64,7 @@ async function handle(req: Request): Promise<NextResponse> {
     } catch (err) {
       logger.error("briefing: failed to enqueue", {
         student: studentLogKey(student.id),
-        error: err instanceof Error ? err.message : String(err),
+        error: errorForLog(err),
       });
     }
   }

@@ -428,10 +428,10 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
 
           <div className="mt-3 flex items-center gap-3">
             {profileStatus === "success" && (
-              <p className="text-sm text-[var(--success)]">Birthdate saved.</p>
+              <p className="text-sm text-success">Birthdate saved.</p>
             )}
             {profileStatus === "error" && (
-              <p className="text-sm text-[var(--error)]">{profileError}</p>
+              <p className="text-sm text-danger">{profileError}</p>
             )}
           </div>
         </div>
@@ -497,10 +497,10 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           </button>
 
           {recoveryStatus === "success" && (
-            <p className="text-sm text-[var(--success)]">Recovery questions saved.</p>
+            <p className="text-sm text-success">Recovery questions saved.</p>
           )}
           {recoveryStatus === "error" && (
-            <p className="text-sm text-[var(--error)]">{recoveryError}</p>
+            <p className="text-sm text-danger">{recoveryError}</p>
           )}
         </div>
       </div>
@@ -509,7 +509,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
       {(hasKey || platformKeyConfigured) && (
         <div className="surface-section mb-6 flex items-center justify-between gap-4 p-5">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--success)]">Sage is active</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-success">Sage is active</p>
             <p className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">
               {hasKey ? "Personal API key connected" : "Platform API key connected"}
             </p>
@@ -661,12 +661,12 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           </div>
 
           {status === "success" && (
-            <p className="mt-3 text-sm text-[var(--success)]">
+            <p className="mt-3 text-sm text-success">
               Key saved successfully. Sage is ready to chat.
             </p>
           )}
           {status === "error" && (
-            <p className="mt-3 text-sm text-[var(--error)]">{errorMsg}</p>
+            <p className="mt-3 text-sm text-danger">{errorMsg}</p>
           )}
         </div>
       </div>
@@ -865,7 +865,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
                   </div>
                 )}
                 {verifyError && (
-                  <p className="mt-2 text-sm text-[var(--error)]">{verifyError}</p>
+                  <p className="mt-2 text-sm text-danger">{verifyError}</p>
                 )}
               </div>
             )}
@@ -900,7 +900,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
                   </button>
                 </div>
                 {phoneError && (
-                  <p className="mt-1.5 text-xs text-[var(--error)]">{phoneError}</p>
+                  <p className="mt-1.5 text-xs text-danger">{phoneError}</p>
                 )}
                 <p className="mt-1.5 text-xs text-[var(--ink-muted)]">
                   Standard messaging rates may apply. Use international format, e.g. +12125551234.
@@ -912,10 +912,10 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
 
         <div className="mt-4 flex items-center gap-3">
           {notifStatus === "success" && (
-            <p className="text-sm text-[var(--success)]">Notification preferences saved.</p>
+            <p className="text-sm text-success">Notification preferences saved.</p>
           )}
           {notifStatus === "error" && (
-            <p className="text-sm text-[var(--error)]">{notifError}</p>
+            <p className="text-sm text-danger">{notifError}</p>
           )}
         </div>
       </div>

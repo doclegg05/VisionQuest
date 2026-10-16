@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sendNotificationWithCooldown } from "@/lib/notifications";
 import { enqueueJobWithCooldown } from "@/lib/jobs";
@@ -1061,7 +1062,7 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
     logger.error("Wellbeing: instructor resolution failed; falling back to all active teachers", {
       student: studentLogKey(studentId),
       alert: "wellbeing_instructor_resolution_failed",
-      error: String(err),
+      error: errorForLog(err),
     });
   }
 
@@ -1106,7 +1107,7 @@ async function findRecentMood(studentId: string, now: Date): Promise<WellbeingMo
     logger.error("Wellbeing: mood lookup for crisis card failed", {
       student: studentLogKey(studentId),
       alert: "wellbeing_mood_lookup_failed",
-      error: String(err),
+      error: errorForLog(err),
     });
     return null;
   }
@@ -1181,7 +1182,7 @@ export async function recordWellbeingConcern({
       student: studentLogKey(studentId),
       reason,
       alert: "wellbeing_alert_failed",
-      error: String(err),
+      error: errorForLog(err),
     });
   }
 
@@ -1253,7 +1254,7 @@ export async function recordWellbeingConcern({
       student: studentLogKey(studentId),
       reason,
       alert: "wellbeing_notify_failed",
-      error: String(err),
+      error: errorForLog(err),
     });
   }
 }

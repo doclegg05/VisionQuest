@@ -18,6 +18,7 @@ import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-dat
 import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
 import { formatCohortDateTime } from "@/lib/timezone";
 import { topProactiveNudge } from "./proactivity";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -196,7 +197,7 @@ export async function getSituationalSnapshot(studentId: string): Promise<string 
   } catch (err) {
     logger.warn("Situational snapshot failed; continuing without it", {
       student: studentLogKey(studentId),
-      error: err instanceof Error ? err.message : String(err),
+      error: errorForLog(err),
     });
     return null;
   }

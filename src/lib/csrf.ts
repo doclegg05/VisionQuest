@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 export function isUrlHostMatch(value: string | null, host: string | null): boolean {
   if (!value || !host) return false;
 
@@ -9,13 +11,16 @@ export function isUrlHostMatch(value: string | null, host: string | null): boole
   }
 }
 
+/**
+ * Equality that takes the same time whatever the inputs' lengths. Both sides
+ * are hashed to 32 bytes first, so there is no length check to return early
+ * on: a guess of the wrong length costs the same as a near miss, and the
+ * response time says nothing about how long the secret is.
+ */
 function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
+  const digestA = createHash("sha256").update(a).digest();
+  const digestB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(digestA, digestB);
 }
 
 /**
@@ -51,4 +56,18 @@ export function isAuthorizedInternalRequest(
   }
 
   return constantTimeEqual(authorizationHeader, `Bearer ${cronSecret}`);
+}
+
+/**
+ * The route-side form of the same check, for the sessionless /api/internal
+ * handlers. The proxy's check alone is not enough: it guards only
+ * state-changing methods, so a GET never meets it, and it accepts any request
+ * whose Origin matches the host, which a script can send.
+ */
+export function isAuthorizedInternalRoute(req: Request): boolean {
+  return isAuthorizedInternalRequest(
+    new URL(req.url).pathname,
+    req.headers.get("authorization"),
+    process.env.CRON_SECRET,
+  );
 }

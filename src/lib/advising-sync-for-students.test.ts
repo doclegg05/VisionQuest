@@ -13,27 +13,35 @@ let inFlight = 0;
 let maxInFlight = 0;
 
 const loadStudentAlertSyncContextMock = mock.fn() as any;
+const applyPlanMock = mock.fn(async () => undefined) as any;
+const syncInterventionNotificationsMock = mock.fn(async () => undefined) as any;
+// A non-null studentSignals is what makes syncStudentAlerts send nudges.
+let planSignals: { displayName: string; studentId: string; email: string } | null = null;
 mock.module("@/lib/advising-sync-context", {
   namedExports: { loadStudentAlertSyncContext: loadStudentAlertSyncContextMock },
 });
 mock.module("@/lib/advising-sync", {
   namedExports: {
     buildStudentAlertSyncPlan: () => ({
-      studentSignals: null,
+      studentSignals: planSignals,
       goalEvidenceEntries: [],
       goalReviewItems: [],
       desiredAlerts: [],
     }),
-    applyStudentAlertSyncPlan: async () => undefined,
+    applyStudentAlertSyncPlan: applyPlanMock,
   },
 });
 mock.module("@/lib/advising-interventions", {
-  namedExports: { syncInterventionNotifications: async () => undefined },
+  namedExports: { syncInterventionNotifications: syncInterventionNotificationsMock },
 });
-mock.module("@/lib/db", { namedExports: { prisma: {}, prismaAdmin: {} } });
+const studentFindManyMock = mock.fn(async () => [{ id: "s1" }, { id: "s2" }]) as any;
+mock.module("@/lib/db", {
+  namedExports: { prisma: {}, prismaAdmin: { student: { findMany: studentFindManyMock } } },
+});
+const loggerErrorMock = mock.fn() as any;
 mock.module("@/lib/logger", {
   namedExports: {
-    logger: { debug: mock.fn(), info: mock.fn(), warn: mock.fn(), error: mock.fn() },
+    logger: { debug: mock.fn(), info: mock.fn(), warn: mock.fn(), error: loggerErrorMock },
   },
 });
 
@@ -46,9 +54,26 @@ function studentContext(studentId: string): RlsContext {
   return { userId: studentId, role: "student", studentId };
 }
 
+// The sweep is sessionless, so its roster is a program-wide admin read.
+describe("listAlertSweepStudentIds", () => {
+  it("lists every active student, read as admin", async () => {
+    const ids = await advising.listAlertSweepStudentIds();
+
+    assert.deepEqual(ids, ["s1", "s2"]);
+    assert.deepEqual(studentFindManyMock.mock.calls[0].arguments[0], {
+      where: { role: "student", isActive: true },
+      select: { id: true },
+    });
+  });
+});
+
 describe("syncAlertsForStudents", () => {
   beforeEach(() => {
     seen.length = 0;
+    planSignals = null;
+    applyPlanMock.mock.resetCalls();
+    syncInterventionNotificationsMock.mock.resetCalls();
+    loggerErrorMock.mock.resetCalls();
     inFlight = 0;
     maxInFlight = 0;
     loadStudentAlertSyncContextMock.mock.resetCalls();
@@ -81,5 +106,64 @@ describe("syncAlertsForStudents", () => {
     assert.equal(loadStudentAlertSyncContextMock.mock.callCount(), 6);
     assert.ok(maxInFlight <= 4, `expected at most 4 in flight, saw ${maxInFlight}`);
     assert.ok(maxInFlight > 1, "batch still runs students concurrently");
+  });
+
+  // The scheduled sweep exists to write alerts for students who have gone
+  // quiet. Nudges belong to activity: a daily sweep that nudged would email
+  // each instructor once per affected student every morning, with no stop
+  // condition (docs/plans/2026-10-15-unscheduled-internal-routes.md).
+  it("writes alerts but sends no nudges", async () => {
+    planSignals = { displayName: "Sam", studentId: "sam01", email: "sam@example.test" };
+
+    await advising.syncAlertsForStudents(["student-a", "student-b"]);
+
+    assert.equal(applyPlanMock.mock.callCount(), 2, "alerts are still written");
+    assert.equal(syncInterventionNotificationsMock.mock.callCount(), 0, "no nudges from the sweep");
+  });
+
+  // One student's failure must not cost every later batch its sync for the
+  // day. The log names the failure by Prisma code and a one-way student key.
+  it("keeps syncing the other students when one fails, and logs neither id nor message", async () => {
+    loadStudentAlertSyncContextMock.mock.mockImplementation(async (studentId: string) => {
+      if (studentId === "student-b") {
+        throw Object.assign(
+          new Error('Invalid `prisma.studentTask.findMany()` invocation: where { studentId: "student-b" }'),
+          { code: "P2024" },
+        );
+      }
+      return { existing: [] };
+    });
+
+    const result = await advising.syncAlertsForStudents(["student-a", "student-b", "student-c", "student-d", "student-e"], 2);
+
+    assert.deepEqual(result, { synced: 4, failed: 1 });
+    assert.equal(applyPlanMock.mock.callCount(), 4, "students after the failure were still synced");
+    const logged = JSON.stringify(loggerErrorMock.mock.calls.map((call: any) => call.arguments));
+    assert.ok(logged.includes("P2024"), "the failure is logged by its code");
+    assert.ok(!logged.includes("student-b"), "no raw student id or message text in the log");
+  });
+});
+
+describe("syncStudentAlerts", () => {
+  beforeEach(() => {
+    planSignals = { displayName: "Sam", studentId: "sam01", email: "sam@example.test" };
+    applyPlanMock.mock.resetCalls();
+    syncInterventionNotificationsMock.mock.resetCalls();
+    loadStudentAlertSyncContextMock.mock.resetCalls();
+    loadStudentAlertSyncContextMock.mock.mockImplementation(async () => ({ existing: [] }));
+  });
+
+  it("still nudges by default, after a student or teacher acts", async () => {
+    await advising.syncStudentAlerts("student-a");
+
+    assert.equal(applyPlanMock.mock.callCount(), 1);
+    assert.equal(syncInterventionNotificationsMock.mock.callCount(), 1);
+  });
+
+  it("skips nudges when asked to", async () => {
+    await advising.syncStudentAlerts("student-a", { notify: false });
+
+    assert.equal(applyPlanMock.mock.callCount(), 1, "alerts are still written");
+    assert.equal(syncInterventionNotificationsMock.mock.callCount(), 0);
   });
 });

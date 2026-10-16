@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth";
 import crypto from "crypto";
 import { logAuditEvent } from "@/lib/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -323,7 +324,7 @@ export async function GET(req: NextRequest) {
 
     return redirectTo("/chat");
   } catch (err) {
-    logger.error("OAuth callback error", { error: String(err) });
+    logger.error("OAuth callback error", { error: errorForLog(err) });
     return redirectTo("/?error=oauth_failed");
   }
 }

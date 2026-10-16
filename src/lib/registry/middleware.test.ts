@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { Prisma } from "@prisma/client";
 import { mockTeacherSession } from "@/lib/test-helpers";
 
 const session = mockTeacherSession();
@@ -131,5 +132,30 @@ describe("withRegistry", () => {
     });
 
     assert.equal(res.status, 403);
+  });
+
+  it("logs an unhandled handler error by name and code, never its message or stack", async () => {
+    const studentId = "cm8registrystudent0000001";
+    mockResolvePermission.mock.mockImplementation(async () => ({ allowed: true, source: "rbac" }));
+    const handler = withRegistry("goals.list", async () => {
+      throw new Prisma.PrismaClientKnownRequestError(
+        `Record to update not found. where: { studentId: "${studentId}" }`,
+        { code: "P2025", clientVersion: "test" },
+      );
+    });
+
+    const res = await handler(new Request("http://localhost/api/goals") as never, {
+      params: Promise.resolve({}),
+    });
+
+    assert.equal(res.status, 500);
+    assert.deepEqual(await res.json(), { error: "Internal server error" });
+    assert.equal(mockLoggerError.mock.callCount(), 1);
+    const [message, context] = mockLoggerError.mock.calls[0].arguments;
+    assert.equal(message, "Unhandled error in registry middleware");
+    assert.deepEqual(context, {
+      toolId: "goals.list",
+      error: { name: "PrismaClientKnownRequestError", code: "P2025" },
+    });
   });
 });

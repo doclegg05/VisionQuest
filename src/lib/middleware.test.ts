@@ -57,6 +57,14 @@ describe("internal request authorization", () => {
       )
     );
   });
+
+  // Without the unset-secret guard, `Bearer ${undefined}` would match a
+  // caller who sends the literal text, opening every /api/internal route
+  // whenever CRON_SECRET is missing.
+  it("rejects every caller when CRON_SECRET is unset or empty", () => {
+    assert.ok(!isAuthorizedInternalRequest("/api/internal/jobs/process", "Bearer undefined", undefined));
+    assert.ok(!isAuthorizedInternalRequest("/api/internal/jobs/process", "Bearer ", ""));
+  });
 });
 
 describe("signed third-party webhooks", () => {

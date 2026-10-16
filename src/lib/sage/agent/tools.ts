@@ -20,6 +20,7 @@ import {
 import { searchForms } from "@/lib/spokes/form-search";
 import { getFormCatalogNote } from "@/lib/catalog/notes";
 import { TOPIC_CONTENT } from "@/lib/sage/knowledge-base";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { hasActiveConsent } from "@/lib/consent";
 import { ensureClassification } from "@/lib/sage/attachment-classify";
@@ -880,7 +881,7 @@ const classifyAttachment: AgentTool = {
             ? "Active cloud_file_processing consent; attachment sent to Gemini for structured classification."
             : "No active cloud consent (or cloud unavailable); local extraction/heuristics only.",
       }).catch((err) => {
-        logger.warn("classify_attachment: AI audit log failed", { err: String(err) });
+        logger.warn("classify_attachment: AI audit log failed", { err: errorForLog(err) });
       });
     }
 

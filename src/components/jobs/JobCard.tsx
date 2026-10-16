@@ -96,12 +96,12 @@ export async function runSaveAndDescribeError(
 export function SaveErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
     <div role="alert" className="flex items-start justify-between gap-2">
-      <p className="text-sm leading-5 text-[var(--error)]">{message}</p>
+      <p className="text-sm leading-5 text-danger">{message}</p>
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss error"
-        className="min-h-11 min-w-11 shrink-0 rounded-lg p-2.5 text-[var(--error)] transition-colors hover:bg-[var(--surface-raised)]"
+        className="min-h-11 min-w-11 shrink-0 rounded-lg p-2.5 text-danger transition-colors hover:bg-[var(--surface-raised)]"
       >
         <X size={24} aria-hidden="true" />
       </button>

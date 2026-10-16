@@ -202,7 +202,7 @@ export default function FormBuilder({ mode, templateId, onClose, onSaved }: Form
         ) : (
           <div className="space-y-5">
             {error && (
-              <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--error)]" role="alert">
+              <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-danger" role="alert">
                 {error}
               </p>
             )}
@@ -358,7 +358,7 @@ function FieldEditor({ field, index, total, onChange, onRemove, onMove }: FieldE
             type="button"
             onClick={onRemove}
             aria-label="Remove field"
-            className="inline-flex items-center rounded-lg border border-[var(--border)] px-2 py-1 text-[var(--error)] pointer-coarse:min-h-11"
+            className="inline-flex items-center rounded-lg border border-[var(--border)] px-2 py-1 text-danger pointer-coarse:min-h-11"
           >
             Remove
           </button>
