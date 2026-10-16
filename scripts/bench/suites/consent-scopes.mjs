@@ -96,13 +96,35 @@ export async function run(ctx) {
     };
   }
 
-  const { tapText, exitCode } = await new Promise((resolve, reject) => {
+  const { output: tapText, exitCode, timedOut } = await runChild("npx", CHILD_ARGS, {
+    cwd: REPO_ROOT,
+    env: childEnv(process.env),
+    timeoutMs: RUN_TIMEOUT_MS,
+  });
+  if (timedOut) {
+    throw new Error(`${TEST_FILE} did not finish within ${RUN_TIMEOUT_MS} ms, so nothing was measured`);
+  }
+
+  return { metrics: [scoreTap(tapText, exitCode)] };
+}
+
+export function runChild(command, args, { cwd, env, timeoutMs }) {
+  return new Promise((resolve, reject) => {
     const chunks = [];
-    const child = spawn("npx", CHILD_ARGS, {
-      cwd: REPO_ROOT,
-      env: childEnv(process.env),
-    });
-    const timer = setTimeout(() => child.kill("SIGKILL"), RUN_TIMEOUT_MS);
+    // Its own process group, so the timeout stops every process under it:
+    // npx and the test process node --test starts share stdout, and `close`
+    // waits for every holder.
+    const child = spawn(command, args, { cwd, env, detached: true });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch (error) {
+        // ESRCH: the group exited between the timer firing and the kill.
+        if (error?.code !== "ESRCH") reject(error);
+      }
+    }, timeoutMs);
     child.stdout.on("data", (d) => chunks.push(d));
     child.stderr.on("data", (d) => chunks.push(d));
     child.on("error", (err) => {
@@ -111,11 +133,9 @@ export async function run(ctx) {
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolve({ tapText: Buffer.concat(chunks).toString("utf8"), exitCode: code });
+      resolve({ output: Buffer.concat(chunks).toString("utf8"), exitCode: code, timedOut });
     });
   });
-
-  return { metrics: [scoreTap(tapText, exitCode)] };
 }
 
 export function scoreTap(tapText, exitCode) {

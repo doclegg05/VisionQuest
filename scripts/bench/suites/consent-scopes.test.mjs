@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CHILD_ARGS, childEnv, scoreTap } from "./consent-scopes.mjs";
+import { CHILD_ARGS, childEnv, runChild, scoreTap } from "./consent-scopes.mjs";
 
 // Real reporter output, not hand-typed TAP: each case runs a small node:test
 // file the way the scorer runs consent-scopes.bench.test.ts, so a change in
@@ -154,4 +154,32 @@ test("app output echoed as a TAP comment cannot override the closing summary", (
   const run = tapFrom(THREE_PASSING);
   const metric = scoreTap(`# pass 99\n# fail 0\n${run.text}`, run.status);
   assert.equal(metric.n, 3);
+});
+
+test("runChild returns the child's output and exit code", async () => {
+  const result = await runChild(process.execPath, ["-e", "console.log('hi'); process.exit(3)"], {
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 5000,
+  });
+  assert.deepEqual(result, { output: "hi\n", exitCode: 3, timedOut: false });
+});
+
+test("a timeout stops the whole process tree, not only the direct child", { timeout: 10_000 }, async () => {
+  // In CI the direct child is npx, and node --test runs the file in a process
+  // under it that holds the same stdout. Killing npx alone left `close`
+  // waiting for that process, so the bound held nothing.
+  const tree = `
+    const { spawn } = require("node:child_process");
+    spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { stdio: "inherit" });
+    setTimeout(() => {}, 20000);
+  `;
+  const started = Date.now();
+  const result = await runChild(process.execPath, ["-e", tree], {
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 300,
+  });
+  assert.equal(result.timedOut, true);
+  assert.ok(Date.now() - started < 5000, `close took ${Date.now() - started} ms`);
 });
