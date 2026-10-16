@@ -141,7 +141,9 @@ ORDER BY jobname;
 ```
 
 Expected: 12 rows, all `active = true`. The repair migration registers the
-first seven; `connect-nudges` comes from `20260905140000_add_connect_nudges_cron`,
+four baseline jobs and re-registers the three Sage jobs, which their own
+migrations first added (`20260625001000`, `20260701140000`,
+`20260708121000`); `connect-nudges` comes from `20260905140000_add_connect_nudges_cron`,
 the two stall detectors from `20261015120000_add_stall_detector_cron` (see
 "Stall detectors, 2026-10" below), and `alert-sync` and `job-board-scrape`
 from `20261016100000_add_alert_sync_and_job_scrape_cron` (see "Alert sweep
