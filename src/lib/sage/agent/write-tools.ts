@@ -329,11 +329,12 @@ const fileDocument: AgentTool = {
       // A category label does not touch the Ready-to-Work checklist; say so,
       // or the student hears "filed" and assumes the requirement is covered.
       // The student reads this (ConfirmToolCard shows it after a confirm), so
-      // it names no tools.
+      // it names no tools. Sage sees a file's id only on the turn that carries
+      // it, so the next step works only if the student attaches it again.
       return {
         summary:
           category === "cert_evidence"
-            ? `${filed} It does not count toward your Ready-to-Work checklist yet. Ask Sage to mark that checklist item done with this file.`
+            ? `${filed} It does not count toward your Ready-to-Work checklist yet. To count it, attach the file again and ask Sage to mark that checklist item done.`
             : filed,
       };
     });

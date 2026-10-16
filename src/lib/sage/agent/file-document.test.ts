@@ -112,6 +112,9 @@ describe("file_document — certification evidence", () => {
     assert.doesNotMatch(summary, /[a-z]+_[a-z_]+|requirementId|fileUploadId/, `tool jargon shown to a student: ${summary}`);
     assert.match(summary, /Ready-to-Work checklist/);
     assert.match(summary, /does not count/, "a label is not a checklist item; the student must not think it is");
+    // Sage sees a file's id only on the turn that carries it, so the next
+    // step only works if the student attaches the file again.
+    assert.match(summary, /attach (the|this) file again/i, `the next step must say to re-attach: ${summary}`);
   });
 
   it("rejects a requirement id instead of filing as if it had been attached", async () => {
