@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { CERTIFICATIONS } from "@/lib/spokes/certifications";
+import { CLASS_REQUIREMENT_CATALOG } from "@/lib/class-requirement-catalog";
 
 interface Requirement {
   id: string;
@@ -29,17 +29,6 @@ const STATUS_OPTIONS = [
   { value: "optional", label: "Optional", color: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] border-[var(--badge-info-bg)]" },
   { value: "not_applicable", label: "N/A", color: "bg-[var(--surface-soft)] text-[var(--ink-muted)] border-[var(--border)]" },
 ];
-
-// Build catalog of items that can be added as requirements.
-// Platforms (LMS systems) are intentionally excluded — they're how students
-// access courses, not courses themselves. Several platforms also duplicated
-// certifications (e.g. "Bring Your A Game" platform vs BYAG certification).
-const CATALOG = CERTIFICATIONS.map((c) => ({
-  itemType: "certification" as const,
-  itemId: c.id,
-  title: c.shortName,
-  description: c.description,
-}));
 
 export default function ClassRequirementEditor({ classId }: ClassRequirementEditorProps) {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
@@ -147,7 +136,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
   if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading requirements...</p>;
 
   const existingIds = new Set(requirements.map((r) => `${r.itemType}:${r.itemId}`));
-  const availableCatalog = CATALOG.filter((c) => !existingIds.has(`${c.itemType}:${c.itemId}`));
+  const availableCatalog = CLASS_REQUIREMENT_CATALOG.filter((c) => !existingIds.has(`${c.itemType}:${c.itemId}`));
 
   return (
     <div className="space-y-3">

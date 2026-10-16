@@ -16,7 +16,7 @@ function openStream(payload: string, cancel = mock.fn(() => undefined)) {
 
 function provider(native = false) {
   return new OllamaProvider("http://unused.invalid", "test-model", {
-    authMode: "none", ...(native ? { keepAlive: "5m" } : { apiStyle: "openai" as const }),
+    authMode: "none", ...(native ? {} : { apiStyle: "openai" as const }),
   });
 }
 
@@ -98,16 +98,12 @@ describe("Ollama stream resource ownership", () => {
     assert.equal(body.locked, false);
   });
 
-  it("discards a failed OpenAI response before native fallback", async () => {
-    const failed = openStream("not found");
-    const fetch = mock.method(globalThis, "fetch", async (url) => {
-      if (String(url).endsWith("/v1/chat/completions")) return new Response(failed.body, { status: 404 });
-      assert.equal(failed.cancel.mock.callCount(), 1);
-      return Response.json({ message: { content: "Hello" } });
-    });
-    const p = new OllamaProvider("http://unused.invalid", "test-model", { authMode: "none" });
-    assert.equal(await p.generateResponse("system", messages), "Hello");
-    assert.equal(fetch.mock.callCount(), 2);
+  it("cancels a native 400 body and makes no second request", async () => {
+    const failed = openStream("exceeds the available context size");
+    const fetch = mock.method(globalThis, "fetch", async () => new Response(failed.body, { status: 400 }));
+    await assert.rejects(provider(true).generateResponse("system", messages), /400/);
+    assert.equal(fetch.mock.callCount(), 1);
+    assert.equal(failed.cancel.mock.callCount(), 1);
   });
 
   it("cancels a non-retryable HTTP error body", async () => {

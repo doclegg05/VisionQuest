@@ -825,6 +825,7 @@ const classifyAttachment: AgentTool = {
     required: ["fileUploadId"],
   },
   // No slash command — model-driven when an attachment is in context.
+  requiresAttachment: true,
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
   riskTier: "read",
   enabled: true,
@@ -965,6 +966,17 @@ export function getEnabledTools(role: string, mode: AgentMode = agentMode()): Ag
       isToolAllowedInMode(tool, mode) &&
       tool.requiredRoles.some((allowed) => allowed === role || (role === "admin" && allowed !== "student")),
   );
+}
+
+/**
+ * The tools to offer the model on one turn. A tool marked requiresAttachment
+ * needs a fileUploadId, and that id exists only on the turn that carries the
+ * file (chat saves message text; tool calls are not replayed), so a turn with
+ * no attachment does not offer it. Confirm cards are unaffected: they execute
+ * through /api/chat/tool-confirm, not a model turn.
+ */
+export function toolsForTurn(tools: AgentTool[], turn: { hasAttachment: boolean }): AgentTool[] {
+  return turn.hasAttachment ? tools : tools.filter((tool) => !tool.requiresAttachment);
 }
 
 export function getToolByName(name: string): AgentTool | undefined {

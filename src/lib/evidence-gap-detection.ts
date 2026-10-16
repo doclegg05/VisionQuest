@@ -5,6 +5,7 @@
  * ones whose item is now met.
  */
 import { writeDetectedAlert } from "@/lib/alert-hold";
+import { isCertificationRequirementMet } from "@/lib/certifications";
 import { prismaAdmin as prisma } from "@/lib/db";
 
 // One transaction holds every upsert of a program-wide run, so Prisma's 5 s
@@ -131,7 +132,7 @@ async function loadCompletions(studentIds: string[]): Promise<Map<string, Comple
 function isRequirementMet(req: RequiredItem, done: Completions): boolean {
   switch (req.itemType) {
     case "certification":
-      return done.certs.has(req.itemId);
+      return isCertificationRequirementMet(req.itemId, done.certs);
     case "orientation":
       return done.orientation.has(req.itemId);
     case "form":

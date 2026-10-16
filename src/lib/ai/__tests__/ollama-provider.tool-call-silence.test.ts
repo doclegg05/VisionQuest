@@ -18,6 +18,8 @@
  *
  * These tests pin the contract for all three: an empty completion is never a
  * return value, and the error names the cause only where the wire proves it.
+ * Ollama endpoints use native /api/chat only, so the silent third case is the
+ * production one; the /v1 cases use an `apiStyle: "openai"` server.
  */
 import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -26,18 +28,14 @@ import { OllamaProvider } from "../ollama-provider";
 const mockFetch = mock.fn<typeof globalThis.fetch>();
 globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
 
-/** First call 404s the OpenAI path so the provider falls through to native. */
-function nativeAfter404(nativeResponse: () => Response): void {
-  let calls = 0;
-  mockFetch.mock.mockImplementation(async () => {
-    calls += 1;
-    if (calls === 1) return new Response("Not Found", { status: 404 });
-    return nativeResponse();
-  });
+function respondWith(response: () => Response): void {
+  mockFetch.mock.mockImplementation(async () => response());
 }
 
 describe("OllamaProvider empty completions", { concurrency: false }, () => {
   let provider: OllamaProvider;
+  /** A generic OpenAI-compatible server: the only kind still sent to /v1. */
+  let openAiProvider: OllamaProvider;
 
   beforeEach(() => {
     mockFetch.mock.resetCalls();
@@ -45,6 +43,10 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
       throw new Error("Unexpected fetch call in OllamaProvider test");
     });
     provider = new OllamaProvider("http://localhost:11434", "gemma4:latest");
+    openAiProvider = new OllamaProvider("http://localhost:1234", "some-model", {
+      authMode: "none",
+      apiStyle: "openai",
+    });
   });
 
   describe("a tool-call finish with no visible content", () => {
@@ -57,7 +59,7 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
       );
 
       await assert.rejects(
-        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        openAiProvider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
         /tool call/i,
       );
     });
@@ -86,13 +88,13 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
       );
 
       await assert.rejects(
-        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        openAiProvider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
         /tool call/i,
       );
     });
 
     it("generateResponse throws on a native tool_calls array", async () => {
-      nativeAfter404(() =>
+      respondWith(() =>
         Response.json({
           message: {
             content: "",
@@ -119,7 +121,7 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
       );
 
       await assert.rejects(
-        provider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]),
+        openAiProvider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]),
         /tool call/i,
       );
     });
@@ -146,7 +148,7 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
       );
 
       await assert.rejects(
-        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        openAiProvider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
         /find_certification/,
       );
     });
@@ -164,7 +166,7 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
         }),
       );
 
-      const result = await provider.generateResponse("sys", [
+      const result = await openAiProvider.generateResponse("sys", [
         { role: "user", content: "Hi" },
       ]);
 
@@ -180,7 +182,7 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
      * not blame reasoning either (that is a different, budget-shaped bug).
      */
     it("generateResponse throws without inventing a cause", async () => {
-      nativeAfter404(() =>
+      respondWith(() =>
         Response.json({ message: { content: "" }, done: true, done_reason: "stop" }),
       );
 
@@ -200,7 +202,7 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
       );
 
       await assert.rejects(
-        provider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]),
+        openAiProvider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]),
         /empty reply/i,
       );
     });
@@ -211,6 +213,31 @@ describe("OllamaProvider empty completions", { concurrency: false }, () => {
         Response.json({
           choices: [{ finish_reason: "tool_calls", message: { content: "" } }],
           usage: { prompt_tokens: 4579, completion_tokens: 12, total_tokens: 4591 },
+        }),
+      );
+
+      const usages: Array<{ inputTokens: number; outputTokens: number }> = [];
+      await assert.rejects(
+        openAiProvider.generateResponse(
+          "sys",
+          [{ role: "user", content: "Hi" }],
+          (usage) => usages.push(usage),
+        ),
+      );
+
+      assert.equal(usages.length, 1);
+      assert.equal(usages[0].inputTokens, 4579);
+      assert.equal(usages[0].outputTokens, 12);
+    });
+
+    it("reports usage before throwing on native too", async () => {
+      respondWith(() =>
+        Response.json({
+          message: { content: "" },
+          done: true,
+          done_reason: "stop",
+          prompt_eval_count: 4579,
+          eval_count: 12,
         }),
       );
 
