@@ -62,7 +62,7 @@ HARD PRIVACY RULE — this is not student-record storage:
 - Never include anything a student disclosed, or any personal circumstance of any student.
 - If the conversation was only about individual students, return [].
 
-Write each fact as one self-contained sentence about the staff member — "Prefers three-bullet answers with the action first.", "Reviews flagged students every Monday before class." Start every sentence with one of these words, exactly as written: ${STAFF_FACT_OPENERS.join(", ")}. If the verb you would naturally use is not on that list, rephrase the sentence so it starts with one that is. Never start a sentence with a name or with any other word.
+Write each fact as one self-contained sentence about the staff member — "Prefers three-bullet answers with the action first.", "Reviews flagged students every Monday before class." Start every sentence with one of these words, exactly as written: ${STAFF_FACT_OPENERS.join(", ")}. If the verb you would naturally use is not on that list, rephrase the sentence so it starts with one that is. Rephrasing never makes a fact about a student acceptable; leave those out. Never start a sentence with a name or with any other word.
 
 Respond with ONLY a JSON array (no prose). Each element:
 {

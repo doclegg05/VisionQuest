@@ -23,6 +23,32 @@ describe("STAFF_FACT_OPENERS", () => {
     }
   });
 
+  it("keeps rejecting common given and family names (allowlist regression guard)", () => {
+    // Adding a word to STAFF_FACT_OPENERS adds it to the filter's allowlist,
+    // and the prompt now gives maintainers a reason to add natural verbs.
+    // A name that slips onto either list would pass here.
+    const names = [
+      // Excluded by name in the SAFE_CAPITALIZED_TOKENS header.
+      "Mark", "Grace", "Will", "May", "June", "Bill", "Rose", "Hope", "Faith",
+      "Lacks",
+      // Common US given names and surnames.
+      "Maria", "Jasmine", "James", "Michael", "Ashley", "Smith", "Johnson",
+      "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
+    ];
+    for (const name of names) {
+      assert.equal(
+        looksLikeStudentReference(`${name} needs a bus pass before class.`),
+        true,
+        `name passed the filter as a sentence opener: ${name}`,
+      );
+      assert.equal(
+        looksLikeStudentReference(`Prefers to check in with ${name} before class.`),
+        true,
+        `name passed the filter mid-sentence: ${name}`,
+      );
+    }
+  });
+
   it("leaves out Lacks, which is a surname, so the filter still rejects it", () => {
     assert.equal(STAFF_FACT_OPENERS.includes("Lacks"), false);
     assert.equal(

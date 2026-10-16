@@ -214,6 +214,24 @@ describe("extractAndStoreStaffMemories", () => {
     assert.doesNotMatch(systemPrompt, /ordinary verb or adverb/);
   });
 
+  it("tells the model that rephrasing to fit an opener never admits a student fact", async () => {
+    // The filter cannot catch a student fact with no subject ("Needs a bus
+    // pass to get to class."), so the instruction to rephrase onto the opener
+    // list must not read as a way to make one acceptable.
+    const provider = providerReturning("[]");
+    await extractAndStoreStaffMemories({
+      provider,
+      staffId: "teacher-1",
+      staffRole: "teacher",
+      conversationId: "conv-staff-7",
+      messages: STAFF_MESSAGES,
+    });
+    const systemPrompt: string = provider.generateStructuredResponse.mock.calls[0].arguments[0];
+    assert.match(systemPrompt, /HARD PRIVACY RULE/);
+    assert.match(systemPrompt, /If the conversation was only about individual students, return \[\]\./);
+    assert.match(systemPrompt, /Rephrasing never makes a fact about a student acceptable/);
+  });
+
   it("records an AI audit event under staff_entered sensitivity", async () => {
     await extractAndStoreStaffMemories({
       provider: providerReturning(STAFF_JSON),
