@@ -159,7 +159,7 @@ Grouped by feature; each folder holds the client/server components for that surf
 | Folder | Key contents |
 |--------|---------|
 | `chat/` | `ChatWindow.tsx`, `ChatInput.tsx`, `MessageBubble.tsx`, `ConversationList.tsx`, `TypingIndicator.tsx`, `StarterChips.tsx`, `CommandPalette.tsx`, `SageMiniChat.tsx` |
-| `ui/` | Design-system primitives: `NavBar`, `BrandLockup`, `PageIntro`, `ReadinessScore`, `MountainProgress`, `XpBar`, `StreakBadge`, `ThemeProvider`, `ThemeToggle`, `AchievementList`, `AchievementUnlock`, `LevelUpCelebration`, `NotificationBell`, `NotificationProvider`, `SignaturePad`, `PageTransition`, `FormUploadButton`, `CertificateDownload`, `SuggestedActions`, `CohortCard`, etc. |
+| `ui/` | Design-system primitives: `NavBar`, `BrandLockup`, `PageIntro`, `ReadinessScore`, `MountainProgress`, `XpBar`, `ThemeProvider`, `ThemeToggle`, `AchievementUnlock`, `LevelUpCelebration`, `NotificationBell`, `NotificationProvider`, `SignaturePad`, `PageTransition`, `FormUploadButton`, `CertificateDownload`, `SuggestedActions`, `CohortCard`, etc. |
 | `goals/`, `advising/`, `career/`, `certifications/`, `documents/`, `files/`, `jobs/`, `lms/`, `orientation/`, `portfolio/`, `progression/`, `resources/`, `spokes/`, `teacher/`, `vision-board/` | Feature-specific components |
 | `auth/` | Auth forms + flows |
 
