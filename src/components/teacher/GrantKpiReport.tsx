@@ -325,7 +325,7 @@ export default function GrantKpiReport() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
           State grant metrics
         </p>
         <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">

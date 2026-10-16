@@ -336,10 +336,11 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
         >
           <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(180deg,transparent_0_1.6rem,rgba(15,154,146,0.08)_1.6rem_1.66rem)]" />
           <div className="relative">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+            {/* The goal card stays light in both themes, so its text is fixed SPOKES dark. */}
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-dark">
               Linked goal
             </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--ink-strong)]">{item.content}</p>
+            <p className="mt-2 text-sm leading-6 text-brand-dark">{item.content}</p>
           </div>
         </div>
       ) : (

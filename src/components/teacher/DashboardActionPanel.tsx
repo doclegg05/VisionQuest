@@ -312,7 +312,7 @@ export default function DashboardActionPanel({
     <div className="surface-section p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-secondary)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-info">
             Dashboard Action
           </p>
           <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">{heading}</h2>
@@ -448,7 +448,7 @@ export default function DashboardActionPanel({
                   <p className="text-sm font-semibold text-[var(--ink-strong)]">
                     {GOAL_LEVEL_META[selectedGoal.goal.level as keyof typeof GOAL_LEVEL_META]?.label || selectedGoal.goal.level}
                   </p>
-                  <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+                  <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-1 text-xs font-semibold text-info">
                     {goalStatusLabel(selectedGoal.goal.status)}
                   </span>
                 </div>

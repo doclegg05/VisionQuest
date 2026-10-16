@@ -228,7 +228,7 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
               {choice.title}
             </p>
             {choice.recommended && (
-              <span className="rounded-full bg-[var(--accent-strong)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--accent-strong)]">
+              <span className="rounded-full bg-[var(--accent-strong)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-success">
                 Recommended
               </span>
             )}

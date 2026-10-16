@@ -21,106 +21,126 @@
 
 :root,
 [data-theme="light"] {
-  /* Tell the browser to render native form controls (select dropdowns,
-     scrollbars, etc.) using light-mode system colors. */
+  /* Native form controls render with light-mode system colors. */
   color-scheme: light;
 
-  /* Brand Colors (unchanged) */
+  /* SPOKES palette (docs/superpowers/specs/2026-10-15-spokes-design-system-design.md,
+     Design 2.1). globals.palette.test.ts fails on any other color in this file. */
   --primary: #007baf;
   --accent: #37b550;
   --dark: #004071;
-  --light: #FFFFFF;
-  --muted: #EDF3F7;
-  --gray: #4a4d54;
+  --light: #ffffff;
+  --muted: #edf3f7;
+  --gray: #60636b;
   --gold: #d3b257;
   --royal: #00133f;
   --mauve: #a7253f;
   --offwhite: #d1d3d4;
   --muted-gold: #ad8806;
+  --accent-text: #1e7a2e;
 
-  /* Theme tokens — Light */
-  --surface-base: #f3f7f8;
-  --surface-raised: rgba(255, 255, 255, 0.95);
-  --surface-soft: rgba(255, 255, 255, 0.86);
-  --surface-muted: rgba(18, 38, 63, 0.05);
+  /* Surfaces and ink */
+  --surface-base: #edf3f7;
+  --surface-raised: #ffffff;
+  --surface-soft: #ffffff;
+  --surface-muted: rgba(0, 64, 113, 0.05);
   --surface-interactive: rgba(0, 64, 113, 0.08);
   --surface-interactive-hover: rgba(0, 64, 113, 0.12);
-  --surface-overlay: rgba(0, 0, 0, 0.04);
+  --surface-overlay: rgba(0, 64, 113, 0.04);
   --surface-sheen: rgba(255, 255, 255, 0.72);
-  --ink-strong: #00133f;
-  --ink-muted: #4a4d54;
-  /* 0.25 measured 1.83:1 against white — badly below the 3:1 floor even for
-     large text, let alone the 4.5:1 normal-text rule (axe color-contrast).
-     0.55 clears 4.5:1 on every light surface this token renders on
-     (surface-base, surface-raised, surface-soft all >= 4.5) with margin. */
-  --ink-faint: rgba(0, 0, 0, 0.55);
-  --border: rgba(18, 38, 63, 0.12);
-  --border-strong: rgba(0, 64, 113, 0.15);
+  --ink-strong: #004071;
+  --ink-muted: #60636b;
+  /* Carries text (HIG Phase 2 measured it), so it clears 4.5:1 on every ground. */
+  --ink-faint: rgba(0, 64, 113, 0.75);
+  --border: #d1d3d4;
+  --border-strong: rgba(0, 64, 113, 0.16);
+  /* Inputs, checkboxes, toggles: 3:1 or better on the page and on cards. */
+  --border-control: #60636b;
   --border-luminous: rgba(255, 255, 255, 0.82);
-  --accent-green: #237a35;
-  /* Text on an accent-green fill: white in light (5.38:1 on #237a35), navy in
-     dark (8.89:1 on #3fcf5e) — white on the dark-theme green is 2.04:1, which
-     was every one of the 78 authenticated axe color-contrast nodes on
-     2026-09-07. Use text-[var(--on-accent)] with any bg-[var(--accent*)]. */
+
+  /* Fills and the ink that sits on them */
+  --accent-green: #1e7a2e;
   --on-accent: #ffffff;
-  --accent-blue: #005d8a;
+  --on-primary: #ffffff;
+  --accent-blue: #007baf;
   --accent-gold: #ad8806;
-  --accent-red: #c43c3c;
-  --error: #c43c3c;
-  /* Ink on an --error fill (Delete, Remove, Discard): white 5.2:1 here, navy 6.1:1
-     on the dark theme's #f06b6b. Use text-[var(--on-error)] with bg-[var(--error)]. */
+  --accent-red: #a7253f;
+  --error: #a7253f;
   --on-error: #ffffff;
-  --success: #2a8a3c;
+  --success: #1e7a2e;
   --glow-green: rgba(55, 181, 80, 0.15);
   --glow-gold: rgba(211, 178, 87, 0.1);
+  --glow-primary: rgba(0, 123, 175, 0.35);
 
-  /* Elevation shadows — theme-aware so cards remain visible in dark mode */
-  --shadow-card: 0 12px 30px rgba(16, 37, 62, 0.12);
-  --shadow-card-lg: 0 18px 46px rgba(16, 37, 62, 0.10);
-  --shadow-premium: 0 20px 54px rgba(16, 37, 62, 0.12), 0 1px 0 rgba(255, 255, 255, 0.88) inset;
-  --shadow-premium-hover: 0 26px 68px rgba(16, 37, 62, 0.16), 0 1px 0 rgba(255, 255, 255, 0.92) inset;
-  --focus-ring: rgba(0, 123, 175, 0.18);
-  --app-background:
-    linear-gradient(180deg, #f8fbfc 0%, #f3f7f8 46%, #eef6f3 100%);
-  --ambient-lines: rgba(0, 64, 113, 0.055);
-  --ambient-lines-strong: rgba(55, 181, 80, 0.05);
+  /* Roles: fill, ink on fill, soft tint, text, border (spec Design 2.4, revised) */
+  --danger-fill: #a7253f;
+  --danger-on: #ffffff;
+  --danger-soft: rgba(167, 37, 63, 0.1);
+  --danger-text: #a7253f;
+  --danger-border: #a7253f;
+  --success-fill: #1e7a2e;
+  --success-on: #ffffff;
+  /* 8%, not 12%: accent-text measures 4.52:1 on this tint over the muted page; 12% fell to 4.37:1. */
+  --success-soft: rgba(55, 181, 80, 0.08);
+  --success-text: #1e7a2e;
+  --success-border: #37b550;
+  --warning-fill: #d3b257;
+  --warning-on: #004071;
+  --warning-soft: rgba(211, 178, 87, 0.25);
+  --warning-text: #004071;
+  --warning-border: #d3b257;
+  --info-fill: #007baf;
+  --info-on: #ffffff;
+  --info-soft: rgba(0, 123, 175, 0.1);
+  --info-text: #004071;
+  --info-border: #007baf;
+  --brand-deep-fill: #00133f;
+  --brand-deep-on: #ffffff;
+  --brand-deep-soft: rgba(0, 19, 63, 0.08);
+  --brand-deep-text: #00133f;
+  --brand-deep-border: #00133f;
 
-  /* Status badges */
-  --badge-success-bg: rgba(42, 138, 60, 0.12);
-  --badge-success-text: #1a6b2a;
-  --badge-warning-bg: rgba(173, 136, 6, 0.12);
-  /* #8a6d05 measured 4.34:1 on this bg composited over white — under the
-     4.5:1 floor. #7a5f04 (same hue, darkened) measures 5.34:1. */
-  --badge-warning-text: #7a5f04;
-  --badge-error-bg: rgba(196, 60, 60, 0.12);
-  --badge-error-text: #a33232;
-  --badge-info-bg: rgba(0, 93, 138, 0.12);
-  --badge-info-text: #004d73;
+  /* Focus (spec Design 2.7, approved exception) and progress-bar edge (Design 7, revised) */
+  --focus-outline: #004071;
+  --focus-ring: rgba(211, 178, 87, 0.55);
+  --progress-edge: #004071;
+  --grad-progress: linear-gradient(90deg, var(--primary) 0%, var(--gold) 100%);
 
-  /* Toast/celebration */
-  --toast-celebration-bg: rgba(211, 178, 87, 0.12);
-  --toast-celebration-border: rgba(211, 178, 87, 0.3);
-  /* Same #8a6d05→#7a5f04 fix as badge-warning-text above (5.60:1 on this bg). */
-  --toast-celebration-text: #7a5f04;
+  /* Elevation: navy-tinted SPOKES shadows. SPOKES shadow-hover is black at 15%;
+     royal at the same alpha keeps the palette test free of exceptions. */
+  --shadow-card: 0 4px 15px rgba(0, 64, 113, 0.08);
+  --shadow-card-lg: 0 8px 32px rgba(0, 64, 113, 0.08);
+  --shadow-premium: 0 18px 50px -12px rgba(0, 19, 63, 0.35);
+  --shadow-premium-hover: 0 10px 30px rgba(0, 19, 63, 0.15);
+  /* Solid muted: SPOKES --grad-slide-bg ends in offwhite, where gray body text is 4.0:1. */
+  --app-background: #edf3f7;
 
-  /* Urgency (teacher) */
-  --urgency-critical-bg: rgba(196, 60, 60, 0.12);
-  --urgency-critical-text: #a33232;
-  --urgency-high-bg: rgba(173, 136, 6, 0.12);
-  /* Same token value as badge-warning-text; see its note above. */
-  --urgency-high-text: #7a5f04;
-  --urgency-medium-bg: rgba(0, 93, 138, 0.12);
-  --urgency-medium-text: #004d73;
-
-  /* Program badges (teacher) — bg/text pairs hit WCAG AA 4.5:1 on --surface-raised */
-  --program-spokes-bg: rgba(15, 154, 146, 0.12);
-  --program-spokes-text: #0a6e6a;
-  --program-ae-bg: rgba(109, 40, 217, 0.12);
-  --program-ae-text: #5b21b6;
-  --program-ietp-bg: rgba(234, 88, 12, 0.12);
-  /* #c2410c measured 4.47:1 on this bg over white — just under 4.5:1.
-     #a53509 (same hue, darkened) measures 5.82:1. */
-  --program-ietp-text: #a53509;
+  /* Status badges (globals.badge-contrast.test.ts) */
+  --badge-success-bg: rgba(55, 181, 80, 0.08);
+  --badge-success-text: #1e7a2e;
+  --badge-warning-bg: rgba(211, 178, 87, 0.25);
+  --badge-warning-text: #004071;
+  --badge-error-bg: rgba(167, 37, 63, 0.1);
+  --badge-error-text: #a7253f;
+  --badge-info-bg: rgba(0, 123, 175, 0.1);
+  --badge-info-text: #004071;
+  --toast-celebration-bg: rgba(211, 178, 87, 0.25);
+  --toast-celebration-border: rgba(211, 178, 87, 0.6);
+  --toast-celebration-text: #004071;
+  --urgency-critical-bg: rgba(167, 37, 63, 0.1);
+  --urgency-critical-text: #a7253f;
+  --urgency-high-bg: rgba(211, 178, 87, 0.25);
+  --urgency-high-text: #004071;
+  --urgency-medium-bg: rgba(0, 123, 175, 0.1);
+  --urgency-medium-text: #004071;
+  --program-spokes-bg: rgba(0, 123, 175, 0.1);
+  --program-spokes-text: #004071;
+  --program-ae-bg: rgba(0, 19, 63, 0.08);
+  --program-ae-text: #00133f;
+  /* IETP is an outlined pill, so it differs from the two filled badges without color. */
+  --program-ietp-bg: rgba(255, 255, 255, 0);
+  --program-ietp-text: #004071;
+  --program-ietp-border: #ad8806;
 
   /* Legacy aliases */
   --background: var(--surface-base);
@@ -132,156 +152,177 @@
   --accent-secondary: var(--accent-blue);
   --accent-tertiary: var(--accent-gold);
 
-  /* Chat surfaces — modern AI chrome (SPOKES blue Sage, green student) */
+  /* Chat */
   --chat-bubble-assistant-bg: transparent;
   --chat-bubble-assistant-border: transparent;
-  --chat-bubble-user-bg: linear-gradient(135deg, #2a8a3c, #1e6e30);
-  --chat-bubble-user-avatar: #2a8a3c;
+  --chat-bubble-user-bg: #1e7a2e;
+  --chat-bubble-user-avatar: #1e7a2e;
   --chat-sage-mark: #007baf;
-  --chat-sage-action: #00527a;
+  --chat-sage-action: #004071;
   --chat-sage-mark-bg: rgba(0, 123, 175, 0.12);
   --chat-panel-bg: #ffffff;
-  --chat-panel-border: rgba(18, 38, 63, 0.10);
+  --chat-panel-border: #d1d3d4;
   --chat-input-bg: transparent;
-  --chat-input-border: rgba(18, 38, 63, 0.12);
-  --chat-area-bg: #f7f9fb;
-  --chat-header-bg: rgba(255, 255, 255, 0.92);
-  --chat-sidebar-bg: #eef2f6;
+  --chat-input-border: #60636b;
+  --chat-area-bg: #ffffff;
+  --chat-header-bg: rgba(255, 255, 255, 0.82);
+  --chat-sidebar-bg: #edf3f7;
   --chat-sidebar-active: rgba(0, 123, 175, 0.12);
   --chat-sidebar-hover: rgba(0, 64, 113, 0.06);
   --chat-typing-dot: var(--ink-muted);
-  --chat-error-bg: #fffbeb;
-  --chat-error-border: #fde68a;
-  --chat-error-text: #92400e;
+  --chat-error-bg: rgba(211, 178, 87, 0.25);
+  --chat-error-border: #d3b257;
+  --chat-error-text: #004071;
   --chat-composer-focus: rgba(0, 123, 175, 0.22);
 
-  /* Animation tokens */
-  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Motion: SPOKES dur-* and ease-* (spec Design 4) */
+  --ease-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
   --duration-fast: 200ms;
-  --duration-normal: 450ms;
+  --duration-normal: 300ms;
   --duration-slow: 800ms;
   --stagger-gap: 120ms;
 
-  /* Ruled note card variables */
-  --paper-bg: #fffdf2;
+  /* Ruled note card */
+  --paper-bg: #ffffff;
   --paper-line: rgba(0, 123, 175, 0.06);
-  --paper-margin: rgba(239, 68, 68, 0.2);
+  --paper-margin: rgba(167, 37, 63, 0.2);
 }
 
 [data-theme="dark"] {
-  /* Without this, native <select> option lists render with light-mode
-     text on the dark page background — invisible text in dropdowns. */
+  /* Without this, native <select> option lists render light-mode text on the dark page. */
   color-scheme: dark;
 
-  --surface-base: #0a1628;
-  --surface-raised: rgba(20, 35, 56, 0.94);
-  --surface-soft: rgba(15, 28, 47, 0.90);
+  --surface-base: #00133f;
+  --surface-raised: #004071;
+  --surface-soft: #004071;
   --surface-muted: rgba(255, 255, 255, 0.05);
   --surface-interactive: rgba(255, 255, 255, 0.08);
   --surface-interactive-hover: rgba(255, 255, 255, 0.12);
-  --surface-overlay: rgba(255, 255, 255, 0.10);
-  --surface-sheen: rgba(255, 255, 255, 0.08);
-  --ink-strong: #f0f2f5;
-  --ink-muted: rgba(255, 255, 255, 0.62);
-  --ink-faint: rgba(255, 255, 255, 0.48);
-  --border: rgba(255, 255, 255, 0.10);
+  --surface-overlay: rgba(255, 255, 255, 0.1);
+  --surface-sheen: rgba(255, 255, 255, 0.04);
+  --ink-strong: #ffffff;
+  --ink-muted: rgba(255, 255, 255, 0.75);
+  /* 0.65, not 0.6: 0.6 measured 4.35:1 on a muted panel inside a card. */
+  --ink-faint: rgba(255, 255, 255, 0.65);
+  --border: rgba(255, 255, 255, 0.12);
   --border-strong: rgba(255, 255, 255, 0.16);
+  --border-control: rgba(255, 255, 255, 0.6);
   --border-luminous: rgba(255, 255, 255, 0.18);
-  --accent-green: #3fcf5e;
-  --on-accent: #0a1628;
-  --accent-blue: #38a8d8;
-  --accent-gold: #e0c06a;
-  --accent-red: #f06b6b;
-  --error: #f06b6b;
-  --on-error: #0a1628;
-  --success: #3fcf5e;
+
+  --accent-green: #1e7a2e;
+  --on-accent: #ffffff;
+  --on-primary: #ffffff;
+  --accent-blue: #007baf;
+  --accent-gold: #d3b257;
+  --accent-red: #a7253f;
+  --error: #a7253f;
+  --on-error: #ffffff;
+  --success: #1e7a2e;
   --glow-green: rgba(55, 181, 80, 0.25);
   --glow-gold: rgba(211, 178, 87, 0.2);
+  --glow-primary: rgba(0, 123, 175, 0.45);
 
-  /* Elevation shadows — deeper + darker for dark surfaces */
-  --shadow-card: 0 12px 28px rgba(0, 0, 0, 0.45);
-  --shadow-card-lg: 0 16px 36px rgba(0, 0, 0, 0.35);
-  --shadow-premium: 0 20px 54px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(255, 255, 255, 0.07) inset;
-  --shadow-premium-hover: 0 26px 68px rgba(0, 0, 0, 0.42), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
-  --focus-ring: rgba(56, 168, 216, 0.24);
-  --app-background:
-    linear-gradient(180deg, #07101e 0%, #0a1628 52%, #0e1f2e 100%);
-  --ambient-lines: rgba(255, 255, 255, 0.055);
-  --ambient-lines-strong: rgba(63, 207, 94, 0.045);
+  /* Roles. No SPOKES red, green, or blue clears 4.5:1 as text on navy (mauve is
+     about 1.5:1), so role text is white and the hue rides on fills, dots, and borders. */
+  --danger-fill: #a7253f;
+  --danger-on: #ffffff;
+  --danger-soft: rgba(167, 37, 63, 0.35);
+  --danger-text: #ffffff;
+  --danger-border: #a7253f;
+  --success-fill: #1e7a2e;
+  --success-on: #ffffff;
+  --success-soft: rgba(55, 181, 80, 0.2);
+  --success-text: #ffffff;
+  --success-border: #37b550;
+  --warning-fill: #d3b257;
+  --warning-on: #004071;
+  --warning-soft: rgba(211, 178, 87, 0.2);
+  /* White, not gold: gold on its own tint over a navy card is about 3.8:1. */
+  --warning-text: #ffffff;
+  --warning-border: #d3b257;
+  --info-fill: #007baf;
+  --info-on: #ffffff;
+  --info-soft: rgba(0, 123, 175, 0.3);
+  --info-text: #ffffff;
+  --info-border: #007baf;
+  --brand-deep-fill: #ffffff;
+  --brand-deep-on: #00133f;
+  --brand-deep-soft: rgba(255, 255, 255, 0.1);
+  --brand-deep-text: #ffffff;
+  --brand-deep-border: rgba(255, 255, 255, 0.6);
 
-  /* Status badges */
-  --badge-success-bg: rgba(63, 207, 94, 0.15);
-  --badge-success-text: #3fcf5e;
-  --badge-warning-bg: rgba(224, 192, 106, 0.15);
-  --badge-warning-text: #e0c06a;
-  --badge-error-bg: rgba(240, 107, 107, 0.15);
-  /* Text on its own tint, drawn on the page, a card, a card's sheen-lit top, or a
-     muted panel: #f06b6b fell to 3.89:1 at a card's top; #f58f8f clears 4.6:1
-     everywhere (globals.badge-contrast.test.ts). */
-  --badge-error-text: #f58f8f;
-  --badge-info-bg: rgba(56, 168, 216, 0.15);
-  --badge-info-text: #64bbe1;
+  --focus-outline: #d3b257;
+  --focus-ring: rgba(211, 178, 87, 0);
+  --progress-edge: #d3b257;
 
-  /* Toast/celebration */
-  --toast-celebration-bg: rgba(224, 192, 106, 0.15);
-  --toast-celebration-border: rgba(224, 192, 106, 0.3);
-  --toast-celebration-text: #e0c06a;
+  --shadow-card: 0 4px 15px rgba(0, 19, 63, 0.6);
+  --shadow-card-lg: 0 8px 32px rgba(0, 19, 63, 0.6);
+  --shadow-premium: 0 18px 50px -12px rgba(0, 19, 63, 0.8);
+  --shadow-premium-hover: 0 10px 30px rgba(0, 19, 63, 0.7);
+  --app-background: #00133f;
 
-  /* Urgency (teacher) */
-  --urgency-critical-bg: rgba(240, 107, 107, 0.15);
-  --urgency-critical-text: #f58f8f;
-  --urgency-high-bg: rgba(224, 192, 106, 0.15);
-  --urgency-high-text: #e0c06a;
-  --urgency-medium-bg: rgba(56, 168, 216, 0.15);
-  --urgency-medium-text: #64bbe1;
+  --badge-success-bg: rgba(55, 181, 80, 0.2);
+  --badge-success-text: #ffffff;
+  --badge-warning-bg: rgba(211, 178, 87, 0.2);
+  --badge-warning-text: #ffffff;
+  --badge-error-bg: rgba(167, 37, 63, 0.35);
+  --badge-error-text: #ffffff;
+  --badge-info-bg: rgba(0, 123, 175, 0.3);
+  --badge-info-text: #ffffff;
+  --toast-celebration-bg: rgba(211, 178, 87, 0.2);
+  --toast-celebration-border: rgba(211, 178, 87, 0.5);
+  --toast-celebration-text: #ffffff;
+  --urgency-critical-bg: rgba(167, 37, 63, 0.35);
+  --urgency-critical-text: #ffffff;
+  --urgency-high-bg: rgba(211, 178, 87, 0.2);
+  --urgency-high-text: #ffffff;
+  --urgency-medium-bg: rgba(0, 123, 175, 0.3);
+  --urgency-medium-text: #ffffff;
+  --program-spokes-bg: rgba(0, 123, 175, 0.3);
+  --program-spokes-text: #ffffff;
+  --program-ae-bg: rgba(255, 255, 255, 0.1);
+  --program-ae-text: #ffffff;
+  --program-ietp-bg: rgba(255, 255, 255, 0);
+  --program-ietp-text: #ffffff;
+  --program-ietp-border: #d3b257;
 
-  /* Program badges — dark mode; brighter tints for low-luminance surfaces */
-  --program-spokes-bg: rgba(15, 154, 146, 0.18);
-  --program-spokes-text: #5cd0c6;
-  --program-ae-bg: rgba(167, 139, 250, 0.18);
-  --program-ae-text: #c4b5fd;
-  --program-ietp-bg: rgba(251, 146, 60, 0.18);
-  --program-ietp-text: #fdba74;
-
-  /* Chat surfaces — dark mode */
   --chat-bubble-assistant-bg: transparent;
   --chat-bubble-assistant-border: transparent;
-  --chat-bubble-user-bg: linear-gradient(135deg, #3fcf5e, #2a8a3c);
-  --chat-bubble-user-avatar: #2a8a3c;
-  --chat-sage-mark: #38a8d8;
-  --chat-sage-action: #71c8ed;
-  --chat-sage-mark-bg: rgba(56, 168, 216, 0.18);
-  --chat-panel-bg: #132237;
+  --chat-bubble-user-bg: #1e7a2e;
+  --chat-bubble-user-avatar: #1e7a2e;
+  /* Gold, not primary: primary on a navy panel is 2.3:1, under the 3:1 icon floor. */
+  --chat-sage-mark: #d3b257;
+  --chat-sage-action: #ffffff;
+  --chat-sage-mark-bg: rgba(255, 255, 255, 0.1);
+  --chat-panel-bg: #004071;
   --chat-panel-border: rgba(255, 255, 255, 0.12);
   --chat-input-bg: transparent;
-  --chat-input-border: rgba(255, 255, 255, 0.14);
-  --chat-area-bg: #0f1b2d;
-  --chat-header-bg: rgba(16, 29, 48, 0.92);
-  --chat-sidebar-bg: #0c1726;
-  --chat-sidebar-active: rgba(56, 168, 216, 0.16);
+  --chat-input-border: rgba(255, 255, 255, 0.6);
+  --chat-area-bg: #00133f;
+  --chat-header-bg: rgba(0, 19, 63, 0.82);
+  --chat-sidebar-bg: #00133f;
+  --chat-sidebar-active: rgba(255, 255, 255, 0.12);
   --chat-sidebar-hover: rgba(255, 255, 255, 0.06);
   --chat-typing-dot: var(--ink-muted);
-  --chat-error-bg: rgba(180, 83, 9, 0.15);
-  --chat-error-border: rgba(251, 191, 36, 0.25);
-  --chat-error-text: #fbbf24;
-  --chat-composer-focus: rgba(56, 168, 216, 0.28);
+  --chat-error-bg: rgba(211, 178, 87, 0.2);
+  --chat-error-border: #d3b257;
+  --chat-error-text: #ffffff;
+  --chat-composer-focus: rgba(211, 178, 87, 0.4);
 
-  /* Legacy aliases */
   --background: var(--surface-base);
   --foreground: var(--ink-strong);
   --surface: var(--surface-raised);
-  --surface-strong: rgba(20, 35, 56, 0.98);
-  --surface-dark: rgba(10, 22, 40, 0.95);
+  --surface-strong: #004071;
+  --surface-dark: rgba(0, 19, 63, 0.95);
   --accent-strong: var(--accent-green);
   --accent-secondary: var(--accent-blue);
   --accent-tertiary: var(--accent-gold);
 
-  /* Ruled note card variables */
-  --paper-bg: #0d1a2d;
+  --paper-bg: #004071;
   --paper-line: rgba(255, 255, 255, 0.04);
-  --paper-margin: rgba(168, 85, 247, 0.2);
+  --paper-margin: rgba(167, 37, 63, 0.35);
 }
 
 @theme inline {
@@ -311,6 +352,74 @@
   --color-accent-blue: var(--accent-blue);
   --color-accent-gold: var(--accent-gold);
   --color-accent-red: var(--accent-red);
+
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--border);
+  --color-line-control: var(--border-control);
+
+  /* Role utilities. Tailwind 4 reads --text-color-*, --border-color-*,
+     --ring-color-*, --outline-color-*, and --divide-color-* before --color-*,
+     so one role name paints each property from its own token
+     (globals.theme-utilities.test.ts). */
+  --color-danger: var(--danger-fill);
+  --color-danger-soft: var(--danger-soft);
+  --text-color-danger: var(--danger-text);
+  --text-color-on-danger: var(--danger-on);
+  --border-color-danger: var(--danger-border);
+  --ring-color-danger: var(--danger-border);
+  --outline-color-danger: var(--danger-border);
+  --divide-color-danger: var(--danger-border);
+  --color-success: var(--success-fill);
+  --color-success-soft: var(--success-soft);
+  --text-color-success: var(--success-text);
+  --text-color-on-success: var(--success-on);
+  --border-color-success: var(--success-border);
+  --ring-color-success: var(--success-border);
+  --outline-color-success: var(--success-border);
+  --divide-color-success: var(--success-border);
+  --color-warning: var(--warning-fill);
+  --color-warning-soft: var(--warning-soft);
+  --text-color-warning: var(--warning-text);
+  --text-color-on-warning: var(--warning-on);
+  --border-color-warning: var(--warning-border);
+  --ring-color-warning: var(--warning-border);
+  --outline-color-warning: var(--warning-border);
+  --divide-color-warning: var(--warning-border);
+  --color-info: var(--info-fill);
+  --color-info-soft: var(--info-soft);
+  --text-color-info: var(--info-text);
+  --text-color-on-info: var(--info-on);
+  --border-color-info: var(--info-border);
+  --ring-color-info: var(--info-border);
+  --outline-color-info: var(--info-border);
+  --divide-color-info: var(--info-border);
+  --color-brand-deep: var(--brand-deep-fill);
+  --color-brand-deep-soft: var(--brand-deep-soft);
+  --text-color-brand-deep: var(--brand-deep-text);
+  --text-color-on-brand-deep: var(--brand-deep-on);
+  --border-color-brand-deep: var(--brand-deep-border);
+  --ring-color-brand-deep: var(--brand-deep-border);
+  --outline-color-brand-deep: var(--brand-deep-border);
+  --divide-color-brand-deep: var(--brand-deep-border);
+
+  /* SPOKES type scale at app size (spec Design 3, approved exception) */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1.0625rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.125rem;
+  --text-4xl: 2.5rem;
+  --text-5xl: 3.5rem;
+
+  /* SPOKES corners (spec Design 4) */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
 }
 
 html {
@@ -322,58 +431,23 @@ body {
   background: var(--app-background);
   color: var(--foreground);
   font-family: var(--font-body), sans-serif;
+  line-height: 1.6;
   position: relative;
   isolation: isolate;
   transition: background-color 300ms var(--ease-smooth), color 300ms var(--ease-smooth);
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    linear-gradient(112deg, rgba(0, 64, 113, 0.08), transparent 34%, rgba(55, 181, 80, 0.07) 68%, rgba(211, 178, 87, 0.08)),
-    repeating-linear-gradient(135deg, var(--ambient-lines) 0 1px, transparent 1px 28px),
-    repeating-linear-gradient(45deg, var(--ambient-lines-strong) 0 1px, transparent 1px 44px);
-  background-size: auto, 34rem 34rem, 52rem 52rem;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.26) 72%, transparent);
-  opacity: 0.72;
-  transition: opacity 300ms var(--ease-smooth);
-  animation: ambient-pan 48s linear infinite;
-}
-
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.10) 1px, transparent 1px);
-  background-size: 6rem 6rem;
-  opacity: 0.18;
-  mask-image: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.55) 18%, transparent 78%);
-  transition: opacity 300ms var(--ease-smooth);
-}
-
-[data-theme="dark"] body::before {
-  opacity: 0.36;
-}
-
-[data-theme="dark"] body::after {
-  opacity: 0.08;
 }
 
 ::selection {
   background: rgba(0, 123, 175, 0.25);
 }
 
-.font-display {
-  font-family: var(--font-display), var(--font-body), sans-serif;
-  letter-spacing: 0;
+@layer components {
+  /* DM Serif Display ships one weight; never let the browser fake a bold. */
+  .font-display {
+    font-family: var(--font-display), Georgia, serif;
+    font-synthesis-weight: none;
+    letter-spacing: -0.01em;
+  }
 }
 
 .panel {
@@ -403,7 +477,7 @@ body::after {
 
 [data-theme="dark"] .theme-card {
   box-shadow:
-    0 22px 48px rgba(0, 0, 0, 0.24),
+    0 22px 48px rgba(0, 19, 63, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
@@ -424,11 +498,11 @@ body::after {
 
 .theme-input {
   background: var(--surface-soft);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control);
   color: var(--ink-strong);
   box-shadow:
     inset 0 1px 0 var(--surface-overlay),
-    0 1px 2px rgba(15, 23, 42, 0.04);
+    0 1px 2px rgba(0, 64, 113, 0.04);
 }
 
 .theme-input::placeholder {
@@ -445,7 +519,7 @@ select.theme-input {
   color: var(--ink-strong);
   box-shadow:
     inset 0 1px 0 var(--surface-overlay),
-    0 1px 2px rgba(15, 23, 42, 0.04);
+    0 1px 2px rgba(0, 64, 113, 0.04);
 }
 
 input.theme-card-subtle::placeholder,
@@ -593,9 +667,9 @@ select.theme-input::placeholder {
 .auth-hero-panel {
   isolation: isolate;
   background:
-    linear-gradient(135deg, rgba(7, 23, 43, 0.98), rgba(0, 93, 138, 0.90) 45%, rgba(42, 138, 60, 0.74) 100%);
+    linear-gradient(135deg, rgba(0, 19, 63, 0.98), rgba(0, 123, 175, 0.90) 45%, rgba(30, 122, 46, 0.74) 100%);
   box-shadow:
-    0 32px 120px rgba(7, 23, 43, 0.28),
+    0 32px 120px rgba(0, 19, 63, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
@@ -653,7 +727,7 @@ select.theme-input::placeholder {
   border-radius: clamp(1.35rem, 1.05rem + 1vw, 1.75rem);
   border: 1px solid rgba(255, 255, 255, 0.18);
   background:
-    linear-gradient(135deg, rgba(0, 64, 113, 0.97), rgba(0, 123, 175, 0.88) 52%, rgba(42, 138, 60, 0.82));
+    linear-gradient(135deg, rgba(0, 64, 113, 0.97), rgba(0, 123, 175, 0.88) 52%, rgba(30, 122, 46, 0.82));
   color: white;
   box-shadow:
     0 28px 90px rgba(0, 64, 113, 0.24),
@@ -696,7 +770,7 @@ select.theme-input::placeholder {
   font-weight: 700;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: rgba(255, 241, 222, 0.76);
+  color: rgba(255, 255, 255, 0.76);
 }
 
 .page-title {
@@ -711,7 +785,7 @@ select.theme-input::placeholder {
 .page-subtitle {
   margin-top: 0.75rem;
   max-width: 44rem;
-  color: rgba(238, 245, 255, 0.85);
+  color: rgba(255, 255, 255, 0.85);
   font-size: 1rem;
   line-height: 1.65;
   text-wrap: pretty;
@@ -767,39 +841,29 @@ select.theme-input::placeholder {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
   position: relative;
-  overflow: hidden;
-  border-radius: 999px;
-  /* Plain fill first, for any browser that drops the color-mix() gradient. */
-  background-color: var(--accent-green);
-  background: linear-gradient(135deg, var(--accent-green), color-mix(in srgb, var(--accent-green) 82%, black) 50%, var(--accent-green));
-  background-size: 220% 100%;
-  color: var(--on-accent);
-  font-weight: 700;
+  border-radius: var(--radius-md);
+  /* SPOKES Button, primary variant: solid primary, white ink. */
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
   cursor: pointer;
-  box-shadow:
-    0 18px 36px rgba(55, 181, 80, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
   transition:
-    transform 120ms ease,
-    box-shadow 160ms ease,
-    filter 160ms ease,
-    background-position 420ms var(--ease-smooth);
+    transform var(--duration-normal) var(--ease-smooth),
+    box-shadow var(--duration-normal) var(--ease-smooth),
+    filter var(--duration-normal) var(--ease-smooth);
 }
 
 .primary-button:hover {
-  transform: translateY(-1px);
-  background-position: 100% 0;
-  filter: saturate(1.05);
-  box-shadow: 0 22px 42px rgba(55, 181, 80, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px var(--glow-primary);
+  filter: brightness(0.92);
 }
 
 .primary-button:active {
-  transform: scale(0.97);
-  box-shadow: 0 8px 18px rgba(55, 181, 80, 0.2);
-  filter: brightness(0.95);
-  transition-duration: 40ms;
+  transform: translateY(0) scale(0.97);
+  box-shadow: none;
 }
 
 .secondary-button {
@@ -807,12 +871,12 @@ select.theme-input::placeholder {
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.24);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.11));
   color: white;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transition: background-color 120ms ease, transform 120ms ease, border-color 120ms ease;
@@ -834,7 +898,7 @@ select.theme-input::placeholder {
 .select-field {
   width: 100%;
   border-radius: 1rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control);
   background:
     linear-gradient(180deg, var(--surface-sheen), transparent 50%),
     var(--surface-raised);
@@ -901,9 +965,9 @@ a[role="button"]:active,
 
 /* Focus visible styles for keyboard navigation */
 *:focus-visible {
-  outline: 2px solid var(--accent-strong);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 7px var(--focus-ring);
 }
 
 /* Remove focus outline for mouse clicks */
@@ -914,11 +978,6 @@ a[role="button"]:active,
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
-}
-
-@keyframes ambient-pan {
-  0% { background-position: 0 0, 0 0, 0 0; }
-  100% { background-position: 0 0, 34rem 34rem, -52rem 52rem; }
 }
 
 /* Cinematic animation keyframes */
@@ -985,7 +1044,7 @@ a[role="button"]:active,
   border: 1px solid var(--border);
   border-radius: 1rem;
   padding: 1.5rem 1.5rem 1.5rem 2.75rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 10px 25px -5px rgba(0, 19, 63, 0.04), 0 8px 10px -6px rgba(0, 19, 63, 0.03);
   transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) var(--ease-spring);
   background-image: repeating-linear-gradient(var(--paper-bg), var(--paper-bg) 2.2rem, var(--paper-line) 2.2rem, var(--paper-line) 2.25rem);
   background-size: 100% 2.25rem;
@@ -1010,10 +1069,10 @@ a[role="button"]:active,
   transform: translateX(-50%) rotate(-1deg);
   width: 6rem;
   height: 1.5rem;
-  background-color: rgba(254, 240, 138, 0.45); /* Semi-transparent yellow tape */
+  background-color: rgba(211, 178, 87, 0.45); /* Semi-transparent yellow tape */
   backdrop-filter: blur(1.5px);
-  border: 1px solid rgba(254, 240, 138, 0.25);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(211, 178, 87, 0.25);
+  box-shadow: 0 2px 4px rgba(0, 19, 63, 0.03);
   z-index: 10;
   pointer-events: none;
 }
@@ -1034,12 +1093,16 @@ a[role="button"]:active,
     scroll-behavior: auto !important;
   }
 
-  body::before,
-  body::after,
   .app-frame::before,
   .app-main::before,
   .app-sidebar::before,
   .page-hero::after {
     display: none;
+  }
+
+  .primary-button:hover,
+  .primary-button:active,
+  .surface-section:hover {
+    transform: none;
   }
 }

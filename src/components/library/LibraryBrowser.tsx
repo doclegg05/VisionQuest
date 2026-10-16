@@ -266,7 +266,7 @@ export default function LibraryBrowser() {
       {error && (
         <div
           role="alert"
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--error)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-danger"
         >
           {error}
         </div>
@@ -330,7 +330,7 @@ function DocumentCard({ doc, onPreview }: DocumentCardProps) {
       <div className="flex items-start gap-3">
         <FileIcon
           mimeType={doc.mimeType}
-          className="mt-0.5 size-8 shrink-0 text-[var(--accent-strong)]"
+          className="mt-0.5 size-8 shrink-0 text-success"
         />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold text-[var(--ink-strong)]" title={doc.title}>
@@ -357,14 +357,14 @@ function DocumentCard({ doc, onPreview }: DocumentCardProps) {
             ref={previewRef}
             type="button"
             onClick={() => onPreview(doc, previewRef.current)}
-            className="inline-flex size-8 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--accent-strong)] pointer-coarse:size-11"
+            className="inline-flex size-8 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-success pointer-coarse:size-11"
             aria-label={`Preview ${doc.title}`}
           >
             <Eye weight="bold" className="size-4" />
           </button>
           <a
             href={`/api/documents/download?id=${doc.id}&mode=download`}
-            className="inline-flex size-8 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--accent-strong)] pointer-coarse:size-11"
+            className="inline-flex size-8 items-center justify-center rounded-md text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] hover:text-success pointer-coarse:size-11"
             aria-label={`Download ${doc.title}`}
           >
             <Download weight="bold" className="size-4" />

@@ -407,7 +407,7 @@ export default function AiProviderPanel() {
           onClick={() => setProvider("local")}
           className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
             provider === "local"
-              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-[var(--accent-strong)]"
+              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-success"
               : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
           }`}
         >
@@ -418,7 +418,7 @@ export default function AiProviderPanel() {
           onClick={() => setProvider("cloud")}
           className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
             provider === "cloud"
-              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-[var(--accent-strong)]"
+              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-success"
               : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
           }`}
         >
@@ -470,17 +470,6 @@ export default function AiProviderPanel() {
               Answer length per job
             </summary>
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              Sage asks the local AI to do four different jobs. Leave a job blank to use
-              the main model above — that is the default, and often the right answer.
-              Every extra model you name stays loaded in memory alongside the others, so
-              add one only when a bake-off shows it earns its place.
-            </p>
-            <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              Compare models with{" "}
-              <code className="rounded bg-[var(--surface-muted)] px-1 py-0.5">
-                npm run sage:model:bakeoff -- --models=a,b,c
-              </code>
-              .
               All jobs use Gemma 4 12B. Adjust answer length below when needed.
             </p>
             <div className="mt-4 space-y-4">
@@ -820,7 +809,7 @@ function CapabilityRow({ label, ok }: { label: string; ok: boolean }) {
     <div className="flex items-center gap-2 text-sm">
       <span
         aria-hidden="true"
-        className={ok ? "text-[var(--accent-strong)]" : "text-[var(--badge-warning-text)]"}
+        className={ok ? "text-success" : "text-[var(--badge-warning-text)]"}
       >
         {ok ? "✓" : "⚠"}
       </span>

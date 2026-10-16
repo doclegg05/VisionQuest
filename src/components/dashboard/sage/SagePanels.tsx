@@ -17,7 +17,7 @@ import { SagePanelActions } from "./SagePanelActions";
 function CardShell({ eyebrow, children }: { eyebrow: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-info">
         {eyebrow}
       </p>
       <div className="mt-1.5 text-sm text-[var(--ink-strong)]">{children}</div>
@@ -61,7 +61,7 @@ function NextSteps({ card }: { card: Extract<PanelCard, { type: "next_steps" }> 
             {step.href ? (
               <Link
                 href={step.href}
-                className="inline-flex min-h-11 items-center underline decoration-[var(--accent-secondary)] underline-offset-2 hover:text-[var(--accent-secondary)]"
+                className="inline-flex min-h-11 items-center underline decoration-[var(--accent-secondary)] underline-offset-2 hover:text-info"
               >
                 {step.label}
               </Link>
@@ -88,7 +88,7 @@ function ResourcePointer({ card }: { card: Extract<PanelCard, { type: "resource_
     <CardShell eyebrow="Worth a look">
       <Link
         href={card.href}
-        className="inline-flex min-h-11 items-center font-semibold underline decoration-[var(--accent-secondary)] underline-offset-2 hover:text-[var(--accent-secondary)]"
+        className="inline-flex min-h-11 items-center font-semibold underline decoration-[var(--accent-secondary)] underline-offset-2 hover:text-info"
       >
         {card.title}
       </Link>

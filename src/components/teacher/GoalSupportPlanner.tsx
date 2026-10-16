@@ -227,7 +227,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                               href={link.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+                              className="inline-flex items-center pointer-coarse:min-h-11 text-xs font-semibold text-success hover:text-[var(--ink-strong)] hover:underline"
                             >
                               Open
                             </a>
@@ -390,7 +390,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                 {plan.suggestions.map((suggestion) => (
                   <span
                     key={suggestion}
-                    className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs text-[var(--accent-secondary)]"
+                    className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs text-info"
                   >
                     {suggestion}
                   </span>

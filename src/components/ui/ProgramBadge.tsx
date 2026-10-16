@@ -13,15 +13,16 @@ const PROGRAM_ICONS: Record<ProgramType, Icon> = {
   ietp: Wrench,
 };
 
+// IETP alone carries an outline, so the three programs differ by more than hue (spec Design 2.5).
 const PROGRAM_COLOR_CLASSES: Record<ProgramType, string> = {
   spokes: "bg-[var(--program-spokes-bg)] text-[var(--program-spokes-text)]",
   adult_ed: "bg-[var(--program-ae-bg)] text-[var(--program-ae-text)]",
-  ietp: "bg-[var(--program-ietp-bg)] text-[var(--program-ietp-text)]",
+  ietp: "border border-[var(--program-ietp-border)] bg-[var(--program-ietp-bg)] text-[var(--program-ietp-text)]",
 };
 
 const SIZE_CLASSES = {
   sm: {
-    container: "px-1.5 py-0.5 text-[0.65rem] gap-1",
+    container: "px-1.5 py-0.5 text-xs gap-1",
     icon: 12,
   },
   md: {

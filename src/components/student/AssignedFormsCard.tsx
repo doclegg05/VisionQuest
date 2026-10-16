@@ -82,7 +82,7 @@ export default function AssignedFormsCard() {
         <Link
           href="/forms"
           prefetch={false}
-          className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-green)]"
+          className="inline-flex min-h-11 items-center text-sm font-semibold text-success"
         >
           See all
         </Link>
