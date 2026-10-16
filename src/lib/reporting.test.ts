@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
 /**
- * getTeacherOutcomeReport — urgent alert counts.
+ * getTeacherOutcomeReport: urgent alerts.
  *
  * Crisis alerts are written with severity "critical"
  * (src/lib/sage/crisis-detection.ts), one rank above "high". The report's
- * urgent count, its summary total and its attention-queue order must all
- * treat a critical alert as at least as urgent as a high one.
+ * urgent count, its summary total, its attention-queue order and the alert
+ * it names first must all treat a critical alert as the most urgent kind.
  */
 
 interface AlertRow {
@@ -79,6 +79,12 @@ describe("getTeacherOutcomeReport urgent alerts", () => {
   it("includes critical alerts in the summary's urgent total", async () => {
     const report = await getTeacherOutcomeReport();
     assert.equal(report.summary.highSeverityAlerts, 2);
+  });
+
+  it("names the most urgent open alert as the student's top alert", async () => {
+    students = [studentRow("crisis", "Avery Crisis", [MEDIUM_1, CRISIS, HIGH])];
+    const report = await getTeacherOutcomeReport();
+    assert.equal(report.attentionQueue[0]?.topAlertTitle, CRISIS.title);
   });
 
   it("puts a student with a critical alert ahead of one with only medium alerts", async () => {

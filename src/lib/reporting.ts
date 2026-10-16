@@ -1,4 +1,4 @@
-import { isUrgentSeverity } from "./alert-severity";
+import { alertSeverityRank, isUrgentSeverity } from "./alert-severity";
 import { prisma } from "./db";
 import { classifyOutcomeVerification } from "./outcome-verification";
 
@@ -8,6 +8,14 @@ function latestDate(...values: Array<Date | null | undefined>) {
     if (!latest || value.getTime() > latest.getTime()) return value;
     return latest;
   }, null);
+}
+
+/** The open alert a teacher should read first: the highest severity, first one on a tie. */
+function mostUrgentAlert<T extends { severity: string }>(alerts: readonly T[]): T | null {
+  return alerts.reduce<T | null>(
+    (top, alert) => (!top || alertSeverityRank(alert.severity) > alertSeverityRank(top.severity) ? alert : top),
+    null,
+  );
 }
 
 function countDaysSince(value: Date, now: Date) {
@@ -233,7 +241,7 @@ export async function getTeacherOutcomeReport(studentIds?: string[]) {
       displayName: student.displayName,
       openAlertCount: student.alerts.length,
       highSeverityAlertCount: student.alerts.filter((alert) => isUrgentSeverity(alert.severity)).length,
-      topAlertTitle: student.alerts[0]?.title || null,
+      topAlertTitle: mostUrgentAlert(student.alerts)?.title || null,
       lastActivityAt,
       daysSinceActivity: lastActivityAt ? countDaysSince(lastActivityAt, now) : null,
       nextAppointmentAt,
