@@ -160,6 +160,20 @@ function isSafeWhenCapitalized(token: string): boolean {
 const PRONOUN_RE = /\b(his|hers?|theirs?|him|she|he|they)\b/iu;
 
 /**
+ * The fixed subject every extracted staff fact opens with. staff-extract.ts
+ * puts it in the prompt and checks for it; the guard uses it to recognize a
+ * framed fact. It lives here so the extractor can import it without a cycle.
+ */
+export const STAFF_FACT_SUBJECT = "This instructor";
+
+/**
+ * Third-person gendered pronouns. In a fact about "this instructor" they point
+ * at a third person. "they" and "their" are left out: the extractor uses them
+ * for the instructor and for learners in general.
+ */
+const GENDERED_PRONOUN_RE = /\b(he|she|him|his|her|hers)\b/iu;
+
+/**
  * True when `content` must not be stored as (or rendered from) a
  * teacher-subject memory. See the module header for the drop-biased rationale.
  */
@@ -205,10 +219,10 @@ export function looksLikeStudentReference(content: string): boolean {
   // mode for a drop-biased guard than the documented residual miss.
   //
   // Facts from staff-extract.ts open with "This instructor", so this check
-  // never fires on them: the extractor's frame check already rejects a
-  // lowercase name in the opening position. A lowercase name later in a
-  // framed fact ("This instructor says jasmine…") falls in the same residual
-  // as any mid-sentence lowercase name, which this check never covered.
+  // never fires on them, and a lowercase name sits later in the sentence
+  // ("This instructor says jasmine…"). The framed-fact check below covers the
+  // pronoun half of that case. A lowercase name with no pronoun still passes,
+  // the same residual as before.
   const firstToken = tokens[0];
   if (
     firstToken !== undefined &&
@@ -216,6 +230,18 @@ export function looksLikeStudentReference(content: string): boolean {
     !isSafeWhenCapitalized(firstToken) &&
     PRONOUN_RE.test(content)
   ) {
+    return true;
+  }
+
+  // Framed-fact check: a "This instructor …" fact is about the instructor, so
+  // a gendered pronoun in it refers to someone else, most likely a student.
+  // Drop-biased: an instructor's own "her caseload" is dropped too, which the
+  // prompt avoids by asking for "they". Measured on 66 stored facts in the
+  // 2026-10-16 A/B: 0 contained one. Running the lowercase-name check above on
+  // the text after the frame was measured too and rejected: it dropped 8 of
+  // the 66, mostly "This instructor performs their review pass…", because
+  // any verb missing from the allowlist plus "their" fires it.
+  if (content.startsWith(STAFF_FACT_SUBJECT) && GENDERED_PRONOUN_RE.test(content)) {
     return true;
   }
 

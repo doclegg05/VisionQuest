@@ -50,6 +50,28 @@ describe("looksLikeStudentReference", () => {
     }
   });
 
+  it("rejects a framed fact with a gendered pronoun, which points at someone else", () => {
+    // Behind the frame the lowercase-name check never sees a name, because the
+    // first word is always "This". A gendered pronoun in a fact about "this
+    // instructor" refers to a third person, so the guard drops it.
+    assert.equal(
+      looksLikeStudentReference("This instructor says jasmine needs a bus pass and is behind on her forms."),
+      true,
+    );
+    assert.equal(looksLikeStudentReference("This instructor checks in with him after class."), true);
+    // Drop-biased: an instructor's own "her caseload" goes too. The prompt asks
+    // for "they" and "their", and the 2026-10-16 A/B stored 0 gendered pronouns.
+    assert.equal(looksLikeStudentReference("This instructor reviews her caseload every Monday."), true);
+  });
+
+  it("keeps framed facts that use \"their\", and legacy unframed rows as before", () => {
+    assert.equal(
+      looksLikeStudentReference("This instructor performs their full review pass every Monday morning."),
+      false,
+    );
+    assert.equal(looksLikeStudentReference("Reviews her caseload every Monday."), false);
+  });
+
   it("still rejects a named person behind the fixed subject", () => {
     assert.equal(looksLikeStudentReference("This instructor says Jasmine needs a bus pass."), true);
     assert.equal(looksLikeStudentReference("This instructor is worried about Ángel missing class."), true);

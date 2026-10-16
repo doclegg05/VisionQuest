@@ -236,6 +236,7 @@ describe("staff facts open with the fixed subject \"This instructor\"", () => {
     await result;
     const systemPrompt: string = provider.generateStructuredResponse.mock.calls[0].arguments[0];
     assert.match(systemPrompt, /Start every fact with "This instructor"/);
+    assert.match(systemPrompt, /Refer to the instructor as "they" or "their", never "he" or "she"/);
     assert.doesNotMatch(systemPrompt, /starting with an ordinary verb/);
   });
 
@@ -268,23 +269,29 @@ describe("staff facts open with the fixed subject \"This instructor\"", () => {
     assert.deepEqual(storedContents(), [content]);
   });
 
-  it("does not accept a lowercase or partial frame", async () => {
+  it("does not accept a lowercase, partial or capitalized-verb frame", async () => {
+    // A capitalized verb after the subject puts the verb back in front of the
+    // proper-noun scan, where "Lacks" reads as a name and "Prefers" happens to
+    // pass. The frame check rejects both the same way.
     const json = JSON.stringify([
       item("this instructor prefers short answers."),
       item("This instructors' room opens at eight."),
       item("This prefers short answers."),
+      item("This instructor Prefers short answers."),
+      item("This instructor Lacks the authority to approve placements."),
     ]);
     const { result } = extractWith(json, "conv-frame-5");
-    assert.deepEqual(await result, { stored: 0, deduped: 0, rejected: 3 });
+    assert.deepEqual(await result, { stored: 0, deduped: 0, rejected: 5 });
   });
 
   it("still drops a framed fact that names a student", async () => {
     const json = JSON.stringify([
       item("This instructor says Jasmine needs a bus pass this month."),
       item("This instructor reports a student disclosed an eviction notice."),
+      item("This instructor says jasmine is behind on her forms."),
     ]);
     const { result } = extractWith(json, "conv-frame-6");
-    assert.deepEqual(await result, { stored: 0, deduped: 0, rejected: 2 });
+    assert.deepEqual(await result, { stored: 0, deduped: 0, rejected: 3 });
   });
 });
 

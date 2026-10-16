@@ -31,7 +31,7 @@ import {
   type ExtractionItem,
   type MemoryCandidate,
 } from "./schema";
-import { looksLikeStudentReference } from "./staff-privacy";
+import { looksLikeStudentReference, STAFF_FACT_SUBJECT } from "./staff-privacy";
 import { storeMemoryCandidates } from "./store";
 import {
   logEstimatedExtractionCost,
@@ -43,17 +43,19 @@ const MAX_STAFF_MEMORIES_PER_CONVERSATION = 3;
 const DEFAULT_STAFF_EXTRACT_DAILY_LIMIT = 100;
 
 /**
- * Every staff fact opens with this fixed subject. The privacy guard reads any
- * capitalized word missing from its allowlist as a name, so a fact that opens
- * with a verb of the model's choosing ("Lacks", "Translates", "Conducts") is
- * dropped as if it named a student. Behind the fixed subject the verb is
- * lowercase and the opener is always "This", which the guard allows. A fact
- * without the frame is rejected, not repaired, so a model that ignores the
- * instruction fails closed. The frame is stored as written: retrieve.ts runs
- * the guard again at render time, and a stripped "Lacks…" row would fail it.
+ * Every staff fact opens with STAFF_FACT_SUBJECT, then a lowercase word. The
+ * privacy guard reads any capitalized word missing from its allowlist as a
+ * name, so a fact that opens with a verb of the model's choosing ("Lacks",
+ * "Translates", "Conducts") is dropped as if it named a student. Behind the
+ * fixed subject the verb is lowercase and the opener is always "This", which
+ * the guard allows. The possessive "This instructor's …" also counts. A fact
+ * without the frame, or with a capitalized word after it, is rejected, not
+ * repaired, so a model that ignores the instruction fails closed. The frame
+ * is stored as written: retrieve.ts runs the guard again at render time, and
+ * a stripped "Lacks…" row would fail it. The pattern is built from a fixed
+ * constant, never from input.
  */
-const STAFF_FACT_SUBJECT = "This instructor";
-const STAFF_FACT_FRAME_RE = new RegExp(`^${STAFF_FACT_SUBJECT}\\b`);
+const STAFF_FACT_FRAME_RE = new RegExp(`^${STAFF_FACT_SUBJECT}(?:['’]s)?\\s+\\p{Ll}`, "u");
 
 /**
  * Layer 1 of the privacy design (the code guard is layer 2). The prompt is
@@ -74,7 +76,7 @@ HARD PRIVACY RULE — this is not student-record storage:
 - Never include anything a student disclosed, or any personal circumstance of any student.
 - If the conversation was only about individual students, return [].
 
-Start every fact with "${STAFF_FACT_SUBJECT}" followed by a lowercase verb, as one self-contained sentence: "${STAFF_FACT_SUBJECT} prefers three-bullet answers with the action first.", "${STAFF_FACT_SUBJECT} reviews flagged students every Monday before class.", "${STAFF_FACT_SUBJECT} cannot approve placements and routes them to the coordinator." A fact that does not start with "${STAFF_FACT_SUBJECT}" is discarded. Never put a name anywhere in the sentence.
+Start every fact with "${STAFF_FACT_SUBJECT}" followed by a lowercase verb, as one self-contained sentence: "${STAFF_FACT_SUBJECT} prefers three-bullet answers with the action first.", "${STAFF_FACT_SUBJECT} reviews flagged students every Monday before class.", "${STAFF_FACT_SUBJECT} cannot approve placements and routes them to the coordinator." A fact that does not start with "${STAFF_FACT_SUBJECT}" is discarded. Refer to the instructor as "they" or "their", never "he" or "she". Never put a name anywhere in the sentence.
 
 Respond with ONLY a JSON array (no prose). Each element:
 {
