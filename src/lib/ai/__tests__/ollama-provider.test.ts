@@ -442,7 +442,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
 
     async function collectStream(): Promise<string[]> {
       const result: string[] = [];
-      for await (const chunk of provider.streamResponse("sys", [
+      for await (const chunk of nativeProvider.streamResponse("sys", [
         { role: "user", content: "Hi" },
       ])) {
         result.push(chunk);
@@ -465,13 +465,18 @@ describe("OllamaProvider", { concurrency: false }, () => {
           "Ollama returned 400: request (4246 tokens) exceeds the available context size (2048 tokens), try increasing it",
       },
       { name: "a bare 500", error: "Ollama returned 500" },
+      // Native is this provider's only surface, so a missing model has no
+      // other path to retry on.
+      { name: "a 404 with a cause", error: "Ollama returned 404: model 'gemma4:e4b' not found" },
     ];
 
     for (const { name, error } of failsAtOnce) {
       it(`fails at once on ${name}`, async () => {
         failFirstRequestWith(error);
 
-        await assert.rejects(collectStream(), { message: error });
+        // The relay's text leads the message; a native 400 also gets the
+        // context-window hint from describeRejection after it.
+        await assert.rejects(collectStream(), (err: Error) => err.message.startsWith(error));
         assert.equal(mockFetch.mock.callCount(), 1);
       });
     }
@@ -479,7 +484,6 @@ describe("OllamaProvider", { concurrency: false }, () => {
     const switchesAndRetries = [
       { name: "a 503 with a cause", error: "Ollama returned 503: no healthy upstream" },
       { name: "a bare 503", error: "Ollama returned 503" },
-      { name: "a 404 with a cause", error: "Ollama returned 404: model 'gemma4:e4b' not found" },
     ];
 
     for (const { name, error } of switchesAndRetries) {
@@ -516,7 +520,7 @@ describe("OllamaProvider", { concurrency: false }, () => {
       ];
 
       await assert.rejects(async () => {
-        for await (const event of provider.streamWithTools(
+        for await (const event of nativeProvider.streamWithTools(
           "sys",
           [{ role: "user", content: "Hi" }],
           tools,
