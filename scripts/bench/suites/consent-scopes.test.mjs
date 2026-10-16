@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CHILD_ARGS, scoreTap } from "./consent-scopes.mjs";
+import { CHILD_ARGS, childEnv, scoreTap } from "./consent-scopes.mjs";
 
 // Real reporter output, not hand-typed TAP: each case runs a small node:test
 // file the way the scorer runs consent-scopes.bench.test.ts, so a change in
@@ -44,6 +44,12 @@ const THREE_PASSING = SUITE(`
 
 test("the child is asked for TAP, because Node 24's default reporter is spec even through a pipe", () => {
   assert.ok(CHILD_ARGS.includes("--test-reporter=tap"), CHILD_ARGS.join(" "));
+});
+
+test("only the scorer's own child gets RLS_TEST_ENABLED, and the caller's env is left alone", () => {
+  const env = { DATABASE_URL: "postgresql://bench@127.0.0.1:1/none" };
+  assert.deepEqual(childEnv(env), { ...env, RLS_TEST_ENABLED: "true" });
+  assert.equal(env.RLS_TEST_ENABLED, undefined);
 });
 
 test("three refusals score 0 writes over 3 samples, not over the one suite line", () => {

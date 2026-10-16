@@ -277,7 +277,7 @@ in CI.
 |---|---|---|
 | `crisis-latency`, `job-refresh`, `matching-scale`, `page-timing`, `sage-latency`, `nudge-sweep` (`sweep_ms`), `classroom-concurrency` | they report `ms`/`seconds`, so the number is a property of the machine, not of the code | the nightly `benchmarks.yml` run on `main`, whose commit-back seeds them from CI hardware |
 | `nudge-sweep`, `packet-privacy`, `query-plans` | need a migrated Postgres and the seeded cohort | the nightly run, or the `verify` job's hermetic pgvector service |
-| `consent-scopes`, `migration-drift-schema` | need a migrated Postgres plus an opt-in each, `RLS_TEST_ENABLED` and a dedicated shadow database | the `verify` job's gate step sets both and measures them on every PR. Both floor at 0, so neither needs a baseline row to fail |
+| `consent-scopes`, `migration-drift-schema` | need a migrated Postgres plus an opt-in each, `CONSENT_SCOPES_BENCH_ENABLED` and a dedicated shadow database | the `verify` job's gate step sets both and measures them on every PR. Both floor at 0, so neither needs a baseline row to fail |
 | `connect-journey`, `journey-day1`, `journey-teacher-loop`, `touch-targets`, `axe-authenticated` | need a browser and a running server | the `e2e` job's collectors |
 | `sage-grounding`, `sage-career`, `sage-readability`, `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when its key is present (`OPENROUTER_API_KEY` for the Sage model suites) |
 | `cron-health`, `cost-per-student`, `ferpa-routing`, `backup-drill` | need the prod read-only URL (an owner step) | once that secret exists |
@@ -345,12 +345,15 @@ still.
 4. `npx tsx scripts/bench/seed-cohort.ts` when that file exists, then
    `npm run bench -- --tier=gate --compare`, both pointed at the hermetic
    pgvector service so `postgres`/`cohort` suites meet a real migrated schema.
-   The gate step also sets `RLS_TEST_ENABLED` for `consent-scopes`, and points
-   `SHADOW_DATABASE_URL` for `migration-drift-schema` at `visionquest_shadow`,
-   a database the step before it creates on the same service. The replay
-   overwrites that database and never touches the shared one.
-   `scripts/bench/__tests__/ci-gate-opt-ins.test.mjs` fails if either opt-in
-   goes missing. The raw-SQL objects `schema.prisma` cannot declare, which the
+   The gate step also sets `CONSENT_SCOPES_BENCH_ENABLED` for
+   `consent-scopes`, and points `SHADOW_DATABASE_URL` for
+   `migration-drift-schema` at `visionquest_shadow`, a database the step
+   before it creates on the same service. The replay overwrites that database
+   and never touches the shared one. The consent scorer sets
+   `RLS_TEST_ENABLED` for its own child only. In the step env it would reach
+   `pii-log-grep`'s `npm test` and run the whole RLS suite inside that log
+   capture. `scripts/bench/__tests__/ci-gate-opt-ins.test.mjs` fails if either
+   opt-in goes missing or `RLS_TEST_ENABLED` moves into the step. The raw-SQL objects `schema.prisma` cannot declare, which the
    drift diff always proposes dropping, are listed with their reasons in
    `config/benchmarks/fixtures/migration-drift-schema.json`.
 

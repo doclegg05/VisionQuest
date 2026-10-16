@@ -63,11 +63,22 @@ function describeCounts(counts) {
     .join(", ");
 }
 
+// The test file gates on RLS_TEST_ENABLED, rls.test.ts's convention. Set in a
+// workflow step, that variable would also reach every other `npm test` the
+// step runs (pii-log-grep's log capture is one) and start the whole RLS suite
+// there. So this scorer has its own switch and hands RLS_TEST_ENABLED to its
+// child alone.
+const OPT_IN = "CONSENT_SCOPES_BENCH_ENABLED";
+
+export function childEnv(env) {
+  return { ...env, RLS_TEST_ENABLED: "true" };
+}
+
 export async function run(ctx) {
   const databaseUrl = ctx?.env?.databaseUrl ?? process.env.DATABASE_URL;
-  const rlsTestEnabled = process.env.RLS_TEST_ENABLED === "true";
+  const optedIn = process.env[OPT_IN] === "true";
 
-  if (!databaseUrl || !rlsTestEnabled) {
+  if (!databaseUrl || !optedIn) {
     return {
       metrics: [
         {
@@ -78,7 +89,7 @@ export async function run(ctx) {
             skipped: true,
             reason: !databaseUrl
               ? "no DATABASE_URL"
-              : "RLS_TEST_ENABLED is not \"true\" — this suite writes real fixture rows and is opt-in, same convention as src/lib/rls.test.ts",
+              : `${OPT_IN} is not "true". This suite writes real fixture rows, so it is opt-in`,
           },
         },
       ],
@@ -89,7 +100,7 @@ export async function run(ctx) {
     const chunks = [];
     const child = spawn("npx", CHILD_ARGS, {
       cwd: REPO_ROOT,
-      env: process.env,
+      env: childEnv(process.env),
     });
     const timer = setTimeout(() => child.kill("SIGKILL"), RUN_TIMEOUT_MS);
     child.stdout.on("data", (d) => chunks.push(d));
@@ -140,7 +151,7 @@ export function scoreTap(tapText, exitCode) {
 }
 
 if (process.argv.includes("--self-test")) {
-  // Self-test never has RLS_TEST_ENABLED, so it proves the skip path works
+  // Self-test never has the opt-in, so it proves the skip path works
   // without touching a database. scoreTap's own cases are in
   // consent-scopes.test.mjs.
   run({ fixture: null, fixturePath: TEST_FILE, env: {}, log: console.log, now: () => new Date() })
@@ -148,7 +159,7 @@ if (process.argv.includes("--self-test")) {
       console.log(JSON.stringify(result, null, 2));
       const metric = result.metrics[0];
       if (!metric.details.skipped) {
-        console.error("FAIL: expected a clean skip with no DATABASE_URL/RLS_TEST_ENABLED set");
+        console.error(`FAIL: expected a clean skip with no DATABASE_URL/${OPT_IN} set`);
         process.exit(1);
       }
       process.exit(0);

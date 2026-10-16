@@ -209,8 +209,8 @@ jobs:
       # and never fail the run, so the Gemini-backed and prod-read-only suites
       # stay quiet here (they belong to benchmarks.yml, nightly). Two gate
       # suites also need an opt-in beyond `requires`, and the step gives both:
-      # RLS_TEST_ENABLED for consent-scopes and SHADOW_DATABASE_URL for
-      # migration-drift-schema.
+      # CONSENT_SCOPES_BENCH_ENABLED for consent-scopes and
+      # SHADOW_DATABASE_URL for migration-drift-schema.
       #
       # Placed after the migrate step so a suite that requires `postgres` or
       # `cohort` meets a real, migrated schema in the hermetic pgvector
@@ -243,12 +243,13 @@ jobs:
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
-          # consent-scopes writes real fixture rows, so it is opt-in through
-          # the same switch as the RLS step above. It connects as postgres,
-          # like that step, so what it measures is the app's own consent
-          # checks: no RLS policy hides a row, and a refusal can only come
-          # from the missing consent.
-          RLS_TEST_ENABLED: "true"
+          # consent-scopes writes real fixture rows, so it is opt-in. Its
+          # scorer hands RLS_TEST_ENABLED to its own child only: set here, it
+          # would also reach pii-log-grep's `npm test`, whose glob holds the
+          # whole RLS suite. It connects as postgres, like the RLS step, so it
+          # measures the app's own consent checks; no policy can hide the rows
+          # a refusal depends on.
+          CONSENT_SCOPES_BENCH_ENABLED: "true"
           SHADOW_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_shadow"
 
       - name: Upload benchmark results

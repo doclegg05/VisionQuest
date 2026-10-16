@@ -413,7 +413,15 @@ test("a suite with one self-skipped metric takes its verdict from the measured o
 // branch emits the same shape as its unseeded-cohort branch, which needs a
 // database to reach. `requires` is emptied so the scorer's own guard runs.
 const REAL_SELF_SKIPS = [
-  { suite: "consent-scopes", env: { DATABASE_URL: "postgresql://bench@127.0.0.1:1/none", RLS_TEST_ENABLED: "" } },
+  // RLS_TEST_ENABLED alone must not start it: the scorer has its own switch.
+  {
+    suite: "consent-scopes",
+    env: {
+      DATABASE_URL: "postgresql://bench@127.0.0.1:1/none",
+      RLS_TEST_ENABLED: "true",
+      CONSENT_SCOPES_BENCH_ENABLED: "",
+    },
+  },
   { suite: "migration-drift-schema", env: { SHADOW_DATABASE_URL: "" } },
   { suite: "nudge-sweep", env: { DATABASE_URL: "" } },
 ];

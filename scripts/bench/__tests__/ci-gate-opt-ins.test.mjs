@@ -28,7 +28,14 @@ function envValue(body, name) {
 const databaseName = (url) => new URL(url).pathname.slice(1);
 
 test("the gate step opts consent-scopes in", () => {
-  assert.equal(envValue(step("Gate-tier benchmarks").body, "RLS_TEST_ENABLED"), "true");
+  assert.equal(envValue(step("Gate-tier benchmarks").body, "CONSENT_SCOPES_BENCH_ENABLED"), "true");
+});
+
+test("the gate step leaves RLS_TEST_ENABLED to the scorer's own child", () => {
+  // pii-log-grep, in the same step, runs `npm test` with the step's env, and
+  // that glob holds src/lib/rls.test.ts. Set here, it would run the whole RLS
+  // suite against this database inside pii-log-grep's bounded log capture.
+  assert.equal(envValue(step("Gate-tier benchmarks").body, "RLS_TEST_ENABLED"), null);
 });
 
 test("the gate step gives migration-drift-schema a shadow database that is not the shared one", () => {
