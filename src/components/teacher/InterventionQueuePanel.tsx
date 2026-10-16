@@ -18,6 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import { api, apiFetch } from "@/lib/api";
 import ProgramBadge from "@/components/ui/ProgramBadge";
+import { FormDialog } from "@/components/ui/FormDialog";
 import { WELLBEING_ALERT_TYPE, formatWellbeingQueueLine } from "@/lib/sage/wellbeing-card";
 import DashboardActionPanel, { type DashboardActionIntent } from "./DashboardActionPanel";
 import {
@@ -107,7 +108,7 @@ const NOTE_CATEGORY_OPTIONS = [
 
 // ─── Quick Task Modal ─────────────────────────────────────────────────────────
 
-function QuickTaskModal({
+export function QuickTaskModal({
   studentId,
   studentName,
   onClose,
@@ -155,51 +156,55 @@ function QuickTaskModal({
     }
   }
 
+  const dirty = title !== "" || dueAt !== "";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-2xl bg-[var(--surface-raised)] p-5 shadow-xl space-y-3"
-      >
-        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
-          Quick task for {studentName}
-        </h3>
+    <FormDialog title={`Quick task for ${studentName}`} dirty={dirty} onClose={onClose} widthClass="max-w-md">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {error && <p className="text-sm text-[var(--error)]">{error}</p>}
-        <input
-          type="text"
-          placeholder="What needs to be done?"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          autoFocus
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-        />
-        <input
-          type="date"
-          value={dueAt}
-          onChange={(e) => setDueAt(e.target.value)}
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-        />
+        <label className="block space-y-1.5">
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">What needs to be done?</span>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            autoFocus
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Due date (optional)</span>
+          <input
+            type="date"
+            value={dueAt}
+            onChange={(e) => setDueAt(e.target.value)}
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+          />
+        </label>
         <div className="flex gap-2 justify-end">
-          <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] px-3 py-1.5"
+          >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || !title.trim()}
-            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="primary-button pointer-coarse:min-h-11 text-sm px-4 py-1.5 rounded-lg disabled:opacity-50"
           >
             {saving ? "Creating..." : "Create Task"}
           </button>
         </div>
       </form>
-    </div>
+    </FormDialog>
   );
 }
 
 // ─── Quick Note Modal ─────────────────────────────────────────────────────────
 
-function QuickNoteModal({
+export function QuickNoteModal({
   studentId,
   studentName,
   onClose,
@@ -243,56 +248,63 @@ function QuickNoteModal({
     }
   }
 
+  const dirty = body !== "" || category !== "general";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-2xl bg-[var(--surface-raised)] p-5 shadow-xl space-y-3"
-      >
-        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
-          Quick note for {studentName}
-        </h3>
+    <FormDialog title={`Quick note for ${studentName}`} dirty={dirty} onClose={onClose} widthClass="max-w-md">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {error && <p className="text-sm text-[var(--error)]">{error}</p>}
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-        >
-          {NOTE_CATEGORY_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <textarea
-          placeholder="Add a note about this student..."
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          autoFocus
-          rows={3}
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] resize-none"
-        />
+        {/* Note comes first: showModal() focuses the dialog's first focusable
+            field, and React's autoFocus cannot reach a field inside a dialog
+            that is still closed at commit time. */}
+        <label className="block space-y-1.5">
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Note</span>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            autoFocus
+            rows={3}
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] resize-none"
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Category</span>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+          >
+            {NOTE_CATEGORY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="flex gap-2 justify-end">
-          <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] px-3 py-1.5"
+          >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || !body.trim()}
-            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="primary-button pointer-coarse:min-h-11 text-sm px-4 py-1.5 rounded-lg disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save Note"}
           </button>
         </div>
       </form>
-    </div>
+    </FormDialog>
   );
 }
 
 // ─── Quick Appointment Modal ──────────────────────────────────────────────────
 
-function QuickAppointmentModal({
+export function QuickAppointmentModal({
   studentId,
   studentName,
   onClose,
@@ -343,46 +355,55 @@ function QuickAppointmentModal({
     }
   }
 
+  const dirty = title !== "" || startsAt !== "";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-2xl bg-[var(--surface-raised)] p-5 shadow-xl space-y-3"
-      >
-        <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
-          Schedule appointment with {studentName}
-        </h3>
+    <FormDialog
+      title={`Schedule appointment with ${studentName}`}
+      dirty={dirty}
+      onClose={onClose}
+      widthClass="max-w-md"
+    >
+      <form onSubmit={handleSubmit} className="space-y-3">
         <p className="text-xs text-[var(--ink-muted)]">Duration defaults to 30 minutes.</p>
         {error && <p className="text-sm text-[var(--error)]">{error}</p>}
-        <input
-          type="text"
-          placeholder="Appointment title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          autoFocus
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-        />
-        <input
-          type="datetime-local"
-          value={startsAt}
-          onChange={(e) => setStartsAt(e.target.value)}
-          className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-        />
+        <label className="block space-y-1.5">
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Appointment title</span>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            autoFocus
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="block text-sm font-medium text-[var(--ink-strong)]">Date and time</span>
+          <input
+            type="datetime-local"
+            value={startsAt}
+            onChange={(e) => setStartsAt(e.target.value)}
+            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+          />
+        </label>
         <div className="flex gap-2 justify-end">
-          <button type="button" onClick={onClose} className="text-sm text-[var(--ink-muted)] px-3 py-1.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-[var(--ink-muted)] px-3 py-1.5"
+          >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || !title.trim() || !startsAt}
-            className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="primary-button pointer-coarse:min-h-11 text-sm px-4 py-1.5 rounded-lg disabled:opacity-50"
           >
             {saving ? "Scheduling..." : "Schedule"}
           </button>
         </div>
       </form>
-    </div>
+    </FormDialog>
   );
 }
 
@@ -407,13 +428,14 @@ function StudentRow({
   const reason = student.primaryAlert?.title ?? topReason(student.signals);
   const { signals } = student;
   const actionIntent = buildQueueActionIntent(student);
+  const evidenceGapLabel = `${signals.evidenceGapCount} evidence gap(s) — review Goals & Plan`;
 
   return (
     <div className="flex flex-col gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)] lg:flex-row lg:items-center">
       {/* Avatar placeholder */}
       <Link
         href={`/teacher/students/${student.studentId}`}
-        className="shrink-0"
+        className="inline-flex size-8 shrink-0 items-center justify-center pointer-coarse:size-11"
         aria-label={`Open ${student.name}'s student profile`}
       >
         <UserCircle
@@ -425,7 +447,7 @@ function StudentRow({
       </Link>
 
       {/* Name + reason */}
-      <Link href={`/teacher/students/${student.studentId}`} className="min-w-0 flex-1">
+      <Link href={`/teacher/students/${student.studentId}`} className="min-w-0 flex-1 pointer-coarse:min-h-11">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-semibold text-[var(--ink-strong)]">
             {student.name}
@@ -455,37 +477,39 @@ function StudentRow({
       <div className="flex shrink-0 items-center gap-2 text-[var(--ink-muted)]">
         {signals.stalledGoalCount > 0 && (
           <span title={`${signals.stalledGoalCount} stalled goal(s)`}>
-            <Target size={16} weight="duotone" className="text-amber-500" />
+            <Target size={16} weight="duotone" className="text-[var(--badge-warning-text)]" />
           </span>
         )}
         {signals.overdueTaskCount > 0 && (
           <span title={`${signals.overdueTaskCount} overdue task(s)`}>
-            <CalendarX size={16} weight="duotone" className="text-orange-500" />
+            <CalendarX size={16} weight="duotone" className="text-[var(--badge-error-text)]" />
           </span>
         )}
         {signals.highSeverityAlertCount > 0 && (
           <span title={`${signals.highSeverityAlertCount} high-severity alert(s)`}>
-            <Warning size={16} weight="duotone" className="text-red-500" />
+            <Warning size={16} weight="duotone" className="text-[var(--badge-error-text)]" />
           </span>
         )}
         {signals.unmatchedGoalCount > 0 && (
           <span title={`${signals.unmatchedGoalCount} goal(s) without pathway`}>
-            <ClipboardText size={16} weight="duotone" className="text-purple-500" />
+            <ClipboardText size={16} weight="duotone" className="text-[var(--badge-info-text)]" />
           </span>
         )}
         {signals.evidenceGapCount > 0 && (
           <Link
             href={`/teacher/students/${student.studentId}`}
-            title={`${signals.evidenceGapCount} evidence gap(s) — review Goals & Plan`}
+            title={evidenceGapLabel}
+            aria-label={evidenceGapLabel}
+            className="inline-flex size-8 items-center justify-center pointer-coarse:size-11"
             onClick={(e) => e.stopPropagation()}
           >
-            <BookOpenText size={16} weight="duotone" className="text-blue-500" />
+            <BookOpenText size={16} weight="duotone" className="text-[var(--badge-info-text)]" />
           </Link>
         )}
       </div>
 
       {/* Quick actions */}
-      <div className="flex shrink-0 flex-wrap items-center gap-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {actionIntent ? (
           <button
             type="button"
@@ -493,14 +517,14 @@ function StudentRow({
               e.preventDefault();
               onPrimaryAction(student);
             }}
-            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
+            className="inline-flex items-center pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
           >
             {student.recommendedAction.label}
           </button>
         ) : (
           <Link
             href={student.recommendedAction.href}
-            className="rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
+            className="inline-flex items-center pointer-coarse:min-h-11 rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-green)]/90"
           >
             {student.recommendedAction.label}
           </Link>
@@ -514,7 +538,8 @@ function StudentRow({
                 onAlertAction(student.primaryAlert!.id, "snooze");
               }}
               title="Snooze for 24 hours"
-              className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+              aria-label="Snooze for 24 hours"
+              className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
             >
               <Clock size={16} weight="regular" />
             </button>
@@ -525,7 +550,8 @@ function StudentRow({
                 onAlertAction(student.primaryAlert!.id, "resolve");
               }}
               title="Mark resolved"
-              className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+              aria-label="Mark resolved"
+              className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
             >
               <CheckCircle size={16} weight="regular" />
             </button>
@@ -537,7 +563,8 @@ function StudentRow({
             onQuickNote(student.studentId, student.name);
           }}
           title="Add quick note"
-          className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+          aria-label="Add quick note"
+          className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
         >
           <NotePencil size={16} weight="regular" />
         </button>
@@ -547,7 +574,8 @@ function StudentRow({
             onSchedule(student.studentId, student.name);
           }}
           title="Schedule appointment"
-          className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+          aria-label="Schedule appointment"
+          className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
         >
           <CalendarPlus size={16} weight="regular" />
         </button>
@@ -557,7 +585,8 @@ function StudentRow({
             onQuickTask(student.studentId, student.name);
           }}
           title="Assign quick task"
-          className="rounded-lg p-1.5 text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
+          aria-label="Assign quick task"
+          className="inline-flex size-8 items-center justify-center pointer-coarse:size-11 rounded-lg text-[var(--ink-muted)] hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)]"
         >
           <DotsThree size={18} weight="bold" />
         </button>

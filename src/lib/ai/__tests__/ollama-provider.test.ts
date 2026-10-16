@@ -473,6 +473,140 @@ describe("OllamaProvider", { concurrency: false }, () => {
     });
   });
 
+  // The relay reports an upstream failure as `Ollama returned NNN[: cause]`.
+  // The status decides retry and native switch; words in the cause must not.
+  describe("relay status lines", () => {
+    const encoder = new TextEncoder();
+    const RUNNER_CRASH = "llama runner process has terminated: exit status 2";
+
+    function relayErrorResponse(error: string): Response {
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode(": heartbeat\n\n"));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error })}\n\n`));
+            controller.close();
+          },
+        }),
+        { status: 200 },
+      );
+    }
+
+    function nativeReplyResponse(text: string): Response {
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(JSON.stringify({ message: { content: text }, done: false }) + "\n"),
+            );
+            controller.enqueue(
+              encoder.encode(JSON.stringify({ message: { content: "" }, done: true }) + "\n"),
+            );
+            controller.close();
+          },
+        }),
+        { status: 200 },
+      );
+    }
+
+    /** The first request gets the relay error; any retry succeeds. */
+    function failFirstRequestWith(error: string): void {
+      let requests = 0;
+      mockFetch.mock.mockImplementation(async () => {
+        requests += 1;
+        return requests === 1 ? relayErrorResponse(error) : nativeReplyResponse("Recovered");
+      });
+    }
+
+    async function collectStream(): Promise<string[]> {
+      const result: string[] = [];
+      for await (const chunk of provider.streamResponse("sys", [
+        { role: "user", content: "Hi" },
+      ])) {
+        result.push(chunk);
+      }
+      return result;
+    }
+
+    const failsAtOnce = [
+      {
+        name: "a 500 runner crash whose cause says terminated",
+        error: `Ollama returned 500: ${RUNNER_CRASH}`,
+      },
+      {
+        name: "a 500 whose cause mentions a retryable status",
+        error: "Ollama returned 500: upstream said Ollama returned 503",
+      },
+      {
+        name: "a 400 oversize-prompt cause",
+        error:
+          "Ollama returned 400: request (4246 tokens) exceeds the available context size (2048 tokens), try increasing it",
+      },
+      { name: "a bare 500", error: "Ollama returned 500" },
+    ];
+
+    for (const { name, error } of failsAtOnce) {
+      it(`fails at once on ${name}`, async () => {
+        failFirstRequestWith(error);
+
+        await assert.rejects(collectStream(), { message: error });
+        assert.equal(mockFetch.mock.callCount(), 1);
+      });
+    }
+
+    const switchesAndRetries = [
+      { name: "a 503 with a cause", error: "Ollama returned 503: no healthy upstream" },
+      { name: "a bare 503", error: "Ollama returned 503" },
+      { name: "a 404 with a cause", error: "Ollama returned 404: model 'gemma4:e4b' not found" },
+    ];
+
+    for (const { name, error } of switchesAndRetries) {
+      it(`retries on the native path after ${name}`, async () => {
+        failFirstRequestWith(error);
+
+        assert.deepEqual(await collectStream(), ["Recovered"]);
+        assert.equal(mockFetch.mock.callCount(), 2);
+        assert.equal(mockFetch.mock.calls[1].arguments[0], "http://localhost:11434/api/chat");
+      });
+    }
+
+    it("still retries transport words in an error that is not a status line", async () => {
+      failFirstRequestWith(RUNNER_CRASH);
+
+      assert.deepEqual(await collectStream(), ["Recovered"]);
+      assert.equal(mockFetch.mock.callCount(), 2);
+    });
+
+    it("fails a tool hop at once on a 500 runner crash", async () => {
+      const error = `Ollama returned 500: ${RUNNER_CRASH}`;
+      failFirstRequestWith(error);
+      const onToolCall = mock.fn(async () => ({
+        response: {},
+        summary: "unused",
+        status: "success" as const,
+      }));
+      const tools = [
+        {
+          name: "lookup_thing",
+          description: "Look up a thing.",
+          parameters: { type: "object" as const, properties: {} },
+        },
+      ];
+
+      await assert.rejects(async () => {
+        for await (const event of provider.streamWithTools(
+          "sys",
+          [{ role: "user", content: "Hi" }],
+          tools,
+          onToolCall,
+        )) {
+          void event;
+        }
+      }, { message: error });
+      assert.equal(mockFetch.mock.callCount(), 1);
+    });
+  });
+
   describe("onUsage", () => {
     it("generateResponse reports real usage from OpenAI-compat 'usage' field", async () => {
       mockFetch.mock.mockImplementationOnce(async () =>

@@ -127,7 +127,7 @@ export default function FormRollupList({ regionId }: { regionId: string }) {
                 <a
                   href={`/api/teacher/forms/${template.templateId}/export`}
                   download
-                  className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)]"
+                  className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] pointer-coarse:min-h-11"
                 >
                   CSV
                 </a>

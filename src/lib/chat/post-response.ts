@@ -48,7 +48,11 @@ import { recordInsight } from "@/lib/sage/record-insight";
 import { proposeGoal } from "@/lib/sage/propose-goal";
 import { maybeCreateGoalProposalWager } from "@/lib/sage/propose-goal-wager";
 import { extractMoodFromConversation } from "@/lib/sage/mood-extractor";
-import { extractDiscoverySignals, topClusterIds } from "@/lib/sage/discovery-extractor";
+import {
+  extractDiscoverySignals,
+  topClusterIds,
+  type DiscoveryResult,
+} from "@/lib/sage/discovery-extractor";
 import { determineStage } from "@/lib/sage/system-prompts";
 import { detectAndRecordClassroomConfirmation } from "@/lib/sage/classroom-confirmation";
 import { extractAndStoreMemories } from "@/lib/sage/memory/extract";
@@ -78,6 +82,39 @@ const DEFAULT_MEMORY_EXTRACT_DAILY_LIMIT = 200;
 function getMemoryExtractDailyLimit(): number {
   const raw = Number.parseInt(process.env.SAGE_MEMORY_EXTRACT_DAILY_LIMIT ?? "", 10);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MEMORY_EXTRACT_DAILY_LIMIT;
+}
+
+/**
+ * True when a parsed discovery extraction recorded nothing at all: no list
+ * entry, no score above zero, no summary text, and no completion. Each pass
+ * replaces the stored CareerDiscovery fields wholesale, so writing an empty
+ * pass can only erase what earlier turns found. The model returns this
+ * shape when it has nothing yet (the prompt asks for it), and a local model
+ * in JSON mode can return a bare `{}`. Neither is a failure, so neither is
+ * dead-lettered; the turn simply writes nothing. A missing row means the
+ * teacher's Career Discovery card reads "Not Started" until a turn carries
+ * a signal, which is what that card already shows when no row exists.
+ */
+function isEmptyDiscoveryResult(result: DiscoveryResult): boolean {
+  const lists = [
+    result.interests,
+    result.strengths,
+    result.subjects,
+    result.problems,
+    result.values,
+    result.circumstances,
+    result.national_career_clusters,
+    result.transferable_skills,
+    result.work_values,
+  ];
+  return (
+    !result.stage_complete &&
+    lists.every((list) => list.length === 0) &&
+    Object.values(result.cluster_scores).every((score) => score <= 0) &&
+    Object.values(result.riasec_scores).every((score) => score <= 0) &&
+    result.summary.trim() === "" &&
+    result.assessment_summary.trim() === ""
+  );
 }
 
 // ─── Per-turn model-call budget (priority order + optional cap) ─────────────
@@ -485,6 +522,13 @@ async function runPostResponse(
             xp: 25,
             mutate: () => {},
           }).catch((err) => logger.error("Failed to award discovery XP", { error: String(err) }));
+        } else if (isEmptyDiscoveryResult(discoveryResult)) {
+          // Writing an empty pass would erase what earlier turns found. The
+          // log line is the only trace if a model keeps replying with nothing.
+          logger.info("Discovery extraction found no signals; CareerDiscovery left unchanged", {
+            student: studentLogKey(studentId),
+            conversationId,
+          });
         } else {
           await upsertDiscoveryFromExtraction(studentId, upsertData);
         }

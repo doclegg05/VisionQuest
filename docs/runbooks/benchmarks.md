@@ -95,6 +95,11 @@ await selfTest(import.meta.url, run); // inert unless run directly with --self-t
 - Return one entry per declared metric. A declared metric the scorer does not
   return is an `error`, not a silent pass; an undeclared metric is dropped with
   a warning.
+- To skip yourself (an opt-in variable is unset, a fixture was not seeded),
+  return every metric with `details: { skipped: true, reason: "…" }`. Only the
+  boolean `true` counts, so keep anything else out of `details.skipped`. A list
+  of students you could not score is evidence; give it its own key
+  (matching-quality uses `studentsSkippedSample`).
 - Optionally return `provider` and `model` alongside `metrics` — they land in
   the result and the baseline row.
 
@@ -104,7 +109,7 @@ The `ctx` handed to `run`:
 |---|---|
 | `fixture` | the parsed fixture JSON, or `null` when the suite declares none (or a non-JSON path) |
 | `fixturePath` | absolute path to the fixture, or `null` |
-| `env` | `{ databaseUrl, geminiApiKey, ollamaHost, baseUrl, prodReadonlyUrl, playwright }` — every value a string or `null`, never `undefined` |
+| `env` | `{ databaseUrl, geminiApiKey, ollamaHost, baseUrl, prodReadonlyUrl, playwright, openrouterApiKey }` — every value a string or `null`, never `undefined` |
 | `log` | `(...args) => void`, prefixed with the suite name |
 | `now` | `() => Date` |
 | `suite`, `config` | the suite name and its parsed config |
@@ -173,11 +178,12 @@ cross is not a gate, and `bench:validate` says so.
 
 ### `requires`
 
-`postgres` · `cohort` · `gemini` · `ollama` · `browser` · `prod-readonly` ·
-`server`. The runner maps each to an environment variable —
+`postgres` · `cohort` · `gemini` · `ollama` · `openrouter` · `browser` ·
+`prod-readonly` · `server`. The runner maps each to an environment variable:
 `DATABASE_URL` (for both `postgres` and `cohort`), `GEMINI_API_KEY`,
-`OLLAMA_HOST`, `PLAYWRIGHT`, `BENCH_PROD_READONLY_URL`, `BENCH_BASE_URL` — and
-marks the suite **`skipped`** when one is unset. Skipped is never a failure:
+`OLLAMA_HOST`, `OPENROUTER_API_KEY`, `PLAYWRIGHT`, `BENCH_PROD_READONLY_URL`,
+`BENCH_BASE_URL`. It marks the suite **`skipped`** when one is unset.
+`openrouter` is for synthetic fixtures only; see `docs/runbooks/openrouter-test-bench.md`. Skipped is never a failure:
 the missing secrets are owner steps, and a benchmark that reds a PR because a
 key was never set teaches everyone to ignore the gate.
 
@@ -209,11 +215,25 @@ whether or not the metric is `exact`.
 | `watch` | below `baseline − tolerance` (above `baseline + tolerance` for a `lower` metric) but still inside the floor |
 | `fail` | the floor was crossed, or an `exact` metric moved off its baseline |
 | `info` | nothing to judge against — no floor **and** no baseline |
-| `skipped` | no value: the suite's `requires` were unmet |
-| `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met |
+| `skipped` | no value: the suite's `requires` were unmet, or the scorer marked the metric `details.skipped: true`. On every tier. The runner records a self-skipped metric's value as `null`, so the placeholder the scorer returned (often `0`) is never judged, shown or written to the baseline |
+| `error` | the scorer threw, did not return a declared metric, or returned `null` for a gate/nightly metric whose `requires` were met, or measured zero samples (`n: 0`) for a floored gate/nightly metric. A metric the scorer marks `details.skipped: true` is `skipped`, not an error. Issue #220: `sage-latency` passed its 6000 ms floor for a week with `p95_ms: 0` over no samples |
 
 The suite's own `status` is the worst of its metrics, except `skipped` and
-`error`, which are facts about the run rather than about any metric.
+`error`, which are facts about the run rather than about any metric. A suite
+whose scorer skipped every metric is `skipped`, and its `skipped` note carries
+the scorer's `details.reason`. Before this rule, consent-scopes and
+migration-drift-schema reported `pass` in the PR gate tier while measuring
+nothing, and nudge-sweep's unseeded-cohort skip reported `error`.
+
+A zero-sample error carries no metrics, so its message does that work. It
+names the metrics with no sample, then lists every value the scorer reported
+with its `n`, all on the first line, because the nightly regression issue
+quotes only that line. `nudge-sweep` gives each metric its own sample:
+students texted for `daily_cap_exceeded` and `duplicate_open_questions`, the
+three sweeps for `sweep_blocked` and `send_errors`, the concurrent pair for
+`concurrent_run_not_skipped`, probe attempts for `send_error_detector_blind`,
+and the one timed sweep for the rest. When every sweep is blocked and nobody
+gets a text, the error still shows `sweep_blocked=3 (n=3)`.
 
 ---
 
@@ -266,9 +286,10 @@ in CI.
 | Deferred | Why | Where its baseline comes from |
 |---|---|---|
 | `crisis-latency`, `job-refresh`, `matching-scale`, `page-timing`, `sage-latency`, `nudge-sweep` (`sweep_ms`), `classroom-concurrency` | they report `ms`/`seconds`, so the number is a property of the machine, not of the code | the nightly `benchmarks.yml` run on `main`, whose commit-back seeds them from CI hardware |
-| `nudge-sweep`, `packet-privacy`, `query-plans`, `consent-scopes`, `migration-drift-schema` | need a migrated Postgres and the seeded cohort | the nightly run, or the `verify` job's hermetic pgvector service |
+| `nudge-sweep`, `packet-privacy`, `query-plans` | need a migrated Postgres and the seeded cohort | the nightly run, or the `verify` job's hermetic pgvector service |
+| `consent-scopes`, `migration-drift-schema` | need a migrated Postgres plus an opt-in each, `CONSENT_SCOPES_BENCH_ENABLED` and a dedicated shadow database | the `verify` job's gate step sets both and measures them on every PR. Both floor at 0, so neither needs a baseline row to fail |
 | `connect-journey`, `journey-day1`, `journey-teacher-loop`, `touch-targets`, `axe-authenticated` | need a browser and a running server | the `e2e` job's collectors |
-| `sage-grounding`, `sage-career`, `sage-readability`, `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when `GEMINI_API_KEY` is present |
+| `sage-grounding`, `sage-career`, `sage-readability`, `explain-faithfulness`, `rag-*` | need a model key; non-deterministic by nature | the nightly run when its key is present (`OPENROUTER_API_KEY` for the Sage model suites) |
 | `cron-health`, `cost-per-student`, `ferpa-routing`, `backup-drill` | need the prod read-only URL (an owner step) | once that secret exists |
 
 **A timing metric must never be baselined from a laptop or a build container.**
@@ -334,6 +355,17 @@ still.
 4. `npx tsx scripts/bench/seed-cohort.ts` when that file exists, then
    `npm run bench -- --tier=gate --compare`, both pointed at the hermetic
    pgvector service so `postgres`/`cohort` suites meet a real migrated schema.
+   The gate step also sets `CONSENT_SCOPES_BENCH_ENABLED` for
+   `consent-scopes`, and points `SHADOW_DATABASE_URL` for
+   `migration-drift-schema` at `visionquest_shadow`, a database the step
+   before it creates on the same service. The replay overwrites that database
+   and never touches the shared one. The consent scorer sets
+   `RLS_TEST_ENABLED` for its own child only. In the step env it would reach
+   `pii-log-grep`'s `npm test` and run the whole RLS suite inside that log
+   capture. `scripts/bench/__tests__/ci-gate-opt-ins.test.mjs` fails if either
+   opt-in goes missing or `RLS_TEST_ENABLED` moves into the step. The raw-SQL objects `schema.prisma` cannot declare, which the
+   drift diff always proposes dropping, are listed with their reasons in
+   `config/benchmarks/fixtures/migration-drift-schema.json`.
 
 `benchmarks.yml`: nightly at 06:00 UTC plus `workflow_dispatch`. Same service,
 migrations applied, cohort seeded, catalog corpus seeded into
@@ -345,8 +377,27 @@ opens or updates one results PR (protected `main` rejects a direct push —
 GH006) with `[skip ci]` so the merge does not re-trigger full CI, and
 opens or updates the "Benchmark regression" issue on any failure.
 
-Suites needing `GEMINI_API_KEY` never run per-PR — only nightly, and only when
-the secret exists (nightly Gemini spend is an owner decision, design §9.4).
+Model-backed suites never run per-PR. They run nightly, and only when
+`OPENROUTER_API_KEY` exists. `sage-grounding`, `sage-readability`,
+`sage-career` and `explain-faithfulness` reach production's model,
+`google/gemini-3.1-flash-lite`, through OpenRouter on synthetic fixtures, the
+same route as the Sage Evals workflow (`OPENROUTER_MODEL` in `benchmarks.yml`).
+That is 21 generations a night on the shared key (3 grounding, 3 readability,
+5 career, 10 explain-faithfulness). The nightly OpenRouter suites run in their
+own step, "Nightly-tier model benchmarks", after the tier step: OpenRouter gets
+synthetic data only, so `--provider=openrouter` refuses to run beside any
+non-local database URL, and the tier step holds `BENCH_PROD_READONLY_URL`.
+The tier step writes `skipped` for them and the model step overwrites it. A new
+nightly suite that requires `openrouter` goes in that step's `--suite=` list;
+the pinning test fails until it does. The repo holds
+no Gemini key (issue #220), so `sage-latency`, whose floor is production's
+direct-to-Google p95 bar in `config/sage-slo.json`, reports skipped. A round
+trip through OpenRouter is a different measurement, so it stays on Gemini
+until a key is restored. `explain-faithfulness` generates through the eval
+resolver (`scripts/lib/sage-eval-provider.mjs`), because the app's
+`resolveAiProvider` never returns OpenRouter. It measures the shipped prompt
+and the shipped guard, not production's provider routing.
+`src/lib/ci-benchmarks-openrouter.test.ts` pins all of this.
 
 ---
 
@@ -454,6 +505,8 @@ These are the secrets the suite reports `skipped` for until they exist
 - `CRON_CHECK_DATABASE_URL` — the scheduled-layer health suite.
 - `BENCH_PROD_READONLY_URL` — a read-only production connection string for
   drift, cost-per-student and FERPA-routing suites.
-- `GEMINI_API_KEY` in the repository's secrets — the model-backed nightly
-  suites. Confirm a monthly ceiling first (the 2026-08-21 credit-drain
-  incident).
+- `OPENROUTER_API_KEY` in the repository's secrets, shared with the Sage
+  Evals workflow: the model-backed nightly suites. Its spending limit is the
+  ceiling (`docs/runbooks/sage-eval-budget.md`). The workflow maps no
+  `GEMINI_API_KEY`; the revoked one in the repository's secrets can be
+  deleted.

@@ -80,7 +80,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { loadEnvFile, parseArgs, ensureParentDir } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
+import { isEvalAbort, resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 import {
   isRefusalOrRedirect,
   normalizeForMatch,
@@ -467,6 +467,8 @@ async function runGroundingCase(deps, provider, systemPrompt, testCase) {
     }
     reply = textParts.join("");
   } catch (err) {
+    // Credits, key or model unavailable: stop the run as not run, never grade it.
+    if (isEvalAbort(err)) throw err;
     failures.push(`reply generation failed — ${err.message}`);
   }
   const graded = evaluateGroundingAssertions({ text: reply, context, calls, expectedDocumentIds, assert });
@@ -517,6 +519,8 @@ async function runCareerCase(deps, provider, declarations, systemPrompt, testCas
       if (event.kind === "text") textParts.push(event.text);
     }
   } catch (err) {
+    // Credits, key or model unavailable: stop the run as not run, never grade it.
+    if (isEvalAbort(err)) throw err;
     failures.push(`reply generation failed — ${err.message}`);
   }
 
@@ -558,6 +562,8 @@ async function runActivityCase(provider, declarations, systemPrompt, testCase) {
       if (event.kind === "text") textParts.push(event.text);
     }
   } catch (err) {
+    // Credits, key or model unavailable: stop the run as not run, never grade it.
+    if (isEvalAbort(err)) throw err;
     failures.push(`reply generation failed — ${err.message}`);
   }
 
@@ -642,6 +648,8 @@ async function runReadabilityCase(deps, provider, systemPrompt, testCase) {
       { temperature: TEMPERATURE },
     );
   } catch (err) {
+    // Credits, key or model unavailable: stop the run as not run, never grade it.
+    if (isEvalAbort(err)) throw err;
     return { pass: false, reason: `reply generation failed — ${err.message}`, text: "" };
   }
   const r = assessReadability(reply);
@@ -795,6 +803,9 @@ async function main() {
         };
       }
     } catch (err) {
+      // Nothing can be evaluated (credits, key, or model unavailable): stop the
+      // whole run with its not-run exit code instead of grading this case.
+      if (isEvalAbort(err)) throw err;
       outcome = { pass: false, reason: `error — ${err.message}` };
     }
     const latencyMs = Math.round(performance.now() - startedAt);

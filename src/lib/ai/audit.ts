@@ -52,11 +52,30 @@ function actionForStatus(status: AiAuditStatus) {
   }
 }
 
+/**
+ * Every provider name the app knows, with its class. A complete Record, so a
+ * new provider name without a class is a compile error instead of a silent
+ * "unknown" that skips de-identification and the cloud quotas.
+ *
+ * "openrouter" is eval-only and never resolved in production (see
+ * docs/runbooks/openrouter-test-bench.md). It is classed cloud so that if it
+ * is ever connected on purpose, every cloud protection applies to it.
+ */
+export type KnownProviderName = "gemini" | "ollama" | "openrouter";
+
+const PROVIDER_CLASS: Readonly<Record<KnownProviderName, "cloud" | "local">> = {
+  gemini: "cloud",
+  ollama: "local",
+  openrouter: "cloud",
+};
+
+function isKnownProviderName(name: string): name is KnownProviderName {
+  return Object.prototype.hasOwnProperty.call(PROVIDER_CLASS, name);
+}
+
 export function getProviderClass(providerName?: string | null): "local" | "cloud" | "none" | "unknown" {
   if (!providerName) return "none";
-  if (providerName === "ollama") return "local";
-  if (providerName === "gemini") return "cloud";
-  return "unknown";
+  return isKnownProviderName(providerName) ? PROVIDER_CLASS[providerName] : "unknown";
 }
 
 /**

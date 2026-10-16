@@ -1,0 +1,2727 @@
+{
+  "version": 1,
+  "description": "Synthetic career-discovery conversations with gold SPOKES pathway and national cluster labels, English and Spanish pairs. Written by an AI agent from a written labeling rule; the rule, not each row, is what an instructor should audit. Spanish rows await native-speaker review.",
+  "labelingRule": "1. Label only from what the STUDENT says or clearly agrees to. Sage's suggestions do not count unless the student agrees. 2. gold.spokes is the SPOKES pathway that best fits the work the student says they want or are drawn to. Interests in fields SPOKES has no dedicated pathway for (trades, construction, manufacturing, warehouse and driving, agriculture, energy and mining, most healthcare and human-services jobs, public safety) map to career-readiness, following NATIONAL_TO_SPOKES_MAP in src/lib/spokes/national-clusters.ts. career-readiness is also gold when the student is genuinely undecided but wants to get job-ready. 3. language-esl is gold only when the student says improving their English is the first thing they need for work (a stated goal or barrier), regardless of the field they mention. 4. gold.national is the national cluster that best fits the work the student describes. For language-esl cases, label the national cluster of the field they mention. For the one genuinely undecided case, label the cluster the student leans toward. 5. acceptable.spokes and acceptable.national list other labels a careful instructor would also accept (0 to 2). The gold label is never repeated inside acceptable. A case with more than 2 equally right labels is too vague and gets rewritten. 6. Every SPOKES label is a valid id from src/lib/spokes/career-clusters.ts and every national label is one of the 14 exact strings in NATIONAL_CAREER_CLUSTERS. Difficulty: clear = the student names the kind of work; indirect = the student only describes hobbies, past life experience or what they enjoy; mixed = two interests, one clearly dominant by what the student says; distractor = the student rejects work Sage suggested or says what they do NOT want. The circumstances flag marks cases where childcare, transport, shift limits, a record, or caring for a parent comes up; those facts must not change either label.",
+  "cases": [
+    {
+      "id": "office-admin-01",
+      "pair": "office-admin-01",
+      "lang": "en",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "Hi! I'd like to learn what kind of work you want. What kind of job comes to mind first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to do office work. Like typing, filing, answering the phone. An administrative assistant, maybe."
+        },
+        {
+          "role": "model",
+          "content": "That sounds like a good fit. What part of office work do you like best?"
+        },
+        {
+          "role": "user",
+          "content": "I like keeping things neat. I'm good with email and I can type pretty fast. I did data entry once for a month and liked it."
+        },
+        {
+          "role": "model",
+          "content": "Nice. What do you hope a job in an office would give you?"
+        },
+        {
+          "role": "user",
+          "content": "A steady paycheck and a place I can grow. I like learning new programs."
+        }
+      ],
+      "gold": {
+        "spokes": "office-admin",
+        "national": "Management & Entrepreneurship"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student names administrative assistant, typing, filing and data entry as the work they want."
+    },
+    {
+      "id": "office-admin-02",
+      "pair": "office-admin-02",
+      "lang": "en",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "Tell me about something you do every week that makes you feel good."
+        },
+        {
+          "role": "user",
+          "content": "I keep my whole family's stuff straight. I have a folder for every kid's school papers and a calendar on the fridge with everybody's appointments."
+        },
+        {
+          "role": "model",
+          "content": "That takes a lot of care. What do you like about it?"
+        },
+        {
+          "role": "user",
+          "content": "When it's all lined up and nothing gets missed. My sister always asks me to fix her mess too. I make her a list and she does fine."
+        },
+        {
+          "role": "model",
+          "content": "What do you use to keep track of it all?"
+        },
+        {
+          "role": "user",
+          "content": "Mostly my phone and a free spreadsheet thing. I like making little charts of who needs to be where."
+        }
+      ],
+      "gold": {
+        "spokes": "office-admin",
+        "national": "Management & Entrepreneurship"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student describes keeping family papers, calendars and schedules in order, which is office-admin work."
+    },
+    {
+      "id": "office-admin-03",
+      "pair": "office-admin-03",
+      "lang": "en",
+      "difficulty": "mixed",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kinds of work are you curious about?"
+        },
+        {
+          "role": "user",
+          "content": "I'd like to work in an office at the courthouse or the county building. Filing and helping people with their forms."
+        },
+        {
+          "role": "model",
+          "content": "Anything else on your list?"
+        },
+        {
+          "role": "user",
+          "content": "I like to bake. I thought maybe a bakery someday. But the office is what I really want. Steady pay, you know?"
+        },
+        {
+          "role": "model",
+          "content": "Is there anything that might make getting to work hard?"
+        },
+        {
+          "role": "user",
+          "content": "I don't have a car. I take the bus. The county building is on the bus line, so that helps."
+        }
+      ],
+      "gold": {
+        "spokes": "office-admin",
+        "national": "Public Service & Safety"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Management & Entrepreneurship"
+        ]
+      },
+      "rationale": "Student wants county or courthouse office work; baking is a side interest they put second, and having no car does not change the pathway."
+    },
+    {
+      "id": "office-admin-04",
+      "pair": "office-admin-04",
+      "lang": "en",
+      "difficulty": "distractor",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work are you thinking about?"
+        },
+        {
+          "role": "user",
+          "content": "Something at a doctor's office."
+        },
+        {
+          "role": "model",
+          "content": "Would you want to take care of patients, like a nurse's aide?"
+        },
+        {
+          "role": "user",
+          "content": "No. I can't stand blood. I want the front part. Scheduling, typing in the records, calling to remind people about their visits."
+        },
+        {
+          "role": "model",
+          "content": "So the paperwork side. Do you like being on the phone a lot?"
+        },
+        {
+          "role": "user",
+          "content": "Some. But mostly I want to sit at a computer and keep the files right. I like when everything is in order."
+        }
+      ],
+      "gold": {
+        "spokes": "office-admin",
+        "national": "Healthcare & Human Services"
+      },
+      "acceptable": {
+        "spokes": [
+          "customer-service"
+        ],
+        "national": [
+          "Management & Entrepreneurship"
+        ]
+      },
+      "rationale": "Student wants scheduling, records and files at a clinic and rejects patient care."
+    },
+    {
+      "id": "finance-bookkeeping-01",
+      "pair": "finance-bookkeeping-01",
+      "lang": "en",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work sounds good to you?"
+        },
+        {
+          "role": "user",
+          "content": "I want to be a bookkeeper. I took a bookkeeping class in high school and I loved it."
+        },
+        {
+          "role": "model",
+          "content": "What did you love about it?"
+        },
+        {
+          "role": "user",
+          "content": "Making the books balance. I like numbers and I like when it all adds up to the penny. I know a little QuickBooks."
+        },
+        {
+          "role": "model",
+          "content": "Have you done this kind of work before?"
+        },
+        {
+          "role": "user",
+          "content": "Not for pay. I did the books for my church's yard sale once. I want to do it for real now."
+        }
+      ],
+      "gold": {
+        "spokes": "finance-bookkeeping",
+        "national": "Financial Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student asks to be a bookkeeper and likes making the books balance."
+    },
+    {
+      "id": "finance-bookkeeping-02",
+      "pair": "finance-bookkeeping-02",
+      "lang": "en",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What are you good at that people ask you for help with?"
+        },
+        {
+          "role": "user",
+          "content": "Money stuff. My neighbors ask me how to stretch their checks. I made my own budget on a spreadsheet and I haven't been late on a bill in two years."
+        },
+        {
+          "role": "model",
+          "content": "That's great. What do you like about it?"
+        },
+        {
+          "role": "user",
+          "content": "I like seeing where every dollar goes. I help my grandma sort her bills and bank papers each month. I'm good at math."
+        },
+        {
+          "role": "model",
+          "content": "How does it feel when you finish?"
+        },
+        {
+          "role": "user",
+          "content": "Good. Like I fixed a puzzle. When the numbers match I feel good all day."
+        }
+      ],
+      "gold": {
+        "spokes": "finance-bookkeeping",
+        "national": "Financial Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student runs a budget and sorts bills for family and says they like it when the numbers match."
+    },
+    {
+      "id": "finance-bookkeeping-03",
+      "pair": "finance-bookkeeping-03",
+      "lang": "en",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of place would you like to work in?"
+        },
+        {
+          "role": "user",
+          "content": "A bank. I'd like to be a teller, or work in the back doing the accounts."
+        },
+        {
+          "role": "model",
+          "content": "Which part sounds better to you?"
+        },
+        {
+          "role": "user",
+          "content": "The numbers part. Counting the money, checking the totals. I like people okay, and I'm friendly, but the numbers are what I like."
+        },
+        {
+          "role": "model",
+          "content": "What do you like about working with money?"
+        },
+        {
+          "role": "user",
+          "content": "It has to be exact. I like that. If one number is wrong, I keep looking until I find it."
+        }
+      ],
+      "gold": {
+        "spokes": "finance-bookkeeping",
+        "national": "Financial Services"
+      },
+      "acceptable": {
+        "spokes": [
+          "customer-service"
+        ],
+        "national": []
+      },
+      "rationale": "Student weighs bank teller work against account work and says the numbers are what they like most."
+    },
+    {
+      "id": "finance-bookkeeping-04",
+      "pair": "finance-bookkeeping-04",
+      "lang": "en",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work do you think you want?"
+        },
+        {
+          "role": "user",
+          "content": "My cousin says I should do computers. But I don't want to fix computers or code. That's not me."
+        },
+        {
+          "role": "model",
+          "content": "What does sound like you?"
+        },
+        {
+          "role": "user",
+          "content": "Payroll. Making sure people get paid right. Or billing. I worked in my uncle's shop and I did the invoices. I liked that part best."
+        },
+        {
+          "role": "model",
+          "content": "What else matters for the job?"
+        },
+        {
+          "role": "user",
+          "content": "It has to be near a bus line. I don't have a car right now. An office job works because I go to the same place every day."
+        }
+      ],
+      "gold": {
+        "spokes": "finance-bookkeeping",
+        "national": "Financial Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Management & Entrepreneurship"
+        ]
+      },
+      "rationale": "Student rejects computer jobs and wants payroll and billing work; having no car only means choosing a job on a bus line."
+    },
+    {
+      "id": "tech-digital-01",
+      "pair": "tech-digital-01",
+      "lang": "en",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of job interests you?"
+        },
+        {
+          "role": "user",
+          "content": "Computers. I want to do help desk or IT support. Fix people's computers when they break."
+        },
+        {
+          "role": "model",
+          "content": "What do you already know?"
+        },
+        {
+          "role": "user",
+          "content": "I built my own computer from parts last year. I know how to reinstall Windows and clean out viruses."
+        },
+        {
+          "role": "model",
+          "content": "What would you like to learn next?"
+        },
+        {
+          "role": "user",
+          "content": "Networks and security. I want to learn how to keep a company's computers safe."
+        }
+      ],
+      "gold": {
+        "spokes": "tech-digital",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants help desk and IT support and has built and repaired computers."
+    },
+    {
+      "id": "tech-digital-02",
+      "pair": "tech-digital-02",
+      "lang": "en",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What do you do for fun?"
+        },
+        {
+          "role": "user",
+          "content": "Mostly games. But I also take apart old phones. My friends bring me their broken ones."
+        },
+        {
+          "role": "model",
+          "content": "Do you fix them?"
+        },
+        {
+          "role": "user",
+          "content": "Most of the time. I watch videos to figure out what's wrong. I put in a new screen for my aunt. I set up the wifi for my whole family too."
+        },
+        {
+          "role": "model",
+          "content": "What's the best part?"
+        },
+        {
+          "role": "user",
+          "content": "When it turns back on. I like figuring out what's wrong, one thing at a time."
+        }
+      ],
+      "gold": {
+        "spokes": "tech-digital",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student repairs phones and sets up wifi for fun and likes working out what is wrong."
+    },
+    {
+      "id": "tech-digital-03",
+      "pair": "tech-digital-03",
+      "lang": "en",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kinds of things do you enjoy?"
+        },
+        {
+          "role": "user",
+          "content": "I draw a lot. Cartoon stuff, mostly. But I don't think I could get paid for it."
+        },
+        {
+          "role": "model",
+          "content": "What kind of work do you picture yourself doing?"
+        },
+        {
+          "role": "user",
+          "content": "Honestly, computer security. I read about hackers and how companies get attacked. I want to be the one who stops it."
+        },
+        {
+          "role": "model",
+          "content": "Would you want to keep drawing too?"
+        },
+        {
+          "role": "user",
+          "content": "Just for fun. The security stuff is what I want my job to be."
+        }
+      ],
+      "gold": {
+        "spokes": "tech-digital",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student draws for fun but says computer security is the job they want."
+    },
+    {
+      "id": "tech-digital-04",
+      "pair": "tech-digital-04",
+      "lang": "en",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of job do you think you'd be good at?"
+        },
+        {
+          "role": "user",
+          "content": "People say I'm friendly, so my case worker said customer service. I don't want that. I did it already and it wore me out."
+        },
+        {
+          "role": "model",
+          "content": "What would you rather do?"
+        },
+        {
+          "role": "user",
+          "content": "IT. Computers. Helping people with their laptops and printers."
+        },
+        {
+          "role": "model",
+          "content": "Is there anything about your work history we should plan around?"
+        },
+        {
+          "role": "user",
+          "content": "I have a felony from years ago. I just want a job where I can learn something and move up. Computers is what I want."
+        }
+      ],
+      "gold": {
+        "spokes": "tech-digital",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student rejects customer service and wants IT work; the felony does not change the pathway."
+    },
+    {
+      "id": "creative-design-01",
+      "pair": "creative-design-01",
+      "lang": "en",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work sounds fun to you?"
+        },
+        {
+          "role": "user",
+          "content": "Graphic design. Making logos and posters and stuff like that."
+        },
+        {
+          "role": "model",
+          "content": "Have you tried making any?"
+        },
+        {
+          "role": "user",
+          "content": "Yeah, I make posters for my kid's school with a free app. I want to learn Photoshop for real."
+        },
+        {
+          "role": "model",
+          "content": "What would you like to make at a job?"
+        },
+        {
+          "role": "user",
+          "content": "Logos, T-shirts, posters. Anything where I get to make it look good."
+        }
+      ],
+      "gold": {
+        "spokes": "creative-design",
+        "national": "Arts, Entertainment, & Design"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student asks for graphic design (logos, posters, shirts) and wants to learn Photoshop."
+    },
+    {
+      "id": "creative-design-02",
+      "pair": "creative-design-02",
+      "lang": "en",
+      "difficulty": "indirect",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What do you do when you have free time?"
+        },
+        {
+          "role": "user",
+          "content": "I draw. I do it at night after my kids are asleep. I also take lots of pictures and fix the colors on my phone."
+        },
+        {
+          "role": "model",
+          "content": "What do you like about it?"
+        },
+        {
+          "role": "user",
+          "content": "I like making something from nothing. People tell me my birthday cards are better than the store ones. I make them for everybody."
+        },
+        {
+          "role": "model",
+          "content": "What do you wish you had more of?"
+        },
+        {
+          "role": "user",
+          "content": "Time, mostly. I'm with the kids all day. I'd like to learn the real programs, not just the phone ones."
+        }
+      ],
+      "gold": {
+        "spokes": "creative-design",
+        "national": "Arts, Entertainment, & Design"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student draws, edits photos and makes cards and wants to learn the design programs; the kids and the time are circumstances."
+    },
+    {
+      "id": "creative-design-03",
+      "pair": "creative-design-03",
+      "lang": "en",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work are you thinking about?"
+        },
+        {
+          "role": "user",
+          "content": "I help my sister with her hair salon. I make her posts for social media and the flyers for the front window."
+        },
+        {
+          "role": "model",
+          "content": "What part do you like?"
+        },
+        {
+          "role": "user",
+          "content": "Making the posts and flyers. Picking the colors and the pictures. I like talking to her customers too, but making things is the fun part."
+        },
+        {
+          "role": "model",
+          "content": "Would you want to do that for other businesses?"
+        },
+        {
+          "role": "user",
+          "content": "Yes. Small shops. I'd make their posts and signs and ads. That's what I want to learn."
+        }
+      ],
+      "gold": {
+        "spokes": "creative-design",
+        "national": "Marketing & Sales"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Arts, Entertainment, & Design"
+        ]
+      },
+      "rationale": "Student makes social posts and flyers for a salon and wants to do that for small businesses; making things outweighs talking to customers."
+    },
+    {
+      "id": "creative-design-04",
+      "pair": "creative-design-04",
+      "lang": "en",
+      "difficulty": "distractor",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work would you like?"
+        },
+        {
+          "role": "user",
+          "content": "Something creative. I can't sit at a desk all day doing paperwork."
+        },
+        {
+          "role": "model",
+          "content": "Some people like office work, like filing and typing. Would that work for you?"
+        },
+        {
+          "role": "user",
+          "content": "No way. I'd go crazy. I want to make things. Banners, T-shirts, signs for stores. I like painting and letters."
+        },
+        {
+          "role": "model",
+          "content": "Have you done any of that?"
+        },
+        {
+          "role": "user",
+          "content": "I painted the sign for my uncle's yard sale and people kept asking who did it. I want to learn the computer part too, so I can print my own."
+        }
+      ],
+      "gold": {
+        "spokes": "creative-design",
+        "national": "Arts, Entertainment, & Design"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student rejects office work and wants to make signs, banners and shirts."
+    },
+    {
+      "id": "customer-service-01",
+      "pair": "customer-service-01",
+      "lang": "en",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work do you want?"
+        },
+        {
+          "role": "user",
+          "content": "Retail. I want to work in a clothing store, helping people find stuff."
+        },
+        {
+          "role": "model",
+          "content": "What do you like about it?"
+        },
+        {
+          "role": "user",
+          "content": "Talking to people. I like helping someone find the right size and seeing them happy. I worked a register at a gift shop before."
+        },
+        {
+          "role": "model",
+          "content": "What would you like to do next?"
+        },
+        {
+          "role": "user",
+          "content": "Get a job at a store where I'm out with the customers every day."
+        }
+      ],
+      "gold": {
+        "spokes": "customer-service",
+        "national": "Marketing & Sales"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants retail work on the floor helping shoppers."
+    },
+    {
+      "id": "customer-service-02",
+      "pair": "customer-service-02",
+      "lang": "en",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What's something you've done that made you feel good?"
+        },
+        {
+          "role": "user",
+          "content": "Every Thanksgiving I host for like thirty people. I set up the tables, plan the food, make sure everybody has a seat."
+        },
+        {
+          "role": "model",
+          "content": "What is the best part?"
+        },
+        {
+          "role": "user",
+          "content": "Seeing everybody have a good time. I put together a baby shower for my friend last spring, too. I did the whole thing, the games and the cake and the decorations."
+        },
+        {
+          "role": "model",
+          "content": "What do you do if something goes wrong?"
+        },
+        {
+          "role": "user",
+          "content": "I fix it fast and smile. Nobody knows. I like it when people leave happy."
+        }
+      ],
+      "gold": {
+        "spokes": "customer-service",
+        "national": "Hospitality, Events, & Tourism"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student hosts big family events and loves making guests happy, which points to hospitality and events."
+    },
+    {
+      "id": "customer-service-03",
+      "pair": "customer-service-03",
+      "lang": "en",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kinds of jobs have you been thinking about?"
+        },
+        {
+          "role": "user",
+          "content": "Waiting tables at a restaurant. Or maybe a nurse's aide."
+        },
+        {
+          "role": "model",
+          "content": "Which one feels more like you?"
+        },
+        {
+          "role": "user",
+          "content": "Waiting tables. I'd get queasy as an aide. I like talking to the customers and remembering what they like."
+        },
+        {
+          "role": "model",
+          "content": "What do you like about talking to customers?"
+        },
+        {
+          "role": "user",
+          "content": "When someone is having a bad day and I get them to smile. Restaurants are fast and I like staying busy."
+        }
+      ],
+      "gold": {
+        "spokes": "customer-service",
+        "national": "Hospitality, Events, & Tourism"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student picks waiting tables over a nurse's aide job, citing talking to customers."
+    },
+    {
+      "id": "customer-service-04",
+      "pair": "customer-service-04",
+      "lang": "en",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of job do you see yourself in?"
+        },
+        {
+          "role": "user",
+          "content": "A grocery store or dollar store. At the register, or helping customers find things."
+        },
+        {
+          "role": "model",
+          "content": "Some stores need people to unload trucks and stock shelves. Would you like that?"
+        },
+        {
+          "role": "user",
+          "content": "No. I don't want to be in the back all day. I want to be out front with the customers."
+        },
+        {
+          "role": "model",
+          "content": "Why do you think you'd do well out front?"
+        },
+        {
+          "role": "user",
+          "content": "I'm patient. Even when people are rude, I stay calm. I need a day shift, though. My son's day care closes at five."
+        }
+      ],
+      "gold": {
+        "spokes": "customer-service",
+        "national": "Marketing & Sales"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student rejects stockroom work and wants the register and customer-facing store work; needing a day shift is a circumstance."
+    },
+    {
+      "id": "language-esl-01",
+      "pair": "language-esl-01",
+      "lang": "en",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "Hi! What would you like to do for work?"
+        },
+        {
+          "role": "user",
+          "content": "I want to work in a hospital, taking care of old people. But first I need to learn English better."
+        },
+        {
+          "role": "model",
+          "content": "What is hard about English right now?"
+        },
+        {
+          "role": "user",
+          "content": "Talking is hard. I understand some. When the doctor talks fast, I get lost. I can't fill out forms."
+        },
+        {
+          "role": "model",
+          "content": "What would help the most?"
+        },
+        {
+          "role": "user",
+          "content": "Classes to speak and read for work. English first, then the nurse's aide class."
+        }
+      ],
+      "gold": {
+        "spokes": "language-esl",
+        "national": "Healthcare & Human Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student says English must come first, with hospital care work as the later goal."
+    },
+    {
+      "id": "language-esl-02",
+      "pair": "language-esl-02",
+      "lang": "en",
+      "difficulty": "indirect",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "Tell me a little about yourself and what you did before."
+        },
+        {
+          "role": "user",
+          "content": "I come from a small town. I cooked every day for my big family and for the church parties. People said my food was the best."
+        },
+        {
+          "role": "model",
+          "content": "That sounds like hard work. What is hard for you now?"
+        },
+        {
+          "role": "user",
+          "content": "English. My children translate for me at the store and at school. I feel bad. I want to talk for myself."
+        },
+        {
+          "role": "model",
+          "content": "What would you like to do first?"
+        },
+        {
+          "role": "user",
+          "content": "Learn English. After that I want a job where I can cook. I can't go to class at night because of the kids, only in the morning."
+        }
+      ],
+      "gold": {
+        "spokes": "language-esl",
+        "national": "Hospitality, Events, & Tourism"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student says learning English comes first and mentions cooking for large groups; child care only limits class times."
+    },
+    {
+      "id": "language-esl-03",
+      "pair": "language-esl-03",
+      "lang": "en",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What do you want to do for work?"
+        },
+        {
+          "role": "user",
+          "content": "I like computers. I fix phones for my friends. I want to work with computers."
+        },
+        {
+          "role": "model",
+          "content": "What do you need before that?"
+        },
+        {
+          "role": "user",
+          "content": "English. The instructions are in English and I don't know all the words. I need to read manuals and talk with people at a job."
+        },
+        {
+          "role": "model",
+          "content": "So what comes first?"
+        },
+        {
+          "role": "user",
+          "content": "English first. Then computers. I can't do a computer job without English."
+        }
+      ],
+      "gold": {
+        "spokes": "language-esl",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student likes computers but says English comes first, so the pathway is language-esl and the computer interest sets the national cluster."
+    },
+    {
+      "id": "language-esl-04",
+      "pair": "language-esl-04",
+      "lang": "en",
+      "difficulty": "distractor",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work do you want?"
+        },
+        {
+          "role": "user",
+          "content": "I want to work in a school helping kids. I speak Spanish, so I can help the Spanish kids."
+        },
+        {
+          "role": "model",
+          "content": "A job with customers could use your Spanish too, like a store. Would you want that?"
+        },
+        {
+          "role": "user",
+          "content": "No, not now. My English is not good enough to talk to customers all day. I get nervous."
+        },
+        {
+          "role": "model",
+          "content": "So what is the first step?"
+        },
+        {
+          "role": "user",
+          "content": "Learn English better. Reading and writing. Then I can ask about the school job."
+        }
+      ],
+      "gold": {
+        "spokes": "language-esl",
+        "national": "Education"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants to be a school aide, turns down customer work for now, and names English as the first step."
+    },
+    {
+      "id": "career-readiness-01",
+      "pair": "career-readiness-01",
+      "lang": "en",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work are you looking for?"
+        },
+        {
+          "role": "user",
+          "content": "Factory work. I want to run machines and make parts. I'd like to learn to be a machine operator."
+        },
+        {
+          "role": "model",
+          "content": "What do you like about it?"
+        },
+        {
+          "role": "user",
+          "content": "I like working with my hands and with machines. A plant near here makes parts and my cousin works there. Good pay and benefits."
+        },
+        {
+          "role": "model",
+          "content": "What do you need to get hired there?"
+        },
+        {
+          "role": "user",
+          "content": "I need to do better on the math test they give. And I need a resume. I never made one."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Advanced Manufacturing"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants machine operator factory work, a manufacturing job SPOKES maps to career-readiness."
+    },
+    {
+      "id": "career-readiness-02",
+      "pair": "career-readiness-02",
+      "lang": "en",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "Tell me about a place where you feel your best."
+        },
+        {
+          "role": "user",
+          "content": "Outside. I grew up at my grandpa's. We had cows and a big garden and I fed the animals every morning."
+        },
+        {
+          "role": "model",
+          "content": "What did you like about it?"
+        },
+        {
+          "role": "user",
+          "content": "Being with the animals. Watching things grow. I never liked being inside all day. I got bored in school because of that."
+        },
+        {
+          "role": "model",
+          "content": "Do you still do any of it?"
+        },
+        {
+          "role": "user",
+          "content": "I have chickens and tomatoes at my house. Neighbors buy my eggs. I'd like a job where I'm outside like that."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Agriculture"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student describes farm animals, gardens and wanting to be outside, with no job named."
+    },
+    {
+      "id": "career-readiness-03",
+      "pair": "career-readiness-03",
+      "lang": "en",
+      "difficulty": "mixed",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work are you thinking about?"
+        },
+        {
+          "role": "user",
+          "content": "Building stuff. Roofing or carpentry. My uncle does roofing and says he can get me on."
+        },
+        {
+          "role": "model",
+          "content": "Anything else?"
+        },
+        {
+          "role": "user",
+          "content": "I thought about driving a truck. But I'd rather build. Seeing a house go up and knowing I helped, that's the thing."
+        },
+        {
+          "role": "model",
+          "content": "How would you get to a job site?"
+        },
+        {
+          "role": "user",
+          "content": "My uncle gives me a ride. I don't have a car. I'm worried about the safety tests and the math for measuring."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Construction"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants roofing or carpentry and says building matters more than truck driving; having no car is a circumstance."
+    },
+    {
+      "id": "career-readiness-04",
+      "pair": "career-readiness-04",
+      "lang": "en",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work are you looking for?"
+        },
+        {
+          "role": "user",
+          "content": "My dad and my papaw both worked for the coal company. I'd like to get on a mine crew or work on the gas wells."
+        },
+        {
+          "role": "model",
+          "content": "A computer job could be good too. Does that sound like you?"
+        },
+        {
+          "role": "user",
+          "content": "No. I don't want to sit inside. I want to work outside or underground, like my family did."
+        },
+        {
+          "role": "model",
+          "content": "Is there anything about getting hired that we should talk about?"
+        },
+        {
+          "role": "user",
+          "content": "I got in trouble when I was nineteen and I have a record. I need to find out who hires with that. And I think I need my safety card."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Energy & Natural Resources"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants mine or gas well work like their family and rejects computer work; the record is a circumstance."
+    },
+    {
+      "id": "career-readiness-05",
+      "pair": "career-readiness-05",
+      "lang": "en",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work are you looking for?"
+        },
+        {
+          "role": "user",
+          "content": "Warehouse work. I want to drive a forklift. Later I'd like to get my CDL and drive a truck."
+        },
+        {
+          "role": "model",
+          "content": "What have you done in this kind of job?"
+        },
+        {
+          "role": "user",
+          "content": "I picked orders at a warehouse for a year. I've used a pallet jack. I never got forklift certified."
+        },
+        {
+          "role": "model",
+          "content": "What do you want to work on?"
+        },
+        {
+          "role": "user",
+          "content": "Getting the forklift card and getting better at the paperwork on loads. Then I'll look into the CDL."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Supply Chain & Transportation"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants warehouse and forklift work, then a CDL."
+    },
+    {
+      "id": "career-readiness-06",
+      "pair": "career-readiness-06",
+      "lang": "en",
+      "difficulty": "indirect",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What's something you do for other people?"
+        },
+        {
+          "role": "user",
+          "content": "I volunteer at the senior center on Saturdays. I help the older folks eat, walk, and call their kids."
+        },
+        {
+          "role": "model",
+          "content": "How does that feel?"
+        },
+        {
+          "role": "user",
+          "content": "Good. I'm calm with them. One lady holds my hand when she's scared and I know what to say. I helped take care of my grandma too."
+        },
+        {
+          "role": "model",
+          "content": "What would you want in a job?"
+        },
+        {
+          "role": "user",
+          "content": "Something like that every day, helping people who need it. I need days only, though. My mom needs rides to her appointments."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Healthcare & Human Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student volunteers helping older adults eat and walk and wants that kind of work every day; days only because of rides for their mom."
+    },
+    {
+      "id": "career-readiness-07",
+      "pair": "career-readiness-07",
+      "lang": "en",
+      "difficulty": "mixed",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kinds of work are you thinking about?"
+        },
+        {
+          "role": "user",
+          "content": "I want to be a firefighter. I've done some volunteer work at the fire department in my town."
+        },
+        {
+          "role": "model",
+          "content": "What do you do there?"
+        },
+        {
+          "role": "user",
+          "content": "Clean the trucks, help at the fundraiser. They let me watch a training. I also thought about being an EMT, but fighting fires is the big one."
+        },
+        {
+          "role": "model",
+          "content": "What would you need to get started?"
+        },
+        {
+          "role": "user",
+          "content": "The physical test and some classes. And I have to work out child care for my baby. My sister can watch him at night but not days."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Public Service & Safety"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Healthcare & Human Services"
+        ]
+      },
+      "rationale": "Student wants to be a firefighter and calls EMT work secondary; child care is a circumstance."
+    },
+    {
+      "id": "career-readiness-08",
+      "pair": "career-readiness-08",
+      "lang": "en",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "What kind of work are you thinking about?"
+        },
+        {
+          "role": "user",
+          "content": "I really don't know. I've been home with my kids for seven years. I need to get a job but I don't know what I'm good at."
+        },
+        {
+          "role": "model",
+          "content": "Some people like office work, like typing and filing. Does that sound good?"
+        },
+        {
+          "role": "user",
+          "content": "No, I'd hate that. I know I don't want that. Honestly I like kids. I help at my son's school party every year. But I don't know if that's a real job."
+        },
+        {
+          "role": "model",
+          "content": "What would help you most right now?"
+        },
+        {
+          "role": "user",
+          "content": "A resume. I've never made one. And how to do an interview. I get nervous. I just need to get job ready first, then I'll figure out the rest."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Education"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Healthcare & Human Services"
+        ]
+      },
+      "rationale": "Student is undecided, rejects office work, leans toward kids, and says getting job-ready comes first."
+    },
+    {
+      "id": "office-admin-01-es",
+      "pair": "office-admin-01",
+      "lang": "es",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¡Hola! Quiero saber qué tipo de trabajo te gustaría. ¿Qué trabajo se te viene primero a la mente?"
+        },
+        {
+          "role": "user",
+          "content": "Quiero trabajar en una oficina. Escribir en la computadora, archivar, contestar el teléfono. De asistente administrativa, tal vez."
+        },
+        {
+          "role": "model",
+          "content": "Suena bien. ¿Qué parte del trabajo de oficina te gusta más?"
+        },
+        {
+          "role": "user",
+          "content": "Me gusta mantener todo ordenado. Escribo rápido y sé usar el email. Una vez hice data entry por un mes y me gustó."
+        },
+        {
+          "role": "model",
+          "content": "Qué bueno. ¿Qué esperas de un trabajo en una oficina?"
+        },
+        {
+          "role": "user",
+          "content": "Un sueldo seguro y un lugar donde pueda crecer. Me gusta aprender programas nuevos."
+        }
+      ],
+      "gold": {
+        "spokes": "office-admin",
+        "national": "Management & Entrepreneurship"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student names administrative assistant, typing, filing and data entry as the work they want."
+    },
+    {
+      "id": "office-admin-02-es",
+      "pair": "office-admin-02",
+      "lang": "es",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "Cuéntame algo que haces cada semana y que te hace sentir bien."
+        },
+        {
+          "role": "user",
+          "content": "Yo llevo todos los papeles de mi familia. Tengo un folder para cada niño con lo de la escuela, y un calendario en el refri con las citas de todos."
+        },
+        {
+          "role": "model",
+          "content": "Eso requiere mucho cuidado. ¿Qué te gusta de eso?"
+        },
+        {
+          "role": "user",
+          "content": "Que todo esté en su lugar y no se me pase nada. Mi hermana siempre me pide que le arregle su desorden. Le hago una lista y ya ella puede."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué usas para llevar todo eso?"
+        },
+        {
+          "role": "user",
+          "content": "Más que nada el celular y una hoja de cálculo gratis. Me gusta hacer cuadritos de quién tiene que estar dónde."
+        }
+      ],
+      "gold": {
+        "spokes": "office-admin",
+        "national": "Management & Entrepreneurship"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student describes keeping family papers, calendars and schedules in order, which is office-admin work."
+    },
+    {
+      "id": "office-admin-03-es",
+      "pair": "office-admin-03",
+      "lang": "es",
+      "difficulty": "mixed",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipos de trabajo te dan curiosidad?"
+        },
+        {
+          "role": "user",
+          "content": "Me gustaría trabajar en una oficina del juzgado o del condado. Archivando y ayudando a la gente con sus formularios."
+        },
+        {
+          "role": "model",
+          "content": "¿Algo más en tu lista?"
+        },
+        {
+          "role": "user",
+          "content": "Me gusta hornear. Pensé que algún día una panadería. Pero lo que de verdad quiero es la oficina. Un sueldo seguro, ¿sabes?"
+        },
+        {
+          "role": "model",
+          "content": "¿Hay algo que pueda hacer difícil llegar al trabajo?"
+        },
+        {
+          "role": "user",
+          "content": "No tengo carro. Me voy en el bus. La oficina del condado está en la ruta del bus, eso ayuda."
+        }
+      ],
+      "gold": {
+        "spokes": "office-admin",
+        "national": "Public Service & Safety"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Management & Entrepreneurship"
+        ]
+      },
+      "rationale": "Student wants county or courthouse office work; baking is a side interest they put second, and having no car does not change the pathway."
+    },
+    {
+      "id": "office-admin-04-es",
+      "pair": "office-admin-04",
+      "lang": "es",
+      "difficulty": "distractor",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo estás pensando?"
+        },
+        {
+          "role": "user",
+          "content": "Algo en una clínica, con los doctores."
+        },
+        {
+          "role": "model",
+          "content": "¿Te gustaría trabajar atendiendo pacientes, como ayudante de enfermería?"
+        },
+        {
+          "role": "user",
+          "content": "No. No soporto la sangre. Yo quiero la parte de adelante. Hacer las citas, pasar los datos a la computadora, llamar a la gente para recordarles su cita."
+        },
+        {
+          "role": "model",
+          "content": "O sea, el papeleo. ¿Te gusta estar mucho tiempo en el teléfono?"
+        },
+        {
+          "role": "user",
+          "content": "Un poco. Pero más que nada quiero estar en la computadora y tener los archivos bien. Me gusta que todo esté en orden."
+        }
+      ],
+      "gold": {
+        "spokes": "office-admin",
+        "national": "Healthcare & Human Services"
+      },
+      "acceptable": {
+        "spokes": [
+          "customer-service"
+        ],
+        "national": [
+          "Management & Entrepreneurship"
+        ]
+      },
+      "rationale": "Student wants scheduling, records and files at a clinic and rejects patient care."
+    },
+    {
+      "id": "finance-bookkeeping-01-es",
+      "pair": "finance-bookkeeping-01",
+      "lang": "es",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo te suena bien?"
+        },
+        {
+          "role": "user",
+          "content": "Quiero trabajar de bookkeeper, llevando las cuentas. Tomé una clase de contabilidad en la high school y me encantó."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué fue lo que te encantó?"
+        },
+        {
+          "role": "user",
+          "content": "Hacer que las cuentas cuadren. Me gustan los números y me gusta cuando todo suma hasta el último centavo. Sé un poquito de QuickBooks."
+        },
+        {
+          "role": "model",
+          "content": "¿Has hecho este tipo de trabajo antes?"
+        },
+        {
+          "role": "user",
+          "content": "No pagado. Llevé las cuentas de la venta de garage de mi iglesia una vez. Ahora quiero hacerlo en serio."
+        }
+      ],
+      "gold": {
+        "spokes": "finance-bookkeeping",
+        "national": "Financial Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student asks to be a bookkeeper and likes making the books balance."
+    },
+    {
+      "id": "finance-bookkeeping-02-es",
+      "pair": "finance-bookkeeping-02",
+      "lang": "es",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿En qué cosas te piden ayuda los demás?"
+        },
+        {
+          "role": "user",
+          "content": "En lo del dinero. Mis vecinos me preguntan cómo estirar el cheque. Hice mi propio presupuesto en una hoja de cálculo y llevo dos años sin atrasarme en ninguna cuenta."
+        },
+        {
+          "role": "model",
+          "content": "Qué bien. ¿Qué te gusta de eso?"
+        },
+        {
+          "role": "user",
+          "content": "Me gusta ver adónde se va cada dólar. Le ayudo a mi abuela a ordenar sus cuentas y los papeles del banco cada mes. Se me dan bien las matemáticas."
+        },
+        {
+          "role": "model",
+          "content": "¿Cómo te sientes cuando terminas?"
+        },
+        {
+          "role": "user",
+          "content": "Bien. Como cuando armas un rompecabezas. Cuando los números cuadran me siento bien todo el día."
+        }
+      ],
+      "gold": {
+        "spokes": "finance-bookkeeping",
+        "national": "Financial Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student runs a budget and sorts bills for family and says they like it when the numbers match."
+    },
+    {
+      "id": "finance-bookkeeping-03-es",
+      "pair": "finance-bookkeeping-03",
+      "lang": "es",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿En qué tipo de lugar te gustaría trabajar?"
+        },
+        {
+          "role": "user",
+          "content": "En un banco. Me gustaría ser cajera, o trabajar atrás con las cuentas."
+        },
+        {
+          "role": "model",
+          "content": "¿Cuál de las dos te llama más?"
+        },
+        {
+          "role": "user",
+          "content": "La parte de los números. Contar el dinero, revisar los totales. La gente me cae bien y soy amable, pero lo que me gusta son los números."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gusta de trabajar con dinero?"
+        },
+        {
+          "role": "user",
+          "content": "Tiene que ser exacto. Eso me gusta. Si un número está mal, lo busco hasta encontrarlo."
+        }
+      ],
+      "gold": {
+        "spokes": "finance-bookkeeping",
+        "national": "Financial Services"
+      },
+      "acceptable": {
+        "spokes": [
+          "customer-service"
+        ],
+        "national": []
+      },
+      "rationale": "Student weighs bank teller work against account work and says the numbers are what they like most."
+    },
+    {
+      "id": "finance-bookkeeping-04-es",
+      "pair": "finance-bookkeeping-04",
+      "lang": "es",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo crees que quieres?"
+        },
+        {
+          "role": "user",
+          "content": "Mi primo dice que me meta a las computadoras. Pero yo no quiero arreglar compus ni programar. Ese no soy yo."
+        },
+        {
+          "role": "model",
+          "content": "¿Y qué sí eres tú?"
+        },
+        {
+          "role": "user",
+          "content": "Nómina. Que a la gente le paguen bien. O facturación. Trabajé en el taller de mi tío y yo hacía las facturas. Esa parte me gustaba más."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué más importa para el trabajo?"
+        },
+        {
+          "role": "user",
+          "content": "Que quede cerca de una ruta del bus. No tengo carro ahorita. Un trabajo de oficina me funciona porque voy siempre al mismo lugar."
+        }
+      ],
+      "gold": {
+        "spokes": "finance-bookkeeping",
+        "national": "Financial Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Management & Entrepreneurship"
+        ]
+      },
+      "rationale": "Student rejects computer jobs and wants payroll and billing work; having no car only means choosing a job on a bus line."
+    },
+    {
+      "id": "tech-digital-01-es",
+      "pair": "tech-digital-01",
+      "lang": "es",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo te interesa?"
+        },
+        {
+          "role": "user",
+          "content": "Las computadoras. Quiero hacer help desk o soporte técnico. Arreglar las compus de la gente cuando se dañan."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué sabes ya?"
+        },
+        {
+          "role": "user",
+          "content": "El año pasado armé mi propia computadora con piezas. Sé reinstalar Windows y quitar virus."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gustaría aprender ahora?"
+        },
+        {
+          "role": "user",
+          "content": "Redes y seguridad. Quiero aprender a proteger las computadoras de una compañía."
+        }
+      ],
+      "gold": {
+        "spokes": "tech-digital",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants help desk and IT support and has built and repaired computers."
+    },
+    {
+      "id": "tech-digital-02-es",
+      "pair": "tech-digital-02",
+      "lang": "es",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué haces por diversión?"
+        },
+        {
+          "role": "user",
+          "content": "Más que nada juego videojuegos. Pero también desarmo celulares viejos. Mis amigos me traen los dañados."
+        },
+        {
+          "role": "model",
+          "content": "¿Los arreglas?"
+        },
+        {
+          "role": "user",
+          "content": "La mayoría. Veo videos para ver qué tiene. Le puse pantalla nueva al celular de mi tía. También le puse el wifi a toda mi familia."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué es lo mejor de eso?"
+        },
+        {
+          "role": "user",
+          "content": "Cuando vuelve a prender. Me gusta ir descubriendo qué tiene, una cosa a la vez."
+        }
+      ],
+      "gold": {
+        "spokes": "tech-digital",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student repairs phones and sets up wifi for fun and likes working out what is wrong."
+    },
+    {
+      "id": "tech-digital-03-es",
+      "pair": "tech-digital-03",
+      "lang": "es",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué cosas disfrutas?"
+        },
+        {
+          "role": "user",
+          "content": "Dibujo mucho. Cosas de caricaturas, más que nada. Pero no creo que me paguen por eso."
+        },
+        {
+          "role": "model",
+          "content": "¿Y qué tipo de trabajo te imaginas haciendo?"
+        },
+        {
+          "role": "user",
+          "content": "La verdad, seguridad de computadoras. Leo de hackers y de cómo atacan a las compañías. Yo quiero ser el que los detiene."
+        },
+        {
+          "role": "model",
+          "content": "¿Quieres seguir dibujando también?"
+        },
+        {
+          "role": "user",
+          "content": "Nada más por gusto. Lo de seguridad es lo que quiero que sea mi trabajo."
+        }
+      ],
+      "gold": {
+        "spokes": "tech-digital",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student draws for fun but says computer security is the job they want."
+    },
+    {
+      "id": "tech-digital-04-es",
+      "pair": "tech-digital-04",
+      "lang": "es",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿En qué tipo de trabajo crees que te iría bien?"
+        },
+        {
+          "role": "user",
+          "content": "Dicen que soy amable, y mi trabajadora social me dijo servicio al cliente. No quiero eso. Ya lo hice y me cansó mucho."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué preferirías?"
+        },
+        {
+          "role": "user",
+          "content": "IT. Computadoras. Ayudar a la gente con sus laptops y las impresoras."
+        },
+        {
+          "role": "model",
+          "content": "¿Hay algo de tu historial de trabajo que debamos tomar en cuenta?"
+        },
+        {
+          "role": "user",
+          "content": "Tengo un felony de hace años. Solo quiero un trabajo donde aprenda algo y vaya subiendo. Lo mío son las computadoras."
+        }
+      ],
+      "gold": {
+        "spokes": "tech-digital",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student rejects customer service and wants IT work; the felony does not change the pathway."
+    },
+    {
+      "id": "creative-design-01-es",
+      "pair": "creative-design-01",
+      "lang": "es",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo te parece divertido?"
+        },
+        {
+          "role": "user",
+          "content": "Diseño gráfico. Hacer logos, carteles y cosas así."
+        },
+        {
+          "role": "model",
+          "content": "¿Ya has hecho algunos?"
+        },
+        {
+          "role": "user",
+          "content": "Sí, hago carteles para la escuela de mi hijo con una app gratis. Quiero aprender Photoshop de verdad."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gustaría hacer en un trabajo?"
+        },
+        {
+          "role": "user",
+          "content": "Logos, camisetas, carteles. Lo que sea donde yo pueda hacer que se vea bonito."
+        }
+      ],
+      "gold": {
+        "spokes": "creative-design",
+        "national": "Arts, Entertainment, & Design"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student asks for graphic design (logos, posters, shirts) and wants to learn Photoshop."
+    },
+    {
+      "id": "creative-design-02-es",
+      "pair": "creative-design-02",
+      "lang": "es",
+      "difficulty": "indirect",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué haces en tu tiempo libre?"
+        },
+        {
+          "role": "user",
+          "content": "Dibujo. Lo hago en la noche cuando mis hijos ya se durmieron. También tomo muchas fotos y les arreglo los colores en el celular."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gusta de eso?"
+        },
+        {
+          "role": "user",
+          "content": "Me gusta hacer algo de la nada. La gente dice que mis tarjetas de cumpleaños están mejor que las de la tienda. Se las hago a todos."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gustaría tener más?"
+        },
+        {
+          "role": "user",
+          "content": "Tiempo, más que nada. Estoy todo el día con los niños. Me gustaría aprender los programas de verdad, no solo los del celular."
+        }
+      ],
+      "gold": {
+        "spokes": "creative-design",
+        "national": "Arts, Entertainment, & Design"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student draws, edits photos and makes cards and wants to learn the design programs; the kids and the time are circumstances."
+    },
+    {
+      "id": "creative-design-03-es",
+      "pair": "creative-design-03",
+      "lang": "es",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo estás pensando?"
+        },
+        {
+          "role": "user",
+          "content": "Le ayudo a mi hermana en su salón de belleza. Le hago los posts para las redes y los volantes para la ventana."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué parte te gusta?"
+        },
+        {
+          "role": "user",
+          "content": "Hacer los posts y los volantes. Escoger los colores y las fotos. Me gusta hablar con sus clientas también, pero lo divertido es crear las cosas."
+        },
+        {
+          "role": "model",
+          "content": "¿Te gustaría hacer eso para otros negocios?"
+        },
+        {
+          "role": "user",
+          "content": "Sí. Negocios chiquitos. Hacerles sus posts, sus letreros y sus anuncios. Eso es lo que quiero aprender."
+        }
+      ],
+      "gold": {
+        "spokes": "creative-design",
+        "national": "Marketing & Sales"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Arts, Entertainment, & Design"
+        ]
+      },
+      "rationale": "Student makes social posts and flyers for a salon and wants to do that for small businesses; making things outweighs talking to customers."
+    },
+    {
+      "id": "creative-design-04-es",
+      "pair": "creative-design-04",
+      "lang": "es",
+      "difficulty": "distractor",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo te gustaría?"
+        },
+        {
+          "role": "user",
+          "content": "Algo creativo. No puedo estar sentada en un escritorio todo el día con papeleo."
+        },
+        {
+          "role": "model",
+          "content": "A algunas personas les gusta el trabajo de oficina, como archivar y escribir. ¿Te serviría eso?"
+        },
+        {
+          "role": "user",
+          "content": "Para nada. Me volvería loca. Yo quiero hacer cosas. Mantas, camisetas, letreros para tiendas. Me gusta pintar y hacer letras."
+        },
+        {
+          "role": "model",
+          "content": "¿Ya has hecho algo así?"
+        },
+        {
+          "role": "user",
+          "content": "Pinté el letrero de la venta de garage de mi tío y la gente seguía preguntando quién lo hizo. Quiero aprender también la parte de la computadora, para imprimir mis propios diseños."
+        }
+      ],
+      "gold": {
+        "spokes": "creative-design",
+        "national": "Arts, Entertainment, & Design"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student rejects office work and wants to make signs, banners and shirts."
+    },
+    {
+      "id": "customer-service-01-es",
+      "pair": "customer-service-01",
+      "lang": "es",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo quieres?"
+        },
+        {
+          "role": "user",
+          "content": "Retail. Quiero trabajar en una tienda de ropa, ayudando a la gente a encontrar lo que busca."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gusta de eso?"
+        },
+        {
+          "role": "user",
+          "content": "Hablar con la gente. Me gusta ayudar a alguien a encontrar su talla y verlo contento. Antes trabajé en la caja de una tienda de regalos."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué quieres hacer ahora?"
+        },
+        {
+          "role": "user",
+          "content": "Conseguir un trabajo en una tienda donde esté con los clientes todos los días."
+        }
+      ],
+      "gold": {
+        "spokes": "customer-service",
+        "national": "Marketing & Sales"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants retail work on the floor helping shoppers."
+    },
+    {
+      "id": "customer-service-02-es",
+      "pair": "customer-service-02",
+      "lang": "es",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué has hecho que te haya hecho sentir bien?"
+        },
+        {
+          "role": "user",
+          "content": "Cada Thanksgiving yo hago la cena para como treinta personas. Pongo las mesas, planeo la comida, me aseguro de que todos tengan silla."
+        },
+        {
+          "role": "model",
+          "content": "¿Cuál es la mejor parte?"
+        },
+        {
+          "role": "user",
+          "content": "Ver a todos pasándola bien. La primavera pasada armé el baby shower de mi amiga. Hice todo, los juegos, el pastel y las decoraciones."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué haces si algo sale mal?"
+        },
+        {
+          "role": "user",
+          "content": "Lo arreglo rápido y sonrío. Nadie se da cuenta. Me gusta que la gente se vaya contenta."
+        }
+      ],
+      "gold": {
+        "spokes": "customer-service",
+        "national": "Hospitality, Events, & Tourism"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student hosts big family events and loves making guests happy, which points to hospitality and events."
+    },
+    {
+      "id": "customer-service-03-es",
+      "pair": "customer-service-03",
+      "lang": "es",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿En qué tipos de trabajo has estado pensando?"
+        },
+        {
+          "role": "user",
+          "content": "De mesera en un restaurante. O quizás de ayudante de enfermera."
+        },
+        {
+          "role": "model",
+          "content": "¿Cuál se siente más como tú?"
+        },
+        {
+          "role": "user",
+          "content": "De mesera. De ayudante me iba a marear. Me gusta hablar con los clientes y acordarme de lo que les gusta."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gusta de hablar con los clientes?"
+        },
+        {
+          "role": "user",
+          "content": "Cuando alguien tiene un mal día y yo logro que sonría. En los restaurantes todo es rápido y me gusta estar ocupada."
+        }
+      ],
+      "gold": {
+        "spokes": "customer-service",
+        "national": "Hospitality, Events, & Tourism"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student picks waiting tables over a nurse's aide job, citing talking to customers."
+    },
+    {
+      "id": "customer-service-04-es",
+      "pair": "customer-service-04",
+      "lang": "es",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿En qué tipo de trabajo te ves?"
+        },
+        {
+          "role": "user",
+          "content": "En una tienda de abarrotes o en una dollar store. En la caja, o ayudando a los clientes a encontrar las cosas."
+        },
+        {
+          "role": "model",
+          "content": "Algunas tiendas necesitan gente para descargar camiones y acomodar los estantes. ¿Te gustaría eso?"
+        },
+        {
+          "role": "user",
+          "content": "No. No quiero estar atrás todo el día. Quiero estar adelante con los clientes."
+        },
+        {
+          "role": "model",
+          "content": "¿Por qué crees que te iría bien adelante?"
+        },
+        {
+          "role": "user",
+          "content": "Soy paciente. Aunque la gente sea grosera, yo me quedo tranquila. Pero necesito turno de día. La guardería de mi hijo cierra a las cinco."
+        }
+      ],
+      "gold": {
+        "spokes": "customer-service",
+        "national": "Marketing & Sales"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student rejects stockroom work and wants the register and customer-facing store work; needing a day shift is a circumstance."
+    },
+    {
+      "id": "language-esl-01-es",
+      "pair": "language-esl-01",
+      "lang": "es",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¡Hola! ¿Qué te gustaría hacer de trabajo?"
+        },
+        {
+          "role": "user",
+          "content": "Quiero trabajar en un hospital, cuidando a gente mayor. Pero primero necesito aprender mejor el inglés."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué es lo más difícil del inglés ahorita?"
+        },
+        {
+          "role": "user",
+          "content": "Hablar. Entiendo un poco. Cuando el doctor habla rápido me pierdo. Y no puedo llenar los formularios."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te ayudaría más?"
+        },
+        {
+          "role": "user",
+          "content": "Clases para hablar y leer en el trabajo. Primero el inglés, y después la clase de asistente de enfermería."
+        }
+      ],
+      "gold": {
+        "spokes": "language-esl",
+        "national": "Healthcare & Human Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student says English must come first, with hospital care work as the later goal."
+    },
+    {
+      "id": "language-esl-02-es",
+      "pair": "language-esl-02",
+      "lang": "es",
+      "difficulty": "indirect",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "Cuéntame un poco de ti y de lo que hacías antes."
+        },
+        {
+          "role": "user",
+          "content": "Soy de un pueblito. Cocinaba todos los días para mi familia grande y para las fiestas de la iglesia. La gente decía que mi comida era la mejor."
+        },
+        {
+          "role": "model",
+          "content": "Eso es mucho trabajo. ¿Qué se te hace difícil ahora?"
+        },
+        {
+          "role": "user",
+          "content": "El inglés. Mis hijos me traducen en la tienda y en la escuela. Me da pena. Quiero hablar yo sola."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gustaría hacer primero?"
+        },
+        {
+          "role": "user",
+          "content": "Aprender inglés. Después quiero un trabajo donde pueda cocinar. No puedo ir a clases en la noche por los niños, solo en la mañana."
+        }
+      ],
+      "gold": {
+        "spokes": "language-esl",
+        "national": "Hospitality, Events, & Tourism"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student says learning English comes first and mentions cooking for large groups; child care only limits class times."
+    },
+    {
+      "id": "language-esl-03-es",
+      "pair": "language-esl-03",
+      "lang": "es",
+      "difficulty": "mixed",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué quieres hacer de trabajo?"
+        },
+        {
+          "role": "user",
+          "content": "Me gustan las computadoras. Arreglo celulares de mis amigos. Quiero trabajar con computadoras."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué necesitas antes de eso?"
+        },
+        {
+          "role": "user",
+          "content": "Inglés. Las instrucciones están en inglés y no entiendo todas las palabras. Necesito leer manuales y hablar con la gente en un trabajo."
+        },
+        {
+          "role": "model",
+          "content": "Entonces, ¿qué va primero?"
+        },
+        {
+          "role": "user",
+          "content": "El inglés primero. Luego las computadoras. Sin inglés no puedo hacer un trabajo de computadoras."
+        }
+      ],
+      "gold": {
+        "spokes": "language-esl",
+        "national": "Digital Technology"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student likes computers but says English comes first, so the pathway is language-esl and the computer interest sets the national cluster."
+    },
+    {
+      "id": "language-esl-04-es",
+      "pair": "language-esl-04",
+      "lang": "es",
+      "difficulty": "distractor",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo quieres?"
+        },
+        {
+          "role": "user",
+          "content": "Quiero trabajar en una escuela ayudando a los niños. Hablo español, entonces puedo ayudar a los niños que hablan español."
+        },
+        {
+          "role": "model",
+          "content": "Un trabajo con clientes también podría usar tu español, como en una tienda. ¿Te gustaría eso?"
+        },
+        {
+          "role": "user",
+          "content": "No, ahorita no. Mi inglés no está lo bastante bien para hablar con clientes todo el día. Me pongo nerviosa."
+        },
+        {
+          "role": "model",
+          "content": "Entonces, ¿cuál es el primer paso?"
+        },
+        {
+          "role": "user",
+          "content": "Aprender mejor el inglés. Leer y escribir. Después puedo preguntar por el trabajo de la escuela."
+        }
+      ],
+      "gold": {
+        "spokes": "language-esl",
+        "national": "Education"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants to be a school aide, turns down customer work for now, and names English as the first step."
+    },
+    {
+      "id": "career-readiness-01-es",
+      "pair": "career-readiness-01",
+      "lang": "es",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo estás buscando?"
+        },
+        {
+          "role": "user",
+          "content": "Trabajo de fábrica. Quiero operar máquinas y hacer piezas. Me gustaría aprender a ser operador de máquinas."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gusta de eso?"
+        },
+        {
+          "role": "user",
+          "content": "Me gusta trabajar con las manos y con las máquinas. Cerca hay una planta que hace piezas y mi primo trabaja ahí. Buena paga y beneficios."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué necesitas para que te contraten ahí?"
+        },
+        {
+          "role": "user",
+          "content": "Necesito mejorar en el examen de matemáticas que les ponen. Y necesito un resume. Nunca he hecho uno."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Advanced Manufacturing"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants machine operator factory work, a manufacturing job SPOKES maps to career-readiness."
+    },
+    {
+      "id": "career-readiness-02-es",
+      "pair": "career-readiness-02",
+      "lang": "es",
+      "difficulty": "indirect",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "Cuéntame de un lugar donde te sientes mejor."
+        },
+        {
+          "role": "user",
+          "content": "Afuera. Crecí en la casa de mi abuelo. Teníamos vacas y un huerto grande, y yo les daba de comer a los animales cada mañana."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te gustaba de eso?"
+        },
+        {
+          "role": "user",
+          "content": "Estar con los animales. Ver cómo crecen las plantas. Nunca me gustó estar adentro todo el día. Me aburría en la escuela por eso."
+        },
+        {
+          "role": "model",
+          "content": "¿Todavía haces algo de eso?"
+        },
+        {
+          "role": "user",
+          "content": "En mi casa tengo gallinas y tomates. Los vecinos me compran los huevos. Me gustaría un trabajo donde esté afuera así."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Agriculture"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student describes farm animals, gardens and wanting to be outside, with no job named."
+    },
+    {
+      "id": "career-readiness-03-es",
+      "pair": "career-readiness-03",
+      "lang": "es",
+      "difficulty": "mixed",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo estás pensando?"
+        },
+        {
+          "role": "user",
+          "content": "Construir cosas. Hacer techos o carpintería. Mi tío hace techos y dice que me puede meter."
+        },
+        {
+          "role": "model",
+          "content": "¿Algo más?"
+        },
+        {
+          "role": "user",
+          "content": "Pensé en manejar un camión. Pero prefiero construir. Ver cómo se levanta una casa y saber que ayudé, eso es lo que me gusta."
+        },
+        {
+          "role": "model",
+          "content": "¿Cómo llegarías al lugar de trabajo?"
+        },
+        {
+          "role": "user",
+          "content": "Mi tío me da raite. No tengo carro. Me preocupan los exámenes de seguridad y las matemáticas para medir."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Construction"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants roofing or carpentry and says building matters more than truck driving; having no car is a circumstance."
+    },
+    {
+      "id": "career-readiness-04-es",
+      "pair": "career-readiness-04",
+      "lang": "es",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo estás buscando?"
+        },
+        {
+          "role": "user",
+          "content": "Mi papá y mi abuelo trabajaron para la compañía del carbón. Me gustaría entrar a una cuadrilla de la mina o trabajar en los pozos de gas."
+        },
+        {
+          "role": "model",
+          "content": "Un trabajo con computadoras también podría ser bueno. ¿Eso suena como tú?"
+        },
+        {
+          "role": "user",
+          "content": "No. No quiero estar sentado adentro. Quiero trabajar afuera o bajo tierra, como mi familia."
+        },
+        {
+          "role": "model",
+          "content": "¿Hay algo sobre la contratación de lo que debamos hablar?"
+        },
+        {
+          "role": "user",
+          "content": "Me metí en problemas a los diecinueve años y tengo antecedentes. Necesito saber quién contrata con eso. Y creo que necesito mi tarjeta de seguridad."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Energy & Natural Resources"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants mine or gas well work like their family and rejects computer work; the record is a circumstance."
+    },
+    {
+      "id": "career-readiness-05-es",
+      "pair": "career-readiness-05",
+      "lang": "es",
+      "difficulty": "clear",
+      "circumstances": false,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo estás buscando?"
+        },
+        {
+          "role": "user",
+          "content": "Trabajo en un warehouse. Quiero manejar un forklift. Más adelante me gustaría sacar mi CDL y manejar un tráiler."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué has hecho en este tipo de trabajo?"
+        },
+        {
+          "role": "user",
+          "content": "Surtí pedidos en una bodega por un año. He usado el pallet jack. Nunca me certifiqué para el forklift."
+        },
+        {
+          "role": "model",
+          "content": "¿En qué quieres trabajar?"
+        },
+        {
+          "role": "user",
+          "content": "En sacar la tarjeta del forklift y mejorar en el papeleo de las cargas. Después voy a ver lo del CDL."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Supply Chain & Transportation"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student wants warehouse and forklift work, then a CDL."
+    },
+    {
+      "id": "career-readiness-06-es",
+      "pair": "career-readiness-06",
+      "lang": "es",
+      "difficulty": "indirect",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué haces tú por otras personas?"
+        },
+        {
+          "role": "user",
+          "content": "Soy voluntaria en el centro de personas mayores los sábados. Les ayudo a comer, a caminar y a llamar a sus hijos."
+        },
+        {
+          "role": "model",
+          "content": "¿Cómo te sientes con eso?"
+        },
+        {
+          "role": "user",
+          "content": "Bien. Estoy tranquila con ellos. Una señora me agarra la mano cuando tiene miedo y yo sé qué decirle. También ayudé a cuidar a mi abuela."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué querrías en un trabajo?"
+        },
+        {
+          "role": "user",
+          "content": "Algo así todos los días, ayudar a gente que lo necesita. Pero necesito turno de día. Mi mamá necesita que la lleve a sus citas."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Healthcare & Human Services"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": []
+      },
+      "rationale": "Student volunteers helping older adults eat and walk and wants that kind of work every day; days only because of rides for their mom."
+    },
+    {
+      "id": "career-readiness-07-es",
+      "pair": "career-readiness-07",
+      "lang": "es",
+      "difficulty": "mixed",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿En qué tipos de trabajo estás pensando?"
+        },
+        {
+          "role": "user",
+          "content": "Quiero ser bombero. He sido voluntario en el departamento de bomberos de mi pueblo."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué haces ahí?"
+        },
+        {
+          "role": "user",
+          "content": "Limpio los camiones, ayudo en las colectas. Me dejaron ver un entrenamiento. También pensé en ser paramédico, pero apagar incendios es lo principal."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué necesitarías para empezar?"
+        },
+        {
+          "role": "user",
+          "content": "La prueba física y unas clases. Y tengo que resolver lo del cuidado de mi bebé. Mi hermana lo puede cuidar en la noche, pero no de día."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Public Service & Safety"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Healthcare & Human Services"
+        ]
+      },
+      "rationale": "Student wants to be a firefighter and calls EMT work secondary; child care is a circumstance."
+    },
+    {
+      "id": "career-readiness-08-es",
+      "pair": "career-readiness-08",
+      "lang": "es",
+      "difficulty": "distractor",
+      "circumstances": true,
+      "messages": [
+        {
+          "role": "model",
+          "content": "¿Qué tipo de trabajo estás pensando?"
+        },
+        {
+          "role": "user",
+          "content": "La verdad no sé. Llevo siete años en casa con mis hijos. Necesito conseguir trabajo pero no sé en qué soy buena."
+        },
+        {
+          "role": "model",
+          "content": "A algunas personas les gusta el trabajo de oficina, escribir y archivar. ¿Te suena bien?"
+        },
+        {
+          "role": "user",
+          "content": "No, lo odiaría. Eso sí sé que no lo quiero. La verdad me gustan los niños. Ayudo cada año en la fiesta de la escuela de mi hijo. Pero no sé si eso es un trabajo de verdad."
+        },
+        {
+          "role": "model",
+          "content": "¿Qué te ayudaría más ahorita?"
+        },
+        {
+          "role": "user",
+          "content": "Un resume. Nunca he hecho uno. Y cómo hacer una entrevista. Me pongo nerviosa. Primero necesito estar lista para trabajar, y después veo lo demás."
+        }
+      ],
+      "gold": {
+        "spokes": "career-readiness",
+        "national": "Education"
+      },
+      "acceptable": {
+        "spokes": [],
+        "national": [
+          "Healthcare & Human Services"
+        ]
+      },
+      "rationale": "Student is undecided, rejects office work, leans toward kids, and says getting job-ready comes first."
+    }
+  ]
+}

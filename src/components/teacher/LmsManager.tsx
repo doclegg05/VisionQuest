@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface LmsLink {
   id: string;
@@ -23,6 +24,7 @@ const CATEGORIES = [
 ];
 
 export default function LmsManager() {
+  const { confirm, confirmDialog } = useConfirm();
   const [links, setLinks] = useState<LmsLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +83,15 @@ export default function LmsManager() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this course link?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this course link?",
+        message: "Students will no longer see it.",
+        confirmLabel: "Delete",
+      }))
+    ) {
+      return;
+    }
 
     try {
       const res = await fetch("/api/teacher/lms", {
@@ -117,8 +127,8 @@ export default function LmsManager() {
 
   if (error) return (
     <div className="surface-section px-6 py-10 text-center">
-      <p className="mb-4 text-sm text-red-600">{error}</p>
-      <button onClick={fetchLinks} className="primary-button px-4 py-2 text-sm">
+      <p className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
+      <button onClick={fetchLinks} className="primary-button px-4 py-2 text-sm pointer-coarse:min-h-11">
         Try Again
       </button>
     </div>
@@ -133,6 +143,7 @@ export default function LmsManager() {
 
   return (
     <div className="space-y-4">
+      {confirmDialog}
       {/* Link list grouped by category */}
       {links.length === 0 ? (
         <div className="surface-section py-8 text-center text-sm text-[var(--ink-muted)]">
@@ -163,13 +174,13 @@ export default function LmsManager() {
                   <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                     <button
                       onClick={() => startEdit(link)}
-                      className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)]"
+                      className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)]"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => handleDelete(link.id)}
-                      className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                      className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--badge-error-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
                     >
                       Delete
                     </button>
@@ -187,55 +198,68 @@ export default function LmsManager() {
           <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
             {editingId ? "Edit Link" : "New Course Link"}
           </h3>
-          <input
-            type="text"
-            placeholder="Title (e.g., 'Google IT Certificate')"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
-          />
-          <input
-            type="text"
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
-          />
-          <input
-            type="url"
-            placeholder="URL (e.g., https://coursera.org/...)"
-            value={form.url}
-            onChange={(e) => setForm({ ...form, url: e.target.value })}
-            className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
-          />
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <select
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="select-field flex-1 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+          <label className="block space-y-1.5">
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Title</span>
             <input
               type="text"
-              placeholder="Icon emoji"
-              value={form.icon}
-              onChange={(e) => setForm({ ...form, icon: e.target.value })}
-              className="field w-full px-3 py-2.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)] sm:w-24"
+              placeholder="e.g., Google IT Certificate"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
             />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Description (optional)</span>
+            <input
+              type="text"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">URL</span>
+            <input
+              type="url"
+              placeholder="e.g., https://coursera.org/..."
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+              className="field px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+            />
+          </label>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <label className="block flex-1 space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Category</span>
+              <select
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                className="select-field w-full px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1.5 sm:w-24">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Icon emoji</span>
+              <input
+                type="text"
+                value={form.icon}
+                onChange={(e) => setForm({ ...form, icon: e.target.value })}
+                className="field w-full px-3 py-2.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
+              />
+            </label>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleSave}
-              className="primary-button px-4 py-2 text-sm"
+              className="primary-button px-4 py-2 text-sm pointer-coarse:min-h-11"
             >
               {editingId ? "Save Changes" : "Add Link"}
             </button>
             <button
               onClick={resetForm}
-              className="rounded-full px-4 py-2 text-sm font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)]"
+              className="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
             >
               Cancel
             </button>

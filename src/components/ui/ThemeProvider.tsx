@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { type Theme, THEME_COOKIE, THEME_DEFAULT } from "@/lib/theme";
+import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
+import { type Theme, type ThemePreference, THEME_COOKIE, resolveTheme } from "@/lib/theme";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -9,7 +9,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: THEME_DEFAULT,
+  theme: "light",
   toggleTheme: () => {},
 });
 
@@ -17,29 +17,42 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+function subscribeToAppearance(onChange: () => void): () => void {
+  const query = window.matchMedia(DARK_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+const devicePrefersDark = () => window.matchMedia(DARK_QUERY).matches;
+// The server cannot see the device; null means "not known yet".
+const unknownOnServer = () => null;
+
 export function ThemeProvider({
-  initialTheme,
+  initialPreference,
   children,
 }: {
-  initialTheme: Theme;
+  initialPreference: ThemePreference;
   children: React.ReactNode;
 }) {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [preference, setPreference] = useState<ThemePreference>(initialPreference);
+  const prefersDark = useSyncExternalStore(subscribeToAppearance, devicePrefersDark, unknownOnServer);
+  const resolved = preference === "system" && prefersDark === null ? null : resolveTheme(preference, prefersDark ?? false);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    // Until the device is known, leave the attribute the boot script set.
+    if (resolved) document.documentElement.setAttribute("data-theme", resolved);
+  }, [resolved]);
 
   const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      document.cookie = `${THEME_COOKIE}=${next};path=/;max-age=${365 * 24 * 60 * 60};SameSite=Strict`;
-      return next;
-    });
-  }, []);
+    const next: Theme = resolved === "dark" ? "light" : "dark";
+    document.cookie = `${THEME_COOKIE}=${next};path=/;max-age=${365 * 24 * 60 * 60};SameSite=Strict`;
+    setPreference(next);
+  }, [resolved]);
 
   return (
-    <ThemeContext value={{ theme, toggleTheme }}>
+    <ThemeContext value={{ theme: resolved ?? "light", toggleTheme }}>
       {children}
     </ThemeContext>
   );

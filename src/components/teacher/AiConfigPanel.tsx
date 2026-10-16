@@ -166,15 +166,15 @@ export default function AiConfigPanel() {
 
   const statusColor =
     status === "connected"
-      ? "bg-emerald-100 text-emerald-700"
+      ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
       : status === "invalid_key"
-        ? "bg-red-100 text-red-700"
-        : "bg-amber-100 text-amber-800";
+        ? "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]"
+        : "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]";
 
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-text)]">
           {error}
         </div>
       )}
@@ -213,14 +213,14 @@ export default function AiConfigPanel() {
               type="button"
               onClick={() => void handleTest()}
               disabled={testing}
-              className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {testing ? "Testing..." : "Test Connection"}
             </button>
             <button
               type="button"
               onClick={() => void handleRemove()}
-              className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
             >
               Remove
             </button>
@@ -257,6 +257,7 @@ export default function AiConfigPanel() {
         <p className="mt-2 text-xs text-[var(--ink-muted)]">
           Get a key from{" "}
           <a
+            data-inline-link
             href="https://aistudio.google.com/apikey"
             target="_blank"
             rel="noopener noreferrer"

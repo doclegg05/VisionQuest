@@ -212,7 +212,10 @@ jobs:
       # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric
       # crosses its floor. Suites whose `requires` are unmet report `skipped`
       # and never fail the run, so the Gemini-backed and prod-read-only suites
-      # stay quiet here (they belong to benchmarks.yml, nightly).
+      # stay quiet here (they belong to benchmarks.yml, nightly). Two gate
+      # suites also need an opt-in beyond `requires`, and the step gives both:
+      # CONSENT_SCOPES_BENCH_ENABLED for consent-scopes and
+      # SHADOW_DATABASE_URL for migration-drift-schema.
       #
       # Placed after the migrate step so a suite that requires `postgres` or
       # `cohort` meets a real, migrated schema in the hermetic pgvector
@@ -231,11 +234,28 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
 
+      - name: Create the migration-drift shadow database
+        # migration-drift-schema replays every migration into this database
+        # and diffs the result against schema.prisma. The replay overwrites
+        # whatever the database holds, so it gets its own database on the same
+        # pgvector service and never touches visionquest_ci, which the other
+        # suites read. The roles the migrations grant to (anon, authenticated,
+        # vq_app) are cluster-wide and already exist from the migrate step.
+        run: docker exec "${{ job.services.postgres.id }}" createdb -U postgres visionquest_shadow
+
       - name: Gate-tier benchmarks
         run: npm run bench -- --tier=gate --compare
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          # consent-scopes writes real fixture rows, so it is opt-in. Its
+          # scorer hands RLS_TEST_ENABLED to its own child only: set here, it
+          # would also reach pii-log-grep's `npm test`, whose glob holds the
+          # whole RLS suite. It connects as postgres, like the RLS step, so it
+          # measures the app's own consent checks; no policy can hide the rows
+          # a refusal depends on.
+          CONSENT_SCOPES_BENCH_ENABLED: "true"
+          SHADOW_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_shadow"
 
       - name: Upload benchmark results
         if: always()

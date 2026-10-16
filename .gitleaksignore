@@ -1,0 +1,17 @@
+# Dummy API keys in the OpenRouter test bench tests (#225), so a merge of main
+# passes `gitleaks protect --staged`. Each value contains "test" and "123" and is
+# 21 to 34 characters; a real OpenRouter key is 73.
+# Entries are file:rule:line, the form `gitleaks protect --staged` reports. They
+# are line-scoped: if one of these lines moves, regenerate that entry with
+# `gitleaks protect --staged --redact --report-format json` and never add a
+# fingerprint for a value you have not confirmed is a dummy.
+scripts/bench/suites/career-classifier.test.mjs:generic-api-key:40
+scripts/lib/eval-abort.e2e.test.mjs:generic-api-key:29
+scripts/lib/eval-abort.e2e.test.mjs:generic-api-key:85
+scripts/lib/sage-eval-provider.test.mjs:generic-api-key:381
+scripts/lib/sage-eval-provider.test.mjs:generic-api-key:393
+scripts/lib/sage-eval-provider.test.mjs:generic-api-key:560
+src/lib/ai/openrouter-provider.test.ts:generic-api-key:13
+docs/superpowers/plans/2026-10-13-openrouter-test-bench.md:generic-api-key:404
+docs/superpowers/plans/2026-10-13-openrouter-test-bench.md:generic-api-key:1439
+docs/superpowers/plans/2026-10-13-openrouter-test-bench.md:generic-api-key:1451

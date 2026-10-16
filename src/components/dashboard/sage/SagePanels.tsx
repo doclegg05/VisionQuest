@@ -61,7 +61,7 @@ function NextSteps({ card }: { card: Extract<PanelCard, { type: "next_steps" }> 
             {step.href ? (
               <Link
                 href={step.href}
-                className="underline decoration-[var(--accent-secondary)] underline-offset-2 hover:text-[var(--accent-secondary)]"
+                className="inline-flex min-h-11 items-center underline decoration-[var(--accent-secondary)] underline-offset-2 hover:text-[var(--accent-secondary)]"
               >
                 {step.label}
               </Link>
@@ -88,7 +88,7 @@ function ResourcePointer({ card }: { card: Extract<PanelCard, { type: "resource_
     <CardShell eyebrow="Worth a look">
       <Link
         href={card.href}
-        className="font-semibold underline decoration-[var(--accent-secondary)] underline-offset-2 hover:text-[var(--accent-secondary)]"
+        className="inline-flex min-h-11 items-center font-semibold underline decoration-[var(--accent-secondary)] underline-offset-2 hover:text-[var(--accent-secondary)]"
       >
         {card.title}
       </Link>

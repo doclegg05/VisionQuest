@@ -15,7 +15,7 @@ export function RetryResponseButton({ onRetry }: RetryResponseButtonProps) {
     <button
       onClick={onRetry}
       type="button"
-      className="ml-11 mt-2 text-xs font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
+      className="ml-11 mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
     >
       Retry response
     </button>

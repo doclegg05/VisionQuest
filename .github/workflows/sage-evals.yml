@@ -1,12 +1,29 @@
 name: Sage Evals
 
 # Live model evals for Sage. Separate from the main `CI` workflow because they
-# (a) call the Gemini API (cost + a GEMINI_API_KEY secret) and (b) are
-# non-deterministic, so they don't belong on the hard PR gate for every change.
+# (a) call a paid model API and (b) are non-deterministic, so they don't
+# belong on the hard PR gate for every change.
+#
+# Model calls go through OpenRouter (OPENROUTER_API_KEY secret) to
+# production's model, google/gemini-3.1-flash-lite. Every prompt here is a
+# synthetic eval fixture: OpenRouter never sees real student data, and the
+# app itself never calls it (docs/runbooks/openrouter-test-bench.md). The
+# memory and answer-quality evals also embed through OpenRouter, with Google's
+# gemini-embedding-001: the eval harness installs an eval-only embedding
+# provider that the app's resolver refuses inside the app server. No step
+# uses a direct Gemini key.
+#
+# Every model-backed step runs through scripts/lib/sage-eval-ci-step.mjs,
+# which writes PASSED, REPORTED, FAILED or NOT RUN to the job summary. A step
+# that could not evaluate anything never reads as a pass: see
+# docs/runbooks/sage-eval-budget.md. The budget is each key's own spending
+# limit; there is no opt-in variable.
+#
+# Keys are mapped only on the steps that call a model, never at job level, so
+# setup steps such as `npm ci` (and any dependency lifecycle script they run)
+# never hold one.
 #
 # Triggers: on-demand, nightly, and on PRs that touch Sage's prompt/tools/evals.
-# When GEMINI_API_KEY is not configured the live steps no-op (so forks and
-# secret-less environments stay green).
 on:
   workflow_dispatch:
   schedule:
@@ -18,6 +35,17 @@ on:
       - "config/sage-*.json"
       - "scripts/sage-*.mjs"
       - "scripts/lib/**"
+      - ".github/workflows/sage-evals.yml"
+
+permissions:
+  contents: read
+
+# A newer push to the same PR cancels the older run instead of letting it
+# keep spending. Nightly and dispatched runs get their own group and are
+# never cancelled.
+concurrency:
+  group: sage-evals-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   sage-evals:
@@ -30,22 +58,19 @@ jobs:
       JWT_SECRET: "ci-test-secret-not-real-at-all-32"
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      # E8 (2026-09-07 budget guard): GEMINI_EVAL_BUDGET_OK is a repo VARIABLE
-      # (not a secret) an operator flips to "1" after confirming the Gemini
-      # project's prepaid balance can absorb this run. Unset/not "1" = every
-      # model-backed step below prints a ::warning:: and exits 0 rather than
-      # spending against a wallet nobody confirmed is funded. This is
-      # DELIBERATELY separate from GEMINI_API_KEY: the key can be present and
-      # valid while the wallet behind it is empty, which is exactly the
-      # 2026-09-05 incident (six runs 429'd on "prepayment credits depleted"
-      # for hours). GEMINI_EVAL_BUDGET_SOFT_FAIL controls what happens if the
-      # wallet runs out mid-run anyway (see the runtime classifier below) —
-      # "1" downgrades that outcome to a warning + exit 0, unset/anything
-      # else keeps exit 3 (a real job failure, per the standing rule that an
-      # ungraded scenario is not a pass). See docs/runbooks/sage-eval-budget.md.
-      GEMINI_EVAL_BUDGET_OK: ${{ vars.GEMINI_EVAL_BUDGET_OK }}
-      GEMINI_EVAL_BUDGET_SOFT_FAIL: ${{ vars.GEMINI_EVAL_BUDGET_SOFT_FAIL }}
+      # Nothing in this workflow calls Google directly, so the quality eval
+      # runs without its Gemini judge (--judge=gemini needs a Gemini key).
+      # What CI measures: production's model, through OpenRouter. Pinned to
+      # DEFAULT_GEMINI_MODEL by src/lib/ci-sage-evals-openrouter.test.ts.
+      OPENROUTER_MODEL: google/gemini-3.1-flash-lite
+      # "true" on this repository's own runs (nightly, dispatch, and PRs from a
+      # branch here), "false" on fork PRs, which never receive secrets. A
+      # required run with a missing secret fails instead of skipping green.
+      SAGE_EVAL_REQUIRED: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      # A run that hits a key's spending limit exits 3, and a refused key or
+      # model exits 4. Both read NOT RUN and fail the step unless the repo
+      # variable SAGE_EVAL_SOFT_FAIL is 1. See docs/runbooks/sage-eval-budget.md.
+      SAGE_EVAL_SOFT_FAIL: ${{ vars.SAGE_EVAL_SOFT_FAIL }}
     steps:
       - uses: actions/checkout@v4
       - name: Print Sage prompt revision
@@ -60,6 +85,14 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      # The eval harness's own tests, before anything spends money: the
+      # provider resolver, the NOT RUN classifiers, and end-to-end checks that
+      # each eval and the embedding preflight exit 3 or 4 against stubbed
+      # providers. No key and no network.
+      - name: Eval harness tests (no model calls)
+        timeout-minutes: 15
+        run: npx tsx --test scripts/lib/sage-eval-provider.test.mjs scripts/lib/eval-abort.e2e.test.mjs
+
       # --deidentify=Sam,Ms. Lee wraps the eval provider in the same
       # de-identification decorator production applies to a cloud
       # student_record call, so the gating evals measure the SHIPPED
@@ -68,78 +101,36 @@ jobs:
       # (studentName "Sam", teacher persona "Ms. Lee"). This is a NEW
       # measurement: if a scenario reds on a placeholder, that is a finding
       # about the layer, never a reason to loosen a fixture.
+      # Red-team results through OpenRouter are close to production but not
+      # identical: OpenRouter cannot pass production's Gemini safetySettings
+      # (BLOCK_ONLY_HIGH for dangerous content), so a reply here is the model
+      # on OpenRouter's defaults.
       - name: Red-team eval (gating — hard boundary violations fail the run)
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "::notice::GEMINI_API_KEY not set — skipping live red-team eval."
-            exit 0
-          fi
-          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
-            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
-            echo "- **Red-team eval**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          set +e
-          npm run sage:redteam:eval -- "--deidentify=Sam,Ms. Lee"
-          status=$?
-          set -e
-          if [ "$status" -eq 3 ]; then
-            echo "::warning::Gemini budget exhausted at runtime — red-team eval NOT RUN (not a pass, not a code failure)"
-            echo "- **Red-team eval**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
-            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
-              exit 0
-            fi
-          fi
-          exit $status
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: >-
+          node scripts/lib/sage-eval-ci-step.mjs --label="Red-team eval" --
+          npm run sage:redteam:eval -- --provider=openrouter "--deidentify=Sam,Ms. Lee"
 
-      - name: Quality eval (informational)
+      # No pass criterion: without its Gemini judge (--judge=gemini calls
+      # Google directly) this reports replies and their reading level only.
+      # The summary says REPORTED, never PASSED. continue-on-error: a NOT RUN
+      # or a failure here shows on the step and in the summary but never
+      # fails the job.
+      - name: Quality eval (informational — replies and reading level, no judge)
         continue-on-error: true
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "::notice::GEMINI_API_KEY not set — skipping quality eval."
-            exit 0
-          fi
-          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
-            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
-            echo "- **Quality eval**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          set +e
-          npm run sage:quality:eval
-          status=$?
-          set -e
-          if [ "$status" -eq 3 ]; then
-            echo "::warning::Gemini budget exhausted at runtime — quality eval NOT RUN (not a pass, not a code failure)"
-            echo "- **Quality eval**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
-            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
-              exit 0
-            fi
-          fi
-          exit $status
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: >-
+          node scripts/lib/sage-eval-ci-step.mjs --label="Quality eval" --informational --
+          npm run sage:quality:eval -- --provider=openrouter
 
-      - name: Tool-selection eval (gating when GEMINI_API_KEY is set — accuracy < 75% fails the run; skips when the secret is unset)
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "::notice::GEMINI_API_KEY not set — skipping tool-selection eval."
-            exit 0
-          fi
-          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
-            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
-            echo "- **Tool-selection eval**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          set +e
-          npm run sage:agent:eval -- --min-accuracy=75 "--deidentify=Sam,Ms. Lee"
-          status=$?
-          set -e
-          if [ "$status" -eq 3 ]; then
-            echo "::warning::Gemini budget exhausted at runtime — tool-selection eval NOT RUN (not a pass, not a code failure)"
-            echo "- **Tool-selection eval**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
-            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
-              exit 0
-            fi
-          fi
-          exit $status
+      - name: Tool-selection eval (gating — accuracy < 75% fails the run)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: >-
+          node scripts/lib/sage-eval-ci-step.mjs --label="Tool-selection eval" --
+          npm run sage:agent:eval -- --provider=openrouter --min-accuracy=75 "--deidentify=Sam,Ms. Lee"
 
       - name: Chat harness — deterministic families (gating — tool + guardrail failures fail the run)
         # --samples=3: Gemini tool selection is not fully deterministic even at
@@ -148,28 +139,11 @@ jobs:
         # still fail outright). See runVotedToolCase in sage-chat-harness.mjs.
         # tool_watch runs informationally: demoted flaky cases stay visible
         # (WATCH lines + a ::warning:: annotation) without gating the run.
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "::notice::GEMINI_API_KEY not set — skipping live chat harness."
-            exit 0
-          fi
-          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
-            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
-            echo "- **Chat harness**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          set +e
-          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --strict --families=tool,tool_watch,guardrail --temperature=0 --samples=3
-          status=$?
-          set -e
-          if [ "$status" -eq 3 ]; then
-            echo "::warning::Gemini budget exhausted at runtime — chat harness NOT RUN (not a pass, not a code failure)"
-            echo "- **Chat harness**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
-            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
-              exit 0
-            fi
-          fi
-          exit $status
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: >-
+          node scripts/lib/sage-eval-ci-step.mjs --label="Chat harness" --
+          npx tsx scripts/sage-chat-harness.mjs --provider=openrouter --strict --families=tool,tool_watch,guardrail --temperature=0 --samples=3
 
   sage-memory-eval:
     runs-on: ubuntu-latest
@@ -191,11 +165,24 @@ jobs:
       JWT_SECRET: "ci-test-secret-not-real-at-all-32"
       API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
       APP_BASE_URL: "http://localhost:3000"
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      # See the matching block in the sage-evals job above — same guard, same
-      # rationale (E8, 2026-09-07): docs/runbooks/sage-eval-budget.md.
-      GEMINI_EVAL_BUDGET_OK: ${{ vars.GEMINI_EVAL_BUDGET_OK }}
-      GEMINI_EVAL_BUDGET_SOFT_FAIL: ${{ vars.GEMINI_EVAL_BUDGET_SOFT_FAIL }}
+      # Generation and embeddings both go through OpenRouter. Memory storage,
+      # memory retrieval and hybrid RAG embed through the app's resolver, which
+      # the eval harness points at google/gemini-embedding-001 on OpenRouter
+      # (eval-only; src/lib/ai/embedding-provider.eval-override.test.ts). Both
+      # steps pass --needs-embeddings, which checks the key with one embedding
+      # call before the eval and again after a failed one, so a refused key or
+      # a drained wallet reads NOT RUN instead of a 0% hit rate.
+      # What CI measures: production's model, through OpenRouter. Pinned to
+      # DEFAULT_GEMINI_MODEL by src/lib/ci-sage-evals-openrouter.test.ts.
+      OPENROUTER_MODEL: google/gemini-3.1-flash-lite
+      # "true" on this repository's own runs (nightly, dispatch, and PRs from a
+      # branch here), "false" on fork PRs, which never receive secrets. A
+      # required run with a missing secret fails instead of skipping green.
+      SAGE_EVAL_REQUIRED: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      # A run that hits a key's spending limit exits 3, and a refused key or
+      # model exits 4. Both read NOT RUN and fail the step unless the repo
+      # variable SAGE_EVAL_SOFT_FAIL is 1. See docs/runbooks/sage-eval-budget.md.
+      SAGE_EVAL_SOFT_FAIL: ${{ vars.SAGE_EVAL_SOFT_FAIL }}
     steps:
       - uses: actions/checkout@v4
       - name: Print Sage prompt revision
@@ -216,16 +203,18 @@ jobs:
       - name: Answer quality on the hermetic catalog (informational during calibration)
         continue-on-error: true
         env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           SAGE_RAG_MODE: "hybrid"
           SAGE_RAG_ABSTAIN_DISTANCE: "0.40"
-        run: |
-          if [ -z "$GEMINI_API_KEY" ] || [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
-            echo "- **Answer quality**: SKIPPED — provider key or confirmed budget unavailable; not release evidence" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          npx tsx scripts/bench/seed-catalog-corpus.mjs --answer-quality --embed
-          mkdir -p reports/sage-answer-quality
-          npx tsx scripts/sage-chat-harness.mjs --provider=gemini --model=gemini-3.1-flash-lite --deidentify=Sam --families=grounding --fixture=config/sage-answer-quality-eval.json --samples=3 --temperature=0 --strict --out=reports/sage-answer-quality/catalog.json
+        # Seeds the catalog with embeddings, then runs the grounding family.
+        # Not release evidence while it calibrates. continue-on-error: a NOT
+        # RUN or a failure here never fails the job.
+        run: >-
+          node scripts/lib/sage-eval-ci-step.mjs --label="Answer quality" --informational --needs-embeddings --
+          bash -c 'set -e;
+          npx tsx scripts/bench/seed-catalog-corpus.mjs --answer-quality --embed --provider=openrouter;
+          mkdir -p reports/sage-answer-quality;
+          npx tsx scripts/sage-chat-harness.mjs --provider=openrouter --deidentify=Sam --families=grounding --fixture=config/sage-answer-quality-eval.json --samples=3 --temperature=0 --strict --out=reports/sage-answer-quality/catalog.json'
 
       - name: Upload answer-quality calibration evidence
         if: always()
@@ -235,29 +224,12 @@ jobs:
           path: reports/sage-answer-quality/
           if-no-files-found: ignore
 
-      - name: Sage memory eval (gating when GEMINI_API_KEY is set — retrieval hit rate < 90% or duplicate rate >= 5% fails the run; skips when the secret is unset)
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "::notice::GEMINI_API_KEY not set — skipping sage memory eval."
-            exit 0
-          fi
-          if [ "$GEMINI_EVAL_BUDGET_OK" != "1" ]; then
-            echo "::warning::GEMINI_EVAL_BUDGET_OK is not 1 — model-backed eval skipped (not run, not passed)"
-            echo "- **Memory eval**: NOT RUN — GEMINI_EVAL_BUDGET_OK is not 1" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          set +e
-          npm run sage:memory:eval
-          status=$?
-          set -e
-          if [ "$status" -eq 3 ]; then
-            echo "::warning::Gemini budget exhausted at runtime — memory eval NOT RUN (not a pass, not a code failure)"
-            echo "- **Memory eval**: NOT RUN — Gemini budget exhausted at runtime" >> "$GITHUB_STEP_SUMMARY"
-            if [ "$GEMINI_EVAL_BUDGET_SOFT_FAIL" = "1" ]; then
-              exit 0
-            fi
-          fi
-          exit $status
+      - name: Sage memory eval (gating — retrieval hit rate < 90% or duplicate rate >= 5% fails the run)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: >-
+          node scripts/lib/sage-eval-ci-step.mjs --label="Memory eval" --needs-embeddings --
+          npm run sage:memory:eval -- --provider=openrouter
 
   catalog-drift:
     # Compares each approved catalog node's expected sageContextNote against

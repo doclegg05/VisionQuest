@@ -841,11 +841,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
   // Format message history for Gemini, using compacted context when available.
   // This was loaded in parallel with RAG/form/memory above (conversationContextPromise).
+  // The user message was saved above, before this window was loaded, so the
+  // window normally already ends with it. Append it only when it does not
+  // (e.g. another send landed in between), so the model reads it once.
   const conversationContext = await conversationContextPromise;
-  const allMessages = [
-    ...conversationContext.messages,
-    { role: "user" as const, content: userMessage },
-  ];
+  const lastLoaded = conversationContext.messages.at(-1);
+  const windowEndsWithUserMessage =
+    lastLoaded?.role === "user" && lastLoaded.content === userMessage;
+  const allMessages = windowEndsWithUserMessage
+    ? conversationContext.messages
+    : [...conversationContext.messages, { role: "user" as const, content: userMessage }];
 
   // Stream response via SSE
   // Local (Ollama) providers MUST use streaming: Cloudflare Tunnel returns 524

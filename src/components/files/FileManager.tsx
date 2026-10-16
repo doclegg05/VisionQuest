@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import AskSageLink from "@/components/sage/AskSageLink";
 import { useConfirm } from "@/components/ui/useConfirm";
 
@@ -38,9 +38,11 @@ export default function FileManager() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const categoryId = useId();
   const [category, setCategory] = useState("general");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { confirm, alert, confirmDialog } = useConfirm();
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     fetchFiles();
@@ -66,8 +68,9 @@ export default function FileManager() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploadError(null);
     if (file.size > 10 * 1024 * 1024) {
-      setError("File is too large. Maximum size is 10MB.");
+      setUploadError("File is too large. Maximum size is 10MB.");
       return;
     }
 
@@ -82,10 +85,11 @@ export default function FileManager() {
         fetchFiles();
       } else {
         const err = await res.json();
-        await alert({ title: "Upload failed", message: err.error || "Please try again." });
+        setUploadError(err.error || "Upload failed. Please try again.");
       }
     } catch (err) {
       console.error("Upload failed:", err instanceof Error ? err.message : "Unknown error");
+      setUploadError("Upload failed. Please try again.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -111,8 +115,8 @@ export default function FileManager() {
 
   if (error) return (
     <div className="surface-section px-6 py-10 text-center">
-      <p className="mb-4 text-sm text-red-600">{error}</p>
-      <button onClick={fetchFiles} className="primary-button px-4 py-2 text-sm">
+      <p role="alert" className="mb-4 text-sm text-[var(--badge-error-text)]">{error}</p>
+      <button onClick={fetchFiles} className="primary-button min-h-11 px-4 py-2 text-sm">
         Try Again
       </button>
     </div>
@@ -133,8 +137,9 @@ export default function FileManager() {
         <h3 className="mb-3 text-sm font-semibold text-[var(--ink-strong)]">Upload a File</h3>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label className="mb-1.5 block text-xs font-medium text-[var(--ink-muted)]">Category</label>
+            <label htmlFor={categoryId} className="mb-1.5 block text-xs font-medium text-[var(--ink-muted)]">Category</label>
             <select
+              id={categoryId}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="select-field w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
@@ -150,18 +155,22 @@ export default function FileManager() {
               ref={fileInputRef}
               onChange={handleUpload}
               accept=".pdf,.jpg,.jpeg,.png,.gif"
+              aria-label="File to upload"
               className="hidden"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               type="button"
-              className="primary-button w-full px-4 py-2.5 text-sm disabled:opacity-50 sm:w-auto"
+              className="primary-button min-h-11 w-full px-4 py-2.5 text-sm disabled:opacity-50 sm:w-auto"
             >
               {uploading ? "Uploading..." : "Choose File"}
             </button>
           </div>
         </div>
+        {uploadError && (
+          <p role="alert" className="mt-2 text-xs text-[var(--badge-error-text)]">{uploadError}</p>
+        )}
         <p className="mt-2 text-xs text-[var(--ink-muted)]">PDF, JPG, PNG, or GIF. Max 10MB.</p>
       </div>
 
@@ -180,7 +189,7 @@ export default function FileManager() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="primary-button px-4 py-2.5 text-sm disabled:opacity-50"
+              className="primary-button min-h-11 px-4 py-2.5 text-sm disabled:opacity-50"
             >
               {uploading ? "Uploading..." : "Choose a file"}
             </button>
@@ -219,13 +228,13 @@ export default function FileManager() {
                       href={`/api/files/download?id=${file.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)]"
+                      className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[var(--surface-muted)]"
                     >
                       View
                     </a>
                     <button
                       onClick={() => handleDelete(file.id, file.filename)}
-                      className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                      className="inline-flex min-h-11 items-center rounded-full border border-[var(--badge-error-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)]"
                     >
                       Delete
                     </button>

@@ -1986,3 +1986,144 @@ describe("POST /api/chat/send — de-identification round trip (AC3)", () => {
     assert.equal(request.sessionDisplayName, session.displayName);
   });
 });
+
+describe("POST /api/chat/send — the new message reaches the model once", () => {
+  // The route saves the user message BEFORE it loads the history window, so
+  // the window the database returns already ends with that message. These
+  // doubles keep that ordering honest: saveMessage writes to an in-memory
+  // transcript and getConversationContext reads it back, the way the real
+  // helpers read the Message table.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  type Turn = { role: "user" | "model"; content: string };
+  const NEW_MESSAGE = "I passed my IC3 test today!";
+  const PRIOR_TURNS: Turn[] = [
+    { role: "user", content: "I have my IC3 test tomorrow." },
+    { role: "model", content: "You have prepared well. Get some sleep tonight." },
+  ];
+
+  function backHistoryWithTranscript(prior: Turn[]) {
+    const transcript: Turn[] = [...prior];
+    mockSaveMessage.mock.mockImplementation(
+      async (_conversationId: string, _studentId: string, role: "user" | "assistant", content: string) => {
+        transcript.push({ role: role === "user" ? "user" : "model", content });
+        return { id: `msg-${transcript.length}` };
+      },
+    );
+    mockGetConversationContext.mock.mockImplementation(async () => ({
+      messages: transcript.map((turn) => ({ ...turn })),
+      summaryInjected: false,
+      droppedForBudget: 0,
+      overBudget: false,
+    }));
+  }
+
+  function makeMessageCapturingProvider() {
+    const captured: { messages: Turn[] | null } = { messages: null };
+    const provider = {
+      name: "ollama",
+      async generateResponse(_systemPrompt: string, messages: Turn[]) {
+        captured.messages = messages;
+        return "Congratulations!";
+      },
+      async *streamResponse(_systemPrompt: string, messages: Turn[]) {
+        captured.messages = messages;
+        yield "Congratulations!";
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+    return { provider, captured };
+  }
+
+  function countNewMessage(messages: Turn[]): number {
+    return messages.filter((m) => m.role === "user" && m.content === NEW_MESSAGE).length;
+  }
+
+  async function send(message = NEW_MESSAGE) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+  }
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it("student, streamed reply: the provider sees the prior turns and the new message once", async () => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    backHistoryWithTranscript(PRIOR_TURNS);
+    const { provider, captured } = makeMessageCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+
+    await send();
+
+    assert.ok(captured.messages, "expected the provider to be called");
+    assert.equal(countNewMessage(captured.messages!), 1);
+    assert.deepEqual(captured.messages, [...PRIOR_TURNS, { role: "user", content: NEW_MESSAGE }]);
+  });
+
+  it("student, agent loop: runAgentTurn gets the new message once", async () => {
+    process.env.SAGE_AGENT_ENABLED = "true";
+    delete process.env.SAGE_AGENT_MODE;
+    backHistoryWithTranscript(PRIOR_TURNS);
+
+    await send();
+
+    assert.equal(mockRunAgentTurn.mock.callCount(), 1);
+    const { messages } = mockRunAgentTurn.mock.calls[0].arguments[0] as { messages: Turn[] };
+    assert.equal(countNewMessage(messages), 1);
+    assert.deepEqual(messages.at(-1), { role: "user", content: NEW_MESSAGE });
+  });
+
+  it("student: post-response extraction gets the new message once", async () => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    backHistoryWithTranscript(PRIOR_TURNS);
+
+    await send();
+
+    assert.equal(mockHandlePostResponse.mock.callCount(), 1);
+    const { allMessages } = mockHandlePostResponse.mock.calls[0].arguments[0] as { allMessages: Turn[] };
+    assert.equal(countNewMessage(allMessages), 1);
+  });
+
+  it("staff (teacher) chat: the provider sees the new message once", async () => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    session = mockTeacherSession();
+    backHistoryWithTranscript(PRIOR_TURNS);
+    const { provider, captured } = makeMessageCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+
+    await send();
+
+    assert.equal(mockGetOrCreateTeacherConversation.mock.callCount(), 1);
+    assert.ok(captured.messages, "expected the provider to be called");
+    assert.equal(countNewMessage(captured.messages!), 1);
+  });
+
+  it("still appends the new message when the loaded window does not end with it", async () => {
+    // Defensive branch: a history load that misses the saved row (a second
+    // send landing in between, or a test double returning []) must not leave
+    // the model without the student's message.
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    mockGetConversationContext.mock.mockImplementation(async () => ({ messages: [...PRIOR_TURNS] }));
+    const { provider, captured } = makeMessageCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+
+    await send();
+
+    assert.deepEqual(captured.messages, [...PRIOR_TURNS, { role: "user", content: NEW_MESSAGE }]);
+  });
+});

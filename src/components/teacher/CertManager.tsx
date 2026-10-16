@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 interface CertTemplate {
   id: string;
@@ -14,6 +15,7 @@ interface CertTemplate {
 }
 
 export default function CertManager() {
+  const { confirm, confirmDialog } = useConfirm();
   const [templates, setTemplates] = useState<CertTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +73,13 @@ export default function CertManager() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this requirement? Student progress for it will also be removed.")) return;
+    if (
+      !(await confirm({
+        title: "Delete this requirement?",
+        message: "Student progress for it is also removed.",
+        confirmLabel: "Delete",
+      }))
+    ) return;
 
     try {
       const res = await fetch("/api/teacher/certifications", {
@@ -108,8 +116,8 @@ export default function CertManager() {
 
   if (error) return (
     <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchTemplates} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+      <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
+      <button onClick={fetchTemplates} className="primary-button px-4 py-2 pointer-coarse:min-h-11">
         Try Again
       </button>
     </div>
@@ -132,7 +140,7 @@ export default function CertManager() {
                 <p className="text-sm font-medium text-[var(--ink-strong)]">
                   {t.label}
                   {t.required && (
-                    <span className="ml-1.5 text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">Required</span>
+                    <span className="ml-1.5 text-xs bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] px-1.5 py-0.5 rounded">Required</span>
                   )}
                 </p>
                 {t.description && (
@@ -140,22 +148,22 @@ export default function CertManager() {
                 )}
                 {t.url && (
                   <a href={t.url} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block">Lesson link ↗</a>
+                    className="mt-1 inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--badge-info-text)] hover:text-[var(--ink-strong)]">Lesson link ↗</a>
                 )}
                 <div className="flex gap-2 mt-1.5">
                   {t.needsFile && (
-                    <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">File required</span>
+                    <span className="text-xs bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-1.5 py-0.5 rounded">File required</span>
                   )}
                   {t.needsVerify && (
-                    <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">Needs verification</span>
+                    <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">Needs verification</span>
                   )}
                 </div>
               </div>
-              <div className="flex gap-1.5">
-                <button onClick={() => startEdit(t)} className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1">
+              <div className="flex gap-2">
+                <button onClick={() => startEdit(t)} className="inline-flex items-center pointer-coarse:min-h-11 rounded-lg text-xs text-[var(--badge-info-text)] hover:bg-[var(--badge-info-bg)] px-2 py-1">
                   Edit
                 </button>
-                <button onClick={() => handleDelete(t.id)} className="text-xs text-red-500 hover:text-red-700 px-2 py-1">
+                <button onClick={() => handleDelete(t.id)} className="inline-flex items-center pointer-coarse:min-h-11 rounded-lg text-xs text-[var(--badge-error-text)] hover:bg-[var(--badge-error-bg)] px-2 py-1">
                   Delete
                 </button>
               </div>
@@ -169,56 +177,65 @@ export default function CertManager() {
           <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
             {editingId ? "Edit Requirement" : "New Certification Requirement"}
           </h3>
-          <input
-            type="text"
-            placeholder="Requirement label (e.g., 'Complete Interview Skills module')"
-            value={form.label}
-            onChange={(e) => setForm({ ...form, label: e.target.value })}
-            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="url"
-            placeholder="Lesson URL (optional, e.g., GitHub Pages link)"
-            value={form.url}
-            onChange={(e) => setForm({ ...form, url: e.target.value })}
-            className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <label className="block space-y-1.5">
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Requirement name</span>
+            <input
+              type="text"
+              placeholder="e.g., Complete Interview Skills module"
+              value={form.label}
+              onChange={(e) => setForm({ ...form, label: e.target.value })}
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Description (optional)</span>
+            <input
+              type="text"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="block text-sm font-medium text-[var(--ink-strong)]">Lesson URL (optional)</span>
+            <input
+              type="url"
+              placeholder="e.g., GitHub Pages link"
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+              className="w-full text-sm theme-input rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+            />
+          </label>
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
-              <input type="checkbox" checked={form.required} onChange={(e) => setForm({ ...form, required: e.target.checked })} className="rounded border-[var(--border-strong)] text-blue-600" />
+              <input type="checkbox" checked={form.required} onChange={(e) => setForm({ ...form, required: e.target.checked })} className="rounded border-[var(--border-strong)] accent-[var(--accent-blue)]" />
               Required
             </label>
             <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
-              <input type="checkbox" checked={form.needsFile} onChange={(e) => setForm({ ...form, needsFile: e.target.checked })} className="rounded border-[var(--border-strong)] text-blue-600" />
+              <input type="checkbox" checked={form.needsFile} onChange={(e) => setForm({ ...form, needsFile: e.target.checked })} className="rounded border-[var(--border-strong)] accent-[var(--accent-blue)]" />
               File upload needed
             </label>
             <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
-              <input type="checkbox" checked={form.needsVerify} onChange={(e) => setForm({ ...form, needsVerify: e.target.checked })} className="rounded border-[var(--border-strong)] text-blue-600" />
+              <input type="checkbox" checked={form.needsVerify} onChange={(e) => setForm({ ...form, needsVerify: e.target.checked })} className="rounded border-[var(--border-strong)] accent-[var(--accent-blue)]" />
               Teacher verification
             </label>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            <button onClick={handleSave} className="primary-button text-sm px-4 py-2 pointer-coarse:min-h-11">
               {editingId ? "Save Changes" : "Add Requirement"}
             </button>
-            <button onClick={resetForm} className="text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)]">Cancel</button>
+            <button onClick={resetForm} className="inline-flex items-center justify-center text-sm text-[var(--ink-muted)] px-4 py-2 hover:text-[var(--ink-strong)] pointer-coarse:min-h-11">Cancel</button>
           </div>
         </div>
       ) : (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full border-2 border-dashed border-[var(--border-strong)] rounded-xl p-3 text-sm text-[var(--ink-muted)] hover:border-[var(--accent-blue)] hover:text-[var(--badge-info-text)] transition-colors"
         >
           + Add Certification Requirement
         </button>
       )}
+      {confirmDialog}
     </div>
   );
 }

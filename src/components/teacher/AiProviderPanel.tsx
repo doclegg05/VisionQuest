@@ -52,7 +52,7 @@ export default function AiProviderPanel() {
   const router = useRouter();
   const [provider, setProvider] = useState<ProviderType>("cloud");
   const [url, setUrl] = useState("");
-  const [model, setModel] = useState("gemma4:26b");
+  const model = "gemma4:12b";
   const [embeddingModel, setEmbeddingModel] = useState("nomic-embed-text");
   const [authMode, setAuthMode] = useState<LocalAuthMode>("none");
   const [apiStyle, setApiStyle] = useState<LocalApiStyle>("ollama");
@@ -141,7 +141,6 @@ export default function AiProviderPanel() {
         if (cancelled || !data) return;
         setProvider(data.provider ?? "cloud");
         setUrl(data.url ?? "");
-        setModel(data.model ?? "gemma4:26b");
         setEmbeddingModel(data.embeddingModel ?? "nomic-embed-text");
         setAuthMode(data.authMode || "none");
         setApiStyle(data.apiStyle || "ollama");
@@ -379,13 +378,12 @@ export default function AiProviderPanel() {
   const cloudflarePartial =
     (hasCloudflareClientId || hasCloudflareClientSecret) && !cloudflareConfigured;
   const installedModels = capabilities?.installedModels ?? [];
-  const chatModelOptions = installedModels.filter((m) => !m.likelyEmbedding);
   const embeddingModelOptions = installedModels.filter((m) => m.likelyEmbedding);
 
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-[var(--badge-error-bg)] bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-text)]">
           {error}
         </div>
       )}
@@ -457,32 +455,19 @@ export default function AiProviderPanel() {
             <input
               id="ollama-model"
               type="text"
-              list="ollama-chat-model-options"
-              value={model}
-              onChange={(e) => {
-                setModel(e.target.value);
-                resetMessages();
-              }}
-              placeholder="gemma4:26b"
+              value="gemma4:12b"
+              readOnly
+              placeholder="gemma4:12b"
               className="field w-full px-4 py-3 text-sm"
             />
-            {chatModelOptions.length > 0 && (
-              <datalist id="ollama-chat-model-options">
-                {chatModelOptions.map((m) => (
-                  <option key={m.name} value={m.name} />
-                ))}
-              </datalist>
-            )}
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              {chatModelOptions.length > 0
-                ? "Suggestions come from models installed on your local AI server. You can still type any model name, even one not yet pulled."
-                : "Run Test Connection to see installed models as suggestions. Free text is always allowed."}
+              VisionQuest uses Gemma 4 12B for all local AI jobs.
             </p>
           </div>
 
-          <details className="rounded-lg border border-[var(--line)] p-4">
+          <details className="rounded-lg border border-[var(--border)] p-4">
             <summary className="cursor-pointer text-sm font-medium text-[var(--ink-strong)]">
-              Model per job (optional)
+              Answer length per job
             </summary>
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
               Sage asks the local AI to do four different jobs. Leave a job blank to use
@@ -492,10 +477,11 @@ export default function AiProviderPanel() {
             </p>
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
               Compare models with{" "}
-              <code className="rounded bg-[var(--surface-sunken)] px-1 py-0.5">
+              <code className="rounded bg-[var(--surface-muted)] px-1 py-0.5">
                 npm run sage:model:bakeoff -- --models=a,b,c
               </code>
               .
+              All jobs use Gemma 4 12B. Adjust answer length below when needed.
             </p>
             <div className="mt-4 space-y-4">
               {AI_ROLES.map((role) => (
@@ -509,12 +495,8 @@ export default function AiProviderPanel() {
                   <input
                     id={`role-model-${role}`}
                     type="text"
-                    list="ollama-chat-model-options"
-                    value={roleModels[role]}
-                    onChange={(e) => {
-                      setRoleModels((prev) => ({ ...prev, [role]: e.target.value }));
-                      resetMessages();
-                    }}
+                    value="gemma4:12b"
+                    readOnly
                     placeholder={model || "Same as the main model"}
                     className="field w-full px-4 py-3 text-sm"
                   />
@@ -608,8 +590,9 @@ export default function AiProviderPanel() {
               </datalist>
             )}
             <p className="mt-2 text-xs text-[var(--ink-muted)]">
-              Must return {EMBEDDING_DIMENSIONS}-dim vectors (e.g. nomic-embed-text, embeddinggemma).
-              1024-dim models like mxbai-embed-large are not supported.
+              Must return {EMBEDDING_DIMENSIONS}-dim vectors. For EmbeddingGemma 2, use
+              google/embeddinggemma-2 with the local bridge endpoint. Changing models
+              requires reindexing existing documents and memories before activating search.
             </p>
           </div>
 
@@ -680,7 +663,7 @@ export default function AiProviderPanel() {
                       setBearerToken("");
                       resetMessages();
                     }}
-                    className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                    className="inline-flex items-center rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)] pointer-coarse:min-h-11"
                   >
                     Clear Saved Token
                   </button>
@@ -729,7 +712,7 @@ export default function AiProviderPanel() {
                         setCloudflareClientSecret("");
                         resetMessages();
                       }}
-                      className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                      className="inline-flex items-center rounded-full border border-[var(--badge-error-bg)] px-4 py-2 text-sm font-semibold text-[var(--badge-error-text)] transition-colors hover:bg-[var(--badge-error-bg)] pointer-coarse:min-h-11"
                     >
                       Clear Saved Credentials
                     </button>
@@ -780,7 +763,7 @@ export default function AiProviderPanel() {
             type="button"
             onClick={() => void handleTest()}
             disabled={testing || !url}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:min-h-11"
           >
             {testing ? "Testing..." : "Test Connection"}
           </button>
@@ -807,7 +790,7 @@ export default function AiProviderPanel() {
                   {capabilities.warnings.map((warning) => (
                     <li
                       key={warning}
-                      className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                      className="flex items-start gap-2 rounded-xl border border-[var(--badge-warning-bg)] bg-[var(--badge-warning-bg)] px-3 py-2 text-xs text-[var(--badge-warning-text)]"
                     >
                       <span aria-hidden="true">⚠</span>
                       <span>{warning}</span>
@@ -837,7 +820,7 @@ function CapabilityRow({ label, ok }: { label: string; ok: boolean }) {
     <div className="flex items-center gap-2 text-sm">
       <span
         aria-hidden="true"
-        className={ok ? "text-[var(--accent-strong)]" : "text-amber-600"}
+        className={ok ? "text-[var(--accent-strong)]" : "text-[var(--badge-warning-text)]"}
       >
         {ok ? "✓" : "⚠"}
       </span>

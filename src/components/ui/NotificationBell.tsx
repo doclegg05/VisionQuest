@@ -103,7 +103,7 @@ export default function NotificationBell() {
               <button
                 onClick={markAllRead}
                 type="button"
-                className="text-xs font-medium text-[var(--accent-strong)] hover:underline"
+                className="inline-flex min-h-11 items-center text-xs font-medium text-[var(--accent-strong)] hover:underline"
               >
                 Mark all read
               </button>
@@ -118,7 +118,7 @@ export default function NotificationBell() {
                 const href = n.type.startsWith("nudge.")
                   ? studentInterventionHref(n.type)
                   : n.type.startsWith("teacher_nudge.")
-                    ? "/teacher-dashboard"
+                    ? "/teacher"
                     : n.type === "sage_daily_prompt"
                       ? "/chat"
                       : null;

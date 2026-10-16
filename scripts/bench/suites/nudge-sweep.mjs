@@ -105,6 +105,32 @@ export function scoreReport(report, budgetMs) {
   };
 }
 
+/**
+ * How many things each metric was measured over. Pure, beside scoreReport.
+ *
+ * One shared `n` would be wrong for most of them: the per-student metrics are
+ * counted over the students who got a text, but the sweep metrics are counted
+ * over sweeps, the probe over its attempts, and the timings over the one cold
+ * sweep. A part of the run the report does not contain counts as 0, which the
+ * runner turns into an error rather than letting its 0 pass a floor.
+ */
+export function sampleSizes(report) {
+  const sweeps = (report.allSkipped ?? []).length;
+  const timedSweeps = report.sweepDurationMs === undefined ? 0 : 1;
+  const students = report.studentsWithSends ?? 0;
+  return {
+    sweep_blocked: sweeps,
+    send_errors: sweeps,
+    send_error_detector_blind: report.failureProbe?.attempted ?? 0,
+    daily_cap_exceeded: students,
+    duplicate_open_questions: students,
+    concurrent_run_not_skipped: (report.concurrent?.skipped ?? []).length,
+    deadline_overrun_ms: timedSweeps,
+    sweep_duration_ms: timedSweeps,
+    sends_per_run: report.sendsPerRun === undefined ? 0 : 1,
+  };
+}
+
 const SKIPPED = {
   sweep_blocked: 0,
   send_errors: 0,
@@ -117,9 +143,9 @@ const SKIPPED = {
   sends_per_run: null,
 };
 
-function emit(values, n, details) {
+function emit(values, sizes, details) {
   return {
-    metrics: Object.entries(values).map(([id, value]) => ({ id, value, n, details })),
+    metrics: Object.entries(values).map(([id, value]) => ({ id, value, n: sizes[id], details })),
   };
 }
 
@@ -129,7 +155,7 @@ export async function run(ctx) {
   if (!databaseUrl) {
     // The runner's `requires` already skips this suite without a DATABASE_URL;
     // the guard is here too because a scorer is also reachable directly.
-    return emit(SKIPPED, 0, { skipped: true, reason: "no DATABASE_URL", budgetMs });
+    return emit(SKIPPED, sampleSizes({}), { skipped: true, reason: "no DATABASE_URL", budgetMs });
   }
 
   const child = spawnSync(process.execPath, ["--import", "tsx", HARNESS], {
@@ -154,7 +180,7 @@ export async function run(ctx) {
     // An unseeded cohort is a skip, not a failure: `bench:validate` and CI
     // seed it, and a benchmark that reds a PR because a fixture step was
     // missing teaches everyone to ignore the gate.
-    return emit(SKIPPED, 0, { skipped: true, reason: report.reason ?? "unknown", budgetMs });
+    return emit(SKIPPED, sampleSizes({}), { skipped: true, reason: report.reason ?? "unknown", budgetMs });
   }
 
   const values = scoreReport(report, budgetMs);
@@ -168,7 +194,7 @@ export async function run(ctx) {
     twilioCalls: report.twilioCalls,
     note: "Twilio is stubbed; a request to any host other than api.twilio.com throws in the harness.",
   };
-  return emit(values, report.studentsWithSends ?? 0, details);
+  return emit(values, sampleSizes(report), details);
 }
 
 await selfTest(import.meta.url, run);
