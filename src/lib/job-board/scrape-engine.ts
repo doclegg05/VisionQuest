@@ -1,6 +1,6 @@
 import { prismaAdmin as prisma } from "@/lib/db";
 import { errorForLog } from "@/lib/log-error";
-import { scrapeRunInProgressWhere } from "./scrape-runs";
+import { retireStaleScrapeRuns, scrapeRunInProgressWhere } from "./scrape-runs";
 import { logger } from "@/lib/logger";
 import { matchJobToClusters } from "./cluster-matcher";
 import { filterQualityJobs } from "./job-quality";
@@ -466,7 +466,9 @@ function withOutcome(summary: AutoRefreshSummary, configId: string, result: Scra
 
 async function refreshOneConfig(summary: AutoRefreshSummary, configId: string): Promise<AutoRefreshSummary> {
   try {
-    if (await hasRunInProgress(configId, new Date())) {
+    const now = new Date();
+    await retireStaleScrapeRuns(configId, now);
+    if (await hasRunInProgress(configId, now)) {
       return { ...summary, skippedConfigs: summary.skippedConfigs + 1 };
     }
     return withOutcome(summary, configId, await scrapeConfig(configId, {}));
@@ -485,7 +487,9 @@ async function refreshOneConfig(summary: AutoRefreshSummary, configId: string): 
  *
  * One class's failure is logged and counted, and the sweep moves on to the
  * next class. A class whose teacher just pressed Refresh is skipped, as the
- * manual route does (src/app/api/teacher/jobs/refresh/route.ts). A class
+ * manual route does (src/app/api/teacher/jobs/refresh/route.ts); a run more
+ * than two hours old is failed first, with its background job, so it never
+ * blocks the class or the teacher's next Refresh. A class
  * whose sources all lack an API key is counted apart from failures, so the
  * job does not read as broken while the CareerOneStop and Talroo keys are
  * pending.

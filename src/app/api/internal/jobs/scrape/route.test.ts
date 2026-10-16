@@ -58,10 +58,12 @@ describe("POST /api/internal/jobs/scrape", () => {
     const res = await POST(authorizedRequest());
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.totalJobs, 12);
-    assert.equal(body.scrapedConfigs, 3);
-    assert.equal(body.skippedConfigs, 1);
-    assert.equal(body.failedConfigs, 0);
+    assert.equal(body.success, true);
+    assert.equal(body.data.totalJobs, 12);
+    assert.equal(body.data.scrapedConfigs, 3);
+    assert.equal(body.data.skippedConfigs, 1);
+    assert.equal(body.data.failedConfigs, 0);
+    assert.equal(typeof body.data.durationMs, "number");
     assert.equal(captureMessage.mock.callCount(), 0);
   });
 
@@ -70,7 +72,7 @@ describe("POST /api/internal/jobs/scrape", () => {
 
     const res = await POST(authorizedRequest());
     assert.equal(res.status, 200);
-    assert.equal((await res.json()).unconfiguredConfigs, 4);
+    assert.equal((await res.json()).data.unconfiguredConfigs, 4);
     assert.equal(captureMessage.mock.callCount(), 0);
   });
 
@@ -83,8 +85,10 @@ describe("POST /api/internal/jobs/scrape", () => {
     const res = await POST(authorizedRequest());
     assert.equal(res.status, 500);
     const body = await res.json();
-    assert.equal(body.failedConfigs, 1);
-    assert.equal(body.scrapedConfigs, 2);
+    assert.equal(body.success, false);
+    assert.equal(body.error, "Job board scrape finished with failures");
+    assert.equal(body.data.failedConfigs, 1);
+    assert.equal(body.data.scrapedConfigs, 2);
     assert.equal(captureMessage.mock.callCount(), 1);
     const [, context] = captureMessage.mock.calls[0].arguments as [string, { tags: Record<string, string> }];
     assert.equal(context.tags.jobname, "job-board-scrape");

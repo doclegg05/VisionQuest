@@ -29,20 +29,21 @@ export async function POST(req: Request) {
   const start = Date.now();
   try {
     const summary = await runAllAutoRefreshScrapes();
-    const durationMs = Date.now() - start;
-    logger.info("Cron job scrape complete", { ...summary, durationMs });
+    const data = { ...summary, durationMs: Date.now() - start };
+    logger.info("Cron job scrape complete", { ...data });
 
     if (summary.failedConfigs > 0) {
       Sentry.captureMessage(`Weekly job board scrape: ${summary.failedConfigs} class(es) failed`, {
         level: "error",
         tags: SENTRY_TAGS,
-        extra: { ...summary, durationMs },
+        extra: data,
       });
+      return NextResponse.json(
+        { success: false, error: "Job board scrape finished with failures", data },
+        { status: 500 },
+      );
     }
-    return NextResponse.json(
-      { ...summary, durationMs },
-      { status: summary.failedConfigs > 0 ? 500 : 200 },
-    );
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     logger.error("Job board scrape failed", { error: errorForLog(error) });
     Sentry.captureMessage("Weekly job board scrape failed before it finished", {
