@@ -69,39 +69,40 @@ export async function run(ctx) {
       timeout: DIFF_TIMEOUT_MS,
       maxBuffer: 10 * 1024 * 1024,
     });
-    // --exit-code makes an EMPTY diff exit 0; a non-empty diff exits 2 and
-    // lands in the catch block below. Reaching here with a non-empty script
-    // would be surprising, but treat it as drift rather than trust the exit
-    // code alone.
-    const trimmed = stdout.trim();
-    return {
-      metrics: [
-        {
-          id: "schema_migration_drift",
-          value: trimmed.length === 0 ? 0 : 1,
-          n: 1,
-          details: trimmed.length === 0 ? {} : { script: trimmed.slice(0, 4000) },
-        },
-      ],
-    };
+    return { metrics: [scoreDiff(stdout)] };
   } catch (error) {
-    // exit-code 2 = non-empty diff (real drift); anything else is a tooling
-    // failure, reported the same way so it is visible rather than swallowed.
-    const stdout = typeof error?.stdout === "string" ? error.stdout : "";
-    const isDrift = error?.code === 2 && stdout.trim().length > 0;
-    return {
-      metrics: [
-        {
-          id: "schema_migration_drift",
-          value: 1,
-          n: 1,
-          details: isDrift
-            ? { script: stdout.trim().slice(0, 4000) }
-            : { toolingError: String(error?.message ?? error) },
-        },
-      ],
-    };
+    const script = scriptFromDiffFailure(error);
+    if (script === null) {
+      return {
+        metrics: [
+          {
+            id: "schema_migration_drift",
+            value: 1,
+            n: 1,
+            details: { toolingError: String(error?.message ?? error) },
+          },
+        ],
+      };
+    }
+    return { metrics: [scoreDiff(script)] };
   }
+}
+
+// exit-code 2 = non-empty diff (real drift); anything else is a tooling
+// failure, reported the same way so it is visible rather than swallowed.
+export function scriptFromDiffFailure(error) {
+  const stdout = typeof error?.stdout === "string" ? error.stdout : "";
+  return error?.code === 2 && stdout.trim().length > 0 ? stdout : null;
+}
+
+export function scoreDiff(script) {
+  const trimmed = script.trim();
+  return {
+    id: "schema_migration_drift",
+    value: trimmed.length === 0 ? 0 : 1,
+    n: 1,
+    details: trimmed.length === 0 ? {} : { script: trimmed.slice(0, 4000) },
+  };
 }
 
 if (process.argv.includes("--self-test")) {
