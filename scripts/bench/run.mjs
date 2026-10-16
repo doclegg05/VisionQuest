@@ -320,14 +320,19 @@ function measuredNothingError(tier, metrics) {
       "a null on a floored metric would pass every floor while measuring nothing"
     );
   }
-  // The error result carries no metrics, so each value rides in the message.
   const unsampled = metrics
     .filter((metric) => metric.floor !== null && metric.n === 0 && !isSelfSkipped(metric))
-    .map((metric) => `${metric.id}=${metric.value}`);
+    .map((metric) => metric.id);
   if (unsampled.length > 0) {
+    // The error result carries no metrics, so every value rides in the
+    // message, sampled or not: nudge-sweep's blocked-sweep count has its own
+    // sample and is the one number that says why the others have none. One
+    // line, because the nightly regression issue quotes only the first.
+    const reported = metrics.map((metric) => `${metric.id}=${metric.value} (n=${metric.n})`);
     return (
       `the scorer ran but measured zero samples for ${tier}-tier metric(s): ${unsampled.join(", ")} — ` +
-      "a value over no samples would pass its floor while measuring nothing"
+      "a value over no samples would pass its floor while measuring nothing. " +
+      `Every value it reported: ${reported.join(", ")}`
     );
   }
   return null;
