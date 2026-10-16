@@ -146,7 +146,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Briefcase size={18} className="text-[var(--accent-blue)]" />
+            <Briefcase size={18} className="text-info" />
             <p className="text-sm font-medium text-[var(--ink-strong)]">Job results</p>
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">
@@ -253,7 +253,7 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
       </div>
 
       {error && (
-        <div className="mt-3 rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-[var(--error)]">
+        <div className="mt-3 rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-danger">
           {error}
         </div>
       )}

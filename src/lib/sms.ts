@@ -2,6 +2,7 @@
  * SMS delivery via Twilio REST API.
  * Twilio credentials are optional — if not configured, SMS silently degrades to no-op.
  */
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { redactContactInfo } from "./log-redaction";
 
@@ -102,7 +103,7 @@ export async function sendSms(to: string, body: string): Promise<boolean> {
     return true;
   } catch (err) {
     logger.error("Twilio SMS delivery threw an error", {
-      error: redactContactInfo(String(err)),
+      error: errorForLog(err),
     });
     return false;
   }

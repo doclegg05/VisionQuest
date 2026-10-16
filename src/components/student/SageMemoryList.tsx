@@ -96,7 +96,7 @@ export function SageMemoryList({ memories }: SageMemoryListProps) {
         <section key={group.category} aria-labelledby={`memory-group-${group.category}`}>
           <h2
             id={`memory-group-${group.category}`}
-            className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-secondary)]"
+            className="text-xs font-semibold uppercase tracking-[0.12em] text-info"
           >
             {categoryLabel(group.category)}
           </h2>

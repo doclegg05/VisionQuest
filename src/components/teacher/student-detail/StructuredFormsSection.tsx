@@ -68,7 +68,7 @@ export default function StructuredFormsSection({ studentId }: { studentId: strin
       </div>
 
       {error && (
-        <p className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--error)]" role="alert">
+        <p className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-danger" role="alert">
           {error}
         </p>
       )}

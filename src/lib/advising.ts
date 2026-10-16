@@ -2,7 +2,8 @@ import { syncInterventionNotifications } from "./advising-interventions";
 import {
   buildBookableAdvisorSlots,
 } from "./advising-scheduling";
-import { prisma } from "./db";
+import { prisma, prismaAdmin } from "./db";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { withStudentRlsContext } from "./rls-context";
 import { studentLogKey } from "@/lib/log-keys";
@@ -148,7 +149,19 @@ export async function listBookableAdvisors({
   });
 }
 
-export async function syncStudentAlerts(studentId: string) {
+export interface SyncStudentAlertsOptions {
+  /**
+   * Send intervention nudges (in-app plus queued email) for the alerts this
+   * sync finds. Default true: syncs that follow a student's or teacher's
+   * action are when a nudge is timely. The scheduled sweep passes false.
+   */
+  notify?: boolean;
+}
+
+export async function syncStudentAlerts(
+  studentId: string,
+  { notify = true }: SyncStudentAlertsOptions = {},
+) {
   const [{ loadStudentAlertSyncContext }, { applyStudentAlertSyncPlan, buildStudentAlertSyncPlan }] =
     await Promise.all([import("./advising-sync-context"), import("./advising-sync")]);
   const now = new Date();
@@ -172,7 +185,7 @@ export async function syncStudentAlerts(studentId: string) {
     desiredAlerts,
   });
 
-  if (studentSignals) {
+  if (notify && studentSignals) {
     try {
       await syncInterventionNotifications({
         studentId,
@@ -187,10 +200,22 @@ export async function syncStudentAlerts(studentId: string) {
     } catch (error) {
       logger.error("Failed to sync intervention notifications", {
         student: studentLogKey(studentId),
-        error: String(error),
+        error: errorForLog(error),
       });
     }
   }
+}
+
+/**
+ * The roster for the /api/internal/alerts/sync sweep: every active student.
+ * The sweep carries no session, so this is a program-wide admin read.
+ */
+export async function listAlertSweepStudentIds(): Promise<string[]> {
+  const students = await prismaAdmin.student.findMany({
+    where: { role: "student", isActive: true },
+    select: { id: true },
+  });
+  return students.map((student) => student.id);
 }
 
 /**
@@ -198,13 +223,44 @@ export async function syncStudentAlerts(studentId: string) {
  * session. Each student's sync runs as that student: the StudentAlert rows
  * and the student's own nudge Notification are the student's own rows, and
  * the app client behind syncStudentAlerts fails closed with no context
- * (review F5/F62, 2026-09-01). Staff nudges inside already use prismaAdmin.
+ * (review F5/F62, 2026-09-01).
+ *
+ * The sweep writes alerts only. It exists for students who have gone quiet,
+ * whose time-based alerts (inactivity, overdue tasks) no activity-triggered
+ * sync will ever write. Nudges stay with those activity syncs, both the
+ * instructor nudges and the student's own reminders (in-app and email):
+ * sent from a daily sweep, each instructor would get one email per affected
+ * student every morning, and a student who stopped coming would get a daily
+ * email until they returned (docs/plans/2026-10-15-unscheduled-internal-routes.md).
+ *
+ * One student's failure is logged with a one-way key and counted; the other
+ * students still sync.
  */
-export async function syncAlertsForStudents(studentIds: string[], batchSize: number = 4) {
+export interface AlertSweepSummary {
+  synced: number;
+  failed: number;
+}
+
+export async function syncAlertsForStudents(
+  studentIds: string[],
+  batchSize: number = 4,
+): Promise<AlertSweepSummary> {
+  let failed = 0;
   for (let index = 0; index < studentIds.length; index += batchSize) {
     const batch = studentIds.slice(index, index + batchSize);
-    await Promise.all(
-      batch.map((studentId) => withStudentRlsContext(studentId, () => syncStudentAlerts(studentId))),
+    const results = await Promise.allSettled(
+      batch.map((studentId) =>
+        withStudentRlsContext(studentId, () => syncStudentAlerts(studentId, { notify: false })),
+      ),
     );
+    results.forEach((result, position) => {
+      if (result.status === "fulfilled") return;
+      failed += 1;
+      logger.error("Scheduled alert sync failed for a student", {
+        student: studentLogKey(batch[position]),
+        error: errorForLog(result.reason),
+      });
+    });
   }
+  return { synced: studentIds.length - failed, failed };
 }

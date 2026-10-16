@@ -85,7 +85,6 @@ api/
 ├── class/              student-facing class views
 ├── credentials/        public credential endpoints
 ├── credly/badges/      Credly public-API proxy
-├── cron/               evidence-gap-detection, goal-stale-detection
 ├── csp-report/         CSP violation report sink
 ├── documents/          ProgramDocument download + list
 ├── events/             career events
@@ -95,7 +94,8 @@ api/
 ├── goals/
 ├── health/             public — Render uses as healthcheck
 ├── internal/           cron-hit routes — auth via CRON_SECRET (alerts,
-│                       appointments, coaching, jobs, reports)
+│                       appointments, coaching, evidence-gap-detection,
+│                       goal-stale-detection, jobs, ...)
 ├── jobs/               job board (student view)
 ├── lms/                LMS integration stubs
 ├── mood/               mood entries
@@ -244,7 +244,7 @@ Config (`/playwright.config.ts`): Chromium only, auto-starts `npm run dev`, BASE
 | New teacher page | `/src/app/(teacher)/teacher/<feature>/page.tsx` |
 | New admin page | `/src/app/(admin)/admin/<feature>/page.tsx` |
 | New API endpoint | `/src/app/api/<namespace>/<action>/route.ts` — must be wrapped by `withRegistry(toolId, handler)`. First, register the tool in `/src/lib/registry/tools.ts` |
-| New cron-triggered endpoint | `/src/app/api/internal/<name>/route.ts` — gets `Authorization: Bearer $CRON_SECRET` enforced by `/src/proxy.ts` + `/src/lib/csrf.ts`. Add the cron service to `/render.yaml` and the entry-point script to `/scripts/run-<name>.mjs` |
+| New cron-triggered endpoint | `/src/app/api/internal/<name>/route.ts` — the only prefix `/src/proxy.ts` lets a `Bearer $CRON_SECRET` call through; check it in the route with `isAuthorizedInternalRequest` from `/src/lib/csrf.ts`. Schedule it with a pg_cron migration named `<timestamp>_<name>_cron` (copy `20261015120000_add_stall_detector_cron`) and add the job to `EXPECTED_CRON_JOBS` in `/scripts/lib/cron-health.mjs`; `/src/lib/cron-schedule-coverage.test.ts` fails until the route, migration and list agree |
 | New business logic | `/src/lib/<namespace>/<file>.ts` — group with existing sub-namespace if one fits (`chat/`, `sage/`, `progression/`, `spokes/`, `teacher/`, etc.) |
 | New Zod schema | Append to `/src/lib/schemas.ts` (or colocate if tightly coupled to one route) |
 | New React component | `/src/components/<feature>/<Name>.tsx`. Shared primitives go in `/src/components/ui/` |

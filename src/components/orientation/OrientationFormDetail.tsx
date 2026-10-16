@@ -94,7 +94,7 @@ function SignAndSubmitButton({
       <button
         onClick={() => setShowPad(true)}
         type="button"
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.12)]"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[rgba(15,154,146,0.12)]"
       >
         {currentStatus === "rejected" ? "Re-sign" : "Sign & Submit"}
       </button>
@@ -130,7 +130,7 @@ function OrientationFormCard({
         </div>
         <div className="flex shrink-0 gap-1.5">
           {form.fillable && (
-            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
+            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
               Fillable
             </span>
           )}
@@ -140,7 +140,7 @@ function OrientationFormCard({
             </span>
           )}
           {form.required && (
-            <span className="rounded-full bg-[rgba(249,115,22,0.1)] px-2 py-0.5 text-xs font-semibold text-[var(--accent-strong)]">
+            <span className="rounded-full bg-[rgba(249,115,22,0.1)] px-2 py-0.5 text-xs font-semibold text-success">
               Required
             </span>
           )}
@@ -154,7 +154,7 @@ function OrientationFormCard({
               href={buildFormDownloadUrl(form, "view")}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+              className="inline-flex min-h-11 items-center text-xs font-semibold text-info transition-colors hover:opacity-80"
             >
               Open PDF
             </a>
@@ -166,7 +166,7 @@ function OrientationFormCard({
             </a>
           </>
         ) : (
-          <p className="text-xs text-[var(--accent-strong)]">
+          <p className="text-xs text-success">
             PDF not connected yet. You can still upload a completed copy if your class uses paper forms.
           </p>
         )}

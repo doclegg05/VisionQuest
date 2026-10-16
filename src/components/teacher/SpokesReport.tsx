@@ -107,7 +107,7 @@ export default function SpokesReport() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">SPOKES</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">SPOKES</p>
         <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Official program reporting snapshot</h2>
       </div>
 

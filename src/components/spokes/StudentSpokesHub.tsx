@@ -167,7 +167,7 @@ export default function StudentSpokesHub({
         <>
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <section className="surface-section p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Milestones</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Milestones</p>
               <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Where you are in the SPOKES process</h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="theme-card rounded-xl p-4">
@@ -202,7 +202,7 @@ export default function StudentSpokesHub({
             </section>
 
             <section className="surface-section p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Modules</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Modules</p>
               <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Required modules</h2>
               <div className="mt-5 space-y-3">
                 {moduleTemplates.map((template) => {
@@ -239,7 +239,7 @@ export default function StudentSpokesHub({
 
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <section className="surface-section p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Paperwork</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Paperwork</p>
               <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Orientation and files</h2>
               <div className="mt-5 space-y-4">
                 {renderChecklist("Orientation items", orientationTemplates)}
@@ -248,7 +248,7 @@ export default function StudentSpokesHub({
             </section>
 
             <section className="surface-section p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">Follow-up</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Follow-up</p>
               <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Employment checkpoints</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
                 Your teachers will log the 1-, 3-, and 6-month check-ins here after unsubsidized employment.

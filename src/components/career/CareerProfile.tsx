@@ -156,7 +156,7 @@ function RiasecSection({
       </p>
       {hollandCode && (
         <div className="mt-3 flex flex-wrap items-baseline gap-3">
-          <span className="font-display text-5xl font-bold text-[var(--accent-strong)]">
+          <span className="font-display text-5xl font-bold text-success">
             {hollandCode}
           </span>
           <span className="text-sm text-[var(--ink-muted)]">
@@ -270,7 +270,7 @@ function ValuesSection({ values }: { values: WorkValue[] }) {
       <ol className="mt-4 space-y-3">
         {top5.map((v, idx) => (
           <li key={v.value} className="flex items-center gap-3">
-            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(42,138,60,0.1)] text-xs font-bold text-[var(--accent-strong)]">
+            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(42,138,60,0.1)] text-xs font-bold text-success">
               {idx + 1}
             </span>
             <div className="min-w-0 flex-1">
@@ -323,12 +323,12 @@ function ClustersSection({ clusters }: { clusters: NationalClusterScore[] }) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(0,123,175,0.12)] text-xs font-bold text-[var(--primary)]">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(0,123,175,0.12)] text-xs font-bold text-info">
                     {rank + 1}
                   </span>
                   <p className="font-semibold text-[var(--ink-strong)]">{nc.cluster_name}</p>
                 </div>
-                <span className="flex-shrink-0 rounded-full bg-[rgba(42,138,60,0.1)] px-2.5 py-0.5 text-xs font-bold text-[var(--accent-strong)]">
+                <span className="flex-shrink-0 rounded-full bg-[rgba(42,138,60,0.1)] px-2.5 py-0.5 text-xs font-bold text-success">
                   {matchPct}% match
                 </span>
               </div>

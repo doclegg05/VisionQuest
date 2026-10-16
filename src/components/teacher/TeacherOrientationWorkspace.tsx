@@ -254,7 +254,7 @@ export default function TeacherOrientationWorkspace() {
               </Link>
               <Link
                 href={`/teacher/students/${selectedStudent.id}#submitted-forms`}
-                className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-4 py-2 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.14)]"
+                className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-4 py-2 text-xs font-semibold text-info transition-colors hover:bg-[rgba(15,154,146,0.14)]"
               >
                 Submitted forms
               </Link>

@@ -173,7 +173,7 @@ export default function OpportunitiesHub({
         </div>
         <div className="surface-section p-5">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Applied</p>
-          <p className="mt-2 text-3xl font-bold text-[var(--accent-secondary)]">{appliedCount}</p>
+          <p className="mt-2 text-3xl font-bold text-info">{appliedCount}</p>
           <p className="mt-2 text-sm text-[var(--ink-muted)]">Opportunities you&apos;ve already moved forward on.</p>
         </div>
         <div className="surface-section p-5">
@@ -230,7 +230,7 @@ export default function OpportunitiesHub({
                       {opportunity.location ? ` • ${opportunity.location}` : ""}
                     </p>
                     {opportunity.deadline ? (
-                      <p className="mt-1 text-sm text-[var(--accent-strong)]">
+                      <p className="mt-1 text-sm text-success">
                         Deadline {new Date(opportunity.deadline).toLocaleString()}
                       </p>
                     ) : null}
@@ -251,7 +251,7 @@ export default function OpportunitiesHub({
                   <p className="mt-4 break-words text-sm leading-7 text-[var(--ink-muted)]">{opportunity.description}</p>
                 ) : null}
 
-                <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[rgba(255,255,255,0.55)] p-4">
+                <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Resume</p>
@@ -279,7 +279,7 @@ export default function OpportunitiesHub({
                           href={`/api/files/download?id=${draft.resumeFileId}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
+                          className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-success hover:bg-[var(--surface-raised)]"
                         >
                           View Resume
                         </a>

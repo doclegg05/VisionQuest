@@ -159,7 +159,7 @@ export default function CredentialSharePanel() {
             </div>
 
             <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-[var(--accent-secondary)]">Preview</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-info">Preview</p>
               <p className="mt-3 font-display text-2xl text-[var(--ink-strong)]">
                 {form.headline || "Ready to Work Certified"}
               </p>
@@ -167,7 +167,7 @@ export default function CredentialSharePanel() {
                 {form.summary || "This learner completed the SPOKES Ready to Work certification."}
               </p>
               {data.publicUrl ? (
-                <p className="mt-4 text-xs break-all text-[var(--accent-strong)]">
+                <p className="mt-4 text-xs break-all text-success">
                   {data.publicUrl}
                 </p>
               ) : null}

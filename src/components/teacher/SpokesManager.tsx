@@ -391,7 +391,7 @@ export default function SpokesManager() {
       ) : null}
 
       <div className="surface-section p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
           Handbook-aligned setup
         </p>
         <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">
@@ -667,7 +667,7 @@ export default function SpokesManager() {
                                 sortOrder: String(template.sortOrder),
                               });
                             }}
-                            className={`${ROW_ACTION} text-[var(--accent-strong)] hover:text-[var(--ink-strong)]`}
+                            className={`${ROW_ACTION} text-success hover:text-[var(--ink-strong)] hover:underline`}
                           >
                             Edit
                           </button>
@@ -829,7 +829,7 @@ export default function SpokesManager() {
                           sortOrder: String(template.sortOrder),
                         });
                       }}
-                      className={`${ROW_ACTION} text-[var(--accent-strong)] hover:text-[var(--ink-strong)]`}
+                      className={`${ROW_ACTION} text-success hover:text-[var(--ink-strong)] hover:underline`}
                     >
                       Edit
                     </button>

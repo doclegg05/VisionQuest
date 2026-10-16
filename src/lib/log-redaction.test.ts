@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { redactContactInfo } from "./log-redaction";
+import { providerErrorText, redactContactInfo } from "./log-redaction";
 
 describe("redactContactInfo", () => {
   it("masks an email address quoted by an SMTP rejection", () => {
@@ -36,5 +36,23 @@ describe("redactContactInfo", () => {
 
   it("returns non-string input as an empty string rather than throwing", () => {
     assert.equal(redactContactInfo(undefined as unknown as string), "");
+  });
+});
+
+describe("providerErrorText", () => {
+  it("keeps an SMTP rejection's reason and masks the address it quotes", () => {
+    const error = new Error("Can't send mail - all recipients were rejected: 550 5.1.1 <jane.doe@example.com>: Recipient address rejected");
+    const out = providerErrorText(error);
+    assert.ok(!out.includes("jane.doe@example.com"));
+    assert.ok(out.includes("550 5.1.1"), "keeps the SMTP status code");
+    assert.ok(out.includes("Recipient address rejected"), "keeps the provider's reason");
+  });
+
+  it("uses the message, not the Error's string form with its class name", () => {
+    assert.equal(providerErrorText(new Error("Email delivery is not configured.")), "Email delivery is not configured.");
+  });
+
+  it("redacts a thrown non-Error value too", () => {
+    assert.equal(providerErrorText("rejected +15551234567"), "rejected [phone redacted]");
   });
 });

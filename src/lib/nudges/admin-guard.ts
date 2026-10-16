@@ -18,6 +18,7 @@
 // =============================================================================
 
 import { prismaAdmin } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 /**
@@ -54,7 +55,7 @@ export async function adminClientIsPrivileged(): Promise<boolean> {
   } catch (error) {
     // An unreachable database is not the same finding, and caching it would
     // turn a blip into a silent outage.
-    logger.error("nudges_admin_client_probe_failed", { error: String(error) });
+    logger.error("nudges_admin_client_probe_failed", { error: errorForLog(error) });
     return false;
   }
 }

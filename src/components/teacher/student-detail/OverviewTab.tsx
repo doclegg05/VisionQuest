@@ -171,13 +171,13 @@ export default function OverviewTab({
               </p>
               <Link
                 href={`/teacher/students/${student.id}/spokes`}
-                className="inline-flex items-center text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
+                className="inline-flex items-center text-xs text-success hover:text-[var(--ink-strong)] hover:underline pointer-coarse:min-h-11"
               >
                 Open SPOKES record
               </Link>
               <Link
                 href={`/teacher/students/${student.id}/dashboard`}
-                className="inline-flex items-center text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
+                className="inline-flex items-center text-xs text-success hover:text-[var(--ink-strong)] hover:underline pointer-coarse:min-h-11"
               >
                 Preview Dashboard
               </Link>

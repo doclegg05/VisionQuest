@@ -1,3 +1,4 @@
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { createWager, goalProposalWagerInput } from "@/lib/sage/wagers";
 import type { ProposeGoalResult } from "@/lib/sage/propose-goal";
@@ -31,7 +32,7 @@ export async function maybeCreateGoalProposalWager(
   } catch (err) {
     logger.error("Failed to create goal_proposal wager", {
       goalId: result.goalId,
-      error: String(err),
+      error: errorForLog(err),
     });
   }
 }

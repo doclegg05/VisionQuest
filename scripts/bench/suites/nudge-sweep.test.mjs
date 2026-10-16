@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { readDeadlineBudgetMs, scoreReport } from "./nudge-sweep.mjs";
+import { readDeadlineBudgetMs, sampleSizes, scoreReport } from "./nudge-sweep.mjs";
 
 const HEALTHY = {
   ran: true,
@@ -18,11 +18,12 @@ const HEALTHY = {
   sendsPerRun: 11,
   allSkipped: [null, null, "already running"],
   sendErrors: 0,
-  concurrent: { ran: 1 },
+  concurrent: { skipped: [null, "already running"], ran: 1 },
   capStress: { attempts: 10, accepted: 2, capConsumingRows: 2, dailyCap: 2 },
   perStudentDailyMax: 2,
   duplicateOpenQuestions: 0,
   failureProbe: { attempted: 1, sendFailures: 1 },
+  studentsWithSends: 50,
 };
 
 describe("readDeadlineBudgetMs", () => {
@@ -124,5 +125,52 @@ describe("scoreReport", () => {
   it("counts only the time past the budget, never a credit for finishing early", () => {
     assert.equal(scoreReport({ ...HEALTHY, sweepDurationMs: 230_000 }, 225_000).deadline_overrun_ms, 5_000);
     assert.equal(scoreReport({ ...HEALTHY, sweepDurationMs: 10 }, 225_000).deadline_overrun_ms, 0);
+  });
+});
+
+describe("sampleSizes", () => {
+  it("counts each metric over what it actually measured", () => {
+    // The shape of a healthy CI run: three sweeps (one cold, two at once), a
+    // failure probe, fifty students texted, and one timed cold sweep.
+    assert.deepEqual(sampleSizes(HEALTHY), {
+      sweep_blocked: 3,
+      send_errors: 3,
+      send_error_detector_blind: 1,
+      daily_cap_exceeded: 50,
+      duplicate_open_questions: 50,
+      concurrent_run_not_skipped: 2,
+      deadline_overrun_ms: 1,
+      sweep_duration_ms: 1,
+      sends_per_run: 1,
+    });
+  });
+
+  it("names exactly the metrics scoreReport does, so a new metric cannot go unsized", () => {
+    assert.deepEqual(
+      Object.keys(sampleSizes(HEALTHY)).sort(),
+      Object.keys(scoreReport(HEALTHY, 225_000)).sort(),
+    );
+  });
+
+  it("keeps a blocked sweep's own sample when no student was texted", () => {
+    // Every sweep refused: nobody got a text, so the per-student metrics have
+    // nothing under them, but the three refused sweeps are three samples.
+    const sizes = sampleSizes({
+      ...HEALTHY,
+      allSkipped: Array(3).fill("run lock unavailable"),
+      concurrent: { skipped: Array(2).fill("run lock unavailable"), ran: 0 },
+      studentsWithSends: 0,
+    });
+    assert.equal(sizes.sweep_blocked, 3);
+    assert.equal(sizes.daily_cap_exceeded, 0);
+    assert.equal(sizes.duplicate_open_questions, 0);
+  });
+
+  it("reports zero for a part of the run the report does not contain", () => {
+    // A report with no probe has not falsified the send_errors detector. Its
+    // 0 is a value over no samples, which the runner turns into an error.
+    const sizes = sampleSizes({ ...HEALTHY, failureProbe: undefined });
+    assert.equal(sizes.send_error_detector_blind, 0);
+    assert.deepEqual(Object.values(sampleSizes({})), Array(9).fill(0));
   });
 });

@@ -19,6 +19,7 @@
 import { FORMS, FORM_CATEGORIES, canViewForm, hasDownloadableFormDocument } from "@/lib/spokes/forms";
 import type { SpokesForm } from "@/lib/spokes/forms";
 import { embedTextsWithModel } from "@/lib/ai/embeddings";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { siblingScoreDelta } from "@/lib/spokes/form-sibling-rules";
 
@@ -140,7 +141,7 @@ async function getFormEmbeddings(queryModel: string): Promise<Map<string, number
     } catch (error) {
       formEmbeddingCache.delete(queryModel);
       logger.warn("Form embedding index unavailable; keyword-only search", {
-        error: error instanceof Error ? error.message : String(error),
+        error: errorForLog(error),
       });
       return null;
     }
@@ -202,7 +203,7 @@ export async function searchForms(params: {
     }
   } catch (error) {
     logger.warn("Form query embedding failed; keyword-only ranking", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
   }
 

@@ -35,6 +35,7 @@ import {
   invalidateAllChatContext,
   invalidateChatContext,
 } from "@/lib/cache";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 export type ChatContextInvalidation =
@@ -245,7 +246,7 @@ export function applyChatContextWriteThrough(
     logger.warn("chat-context write-through invalidation failed; write unaffected", {
       model: model ?? "(raw)",
       operation,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
   }
 }

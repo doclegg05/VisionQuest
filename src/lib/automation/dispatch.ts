@@ -19,6 +19,7 @@
  */
 
 import { createHmac, randomUUID } from "node:crypto";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 export const AUTOMATION_EVENT_TYPES = [
@@ -160,7 +161,7 @@ export async function dispatchAutomationEvent(
   } catch (err) {
     logger.warn("Automation webhook delivery failed (non-fatal)", {
       type,
-      error: err instanceof Error ? err.message : String(err),
+      error: errorForLog(err),
     });
     return { status: "failed", error: err instanceof Error ? err.message : String(err) };
   } finally {

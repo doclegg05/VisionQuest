@@ -19,6 +19,7 @@
 // =============================================================================
 
 import { prismaAdmin } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
 import {
@@ -244,7 +245,7 @@ export async function recordEmployerView(
   } catch (error) {
     // No connection id in the log line: it resolves to one student's
     // disclosure record for anyone who can also read the database.
-    logger.warn("Employer view event not recorded", { error: String(error) });
+    logger.warn("Employer view event not recorded", { error: errorForLog(error) });
   }
 }
 

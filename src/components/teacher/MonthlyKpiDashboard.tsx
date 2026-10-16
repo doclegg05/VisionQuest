@@ -236,7 +236,7 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
           Monthly snapshot — {readiness.month}
         </p>
         <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">

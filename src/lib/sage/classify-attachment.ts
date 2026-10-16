@@ -30,6 +30,7 @@
 
 import { z } from "zod";
 import { extractTextFromBuffer } from "./extract";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { logLlmCall } from "@/lib/llm-usage";
 import { resolveAiProvider } from "@/lib/ai";
@@ -219,7 +220,7 @@ async function resolveClassifier(studentId: string): Promise<AIProvider | null> 
   } catch (error) {
     if (error instanceof AiCloudRefusedError) return null;
     logger.warn("Classification provider resolution failed; falling back", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return null;
   }
@@ -305,7 +306,7 @@ async function cloudClassify(
     return classification;
   } catch (error) {
     logger.warn("Cloud classification returned non-JSON", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     await logAiAuditEvent({ ...auditBase, status: "failed", allowCloud, errorCode: "non_json_reply" });
     return null;
@@ -384,9 +385,8 @@ async function localClassify(
 
     const parsed = LOCAL_CLASSIFICATION_SCHEMA.safeParse(JSON.parse(raw));
     if (!parsed.success) {
-      logger.warn("Local classification failed schema validation; falling back", {
-        error: parsed.error.message,
-      });
+      const issues = parsed.error.issues.map((issue) => ({ path: issue.path.map(String).join("."), code: issue.code }));
+      logger.warn("Local classification failed schema validation; falling back", { issues });
       await logAiAuditEvent({
         ...auditBase,
         status: "failed",
@@ -407,7 +407,7 @@ async function localClassify(
     return classification;
   } catch (error) {
     logger.warn("Local classification threw; falling back to keyword heuristics", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     await logAiAuditEvent({
       ...auditBase,
@@ -479,7 +479,7 @@ export async function classifyAttachment(params: {
         if (classification) return { classification, method: "cloud" };
       } catch (error) {
         logger.warn("Cloud classification threw; falling back to local extraction", {
-          error: error instanceof Error ? error.message : String(error),
+          error: errorForLog(error),
         });
       }
     }

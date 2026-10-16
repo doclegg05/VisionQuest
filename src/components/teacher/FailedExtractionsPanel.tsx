@@ -168,7 +168,7 @@ export function FailedExtractionsPanel() {
   return (
     <section className="surface-section p-5">
       <div className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
           Sage operations
         </p>
         <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Failed extractions</h2>
@@ -187,7 +187,7 @@ export function FailedExtractionsPanel() {
       {loading && <ListSkeleton />}
 
       {!loading && error && (
-        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--error)]" role="alert">
+        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-danger" role="alert">
           {error}
         </p>
       )}

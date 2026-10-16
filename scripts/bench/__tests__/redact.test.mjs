@@ -28,9 +28,22 @@ test("every secret the runner can hand a scorer is on the list", () => {
       "DIRECT_URL",
       "GEMINI_API_KEY",
       "OPENROUTER_API_KEY",
+      "SHADOW_DATABASE_URL",
       "TWILIO_AUTH_TOKEN",
     ]
   );
+});
+
+test("the shadow database URL is redacted by name, even where the URL scrub misses it", () => {
+  // migration-drift-schema passes it to prisma on the command line, so a failed
+  // diff's error message carries it. An unencoded `/` in the password stops the
+  // generic scheme://user:password@ pattern from matching.
+  const shadow = "postgresql://shadow:pa/ss-word-long@127.0.0.1:5432/visionquest_shadow";
+  const redacted = redactSecrets(`Command failed: npx prisma migrate diff --shadow-database-url ${shadow}`, {
+    SHADOW_DATABASE_URL: shadow,
+  });
+  assert.ok(!redacted.includes("pa/ss-word-long"), redacted);
+  assert.ok(redacted.includes("[redacted:SHADOW_DATABASE_URL]"), redacted);
 });
 
 test("a set secret's value is replaced by a named placeholder", () => {

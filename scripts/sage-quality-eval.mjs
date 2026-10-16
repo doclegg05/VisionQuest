@@ -186,6 +186,12 @@ async function main() {
 
   console.log(`\n=== Sage Quality Eval ===`);
   console.log(`Replies generated: ${replied}/${SCENARIOS.length}`);
+  // With no reply there is nothing to report, and exit 0 would read as one.
+  if (replied === 0) {
+    console.error("::error::No scenario produced a reply — quality eval has nothing to report.");
+    process.exitCode = 1;
+    return;
+  }
   if (gradeCount > 0) {
     console.log(
       `Reading level (Flesch-Kincaid): avg ${(gradeSum / gradeCount).toFixed(1)}; ` +

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { updateProgression } from "./service";
 import type { ProgressionState } from "./engine";
@@ -79,7 +80,7 @@ export async function awardEvent({
       eventType,
       sourceType,
       sourceId,
-      error: String(err),
+      error: errorForLog(err),
     });
     if (rethrowOnFailure) throw err;
     return false;
@@ -104,7 +105,7 @@ export async function awardEvent({
             eventType,
             sourceType,
             sourceId,
-            error: String(rollbackErr),
+            error: errorForLog(rollbackErr),
           }),
         );
       throw err;

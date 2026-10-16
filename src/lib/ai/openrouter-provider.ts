@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
+import { appServerMarker } from "./app-server";
 import type {
   AIProvider,
   ChatMessage,
@@ -33,21 +34,36 @@ export const OPENROUTER_DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
 export const OPENROUTER_PRIVACY = Object.freeze({ zdr: true, data_collection: "deny" } as const);
 
 /** Same ladder as GeminiProvider: 3 attempts, 500ms then 1500ms. */
-const RETRY_DELAYS_MS = [500, 1_500];
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+export const RETRY_DELAYS_MS = [500, 1_500];
+export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_STREAM_ESTABLISH_TIMEOUT_MS = 20_000;
 const DEFAULT_STREAM_STALL_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_HOPS = 5;
 /** Never sent: they identify a person or route content to third-party plugins. */
 const FORBIDDEN_BODY_KEYS = new Set(["user", "session_id", "plugins", "provider"]);
 const KEY_LIMIT_PATTERN = /key[_\s-]?limit/i;
+/**
+ * A 400 body that rejects the model id ("<id> is not a valid model ID"). Not
+ * just the word "model": a request-shape error can name the model field.
+ */
+const UNKNOWN_MODEL_PATTERN =
+  /not a valid model|\bmodel\b[^.\n]{0,60}\b(?:not found|does not exist|is not available|no longer available)/i;
 
 /**
  * "network" is a connection that never happened (fetch threw before any
  * response); the evals use it to tell an unreachable provider from a slow or
  * failing one. "unavailable" covers timeouts, 5xx and broken replies.
+ * "unknown_model" is a 400 that rejects the model id; every other 400 is
+ * "bad_request", a request the caller built wrong.
  */
-export type OpenRouterErrorKind = "credits" | "refused" | "rate_limited" | "unavailable" | "network" | "bad_request";
+export type OpenRouterErrorKind =
+  | "credits"
+  | "refused"
+  | "rate_limited"
+  | "unavailable"
+  | "network"
+  | "unknown_model"
+  | "bad_request";
 
 export class OpenRouterError extends Error {
   readonly kind: OpenRouterErrorKind;
@@ -61,16 +77,13 @@ export class OpenRouterError extends Error {
   }
 }
 
-/** The Next.js server sets NEXT_RUNTIME; Render sets RENDER. OpenRouter must run in neither. */
-const APP_SERVER_MARKERS = ["NEXT_RUNTIME", "RENDER"] as const;
-
 /**
  * Runtime half of the eval-only rule. The lint guard can be sidestepped by an
  * import shape it does not know; this check cannot, because it runs wherever
  * the provider is constructed.
  */
 export function assertNotAppServer(env: NodeJS.ProcessEnv = process.env): void {
-  const marker = APP_SERVER_MARKERS.find((name) => Boolean(env[name]?.trim()));
+  const marker = appServerMarker(env);
   if (marker) {
     throw new OpenRouterError(
       `OpenRouter is eval-only and refuses to run inside the app server (${marker} is set).`,
@@ -169,12 +182,16 @@ interface HopResult {
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-/** An HTTP failure's kind. The body is read only to spot a key spending limit and never reaches a message. */
+/**
+ * An HTTP failure's kind. The body is read only to spot a key spending limit
+ * or an unknown model id, and never reaches a message.
+ */
 export function classifyOpenRouterFailure(status: number, bodyText: string): OpenRouterErrorKind {
   if (status === 402) return "credits";
   if (status === 403) return KEY_LIMIT_PATTERN.test(bodyText) ? "credits" : "refused";
   if (status === 429) return "rate_limited";
   if (status === 408 || status >= 500) return "unavailable";
+  if (status === 400 && UNKNOWN_MODEL_PATTERN.test(bodyText)) return "unknown_model";
   return "bad_request";
 }
 
@@ -333,7 +350,7 @@ function serializeToolResponse(response: unknown, summary: string): Record<strin
   return { result: response, _summary: summary };
 }
 
-function transportError(error: unknown, timeoutMs: number): OpenRouterError {
+export function transportError(error: unknown, timeoutMs: number): OpenRouterError {
   const name = error instanceof Error ? error.name : "";
   if (name === "TimeoutError" || name === "AbortError") {
     return new OpenRouterError(`OpenRouter request timed out after ${timeoutMs}ms`, "unavailable");
@@ -341,16 +358,17 @@ function transportError(error: unknown, timeoutMs: number): OpenRouterError {
   return new OpenRouterError("OpenRouter request failed (network)", "network");
 }
 
-function isRetryable(error: unknown): boolean {
+export function isRetryable(error: unknown): boolean {
   return (
     error instanceof OpenRouterError &&
     (error.kind === "rate_limited" || error.kind === "unavailable" || error.kind === "network")
   );
 }
 
-async function failureFromResponse(response: Response): Promise<OpenRouterError> {
-  // The body only refines 403 into credits vs refused. If it cannot be read,
-  // the status alone still classifies the failure.
+export async function failureFromResponse(response: Response): Promise<OpenRouterError> {
+  // The body only refines 403 into credits vs refused and 400 into an unknown
+  // model vs a bad request. If it cannot be read, the status alone still
+  // classifies the failure.
   const bodyText = await response.text().catch(() => "");
   const kind = classifyOpenRouterFailure(response.status, bodyText);
   return new OpenRouterError(`OpenRouter request failed (${response.status}, ${kind})`, kind, response.status);
@@ -500,7 +518,8 @@ function assistantTurn(hop: HopResult): WireMessage {
 export class OpenRouterProvider implements AIProvider {
   readonly name = "openrouter";
   readonly model: string;
-  private readonly apiKey: string;
+  // A private field, so logging or serializing the provider never shows the key.
+  readonly #apiKey: string;
   private readonly url: string;
   private readonly fetchImpl: typeof fetch;
   private readonly requestTimeoutMs: number;
@@ -513,7 +532,7 @@ export class OpenRouterProvider implements AIProvider {
   constructor(apiKey: string, model: string = OPENROUTER_DEFAULT_MODEL, options: OpenRouterProviderOptions = {}) {
     assertNotAppServer();
     if (!apiKey) throw new OpenRouterError("OPENROUTER_API_KEY is not set", "bad_request");
-    this.apiKey = apiKey;
+    this.#apiKey = apiKey;
     this.model = model;
     this.url = `${(options.baseUrl ?? OPENROUTER_DEFAULT_BASE).replace(/\/+$/, "")}/v1/chat/completions`;
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
@@ -720,7 +739,7 @@ export class OpenRouterProvider implements AIProvider {
     try {
       response = await this.fetchImpl(this.url, {
         method: "POST",
-        headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${this.#apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal,
       });

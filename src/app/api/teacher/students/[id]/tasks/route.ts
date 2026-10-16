@@ -4,6 +4,7 @@ import { isTaskPriority, syncStudentAlerts } from "@/lib/advising";
 import { logAuditEvent } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
 
@@ -95,7 +96,7 @@ export const POST = withTeacherAuth(async (
     type: "task",
     title: "New task assigned",
     body: `"${title}"${dueAt ? ` — due ${dueAt.toLocaleDateString()}` : ""}`,
-  }).catch((err) => logger.error("Failed to send notification", { error: String(err) }));
+  }).catch((err) => logger.error("Failed to send notification", { error: errorForLog(err) }));
 
   return NextResponse.json({ task });
 });
