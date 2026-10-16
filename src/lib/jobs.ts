@@ -11,6 +11,8 @@ import { studentLogKey } from "./log-keys";
  * - Automatic retry on failure (up to 3 attempts)
  * - Job deduplication via unique key
  * - Processing via inline execution or cron endpoint
+ * - A claim is a lease: a job's result is written only while its claim
+ *   still holds the row (see finishClaimedJob)
  *
  * Jobs are stored in the BackgroundJob table and processed in order.
  */
@@ -156,6 +158,36 @@ function redactPayloadStudentIds(message: string, payload: Record<string, unknow
   return ids.reduce((text, id) => text.split(id).join(studentLogKey(id)), message);
 }
 
+type JobResult = Prisma.BackgroundJobUpdateManyMutationInput & { status: "completed" | "failed" | "pending" };
+
+/**
+ * Write a claimed job's result, only while this claim still holds the row.
+ *
+ * A claim is a lease: the row must still be "processing" under the attempt
+ * number the claim set. attempts goes up by one on every claim and nothing
+ * lowers it, so it names one claim; startedAt comes from NOW(), which is not
+ * guaranteed to differ between two claims. Something else may have taken the
+ * row while the handler ran: retireStaleScrapeRuns fails a scrape job that
+ * has run past two hours so a crashed run stops blocking the class. Writing
+ * anyway would flip that retired job back to "completed", or to "pending"
+ * for another try beside its replacement. Returns whether the write landed.
+ */
+async function finishClaimedJob(job: ClaimedJob, result: JobResult): Promise<boolean> {
+  const { count } = await prisma.backgroundJob.updateMany({
+    where: { id: job.id, status: "processing", attempts: job.attempts },
+    data: result,
+  });
+  if (count === 0) {
+    logger.warn("Job claim no longer held; its result was not written", {
+      type: job.type,
+      jobId: job.id,
+      attempt: job.attempts,
+      outcome: result.status,
+    });
+  }
+  return count > 0;
+}
+
 async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
   if (claimed.length === 0) return 0;
 
@@ -167,10 +199,7 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
       const handler = JOB_HANDLERS[job.type];
       if (!handler) {
         logger.error("Unknown job type", { type: job.type, jobId: job.id });
-        await prisma.backgroundJob.update({
-          where: { id: job.id },
-          data: { status: "failed", error: `Unknown job type: ${job.type}` },
-        });
+        await finishClaimedJob(job, { status: "failed", error: `Unknown job type: ${job.type}` });
         continue;
       }
 
@@ -178,22 +207,17 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
       payload = parsed;
       await handler(parsed);
 
-      await prisma.backgroundJob.update({
-        where: { id: job.id },
-        data: { status: "completed", completedAt: new Date() },
-      });
-      processed++;
+      if (await finishClaimedJob(job, { status: "completed", completedAt: new Date() })) {
+        processed++;
+      }
     } catch (err) {
       const rawMessage = err instanceof Error ? err.message : String(err);
       const errorMsg = redactPayloadStudentIds(rawMessage, payload);
       logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts, error: errorMsg });
 
-      await prisma.backgroundJob.update({
-        where: { id: job.id },
-        data: {
-          status: job.attempts >= 3 ? "failed" : "pending",
-          error: errorMsg,
-        },
+      await finishClaimedJob(job, {
+        status: job.attempts >= 3 ? "failed" : "pending",
+        error: errorMsg,
       });
     }
   }
