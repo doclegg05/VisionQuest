@@ -241,7 +241,9 @@ export interface EvidenceGapSummary {
 export async function runEvidenceGapDetection(now: Date): Promise<EvidenceGapSummary> {
   const enrollments = await loadActiveEnrollments();
   if (enrollments.size === 0) {
-    return { studentsScanned: 0, requirementsChecked: 0, newAlerts: 0, resolvedAlerts: 0 };
+    // Still sync: this job is the only writer that resolves evidence_gap alerts.
+    const { resolvedAlerts } = await syncEvidenceGapAlerts([], now);
+    return { studentsScanned: 0, requirementsChecked: 0, newAlerts: 0, resolvedAlerts };
   }
 
   const studentIds = [...enrollments.keys()];

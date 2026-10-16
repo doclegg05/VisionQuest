@@ -194,6 +194,19 @@ describe("POST /api/internal/evidence-gap-detection", () => {
     assert.deepEqual(alertUpdateMany.mock.calls[0].arguments[0].where, { id: { in: ["alert-now-met"] } });
   });
 
+  // This job is the only writer that resolves evidence_gap alerts, so a run
+  // with no active enrollment left must still resolve the ones it opened.
+  it("resolves open gaps when no active enrollments remain", async () => {
+    enrollmentFindMany.mock.mockImplementation(async () => []);
+    existingAlerts([], [{ id: "alert-left-class", alertKey: GAP_KEY }]);
+
+    const body = await (await POST(request("Bearer test-cron-secret"))).json();
+
+    assert.equal(body.studentsScanned, 0);
+    assert.equal(body.resolvedAlerts, 1);
+    assert.deepEqual(alertUpdateMany.mock.calls[0].arguments[0].where, { id: { in: ["alert-left-class"] } });
+  });
+
   // A teacher's dismiss means "won't reappear on resync" (PATCH
   // /api/teacher/alerts/:id), and the alert sync honors it and unexpired
   // snoozes (applyStudentAlertSyncPlan). A daily job must too.
