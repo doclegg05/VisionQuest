@@ -1,3 +1,4 @@
+import { isCertificationRequirementMet } from "./certifications";
 import { prisma } from "./db";
 
 export interface RequirementComplianceItem {
@@ -103,7 +104,7 @@ export async function checkStudentComplianceForClass(
 
     switch (req.itemType) {
       case "certification":
-        met = completedCerts.has(req.itemId);
+        met = isCertificationRequirementMet(req.itemId, completedCerts);
         break;
       case "orientation":
         met = completedOrientation.has(req.itemId);
@@ -240,7 +241,7 @@ export async function checkClassCompliance(
       let met = false;
       switch (req.itemType) {
         case "certification":
-          met = completedCerts.has(req.itemId);
+          met = isCertificationRequirementMet(req.itemId, completedCerts);
           break;
         case "orientation":
           met = completedOrientation.has(req.itemId);
