@@ -1,0 +1,38 @@
+{
+  "suite": "sage-grounding",
+  "tier": "nightly",
+  "startedAt": "2026-10-17T10:08:54.386Z",
+  "durationMs": 9138,
+  "commit": "ddb47c0",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.21.0",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "pass_rate",
+      "value": 0.6666666666666666,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 3,
+      "floor": 1,
+      "tolerance": 0,
+      "baseline": null,
+      "status": "fail",
+      "details": {
+        "failing": [
+          {
+            "id": "grounding-rights-responsibilities",
+            "reason": "sample 1: expected one of [rights, responsibilities]"
+          }
+        ]
+      }
+    }
+  ],
+  "status": "fail"
+}
