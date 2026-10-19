@@ -27,6 +27,8 @@ interface FakeOptions {
   /** Thrown, one per call, by the instructor upsert before it does anything. */
   instructorUpsertErrors?: Error[];
   students?: Row[];
+  /** Classes that exist before the run starts. */
+  classes?: Row[];
   availability?: Row[];
   /** Logins the starter pre-read cannot see, as if another request made them a moment later. */
   hiddenFromFindMany?: string[];
@@ -41,7 +43,7 @@ function createFakeDb(options: FakeOptions = {}) {
 
   const state = {
     students: [...(options.students ?? [])] as Row[],
-    classes: [] as Row[],
+    classes: [...(options.classes ?? [])] as Row[],
     links: [] as Row[],
     enrollments: [] as Row[],
     progress: [] as Row[],
@@ -53,6 +55,13 @@ function createFakeDb(options: FakeOptions = {}) {
   const calls: string[] = [];
   const writes: Array<{ table: string; inTx: boolean }> = [];
   const instructorUpsertData: Row[] = [];
+  // What each upsert was asked to do to a row that already exists. The demo
+  // rows must come back untouched, so these are expected to stay empty.
+  const upsertUpdates = {
+    student: [] as unknown[],
+    spokesClass: [] as unknown[],
+    spokesClassInstructor: [] as unknown[],
+  };
 
   const record = (name: string) => calls.push(name);
   const wrote = (table: string) => writes.push({ table, inTx: txDepth > 0 });
@@ -70,6 +79,7 @@ function createFakeDb(options: FakeOptions = {}) {
     student: {
       upsert: async (args: { where: Row; create: Row; update: Row }) => {
         record("student.upsert");
+        upsertUpdates.student.push(args.update);
         if (args.where.studentId === DEMO_INSTRUCTOR_LOGIN) {
           instructorUpsertData.push(args.create);
           const error = instructorErrors.shift();
@@ -104,8 +114,9 @@ function createFakeDb(options: FakeOptions = {}) {
       },
     },
     spokesClass: {
-      upsert: async (args: { where: { code: string }; create: Row }) => {
+      upsert: async (args: { where: { code: string }; create: Row; update: Row }) => {
         record("spokesClass.upsert");
+        upsertUpdates.spokesClass.push(args.update);
         let row = state.classes.find((c) => c.code === args.where.code);
         if (!row) {
           row = { id: newId("cls"), ...args.create };
@@ -119,8 +130,10 @@ function createFakeDb(options: FakeOptions = {}) {
       upsert: async (args: {
         where: { classId_instructorId: { classId: string; instructorId: string } };
         create: Row;
+        update: Row;
       }) => {
         record("spokesClassInstructor.upsert");
+        upsertUpdates.spokesClassInstructor.push(args.update);
         const key = args.where.classId_instructorId;
         let row = state.links.find(
           (l) => l.classId === key.classId && l.instructorId === key.instructorId,
@@ -195,7 +208,7 @@ function createFakeDb(options: FakeOptions = {}) {
     },
   };
 
-  return { db, state, calls, writes, instructorUpsertData };
+  return { db, state, calls, writes, instructorUpsertData, upsertUpdates };
 }
 
 let current = createFakeDb();
@@ -430,6 +443,53 @@ describe("ensureDemoClassroom", () => {
 
     await assert.rejects(ensureDemoClassroom(), /not a demo instructor/);
     assert.equal(current.state.classes.length, 0);
+  });
+
+  it("refuses to adopt a class that holds the demo class code but was not made by the demo instructor", async () => {
+    // A real teacher who names a class "Cohort Demo" gets exactly this code.
+    current = createFakeDb({
+      classes: [
+        { id: "cls-real", code: DEMO_CLASS_CODE, name: "Cohort Demo", createdById: "teacher-real" },
+      ],
+    });
+
+    await assert.rejects(ensureDemoClassroom(), /not the demo class/);
+
+    const { state } = current;
+    assert.equal(state.links.length, 0);
+    assert.equal(state.enrollments.length, 0);
+    assert.equal(state.availability.length, 0);
+    assert.equal(state.students.filter((s) => String(s.studentId).startsWith("demo-starter-")).length, 0);
+    assert.deepEqual(state.classes, [
+      { id: "cls-real", code: DEMO_CLASS_CODE, name: "Cohort Demo", createdById: "teacher-real" },
+    ]);
+  });
+
+  it("fails closed when the class has no creator, as after the demo instructor was deleted", async () => {
+    current = createFakeDb({
+      classes: [{ id: "cls-orphan", code: DEMO_CLASS_CODE, name: DEMO_CLASS_NAME, createdById: null }],
+    });
+
+    await assert.rejects(ensureDemoClassroom(), /not the demo class/);
+
+    assert.equal(current.state.links.length, 0);
+    assert.equal(current.state.enrollments.length, 0);
+  });
+
+  it("asks every upsert to change nothing on a row that already exists", async () => {
+    await ensureDemoClassroom();
+
+    // Exactly one call per table, each with an empty update. A non-empty update
+    // would let the bootstrap rewrite a real account or class that holds a demo key.
+    assert.deepEqual(current.upsertUpdates.student, [{}]);
+    assert.deepEqual(current.upsertUpdates.spokesClass, [{}]);
+    assert.deepEqual(current.upsertUpdates.spokesClassInstructor, [{}]);
+
+    // And a new instructor is created with no way to sign in by password.
+    assert.equal(current.instructorUpsertData.length, 1);
+    const create = current.instructorUpsertData[0];
+    assert.equal("passwordHash" in create, false);
+    assert.equal("email" in create, false);
   });
 });
 

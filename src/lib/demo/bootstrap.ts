@@ -91,8 +91,18 @@ async function ensureClass(instructorId: string): Promise<{ id: string }> {
     where: { code: DEMO_CLASS_CODE },
     create: { code: DEMO_CLASS_CODE, name: DEMO_CLASS_NAME, createdById: instructorId },
     update: {},
-    select: { id: true },
+    select: { id: true, createdById: true },
   });
+
+  // `code` is derived from a class name, so a real teacher who names a class
+  // "Cohort Demo" gets this exact code. Linking the shared passwordless demo
+  // instructor to that class, and enrolling demo students in it, would put
+  // every visitor on a real roster. Only a class the demo instructor created is
+  // the demo class. A class whose creator was deleted (createdById is null)
+  // fails this check too, which is the safe direction.
+  if (demoClass.createdById !== instructorId) {
+    throw new Error("A class holds the demo class code but is not the demo class");
+  }
 
   // Without this row the demo instructor sees no class at all.
   await prismaAdmin.spokesClassInstructor.upsert({
@@ -100,7 +110,7 @@ async function ensureClass(instructorId: string): Promise<{ id: string }> {
     create: { classId: demoClass.id, instructorId },
     update: {},
   });
-  return demoClass;
+  return { id: demoClass.id };
 }
 
 /** Adds the weekly slots once. An instructor who already has any slot is left alone. */
