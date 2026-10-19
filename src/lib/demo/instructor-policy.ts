@@ -88,6 +88,10 @@ export const DEMO_INSTRUCTOR_WRITE_ALLOW: readonly string[] = [
   "POST /api/notifications",
   "DELETE /api/chat/conversations/[id]",
   "POST /api/sage/panel/dismiss",
+  // The demo sign-in endpoints. A demo instructor who is still signed in may
+  // pick the student side, or sign in as the instructor again, from the sign-in page.
+  "POST /api/demo/student",
+  "POST /api/demo/instructor",
 ];
 
 /**

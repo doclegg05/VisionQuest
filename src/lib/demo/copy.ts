@@ -10,6 +10,7 @@ export const DEMO_CONTINUE_AS_PREFIX = "Continue as";
 export const DEMO_LIMIT_NETWORK = "You have started a lot of demo students. Please try again in an hour.";
 export const DEMO_LIMIT_HOURLY = "Many people are trying the demo right now. Please try again in an hour.";
 export const DEMO_LIMIT_DAILY = "The demo is full for today. Please try again tomorrow.";
+export const DEMO_LIMIT_INSTRUCTOR = "You have signed in a lot. Please try again in a few minutes.";
 export const DEMO_READ_ONLY_REFUSAL = "This is a demo, so you can't change this here.";
 export const DEMO_CREDENTIALS_REFUSAL = "Demo accounts can't change sign-in settings.";
 export const DEMO_NO_SEND_REFUSAL = "This is a demo, so VisionQuest doesn't send messages.";
