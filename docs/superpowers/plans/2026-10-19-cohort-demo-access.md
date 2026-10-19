@@ -66,8 +66,8 @@ Exact copy for `copy.ts`:
 
 ```ts
 export const DEMO_SIGNIN_NOTE = "This is a demo with made-up students. Pick one to look around.";
-export const DEMO_ENTER_STUDENT = "Enter as a student";
-export const DEMO_ENTER_INSTRUCTOR = "Enter as an instructor";
+export const DEMO_ENTER_STUDENT = "Try the demo as a student";
+export const DEMO_ENTER_INSTRUCTOR = "Try the demo as an instructor";
 export const DEMO_CONTINUE_AS_PREFIX = "Continue as";
 export const DEMO_LIMIT_NETWORK = "You have started a lot of demo students. Please try again in an hour.";
 export const DEMO_LIMIT_HOURLY = "Many people are trying the demo right now. Please try again in an hour.";
@@ -79,6 +79,8 @@ export const DEMO_PUBLIC_PAGE_REFUSAL = "This is a demo, so you can't make a pub
 export const DEMO_SAGE_LIMIT = "The demo has used all of its Sage messages for today. Please try again tomorrow.";
 export const DEMO_PRIVACY_NOTICE = "This is a demo. Anyone using the instructor side can read what you type. Use made-up details.";
 ```
+
+The two button labels changed in review. This block first said "Enter as a student" and "Enter as an instructor"; the shipped labels are "Try the demo as a student" and "Try the demo as an instructor", and `src/lib/demo/copy.ts` holds the current wording.
 
 - [ ] **Step 1: Write the failing tests** in `src/lib/demo/config.test.ts`:
 
@@ -398,14 +400,16 @@ With `demoEnabled`, `AuthPageClient` behaves like this:
 **Interfaces:**
 - Consumes: everything above, plus the seeded CI data: `E2E_STUDENT` in `e2e/fixtures.ts` and the bench instructor `cbenchinstr1`, "Marlow Denbrook", in `scripts/bench/generate-cohort.mjs`.
 
+(The button labels below changed in review from "Enter as ..." to "Try the demo as ...". The specs look every label up through `src/lib/demo/copy.ts`, so they follow any later change.)
+
 - [ ] **Step 1: Write `e2e/cohort-demo.spec.ts`,** which skips unless `COHORT_DEMO_MODE === "true"`. Its tests:
-  - `student button lands on welcome with the notice`: in a fresh context, click "Enter as a student". Expect `/welcome`, never `/recovery-setup`, with `DEMO_PRIVACY_NOTICE` visible. Keep the `displayName` from the response.
+  - `student button lands on welcome with the notice`: in a fresh context, click "Try the demo as a student". Expect `/welcome`, never `/recovery-setup`, with `DEMO_PRIVACY_NOTICE` visible. Keep the `displayName` from the response.
   - `returning visitor sees Continue as`: in the same context, go to `/` and expect `Continue as <displayName>`.
   - `two fresh visitors get two students`: two new contexts produce two different `displayName`s.
-  - `instructor sees the new student and nothing else`: click "Enter as an instructor" and expect that `displayName` on `/teacher`. Visit `/teacher`, `/teacher/students` and `/teacher/classes`, and expect neither "Marlow Denbrook" nor `E2E_STUDENT`'s display name on any of them.
+  - `instructor sees the new student and nothing else`: click "Try the demo as an instructor" and expect that `displayName` on `/teacher`. Visit `/teacher`, `/teacher/students` and `/teacher/classes`, and expect neither "Marlow Denbrook" nor `E2E_STUDENT`'s display name on any of them.
   - `instructor can add a note`: open the demo student, add a note, and expect it saved.
   - `instructor cannot change program-wide content`: `page.request.post("/api/teacher/sage-snippets", { headers: { Origin } })` returns 403 with `DEMO_READ_ONLY_REFUSAL`.
-- [ ] **Step 2: Write `e2e/cohort-demo-off.spec.ts`,** which skips when `COHORT_DEMO_MODE === "true"`. It expects no "Enter as a student" button and the Google block or its fallback note present, and expects `POST /api/demo/student` with a same-origin `Origin` to return 404.
+- [ ] **Step 2: Write `e2e/cohort-demo-off.spec.ts`,** which skips when `COHORT_DEMO_MODE === "true"`. It expects no "Try the demo as a student" button and the Google block or its fallback note present, and expects `POST /api/demo/student` with a same-origin `Origin` to return 404.
 - [ ] **Step 3: Wire CI.** Add `e2e/cohort-demo-off.spec.ts` to the spec list of the first `E2E gate` step, the one that runs `e2e/a11y.spec.ts`. Add a step after it named `E2E gate: cohort demo on` with `env: { COHORT_DEMO_MODE: "true" }` that runs `npx playwright test e2e/cohort-demo.spec.ts --reporter=line --timeout=120000`. The build step stays without the switch. That build-off, run-on setup is the Review Focus 1 check.
 - [ ] **Step 4: Write the docs.**
   - `DEPLOY.md` gets a "Cohort demo mode" section with the Render dashboard steps to set and remove `COHORT_DEMO_MODE` and the three limit variables.

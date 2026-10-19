@@ -17,9 +17,11 @@ Britt confirmed on 2026-10-19 that all data on the live site is mock. The six re
 
 The sign-in page at visionquest.onrender.com keeps its username and password form. The "Sign in with Google" button sits under the form in `src/components/auth/AuthPageClient.tsx:357`. Two buttons take its place:
 
-1. 'Enter as a student' - creates a new mock student with a made-up name, enrolls it in the demo class, signs the visitor in, and opens the first-day welcome steps.
-2. 'Enter as an instructor' - signs the visitor in to one shared demo instructor account and opens the teacher dashboard. Its class holds a few starter mock students plus every student a visitor has created.
+1. 'Try the demo as a student' - creates a new mock student with a made-up name, enrolls it in the demo class, signs the visitor in, and opens the first-day welcome steps.
+2. 'Try the demo as an instructor' - signs the visitor in to one shared demo instructor account and opens the teacher dashboard. Its class holds a few starter mock students plus every student a visitor has created.
 3. 'Demo switch' - one environment variable turns all of this on, and removing it restores today's sign-in page.
+
+The two button labels changed in review. This spec first called them 'Enter as a student' and 'Enter as an instructor'. The shipped labels are the ones above, and they live in `src/lib/demo/copy.ts`.
 
 Each visitor who picks the student button gets their own student, so every visitor starts on day one and no other student visitor sees their Sage chats or goals. The instructor side does see them, the same way a real instructor would, and the student side says so.
 

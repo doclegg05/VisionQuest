@@ -188,6 +188,7 @@ If you do not use the blueprint:
 | `SENTRY_DSN` | Server error tracking |
 | `NEXT_PUBLIC_SENTRY_DSN` | Client error tracking |
 | `LOG_LEVEL` | Logging verbosity |
+| `COHORT_DEMO_MODE` | `true` opens the sign-in page to demo students and a shared demo instructor. See [Cohort demo mode](#cohort-demo-mode) |
 
 Render dashboard note:
 
@@ -289,6 +290,45 @@ psql "DIRECT_URL" < backup.sql
 
 1. Roll back the service in Render to the last healthy deploy.
 2. Verify whether the prior application is compatible with the current schema. Additive retrieval changes normally need only an application/configuration rollback. Investigate migration failures before selecting a database recovery procedure; a wholesale restore can discard unrelated live writes.
+
+## Cohort demo mode
+
+For the AI Leadership Academy cohort (Oct 15 to Dec 18, 2026). With the switch on, the sign-in page keeps its username and password form and adds two buttons, "Try the demo as a student" and "Try the demo as an instructor". The student button makes a new mock student and opens the first-day welcome steps. The instructor button signs the visitor in to one shared demo instructor, who sees only the "Cohort Demo Class" and its students. Nothing is emailed or texted for a demo account.
+
+This opens the site to anyone with the link, so turn it on only while every record in the live database is mock data. That was true on 2026-10-19.
+
+### Turn it on
+
+1. Open the Render dashboard and select the VisionQuest web service.
+2. Open **Environment** and choose **Add Environment Variable**.
+3. Set the key to `COHORT_DEMO_MODE` and the value to `true`. Paste the value without quotes.
+4. Save, and let Render deploy.
+5. Open https://visionquest.onrender.com and check that both demo buttons show. Click each one. The student button opens the welcome steps with a privacy note, and the instructor button shows that new student in the demo class.
+
+The switch is read when each request arrives, so it needs a restart and no rebuild. The value `true` turns it on, and capital letters or spaces around it do not matter. Any other value, or no variable, leaves it off.
+
+While it is on, Google sign-in and the "Staff? Register here" link are hidden. Staff sign in with their own username and password.
+
+### Limits
+
+The defaults need no setup. Raise or lower them by adding any of these in the same **Environment** page. Each value is a whole number of 1 or more. A value that is not a valid number is ignored, the default applies, and one warning is logged with the variable name.
+
+| Variable | Default | What it limits |
+|----------|---------|----------------|
+| `COHORT_DEMO_STUDENTS_PER_HOUR` | 40 | New demo students started on the whole site in one hour |
+| `COHORT_DEMO_STUDENTS_PER_DAY` | 200 | New demo students started on the whole site in one UTC day |
+| `COHORT_DEMO_SAGE_PER_DAY` | 2000 | Sage messages sent by all demo accounts together in one UTC day |
+
+Two limits are fixed in code. One network can start 10 new demo students an hour, which only slows repeat clicks because the address comes from a header the caller controls. The shared demo instructor can send 300 Sage messages an hour and 1,000 a day. A visitor past any limit sees a plain message asking them to try again later.
+
+### Turn it off after Dec 18, 2026
+
+1. Open the VisionQuest web service in the Render dashboard, then **Environment**.
+2. Delete `COHORT_DEMO_MODE`. Delete the three limit variables too if you added them.
+3. Save, and let Render deploy.
+4. Open the sign-in page and check that the demo buttons are gone and the Google block is back.
+
+After that, the demo endpoints answer 404, and any demo session that is still open stops working on its next request. Demo accounts have no password, so nobody can sign in to one again. The demo students, the demo instructor and the "Cohort Demo Class" stay in the database until someone deletes them, which this change does not do.
 
 ## Chat-First Rebuild (June 2026) — operational notes
 
