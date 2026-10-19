@@ -1,7 +1,7 @@
 # Sage answer quality and application release sprint
 
 Created: 2026-09-10
-Status: Corrective release `b655675` verified; fresh first-hour and next-working-day observations pending
+Status: Complete — first-hour and next-working-day observations passed; noncritical follow-ups recorded
 Duration: Five working days from kickoff plus a next-working-day release check, assuming one implementing engineer/agent
 Product and release owner: Britt
 Delivery owner: The engineer/agent executing this plan
@@ -121,7 +121,7 @@ Acceptance: Deployed-commit evidence and smoke results are attached, the index r
 - [x] Stale fixture expectations corrected with source evidence and isolation coverage retained.
 - [x] CI/assertion coverage added; real-provider and real-route results distinguished from synthetic fixtures and stubs.
 - [x] Final integrated repository checks pass, with no secret-dependent skip counted as executed validation.
-- [ ] Application released; deployed commit, smoke checks, observation, and rollback evidence recorded.
+- [x] Application released; deployed commit, smoke checks, observation, and rollback evidence recorded.
 - [x] Read-only integrity check still reports an empty repair queue; corpus activation/audience boundaries preserved.
 
 Deliver an execution report alongside the sprint plan, linking the PR/deployment and sanitized evidence. Record deferred issues with a concrete reason and owner. The prior Supabase optimization remains complete; this sprint supplies the answer-level verification and application release that follow it.
