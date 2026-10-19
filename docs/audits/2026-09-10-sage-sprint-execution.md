@@ -1,6 +1,6 @@
 # Sage answer-quality sprint execution
 
-Status: In progress. No application release or live Render configuration change has occurred.
+Status: Complete. The application release (PR #213) went live on 2026-09-10, the corrective release (PR #214) followed the same day, and both observation windows passed by 2026-09-11. The release saved the `0.40` threshold and the health-check path in Render's settings. The sections before "Released; observation pending" describe the state before release.
 
 Implementation is isolated in `codex/sage-answer-quality-release`, based on current main and deployed commit `734d49840779c3c63b8d660462d1153da58f31a8`. The original `codex/Supabasedesign` checkout and unrelated intake/prototype changes are preserved. See the [sprint plan](../plans/2026-09-10-sage-answer-quality-and-release-sprint.md).
 
