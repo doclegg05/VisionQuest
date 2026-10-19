@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/api-error";
-import { logAuditEvent } from "@/lib/audit";
+import { tryLogAuditEvent } from "@/lib/audit";
 import { setSessionCookie } from "@/lib/auth";
 import { clientIpBucket } from "@/lib/client-ip";
 import { ensureDemoClassroom } from "@/lib/demo/bootstrap";
@@ -38,7 +38,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const sessionVersion = await readDemoInstructorSessionVersion(instructorId);
   await setSessionCookie(instructorId, "teacher", sessionVersion, { demo: "instructor" });
 
-  await logAuditEvent({
+  // A failed audit write is logged by `tryLogAuditEvent` and must not undo a
+  // sign-in that already set its cookie, so the result is not checked.
+  await tryLogAuditEvent({
     actorId: instructorId,
     actorRole: "teacher",
     action: "demo.instructor.signin",

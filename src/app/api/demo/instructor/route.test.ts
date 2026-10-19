@@ -12,7 +12,10 @@ let bootstrapResult: () => Promise<unknown>;
 const findUniqueCalls: unknown[] = [];
 let instructorRow: { sessionVersion: number } | null;
 const cookieCalls: unknown[][] = [];
-const auditCalls: Array<Record<string, unknown>> = [];
+// The real audit module runs over this table, so a failed audit write is a
+// rejected `auditLog.create`, not a hand-made return value.
+const auditRows: Array<Record<string, unknown>> = [];
+let auditWriteFails = false;
 const errorLogs: unknown[][] = [];
 
 mock.module("@/lib/db", {
@@ -22,6 +25,13 @@ mock.module("@/lib/db", {
         findUnique: async (args: unknown) => {
           findUniqueCalls.push(args);
           return instructorRow;
+        },
+      },
+      auditLog: {
+        create: async (args: { data: Record<string, unknown> }) => {
+          if (auditWriteFails) throw new Error("audit table unavailable");
+          auditRows.push(args.data);
+          return args.data;
         },
       },
     },
@@ -57,14 +67,6 @@ mock.module("@/lib/demo/bootstrap", {
   },
 });
 
-mock.module("@/lib/audit", {
-  exports: {
-    logAuditEvent: async (input: Record<string, unknown>) => {
-      auditCalls.push(input);
-    },
-  },
-});
-
 mock.module("@/lib/logger", {
   exports: {
     logger: {
@@ -93,7 +95,8 @@ beforeEach(() => {
   findUniqueCalls.length = 0;
   instructorRow = { sessionVersion: 9 };
   cookieCalls.length = 0;
-  auditCalls.length = 0;
+  auditRows.length = 0;
+  auditWriteFails = false;
   errorLogs.length = 0;
   process.env.COHORT_DEMO_MODE = "true";
 });
@@ -121,7 +124,7 @@ describe("POST /api/demo/instructor", () => {
     assert.equal(rateLimitCalls.length, 0);
     assert.equal(bootstrapCalls.length, 0, "nothing is created while the demo is off");
     assert.equal(cookieCalls.length, 0);
-    assert.equal(auditCalls.length, 0);
+    assert.equal(auditRows.length, 0);
   });
 
   it("sets a demo session cookie and returns the redirect", async () => {
@@ -158,16 +161,33 @@ describe("POST /api/demo/instructor", () => {
     assert.deepEqual(await response.json(), { error: DEMO_LIMIT_INSTRUCTOR });
     assert.equal(bootstrapCalls.length, 0);
     assert.equal(cookieCalls.length, 0);
-    assert.equal(auditCalls.length, 0);
+    assert.equal(auditRows.length, 0);
   });
 
   it("audits the sign-in", async () => {
     await route.POST(post() as never);
 
-    assert.equal(auditCalls.length, 1);
-    assert.equal(auditCalls[0].action, "demo.instructor.signin");
-    assert.equal(auditCalls[0].targetType, "student");
-    assert.equal(auditCalls[0].targetId, "instr-1");
+    assert.equal(auditRows.length, 1);
+    assert.equal(auditRows[0].action, "demo.instructor.signin");
+    assert.equal(auditRows[0].targetType, "student");
+    assert.equal(auditRows[0].targetId, "instr-1");
+  });
+
+  it("still signs in when the audit write fails", async () => {
+    auditWriteFails = true;
+
+    const response = await route.POST(post() as never);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { redirectTo: "/teacher" });
+    assert.equal(cookieCalls.length, 1, "the session cookie is set");
+    assert.equal(cookieCalls[0][0], "instr-1");
+    assert.deepEqual(cookieCalls[0][3], { demo: "instructor" });
+    assert.equal(auditRows.length, 0);
+    assert.ok(
+      JSON.stringify(errorLogs).includes("audit_write_failed"),
+      "the failed audit write is logged so an operator can see it",
+    );
   });
 
   it("turns a bootstrap failure into the generic 500, once, with nothing about the clash in the log", async () => {
@@ -182,7 +202,7 @@ describe("POST /api/demo/instructor", () => {
     assert.deepEqual(await response.json(), { error: "Internal server error", code: "INTERNAL_ERROR" });
     assert.equal(bootstrapCalls.length, 1, "no retry");
     assert.equal(cookieCalls.length, 0);
-    assert.equal(auditCalls.length, 0);
+    assert.equal(auditRows.length, 0);
     assert.equal(JSON.stringify(errorLogs).includes(clash), false, "the clash text stays out of the log");
     assert.equal(JSON.stringify(errorLogs).includes("demo-instructor"), false, "the login stays out of the log");
   });
@@ -194,6 +214,6 @@ describe("POST /api/demo/instructor", () => {
 
     assert.equal(response.status, 500);
     assert.equal(cookieCalls.length, 0);
-    assert.equal(auditCalls.length, 0);
+    assert.equal(auditRows.length, 0);
   });
 });
