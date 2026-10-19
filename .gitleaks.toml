@@ -1,0 +1,18 @@
+# Config for the Secret scan workflow and for local `gitleaks` runs.
+# Known false positives are listed by fingerprint in .gitleaksignore.
+
+title = "VisionQuest gitleaks config"
+
+[extend]
+useDefault = true
+
+# The allowlist matches the key name, not the value. The scan runs with
+# --redact, and gitleaks redacts a match before it checks allowlists, so a
+# pattern on the value never matches. Scoping to workflow files keeps the
+# exception narrow.
+[[allowlists]]
+description = "Throwaway API_KEY_ENCRYPTION_KEY values that CI jobs set for tests"
+condition = "AND"
+paths = ['''^\.github/workflows/[^/]+\.ya?ml$''']
+regexTarget = "match"
+regexes = ['''API_KEY_ENCRYPTION_KEY:\s*"''']

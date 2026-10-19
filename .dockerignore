@@ -1,9 +1,14 @@
 node_modules
 .next
 .git
-.env
-.env.local
-.env.*.local
+.env*
+*.pem
+*.key
+*.p12
+*.pfx
+.cloudflared
+config/cloudflared/config.yml
+config/cloudflared/*.json
 uploads
 SPOKES Handbook
 *.md
