@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { withAuth, badRequest, rateLimited } from "@/lib/api-error";
+import { assertNotDemoAccount } from "@/lib/demo/guards";
+import { DEMO_NO_SEND_REFUSAL } from "@/lib/demo/copy";
 import { confirmVerificationCode } from "@/lib/nudges/phone-verification";
 import { rateLimit } from "@/lib/rate-limit";
 import { parseBody } from "@/lib/schemas";
@@ -32,6 +34,9 @@ const CONFIRM_WINDOW_MS = 5 * 60 * 1000;
  * box; without it, consent is self-attested about a number nobody checked.
  */
 export const POST = withAuth(async (session, req: Request) => {
+  // Before the guess limiter, so a demo visitor spends none of it and is told why.
+  assertNotDemoAccount(session, DEMO_NO_SEND_REFUSAL);
+
   // Before the body is read, so a malformed code costs a guess too, and before
   // any comparison, so a refusal cannot be told apart from a wrong code.
   //

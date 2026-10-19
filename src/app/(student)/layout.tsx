@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { parseState, createInitialState } from "@/lib/progression/engine";
 import { computeNavPhase, type NavPhase } from "@/lib/nav-progression";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-import { hasConfiguredSecurityQuestionSet } from "@/lib/security-questions";
+import { needsRecoverySetup } from "@/lib/security-questions";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import ProgressionProvider from "@/components/progression/ProgressionProvider";
@@ -40,8 +40,12 @@ export default async function StudentLayout({
   // One-time recovery gate: staff-created accounts have no recovery questions,
   // so a forgotten password can lock a student out when SMTP is unconfigured.
   // Force setup before any student page renders (the setup route is outside
-  // this layout's group, so this redirect cannot loop).
-  if (!hasConfiguredSecurityQuestionSet(securityKeys.map((k) => k.questionKey))) {
+  // this layout's group, so this redirect cannot loop). Demo accounts have no
+  // password to forget, so they skip it.
+  if (needsRecoverySetup({
+    demoAccount: session.demoAccount,
+    questionKeys: securityKeys.map((k) => k.questionKey),
+  })) {
     redirect("/recovery-setup");
   }
 

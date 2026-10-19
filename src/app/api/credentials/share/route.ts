@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
+import { assertNotDemoAccount } from "@/lib/demo/guards";
+import { DEMO_PUBLIC_PAGE_REFUSAL } from "@/lib/demo/copy";
 import { parseBody, shareCredentialSchema } from "@/lib/schemas";
 import { READY_TO_WORK_FAMILY_CERT_TYPES } from "@/lib/certifications";
 
@@ -61,6 +63,9 @@ export const GET = withAuth(async (session, req: Request) => {
 });
 
 export const POST = withAuth(async (session, req: Request) => {
+  // Before the body is read: a public page is reachable by anyone with the link.
+  assertNotDemoAccount(session, DEMO_PUBLIC_PAGE_REFUSAL);
+
   const { isPublic, headline, summary } = await parseBody(req, shareCredentialSchema);
 
   // D7 (2026-09-07): same family lookup as GET, above.
