@@ -567,6 +567,28 @@ test("a secret inside metric details is redacted too", () => {
   }
 });
 
+test("a secret in a top-level field reaches neither the result file nor --json output", () => {
+  const root = makeRepo();
+  const secret = "postgresql://ro:hunter2isverylong@prod.host:5432/visionquest";
+  try {
+    addSuite(root, "demo", {
+      tier: "watch",
+      metrics,
+      scorer: `export async function run(ctx) {
+        return { provider: "openrouter", model: ctx.env.prodReadonlyUrl, metrics: [{ id: "accuracy", value: 1 }] };
+      }`,
+    });
+    const out = bench(root, ["--suite=demo", "--json"], { BENCH_PROD_READONLY_URL: secret });
+    assert.equal(out.status, 0, out.stderr);
+    const raw = readFileSync(join(root, "reports", "benchmarks", "latest", "demo.json"), "utf8");
+    assert.ok(!raw.includes("hunter2isverylong"), raw);
+    assert.equal(JSON.parse(raw).model, "[redacted:BENCH_PROD_READONLY_URL]");
+    assert.ok(!out.stdout.includes("hunter2isverylong"), out.stdout);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("--tier selects every suite of that tier whose requires are met", () => {
   const root = makeRepo();
   try {
