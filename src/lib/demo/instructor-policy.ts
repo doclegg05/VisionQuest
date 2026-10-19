@@ -85,6 +85,9 @@ export const DEMO_INSTRUCTOR_WRITE_ALLOW: readonly string[] = [
   "POST /api/chat/send",
   "POST /api/chat/tool-confirm",
   "DELETE /api/auth/session",
+  "POST /api/notifications",
+  "DELETE /api/chat/conversations/[id]",
+  "POST /api/sage/panel/dismiss",
 ];
 
 /**
@@ -126,7 +129,6 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
 
   "POST /api/certifications",
 
-  "DELETE /api/chat/conversations/[id]",
   "POST /api/chat/upload",
 
   "POST /api/connect/[id]/approve",
@@ -172,7 +174,6 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
 
   "POST /api/mood",
 
-  "POST /api/notifications",
   "PUT /api/notifications/preferences",
   "POST /api/notifications/preferences/verify-phone",
   "POST /api/notifications/preferences/verify-phone/confirm",
@@ -190,7 +191,6 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
   "POST /api/resume/assist",
   "POST /api/resume/upload",
 
-  "POST /api/sage/panel/dismiss",
   "POST /api/sage/panel/refresh",
   "POST /api/sage/tools/propose-goal",
 
@@ -268,14 +268,19 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
 /**
  * Reads that would show another class, or staff names and emails. Reads of
  * program-wide content are allowed on purpose.
+ *
+ * This is the one list that fails open, because a pattern that matches no real
+ * route denies nothing. instructor-policy.test.ts checks that each entry lands
+ * on a GET handler that exists. The folders that hold a whole family of reads
+ * use `/**`, so a route added under one of them later is denied from the start.
  */
 export const DEMO_INSTRUCTOR_READ_DENY: readonly string[] = [
   "GET /api/teacher/reports/**",
   "GET /api/teacher/spokes/referrals",
   "GET /api/teacher/failed-extractions",
   "GET /api/teacher/forms/responses",
-  "GET /api/teacher/export",
-  "GET /api/teacher/audit",
+  "GET /api/teacher/export/**",
+  "GET /api/teacher/audit/**",
 ];
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);

@@ -23,8 +23,8 @@ import {
 const API_DIR = path.join(process.cwd(), "src/app/api");
 const MUTATING_METHODS = ["POST", "PUT", "PATCH", "DELETE"] as const;
 
-/** The mutating HTTP methods a route file exports, in any of the forms this repo uses. */
-function exportedMutatingMethods(source: string): string[] {
+/** The given HTTP methods a route file exports, in any of the forms this repo uses. */
+function exportedMethods(source: string, wanted: readonly string[]): string[] {
   const exported = new Set<string>();
   // `export const POST = ...`, `export async function POST`, `export function POST`
   for (const match of source.matchAll(/^export\s+(?:async\s+function|function|const)\s+([A-Z]+)\b/gm)) {
@@ -37,7 +37,7 @@ function exportedMutatingMethods(source: string): string[] {
       if (name) exported.add(name);
     }
   }
-  return MUTATING_METHODS.filter((method) => exported.has(method));
+  return wanted.filter((method) => exported.has(method));
 }
 
 /** `(group)` folders are not part of a URL; `[param]` folders stay as written. */
@@ -49,14 +49,15 @@ function urlPathForRouteFile(relativeFile: string): string {
   return ["/api", ...segments].join("/");
 }
 
-function mutatingRouteKeys(): string[] {
+/** "METHOD /api/path" for every handler of the given methods under src/app/api. */
+function routeKeysFor(wanted: readonly string[]): string[] {
   const keys: string[] = [];
   const files = readdirSync(API_DIR, { recursive: true, encoding: "utf8" })
     .filter((file) => path.basename(file) === "route.ts")
     // A folder that starts with an underscore is private to Next.js and has no URL.
     .filter((file) => !file.split(path.sep).some((segment) => segment.startsWith("_")));
   for (const file of files) {
-    const methods = exportedMutatingMethods(readFileSync(path.join(API_DIR, file), "utf8"));
+    const methods = exportedMethods(readFileSync(path.join(API_DIR, file), "utf8"), wanted);
     for (const method of methods) keys.push(`${method} ${urlPathForRouteFile(file)}`);
   }
   return keys.sort();
@@ -65,7 +66,8 @@ function mutatingRouteKeys(): string[] {
 const listed = [...DEMO_INSTRUCTOR_WRITE_ALLOW, ...DEMO_INSTRUCTOR_WRITE_DENY];
 
 describe("demo instructor route walk", () => {
-  const routeKeys = mutatingRouteKeys();
+  const routeKeys = routeKeysFor(MUTATING_METHODS);
+  const getKeys = routeKeysFor(["GET"]);
 
   it("finds the routes it is meant to classify", () => {
     assert.ok(routeKeys.length > 100, `expected over 100 state-changing handlers, found ${routeKeys.length}`);
@@ -84,6 +86,20 @@ describe("demo instructor route walk", () => {
     const known = new Set(routeKeys);
     for (const entry of listed) {
       assert.ok(known.has(entry), `${entry} names no route file or no exported method`);
+    }
+  });
+
+  // READ_DENY is the one list that fails open: a pattern that matches no real
+  // route denies nothing, and every other test would still pass. So each entry
+  // has to land on a GET handler that exists, and a "/**" entry on at least one
+  // under it. A renamed folder or a typo now fails here by name.
+  it("points every READ_DENY entry at a real GET handler", () => {
+    assert.ok(getKeys.includes("GET /api/teacher/export"), "the walk must see GET handlers");
+    for (const entry of DEMO_INSTRUCTOR_READ_DENY) {
+      const covered = entry.endsWith("/**")
+        ? getKeys.some((key) => matchesRoutePattern(entry, "GET", key.split(" ")[1]))
+        : getKeys.includes(entry);
+      assert.ok(covered, `${entry} matches no GET handler under src/app/api`);
     }
   });
 });
@@ -152,6 +168,14 @@ describe("isDemoInstructorRequestAllowed", () => {
     assert.equal(isDemoInstructorRequestAllowed("DELETE", "/api/auth/session"), true);
   });
 
+  it("allows the writes that touch only the caller's own rows", () => {
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/api/notifications"), true);
+    assert.equal(isDemoInstructorRequestAllowed("DELETE", "/api/chat/conversations/abc"), true);
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/api/sage/panel/dismiss"), true);
+    // Preferences carry a phone number and an email, so they stay refused.
+    assert.equal(isDemoInstructorRequestAllowed("PUT", "/api/notifications/preferences"), false);
+  });
+
   it("refuses program-wide, credential and sending routes, and unknown writes", () => {
     const refused: Array<[string, string]> = [
       ["POST", "/api/teacher/sage-snippets"],
@@ -182,6 +206,12 @@ describe("isDemoInstructorRequestAllowed", () => {
       "/api/teacher/export",
       "/api/teacher/audit",
     ]) {
+      assert.equal(isDemoInstructorRequestAllowed("GET", pathname), false, pathname);
+    }
+  });
+
+  it("refuses a route added under the export and audit reads", () => {
+    for (const pathname of ["/api/teacher/export/csv", "/api/teacher/export/abc/file", "/api/teacher/audit/abc"]) {
       assert.equal(isDemoInstructorRequestAllowed("GET", pathname), false, pathname);
     }
   });
