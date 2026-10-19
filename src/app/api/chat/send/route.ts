@@ -2,6 +2,9 @@ import { getPromptTier, resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { rateLimit, rateLimitDaily, refundRateLimit } from "@/lib/rate-limit";
 import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
+import { chatLimitsFor } from "@/lib/chat/chat-limits";
+import { getDemoLimits } from "@/lib/demo/config";
+import { DEMO_SAGE_LIMIT } from "@/lib/demo/copy";
 import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { promptStageForMessage } from "@/lib/sage/stage";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
@@ -221,6 +224,9 @@ function presentFormSseExtras(record: AgentToolCallRecord): ChatSseEvent[] {
   }
   return extras;
 }
+
+/** The one daily counter every demo account's Sage messages are charged to. */
+const DEMO_WIDE_CHAT_KEY = "chat-daily:demo-all";
 
 export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) => {
   const body = await parseBody(req, chatSendSchema);
@@ -467,6 +473,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // See code review finding 2026-05-08 (Sprint 1 Bundle #5 / Task A).
   const isCloudProvider = provider.name === "gemini";
   let dailyRemaining: number | null = null;
+  // The per-account daily cap that `dailyRemaining` counts down from.
+  let perAccountDailyLimit: number | null = null;
   // Units this request consumed, each with the window it was consumed from,
   // so a turn whose only outcome is a confirm card can give them back (see
   // the refund after generation below). Degraded (fail-open) results have no
@@ -475,19 +483,24 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
   // The dev-only switch and its production guard live in rate-limit-switch.ts.
   if (!rateLimitsDisabled()) {
+    // The numbers live in chat-limits.ts. Demo limits are read once, and only
+    // for a demo session, so a real account never touches that configuration.
+    const limits = chatLimitsFor(
+      {
+        role: session.role,
+        isStaffChat,
+        isCloudProvider,
+        demoAccount: session.demoAccount,
+      },
+      session.demoAccount ? getDemoLimits() : undefined,
+    );
+
     // Hourly per-user request cap. Fires for every role (student, teacher,
     // admin) because the goal is host protection, not cost control. Admin
     // gets a higher ceiling consistent with prior cloud-only behavior, but
-    // is NOT skipped — see review finding 2026-05-08.
-    //
-    // Bound rationale: well above sustained human chat pace (~1/min) yet
-    // leaves room for legitimate bursts. Multiplied across an alpha-stage
-    // cohort it stays inside Ollama single-host throughput. Per-role caps
-    // mirror the previous cloud-only configuration (student 40, teacher 60,
-    // admin 120) so behavior is unchanged for the cloud path.
-    const hourlyLimit = isStaffChat ? (session.role === "admin" ? 120 : 60) : 40;
+    // is NOT skipped. See review finding 2026-05-08.
     const hourlyKey = `chat:${session.id}`;
-    const hourlyRl = await rateLimit(hourlyKey, hourlyLimit, 60 * 60 * 1000);
+    const hourlyRl = await rateLimit(hourlyKey, limits.hourly, 60 * 60 * 1000);
     if (!hourlyRl.success) {
       return new Response(
         JSON.stringify({
@@ -501,11 +514,11 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     }
 
     // Daily limit by role (calendar-day, resets midnight UTC). Cloud-only
-    // because the daily cap exists to bound API spend, not host load.
-    if (isCloudProvider && session.role !== "admin") {
-      const dailyLimit = isStaffChat ? 400 : 200;
+    // for real accounts because the daily cap exists to bound API spend, not
+    // host load. The demo instructor has one on any provider.
+    if (limits.perAccountDaily !== null) {
       const dailyKey = `chat-daily:${session.id}`;
-      const dailyRl = await rateLimitDaily(dailyKey, dailyLimit);
+      const dailyRl = await rateLimitDaily(dailyKey, limits.perAccountDaily);
       if (!dailyRl.success) {
         return new Response(
           JSON.stringify({
@@ -520,6 +533,22 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         consumedChatLimits = [...consumedChatLimits, { key: dailyKey, resetTime: dailyRl.resetTime }];
       }
       dailyRemaining = dailyRl.remaining;
+      perAccountDailyLimit = limits.perAccountDaily;
+    }
+
+    // One daily budget shared by every demo account, on any provider, so a
+    // crowd of made-up visitors cannot spend without bound.
+    if (limits.demoWideDaily !== null) {
+      const demoWideRl = await rateLimitDaily(DEMO_WIDE_CHAT_KEY, limits.demoWideDaily);
+      if (!demoWideRl.success) {
+        return new Response(
+          JSON.stringify({ error: withCrisisResources(DEMO_SAGE_LIMIT) }),
+          { status: 429 },
+        );
+      }
+      if (!demoWideRl.degraded) {
+        consumedChatLimits = [...consumedChatLimits, { key: DEMO_WIDE_CHAT_KEY, resetTime: demoWideRl.resetTime }];
+      }
     }
   }
 
@@ -824,9 +853,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   }
 
   // 80% daily warning — inject into system prompt so Sage mentions it naturally
-  if (dailyRemaining !== null) {
-    const dailyLimit = isStaffChat ? 400 : 200;
-    const usagePercent = 1 - (dailyRemaining / dailyLimit);
+  if (dailyRemaining !== null && perAccountDailyLimit !== null) {
+    const usagePercent = 1 - (dailyRemaining / perAccountDailyLimit);
     if (usagePercent >= 0.8) {
       const dailyWarningBlock = `\n\n[SYSTEM NOTE: This user has used ${Math.round(usagePercent * 100)}% of their daily message limit. Naturally mention that you're getting a lot of questions today and your answers may be shorter for a bit. Do not make it alarming.]`;
       systemPrompt += dailyWarningBlock;
