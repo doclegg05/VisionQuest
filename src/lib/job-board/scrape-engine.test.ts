@@ -31,6 +31,8 @@ mock.module("@/lib/db", {
       jobScrapeRun: {
         create: async () => ({ id: "run-1" }),
         update: async () => ({}),
+        // The run's result write, guarded on the run still being open.
+        updateMany: async () => ({ count: 1 }),
       },
       jobScrapeSourceResult: {
         upsert: async () => ({}),

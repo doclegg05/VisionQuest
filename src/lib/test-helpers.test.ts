@@ -5,6 +5,7 @@ import {
   mockTeacherSession,
   mockAdminSession,
   mockRequest,
+  matchesWhere,
 } from "./test-helpers";
 
 // ---------------------------------------------------------------------------
@@ -84,5 +85,46 @@ describe("mockRequest", () => {
       body: { ignored: true },
     });
     assert.equal(req.body, null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Prisma where evaluation for in-memory fakes
+// ---------------------------------------------------------------------------
+
+describe("matchesWhere", () => {
+  const T0 = new Date("2026-10-19T08:00:00.000Z");
+  const T1 = new Date("2026-10-19T10:00:00.000Z");
+  const row = { id: "run-1", status: "processing", key: "scrape:cfg-1:talroo", startedAt: T0, completedAt: null };
+
+  it("matches equality, including dates and null", () => {
+    assert.equal(matchesWhere(row, { id: "run-1", startedAt: new Date(T0), completedAt: null }), true);
+    assert.equal(matchesWhere(row, { status: "queued" }), false);
+  });
+
+  it("applies comparison, in and startsWith operators", () => {
+    assert.equal(matchesWhere(row, { startedAt: { lt: T1 }, status: { in: ["queued", "processing"] } }), true);
+    assert.equal(matchesWhere(row, { startedAt: { gte: T1 } }), false);
+    assert.equal(matchesWhere(row, { key: { startsWith: "scrape:cfg-1:" } }), true);
+  });
+
+  it("compares nothing against a null column, as SQL does", () => {
+    assert.equal(matchesWhere(row, { completedAt: { lt: T1 } }), false);
+    assert.equal(matchesWhere(row, { completedAt: { gte: T1 } }), false);
+  });
+
+  it("combines clauses with AND and OR", () => {
+    const where = {
+      AND: [
+        { OR: [{ key: "scrape:cfg-1" }, { key: { startsWith: "scrape:cfg-1:" } }] },
+        { OR: [{ status: "queued" }, { status: "processing", startedAt: { lt: T1 } }] },
+      ],
+    };
+    assert.equal(matchesWhere(row, where), true);
+    assert.equal(matchesWhere({ ...row, key: "scrape:cfg-2" }, where), false);
+  });
+
+  it("throws on an operator it does not know, so a fake never matches by accident", () => {
+    assert.throws(() => matchesWhere(row, { status: { contains: "process" } }), /contains/);
   });
 });

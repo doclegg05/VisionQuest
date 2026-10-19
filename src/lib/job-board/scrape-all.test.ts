@@ -13,6 +13,7 @@
  */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { matchesWhere } from "@/lib/test-helpers";
 import type { JobSourceAdapter, NormalizedJob } from "./types";
 
 const HOUR = 60 * 60 * 1000;
@@ -25,24 +26,16 @@ const SOURCES_DOWN_CONFIG = "config-f"; // its only source rejects
 const RAW_MESSAGE = 'Invalid `prisma.jobClassConfig.findUnique()` invocation: where { id: "config-b" }';
 
 interface RunRow {
+  id: string;
   classConfigId: string;
   status: string;
   createdAt: Date;
+  startedAt: Date | null;
 }
 
 let runs: RunRow[] = [];
 const configReads: string[] = [];
 const errorLogs: Array<{ message: string; context: unknown }> = [];
-
-function matchesInProgress(run: RunRow, where: Record<string, unknown>): boolean {
-  const status = where.status as { in: string[] };
-  const createdAt = where.createdAt as { gte: Date } | undefined;
-  return (
-    run.classConfigId === where.classConfigId &&
-    status.in.includes(run.status) &&
-    (createdAt === undefined || run.createdAt >= createdAt.gte)
-  );
-}
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -66,18 +59,17 @@ mock.module("@/lib/db", {
       },
       jobScrapeRun: {
         findFirst: async ({ where }: { where: Record<string, unknown> }) =>
-          runs.find((run) => matchesInProgress(run, where)) ? { id: "run-busy" } : null,
-        create: async () => ({ id: "run-new" }),
+          runs.find((run) => matchesWhere({ ...run }, where)) ? { id: "run-busy" } : null,
+        create: async ({ data }: { data: Omit<RunRow, "id" | "createdAt"> }) => {
+          const run: RunRow = { id: `run-new-${data.classConfigId}`, createdAt: new Date(), ...data };
+          runs.push(run);
+          return run;
+        },
         update: async () => ({}),
         updateMany: async ({ where, data }: { where: Record<string, unknown>; data: { status: string } }) => {
-          const before = (where.createdAt as { lt: Date }).lt;
-          const status = where.status as { in: string[] };
-          const stale = runs.filter(
-            (run) =>
-              run.classConfigId === where.classConfigId && status.in.includes(run.status) && run.createdAt < before,
-          );
-          for (const run of stale) run.status = data.status;
-          return { count: stale.length };
+          const matched = runs.filter((run) => matchesWhere({ ...run }, where));
+          for (const run of matched) run.status = data.status;
+          return { count: matched.length };
         },
       },
       backgroundJob: {
@@ -149,8 +141,20 @@ before(async () => {
 beforeEach(() => {
   const now = Date.now();
   runs = [
-    { classConfigId: BUSY_CONFIG, status: "processing", createdAt: new Date(now - 0.5 * HOUR) },
-    { classConfigId: STALE_RUN_CONFIG, status: "processing", createdAt: new Date(now - 3 * HOUR) },
+    {
+      id: "run-busy",
+      classConfigId: BUSY_CONFIG,
+      status: "processing",
+      createdAt: new Date(now - 0.5 * HOUR),
+      startedAt: new Date(now - 0.5 * HOUR),
+    },
+    {
+      id: "run-crashed",
+      classConfigId: STALE_RUN_CONFIG,
+      status: "processing",
+      createdAt: new Date(now - 3 * HOUR),
+      startedAt: new Date(now - 3 * HOUR),
+    },
   ];
   configReads.length = 0;
   errorLogs.length = 0;

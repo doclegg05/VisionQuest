@@ -9,7 +9,7 @@ mock.module("./db", { namedExports: { prismaAdmin: {
     if (failClaim) throw new Error("claim failed");
     return [{ id: `job-${claims}`, type: "capacity", payload: "{}", attempts: 1 }];
   },
-  backgroundJob: { update: async () => ({}) },
+  backgroundJob: { updateMany: async () => ({ count: 1 }) },
 } } });
 mock.module("./logger", { namedExports: { logger: { error: () => {} } } });
 mock.module("./log-keys", { namedExports: { studentLogKey: () => "redacted" } });

@@ -6,7 +6,7 @@ import { studentLogKey } from "@/lib/log-keys";
 
 type FindFirstArgs = Parameters<typeof prisma.backgroundJob.findFirst>[0];
 type CreateArgs = Parameters<typeof prisma.backgroundJob.create>[0];
-type UpdateArgs = Parameters<typeof prisma.backgroundJob.update>[0];
+type UpdateManyArgs = Parameters<typeof prisma.backgroundJob.updateMany>[0];
 
 interface ClaimedRow {
   id: string;
@@ -23,19 +23,21 @@ function stubQueryRaw(rows: ClaimedRow[]) {
   };
 }
 
-function stubBackgroundJobUpdate() {
-  const calls: UpdateArgs[] = [];
-  const original = prisma.backgroundJob.update;
-  (prisma.backgroundJob.update as unknown as (args: UpdateArgs) => Promise<unknown>) = async (
-    args: UpdateArgs,
+// The processor writes a job's result with updateMany, guarded by its claim
+// (jobs.lease.test.ts); count 1 means the claim still held the row.
+function stubBackgroundJobUpdateMany() {
+  const calls: UpdateManyArgs[] = [];
+  const original = prisma.backgroundJob.updateMany;
+  (prisma.backgroundJob.updateMany as unknown as (args: UpdateManyArgs) => Promise<unknown>) = async (
+    args: UpdateManyArgs,
   ) => {
     calls.push(args);
-    return {} as unknown;
+    return { count: 1 };
   };
   return {
     calls,
     restore() {
-      prisma.backgroundJob.update = original;
+      prisma.backgroundJob.updateMany = original;
     },
   };
 }
@@ -99,7 +101,7 @@ test("processJobs runs handler and marks job completed on success", async () => 
   const restoreClaim = stubQueryRaw([
     { id: "job-1", type: "test_success", payload: JSON.stringify({ n: 1 }), attempts: 1 },
   ]);
-  const updateStub = stubBackgroundJobUpdate();
+  const updateStub = stubBackgroundJobUpdateMany();
 
   let handlerCalledWith: unknown = null;
   registerJobHandler("test_success", async (payload) => {
@@ -111,7 +113,7 @@ test("processJobs runs handler and marks job completed on success", async () => 
     assert.equal(processed, 1);
     assert.deepEqual(handlerCalledWith, { n: 1 });
     assert.equal(updateStub.calls.length, 1);
-    assert.equal(updateStub.calls[0].where.id, "job-1");
+    assert.equal(updateStub.calls[0].where?.id, "job-1");
     assert.equal(updateStub.calls[0].data.status, "completed");
   } finally {
     restoreClaim();
@@ -123,7 +125,7 @@ test("processJobById claims and runs one specific pending job", async () => {
   const restoreClaim = stubQueryRaw([
     { id: "job-specific", type: "test_specific", payload: JSON.stringify({ source: "manual" }), attempts: 1 },
   ]);
-  const updateStub = stubBackgroundJobUpdate();
+  const updateStub = stubBackgroundJobUpdateMany();
 
   let handlerCalledWith: unknown = null;
   registerJobHandler("test_specific", async (payload) => {
@@ -135,7 +137,7 @@ test("processJobById claims and runs one specific pending job", async () => {
     assert.equal(processed, 1);
     assert.deepEqual(handlerCalledWith, { source: "manual" });
     assert.equal(updateStub.calls.length, 1);
-    assert.equal(updateStub.calls[0].where.id, "job-specific");
+    assert.equal(updateStub.calls[0].where?.id, "job-specific");
     assert.equal(updateStub.calls[0].data.status, "completed");
   } finally {
     restoreClaim();
@@ -147,7 +149,7 @@ test("processJobs marks job failed when type is unknown", async () => {
   const restoreClaim = stubQueryRaw([
     { id: "job-2", type: "unregistered_type", payload: "{}", attempts: 1 },
   ]);
-  const updateStub = stubBackgroundJobUpdate();
+  const updateStub = stubBackgroundJobUpdateMany();
 
   try {
     const processed = await processJobs(1);
@@ -165,7 +167,7 @@ test("processJobs re-queues with status=pending when handler throws and attempts
   const restoreClaim = stubQueryRaw([
     { id: "job-3", type: "test_fail_retry", payload: "{}", attempts: 2 },
   ]);
-  const updateStub = stubBackgroundJobUpdate();
+  const updateStub = stubBackgroundJobUpdateMany();
 
   registerJobHandler("test_fail_retry", async () => {
     throw new Error("transient boom");
@@ -187,7 +189,7 @@ test("processJobs marks failed when handler throws and attempts === 3 (final att
   const restoreClaim = stubQueryRaw([
     { id: "job-4", type: "test_fail_final", payload: "{}", attempts: 3 },
   ]);
-  const updateStub = stubBackgroundJobUpdate();
+  const updateStub = stubBackgroundJobUpdateMany();
 
   registerJobHandler("test_fail_final", async () => {
     throw new Error("fatal boom");
@@ -206,7 +208,7 @@ test("processJobs marks failed when handler throws and attempts === 3 (final att
 
 test("processJobs returns 0 immediately when nothing is claimed", async () => {
   const restoreClaim = stubQueryRaw([]);
-  const updateStub = stubBackgroundJobUpdate();
+  const updateStub = stubBackgroundJobUpdateMany();
 
   try {
     const processed = await processJobs(5);
@@ -227,7 +229,7 @@ test("processJobs keeps a payload student id out of the error column and the log
   const restoreClaim = stubQueryRaw([
     { id: "job-5", type: "test_fail_leaky", payload: JSON.stringify({ studentId }), attempts: 1 },
   ]);
-  const updateStub = stubBackgroundJobUpdate();
+  const updateStub = stubBackgroundJobUpdateMany();
   const consoleLines: string[] = [];
   const originalConsoleError = console.error;
   console.error = (...args: unknown[]) => {
