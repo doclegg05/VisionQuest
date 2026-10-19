@@ -8,6 +8,7 @@ import {
   normalizeInstructorIds,
 } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { isDemoInstructor } from "@/lib/demo/guards";
 import { logAuditEvent } from "@/lib/audit";
 import { isProgramType, type ProgramType } from "@/lib/program-type";
 
@@ -61,20 +62,24 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
     orderBy: [{ status: "asc" }, { name: "asc" }],
   });
 
-  // Teachers and admins both get the full instructor list
-  const availableInstructors = await prisma.student.findMany({
-    where: {
-      role: "teacher",
-      isActive: true,
-    },
-    select: {
-      id: true,
-      studentId: true,
-      displayName: true,
-      email: true,
-    },
-    orderBy: { displayName: "asc" },
-  });
+  // Teachers and admins both get the full instructor list. The demo instructor
+  // does not: that list is real people's names and emails, and a visitor to
+  // the demo has no use for it.
+  const availableInstructors = isDemoInstructor(session)
+    ? []
+    : await prisma.student.findMany({
+        where: {
+          role: "teacher",
+          isActive: true,
+        },
+        select: {
+          id: true,
+          studentId: true,
+          displayName: true,
+          email: true,
+        },
+        orderBy: { displayName: "asc" },
+      });
 
   return NextResponse.json({
     classes: classes.map((item) => ({

@@ -11,11 +11,13 @@ import { logger } from "@/lib/logger";
 import { logAuditEvent } from "@/lib/audit";
 import { isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
+import { isDemoInstructor } from "@/lib/demo/guards";
 import { getToolByName, findToolBySlashCommand } from "./tools";
 import { validateToolArgs } from "./validation";
 import { checkToolRateLimit, rateLimitMessage } from "./rate-limit";
 import { agentMode, isTierAllowedInMode } from "./flags";
-import type { AgentTool, AgentToolCallRecord, AgentToolResult } from "./types";
+import type { AgentTool, AgentToolCallRecord, AgentToolResult, RiskTier } from "./types";
 
 export interface ExecuteToolOptions {
   session: Session;
@@ -85,6 +87,14 @@ export async function executeAgentTool(
           `${validation.error} Call the tool again with only valid JSON arguments.`,
       },
     );
+  }
+
+  // The demo instructor may look, but a write that names no student is not tied
+  // to the demo class, so it could reach anything the tool can. A write that
+  // does name a student goes through the class check below, which is narrowed
+  // to the demo instructor's own class.
+  if (!targetStudentId && isDemoInstructor(session) && isWriteTier(tool.riskTier)) {
+    return errorRecord(callId, toolName, args, startedAt, DEMO_READ_ONLY_REFUSAL);
   }
 
   // Confirmation tokens bind a target, but do not grant lasting access to it.
@@ -213,6 +223,18 @@ export async function executeSlashCommand(
   });
 
   return { tool, record };
+}
+
+/** Exhaustive over RiskTier: a new tier is a compile error here. */
+function isWriteTier(tier: RiskTier): boolean {
+  switch (tier) {
+    case "read":
+    case "read_ai":
+      return false;
+    case "mutate_reversible":
+    case "mutate_consequential":
+      return true;
+  }
 }
 
 function isAuthorized(session: Session, tool: AgentTool): boolean {

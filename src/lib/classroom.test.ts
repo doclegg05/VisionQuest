@@ -7,6 +7,7 @@ import {
   buildManagedStudentWhere,
   buildStudentIdentifierWhere,
   canManageAnyClass,
+  canManageAnyClassFor,
   canPerformElevatedStaffAction,
   normalizeClassCode,
 } from "./classroom";
@@ -271,4 +272,91 @@ test("getRoleHomePath routes each role to the correct landing page", () => {
   assert.equal(getRoleHomePath("cdc"), "/cdc");
   assert.equal(getRoleHomePath("student"), "/dashboard");
   assert.equal(getRoleHomePath("unknown"), "/dashboard");
+});
+
+// --- Cohort demo mode: the demo instructor is narrowed to its own class ----
+// The demo instructor is a real `teacher` row, so `canManageAnyClass("teacher")`
+// is true for it. `canManageAnyClassFor` takes the whole session and says no to
+// the demo instructor, which sends every helper in classroom.ts down the
+// "assigned instructor" branch that non-staff roles already use.
+
+const demoInstructor = {
+  id: "demo-instructor-1",
+  studentId: "demo-instructor",
+  displayName: "Demo Instructor",
+  role: "teacher",
+  demoAccount: "instructor" as const,
+};
+
+test("canManageAnyClassFor keeps every staff role unscoped except the demo instructor", () => {
+  const base = { id: "u-1", studentId: "u-1", displayName: "User" };
+  assert.equal(canManageAnyClassFor({ ...base, role: "admin" }), true);
+  assert.equal(canManageAnyClassFor({ ...base, role: "teacher" }), true);
+  assert.equal(canManageAnyClassFor({ ...base, role: "coordinator" }), true);
+  assert.equal(canManageAnyClassFor({ ...base, role: "cdc" }), false);
+  assert.equal(canManageAnyClassFor({ ...base, role: "student" }), false);
+  assert.equal(canManageAnyClassFor(demoInstructor), false);
+});
+
+test("scopes a demo instructor's student where to classes it teaches", () => {
+  const where = buildManagedStudentWhere(demoInstructor) as {
+    classEnrollments: { some: { class: { instructors: { some: { instructorId: string } } } } };
+  };
+
+  assert.equal(
+    where.classEnrollments.some.class.instructors.some.instructorId,
+    demoInstructor.id,
+  );
+  assert.deepEqual(buildManagedStudentWhere(demoInstructor), {
+    role: "student",
+    classEnrollments: {
+      some: {
+        status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
+        class: {
+          instructors: {
+            some: { instructorId: demoInstructor.id },
+          },
+        },
+      },
+    },
+  });
+});
+
+test("keeps a demo instructor's class filter inside the classes it teaches", () => {
+  assert.deepEqual(buildManagedStudentWhere(demoInstructor, { classId: "class-1" }), {
+    role: "student",
+    classEnrollments: {
+      some: {
+        status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
+        classId: "class-1",
+        class: {
+          instructors: {
+            some: { instructorId: demoInstructor.id },
+          },
+        },
+      },
+    },
+  });
+});
+
+test("keeps a real teacher unscoped", () => {
+  const realTeacher = {
+    id: "teacher-1",
+    studentId: "teacher-1",
+    displayName: "Teacher",
+    role: "teacher",
+  };
+
+  assert.deepEqual(buildManagedStudentWhere(realTeacher), { role: "student" });
+  assert.deepEqual(
+    buildManagedStudentWhere({ ...realTeacher, demoAccount: undefined }),
+    { role: "student" },
+  );
+  assert.deepEqual(
+    buildManagedStudentWhere(
+      { id: "admin-1", studentId: "admin-1", displayName: "Admin", role: "admin" },
+      { includeInactiveAccounts: false },
+    ),
+    { role: "student", isActive: true },
+  );
 });
