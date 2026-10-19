@@ -19,9 +19,10 @@ mock.module("@/lib/db", {
 });
 
 let isDemoStudentId: typeof import("./accounts").isDemoStudentId;
+let isDemoStudentIdOrFalse: typeof import("./accounts").isDemoStudentIdOrFalse;
 
 before(async () => {
-  ({ isDemoStudentId } = await import("./accounts"));
+  ({ isDemoStudentId, isDemoStudentIdOrFalse } = await import("./accounts"));
 });
 
 describe("isDemoStudentId", () => {
@@ -67,5 +68,63 @@ describe("isDemoStudentId", () => {
       throw new Error("db down");
     });
     await assert.rejects(isDemoStudentId("stu-4"), /db down/);
+  });
+});
+
+// The crisis alert and the teacher nudge share this one policy: a doubt about
+// the demo marker counts as "a real account", because for a real student the
+// program-wide fallback is the safe direction. The two callers differ only in
+// what they log, which they pass in.
+describe("isDemoStudentIdOrFalse", () => {
+  beforeEach(() => {
+    mockFindUnique.mock.resetCalls();
+    mockAppFindUnique.mock.resetCalls();
+  });
+
+  it("is true for a demo row, and does not call the error callback", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({ demoAccount: "student" }));
+    const onError = mock.fn<(error: unknown) => void>();
+
+    assert.equal(await isDemoStudentIdOrFalse("stu-1", onError), true);
+    assert.equal(onError.mock.callCount(), 0);
+  });
+
+  it("is false for a real person, and does not call the error callback", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({ demoAccount: null }));
+    const onError = mock.fn<(error: unknown) => void>();
+
+    assert.equal(await isDemoStudentIdOrFalse("stu-2", onError), false);
+    assert.equal(onError.mock.callCount(), 0);
+  });
+
+  it("is false for a missing row, and does not call the error callback", async () => {
+    mockFindUnique.mock.mockImplementation(async () => null);
+    const onError = mock.fn<(error: unknown) => void>();
+
+    assert.equal(await isDemoStudentIdOrFalse("missing", onError), false);
+    assert.equal(onError.mock.callCount(), 0);
+  });
+
+  it("is false when the lookup throws, and reports the error to the caller once", async () => {
+    const failure = new Error("db down");
+    mockFindUnique.mock.mockImplementation(async () => {
+      throw failure;
+    });
+    const onError = mock.fn<(error: unknown) => void>();
+
+    assert.equal(await isDemoStudentIdOrFalse("stu-3", onError), false);
+    assert.equal(onError.mock.callCount(), 1);
+    assert.equal(onError.mock.calls[0].arguments[0], failure, "the original error is passed through");
+  });
+
+  it("reads the same one column through the admin client", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({ demoAccount: null }));
+    await isDemoStudentIdOrFalse("stu-4", () => undefined);
+
+    assert.deepEqual(mockFindUnique.mock.calls[0].arguments[0], {
+      where: { id: "stu-4" },
+      select: { demoAccount: true },
+    });
+    assert.equal(mockAppFindUnique.mock.callCount(), 0);
   });
 });

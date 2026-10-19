@@ -13,7 +13,7 @@ import {
 } from "./wellbeing-card";
 import { studentLogKey } from "@/lib/log-keys";
 import { findAssignedInstructors, listActiveTeachers, type StaffRecipient } from "@/lib/staff-recipients";
-import { isDemoStudentId } from "@/lib/demo/accounts";
+import { isDemoStudentIdOrFalse } from "@/lib/demo/accounts";
 
 /**
  * Wellbeing / crisis safety-net.
@@ -1079,7 +1079,7 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
   // a silent empty fallback is exactly the failure the fallback exists to stop.
   // A demo student skips it: the fallback would carry a made-up student's
   // alert to real teachers' inboxes, and `assigned` is already empty here.
-  const everyone = (await isDemoStudentOrFalse(studentId)) ? assigned : await listActiveTeachers();
+  const everyone = (await isDemoStudent(studentId)) ? assigned : await listActiveTeachers();
 
   if (everyone.length === 0) {
     // A CRITICAL alert with nobody to notify must never be quiet. This is the
@@ -1096,21 +1096,17 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
 }
 
 /**
- * Whether the student is a cohort demo account, with a failed lookup counted
- * as "no". For a real student in crisis the program-wide fallback is the safe
- * failure, so a doubt about the demo marker must never narrow the audience.
+ * Whether the student is a cohort demo account. A failed lookup counts as "no"
+ * (the shared policy in src/lib/demo/accounts.ts) and is logged here.
  */
-async function isDemoStudentOrFalse(studentId: string): Promise<boolean> {
-  try {
-    return await isDemoStudentId(studentId);
-  } catch (err) {
+function isDemoStudent(studentId: string): Promise<boolean> {
+  return isDemoStudentIdOrFalse(studentId, (err) => {
     logger.error("Wellbeing: demo-account check failed; treating the student as a real account", {
       student: studentLogKey(studentId),
       alert: "wellbeing_demo_check_failed",
       error: errorForLog(err),
     });
-    return false;
-  }
+  });
 }
 
 /**

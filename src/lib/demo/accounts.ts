@@ -25,3 +25,26 @@ export async function isDemoStudentId(studentId: string): Promise<boolean> {
   });
   return Boolean(row?.demoAccount);
 }
+
+/**
+ * The fail-open reading of `isDemoStudentId`, for the two safety fallbacks (the
+ * crisis alert and the teacher nudge). A lookup that throws counts as "not a
+ * demo account" and is handed to `onError` for the caller to log. For a real
+ * student the program-wide fallback is the safe direction, so a doubt about the
+ * demo marker must never narrow it.
+ *
+ * Both callers share this one policy so a change to it (a timeout, a retry)
+ * cannot reach one fallback and skip the other. They differ only in what they
+ * log, which they pass in.
+ */
+export async function isDemoStudentIdOrFalse(
+  studentId: string,
+  onError: (error: unknown) => void,
+): Promise<boolean> {
+  try {
+    return await isDemoStudentId(studentId);
+  } catch (error) {
+    onError(error);
+    return false;
+  }
+}

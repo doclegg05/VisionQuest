@@ -9,7 +9,7 @@ import {
 import { enqueueJobWithCooldown } from "./jobs";
 import { sendNotificationWithCooldown } from "./notifications";
 import { isEmailDeliveryConfigured } from "./email";
-import { isDemoStudentId } from "./demo/accounts";
+import { isDemoStudentIdOrFalse } from "./demo/accounts";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { studentLogKey } from "./log-keys";
@@ -204,7 +204,7 @@ async function deliverTeacherNudges(
 
   // Nobody assigned, or nobody assigned could be written to. Widen, unless
   // this is a demo student, whose nudge must not leave the demo.
-  if (await isDemoStudentOrFalse(studentId)) {
+  if (await isDemoStudent(studentId)) {
     alarmIfUndelivered(assignedDelivered, assigned.length);
     return assignedDelivered;
   }
@@ -235,21 +235,17 @@ function alarmIfUndelivered(delivered: StaffRecipient[], attemptedCount: number)
 }
 
 /**
- * Whether the student is a cohort demo account, with a failed lookup counted
- * as "no": a real student's nudge must still reach somebody, so a doubt about
- * the demo marker never narrows the audience.
+ * Whether the student is a cohort demo account. A failed lookup counts as "no"
+ * (the shared policy in src/lib/demo/accounts.ts) and is logged here.
  */
-async function isDemoStudentOrFalse(studentId: string): Promise<boolean> {
-  try {
-    return await isDemoStudentId(studentId);
-  } catch (err) {
+function isDemoStudent(studentId: string): Promise<boolean> {
+  return isDemoStudentIdOrFalse(studentId, (err) => {
     logger.error("Nudge: demo-account check failed; treating the student as a real account", {
       student: studentLogKey(studentId),
       alert: "intervention_nudge_demo_check_failed",
       error: errorForLog(err),
     });
-    return false;
-  }
+  });
 }
 
 /** The assigned instructors, or [] if resolution returned nothing or threw. */
