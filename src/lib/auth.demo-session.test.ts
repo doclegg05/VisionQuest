@@ -181,6 +181,39 @@ describe("getSession and the demo marker", () => {
     );
   });
 
+  // The proxy fences on the token's claim and handlers read the row, so a
+  // session where the two disagree would be fenced by one and not the other.
+  // getSession refuses it outright. The switch is on in each case, so a null
+  // can only come from the cross-check and not from the switch.
+  it("returns null when the row is demo but the token has no demo claim", async () => {
+    process.env[SWITCH_VARIABLE] = "true";
+    const id = freshId();
+    mockFindUnique.mock.mockImplementation(async () => rowFor(id, { demoAccount: "student" }));
+    sessionCookieValue = signToken(id, "student", 1);
+
+    assert.equal(await getSession(), null);
+  });
+
+  it("returns null when the token claims demo but the row is not demo", async () => {
+    process.env[SWITCH_VARIABLE] = "true";
+    const id = freshId();
+    mockFindUnique.mock.mockImplementation(async () => rowFor(id));
+    sessionCookieValue = signToken(id, "student", 1, { demo: "student" });
+
+    assert.equal(await getSession(), null);
+  });
+
+  it("returns null when the claim and the row name different demo kinds", async () => {
+    process.env[SWITCH_VARIABLE] = "true";
+    const id = freshId();
+    mockFindUnique.mock.mockImplementation(async () =>
+      rowFor(id, { demoAccount: "instructor", role: "teacher" }),
+    );
+    sessionCookieValue = signToken(id, "teacher", 1, { demo: "student" });
+
+    assert.equal(await getSession(), null);
+  });
+
   it("selects demoAccount from the database row", async () => {
     const id = freshId();
     mockFindUnique.mock.mockImplementation(async () => rowFor(id));

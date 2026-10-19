@@ -199,6 +199,9 @@ export async function getSession() {
   // lookup: turning demo mode off must end demo sessions at once, not when a
   // cached row expires.
   if (student.demoAccount && !isCohortDemoEnabled()) return null;
+  // The proxy fences on the token's demo claim and handlers read the row, so
+  // the two must agree in both directions. A real account has neither.
+  if ((claims.demo ?? null) !== (student.demoAccount ?? null)) return null;
   return {
     id: student.id,
     studentId: student.studentId,
