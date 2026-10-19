@@ -81,7 +81,7 @@ For each Grok finding, check that it's real. Then fix it and reply `Fixed in <co
 
 When the verdict is NEEDS BRITT, stop. Tell Britt in plain words what's needed and do nothing to get around it.
 
-If Britt tells you to merge a PR anyway, first tell Britt in one or two plain sentences what is still open, and merge only after Britt confirms.
+If Britt tells you to merge a PR anyway while one of the three conditions above is not met, first tell Britt in one or two plain sentences what is still open, and merge only after Britt confirms. Britt's confirmation is the only exception to those three conditions. It never allows the admin "bypass rules" option or auto-merge.
 
 Until 28 Oct 2026 Greptile and CodeRabbit may also comment. Fix their real findings as before, but Grok's verdict decides the merge.
 
