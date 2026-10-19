@@ -7,6 +7,7 @@ export const DEMO_SIGNIN_NOTE = "This is a demo with made-up students. Pick one 
 export const DEMO_ENTER_STUDENT = "Enter as a student";
 export const DEMO_ENTER_INSTRUCTOR = "Enter as an instructor";
 export const DEMO_CONTINUE_AS_PREFIX = "Continue as";
+export const DEMO_ENTRY_FAILED = "We could not start the demo. Please try again.";
 export const DEMO_LIMIT_NETWORK = "You have started a lot of demo students. Please try again in an hour.";
 export const DEMO_LIMIT_HOURLY = "Many people are trying the demo right now. Please try again in an hour.";
 export const DEMO_LIMIT_DAILY = "The demo is full for today. Please try again tomorrow.";
