@@ -26,3 +26,18 @@ export function assertNotDemoAccount(
     throw forbidden(message ?? DEMO_CREDENTIALS_REFUSAL);
   }
 }
+
+/**
+ * Whose appointment slots a session may see and book: the demo instructor's
+ * ("demo") or every real advisor's ("standard").
+ */
+export type BookingAudience = "demo" | "standard";
+
+/**
+ * Both kinds of demo account share the demo audience, so a demo student only
+ * ever meets the demo instructor, and a real student or staff member never
+ * does. Real people, and every session while demo mode is off, are standard.
+ */
+export function bookingAudienceFor(session: Pick<Session, "demoAccount">): BookingAudience {
+  return session.demoAccount === undefined ? "standard" : "demo";
+}

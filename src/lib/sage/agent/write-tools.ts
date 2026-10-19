@@ -24,6 +24,7 @@ import {
   upsertWorkProfile,
 } from "@/lib/connect/work-profile";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
+import { bookingAudienceFor } from "@/lib/demo/guards";
 import { formatCohortDateTime } from "@/lib/timezone";
 import { isValidUrl } from "@/lib/validation";
 import { normalizePortfolioItemType, PORTFOLIO_ITEM_TYPES } from "@/lib/portfolio";
@@ -758,6 +759,7 @@ const bookAppointment: AgentTool = {
       days: 21,
       maxSlotsPerAdvisor: 100,
       minimumLeadMinutes: 60,
+      audience: bookingAudienceFor(ctx.session),
     });
     const advisor = advisors.find((entry) => entry.advisorId === advisorId);
     const slot = advisor?.slots.find((entry) => entry.startsAt === startsAt);

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiError } from "../api-error";
 import { DEMO_CREDENTIALS_REFUSAL } from "./copy";
-import { assertNotDemoAccount, isDemoInstructor } from "./guards";
+import { assertNotDemoAccount, bookingAudienceFor, isDemoInstructor } from "./guards";
 
 test("isDemoInstructor is true only for the demo instructor", () => {
   assert.equal(isDemoInstructor({ demoAccount: "instructor" }), true);
@@ -34,4 +34,14 @@ test("assertNotDemoAccount uses a caller's own message when given one", () => {
     () => assertNotDemoAccount({ demoAccount: "student" }, "No can do."),
     (error: unknown) => error instanceof ApiError && error.message === "No can do.",
   );
+});
+
+test("bookingAudienceFor puts both kinds of demo account in the demo audience", () => {
+  assert.equal(bookingAudienceFor({ demoAccount: "student" }), "demo");
+  assert.equal(bookingAudienceFor({ demoAccount: "instructor" }), "demo");
+});
+
+test("bookingAudienceFor leaves every real person in the standard audience", () => {
+  assert.equal(bookingAudienceFor({}), "standard");
+  assert.equal(bookingAudienceFor({ demoAccount: undefined }), "standard");
 });

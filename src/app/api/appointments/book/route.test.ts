@@ -369,6 +369,69 @@ describe("POST /api/appointments/book", () => {
     });
   });
 
+  describe("cohort demo: demo accounts book only the demo instructor", () => {
+    const DEMO_STUDENT = mockStudentSession({
+      id: "stu-demo-001",
+      studentId: "demostudent",
+      demoAccount: "student",
+    });
+    const DEMO_ADVISOR = {
+      advisorId: "tch-demo-001",
+      advisorName: "Demo Instructor",
+      slots: [SLOT],
+    };
+
+    // Stands in for listBookableAdvisors' audience filter: the demo audience
+    // is offered the demo instructor, everyone else the real advisor.
+    function audienceOf(args: unknown): string | undefined {
+      return (args as { audience?: string } | undefined)?.audience;
+    }
+
+    beforeEach(() => {
+      mockListBookableAdvisors.mock.mockImplementation(async (args) =>
+        audienceOf(args) === "demo" ? [DEMO_ADVISOR] : [ADVISOR],
+      );
+    });
+
+    it("refuses a demo student booking a real advisor's slot", async () => {
+      const result = await post(DEMO_STUDENT, { advisorId: ADVISOR.advisorId });
+
+      assert.equal(result.status, 409);
+      assert.equal(result.body.error, "That time slot is no longer available.");
+      assert.equal(mockAppointmentCreate.mock.callCount(), 0);
+      assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
+      assert.equal(mockSendAppointmentConfirmation.mock.callCount(), 0);
+    });
+
+    it("lets a demo student book the demo instructor", async () => {
+      const result = await post(DEMO_STUDENT, { advisorId: DEMO_ADVISOR.advisorId });
+
+      assert.equal(result.status, 201);
+      assert.equal(mockAppointmentCreate.mock.callCount(), 1);
+      const { data } = mockAppointmentCreate.mock.calls[0].arguments[0];
+      assert.equal(data.studentId, DEMO_STUDENT.id);
+      assert.equal(data.advisorId, DEMO_ADVISOR.advisorId);
+    });
+
+    it("refuses a real student booking the demo instructor's slot", async () => {
+      const result = await post(STUDENT_A, { advisorId: DEMO_ADVISOR.advisorId });
+
+      assert.equal(result.status, 409);
+      assert.equal(result.body.error, "That time slot is no longer available.");
+      assert.equal(mockAppointmentCreate.mock.callCount(), 0);
+    });
+
+    it("reads the open slots for the session's own audience", async () => {
+      await post(DEMO_STUDENT, { advisorId: DEMO_ADVISOR.advisorId });
+      await post(STUDENT_A);
+
+      assert.deepEqual(
+        mockListBookableAdvisors.mock.calls.map((call) => audienceOf(call.arguments[0])),
+        ["demo", "standard"],
+      );
+    });
+  });
+
   describe("happy path", () => {
     it("writes first, then alerts, audit, confirmation, and returns 201 with the appointment", async () => {
       const result = await post(STUDENT_A, { title: "Resume review", description: "Bring my draft" });
