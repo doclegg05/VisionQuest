@@ -1,9 +1,19 @@
 import { prisma } from "./db";
-import { getCertificationProgress } from "./certifications";
+import {
+  getCertificationProgress,
+  READY_TO_WORK_CERT_TYPE,
+  READY_TO_WORK_FAMILY_CERT_TYPES,
+} from "./certifications";
 
 async function getTemplates(certType: string) {
+  // Every Ready-to-Work family row (e.g. "workkeys-ncrc", created by the D7
+  // certId path) shares the one checklist stored under "ready-to-work";
+  // no templates exist under the other family labels.
+  const templateCertType = READY_TO_WORK_FAMILY_CERT_TYPES.includes(certType)
+    ? READY_TO_WORK_CERT_TYPE
+    : certType;
   return prisma.certTemplate.findMany({
-    where: { certType },
+    where: { certType: templateCertType },
     select: {
       id: true,
       required: true,
