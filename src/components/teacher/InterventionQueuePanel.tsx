@@ -603,7 +603,7 @@ export default function InterventionQueuePanel({
               role="alert"
               className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2"
             >
-              <p className="text-sm text-[var(--error)]">
+              <p className="text-sm text-danger">
                 Could not refresh the queue. The list below may be out of date.
               </p>
               <button
