@@ -99,7 +99,12 @@ export const FORMS: SpokesForm[] = [
     required: true,
     audience: "student",
     acceptsSubmission: true,
-    requiresSignature: false,
+    // Signature line on the paper original (owner-confirmed 2026-07-24). The
+    // wizard still completes this in-browser as a `profile-form` step, so the
+    // flag drives the print packet's "(sign)" marking, what Sage reports, and
+    // the /api/forms/sign allowlist — not a SignaturePad step. See the
+    // `student-profile` special cases in orientation-step-resources.ts.
+    requiresSignature: true,
     sortOrder: 3,
   },
   {
@@ -275,8 +280,13 @@ export const FORMS: SpokesForm[] = [
     fillable: false,
     required: true,
     audience: "student",
+    // Read-and-sign on the paper original. The notice is not fillable, so
+    // acceptsSubmission stays false: /api/forms/sign creates the
+    // FormSubmission, with no separate upload. STEP_DEFINITIONS in
+    // orientation-step-resources.ts lists it under "Review Rights and
+    // Responsibilities", so that item needs both signatures to complete.
     acceptsSubmission: false,
-    requiresSignature: false,
+    requiresSignature: true,
     sortOrder: 14,
   },
   {

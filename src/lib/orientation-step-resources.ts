@@ -48,7 +48,10 @@ const STEP_DEFINITIONS: OrientationStepDefinition[] = [
       "rights and responsibilities",
       "student rights and responsibilities",
     ],
-    formIds: ["rights-responsibilities"],
+    // The Non-Discrimination Notice is signed in this step too (owner call,
+    // 2026-10-19). The seeded checklist has no item of its own for it, so
+    // without this mapping no wizard step asks for its signature.
+    formIds: ["rights-responsibilities", "non-discrimination"],
   },
   {
     aliases: [

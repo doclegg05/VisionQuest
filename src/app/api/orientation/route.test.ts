@@ -119,9 +119,21 @@ describe("POST /api/orientation (signature guard)", () => {
     assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
   });
 
-  it("allows the student once the required signature is on file", async () => {
+  it("rejects the student when only the Rights form is signed and the Non-Discrimination Notice is not", async () => {
     mockSubmissionFindMany.mock.mockImplementation(async () => [
       { formId: "rights-responsibilities" },
+    ]);
+
+    const res = await route.POST(toggleRequest({ itemId: ITEM_ID, completed: true }));
+
+    assert.equal(res.status, 400);
+    assert.equal(mockProgressUpsert.mock.callCount(), 0);
+  });
+
+  it("allows the student once the required signatures are on file", async () => {
+    mockSubmissionFindMany.mock.mockImplementation(async () => [
+      { formId: "rights-responsibilities" },
+      { formId: "non-discrimination" },
     ]);
 
     const res = await route.POST(toggleRequest({ itemId: ITEM_ID, completed: true }));
