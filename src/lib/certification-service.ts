@@ -97,8 +97,14 @@ export async function recomputeCertificationStatus(certificationId: string, cert
 }
 
 export async function recomputeCertificationStatusesForType(certType: string) {
+  // The teacher template routes pass "ready-to-work", the only certType that
+  // holds templates. Every family row holds that checklist, so a change to it
+  // recomputes the whole family.
   const certifications = await prisma.certification.findMany({
-    where: { certType },
+    where: {
+      certType:
+        certType === READY_TO_WORK_CERT_TYPE ? { in: [...READY_TO_WORK_FAMILY_CERT_TYPES] } : certType,
+    },
     select: { id: true },
   });
 
