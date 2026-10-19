@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { renderToString } from "react-dom/server";
+import ChatInput from "@/components/chat/ChatInput";
+import { DEMO_PRIVACY_NOTICE } from "@/lib/demo/copy";
 import { SECURITY_QUESTIONS } from "@/lib/security-questions";
 
 // The student layout is the recovery-question gate. These cases pin who it
@@ -88,5 +91,30 @@ describe("student layout recovery gate", () => {
     session = null;
 
     assert.equal(await redirectTarget(), "/");
+  });
+});
+
+// The layout is where a demo student's account kind reaches the client tree.
+// Rendering a real ChatInput as the layout's child proves the whole chain:
+// session -> provider value -> useDemoAccount -> notice.
+describe("student layout demo privacy notice", () => {
+  beforeEach(() => {
+    session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
+    questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+  });
+
+  async function renderLayoutWithChatInput(): Promise<string> {
+    const tree = await Layout({ children: <ChatInput onSend={() => {}} /> });
+    return renderToString(tree);
+  }
+
+  it("warns a demo student next to the message box", async () => {
+    session = { ...session!, demoAccount: "student" };
+
+    assert.ok((await renderLayoutWithChatInput()).includes(DEMO_PRIVACY_NOTICE));
+  });
+
+  it("shows a real student no notice", async () => {
+    assert.ok(!(await renderLayoutWithChatInput()).includes(DEMO_PRIVACY_NOTICE));
   });
 });

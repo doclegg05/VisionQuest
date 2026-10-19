@@ -4,6 +4,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Command, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
 import { CommandPalette } from "./CommandPalette";
+import { useDemoAccount } from "@/components/demo/DemoAccountContext";
+import { DemoPrivacyNotice } from "@/components/demo/DemoPrivacyNotice";
 import { type ChatRole, type SlashCommand } from "@/lib/chat/commands";
 
 interface ChatInputProps {
@@ -26,6 +28,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
   const prevDisabledRef = useRef(disabled);
   const commandListboxId = useId();
   const reduce = useReducedMotion();
+  const demoAccount = useDemoAccount();
 
   useEffect(() => {
     if (prevDisabledRef.current && !disabled) {
@@ -338,6 +341,11 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
             </motion.button>
           </div>
         </div>
+        {demoAccount === "student" && (
+          <div className="mt-2 px-1">
+            <DemoPrivacyNotice />
+          </div>
+        )}
       </div>
     </div>
   );

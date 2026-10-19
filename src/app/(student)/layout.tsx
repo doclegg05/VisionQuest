@@ -10,6 +10,7 @@ import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import ProgressionProvider from "@/components/progression/ProgressionProvider";
 import { PageTransition } from "@/components/ui/PageTransition";
+import { DemoAccountProvider } from "@/components/demo/DemoAccountContext";
 
 export default async function StudentLayout({
   children,
@@ -56,21 +57,25 @@ export default async function StudentLayout({
     orientationComplete: progState.orientationComplete || false,
   });
 
+  // NavBar renders the Sage mini chat, so the provider wraps the whole frame,
+  // not only the page children. Real accounts pass null.
   return (
-    <NotificationProvider>
-      <div className="app-frame min-h-screen">
-        <NavBar studentName={session.displayName} role={session.role} navPhase={navPhase} orientationComplete={progState.orientationComplete || false} />
-        <ProgressionProvider>
-          <main
-            id="main-content"
-            className="app-main min-h-screen overflow-y-auto pb-28 pt-20 md:ml-[19rem] md:pb-10 md:pr-5 md:pt-5"
-          >
-            <PageTransition>
-              {children}
-            </PageTransition>
-          </main>
-        </ProgressionProvider>
-      </div>
-    </NotificationProvider>
+    <DemoAccountProvider value={session.demoAccount ?? null}>
+      <NotificationProvider>
+        <div className="app-frame min-h-screen">
+          <NavBar studentName={session.displayName} role={session.role} navPhase={navPhase} orientationComplete={progState.orientationComplete || false} />
+          <ProgressionProvider>
+            <main
+              id="main-content"
+              className="app-main min-h-screen overflow-y-auto pb-28 pt-20 md:ml-[19rem] md:pb-10 md:pr-5 md:pt-5"
+            >
+              <PageTransition>
+                {children}
+              </PageTransition>
+            </main>
+          </ProgressionProvider>
+        </div>
+      </NotificationProvider>
+    </DemoAccountProvider>
   );
 }
