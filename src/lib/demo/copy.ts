@@ -4,14 +4,16 @@
  * it all in one place.
  */
 export const DEMO_SIGNIN_NOTE = "This is a demo with made-up students. Pick one to look around.";
-export const DEMO_ENTER_STUDENT = "Enter as a student";
-export const DEMO_ENTER_INSTRUCTOR = "Enter as an instructor";
+export const DEMO_ENTER_STUDENT = "Try the demo as a student";
+export const DEMO_ENTER_INSTRUCTOR = "Try the demo as an instructor";
 export const DEMO_CONTINUE_AS_PREFIX = "Continue as";
 export const DEMO_ENTRY_FAILED = "We could not start the demo. Please try again.";
-export const DEMO_LIMIT_NETWORK = "You have started a lot of demo students. Please try again in an hour.";
+export const DEMO_ENTRY_PENDING = "Starting the demo...";
+export const DEMO_ENTRY_OFFLINE = "We couldn't reach VisionQuest. Check your internet and try again.";
+export const DEMO_LIMIT_NETWORK = "Too many demo students were started from this network. Please try again in an hour.";
 export const DEMO_LIMIT_HOURLY = "Many people are trying the demo right now. Please try again in an hour.";
 export const DEMO_LIMIT_DAILY = "The demo is full for today. Please try again tomorrow.";
-export const DEMO_LIMIT_INSTRUCTOR = "You have signed in a lot. Please try again in a few minutes.";
+export const DEMO_LIMIT_INSTRUCTOR = "Too many instructor sign-ins just now. Please wait a few minutes and try again.";
 export const DEMO_READ_ONLY_REFUSAL = "This is a demo, so you can't change this here.";
 export const DEMO_CREDENTIALS_REFUSAL = "Demo accounts can't change sign-in settings.";
 export const DEMO_NO_SEND_REFUSAL = "This is a demo, so VisionQuest doesn't send messages.";

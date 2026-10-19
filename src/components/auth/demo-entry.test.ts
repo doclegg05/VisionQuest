@@ -1,8 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { DEMO_ENTRY_FAILED } from "@/lib/demo/copy";
-import { continueTargetFor, entryOutcomeFor } from "./demo-entry";
+import { DEMO_ACCOUNT_KINDS } from "@/lib/demo/config";
+import { DEMO_ENTRY_FAILED, DEMO_ENTRY_OFFLINE, DEMO_ENTRY_PENDING } from "@/lib/demo/copy";
+import {
+  announcementFor,
+  continueTargetFor,
+  entryButtonViewFor,
+  entryOutcomeFor,
+  offlineOutcome,
+} from "./demo-entry";
 
 /** What GET /api/auth/session answers for a live session. */
 function sessionBody(overrides: Record<string, unknown>) {
@@ -127,5 +134,108 @@ describe("entryOutcomeFor", () => {
         `expected no navigation for ${JSON.stringify(body)}`,
       );
     }
+  });
+
+  it("does not navigate when a tab, line feed or carriage return hides a second slash", () => {
+    // The WHATWG URL parser deletes tab, LF and CR before it reads the path, so
+    // "/\t/evil.example" resolves to https://evil.example/ and router.push
+    // would leave the site. A pattern that only looks at the second character
+    // lets all three through.
+    const hidden: unknown[] = [
+      { redirectTo: "/\t/evil.example" },
+      { redirectTo: "/\n/evil.example" },
+      { redirectTo: "/\r/evil.example" },
+      { redirectTo: "/\t\\evil.example" },
+      { redirectTo: "/\r\n/evil.example" },
+      { redirectTo: "/dashboard\t" },
+      { redirectTo: "/dash\nboard" },
+    ];
+    for (const body of hidden) {
+      assert.deepEqual(
+        entryOutcomeFor(true, body),
+        { kind: "refused", message: DEMO_ENTRY_FAILED },
+        `expected no navigation for ${JSON.stringify(body)}`,
+      );
+    }
+  });
+
+  it("only follows the landing pages it knows, not any page on the site", () => {
+    const elsewhere: unknown[] = [
+      { redirectTo: "/settings" },
+      { redirectTo: "/admin" },
+      { redirectTo: "/dashboard/" },
+      { redirectTo: "/dashboard?next=//evil.example" },
+      { redirectTo: "/dashboard#top" },
+      { redirectTo: " /dashboard" },
+      { redirectTo: "/Dashboard" },
+      { redirectTo: "/teacher/students" },
+    ];
+    for (const body of elsewhere) {
+      assert.deepEqual(
+        entryOutcomeFor(true, body),
+        { kind: "refused", message: DEMO_ENTRY_FAILED },
+        `expected no navigation for ${JSON.stringify(body)}`,
+      );
+    }
+  });
+
+  it("follows the landing page of every kind of demo account", () => {
+    // The allowed pages and the Continue as links come from one record, so a new
+    // kind of account cannot gain a link that the entry buttons would refuse.
+    for (const kind of DEMO_ACCOUNT_KINDS) {
+      const target = continueTargetFor(sessionBody({ demoAccount: kind }));
+      assert.ok(target, `expected a Continue as link for ${kind}`);
+      assert.deepEqual(entryOutcomeFor(true, { redirectTo: target.href }), {
+        kind: "enter",
+        redirectTo: target.href,
+      });
+    }
+  });
+});
+
+describe("offlineOutcome", () => {
+  it("tells the visitor to check their internet, which is not the unknown-reply message", () => {
+    assert.deepEqual(offlineOutcome(), { kind: "refused", message: DEMO_ENTRY_OFFLINE });
+    assert.equal(DEMO_ENTRY_OFFLINE, "We couldn't reach VisionQuest. Check your internet and try again.");
+    assert.notEqual(DEMO_ENTRY_OFFLINE, DEMO_ENTRY_FAILED);
+  });
+});
+
+describe("entryButtonViewFor", () => {
+  const STUDENT = "/api/demo/student";
+  const INSTRUCTOR = "/api/demo/instructor";
+
+  it("leaves both buttons on their own labels and enabled when nothing is running", () => {
+    assert.deepEqual(entryButtonViewFor(null, STUDENT, "Try as a student"), {
+      label: "Try as a student",
+      disabled: false,
+    });
+    assert.deepEqual(entryButtonViewFor(null, INSTRUCTOR, "Try as an instructor"), {
+      label: "Try as an instructor",
+      disabled: false,
+    });
+  });
+
+  it("shows the pressed button as starting, and disables it", () => {
+    assert.deepEqual(entryButtonViewFor(STUDENT, STUDENT, "Try as a student"), {
+      label: DEMO_ENTRY_PENDING,
+      disabled: true,
+    });
+  });
+
+  it("keeps the other button on its own label but disabled", () => {
+    assert.deepEqual(entryButtonViewFor(STUDENT, INSTRUCTOR, "Try as an instructor"), {
+      label: "Try as an instructor",
+      disabled: true,
+    });
+  });
+});
+
+describe("announcementFor", () => {
+  it("announces the same words the pressed button shows, and nothing when idle", () => {
+    assert.equal(announcementFor("/api/demo/student"), DEMO_ENTRY_PENDING);
+    assert.equal(announcementFor("/api/demo/instructor"), DEMO_ENTRY_PENDING);
+    assert.equal(announcementFor(null), "");
+    assert.equal(DEMO_ENTRY_PENDING, "Starting the demo...");
   });
 });
