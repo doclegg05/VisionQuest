@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding covers Prisma methods with different signatures. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
+import { ApiError } from "@/lib/api-error";
+import { DEMO_NO_SEND_REFUSAL } from "@/lib/demo/copy";
 
 /**
  * `sendConnection` is the gate between this program and the outside world.
@@ -22,6 +24,10 @@ const state = {
   employerStatus: "active" as string,
   leadStatus: "open" as string,
   emailConfigured: true,
+  /** The student's demo marker as the admin client reads it: null for a real person. */
+  demoAccount: null as string | null,
+  /** Make the demo-marker lookup throw. */
+  demoLookupThrows: false,
   /** Make sendEmail throw, to exercise the claim -> fail -> rollback path. */
   emailThrows: false,
   /** Rows the guarded rollback updateMany reports as changed. */
@@ -81,6 +87,7 @@ const mockConnectionFindUnique = mock.fn(async () => ({
 const rollbackUpdates: Array<Record<string, unknown>> = [];
 const compensatingEvents: Array<Record<string, unknown>> = [];
 const refunds: Array<{ key: string; resetTime: number }> = [];
+const demoLookups: Array<unknown> = [];
 
 const mockConnectionUpdateMany = mock.fn(async (args: any) => {
   rollbackUpdates.push(args);
@@ -131,6 +138,14 @@ mock.module("@/lib/db", {
       outboundMessage: {
         get count() {
           return mockOutboundCount;
+        },
+      },
+      // The demo-account check (src/lib/demo/accounts.ts) reads one column here.
+      student: {
+        findUnique: async (args: unknown) => {
+          demoLookups.push(args);
+          if (state.demoLookupThrows) throw new Error("lookup down");
+          return { demoAccount: state.demoAccount };
         },
       },
     },
@@ -232,6 +247,8 @@ beforeEach(() => {
   state.employerStatus = "active";
   state.leadStatus = "open";
   state.emailConfigured = true;
+  state.demoAccount = null;
+  state.demoLookupThrows = false;
   state.emailThrows = false;
   state.rollbackCount = 1;
   state.contact = {
@@ -248,6 +265,7 @@ beforeEach(() => {
   rollbackUpdates.length = 0;
   compensatingEvents.length = 0;
   refunds.length = 0;
+  demoLookups.length = 0;
   // Call counts are cumulative across tests otherwise, which turns "this never
   // ran" into "this ran eight times in earlier cases".
   mockOutboundCount.mock.resetCalls();
@@ -479,5 +497,64 @@ describe("sendConnection — what may never leave the program", () => {
       const serialized = JSON.stringify(line);
       assert.ok(!/tokenHash|employerTokenHash/.test(serialized), line.message);
     }
+  });
+});
+
+describe("sendConnection for a demo student", () => {
+  it("refuses to send for a demo student before claiming", async () => {
+    state.demoAccount = "student";
+
+    await assert.rejects(
+      () => sendConnection("conn-1", OPTIONS),
+      (error: unknown) =>
+        error instanceof ApiError &&
+        error.statusCode === 403 &&
+        error.code === "FORBIDDEN" &&
+        error.message === DEMO_NO_SEND_REFUSAL,
+    );
+
+    assert.equal(sentEmails.length, 0, "no packet went out");
+    assert.equal(transitions.length, 0, "the connection was not claimed");
+    assert.equal(outboundRows.length, 0, "no outbound message was recorded");
+    assert.equal(mockOutboundCount.mock.callCount(), 0, "the weekly limiter was never reached");
+    assert.equal(refunds.length, 0, "no slot was taken and given back");
+    assert.equal(mockConnectionUpdateMany.mock.callCount(), 0);
+  });
+
+  it("gives the demo refusal even when email is not set up", async () => {
+    state.demoAccount = "student";
+    state.emailConfigured = false;
+
+    await assert.rejects(
+      () => sendConnection("conn-1", OPTIONS),
+      (error: unknown) => error instanceof ApiError && error.message === DEMO_NO_SEND_REFUSAL,
+    );
+  });
+
+  it("looks the demo marker up by the connection's student, nothing else", async () => {
+    await sendConnection("conn-1", OPTIONS);
+
+    assert.deepEqual(demoLookups, [
+      { where: { id: STUDENT_ID }, select: { demoAccount: true } },
+    ]);
+  });
+
+  it("still sends for a real student", async () => {
+    state.demoAccount = null;
+
+    const result = await sendConnection("conn-1", OPTIONS);
+
+    assert.equal(sentEmails.length, 1);
+    assert.equal(result.contactName, "Pat Buyer");
+    assert.equal(transitions[0].to, "sent");
+  });
+
+  it("does not guess when the demo lookup fails: nothing is sent", async () => {
+    // Unlike the crisis path, an employer packet has no safety reason to go out
+    // on a doubt, so a failed lookup stops the send.
+    state.demoLookupThrows = true;
+    await assert.rejects(() => sendConnection("conn-1", OPTIONS), /lookup down/);
+    assert.equal(sentEmails.length, 0);
+    assert.equal(transitions.length, 0);
   });
 });

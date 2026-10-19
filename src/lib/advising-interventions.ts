@@ -9,6 +9,7 @@ import {
 import { enqueueJobWithCooldown } from "./jobs";
 import { sendNotificationWithCooldown } from "./notifications";
 import { isEmailDeliveryConfigured } from "./email";
+import { isDemoStudentId } from "./demo/accounts";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { studentLogKey } from "./log-keys";
@@ -172,6 +173,13 @@ export async function syncInterventionNotifications({
  * teacher. Only staff identities are read; the student's own nudge stays on
  * the app client.
  *
+ * Cohort demo mode is the one exception to the widening. A demo student's
+ * nudge names a made-up student, and the program-wide fallback would put it in
+ * real teachers' inboxes, so a demo student is never widened: the nudge stays
+ * with whoever is assigned (the demo instructor, who has no email address). A
+ * real student is never narrowed by this, including when the demo lookup
+ * fails.
+ *
  * The structured log names the branch that fired and carries counts. The
  * failure line carries `studentLogKey(studentId)` — a one-way correlation
  * key, never the raw id — because a broken lookup is worth tracing back to
@@ -184,38 +192,64 @@ async function deliverTeacherNudges(
 ): Promise<StaffRecipient[]> {
   const assigned = await resolveAssignedInstructors(studentId);
 
-  let attempted = assigned;
-  let delivered = await sendToAll(assigned, teacherSpecs);
+  const assignedDelivered = await sendToAll(assigned, teacherSpecs);
 
-  if (delivered.length > 0) {
+  if (assignedDelivered.length > 0) {
     logger.debug("Nudge: delivered to assigned instructors", {
       alert: "intervention_nudge_assigned_instructors",
-      recipientCount: delivered.length,
+      recipientCount: assignedDelivered.length,
     });
-    return delivered;
+    return assignedDelivered;
   }
 
-  // Nobody assigned, or nobody assigned could be written to. Widen.
+  // Nobody assigned, or nobody assigned could be written to. Widen, unless
+  // this is a demo student, whose nudge must not leave the demo.
+  if (await isDemoStudentOrFalse(studentId)) {
+    alarmIfUndelivered(assignedDelivered, assigned.length);
+    return assignedDelivered;
+  }
+
   const everyone = await listActiveTeachers();
   logger.warn("Nudge: no assigned instructor received it; delivering program-wide", {
     alert: "intervention_nudge_fallback_program_wide",
     recipientCount: everyone.length,
   });
-  attempted = everyone;
-  delivered = await sendToAll(everyone, teacherSpecs);
-
-  if (delivered.length === 0) {
-    // The nudge reached nobody. Same shape and same reason as
-    // `wellbeing_no_recipients`: this is the line that fires when
-    // ADMIN_DATABASE_URL is unset and prismaAdmin has silently degraded to
-    // vq_app, and it must never be quiet.
-    logger.error("Nudge: no staff recipients received it; nobody was notified", {
-      alert: "intervention_nudge_no_recipients",
-      attemptedCount: attempted.length,
-    });
-  }
+  const delivered = await sendToAll(everyone, teacherSpecs);
+  alarmIfUndelivered(delivered, everyone.length);
 
   return delivered;
+}
+
+/**
+ * The nudge reached nobody. Same shape and same reason as
+ * `wellbeing_no_recipients`: this is the line that fires when
+ * ADMIN_DATABASE_URL is unset and prismaAdmin has silently degraded to
+ * vq_app, and it must never be quiet.
+ */
+function alarmIfUndelivered(delivered: StaffRecipient[], attemptedCount: number): void {
+  if (delivered.length > 0) return;
+  logger.error("Nudge: no staff recipients received it; nobody was notified", {
+    alert: "intervention_nudge_no_recipients",
+    attemptedCount,
+  });
+}
+
+/**
+ * Whether the student is a cohort demo account, with a failed lookup counted
+ * as "no": a real student's nudge must still reach somebody, so a doubt about
+ * the demo marker never narrows the audience.
+ */
+async function isDemoStudentOrFalse(studentId: string): Promise<boolean> {
+  try {
+    return await isDemoStudentId(studentId);
+  } catch (err) {
+    logger.error("Nudge: demo-account check failed; treating the student as a real account", {
+      student: studentLogKey(studentId),
+      alert: "intervention_nudge_demo_check_failed",
+      error: errorForLog(err),
+    });
+    return false;
+  }
 }
 
 /** The assigned instructors, or [] if resolution returned nothing or threw. */

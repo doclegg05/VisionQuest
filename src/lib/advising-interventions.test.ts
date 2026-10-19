@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is intentionally loose across the shared prisma + notification mocks. */
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
 // ---------------------------------------------------------------------------
 // syncInterventionNotifications runs inside whichever RLS context the calling
@@ -14,6 +14,9 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 // ---------------------------------------------------------------------------
 
 const mockAdminStudentFindMany = mock.fn() as any; // prismaAdmin.student.findMany
+// prismaAdmin.student.findUnique: the demo-account check (src/lib/demo/accounts.ts).
+// Real people have a null marker; the demo describe below overrides it per case.
+const mockAdminStudentFindUnique = mock.fn(async () => ({ demoAccount: null })) as any;
 const mockAdminEnrollmentFindMany = mock.fn() as any; // prismaAdmin.studentClassEnrollment.findMany
 const mockAppStudentFindMany = mock.fn() as any; // prisma.student.findMany
 const mockAppEnrollmentFindMany = mock.fn() as any; // prisma.studentClassEnrollment.findMany
@@ -30,7 +33,7 @@ mock.module("./db", {
       studentClassEnrollment: { findMany: mockAppEnrollmentFindMany },
     },
     prismaAdmin: {
-      student: { findMany: mockAdminStudentFindMany },
+      student: { findMany: mockAdminStudentFindMany, findUnique: mockAdminStudentFindUnique },
       studentClassEnrollment: { findMany: mockAdminEnrollmentFindMany },
     },
   },
@@ -593,5 +596,167 @@ describe("syncInterventionNotifications delivery accounting (W2)", () => {
       ).length,
       0,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cohort demo mode: a demo student's nudge stays inside the demo. The
+// program-wide teacher fallback is the one path that would carry a demo
+// student's name to a real teacher's inbox, so it never runs for a demo
+// student. Real students keep the fallback, and a failed demo lookup counts as
+// "not a demo account": a real student's nudge must still reach somebody.
+// ---------------------------------------------------------------------------
+describe("syncInterventionNotifications for a demo student", () => {
+  const DEMO_INSTRUCTOR_ENROLLMENT = {
+    class: {
+      status: "active",
+      instructors: [
+        instructorLink({
+          id: "demo-instructor",
+          email: null,
+          displayName: "Demo Instructor",
+        }),
+      ],
+    },
+  };
+
+  function teacherEmailRecipients(): string[] {
+    return mockEnqueueJob.mock.calls
+      .filter((call: any) => String(call.arguments[0].dedupeKey).startsWith("teacher-nudge:"))
+      .map((call: any) => call.arguments[0].payload.to);
+  }
+
+  function logsFor(mock: any, alert: string) {
+    return mock.mock.calls.filter((call: any) => call.arguments[1]?.alert === alert);
+  }
+
+  beforeEach(() => {
+    for (const m of [
+      mockAdminStudentFindMany,
+      mockAdminStudentFindUnique,
+      mockAdminEnrollmentFindMany,
+      mockAppStudentFindMany,
+      mockAppEnrollmentFindMany,
+      mockSendNotification,
+      mockEnqueueJob,
+      mockLogWarn,
+      mockLogError,
+      mockLogDebug,
+    ]) {
+      m.mock.resetCalls();
+    }
+    mockAdminStudentFindMany.mock.mockImplementation(async () => TEACHERS);
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ demoAccount: "student" }));
+    mockAdminEnrollmentFindMany.mock.mockImplementation(async () => []);
+    mockAppStudentFindMany.mock.mockImplementation(async () => []);
+    mockAppEnrollmentFindMany.mock.mockImplementation(async () => []);
+    mockSendNotification.mock.mockImplementation(async () => true);
+    mockEnqueueJob.mock.mockImplementation(async () => null);
+    for (const m of [mockLogWarn, mockLogError, mockLogDebug]) {
+      m.mock.mockImplementation(() => undefined);
+    }
+    mockEmailEnabled = true;
+  });
+
+  afterEach(() => {
+    mockEmailEnabled = false;
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ demoAccount: null }));
+  });
+
+  it("never widens a demo student's nudge to all teachers", async () => {
+    await runSync();
+
+    assert.equal(mockAdminStudentFindMany.mock.callCount(), 0, "no program-wide teacher query");
+    for (const teacher of TEACHERS) {
+      assert.equal(callsFor(teacher.id).length, 0, `${teacher.id} is not nudged`);
+    }
+    assert.deepEqual(teacherEmailRecipients(), [], "no teacher-nudge email is queued");
+    assert.equal(
+      logsFor(mockLogWarn, "intervention_nudge_fallback_program_wide").length,
+      0,
+      "the program-wide branch did not fire",
+    );
+  });
+
+  it("never widens when the instructor lookup throws either", async () => {
+    mockAdminEnrollmentFindMany.mock.mockImplementation(async () => {
+      throw new Error("Inconsistent query result: Field instructor is required to return data");
+    });
+
+    await runSync();
+
+    assert.equal(mockAdminStudentFindMany.mock.callCount(), 0, "no program-wide teacher query");
+    for (const teacher of TEACHERS) {
+      assert.equal(callsFor(teacher.id).length, 0, `${teacher.id} is not nudged`);
+    }
+    assert.deepEqual(teacherEmailRecipients(), []);
+  });
+
+  it("asks the demo question of the admin client, by the student's id", async () => {
+    await runSync();
+
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 1);
+    assert.deepEqual(mockAdminStudentFindUnique.mock.calls[0].arguments[0], {
+      where: { id: "student-1" },
+      select: { demoAccount: true },
+    });
+  });
+
+  it("keeps the no-recipients alarm when nobody could be told, with no student field", async () => {
+    await runSync();
+
+    const alarms = logsFor(mockLogError, "intervention_nudge_no_recipients");
+    assert.equal(alarms.length, 1, "a nudge nobody received is never quiet");
+    assert.equal(alarms[0].arguments[1].attemptedCount, 0);
+    assertNoStudentIdentifier(alarms[0].arguments[1]);
+  });
+
+  it("still nudges the demo instructor in the app, and queues no email for them", async () => {
+    mockAdminEnrollmentFindMany.mock.mockImplementation(async () => [DEMO_INSTRUCTOR_ENROLLMENT]);
+
+    await runSync();
+
+    assert.equal(callsFor("demo-instructor").length, 1);
+    assert.deepEqual(teacherEmailRecipients(), [], "the demo instructor has no email address");
+    assert.equal(mockAdminStudentFindMany.mock.callCount(), 0);
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 0, "no extra read on the usual path");
+  });
+
+  it("still widens a real student with no assigned instructor to all active teachers", async () => {
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ demoAccount: null }));
+
+    await runSync();
+
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 1, "the demo check ran");
+    for (const teacher of TEACHERS) {
+      assert.equal(callsFor(teacher.id).length, 1, `fallback nudges ${teacher.id}`);
+    }
+    assert.deepEqual(teacherEmailRecipients().sort(), ["nine@example.test", "one@example.test"]);
+  });
+
+  it("still widens when the student row cannot be found for the demo check", async () => {
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => null);
+
+    await runSync();
+
+    for (const teacher of TEACHERS) {
+      assert.equal(callsFor(teacher.id).length, 1, `fallback nudges ${teacher.id}`);
+    }
+  });
+
+  it("still widens when the demo check itself fails, and says so without the raw id", async () => {
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => {
+      throw new Error("demo lookup down");
+    });
+
+    await runSync();
+
+    for (const teacher of TEACHERS) {
+      assert.equal(callsFor(teacher.id).length, 1, `fallback nudges ${teacher.id}`);
+    }
+    const failures = logsFor(mockLogError, "intervention_nudge_demo_check_failed");
+    assert.equal(failures.length, 1, "a failed demo check is loud, not silent");
+    assert.match(failures[0].arguments[1].student, /^stu_[0-9a-f]{12}$/);
+    assert.ok(!JSON.stringify(failures[0].arguments).includes("student-1"));
   });
 });

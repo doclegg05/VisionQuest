@@ -16,8 +16,11 @@
 
 import { Prisma } from "@prisma/client";
 
+import { forbidden } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma, prismaAdmin } from "@/lib/db";
+import { DEMO_NO_SEND_REFUSAL } from "@/lib/demo/copy";
+import { isDemoStudentId } from "@/lib/demo/accounts";
 import { sendEmail, isEmailDeliveryConfigured } from "@/lib/email";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
@@ -804,6 +807,17 @@ export async function sendConnection(
 
   const packet = parsePacket(connection.packet);
   if (!packet) throw new ConnectionError("That connection has nothing to send yet.");
+
+  // Cohort demo mode: a demo student's packet never leaves the program. The
+  // address is whatever a teacher typed, so it could be a real employer's.
+  // Like the email-config check below, this is BEFORE the limiter and before
+  // the claim, so a refusal spends no weekly slot and changes no state. It is
+  // also before the config check, so a demo deployment with no mail set up
+  // still says why. A failed lookup stops the send: an employer packet has no
+  // reason to go out on a doubt.
+  if (await isDemoStudentId(connection.studentId)) {
+    throw forbidden(DEMO_NO_SEND_REFUSAL);
+  }
 
   // BEFORE the limiter, not after.
   //

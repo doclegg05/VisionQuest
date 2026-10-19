@@ -13,6 +13,7 @@ import {
 } from "./wellbeing-card";
 import { studentLogKey } from "@/lib/log-keys";
 import { findAssignedInstructors, listActiveTeachers, type StaffRecipient } from "@/lib/staff-recipients";
+import { isDemoStudentId } from "@/lib/demo/accounts";
 
 /**
  * Wellbeing / crisis safety-net.
@@ -1053,6 +1054,11 @@ function reasonText(reason: WellbeingReason): string {
  * sensitive signal in the system isn't over-disclosed program-wide, but zero
  * resolved instructors OR any resolution failure falls back to every active
  * teacher — over-notifying is the safe failure mode.
+ *
+ * The one exception is a cohort demo account (src/lib/demo/accounts.ts). Its
+ * alert never widens to real teachers: it reaches whoever is assigned to the
+ * demo student, which is the demo instructor, who has no email address. A real
+ * student is never narrowed by this, including when the demo lookup fails.
  */
 async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecipient[]> {
   let assigned: StaffRecipient[] = [];
@@ -1071,7 +1077,9 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
   // prismaAdmin for the same reason as findAssignedInstructors: through the
   // app client this query returns zero rows under the student's context, and
   // a silent empty fallback is exactly the failure the fallback exists to stop.
-  const everyone = await listActiveTeachers();
+  // A demo student skips it: the fallback would carry a made-up student's
+  // alert to real teachers' inboxes, and `assigned` is already empty here.
+  const everyone = (await isDemoStudentOrFalse(studentId)) ? assigned : await listActiveTeachers();
 
   if (everyone.length === 0) {
     // A CRITICAL alert with nobody to notify must never be quiet. This is the
@@ -1085,6 +1093,24 @@ async function resolveWellbeingRecipients(studentId: string): Promise<StaffRecip
   }
 
   return everyone;
+}
+
+/**
+ * Whether the student is a cohort demo account, with a failed lookup counted
+ * as "no". For a real student in crisis the program-wide fallback is the safe
+ * failure, so a doubt about the demo marker must never narrow the audience.
+ */
+async function isDemoStudentOrFalse(studentId: string): Promise<boolean> {
+  try {
+    return await isDemoStudentId(studentId);
+  } catch (err) {
+    logger.error("Wellbeing: demo-account check failed; treating the student as a real account", {
+      student: studentLogKey(studentId),
+      alert: "wellbeing_demo_check_failed",
+      error: errorForLog(err),
+    });
+    return false;
+  }
 }
 
 /**
