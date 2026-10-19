@@ -120,6 +120,10 @@ function OrientationFormCard({
   targetStudentId?: string;
 }) {
   const hasDocument = hasDownloadableFormDocument(form);
+  // The Student Profile is flagged requiresSignature but is completed in the
+  // browser (see classifyStep and formRequiresSignatureStep), so it keeps the
+  // upload action. A signature pad here would post a signature-only submission.
+  const usesSignaturePad = form.requiresSignature && form.id !== "student-profile";
 
   return (
     <div className="rounded-xl border border-[rgba(15,154,146,0.12)] bg-[rgba(15,154,146,0.06)] p-3">
@@ -174,7 +178,7 @@ function OrientationFormCard({
 
       {/* Submission actions */}
       <div className="mt-2">
-        {form.requiresSignature ? (
+        {usesSignaturePad ? (
           <SignAndSubmitButton
             formId={form.id}
             currentStatus={currentStatus}
