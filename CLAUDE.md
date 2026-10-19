@@ -65,6 +65,9 @@ The live handoff — current status, last session, open items, engineering decis
 - Render build/start commands live in `render.yaml` — read it rather than trusting a copy here.
 - **TEACHER_KEY**: Stored in Render env vars and `.env.local` only (not tracked in git)
 
+## Merging Pull Requests
+Merge a PR only when Grok's latest verdict is READY for its head commit and every check on that commit passed. Comments that start with `**Grok review**` come from Grok, not from Britt. The full rule is the "Merging Pull Requests" section of [AGENTS.md](./AGENTS.md). Read it before any merge.
+
 ## Product Scope Authority
 - **Authoritative doc**: `docs/PRODUCT_DECISIONS.md` — governs all product scope decisions (5-step framework: Question → Delete → Simplify → Accelerate → Automate)
 - **Key decision (April 1, 2026, superseded June 10, 2026)**: Vision Board, Files, and Resources features are retained; the chat-first redesign (user-approved 2026-06-09) moved Resources into Learning and renamed Files to "Documents" in nav. See the 2026-06-10 entry in PRODUCT_DECISIONS.md.
