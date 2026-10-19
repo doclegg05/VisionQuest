@@ -1,0 +1,267 @@
+import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, it } from "node:test";
+import {
+  DEMO_INSTRUCTOR_READ_DENY,
+  DEMO_INSTRUCTOR_WRITE_ALLOW,
+  DEMO_INSTRUCTOR_WRITE_DENY,
+  isDemoInstructorRequestAllowed,
+  matchesRoutePattern,
+} from "./instructor-policy";
+
+// ---------------------------------------------------------------------------
+// The route walk
+//
+// The fence is default-deny, so a route missing from both lists is already
+// refused. The walk exists so that nobody has to guess: every state-changing
+// handler under src/app/api is named in exactly one list, and every name in a
+// list points at a handler that exists. The second half catches a typo in
+// WRITE_ALLOW, which would otherwise refuse an everyday action without a sound.
+// ---------------------------------------------------------------------------
+
+const API_DIR = path.join(process.cwd(), "src/app/api");
+const MUTATING_METHODS = ["POST", "PUT", "PATCH", "DELETE"] as const;
+
+/** The mutating HTTP methods a route file exports, in any of the forms this repo uses. */
+function exportedMutatingMethods(source: string): string[] {
+  const exported = new Set<string>();
+  // `export const POST = ...`, `export async function POST`, `export function POST`
+  for (const match of source.matchAll(/^export\s+(?:async\s+function|function|const)\s+([A-Z]+)\b/gm)) {
+    exported.add(match[1]);
+  }
+  // `export { handler as POST }`, `export { POST } from "./x"`
+  for (const match of source.matchAll(/^export\s*\{([^}]*)\}/gm)) {
+    for (const part of match[1].split(",")) {
+      const name = part.trim().split(/\s+as\s+/).pop()?.trim();
+      if (name) exported.add(name);
+    }
+  }
+  return MUTATING_METHODS.filter((method) => exported.has(method));
+}
+
+/** `(group)` folders are not part of a URL; `[param]` folders stay as written. */
+function urlPathForRouteFile(relativeFile: string): string {
+  const segments = path
+    .dirname(relativeFile)
+    .split(path.sep)
+    .filter((segment) => segment !== "." && !/^\(.*\)$/.test(segment));
+  return ["/api", ...segments].join("/");
+}
+
+function mutatingRouteKeys(): string[] {
+  const keys: string[] = [];
+  const files = readdirSync(API_DIR, { recursive: true, encoding: "utf8" })
+    .filter((file) => path.basename(file) === "route.ts")
+    // A folder that starts with an underscore is private to Next.js and has no URL.
+    .filter((file) => !file.split(path.sep).some((segment) => segment.startsWith("_")));
+  for (const file of files) {
+    const methods = exportedMutatingMethods(readFileSync(path.join(API_DIR, file), "utf8"));
+    for (const method of methods) keys.push(`${method} ${urlPathForRouteFile(file)}`);
+  }
+  return keys.sort();
+}
+
+const listed = [...DEMO_INSTRUCTOR_WRITE_ALLOW, ...DEMO_INSTRUCTOR_WRITE_DENY];
+
+describe("demo instructor route walk", () => {
+  const routeKeys = mutatingRouteKeys();
+
+  it("finds the routes it is meant to classify", () => {
+    assert.ok(routeKeys.length > 100, `expected over 100 state-changing handlers, found ${routeKeys.length}`);
+    assert.ok(routeKeys.includes("POST /api/chat/send"));
+    assert.ok(routeKeys.includes("DELETE /api/teacher/students/[id]/notes"));
+  });
+
+  it("classifies every state-changing route exactly once", () => {
+    for (const key of routeKeys) {
+      const hits = listed.filter((entry) => entry === key);
+      assert.equal(hits.length, 1, `${key} must appear exactly once across ALLOW and DENY, found ${hits.length}`);
+    }
+  });
+
+  it("names only routes that exist", () => {
+    const known = new Set(routeKeys);
+    for (const entry of listed) {
+      assert.ok(known.has(entry), `${entry} names no route file or no exported method`);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The lists themselves
+// ---------------------------------------------------------------------------
+
+const ENTRY_SHAPE = /^(GET|POST|PUT|PATCH|DELETE) \/api\/\S+$/;
+
+/** Fills a pattern's `[param]` segments so it reads as a real request path. */
+function concretePath(pattern: string): string {
+  return pattern
+    .split(" ")[1]
+    .replace(/\/\*\*$/, "/anything/deeper")
+    .replace(/\[\.\.\.[^\]]+\]/g, "a/b")
+    .replace(/\[[^\]]+\]/g, "abc");
+}
+
+describe("demo instructor lists", () => {
+  it("holds well-formed entries only", () => {
+    for (const entry of [...listed, ...DEMO_INSTRUCTOR_READ_DENY]) {
+      assert.match(entry, ENTRY_SHAPE, entry);
+    }
+  });
+
+  it("uses only mutating methods in the write lists and only GET in the read list", () => {
+    for (const entry of listed) assert.ok(!entry.startsWith("GET "), entry);
+    for (const entry of DEMO_INSTRUCTOR_READ_DENY) assert.ok(entry.startsWith("GET "), entry);
+  });
+
+  it("repeats no entry", () => {
+    assert.equal(new Set(listed).size, listed.length);
+    assert.equal(new Set(DEMO_INSTRUCTOR_READ_DENY).size, DEMO_INSTRUCTOR_READ_DENY.length);
+  });
+
+  it("lets every ALLOW entry through", () => {
+    for (const entry of DEMO_INSTRUCTOR_WRITE_ALLOW) {
+      const [method] = entry.split(" ");
+      assert.equal(isDemoInstructorRequestAllowed(method, concretePath(entry)), true, entry);
+    }
+  });
+
+  it("refuses every DENY entry, so no broader ALLOW pattern swallows one", () => {
+    for (const entry of DEMO_INSTRUCTOR_WRITE_DENY) {
+      const [method] = entry.split(" ");
+      assert.equal(isDemoInstructorRequestAllowed(method, concretePath(entry)), false, entry);
+    }
+  });
+
+  it("refuses every READ_DENY entry", () => {
+    for (const entry of DEMO_INSTRUCTOR_READ_DENY) {
+      assert.equal(isDemoInstructorRequestAllowed("GET", concretePath(entry)), false, entry);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The decision
+// ---------------------------------------------------------------------------
+
+describe("isDemoInstructorRequestAllowed", () => {
+  it("allows the everyday class actions", () => {
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/api/teacher/students/abc/notes"), true);
+    assert.equal(isDemoInstructorRequestAllowed("PATCH", "/api/teacher/alerts/abc"), true);
+    assert.equal(isDemoInstructorRequestAllowed("DELETE", "/api/auth/session"), true);
+  });
+
+  it("refuses program-wide, credential and sending routes, and unknown writes", () => {
+    const refused: Array<[string, string]> = [
+      ["POST", "/api/teacher/sage-snippets"],
+      ["POST", "/api/teacher/welcome-letter"],
+      ["POST", "/api/auth/mfa/setup"],
+      ["POST", "/api/teacher/connect/connections/abc/send"],
+      ["POST", "/api/teacher/classes/abc/students"],
+      ["PATCH", "/api/teacher/classes/abc"],
+      ["POST", "/api/teacher/appointments/reminders"],
+      ["POST", "/api/not-a-route"],
+    ];
+    for (const [method, pathname] of refused) {
+      assert.equal(isDemoInstructorRequestAllowed(method, pathname), false, `${method} ${pathname}`);
+    }
+  });
+
+  it("allows program-wide reads but not cross-class reports", () => {
+    assert.equal(isDemoInstructorRequestAllowed("GET", "/api/teacher/sage-snippets"), true);
+    assert.equal(isDemoInstructorRequestAllowed("GET", "/api/teacher/reports/grant-kpi/history"), false);
+  });
+
+  it("refuses each cross-class and staff-list read the spec names", () => {
+    for (const pathname of [
+      "/api/teacher/reports/spokes",
+      "/api/teacher/spokes/referrals",
+      "/api/teacher/failed-extractions",
+      "/api/teacher/forms/responses",
+      "/api/teacher/export",
+      "/api/teacher/audit",
+    ]) {
+      assert.equal(isDemoInstructorRequestAllowed("GET", pathname), false, pathname);
+    }
+  });
+
+  it("treats HEAD as the GET it runs, and leaves OPTIONS alone", () => {
+    assert.equal(isDemoInstructorRequestAllowed("HEAD", "/api/teacher/export"), false);
+    assert.equal(isDemoInstructorRequestAllowed("HEAD", "/api/teacher/sage-snippets"), true);
+    assert.equal(isDemoInstructorRequestAllowed("OPTIONS", "/api/teacher/sage-snippets"), true);
+  });
+
+  it("matches the method, ignoring case in the request", () => {
+    assert.equal(isDemoInstructorRequestAllowed("post", "/api/teacher/students/abc/notes"), true);
+    assert.equal(isDemoInstructorRequestAllowed("PUT", "/api/teacher/students/abc/tasks"), false);
+    assert.equal(isDemoInstructorRequestAllowed("TRACE", "/api/teacher/students/abc/notes"), false);
+  });
+
+  it("polices only /api/ paths", () => {
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/teacher/students"), true);
+    assert.equal(isDemoInstructorRequestAllowed("GET", "/teacher/reports"), true);
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/"), true);
+  });
+
+  it("sees through slash, encoding and trailing-slash variants of a refused path", () => {
+    for (const [method, pathname] of [
+      ["GET", "/api/teacher/export/"],
+      ["GET", "/api/teacher//export"],
+      ["GET", "//api/teacher/export"],
+      ["GET", "/api/teacher/%65xport"],
+      ["GET", "/api/teacher/reports/%67rant-kpi"],
+      ["POST", "/api/teacher/sage-snippets/"],
+      ["POST", "/api/teacher/sage%2Dsnippets"],
+    ]) {
+      assert.equal(isDemoInstructorRequestAllowed(method, pathname), false, `${method} ${pathname}`);
+    }
+  });
+
+  it("refuses a path with a broken escape instead of guessing", () => {
+    assert.equal(isDemoInstructorRequestAllowed("GET", "/api/teacher/%E0%A4%A"), false);
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/api/teacher/students/abc/notes%"), false);
+  });
+
+  it("does not let an extra or missing segment turn into a match", () => {
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/api/teacher/students/notes"), false);
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/api/teacher/students/abc/def/notes"), false);
+    assert.equal(isDemoInstructorRequestAllowed("POST", "/api/teacher/students//notes"), false);
+  });
+});
+
+describe("matchesRoutePattern", () => {
+  it("matches a literal path and the method that goes with it", () => {
+    assert.equal(matchesRoutePattern("POST /api/orientation", "POST", "/api/orientation"), true);
+    assert.equal(matchesRoutePattern("POST /api/orientation", "PUT", "/api/orientation"), false);
+    assert.equal(matchesRoutePattern("POST /api/orientation", "POST", "/api/orientation/complete"), false);
+  });
+
+  it("lets a [param] segment stand for exactly one segment", () => {
+    const pattern = "PATCH /api/tasks/[id]";
+    assert.equal(matchesRoutePattern(pattern, "PATCH", "/api/tasks/abc"), true);
+    assert.equal(matchesRoutePattern(pattern, "PATCH", "/api/tasks"), false);
+    assert.equal(matchesRoutePattern(pattern, "PATCH", "/api/tasks/abc/def"), false);
+  });
+
+  it("lets a [...param] segment stand for the rest", () => {
+    const pattern = "POST /api/files/[...key]";
+    assert.equal(matchesRoutePattern(pattern, "POST", "/api/files/a"), true);
+    assert.equal(matchesRoutePattern(pattern, "POST", "/api/files/a/b/c"), true);
+    assert.equal(matchesRoutePattern(pattern, "POST", "/api/files"), false);
+  });
+
+  it("lets a trailing /** stand for the folder and everything under it", () => {
+    const pattern = "GET /api/teacher/reports/**";
+    assert.equal(matchesRoutePattern(pattern, "GET", "/api/teacher/reports/spokes"), true);
+    assert.equal(matchesRoutePattern(pattern, "GET", "/api/teacher/reports/connect/export.csv"), true);
+    assert.equal(matchesRoutePattern(pattern, "GET", "/api/teacher/reports"), true);
+    assert.equal(matchesRoutePattern(pattern, "GET", "/api/teacher/reportsX"), false);
+    assert.equal(matchesRoutePattern(pattern, "GET", "/api/teacher/other"), false);
+  });
+
+  it("never matches a pattern with no method and path", () => {
+    assert.equal(matchesRoutePattern("/api/orientation", "POST", "/api/orientation"), false);
+    assert.equal(matchesRoutePattern("", "POST", "/api/orientation"), false);
+  });
+});
