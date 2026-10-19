@@ -15,8 +15,10 @@ import { BASE_URL } from "./helpers/auth";
  * a label that changed in copy.ts would otherwise leave these "no button"
  * checks passing on a string nobody renders any more.
  */
+// Skips only off CI. Playwright exits 0 when every test in the named file is
+// skipped, so in CI a stray switch must fail this spec and not skip it.
 test.skip(
-  process.env.COHORT_DEMO_MODE === "true",
+  process.env.COHORT_DEMO_MODE === "true" && !process.env.CI,
   "The app was started with COHORT_DEMO_MODE=true; e2e/cohort-demo.spec.ts covers that mode.",
 );
 

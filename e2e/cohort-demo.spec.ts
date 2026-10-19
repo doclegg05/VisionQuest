@@ -41,8 +41,10 @@ import { createPrisma } from "./helpers/db";
  * (scripts/bench/seed-cohort.ts), both run earlier in the job. They are the
  * "other classes" the demo instructor must not be able to see.
  */
+// Skips only off CI. Playwright exits 0 when every test in the named file is
+// skipped, so a skip in CI would turn a lost or mistyped switch into a green step.
 test.skip(
-  process.env.COHORT_DEMO_MODE !== "true",
+  process.env.COHORT_DEMO_MODE !== "true" && !process.env.CI,
   "Needs the app started with COHORT_DEMO_MODE=true (the 'E2E gate: cohort demo on' CI step).",
 );
 
