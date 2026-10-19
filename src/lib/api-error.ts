@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "./auth";
+import type { DemoAccountKind } from "./demo/config";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { withRlsContext, type RlsContext } from "./rls-context";
@@ -120,6 +121,8 @@ export interface Session {
   studentId: string;
   displayName: string;
   role: string;
+  /** Set only on demo accounts, and only while the demo switch is on. */
+  demoAccount?: DemoAccountKind;
 }
 
 export function isStaffRole(role: string) {
