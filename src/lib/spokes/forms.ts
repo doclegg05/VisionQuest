@@ -282,10 +282,9 @@ export const FORMS: SpokesForm[] = [
     audience: "student",
     // Read-and-sign on the paper original. The notice is not fillable, so
     // acceptsSubmission stays false: /api/forms/sign creates the
-    // FormSubmission, with no separate upload. No orientation checklist item
-    // lists this form yet (STEP_DEFINITIONS in orientation-step-resources.ts),
-    // so the flag marks the print packet, informs Sage and admits the form to
-    // /api/forms/sign, but no wizard step asks the student for the signature.
+    // FormSubmission, with no separate upload. STEP_DEFINITIONS in
+    // orientation-step-resources.ts lists it under "Review Rights and
+    // Responsibilities", so that item needs both signatures to complete.
     acceptsSubmission: false,
     requiresSignature: true,
     sortOrder: 14,

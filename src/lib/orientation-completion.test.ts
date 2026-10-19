@@ -52,9 +52,44 @@ describe("applyStudentOrientationCompletion", () => {
     assert.equal(result.outcome, "signature_required");
     if (result.outcome === "signature_required") {
       assert.equal(result.message, helper.SIGNATURE_REQUIRED_MESSAGE);
-      assert.deepEqual(result.missingForms.map((form) => form.id), ["rights-responsibilities"]);
+      assert.deepEqual(result.missingForms.map((form) => form.id), [
+        "rights-responsibilities",
+        "non-discrimination",
+      ]);
     }
     assert.equal(mockProgressUpsert.mock.callCount(), 0);
+  });
+
+  it("Rights item: signing only the Rights form still leaves the Non-Discrimination Notice missing", async () => {
+    mockItemFindUnique.mock.mockImplementation(async () => ({
+      label: "Review Rights and Responsibilities",
+    }));
+    mockSubmissionFindMany.mock.mockImplementation(async () => [
+      { formId: "rights-responsibilities" },
+    ]);
+
+    const result = await helper.applyStudentOrientationCompletion(STUDENT_ID, ITEM_ID);
+
+    assert.equal(result.outcome, "signature_required");
+    if (result.outcome === "signature_required") {
+      assert.deepEqual(result.missingForms.map((form) => form.id), ["non-discrimination"]);
+    }
+    assert.equal(mockProgressUpsert.mock.callCount(), 0);
+  });
+
+  it("Rights item: completes once both forms are signed", async () => {
+    mockItemFindUnique.mock.mockImplementation(async () => ({
+      label: "Review Rights and Responsibilities",
+    }));
+    mockSubmissionFindMany.mock.mockImplementation(async () => [
+      { formId: "rights-responsibilities" },
+      { formId: "non-discrimination" },
+    ]);
+
+    const result = await helper.applyStudentOrientationCompletion(STUDENT_ID, ITEM_ID);
+
+    assert.equal(result.outcome, "completed");
+    assert.equal(mockProgressUpsert.mock.callCount(), 1);
   });
 
   it("stores an instructor-led item as a pending verification claim", async () => {

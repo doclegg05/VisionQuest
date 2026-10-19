@@ -61,7 +61,7 @@ describe("form signature requirements", () => {
     });
   }
 
-  it("classifies the Non-Discrimination Notice as a sign step once an item lists it", () => {
+  it("classifies the Non-Discrimination Notice as a sign step", () => {
     // It has a stored PDF, so it must classify as a `sign` step rather than
     // degrading to the paper "no-pdf" path that ai-data-consent falls into.
     const notice = form("non-discrimination");
@@ -69,20 +69,16 @@ describe("form signature requirements", () => {
     assert.equal(formRequiresSignatureStep(notice), true);
   });
 
-  it("is not listed by any seeded orientation item yet", () => {
-    // Known gap, recorded so it is deliberate. STEP_DEFINITIONS maps no
-    // checklist item to the Non-Discrimination Notice, and the wizard only
-    // builds form steps from that mapping. The flag therefore marks the print
-    // packet, informs Sage and admits the form to /api/forms/sign, but no
-    // checklist item asks for the signature or blocks completion on it.
-    // When an item lists the notice, this expectation flips: assert that
-    // item's label and that getSignatureRequiredForms returns the notice.
+  it("is listed by exactly one seeded orientation item, Review Rights and Responsibilities", () => {
+    // STEP_DEFINITIONS maps the notice to the Rights step, and the wizard only
+    // builds form steps from that mapping. Reading the labels from the seed
+    // script keeps this honest if an item is renamed or a second one adds it.
     const labels = seededOrientationLabels();
     assert.ok(labels.length >= 20, "expected the seeded orientation checklist");
     const holders = labels.filter((label) =>
       getOrientationStepDetail(label).forms.some((f) => f.id === "non-discrimination"),
     );
-    assert.deepEqual(holders, []);
+    assert.deepEqual(holders, ["Review Rights and Responsibilities"]);
   });
 
   it("keeps the Student Profile on the in-browser profile-form path", () => {
