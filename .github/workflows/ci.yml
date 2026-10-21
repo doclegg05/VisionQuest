@@ -133,6 +133,9 @@ jobs:
         # ports. Outside `npm test`'s src/** glob, so it needs its own step.
         run: npm run test:relay
 
+      - name: Process tooling tests
+        run: npm run test:process-tools
+
       - name: Catalog integrity (hard gate — DB-free checks only)
         # catalog:validate needs a live DB ONLY for the program_document node
         # type (fetching ProgramDocument rows to diff title/audience/category
