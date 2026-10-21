@@ -16,6 +16,7 @@
     "test:forms:delivery": "tsx --test --experimental-test-module-mocks src/lib/spokes/forms-delivery.test.ts src/lib/spokes/forms-delivery.s3fallback.test.ts src/lib/spokes/forms-delivery.route.test.ts",
     "test:relay": "node --test scripts/__tests__/ollama-relay.test.mjs",
     "test:process-tools": "node --test scripts/memory/*.test.mjs",
+    "memory:validate": "node scripts/memory/validate-memory-file.mjs",
     "test:smoke": "node scripts/run-smoke-public-routes.mjs",
     "test:smoke:api": "python scripts/smoke_api_routes.py",
     "test:e2e": "playwright test",
@@ -80,7 +81,7 @@
     "bench:compare": "node scripts/bench/compare.mjs",
     "bench:validate": "node scripts/bench/validate.mjs",
     "bench:test": "node --test \"scripts/bench/__tests__/*.test.mjs\"",
-    "pipelines:validate": "npm run ci-pipeline:validate && npm run a11y-pipeline:validate && npm run bench:validate"
+    "pipelines:validate": "npm run ci-pipeline:validate && npm run a11y-pipeline:validate && npm run bench:validate && npm run memory:validate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1042.0",
