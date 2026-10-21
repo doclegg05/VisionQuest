@@ -6,7 +6,7 @@ Scripts you run yourself in a normal terminal, for work the Claude Code session 
 
 | Job | Command |
 |---|---|
-| Live Sage memory eval on OpenRouter | `node scripts/terminal/run-with-env.mjs sage:memory:eval -- --provider=openrouter` |
+| Live Sage memory eval on OpenRouter | `node scripts/terminal/run-with-env.mjs sage:memory:eval --provider=openrouter` |
 | Cron health check against the database | `node scripts/terminal/run-with-env.mjs cron:health` |
 | Any database script | `node scripts/terminal/run-with-env.mjs <npm-script> [args...]` |
 | Any script that needs the `tsx` CLI | `node scripts/terminal/run-with-env.mjs <npm-script> [args...]` |

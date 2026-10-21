@@ -14,6 +14,31 @@ const SCRIPT = path.resolve(
 const DB_URL = 'postgresql://u:s3cretpw$pw@db.example.test:5432/x';
 const ENV_FILE = `DATABASE_URL=${DB_URL}\nOPENROUTER_API_KEY=sk-or-fake-value\n`;
 
+// The Claude Code session sandbox denies reading any file named .env.local.
+// Probe once; tests that need the runner to read it skip there and run
+// everywhere else (CI, a normal terminal).
+function canReadEnvLocal() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'env-probe-'));
+  try {
+    const file = path.join(dir, '.env.local');
+    fs.writeFileSync(file, 'X=1\n');
+    fs.readFileSync(file, 'utf8');
+    return true;
+  } catch (err) {
+    if (err.code === 'EPERM' || err.code === 'ENOENT') return false;
+    throw err;
+  } finally {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Cleanup of the probe dir is best effort under the sandbox.
+    }
+  }
+}
+const NEEDS_ENV = canReadEnvLocal()
+  ? {}
+  : { skip: 'sandbox denies reading .env.local' };
+
 function setup({ withEnv = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-with-env-'));
   const bin = path.join(dir, 'bin');
@@ -55,7 +80,7 @@ function withCtx(opts, fn) {
   }
 }
 
-test('loads env for npm', () => {
+test('loads env for npm', NEEDS_ENV, () => {
   withCtx({}, (ctx) => {
     const r = run(ctx, ['--yes', 'demo']);
     assert.equal(r.status, 0, r.stderr);
@@ -63,7 +88,7 @@ test('loads env for npm', () => {
   });
 });
 
-test('never prints secret values', () => {
+test('never prints secret values', NEEDS_ENV, () => {
   withCtx({}, (ctx) => {
     const r = run(ctx, ['--yes', 'demo']);
     const logDir = path.join(ctx.dir, 'reports', 'terminal');
@@ -79,7 +104,7 @@ test('never prints secret values', () => {
   });
 });
 
-test('writes a log under reports/terminal', () => {
+test('writes a log under reports/terminal', NEEDS_ENV, () => {
   withCtx({}, (ctx) => {
     run(ctx, ['--yes', 'demo']);
     const logs = fs
@@ -97,7 +122,7 @@ test('missing env file exits 2', () => {
   });
 });
 
-test('dollar sign survives', () => {
+test('dollar sign survives', NEEDS_ENV, () => {
   withCtx({}, (ctx) => {
     const r = run(ctx, ['--yes', 'demo']);
     assert.match(r.stdout, new RegExp(`DB_LEN=${DB_URL.length}\\b`));
@@ -110,5 +135,16 @@ test('rejects unsafe script name', () => {
     assert.equal(r.status, 2);
     assert.match(r.stderr, /[Uu]sage/);
     assert.ok(!fs.existsSync(ctx.marker));
+  });
+});
+
+test('leading -- is not doubled', NEEDS_ENV, () => {
+  withCtx({}, (ctx) => {
+    const r = run(ctx, ['--yes', 'demo', '--', '--flag=x']);
+    assert.equal(r.status, 0, r.stderr);
+    const line = r.stdout.split('\n').find((l) => l.startsWith('ARGS='));
+    const args = line.slice('ARGS='.length).split(' ');
+    assert.ok(args.includes('--flag=x'));
+    assert.equal(args.filter((a) => a === '--').length, 1);
   });
 });

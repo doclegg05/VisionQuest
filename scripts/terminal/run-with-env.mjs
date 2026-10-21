@@ -46,7 +46,10 @@ async function main() {
   const argv = process.argv.slice(2);
   const skipPause = argv[0] === '--yes';
   const rest = skipPause ? argv.slice(1) : argv;
-  const [script, ...passArgs] = rest;
+  const [script, ...afterScript] = rest;
+  // The runner adds its own "--" before pass-through args, so drop one the
+  // caller typed to avoid handing npm a doubled "--".
+  const passArgs = afterScript[0] === '--' ? afterScript.slice(1) : afterScript;
 
   if (!script || !SCRIPT_NAME.test(script)) fail(USAGE);
 
