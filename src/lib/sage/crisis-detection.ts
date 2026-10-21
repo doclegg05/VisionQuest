@@ -350,7 +350,7 @@ const CRISIS_PATTERNS: CrisisPattern[] = [
   // entries that deliberately have NO Spanish twin say so where they stand.
   //
   // Why this block exists: every pattern above is about IDEATION or about
-  // pills. `.claude/MEMORY.md` named these three families the largest
+  // pills. `docs/decisions/closed-items.md` records these three families as the largest
   // remaining coverage gap, and the crisis-en benchmark measured it —
   // means_firearm 0/16, means_hanging 0/13, means_jumping 0/12, all zero, with
   // the headline recall held down to 0.794 by them alone. A stated method is

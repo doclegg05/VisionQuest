@@ -3,7 +3,7 @@
 // code.
 //
 // `scripts/lib/percentile.mjs` is the canonical implementation (2026-08-20
-// consolidation — see `.claude/MEMORY.md`'s Key Decisions Log). It lives
+// consolidation, see `docs/decisions/engineering-log.md`). It lives
 // under `scripts/` because its original callers were harness/report scripts;
 // `src/lib/connect/funnel-shared.ts` (Match & Connect Phase 6) is the first
 // PRODUCTION module to need it, and a relative `../../../scripts/lib/...`

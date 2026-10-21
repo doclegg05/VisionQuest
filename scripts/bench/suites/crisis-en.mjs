@@ -5,7 +5,7 @@
  * ---------------------------------------------------------------------------
  * The design (docs/superpowers/specs/2026-09-05-benchmark-suite-design.md §4.1)
  * proposes this suite as a gate at recall >= 0.98. It shipped at `watch`
- * because three means families named in .claude/MEMORY.md as "the largest
+ * because three means families named in docs/decisions/closed-items.md as "the largest
  * remaining coverage gap" — firearms, hanging, jumping — had no patterns in
  * either language, and the honest number was 0.71. Two changes closed it:
  * the means families (B1, recall 0.95) and then the passive-ideation,

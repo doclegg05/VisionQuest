@@ -141,7 +141,7 @@ describe("recordOperation", () => {
 // Both fields are proven elsewhere (write-tools.ts propose_resume_edit,
 // update_goal_status) to embed quoted free text (resume-section previews,
 // the first 80 chars of goal content), which the crisis-era "no transcript
-// access" decision (MEMORY.md 2026-07-20) says a teacher ledger view must
+// access" decision (`docs/decisions/engineering-log.md`, 2026-07-20) says a teacher ledger view must
 // never surface.
 // ---------------------------------------------------------------------------
 

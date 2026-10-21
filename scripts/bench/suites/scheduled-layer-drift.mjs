@@ -11,7 +11,7 @@
  * This is the exact class of drift the 2026-09-01 review found: the 4
  * baseline cron jobs were registered nowhere the health check's expected
  * list agreed with, invisible for five months until someone queried prod
- * directly (.claude/MEMORY.md, "the scheduled layer has never worked in
+ * directly (`.claude/handoffs/2026-10-21-status-archive.md`, "the scheduled layer has never worked in
  * prod"). A migration that starts scheduling a job the health check does
  * not know about, or stops re-registering one it does, now fails on the
  * migration diff instead of silently drifting.
