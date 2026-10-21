@@ -3,6 +3,7 @@
 // and proves nothing was lost via findMissingLines.
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const SESSION_HEADING =
   /^## (Last Session|Prior Session|Also |Previous Session|Session Before That)/;
@@ -142,5 +143,6 @@ function main() {
 }
 
 const isMain =
-  process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href;
 if (isMain) main();
