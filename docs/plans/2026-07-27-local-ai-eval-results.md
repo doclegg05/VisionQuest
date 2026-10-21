@@ -4,10 +4,10 @@
 >
 > - Reasoning is off by default in `OllamaProvider` (PR #147), and the empty reply from an undeclared tool call was fixed in the eval harness (PR #149).
 > - Per-role models replaced the single resident model plan. See `docs/plans/2026-08-21-local-ai-role-models.md`.
-> - Production AI moved from Gemini to OpenRouter on 2026-10-15. See `docs/superpowers/specs/2026-10-15-production-openrouter-design.md`. The Gemini-judged stage S7 and the Gemini credit notes below no longer apply.
+> - On 2026-10-15 Britt decided to move production AI from Gemini to OpenRouter. See the decision record, `docs/superpowers/specs/2026-10-15-production-openrouter-design.md`. As of 2026-10-21 that move has not shipped: `resolveAiProvider` still sends cloud calls to `GeminiProvider`, and the rollout and post-deploy checks in `docs/superpowers/plans/2026-10-15-production-openrouter.md` are still open. The Gemini-judged stage S7 and the Gemini credit notes below are part of the July evaluation record.
 > - Per-classroom PC models were shelved on 2026-10-15. The shared local AI host stays.
 >
-> The file is kept for the host facts and the model numbers. No other local-model run is committed to the repo. The body below is unchanged from branch `local-ai/32gb-eval` at `f897e3ee`.
+> The file is kept for the host facts and the model numbers. No other local-model run is committed to the repo. The body below is unchanged from branch `local-ai/32gb-eval` at `f897e3ee`, except two corrections marked "corrected 2026-10-21".
 
 Status: **S0–S4 COMPLETE — evaluation paused for owner decisions.** 2026-07-27
 Branch: `local-ai/32gb-eval` (off `remediation/critical-high` so evals run against the fail-closed provider code that ships with PR #136)
@@ -25,7 +25,7 @@ on every axis.
 |---|---|---|
 | S0 capability | ✅ PASS | chat, tools, JSON, 768-dim embeddings |
 | S1 speed + quality | ✅ PASS | 11.2s cold load, 34.5 tok/s decode, FK 4.7 |
-| **S2 agent** | ✅ **PASS** | 90.4–91.1% mean vs an 85% gate; **93.3%** under CI-style majority voting; 0 injection failures |
+| **S2 agent** | ✅ **PASS** | 90.4–91.1% mean vs an 85% gate (revs `.2` and `.3`); **93.3%** under CI-style majority voting on the earlier clean set, whose mean was 89.6% (corrected 2026-10-21); 0 injection failures |
 | S3 harness | ⚠️ PARTIAL | tool 4/4 + guardrail 7/7; grounding blocked on a missing local Postgres |
 | S4 redteam | ✅ PASS | 0 hard violations, crisis 7/7, 4 soft warnings (8B had 8) |
 | S5 memory · S6 documents · S7 judged | ⛔ NOT RUN | S5 needs a DB; S6/S7 never attempted |
@@ -373,6 +373,8 @@ npm run sage:memory:eval                                                        
 
 Already done and NOT worth re-running unless something changes: S0 capability
 probe, S1 quality screen, S2/S3/S4 on the 8B baseline, S4 on the candidate.
+
+> **Superseded (corrected 2026-10-21).** The next paragraph was written before the S2 re-measurement. S2 now passes, so the fallback ladder is not needed. See the RESOLVED note above and step 1 of the commands.
 
 The decisive question is now narrower: **does tool-description
 disambiguation carry the candidate from 82.2% to ≥85%?** It already passes
