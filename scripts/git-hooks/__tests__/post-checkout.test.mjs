@@ -18,6 +18,11 @@ function setup({ ownNodeModules }) {
   writeFileSync(log, '');
   writeFileSync(join(bin, 'npx'), `#!/usr/bin/env bash\necho "$@" >> "${log}"\n`);
   chmodSync(join(bin, 'npx'), 0o755);
+  const gitLog = join(dir, 'git.log');
+  writeFileSync(gitLog, '');
+  const realGit = spawnSync('bash', ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim();
+  writeFileSync(join(bin, 'git'), `#!/usr/bin/env bash\necho "$@" >> "${gitLog}"\nexec "${realGit}" "$@"\n`);
+  chmodSync(join(bin, 'git'), 0o755);
   const env = {
     ...process.env,
     PATH: `${bin}:${process.env.PATH}`,
@@ -44,7 +49,8 @@ function setup({ ownNodeModules }) {
   const run = (oldSha, newSha, flag) =>
     spawnSync('bash', [HOOK, oldSha, newSha, flag], { cwd: repo, env, encoding: 'utf8' });
   const npxLog = () => readFileSync(log, 'utf8');
-  return { dir, first, second, run, npxLog };
+  const gitCalls = () => readFileSync(gitLog, 'utf8');
+  return { dir, first, second, run, npxLog, gitCalls };
 }
 
 function withRepo(opts, fn) {
@@ -94,9 +100,11 @@ test('file checkout flag 0 is a no-op', () => {
 });
 
 test('null old sha is a no-op', () => {
-  withRepo({ ownNodeModules: true }, ({ second, run, npxLog }) => {
+  withRepo({ ownNodeModules: true }, ({ second, run, npxLog, gitCalls }) => {
+    const before = gitCalls();
     const r = run(ZERO, second, '1');
     assert.equal(r.status, 0);
     assert.equal(npxLog(), '');
+    assert.equal(gitCalls().slice(before.length).includes('diff'), false, 'guard must stop before git diff');
   });
 });
