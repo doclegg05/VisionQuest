@@ -16,6 +16,7 @@ Add `--yes` before the script name to skip the Enter-to-continue pause.
 ## Other helpers
 
 - `scripts/terminal/merge-pr.sh`: merges a pull request and checks the result against the GitHub API.
+- `scripts/terminal/branch-cleanup.sh <manifest.tsv> [--apply] [--remote origin]`: deletes or archives (tag, then delete) the remote branches in a manifest, refusing any whose tip moved since the manifest was written. It is a dry run by default, and `--apply` is Britt's step.
 
 ## How it works
 
