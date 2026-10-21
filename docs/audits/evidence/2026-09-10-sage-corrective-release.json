@@ -62,12 +62,118 @@
   },
   "indexStrictFailures": 0,
   "priorReleaseObservation": "Failed due to pre-existing bounded transcript role defect; fixed in this corrective release",
-  "oneHourObservation": "pending",
+  "oneHourObservation": "passed with noncritical warnings; next-working-day observation pending",
   "firstHourWindow": [
     "2026-09-10T17:50:54Z",
     "2026-09-10T18:50:54Z"
   ],
-  "nextWorkingDayObservation": "pending",
+  "nextWorkingDayObservation": "passed with previously recorded noncritical follow-ups",
   "automation": "sage-release-observations",
-  "schedule": "September 10 at 15:15 and September 11 at 09:15 America/New_York"
+  "schedule": "September 10 at 15:15 and September 11 at 09:15 America/New_York",
+  "firstHourReview": {
+    "reviewedAt": "2026-09-10T19:20:00Z",
+    "window": [
+      "2026-09-10T17:50:54Z",
+      "2026-09-10T18:50:54Z"
+    ],
+    "method": "Render application log review plus separate error and failed searches over Last 4 hours, covering the entire corrective first hour. Custom time inputs did not persist; no exact-range metric claim is made. Historical entries were classified by timestamp.",
+    "newErrorOrFailedSearchMatches": 0,
+    "historicalErrorMatches": {
+      "count": 2,
+      "at": "2026-09-10T17:02:26Z",
+      "note": "Prior release discovery/memory role errors, before the corrected window"
+    },
+    "successfulPostResponseEntries": 6,
+    "postResponseDurationsMs": [
+      6959,
+      4228,
+      6208,
+      3629,
+      4620,
+      2725
+    ],
+    "warnings": [
+      {
+        "kind": "readability_over_target",
+        "count": 4,
+        "estimatedGrades": [
+          8.3,
+          13.1,
+          10.9,
+          8.6
+        ],
+        "maxGrade": 8,
+        "note": "Operational metadata only; no real student conversation text read. Follow-up needed for plain-language quality; this heuristic does not establish an unsupported claim."
+      },
+      {
+        "kind": "CSP violation",
+        "at": "2026-09-10T18:01:51.779Z",
+        "directive": "script-src",
+        "blockedHost": "eval",
+        "path": "/career",
+        "note": "Blocked script execution reported; impact and regression status not established. Preserve CSP and investigate separately."
+      }
+    ],
+    "metrics": {
+      "range": "Last 4 hours at review",
+      "totalRequests": 323,
+      "statusSelectorHad5xxEntry": false,
+      "latencyPercentiles": "Unavailable on plan",
+      "limit": "Status selector is not an exact first-hour error-rate measurement. CPU/memory chart values not extracted; no percentile or latency-improvement claim."
+    },
+    "limits": "Read-only operational observation, not a new answer-quality or audience-isolation test. Existing synthetic release evidence remains separate. UI log searches found no new errors; this does not guarantee every request succeeded."
+  },
+  "documentationRelease": {
+    "pr": 215,
+    "commit": "af6a6e0d7eb83f2a2f07587216d7b212ad0e9e73",
+    "deployment": "dep-dahfb4ou01pc739bmd3g",
+    "liveAt": "2026-09-10T18:26:54Z",
+    "liveTimestampSource": "Render application log: Your service is live, 02:26:54 PM EDT",
+    "status": "Live at observation review",
+    "applicationAndMigrationTreesUnchanged": true,
+    "migrationStatus": "52 migrations; none pending",
+    "health": {
+      "status": "healthy",
+      "db": "connected",
+      "schema": "ready",
+      "latency_ms": 640,
+      "uptime": 3018.868002871,
+      "timestamp": "2026-09-10T19:16:56.347Z"
+    }
+  },
+  "nextWorkingDayReview": {
+    "reviewedAt": "2026-09-11T13:20:00Z",
+    "status": "passed",
+    "health": {
+      "status": "healthy",
+      "db": "connected",
+      "schema": "ready",
+      "latency_ms": 534,
+      "timestamp": "2026-09-11T13:16:58.512Z"
+    },
+    "deployedCommit": "44ec49ac89d7642b557dcf4ee9a9ed18b0bbf877",
+    "deployment": "dep-dahtstuk1f9s73fac730",
+    "laterRelease": "PR #216 changes CI workflow and documentation only; git diff verifies application and migration files unchanged from af6a6e0. Render reports Live.",
+    "logRange": "Last 24 hours, covering corrective release through next-working-day review",
+    "failedSearchMatches": 19,
+    "failedSearchMatchesAfterCorrectiveRelease": 0,
+    "historicalFailures": "17 PDF worker extraction failures at September 10 13:36-13:37 UTC and two transcript-role failures at 17:02 UTC; all precede corrective deployment. Absence of recurrence does not prove PDF-worker packaging is fixed.",
+    "newWarningsSinceFirstHourReview": 0,
+    "index": {
+      "generatedAt": "2026-09-11T13:17:31.189Z",
+      "retrievableDocuments": 67,
+      "activeMemories": 57,
+      "missingMemoryEmbeddings": 0,
+      "staleMemoryEmbeddings": 0,
+      "strictFailures": 0
+    },
+    "metrics": {
+      "range": "Last 24 hours",
+      "requests": 517,
+      "statusSelectorHad5xxEntry": false,
+      "latencyPercentiles": "Unavailable on plan"
+    },
+    "limitations": "UI log searches and broader-range metrics are operational evidence, not exhaustive request success or new answer-quality testing. No real student transcript content read, fixtures created, or production mutations performed. Prior readability and CSP findings remain follow-ups."
+  },
+  "sprintStatus": "complete; observation gates passed; noncritical follow-ups retained"
 }
