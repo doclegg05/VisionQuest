@@ -104,6 +104,36 @@ test('apply deletes and archives', () => {
   }
 });
 
+test('archive rerun after a failed delete succeeds', () => {
+  const { root, bare, clone, shas } = setup();
+  try {
+    // Simulate an earlier partial run: the local tag already exists at b's sha.
+    git(clone, 'tag', 'archive/b', shas.b);
+    const file = manifest(root, [['b', shas.b, 'archive']]);
+    const r = run(clone, file, ['--apply']);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const refs = remoteRefs(bare);
+    assert.doesNotMatch(refs, /refs\/heads\/b$/m);
+    assert.match(refs, /refs\/tags\/archive\/b$/m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('archive tag at a different commit fails and keeps the branch', () => {
+  const { root, bare, clone, shas } = setup();
+  try {
+    git(clone, 'tag', 'archive/b', shas.a);
+    const file = manifest(root, [['b', shas.b, 'archive']]);
+    const r = run(clone, file, ['--apply']);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /FAILED b: archive tag exists at a different commit/);
+    assert.match(remoteRefs(bare), /refs\/heads\/b$/m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('refuses moved tip and continues', () => {
   const { root, bare, clone, shas } = setup();
   try {

@@ -30,13 +30,14 @@ sprint-1/coverage-instrumentation	48178af87355781e4984f4c12d0a67cd5ace4f2d	delet
 sprint-2/lint-enforcement	6bc843bc9bc89ae05e3eaaf374a50f48fc8f615e	delete
 sprint-3/e2e-authenticated-chat	cb1aac547999ac2325d05a7b47b6a1fef4870556	delete
 #
-# Audit says delete (4):
+# Audit says delete (3):
 codex/sage-extraction-transcript	43df9155e6d7e50d4a7997063143a9ced3394a54	delete
 codex/sage-answer-quality-release	6017500293ff2b8872387b29a847ffee6b957ad6	delete
-codex/ai-provider-benchmark-harness	62a0540f80e63c3dfc7b96ee45483582ec0dc3e4	delete
 goal/signin-maturity-instrument	f9d02ee25d0a794a6e9fb4a212bb0e751c872fcb	delete
 #
-# Audit says archive (6), plus the archive halves of two "land a slice" branches (2):
+# Audit says archive (6), plus the archive halves of two "land a slice" branches (2),
+# plus codex/ai-provider-benchmark-harness (audit says delete, but it exists only on GitHub with no PR, so it is archived instead) (1):
+codex/ai-provider-benchmark-harness	62a0540f80e63c3dfc7b96ee45483582ec0dc3e4	archive
 codex/docs-ferpa-provider-terms	cf4406c23e55911b0e08327575fda10dae647b48	archive
 codex/provider-neutral-ai-harness-hardening	bcda6c10c0929284b6886e03a6fbbc71573122da	archive
 codex/local-model-routing-security	f8f3c3ea8b8bd14c60e70474c0be685e4f9c772c	archive

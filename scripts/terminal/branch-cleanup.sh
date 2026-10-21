@@ -60,11 +60,19 @@ delete_branch() {
 
 # Tag the branch tip and push the tag, using fully qualified refs.
 archive_tag() {
-  local branch="$1" sha="$2" out
-  out=$(git tag "archive/${branch}" "$sha" 2>&1) || {
-    echo "FAILED $branch: $(printf '%s' "$out" | tr '\n' ' ')"
+  local branch="$1" sha="$2" out existing
+  # A tag left by an earlier partial run is reused if it points at the same
+  # commit; at a different commit it is an error and the branch is kept.
+  existing=$(git rev-parse -q --verify "refs/tags/archive/${branch}^{commit}" 2>/dev/null)
+  if [ -z "$existing" ]; then
+    out=$(git tag "archive/${branch}" "$sha" 2>&1) || {
+      echo "FAILED $branch: $(printf '%s' "$out" | tr '\n' ' ')"
+      return 1
+    }
+  elif [ "$existing" != "$sha" ]; then
+    echo "FAILED $branch: archive tag exists at a different commit"
     return 1
-  }
+  fi
   out=$(git push "$remote" "refs/tags/archive/${branch}:refs/tags/archive/${branch}" 2>&1) || {
     echo "FAILED $branch: $(printf '%s' "$out" | tr '\n' ' ')"
     return 1
