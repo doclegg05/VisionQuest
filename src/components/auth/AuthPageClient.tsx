@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Books, Briefcase, CheckCircle, Target } from "@phosphor-icons/react";
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { DemoEntryButtons } from "./DemoEntryButtons";
 import { lookupErrorMessage } from "./error-message-lookup";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -33,11 +34,24 @@ const MODULE_SPOTLIGHT = [
   { icon: Briefcase, label: "Career proof", copy: "Portfolio, resume, and ready-to-share wins." },
 ];
 
-interface AuthPageClientProps {
-  googleAuthEnabled: boolean;
+/** The "or" rule between the password form and a second way in. */
+function OrDivider() {
+  return (
+    <div className="my-5 flex items-center gap-3">
+      <div className="h-px flex-1 bg-[var(--border)]" />
+      <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ink-muted)]">or</span>
+      <div className="h-px flex-1 bg-[var(--border)]" />
+    </div>
+  );
 }
 
-function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
+interface AuthPageClientProps {
+  googleAuthEnabled: boolean;
+  /** Cohort demo mode: the demo block replaces the Google block, the instructor note and the staff link. */
+  demoEnabled: boolean;
+}
+
+function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
   const [studentId, setStudentId] = useState("");
   const [password, setPassword] = useState("");
   const [mfaToken, setMfaToken] = useState("");
@@ -354,13 +368,16 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
               </form>
             )}
 
-            {!mfaRequired && googleAuthEnabled ? (
+            {!mfaRequired && demoEnabled && (
               <>
-                <div className="my-5 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-[var(--border)]" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ink-muted)]">or</span>
-                  <div className="h-px flex-1 bg-[var(--border)]" />
-                </div>
+                <OrDivider />
+                <DemoEntryButtons />
+              </>
+            )}
+
+            {!mfaRequired && !demoEnabled && googleAuthEnabled ? (
+              <>
+                <OrDivider />
 
                 <a
                   href="/api/auth/google"
@@ -377,23 +394,27 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
                   Sign in with Google
                 </a>
               </>
-            ) : !mfaRequired ? (
+            ) : !mfaRequired && !demoEnabled ? (
               <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
                 Google sign-in is not enabled in this environment. Use the sign-in form above.
               </div>
             ) : null}
 
-            <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
-              Your instructor will provide your username and password.
-            </div>
+            {!demoEnabled && (
+              <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+                Your instructor will provide your username and password.
+              </div>
+            )}
 
             <div className="mt-8 flex flex-col items-center gap-3 sm:gap-4">
-              <a
-                href="/teacher-register"
-                className="inline-flex min-h-11 items-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
-              >
-                Staff? Register here
-              </a>
+              {!demoEnabled && (
+                <a
+                  href="/teacher-register"
+                  className="inline-flex min-h-11 items-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
+                >
+                  Staff? Register here
+                </a>
+              )}
               <div className="mt-1 flex flex-wrap items-center justify-center gap-4 sm:mt-2 sm:gap-5">
                 <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />
                 <Image src="/spokes-logo.png" alt="SPOKES Logo" width={110} height={55} className="object-contain" />
@@ -409,10 +430,10 @@ function AuthForm({ googleAuthEnabled }: AuthPageClientProps) {
   );
 }
 
-export default function AuthPageClient({ googleAuthEnabled }: AuthPageClientProps) {
+export default function AuthPageClient({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
   return (
     <Suspense fallback={null}>
-      <AuthForm googleAuthEnabled={googleAuthEnabled} />
+      <AuthForm googleAuthEnabled={googleAuthEnabled} demoEnabled={demoEnabled} />
     </Suspense>
   );
 }

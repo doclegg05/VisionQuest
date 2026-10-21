@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { withAuth, badRequest } from "@/lib/api-error";
+import { assertNotDemoAccount } from "@/lib/demo/guards";
+import { DEMO_NO_SEND_REFUSAL } from "@/lib/demo/copy";
 import { phoneNumberInUseByAnotherStudent } from "@/lib/nudges/phone-verification";
 import { normalizedPhone } from "@/lib/nudges/sms-policy-shared";
 
@@ -63,6 +65,15 @@ export const PUT = withAuth(async (session, req: Request) => {
   }
 
   const { email, sms } = parsed.data;
+
+  // A demo sends no messages, so a demo account may not save a phone number or
+  // turn texts on. Other changes, such as email off, are harmless and stay
+  // allowed. This is the one guard that follows the body: what it refuses
+  // depends on what the request asks for. It still runs before any database
+  // read or write.
+  if (sms !== undefined && (sms.phoneNumber !== undefined || sms.enabled)) {
+    assertNotDemoAccount(session, DEMO_NO_SEND_REFUSAL);
+  }
 
   const upserts: Promise<unknown>[] = [];
 

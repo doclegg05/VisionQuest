@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedInternalRequest, isSignedWebhookPath, isUrlHostMatch } from "@/lib/csrf";
-import { verifyToken } from "@/lib/session-token";
+import { isCohortDemoEnabled } from "@/lib/demo/config";
+import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
+import { isDemoInstructorRequestAllowed } from "@/lib/demo/instructor-policy";
+import { verifyToken, type SessionClaims } from "@/lib/session-token";
 import {
   RLS_HEADER_NAMES,
   RLS_HEADER_ROLE,
@@ -20,6 +23,9 @@ const SESSION_COOKIE_NAME = "vq-session";
 //   4. X-API-Version response header on /api/* responses
 //   5. RLS context headers derived from the session JWT (Slice B).
 //   6. X-Robots-Tag on the two public per-student pages (crawlerHeadersFor).
+//   7. Cohort demo fence: a demo session is treated as signed out once the
+//      switch is off, and the shared demo instructor is held to
+//      src/lib/demo/instructor-policy.ts. Both checks need no database.
 // The static CSP in next.config.ts has been removed — this proxy is the single source of truth.
 // Referrer-Policy and X-Content-Type-Options are NOT set here: next.config.ts
 // `headers()` already applies both (plus HSTS and X-Frame-Options) to `/(.*)`.
@@ -45,8 +51,22 @@ export function crawlerHeadersFor(pathname: string): Record<string, string> {
   return noindex ? { "X-Robots-Tag": "noindex, nofollow" } : {};
 }
 
+/**
+ * The verified session claims for this request, or null for no usable session.
+ * The token is verified once here and every later check reads the result. A
+ * demo session whose switch is off counts as no session at all: the proxy has
+ * no database to ask, so the token's own `demo` claim is what it can see.
+ */
+function sessionClaimsFor(request: NextRequest): SessionClaims | null {
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const claims = token ? verifyToken(token) : null;
+  if (claims?.demo !== undefined && !isCohortDemoEnabled()) return null;
+  return claims;
+}
+
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const claims = sessionClaimsFor(request);
 
   // --- Auth redirect for gated routes ---
   // Redirect unauthenticated users hitting student/teacher/admin routes to the sign-in page.
@@ -58,15 +78,10 @@ export function proxy(request: NextRequest) {
     pathname === prefix || pathname.startsWith(prefix + "/")
   );
 
-  if (isGatedRoute) {
-    const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-    const claims = token ? verifyToken(token) : null;
-    
-    if (!claims) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/";
-      return NextResponse.redirect(url);
-    }
+  if (isGatedRoute && !claims) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
   }
 
   // --- CSRF protection (state-changing API requests only) ---
@@ -100,6 +115,14 @@ export function proxy(request: NextRequest) {
         { status: 403 },
       );
     }
+  }
+
+  // --- Demo instructor fence ---
+  // After the CSRF check, so a cross-site request still gets the origin
+  // refusal. The shared demo instructor is a real teacher account, so the
+  // route handlers alone would let it change the program's real content.
+  if (claims?.demo === "instructor" && !isDemoInstructorRequestAllowed(method, pathname)) {
+    return NextResponse.json({ error: DEMO_READ_ONLY_REFUSAL }, { status: 403 });
   }
 
   // --- CSP nonce + response headers ---
@@ -138,15 +161,11 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   for (const name of RLS_HEADER_NAMES) requestHeaders.delete(name);
 
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  if (token) {
-    const claims = verifyToken(token);
-    if (claims) {
-      const rls = rlsHeadersFromClaims(claims);
-      requestHeaders.set(RLS_HEADER_USER_ID, rls[RLS_HEADER_USER_ID]);
-      requestHeaders.set(RLS_HEADER_ROLE, rls[RLS_HEADER_ROLE]);
-      requestHeaders.set(RLS_HEADER_STUDENT_ID, rls[RLS_HEADER_STUDENT_ID]);
-    }
+  if (claims) {
+    const rls = rlsHeadersFromClaims(claims);
+    requestHeaders.set(RLS_HEADER_USER_ID, rls[RLS_HEADER_USER_ID]);
+    requestHeaders.set(RLS_HEADER_ROLE, rls[RLS_HEADER_ROLE]);
+    requestHeaders.set(RLS_HEADER_STUDENT_ID, rls[RLS_HEADER_STUDENT_ID]);
   }
 
   requestHeaders.set("x-csp-nonce", nonce);

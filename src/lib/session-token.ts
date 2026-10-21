@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { DEMO_ACCOUNT_KINDS, type DemoAccountKind } from "./demo/config";
 
 const TOKEN_TTL = "7d";
 const MFA_TOKEN_TTL = "5m";
@@ -7,6 +8,11 @@ export interface SessionClaims {
   sub: string;
   role: string;
   sv: number;
+  /**
+   * Set only on demo accounts. src/proxy.ts reads it to fence demo sessions
+   * without a database lookup. Real accounts never carry the key at all.
+   */
+  demo?: DemoAccountKind;
 }
 
 export interface MfaSessionClaims {
@@ -27,11 +33,27 @@ export function getJwtSecret(): string {
   return secret;
 }
 
-export function signToken(studentId: string, role: string, sessionVersion: number): string {
-  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, getJwtSecret(), {
+export function signToken(
+  studentId: string,
+  role: string,
+  sessionVersion: number,
+  options: { demo?: DemoAccountKind } = {},
+): string {
+  // A real account's payload stays exactly {sub, role, sv}: no `demo` key.
+  const claims: SessionClaims = {
+    sub: studentId,
+    role,
+    sv: sessionVersion,
+    ...(options.demo === undefined ? {} : { demo: options.demo }),
+  };
+  return jwt.sign(claims, getJwtSecret(), {
     expiresIn: TOKEN_TTL,
     algorithm: "HS256",
   });
+}
+
+function isDemoAccountKind(value: unknown): value is DemoAccountKind {
+  return DEMO_ACCOUNT_KINDS.some((kind) => kind === value);
 }
 
 /**
@@ -55,6 +77,12 @@ export function signToken(studentId: string, role: string, sessionVersion: numbe
  * so any future purpose-scoped token is rejected by default rather than
  * inheriting session authority the day it is added. Session tokens themselves
  * are never given a purpose claim, so existing 7-day tokens keep working.
+ *
+ * A `demo` claim, when present, must be one of DEMO_ACCOUNT_KINDS. Anything
+ * else, a non-string included, fails the whole token: a claim this code does
+ * not recognize is not one it can safely ignore. Tokens with no `demo` key
+ * (every real account, and every token issued before demo mode) verify as
+ * before.
  */
 export function verifyToken(token: string): SessionClaims | null {
   try {
@@ -68,6 +96,9 @@ export function verifyToken(token: string): SessionClaims | null {
       typeof payload.role !== "string" ||
       typeof payload.sv !== "number"
     ) {
+      return null;
+    }
+    if ("demo" in payload && !isDemoAccountKind(payload.demo)) {
       return null;
     }
     return payload as SessionClaims;

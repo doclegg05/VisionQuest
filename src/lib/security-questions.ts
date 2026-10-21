@@ -1,3 +1,5 @@
+import type { DemoAccountKind } from "@/lib/demo/config";
+
 export const SECURITY_QUESTIONS = [
   { key: "birth_city", prompt: "What city were you born in?" },
   { key: "elementary_school", prompt: "What was the name of your elementary school?" },
@@ -61,11 +63,26 @@ export function validateSecurityQuestionAnswers(raw: unknown): {
   return { answers, error: null };
 }
 
-export function hasConfiguredSecurityQuestionSet(questionKeys: string[]): boolean {
+export function hasConfiguredSecurityQuestionSet(questionKeys: readonly string[]): boolean {
   if (questionKeys.length !== SECURITY_QUESTIONS.length) {
     return false;
   }
 
   const configured = new Set(questionKeys);
   return SECURITY_QUESTIONS.every((question) => configured.has(question.key));
+}
+
+/**
+ * Whether a signed-in student must set up recovery questions before using the
+ * app. A demo account has no password to forget and no way to reset one, so it
+ * never needs them; asking for them would only trap a visitor on a setup page.
+ * The student layout and the setup page both ask this, so they cannot disagree
+ * and bounce a student between the two.
+ */
+export function needsRecoverySetup(input: {
+  demoAccount?: DemoAccountKind;
+  questionKeys: readonly string[];
+}): boolean {
+  if (input.demoAccount !== undefined) return false;
+  return !hasConfiguredSecurityQuestionSet(input.questionKeys);
 }

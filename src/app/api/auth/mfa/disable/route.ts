@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertNotDemoAccount } from "@/lib/demo/guards";
 import { logAuditEvent } from "@/lib/audit";
 import { parseBody } from "@/lib/schemas";
 import { verifyTotp } from "@/lib/mfa";
@@ -19,6 +20,9 @@ const mfaDisableSchema = z.object({
  * Clears mfaSecret, mfaEnabled, mfaBackupCodes, and mfaVerifiedAt.
  */
 export const POST = withTeacherAuth(async (session, req: NextRequest) => {
+  // Before the limiter and the body, so a demo visitor costs no work.
+  assertNotDemoAccount(session);
+
   const rl = await rateLimit(`mfa-disable:${session.id}`, 5, 5 * 60 * 1000);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });

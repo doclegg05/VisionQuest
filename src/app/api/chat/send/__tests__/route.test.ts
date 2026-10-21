@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it, mock } from "node:test";
-import { mockStudentSession, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
+import { mockAdminSession, mockStudentSession, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
+import { DEMO_SAGE_LIMIT } from "@/lib/demo/copy";
 
 // ---------------------------------------------------------------------------
 // Request-level tests for POST /api/chat/send.
@@ -628,6 +629,221 @@ describe("POST /api/chat/send — rate limiting", () => {
     } finally {
       mockRateLimitsDisabled.mock.mockImplementation(() => false);
     }
+  });
+});
+
+describe("POST /api/chat/send: Sage limits for demo accounts", () => {
+  // Classic streamResponse() path, so a capturing provider can read the prompt.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  const previousDemoSageCap = process.env.COHORT_DEMO_SAGE_PER_DAY;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+    if (previousDemoSageCap === undefined) delete process.env.COHORT_DEMO_SAGE_PER_DAY;
+    else process.env.COHORT_DEMO_SAGE_PER_DAY = previousDemoSageCap;
+  });
+
+  const DEMO_WIDE_KEY = "chat-daily:demo-all";
+  const CRISIS_MESSAGE = "I just want to end it all";
+  const NORMAL_MESSAGE = "How do I finish my OSHA 10 certification?";
+  const EN_BLOCK = /call or text 988/;
+
+  // Every chat counter the route charges, in order, as "key:limit". The hourly
+  // and daily counters are separate mocks, so one shared log is what shows
+  // order. Other counters (crisis, staff memory) are not chat limits.
+  let charged: string[] = [];
+  const logCharge = (key: string, limit: number) => {
+    if (key.startsWith("chat:") || key.startsWith("chat-daily:")) charged.push(`${key}:${limit}`);
+  };
+
+  beforeEach(() => {
+    resetMocks();
+    delete process.env.COHORT_DEMO_SAGE_PER_DAY;
+    charged = [];
+    mockRateLimit.mock.mockImplementation(async (key: string, limit: number) => {
+      logCharge(key, limit);
+      return { success: true, remaining: 100, resetTime: Date.now() + 3600_000, degraded: false };
+    });
+    mockRateLimitDaily.mock.mockImplementation(async (key: string, limit: number) => {
+      logCharge(key, limit);
+      return { success: true, remaining: 100, resetTime: Date.now() + 3600_000, degraded: false };
+    });
+  });
+
+  function post(message = NORMAL_MESSAGE) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    return route.POST(req as never, { params: Promise.resolve({}) } as never);
+  }
+
+  const useCloud = () =>
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+  const demoStudent = () => mockStudentSession({ demoAccount: "student" });
+  const demoInstructor = () => mockTeacherSession({ demoAccount: "instructor" });
+
+  it("refuses past the demo-wide cap with crisis resources", async () => {
+    session = demoStudent();
+    mockRateLimitDaily.mock.mockImplementation(async (key: string, limit: number) => {
+      logCharge(key, limit);
+      return key === DEMO_WIDE_KEY
+        ? { success: false, remaining: 0, resetTime: Date.now() + 3600_000, degraded: false }
+        : { success: true, remaining: 100, resetTime: Date.now() + 3600_000, degraded: false };
+    });
+
+    const res = await post(CRISIS_MESSAGE);
+
+    assert.equal(res.status, 429);
+    const body = await res.json();
+    assert.ok(body.error.startsWith(DEMO_SAGE_LIMIT), "the demo wording comes first");
+    assert.match(body.error, EN_BLOCK);
+    assert.equal(mockSaveMessage.mock.callCount(), 0, "a refused message is not saved");
+    assert.ok(charged.includes(`${DEMO_WIDE_KEY}:2000`));
+  });
+
+  it("keeps the refusal plain when the message carries no crisis signal", async () => {
+    session = demoStudent();
+    mockRateLimitDaily.mock.mockImplementation(async () => ({
+      success: false,
+      remaining: 0,
+      resetTime: Date.now() + 3600_000,
+      degraded: false,
+    }));
+
+    const res = await post();
+
+    assert.equal(res.status, 429);
+    assert.equal((await res.json()).error, DEMO_SAGE_LIMIT);
+  });
+
+  it("charges the hour, the account's day and the demo-wide day, in that order", async () => {
+    session = demoStudent();
+    useCloud();
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.deepEqual(charged, [
+      `chat:${session.id}:40`,
+      `chat-daily:${session.id}:200`,
+      `${DEMO_WIDE_KEY}:2000`,
+    ]);
+  });
+
+  it("applies the demo-wide cap to a demo student on a local provider too", async () => {
+    session = demoStudent();
+
+    const res = await post();
+    await readSseBody(res);
+
+    // No per-account day on a local provider, but the demo-wide one is not
+    // about cost per account, so it stays.
+    assert.deepEqual(charged, [`chat:${session.id}:40`, `${DEMO_WIDE_KEY}:2000`]);
+  });
+
+  it("gives the demo instructor 300 an hour and 1000 a day, even on a local provider", async () => {
+    session = demoInstructor();
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.deepEqual(charged, [
+      `chat:${session.id}:300`,
+      `chat-daily:${session.id}:1000`,
+      `${DEMO_WIDE_KEY}:2000`,
+    ]);
+  });
+
+  it("reads the demo-wide cap from the environment on each request", async () => {
+    session = demoStudent();
+    process.env.COHORT_DEMO_SAGE_PER_DAY = "1234";
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.ok(charged.includes(`${DEMO_WIDE_KEY}:1234`), charged.join(", "));
+  });
+
+  it("never charges the demo-wide cap to a real account", async () => {
+    useCloud();
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.deepEqual(charged, [`chat:${session.id}:40`, `chat-daily:${session.id}:200`]);
+  });
+
+  it("skips the demo-wide cap when rate limits are disabled", async () => {
+    session = demoStudent();
+    mockRateLimitsDisabled.mock.mockImplementation(() => true);
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.deepEqual(charged, []);
+  });
+
+  describe("real accounts keep today's numbers", () => {
+    const rows = [
+      { who: "student", make: () => mockStudentSession(), hourly: 40, cloudDaily: 200 },
+      { who: "teacher", make: () => mockTeacherSession(), hourly: 60, cloudDaily: 400 },
+      {
+        who: "coordinator",
+        make: () => mockTeacherSession({ id: "crd-test-001", role: "coordinator" }),
+        hourly: 60,
+        cloudDaily: 400,
+      },
+      { who: "admin", make: () => mockAdminSession(), hourly: 120, cloudDaily: null },
+    ] as const;
+
+    for (const row of rows) {
+      it(`${row.who}, cloud provider`, async () => {
+        session = row.make();
+        useCloud();
+
+        await readSseBody(await post());
+
+        const expected = [`chat:${session.id}:${row.hourly}`];
+        if (row.cloudDaily !== null) expected.push(`chat-daily:${session.id}:${row.cloudDaily}`);
+        assert.deepEqual(charged, expected);
+      });
+
+      it(`${row.who}, local provider`, async () => {
+        session = row.make();
+
+        await readSseBody(await post());
+
+        assert.deepEqual(charged, [`chat:${session.id}:${row.hourly}`]);
+      });
+    }
+  });
+
+  it("measures the 80% daily warning against the demo instructor's own daily cap", async () => {
+    session = demoInstructor();
+    const captured = { systemPrompt: "" };
+    mockResolveAiProvider.mock.mockImplementation(async () => ({
+      ...makeFakeProvider("ollama"),
+      async *streamResponse(systemPrompt: string) {
+        captured.systemPrompt = systemPrompt;
+        yield "ok";
+      },
+    }));
+    // 150 left of 1000 is 85% used. Against the old 400 it would read 62%.
+    mockRateLimitDaily.mock.mockImplementation(async (key: string) => ({
+      success: true,
+      remaining: key === `chat-daily:${session.id}` ? 150 : 1500,
+      resetTime: Date.now() + 3600_000,
+      degraded: false,
+    }));
+
+    await readSseBody(await post());
+
+    assert.match(captured.systemPrompt, /used 85% of their daily message limit/);
   });
 });
 
@@ -1692,6 +1908,37 @@ describe("POST /api/chat/send — chat limit charged on a reply, not on a confir
       [`chat-daily:${session.id}`, DAILY_RESET],
       [`chat:${session.id}`, HOURLY_RESET],
     ]);
+  });
+
+  it("refunds the demo-wide unit too when a demo account's turn ends in a confirm card", async () => {
+    session = mockStudentSession({ demoAccount: "student" });
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+
+    const res = await post("Add a goal to finish my resume this week");
+    await readSseBody(res);
+
+    assert.deepEqual(refundCalls().sort(), [
+      ["chat-daily:demo-all", DAILY_RESET],
+      [`chat-daily:${session.id}`, DAILY_RESET],
+      [`chat:${session.id}`, HOURLY_RESET],
+    ]);
+  });
+
+  it("has nothing to refund for a demo-wide unit that came back degraded", async () => {
+    session = mockStudentSession({ demoAccount: "student" });
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+    mockRateLimitDaily.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 1999,
+      resetTime: DAILY_RESET,
+      degraded: true,
+    }));
+
+    const res = await post("Add a goal to finish my resume this week");
+    await readSseBody(res);
+
+    assert.deepEqual(refundCalls(), [[`chat:${session.id}`, HOURLY_RESET]]);
   });
 
   it("refunds nothing when rate limits are disabled (nothing was consumed)", async () => {

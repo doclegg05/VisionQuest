@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import type { Session } from "@/lib/api-error";
+import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
 import type { AgentTool } from "./types";
 
 const secret = "private student note / database credential";
@@ -19,7 +20,7 @@ mock.module("./tools", { namedExports: { getToolByName: () => tool, findToolBySl
 mock.module("./flags", { namedExports: { agentMode: () => "full", isTierAllowedInMode: () => true } });
 mock.module("./rate-limit", { namedExports: { checkToolRateLimit: rateLimit, rateLimitMessage: () => "Limited" } });
 mock.module("@/lib/classroom", { namedExports: { assertStaffCanManageStudent: checkAccess } });
-mock.module("@/lib/api-error", { namedExports: { isStaffRole: (role: string) => ["teacher", "admin", "coordinator"].includes(role) } });
+mock.module("@/lib/api-error", { namedExports: { isStaffRole: (role: string) => ["teacher", "admin", "coordinator"].includes(role), forbidden: (message = "Forbidden") => new Error(message) } });
 mock.module("@/lib/audit", { namedExports: { logAuditEvent: async (event: unknown) => { audits.push(event); } } });
 mock.module("@/lib/logger", { namedExports: { logger: { error: (...args: unknown[]) => logs.push(args), warn: (...args: unknown[]) => logs.push(args) } } });
 
@@ -28,6 +29,7 @@ before(async () => { ({ executeAgentTool } = await import("./executor")); });
 const session: Session = { id: "actor", studentId: "actor", displayName: "Test", role: "student" };
 const options = { session, conversationId: "conversation", toolName: tool.name, args: { note: secret } };
 beforeEach(() => {
+  tool.riskTier = "read";
   execute.mock.resetCalls();
   execute.mock.mockImplementation(async () => ({ status: "success", summary: secret }));
   checkAccess.mock.resetCalls();
@@ -90,5 +92,43 @@ describe("agent execution security boundary", () => {
     assert.equal(result.result.summary, "Tool failed unexpectedly.");
     assert.ok(!JSON.stringify(logs).includes(secret));
     assert.equal(logs.length, 1);
+  });
+  describe("demo instructor", () => {
+    const demoInstructor: Session = { ...session, role: "teacher", demoAccount: "instructor" };
+    const demoOptions = { ...options, session: demoInstructor };
+
+    it("refuses a demo instructor's write tool that names no student", async () => {
+      for (const riskTier of ["mutate_reversible", "mutate_consequential"] as const) {
+        tool.riskTier = riskTier;
+        const result = await executeAgentTool(demoOptions);
+        assert.equal(result.result.status, "error", riskTier);
+        assert.equal(result.result.summary, DEMO_READ_ONLY_REFUSAL, riskTier);
+      }
+      assert.equal(rateLimit.mock.callCount(), 0);
+      assert.equal(execute.mock.callCount(), 0);
+    });
+    it("lets a demo instructor run read tools without naming a student", async () => {
+      for (const riskTier of ["read", "read_ai"] as const) {
+        tool.riskTier = riskTier;
+        const result = await executeAgentTool(demoOptions);
+        assert.equal(result.result.status, "success", riskTier);
+      }
+      assert.equal(execute.mock.callCount(), 2);
+    });
+    it("sends a demo instructor's write tool that names a student through the class check", async () => {
+      tool.riskTier = "mutate_reversible";
+      const result = await executeAgentTool({ ...demoOptions, targetStudentId: "other" });
+      assert.equal(result.result.status, "success");
+      assert.equal(checkAccess.mock.callCount(), 1);
+      assert.equal(checkAccess.mock.calls[0].arguments[0], demoInstructor);
+      assert.equal(execute.mock.callCount(), 1);
+    });
+    it("leaves a real teacher's write tool alone", async () => {
+      tool.riskTier = "mutate_reversible";
+      const teacher: Session = { ...session, role: "teacher" };
+      const result = await executeAgentTool({ ...options, session: teacher });
+      assert.equal(result.result.status, "success");
+      assert.equal(execute.mock.callCount(), 1);
+    });
   });
 });

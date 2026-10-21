@@ -22,6 +22,8 @@ import {
 // red instead of passing on rows production would never return.
 const mockEnrollmentFindMany = mock.fn() as any; // prismaAdmin.studentClassEnrollment.findMany
 const mockStudentFindMany = mock.fn() as any; // prismaAdmin.student.findMany (fallback)
+// prismaAdmin.student.findUnique: the demo-account check (src/lib/demo/accounts.ts).
+const mockAdminStudentFindUnique = mock.fn() as any;
 const mockAppEnrollmentFindMany = mock.fn() as any; // prisma.studentClassEnrollment.findMany
 const mockAppStudentFindMany = mock.fn() as any; // prisma.student.findMany
 // The student's OWN rows stay on the app client: own record, alert, mood.
@@ -41,7 +43,7 @@ mock.module("@/lib/db", {
     },
     prismaAdmin: {
       studentClassEnrollment: { findMany: mockEnrollmentFindMany },
-      student: { findMany: mockStudentFindMany },
+      student: { findMany: mockStudentFindMany, findUnique: mockAdminStudentFindUnique },
     },
   },
 });
@@ -250,6 +252,7 @@ function resetWellbeingMocks() {
   mockAppEnrollmentFindMany.mock.resetCalls();
   mockStudentFindUnique.mock.resetCalls();
   mockStudentFindMany.mock.resetCalls();
+  mockAdminStudentFindUnique.mock.resetCalls();
   mockAppStudentFindMany.mock.resetCalls();
   mockAlertUpsert.mock.resetCalls();
   mockMoodFindFirst.mock.resetCalls();
@@ -268,6 +271,7 @@ function resetWellbeingMocks() {
     studentId: "S-001",
   }));
   mockStudentFindMany.mock.mockImplementation(async () => ALL_TEACHERS);
+  mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ demoAccount: null }));
   mockAlertUpsert.mock.mockImplementation(async () => ({}));
   mockMoodFindFirst.mock.mockImplementation(async () => null);
   mockSendNotification.mock.mockImplementation(async () => ({ sent: true }));
@@ -487,6 +491,181 @@ describe("recordWellbeingConcern under the student's RLS context", { skip: SKIP_
     );
     assert.equal(mockSendNotification.mock.callCount(), 0, "nobody to notify");
     assert.equal(mockAlertUpsert.mock.callCount(), 1, "the CRITICAL alert row is still written");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cohort demo mode: a demo student's alert must stay inside the demo. The
+// all-active-teachers fallback is the one path that would carry a demo
+// student's alert to a real person's inbox, so it never runs for a demo
+// student. Real students keep the fallback, and a failed demo lookup counts
+// as "not a demo account": for a real student in crisis, over-notifying is the
+// safe failure.
+// ---------------------------------------------------------------------------
+
+const DEMO_INSTRUCTOR_ENROLLMENT = enrollmentWithInstructors([
+  { id: "demo-instructor", email: null, isActive: true },
+]);
+
+function wellbeingNoRecipientLogs() {
+  return mockLoggerError.mock.calls.filter(
+    (call: any) => call.arguments[1]?.alert === "wellbeing_no_recipients",
+  );
+}
+
+describe("recordWellbeingConcern for a demo student", { skip: SKIP_IN_CI }, () => {
+  beforeEach(() => {
+    resetWellbeingMocks();
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ demoAccount: "student" }));
+  });
+
+  it("never widens a demo student's alert to all teachers", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => []);
+
+    await recordWellbeingConcern({
+      studentId: "demo-student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.equal(mockStudentFindMany.mock.callCount(), 0, "no all-active-teachers query");
+    assert.deepEqual(notifiedIds(), [], "no real teacher is notified");
+    assert.equal(mockEnqueueJob.mock.callCount(), 0, "no send_email job is queued");
+    assert.equal(mockAlertUpsert.mock.callCount(), 1, "the in-app alert row is still written");
+  });
+
+  it("never widens when the instructor lookup throws either", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => {
+      throw new Error("db exploded");
+    });
+
+    await recordWellbeingConcern({
+      studentId: "demo-student-1",
+      conversationId: "conv-1",
+      reason: "low_mood",
+    });
+
+    assert.equal(mockStudentFindMany.mock.callCount(), 0, "no all-active-teachers query");
+    assert.deepEqual(notifiedIds(), []);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0, "no send_email job is queued");
+    assert.equal(mockAlertUpsert.mock.callCount(), 1);
+  });
+
+  it("asks the demo question of the admin client, by the student's id", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => []);
+
+    await recordWellbeingConcern({
+      studentId: "demo-student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 1);
+    assert.deepEqual(mockAdminStudentFindUnique.mock.calls[0].arguments[0], {
+      where: { id: "demo-student-1" },
+      select: { demoAccount: true },
+    });
+  });
+
+  it("still logs the loud no-recipients error when nobody is assigned, with no raw id", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => []);
+
+    await recordWellbeingConcern({
+      studentId: "demo-student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    const logs = wellbeingNoRecipientLogs();
+    assert.equal(logs.length, 1, "exactly one wellbeing_no_recipients error log");
+    assert.match(logs[0].arguments[1].student, /^stu_[0-9a-f]{12}$/);
+    assert.ok(!JSON.stringify(logs[0].arguments).includes("demo-student-1"));
+  });
+
+  it("reaches the demo instructor in the app, and queues no email for them", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => [DEMO_INSTRUCTOR_ENROLLMENT]);
+
+    await recordWellbeingConcern({
+      studentId: "demo-student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.deepEqual(notifiedIds(), ["demo-instructor"]);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0, "the demo instructor has no email address");
+    assert.equal(mockStudentFindMany.mock.callCount(), 0);
+    assert.equal(wellbeingNoRecipientLogs().length, 0, "a recipient resolved, so no alarm");
+  });
+});
+
+describe("recordWellbeingConcern keeps the real-student fallback beside the demo guard", {
+  skip: SKIP_IN_CI,
+}, () => {
+  beforeEach(resetWellbeingMocks);
+
+  it("still widens a real student with no assigned instructor to all active teachers", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => []);
+
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 1, "the demo check ran");
+    assert.equal(mockStudentFindMany.mock.callCount(), 1);
+    assert.deepEqual(notifiedIds().sort(), ["teacher-all-1", "teacher-all-2"]);
+    assert.deepEqual(emailedTo().sort(), ["all1@example.test", "all2@example.test"]);
+  });
+
+  it("still widens when the student row cannot be found for the demo check", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => []);
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => null);
+
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.deepEqual(notifiedIds().sort(), ["teacher-all-1", "teacher-all-2"]);
+  });
+
+  it("still widens when the demo check itself fails, and says so without the raw id", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => []);
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => {
+      throw new Error("demo lookup down");
+    });
+
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.deepEqual(notifiedIds().sort(), ["teacher-all-1", "teacher-all-2"]);
+    assert.deepEqual(emailedTo().sort(), ["all1@example.test", "all2@example.test"]);
+    const logs = mockLoggerError.mock.calls.filter(
+      (call: any) => call.arguments[1]?.alert === "wellbeing_demo_check_failed",
+    );
+    assert.equal(logs.length, 1, "a failed demo check is loud, not silent");
+    assert.match(logs[0].arguments[1].student, /^stu_[0-9a-f]{12}$/);
+    assert.ok(!JSON.stringify(logs[0].arguments).includes("student-1"));
+  });
+
+  it("does not run the demo check when assigned instructors already resolve", async () => {
+    mockEnrollmentFindMany.mock.mockImplementation(async () => [
+      enrollmentWithInstructors([{ id: "instructor-1", email: "one@example.test", isActive: true }]),
+    ]);
+
+    await recordWellbeingConcern({
+      studentId: "student-1",
+      conversationId: "conv-1",
+      reason: "message_signal",
+    });
+
+    assert.equal(mockAdminStudentFindUnique.mock.callCount(), 0, "no extra read on the usual path");
+    assert.deepEqual(notifiedIds(), ["instructor-1"]);
   });
 });
 

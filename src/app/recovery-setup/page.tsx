@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getRoleHomePath } from "@/lib/role-home";
 import { prisma } from "@/lib/db";
-import { hasConfiguredSecurityQuestionSet } from "@/lib/security-questions";
+import { needsRecoverySetup } from "@/lib/security-questions";
 import RecoverySetupForm from "@/components/auth/RecoverySetupForm";
 
 // One-time recovery-question gate. Student accounts are created by staff with no
@@ -19,7 +19,13 @@ export default async function RecoverySetupPage() {
     where: { studentId: session.id },
     select: { questionKey: true },
   });
-  if (hasConfiguredSecurityQuestionSet(answers.map((a) => a.questionKey))) {
+  // The same question the student layout asks before it sends anyone here, so
+  // the two cannot disagree. A demo account never needs setup and lands on the
+  // dashboard.
+  if (!needsRecoverySetup({
+    demoAccount: session.demoAccount,
+    questionKeys: answers.map((a) => a.questionKey),
+  })) {
     redirect("/dashboard");
   }
 

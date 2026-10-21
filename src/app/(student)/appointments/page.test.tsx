@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { before, describe, it, mock } from "node:test";
+import { before, beforeEach, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
 import {
   createStudentAlertStore,
@@ -20,19 +20,26 @@ mock.module("@/lib/db", {
   },
 });
 
+const REAL_STUDENT_SESSION = {
+  id: STUDENT_ID,
+  studentId: STUDENT_ID,
+  displayName: "Test Student",
+  role: "student",
+};
+let currentSession: Record<string, unknown> = REAL_STUDENT_SESSION;
+
 mock.module("@/lib/auth", {
   namedExports: {
-    getSession: async () => ({
-      id: STUDENT_ID,
-      studentId: STUDENT_ID,
-      displayName: "Test Student",
-      role: "student",
-    }),
+    getSession: async () => currentSession,
   },
 });
 
+// Records the options the page reads open slots with; the audience filter
+// itself is covered in src/lib/advising.test.ts.
+const mockListBookableAdvisors = mock.fn(async (_options?: unknown) => []);
+
 mock.module("@/lib/advising", {
-  namedExports: { listBookableAdvisors: async () => [] },
+  namedExports: { listBookableAdvisors: mockListBookableAdvisors },
 });
 
 interface HubAlert {
@@ -72,5 +79,26 @@ describe("AppointmentsPage alerts", () => {
     const text = JSON.stringify(hub.alerts);
     assert.ok(!text.includes("call 911"), "the staff crisis checklist reached the student");
     assert.ok(!text.includes("Archive review"), "inactivity triage reached the student");
+  });
+});
+
+describe("AppointmentsPage booking audience", () => {
+  beforeEach(() => {
+    currentSession = REAL_STUDENT_SESSION;
+    mockListBookableAdvisors.mock.resetCalls();
+  });
+
+  it("lists only the demo instructor's slots for a demo student", async () => {
+    currentSession = { ...REAL_STUDENT_SESSION, demoAccount: "student" };
+
+    renderToString(await AppointmentsPage());
+
+    assert.deepEqual(mockListBookableAdvisors.mock.calls[0].arguments, [{ audience: "demo" }]);
+  });
+
+  it("lists real advisors' slots for a real student", async () => {
+    renderToString(await AppointmentsPage());
+
+    assert.deepEqual(mockListBookableAdvisors.mock.calls[0].arguments, [{ audience: "standard" }]);
   });
 });

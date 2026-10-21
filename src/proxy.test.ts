@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import { describe, it, test } from "node:test";
 import { NextRequest } from "next/server";
 import { config as proxyConfig, crawlerHeadersFor, proxy, PROXY_MATCHER } from "./proxy";
+import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
+import { signToken } from "@/lib/session-token";
 
 // FERPA review W7 (2026-09-06): the two public pages that render one
 // student's data behind an opaque identifier — /credentials/[slug] and
@@ -231,3 +233,145 @@ test("file-looking gated pages still redirect unauthenticated requests", () => {
   assert.equal(response.status, 307);
   assert.equal(response.headers.get("location"), "https://vq.example/");
 });
+
+// ---------------------------------------------------------------------------
+// Cohort demo sessions
+//
+// A demo session is an ordinary signed token with a `demo` claim. Two rules
+// live here because this is the one layer that sees every request without a
+// database lookup: a session whose demo claim outlives the switch is treated
+// as no session at all, and the shared demo instructor may only do what
+// src/lib/demo/instructor-policy.ts lists. Both are fail-closed.
+// ---------------------------------------------------------------------------
+
+const DEMO_TEST_JWT_SECRET = "test-secret-for-proxy-demo-session-fence";
+const SAME_ORIGIN = { origin: "https://vq.example" };
+
+/** Runs `run` with a signing secret and the demo switch set the way the test needs. */
+async function withDemoSwitch<T>(mode: "on" | "off", run: () => T | Promise<T>): Promise<T> {
+  const previousSecret = process.env.JWT_SECRET;
+  const previousMode = process.env.COHORT_DEMO_MODE;
+  process.env.JWT_SECRET = DEMO_TEST_JWT_SECRET;
+  if (mode === "on") process.env.COHORT_DEMO_MODE = "true";
+  else delete process.env.COHORT_DEMO_MODE;
+  try {
+    return await run();
+  } finally {
+    if (previousSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previousSecret;
+    if (previousMode === undefined) delete process.env.COHORT_DEMO_MODE;
+    else process.env.COHORT_DEMO_MODE = previousMode;
+  }
+}
+
+function sessionCookie(token: string): Record<string, string> {
+  return { cookie: `vq-session=${token}` };
+}
+
+function demoInstructorCookie(): Record<string, string> {
+  return sessionCookie(signToken("demo-instructor-id", "teacher", 1, { demo: "instructor" }));
+}
+
+function forwardedHeader(response: Response, name: string): string | null {
+  return response.headers.get(`x-middleware-request-${name}`);
+}
+
+describe("proxy, the demo instructor fence", () => {
+  it("refuses a demo instructor write outside the allowlist", () =>
+    withDemoSwitch("on", async () => {
+      const res = proxy(request("/api/teacher/sage-snippets", { ...SAME_ORIGIN, ...demoInstructorCookie() }));
+      assert.equal(res.status, 403);
+      assert.deepEqual(await res.json(), { error: DEMO_READ_ONLY_REFUSAL });
+    }));
+
+  it("passes an allowlisted demo instructor write and still sets the RLS headers", () =>
+    withDemoSwitch("on", () => {
+      const res = proxy(request("/api/teacher/students/abc/notes", { ...SAME_ORIGIN, ...demoInstructorCookie() }));
+      assert.equal(res.status, 200);
+      assert.equal(forwardedHeader(res, "x-vq-user-id"), "demo-instructor-id");
+      assert.equal(forwardedHeader(res, "x-vq-role"), "teacher");
+    }));
+
+  it("refuses a demo instructor read of a cross-class report, and passes a program-wide read", () =>
+    withDemoSwitch("on", async () => {
+      const refused = proxy(request("/api/teacher/reports/grant-kpi", { ...demoInstructorCookie() }, "GET"));
+      assert.equal(refused.status, 403);
+      assert.deepEqual(await refused.json(), { error: DEMO_READ_ONLY_REFUSAL });
+
+      const passed = proxy(request("/api/teacher/sage-snippets", { ...demoInstructorCookie() }, "GET"));
+      assert.equal(passed.status, 200);
+    }));
+
+  it("passes a real teacher's program-wide write", () =>
+    withDemoSwitch("on", () => {
+      const cookie = sessionCookie(signToken("teacher-1", "teacher", 1));
+      const res = proxy(request("/api/teacher/sage-snippets", { ...SAME_ORIGIN, ...cookie }));
+      assert.equal(res.status, 200);
+      assert.equal(forwardedHeader(res, "x-vq-user-id"), "teacher-1");
+    }));
+
+  it("leaves a demo student to the routes' own checks", () =>
+    withDemoSwitch("on", () => {
+      const cookie = sessionCookie(signToken("demo-student-id", "student", 1, { demo: "student" }));
+      const res = proxy(request("/api/goals", { ...SAME_ORIGIN, ...cookie }));
+      assert.equal(res.status, 200);
+      assert.equal(forwardedHeader(res, "x-vq-role"), "student");
+      assert.equal(forwardedHeader(res, "x-vq-student-id"), "demo-student-id");
+    }));
+
+  it("answers a cross-site write from a demo instructor with the origin refusal, not the demo one", () =>
+    withDemoSwitch("on", async () => {
+      const res = proxy(request("/api/teacher/sage-snippets", { origin: "https://evil.example", ...demoInstructorCookie() }));
+      assert.equal(res.status, 403);
+      assert.deepEqual(await res.json(), { error: "Forbidden: origin mismatch." });
+    }));
+});
+
+describe("proxy, a demo session when the switch is off", () => {
+  it("treats the session as signed out on a gated page", () =>
+    withDemoSwitch("off", () => {
+      for (const cookie of [
+        demoInstructorCookie(),
+        sessionCookie(signToken("demo-student-id", "student", 1, { demo: "student" })),
+      ]) {
+        const res = proxy(request("/teacher", cookie, "GET"));
+        assert.equal(res.status, 307);
+        assert.equal(res.headers.get("location"), "https://vq.example/");
+      }
+    }));
+
+  it("sets no RLS headers on an API request", () =>
+    withDemoSwitch("off", () => {
+      const res = proxy(request("/api/teacher/students", demoInstructorCookie(), "GET"));
+      for (const name of ["x-vq-user-id", "x-vq-role", "x-vq-student-id"]) {
+        assert.equal(forwardedHeader(res, name), null, `${name} must not be forwarded`);
+        assert.ok(!res.headers.get("x-middleware-override-headers")?.split(",").includes(name), name);
+      }
+    }));
+
+  it("lets the same session through when the switch is on", () =>
+    withDemoSwitch("on", () => {
+      const res = proxy(request("/teacher", demoInstructorCookie(), "GET"));
+      assert.equal(res.status, 200);
+    }));
+
+  it("does not touch a real teacher's session", () =>
+    withDemoSwitch("off", () => {
+      const cookie = sessionCookie(signToken("teacher-1", "teacher", 1));
+      const res = proxy(request("/teacher", cookie, "GET"));
+      assert.equal(res.status, 200);
+      const api = proxy(request("/api/teacher/students", cookie, "GET"));
+      assert.equal(forwardedHeader(api, "x-vq-user-id"), "teacher-1");
+    }));
+});
+
+// Anti-goal 9: a page on another site must not be able to start a demo
+// session by posting to the demo endpoints. The proxy's Origin check already
+// covers any /api/ POST, so this passes before the demo routes exist; it is
+// here so the day they land, the guarantee is pinned to them by name.
+test("a cross-site POST to the demo endpoints is refused", () =>
+  withDemoSwitch("on", () => {
+    for (const path of ["/api/demo/student", "/api/demo/instructor"]) {
+      assert.equal(proxy(request(path, { origin: "https://evil.example" })).status, 403, path);
+    }
+  }));

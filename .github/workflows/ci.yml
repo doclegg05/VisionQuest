@@ -413,7 +413,36 @@ jobs:
           e2e/student-journey.spec.ts
           e2e/teacher-loop.spec.ts
           e2e/theme-variant.spec.ts
+          e2e/cohort-demo-off.spec.ts
           --reporter=line --timeout=120000
+
+      # Cohort demo mode, switch ON. COHORT_DEMO_MODE is set on this step and
+      # NOT on the Build step above, on purpose: the sign-in page is rendered
+      # per request and the proxy reads the switch per request, so a build made
+      # without it must still serve the demo once the server starts with it.
+      # This step is the proof of that. Playwright boots its own server per
+      # invocation and passes it this step's environment, so the spec and the
+      # server see the same value. The switch-off twin, e2e/cohort-demo-off.spec.ts,
+      # runs in the gate step above.
+      #
+      # No seed re-run is needed first, unlike the steps below. The seed clears
+      # the `login:` rate-limit buckets, and nothing here logs in through
+      # /api/auth/login: a demo session is a cookie the demo endpoints set. The
+      # demo endpoints have buckets of their own (`demo-student:`,
+      # `demo-instructor:`); the spec gives every visitor their own
+      # X-Forwarded-For address, so no seed would clear anything this step needs.
+      #
+      # The rows this step creates (the demo class, its instructor, the
+      # starter students and the test visitors) stay in the database for the
+      # steps after it, and a real teacher can see them. That is harmless to
+      # those steps: teacher-queue scopes to the e2e class (?classId=), and
+      # the specs that read the unscoped intervention queue (a11y-authenticated,
+      # spokes-visual) look their student up by id in a response that is not
+      # capped, so extra rows cannot push it out.
+      - name: "E2E gate: cohort demo on"
+        env:
+          COHORT_DEMO_MODE: "true"
+        run: npx playwright test e2e/cohort-demo.spec.ts --reporter=line --timeout=120000
 
       # Gating, in its own Playwright invocation with the seed re-run first:
       # the seed clears the login rate-limit buckets, and the per-IP budget

@@ -125,6 +125,13 @@ const SCAN_ROOTS = [
   // interpolated by the settings component, so scanning the component alone
   // would find none of the words a student actually reads.
   { label: "SMS + consent copy data (src/lib carve-out)", relPath: "src/lib/nudges/sms-policy-shared.ts" },
+  // Cohort demo mode keeps every word a visitor sees because of it in one
+  // file (src/lib/demo/copy.ts), imported by the sign-in buttons and by the
+  // routes that refuse a demo account. Same single-file shape as the carve-outs
+  // above, with one difference: these constants are all named DEMO_<SOMETHING>,
+  // so the copy-name heuristic misses nearly all of them. See
+  // EXPORTED_CONSTANT_COPY_FILES below.
+  { label: "cohort demo copy data (src/lib carve-out, every exported string)", relPath: "src/lib/demo/copy.ts" },
   // Added with the benchmark dashboard (2026-09-05). The audience is the
   // program owner, who does not write code: the whole point of the page is
   // that a number's standing can be read without a glossary, so its copy
@@ -296,10 +303,33 @@ function collectContext(node) {
   return { jsxChild, names, hardExcluded: false };
 }
 
-function isCopyCandidate(node) {
+/**
+ * Files where EVERY exported string constant is copy, whatever it is named.
+ *
+ * The name heuristic above keys on words like title, note or message. The cohort
+ * demo's constants are all DEMO_<SOMETHING> (DEMO_LIMIT_DAILY, DEMO_SAGE_LIMIT,
+ * ...), so it found one of the fourteen and a hard sentence added under any
+ * other name passed the gate unseen. This is an allowlist of single files, not a
+ * general rule: a file is added here only when it holds nothing but visitor
+ * facing words. It widens what the gate reads and relaxes nothing.
+ */
+const EXPORTED_CONSTANT_COPY_FILES = new Set(["src/lib/demo/copy.ts"]);
+
+/** True when `node` is the initializer of an `export const NAME = "..."` statement. */
+function isExportedConstantValue(node) {
+  const declaration = node.parent;
+  if (!declaration || !ts.isVariableDeclaration(declaration) || declaration.initializer !== node) return false;
+  const list = declaration.parent;
+  const statement = list?.parent;
+  if (!statement || !ts.isVariableStatement(statement)) return false;
+  return (statement.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+}
+
+function isCopyCandidate(node, relPath) {
   const ctx = collectContext(node);
   if (ctx.hardExcluded) return false;
   if (ctx.jsxChild) return true;
+  if (EXPORTED_CONSTANT_COPY_FILES.has(relPath.split(sep).join("/")) && isExportedConstantValue(node)) return true;
   return ctx.names.some((n) => nameLooksLikeCopy(n));
 }
 
@@ -433,7 +463,7 @@ export async function scanReadabilityForRoots(rootRelPaths) {
     const visit = (node) => {
       if (ts.isJsxText(node)) {
         record(node, node.text);
-      } else if (ts.isStringLiteralLike(node) && isCopyCandidate(node)) {
+      } else if (ts.isStringLiteralLike(node) && isCopyCandidate(node, relPath)) {
         record(node, node.text);
       }
       ts.forEachChild(node, visit);
@@ -541,7 +571,7 @@ async function main() {
     const visit = (node) => {
       if (ts.isJsxText(node)) {
         record(node, node.text);
-      } else if (ts.isStringLiteralLike(node) && isCopyCandidate(node)) {
+      } else if (ts.isStringLiteralLike(node) && isCopyCandidate(node, relPath)) {
         record(node, node.text);
       }
       ts.forEachChild(node, visit);

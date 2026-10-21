@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { withAuth, badRequest } from "@/lib/api-error";
+import { assertNotDemoAccount } from "@/lib/demo/guards";
+import { DEMO_NO_SEND_REFUSAL } from "@/lib/demo/copy";
 import { sendVerificationCode } from "@/lib/nudges/phone-verification";
 
 /**
@@ -13,6 +15,9 @@ import { sendVerificationCode } from "@/lib/nudges/phone-verification";
  * code to an arbitrary phone.
  */
 export const POST = withAuth(async (session) => {
+  // First: this route sends a text, and a demo sends no messages.
+  assertNotDemoAccount(session, DEMO_NO_SEND_REFUSAL);
+
   const result = await sendVerificationCode({ studentId: session.id });
   if (result.ok) return NextResponse.json({ sent: true });
 

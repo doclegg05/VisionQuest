@@ -3,6 +3,7 @@ import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } 
 import { createStudentBooking } from "@/lib/appointment-booking";
 import { logAuditEvent } from "@/lib/audit";
 import { withAuth } from "@/lib/api-error";
+import { bookingAudienceFor } from "@/lib/demo/guards";
 import { studentLogKey } from "@/lib/log-keys";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
@@ -22,10 +23,13 @@ export const POST = withAuth(async (session, req: Request) => {
   // Fast path only: refuse slots that are not open. Two students can both
   // pass this read; the partial unique index behind createStudentBooking
   // decides who gets the slot (review F27 / API-U-02).
+  // The audience keeps demo students on the demo instructor and everyone else
+  // off it: a slot outside the session's audience is simply not open.
   const advisors = await listBookableAdvisors({
     days: 21,
     maxSlotsPerAdvisor: 100,
     minimumLeadMinutes: 60,
+    audience: bookingAudienceFor(session),
   });
 
   const advisor = advisors.find((entry) => entry.advisorId === advisorId);

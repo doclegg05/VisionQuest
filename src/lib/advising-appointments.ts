@@ -26,12 +26,14 @@ async function getAppointmentEmailContext(appointmentId: string) {
         select: {
           displayName: true,
           email: true,
+          demoAccount: true,
         },
       },
       advisor: {
         select: {
           displayName: true,
           email: true,
+          demoAccount: true,
         },
       },
     },
@@ -67,6 +69,13 @@ export async function sendAppointmentConfirmation(appointmentId: string) {
   const appointment = await getAppointmentEmailContext(appointmentId);
   if (!appointment) {
     return { sent: false, reason: "missing_appointment" as const };
+  }
+
+  // Cohort demo mode: nothing is sent by, for, or about a demo account. Either
+  // person being a demo account is enough, since the other one's address would
+  // otherwise get a message naming the demo account.
+  if (appointment.student.demoAccount || appointment.advisor.demoAccount) {
+    return { sent: false, reason: "demo" as const };
   }
 
   const emailCopy = buildAppointmentEmailCopy(appointment);
@@ -136,6 +145,11 @@ export async function sendPendingAppointmentReminders({
         gte: now,
         lte: upperBound,
       },
+      // Cohort demo mode: no reminder goes out by, for, or about a demo
+      // account. Filtered in the query so a demo appointment is never loaded,
+      // stamped as reminded, or counted as skipped.
+      student: { demoAccount: null },
+      advisor: { demoAccount: null },
     },
     select: {
       id: true,

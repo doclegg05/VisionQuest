@@ -32,6 +32,7 @@ model Student {
   mfaLastUsedCounter   Int? // Last accepted TOTP counter — prevents replay within 90s window
   classroomConfirmedAt DateTime? // Set once Sage has confirmed the student is in the right classroom
   offboardedAt         DateTime? // Set by the admin-only manual offboarding flow — see docs/DATA_RETENTION_POLICY.md
+  demoAccount          DemoAccountKind? // Non-null only for cohort demo accounts; NULL for every real person
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -97,6 +98,18 @@ model Student {
   connections             Connection[]             @relation("StudentConnections")
   proposedConnections     Connection[]             @relation("ProposedConnections")
   sentConnections         Connection[]             @relation("SentConnections")
+
+  @@index([demoAccount, createdAt])
+  @@schema("visionquest")
+}
+
+/// Marks a Student row as a cohort demo account (see
+/// docs/superpowers/specs/2026-10-19-cohort-demo-access-design.md). Real
+/// students, teachers and admins carry NULL. Keep in step with
+/// DEMO_ACCOUNT_KINDS in src/lib/demo/config.ts; a test compares the two.
+enum DemoAccountKind {
+  student
+  instructor
 
   @@schema("visionquest")
 }

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { prismaAdmin } from "./db";
 import { cached, invalidatePrefix } from "./cache";
+import { isCohortDemoEnabled, type DemoAccountKind } from "./demo/config";
 import {
   signToken as signSessionToken,
   verifyToken as verifySessionToken,
@@ -150,8 +151,13 @@ export const verifyToken = verifySessionToken;
 
 // --- Session helpers ---
 
-export async function setSessionCookie(studentId: string, role: string, sessionVersion: number) {
-  const token = signToken(studentId, role, sessionVersion);
+export async function setSessionCookie(
+  studentId: string,
+  role: string,
+  sessionVersion: number,
+  options?: { demo?: DemoAccountKind },
+) {
+  const token = signToken(studentId, role, sessionVersion, options);
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
@@ -176,16 +182,33 @@ export async function getSession() {
   const student = await cached(cacheKey, 10, () =>
     prismaAdmin.student.findUnique({
       where: { id: claims.sub },
-      select: { id: true, studentId: true, displayName: true, role: true, sessionVersion: true, isActive: true },
+      select: {
+        id: true,
+        studentId: true,
+        displayName: true,
+        role: true,
+        sessionVersion: true,
+        isActive: true,
+        demoAccount: true,
+      },
     }),
   );
 
   if (!student || student.sessionVersion !== claims.sv || !student.isActive) return null;
+  // The switch is read here, after the cache, and not inside the cached
+  // lookup: turning demo mode off must end demo sessions at once, not when a
+  // cached row expires.
+  if (student.demoAccount && !isCohortDemoEnabled()) return null;
+  // The proxy fences on the token's demo claim and handlers read the row, so
+  // the two must agree in both directions. A real account has neither.
+  if ((claims.demo ?? null) !== (student.demoAccount ?? null)) return null;
   return {
     id: student.id,
     studentId: student.studentId,
     displayName: student.displayName,
     role: student.role,
+    // Real accounts get no demoAccount key at all.
+    ...(student.demoAccount ? { demoAccount: student.demoAccount } : {}),
   };
 }
 

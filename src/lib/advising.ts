@@ -7,6 +7,7 @@ import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { withStudentRlsContext } from "./rls-context";
 import { studentLogKey } from "@/lib/log-keys";
+import type { BookingAudience } from "@/lib/demo/guards";
 export { buildStudentAlertDescriptors } from "./advising-alerts";
 export {
   buildBookableAdvisorSlots,
@@ -77,25 +78,37 @@ function addDays(value: Date, amount: number) {
   return day;
 }
 
+/**
+ * Which advisors a booking audience may see. The demo audience sees only the
+ * shared demo instructor; the standard audience sees every real teacher and
+ * never the demo instructor.
+ */
+function advisorFilterFor(audience: BookingAudience) {
+  return audience === "demo"
+    ? ({ role: "teacher", demoAccount: "instructor" } as const)
+    : ({ role: "teacher", demoAccount: null } as const);
+}
+
 export async function listBookableAdvisors({
   now = new Date(),
   days = 14,
   maxSlotsPerAdvisor = 12,
   minimumLeadMinutes = 60,
+  audience = "standard",
 }: {
   now?: Date;
   days?: number;
   maxSlotsPerAdvisor?: number;
   minimumLeadMinutes?: number;
+  /** Defaults to "standard", so a caller that forgets it never offers the demo instructor. */
+  audience?: BookingAudience;
 } = {}) {
   const upperBound = addDays(startOfDay(now), days + 1);
   const [blocks, appointments] = await Promise.all([
     prisma.advisorAvailability.findMany({
       where: {
         active: true,
-        advisor: {
-          role: "teacher",
-        },
+        advisor: advisorFilterFor(audience),
       },
       select: {
         id: true,

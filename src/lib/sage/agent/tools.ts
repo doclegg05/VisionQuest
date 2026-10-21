@@ -26,6 +26,7 @@ import { hasActiveConsent } from "@/lib/consent";
 import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
 import { listBookableAdvisors } from "@/lib/advising";
+import { bookingAudienceFor } from "@/lib/demo/guards";
 import { formatCohortDateTime } from "@/lib/timezone";
 import { lookupCertProgress as lookupStudentCertProgress } from "@/lib/sage/cert-actions";
 import type { AgentTool, AgentToolResult } from "./types";
@@ -626,12 +627,13 @@ const findAppointmentSlots: AgentTool = {
   requiredRoles: ["student", "teacher", "admin", "coordinator"],
   riskTier: "read",
   enabled: true,
-  async execute(args): Promise<AgentToolResult> {
+  async execute(args, ctx): Promise<AgentToolResult> {
     const days = Math.min(Math.max(Number(args.withinDays) || 14, 1), 30);
     const advisors = await listBookableAdvisors({
       days,
       maxSlotsPerAdvisor: 6,
       minimumLeadMinutes: 60,
+      audience: bookingAudienceFor(ctx.session),
     });
 
     const slots = advisors

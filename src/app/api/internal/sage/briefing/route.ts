@@ -18,8 +18,8 @@ const MAX_STUDENTS_PER_RUN = 50;
  * POST /api/internal/sage/briefing
  *
  * Cron endpoint — enqueues one `sage_briefing` background job per active
- * student (the job-processor cron executes them). Runs daily at 11:00 UTC
- * via pg_cron `sage-daily-briefing`.
+ * real student (the job-processor cron executes them); cohort demo students are
+ * left out. Runs daily at 11:00 UTC via pg_cron `sage-daily-briefing`.
  *
  * Auth: Bearer CRON_SECRET. Kill switch: SAGE_AUTOPILOT_ENABLED (+ global
  * SAGE_AGENT_MODE), also re-checked inside each job.
@@ -36,8 +36,10 @@ async function handle(req: Request): Promise<NextResponse> {
     });
   }
 
+  // demoAccount: null leaves out cohort demo students. They are made up and
+  // numerous, and each briefing is a paid AI job.
   const students = await prisma.student.findMany({
-    where: { role: "student", isActive: true },
+    where: { role: "student", isActive: true, demoAccount: null },
     select: { id: true },
     orderBy: { createdAt: "asc" },
   });
