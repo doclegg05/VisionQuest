@@ -19,7 +19,7 @@ Summary as of the last handoff (2026-10-19). The full earlier text is in `.claud
 
 ## Last Session
 - **Date**: 2026-10-21
-- **Handoff**: .claude/handoffs/2026-10-19-branch-cleanup.md
+- **Handoff**: .claude/handoffs/2026-10-21-process-optimizations.md
 
 ## Open Items
 - [ ] **Follow-ups from the 2026-10-16 merge sweep**:
