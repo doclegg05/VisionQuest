@@ -7,7 +7,8 @@ export const LOCAL_MODELS = [MODEL, "gemma4:12b-mlx"];
 export const MAX_BODY = 2 * 1024 * 1024;
 export const MAX_RESPONSE = 16 * 1024 * 1024;
 export const MAX_BUFFER = 4 * 1024 * 1024;
-export const MAX_PENDING = 4;
+export const MAX_PENDING = 12;
+export const MAX_BACKGROUND_PENDING = 8;
 export const REQUEST_TIMEOUT = 180_000;
 export const idSchema = z.string().uuid();
 const base64 = z.string().max(100_000).regex(/^[A-Za-z0-9+/]*={0,2}$/);
@@ -31,10 +32,11 @@ export function allowedRequest(method, path, body) {
   if (method !== "POST" || !["/api/chat", "/api/generate", "/api/show"].includes(path)) return false;
   try {
     const parsed = JSON.parse(body);
-    // Ollama uses Go JSON decoding, which also matches case-insensitive keys.
-    const aliasedModel = parsed !== null && typeof parsed === "object" &&
-      Object.keys(parsed).some((key) => key !== "model" && key.toLowerCase() === "model");
-    return !aliasedModel && inferenceSchema.safeParse(parsed).success;
+    // Go folds ASCII and Unicode field aliases. Accept only canonical API
+    // field names at the top level; message/tool payloads retain Unicode.
+    const canonicalKeys = parsed !== null && typeof parsed === "object" &&
+      Object.keys(parsed).every((key) => /^[a-z][a-z0-9_]*$/.test(key));
+    return canonicalKeys && inferenceSchema.safeParse(parsed).success;
   } catch { return false; }
 }
 
@@ -56,4 +58,9 @@ export function parseFrame(raw, schema) {
 export function sendFrame(socket, message) {
   if (socket.readyState !== 1 || socket.bufferedAmount > MAX_BUFFER) throw new Error("Relay connection unavailable");
   socket.send(JSON.stringify(message));
+}
+
+/** Metadata is never background inference. Call only after allowedRequest. */
+export function isBackgroundRequest(method, path, body) {
+  return method === "POST" && ["/api/chat", "/api/generate"].includes(path) && JSON.parse(body).stream === false;
 }
