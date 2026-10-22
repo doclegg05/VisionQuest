@@ -2,9 +2,10 @@ import { readFileSync, statSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { WebSocket } from "ws";
 import { z } from "zod";
+import { createInferenceQueue } from "./inference-queue.mjs";
 import { AGENT_PATH, MAX_BODY, MAX_PENDING, REQUEST_TIMEOUT, allowedRequest, parseFrame, requestSchema, sendFrame, validToken } from "./protocol.mjs";
 
-export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://127.0.0.1:11436", reconnectMs = 1000, allowLoopbackWs = false, onState = () => {} }) {
+export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://127.0.0.1:11436", reconnectMs = 1000, allowLoopbackWs = false, backgroundGraceMs = 10_000, onState = () => {} }) {
   const endpoint = new URL(relayUrl);
   const upstream = new URL(upstreamUrl);
   if (!validToken(agentToken) || endpoint.pathname !== AGENT_PATH || endpoint.search || endpoint.hash || endpoint.username || endpoint.password ||
@@ -20,6 +21,7 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
   let heartbeat;
   let attempts = 0;
   const active = new Map();
+  const enqueueInference = createInferenceQueue({ backgroundGraceMs });
   const abortAll = () => { for (const controller of active.values()) controller.abort(); active.clear(); };
   const run = () => {
     if (stopped) return;
@@ -56,25 +58,35 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
       active.set(frame.id, controller);
       const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
       try {
-        const response = await fetch(new URL(frame.path, upstream), {
-          method: frame.method,
-          body: frame.method === "POST" ? frame.body : undefined,
-          headers: { "content-type": "application/json" },
-          signal: controller.signal,
-          redirect: "error",
-        });
-        const rawType = response.headers.get("content-type")?.split(";")[0];
-        const contentType = ["application/json", "application/x-ndjson", "text/event-stream"].includes(rawType) ? rawType : "application/json";
-        sendFrame(ws, { type: "start", id: frame.id, status: response.status, contentType });
-        if (response.body) {
-          for await (const value of response.body) {
-            const bytes = Buffer.from(value);
-            for (let offset = 0; offset < bytes.length; offset += 48 * 1024) {
-              sendFrame(ws, { type: "data", id: frame.id, data: bytes.subarray(offset, offset + 48 * 1024).toString("base64") });
+        const forward = async () => {
+          const response = await fetch(new URL(frame.path, upstream), {
+            method: frame.method,
+            body: frame.method === "POST" ? frame.body : undefined,
+            headers: { "content-type": "application/json" },
+            signal: controller.signal,
+            redirect: "error",
+          });
+          const rawType = response.headers.get("content-type")?.split(";")[0];
+          const contentType = ["application/json", "application/x-ndjson", "text/event-stream"].includes(rawType) ? rawType : "application/json";
+          sendFrame(ws, { type: "start", id: frame.id, status: response.status, contentType });
+          if (response.body) {
+            for await (const value of response.body) {
+              const bytes = Buffer.from(value);
+              for (let offset = 0; offset < bytes.length; offset += 48 * 1024) {
+                sendFrame(ws, { type: "data", id: frame.id, data: bytes.subarray(offset, offset + 48 * 1024).toString("base64") });
+              }
             }
           }
+          sendFrame(ws, { type: "end", id: frame.id });
+        };
+        if (frame.method === "POST" && ["/api/chat", "/api/generate"].includes(frame.path)) {
+          // Sage streams interactive replies; structured extraction uses
+          // stream:false. Keep health/model metadata independent of this queue.
+          const interactive = JSON.parse(frame.body).stream !== false;
+          await enqueueInference(forward, { signal: controller.signal, interactive });
+        } else {
+          await forward();
         }
-        sendFrame(ws, { type: "end", id: frame.id });
       } catch {
         controller.abort();
         try { sendFrame(ws, { type: "error", id: frame.id }); } catch { ws.terminate(); }
@@ -85,7 +97,10 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
     });
   };
   run();
-  return { stop() { stopped = true; clearTimeout(reconnect); clearInterval(heartbeat); abortAll(); socket?.terminate(); } };
+  return {
+    pending: () => active.size,
+    stop() { stopped = true; clearTimeout(reconnect); clearInterval(heartbeat); abortAll(); socket?.terminate(); },
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

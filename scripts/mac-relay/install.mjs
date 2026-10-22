@@ -26,7 +26,7 @@ if (!existsSync(configPath)) {
     { key: "COHORT_DEMO_LOCAL_AI_ORIGIN", value: "http://127.0.0.1:11437" },
   ], null, 2) + "\n", { mode: 0o600, flag: "wx" });
 }
-for (const name of ["agent.mjs", "protocol.mjs"]) copyFileSync(join(source, name), join(destination, name));
+for (const name of ["agent.mjs", "protocol.mjs", "inference-queue.mjs"]) copyFileSync(join(source, name), join(destination, name));
 for (const name of ["ws", "zod"]) cpSync(join(root, "node_modules", name), join(destination, "node_modules", name), { recursive: true });
 writeFileSync(join(destination, "package.json"), JSON.stringify({ private: true, type: "module", dependencies: Object.fromEntries(["ws", "zod"].map((name) => [name, JSON.parse(readFileSync(join(root, "node_modules", name, "package.json"), "utf8")).version])) }, null, 2) + "\n");
 const log = join(destination, "agent.log");
