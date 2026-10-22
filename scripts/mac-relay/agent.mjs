@@ -89,6 +89,7 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
   const configPath = process.argv[2];
   if (!configPath) throw new Error("Pass the private agent configuration file path");
   const stat = statSync(configPath);
@@ -96,4 +97,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const config = z.object({ relayUrl: z.string(), agentToken: z.string(), upstreamUrl: z.string().optional() }).strict().parse(JSON.parse(readFileSync(configPath, "utf8")));
   const agent = connectMacAgent({ ...config, onState: (state) => console.log(`VisionQuest Mac connection ${state}`) });
   for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => { agent.stop(); process.exit(0); });
+  } catch {
+    // Parser/URL exceptions may include config fragments; never print the cause.
+    console.error("VisionQuest Mac agent could not start; check private configuration and permissions.");
+    process.exitCode = 1;
+  }
 }

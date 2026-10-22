@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import http from "node:http";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { WebSocket } from "ws";
 import { startRelay } from "./server.mjs";
@@ -28,7 +32,7 @@ async function setup(t, handler, options = {}) {
     res.write('{"message":{"content":"local "}}\n');
     setTimeout(() => res.end('{"message":{"content":"reply"},"done":true}\n'), 20);
   });
-  const next = await server((req, res) => { res.writeHead(200, { "x-test-proxy": "yes" }); res.end(req.headers.host + req.url); });
+  const next = await server((req, res) => { if (options.nextHandler) return options.nextHandler(req, res); res.writeHead(200, { "x-test-proxy": "yes" }); res.end(req.headers.host + req.url); });
   const relay = await startRelay({ agentToken, appToken, publicPort: 0, publicHost: "127.0.0.1", localPort: 0, nextPort: next.address().port, ...options });
   const url = `http://127.0.0.1:${relay.local.address().port}`;
   const publicUrl = `http://127.0.0.1:${relay.front.address().port}`;
@@ -107,4 +111,28 @@ test("insecure production transport and non-loopback models are rejected", () =>
   assert.throws(() => connectMacAgent({ relayUrl: "ws://example.com" + AGENT_PATH, agentToken }), /secure/);
   assert.throws(() => connectMacAgent({ relayUrl: "wss://visionquest.onrender.com" + AGENT_PATH, agentToken, upstreamUrl: "http://example.com" }), /loopback/);
   assert.equal(allowedRequest("POST", "/api/chat", JSON.stringify({ model: "gemma4:12b", options: { num_ctx: 1000000 } })), false);
+});
+
+
+test("Next aborting a partial SSE response terminates the browser response", async (t) => {
+  const x = await setup(t, null, { nextHandler: (_req, res) => {
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    res.write("data: partial\n\n");
+    setTimeout(() => res.destroy(), 20);
+  } });
+  const response = await fetch(x.publicUrl + "/api/chat/send", { signal: AbortSignal.timeout(1500) });
+  await assert.rejects(response.text(), /terminated|aborted/);
+});
+
+test("malformed private agent configuration never appears in startup logs", (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "vq-relay-config-"));
+  t.after(() => rmSync(dir, { recursive: true }));
+  const path = join(dir, "config.json");
+  for (const config of ["SECRET-MARKER-invalid-json", JSON.stringify({ relayUrl: "SECRET-MARKER-invalid-url", agentToken })]) {
+    writeFileSync(path, config, { mode: 0o600 });
+    const result = spawnSync(process.execPath, [new URL("./agent.mjs", import.meta.url).pathname, path], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /could not start/);
+    assert.doesNotMatch(result.stdout + result.stderr, /SECRET-MARKER/);
+  }
 });

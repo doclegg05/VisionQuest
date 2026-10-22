@@ -98,6 +98,9 @@ export async function startRelay({ agentToken, appToken, publicPort, nextPort, l
   const front = http.createServer((req, res) => {
     if (req.url?.split("?")[0] === AGENT_PATH) return json(res, 404, { error: "Not found" });
     const upstream = http.request({ hostname: "127.0.0.1", port: nextPort, method: req.method, path: req.url, headers: req.headers }, (reply) => {
+      reply.on("error", () => res.destroy());
+      reply.on("aborted", () => res.destroy());
+      reply.on("close", () => { if (!reply.complete) res.destroy(); });
       res.writeHead(reply.statusCode, reply.headers);
       reply.pipe(res);
     });
