@@ -56,7 +56,7 @@ Its `config.json` must be owner-only (0600), in an owner-only directory (0700):
 
 Install the pinned `ws` and `zod` dependencies from the source package versions.
 Run `node agent.mjs /absolute/path/config.json`. The maintained sources are in
-`scripts/mac-relay/`; copy `agent.mjs` and `protocol.mjs` to the persistent directory.
+`scripts/mac-relay/`; copy `agent.mjs`, `protocol.mjs`, and `inference-queue.mjs` to the persistent directory.
 The LaunchAgent `com.visionquest.mac-relay` runs this command under `caffeinate -i`
 to prevent idle sleep while enabled. It restarts on failure and at login. It does
 not change global power settings or prevent display sleep. Logging contains only
@@ -93,3 +93,18 @@ bridge or any model files. To disable the Render wrapper, set
 `VQ_MAC_RELAY_ENABLED=false` and leave the cloud fence enabled. Clear the approved
 origin as well: old saved endpoints must not become implicitly trusted. The normal
 Next startup resumes; demo model requests remain safely unavailable.
+
+## Interactive priority
+
+The Mac agent admits at most four pending requests and forwards one inference at
+a time. Streaming chat runs before waiting non-streaming extraction calls;
+within each class, requests keep arrival order. It does not interrupt an active
+inference. Health and model metadata bypass the inference queue. Queued work
+keeps its original 180-second deadline and disconnect cancellation; no requests
+are replayed. Four already-admitted requests can still cause a new request to
+receive a busy response. This is scheduling, not extra model capacity.
+
+This improves contention after a student reply without disabling discovery,
+classroom confirmation, mood, or memory extraction. It does not eliminate the
+cost of processing a fresh prompt. Measure first visible text separately from
+whole-reply completion, and report uncached and reused-prefix results separately.

@@ -150,3 +150,52 @@ test("case-variant model aliases cannot override the pinned model", async (t) =>
   }
   assert.equal(x.received.length, 0);
 });
+
+test("interactive chat overtakes queued extraction calls without dropping them", async (t) => {
+  const responses = [];
+  const x = await setup(t, (_req, res) => { responses.push(res); });
+  x.connect(); await until(x.relay.connected);
+  const post = (stream, label, signal) => fetch(x.url + "/api/chat", { method: "POST", headers, signal,
+    body: JSON.stringify({ model: "gemma4:12b", stream, messages: [{ role: "user", content: label }] }),
+  }).then(async (r) => ({ status: r.status, body: await r.text() }));
+  const first = post(false, "background one");
+  await until(() => responses.length === 1);
+  const second = post(false, "background two");
+  const interactive = post(true, "foreground");
+  // Allow both authenticated requests to reach the agent before releasing the
+  // active extraction. A raw FIFO Ollama queue would run background two next.
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(responses.length, 1, "only one inference may occupy the Mac at once");
+  responses[0].end('{"done":true}');
+  await first;
+  await until(() => responses.length === 2);
+  assert.equal(JSON.parse(x.received[1].body).messages[0].content, "foreground");
+  responses[1].end('{"done":true}');
+  await interactive;
+  await until(() => responses.length === 3);
+  assert.equal(JSON.parse(x.received[2].body).messages[0].content, "background two");
+  responses[2].end('{"done":true}');
+  assert.equal((await second).status, 200);
+});
+
+test("cancelled queued inference never reaches the Mac and metadata bypasses the queue", async (t) => {
+  let release;
+  const x = await setup(t, (req, res) => {
+    if (req.url === "/api/tags") return res.end('{"models":[]}');
+    release = () => res.end('{"done":true}');
+  });
+  x.connect(); await until(x.relay.connected);
+  const first = fetch(x.url + "/api/chat", { method: "POST", body, headers }).then((r) => r.text());
+  await until(() => x.received.length === 1);
+  const controller = new AbortController();
+  const queued = fetch(x.url + "/api/chat", { method: "POST", body, headers, signal: controller.signal }).catch(() => null);
+  await new Promise((r) => setTimeout(r, 50));
+  const metadata = await fetch(x.url + "/api/tags", { headers });
+  assert.equal(metadata.status, 200);
+  await metadata.text();
+  controller.abort(); await queued;
+  await new Promise((r) => setTimeout(r, 50));
+  release(); await first;
+  await new Promise((r) => setTimeout(r, 50));
+  assert.deepEqual(x.received.map((r) => r.path), ["/api/chat", "/api/tags"]);
+});
