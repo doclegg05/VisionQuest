@@ -361,3 +361,34 @@ The tool refuses a class not owned by the marked demo instructor, unmarked stude
 - All migrations are additive and apply automatically via `prisma migrate deploy`.
 - E2E locally: `BASE_URL=http://localhost:3100 PORT=3100 npx playwright test` if port 3000
   is occupied (config honors BASE_URL/PORT).
+
+
+### Demo Sage: local inference only
+
+Public demo mode overrides the saved provider setting for the entire service,
+including instructor, system, and background work. Generative requests use the
+configured local endpoint and the pinned `gemma4:12b` model. Direct Gemini and
+OpenRouter inference is refused before network access; `preferCloud` cannot
+bypass the restriction. A local outage never falls back to a cloud model.
+
+Set `COHORT_DEMO_LOCAL_ONLY=true` alongside `COHORT_DEMO_MODE=true` and retain it
+when closing demo entry, so queued demo work remains protected. This safeguard
+also applies to non-demo accounts on this service while either flag is true.
+It does not alter the saved provider settings. Restoring ordinary cloud behavior
+requires explicitly clearing both flags after demo jobs have drained.
+
+Cloud embeddings are blocked without selecting another embedding model or
+reindexing stored vectors. Document retrieval falls back to keyword search;
+embedding-dependent memory work can remain pending or fail. Switching to local
+embeddings requires a separately approved index migration.
+
+The Render server must reach an authenticated, owner-approved endpoint for the
+Mac's local model. Set `COHORT_DEMO_LOCAL_AI_ORIGIN` to that verified origin
+(scheme, host, and optional port only), matching the configured provider URL.
+Until it is explicitly pinned, demo inference fails before network access; the
+saved legacy URL is not implicitly trusted. The origin pin is an operator trust
+decision, not proof that an arbitrary remote server is local. A model listening on the Mac's loopback address alone is not
+reachable from Render. Do not enable a new tunnel or change DNS as part of this
+switch. Verify the existing transport separately; if it is unavailable, Sage
+reports an outage while the portal remains usable. Hosted Ollama `:cloud` tags,
+known cloud API endpoints, and HTTP redirects are refused in demo mode.
