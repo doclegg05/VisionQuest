@@ -154,7 +154,7 @@ test("case-variant model aliases cannot override the pinned model", async (t) =>
 test("interactive chat overtakes queued extraction calls without dropping them", async (t) => {
   const responses = [];
   const x = await setup(t, (_req, res) => { responses.push(res); });
-  x.connect(); await until(x.relay.connected);
+  const agent = x.connect(); await until(x.relay.connected);
   const post = (stream, label, signal) => fetch(x.url + "/api/chat", { method: "POST", headers, signal,
     body: JSON.stringify({ model: "gemma4:12b", stream, messages: [{ role: "user", content: label }] }),
   }).then(async (r) => ({ status: r.status, body: await r.text() }));
@@ -162,9 +162,9 @@ test("interactive chat overtakes queued extraction calls without dropping them",
   await until(() => responses.length === 1);
   const second = post(false, "background two");
   const interactive = post(true, "foreground");
-  // Allow both authenticated requests to reach the agent before releasing the
-  // active extraction. A raw FIFO Ollama queue would run background two next.
-  await new Promise((r) => setTimeout(r, 100));
+  // Both requests must actually be admitted before releasing the active
+  // extraction. A raw FIFO Ollama queue would run background two next.
+  await until(() => agent.pending() === 3);
   assert.equal(responses.length, 1, "only one inference may occupy the Mac at once");
   responses[0].end('{"done":true}');
   await first;
@@ -184,29 +184,29 @@ test("cancelled queued inference never reaches the Mac and metadata bypasses the
     if (req.url === "/api/tags") return res.end('{"models":[]}');
     release = () => res.end('{"done":true}');
   });
-  x.connect(); await until(x.relay.connected);
+  const agent = x.connect(); await until(x.relay.connected);
   const first = fetch(x.url + "/api/chat", { method: "POST", body, headers }).then((r) => r.text());
   await until(() => x.received.length === 1);
   const controller = new AbortController();
   const queued = fetch(x.url + "/api/chat", { method: "POST", body, headers, signal: controller.signal }).catch(() => null);
-  await new Promise((r) => setTimeout(r, 50));
+  await until(() => agent.pending() === 2);
   const metadata = await fetch(x.url + "/api/tags", { headers });
   assert.equal(metadata.status, 200);
   await metadata.text();
   controller.abort(); await queued;
-  await new Promise((r) => setTimeout(r, 50));
+  await until(() => agent.pending() === 1);
   release(); await first;
-  await new Promise((r) => setTimeout(r, 50));
+  await until(() => agent.pending() === 0);
   assert.deepEqual(x.received.map((r) => r.path), ["/api/chat", "/api/tags"]);
 });
 
 test("extraction grace lets an arriving chat start first without resetting extraction eligibility", async (t) => {
   const responses = [];
   const x = await setup(t, (_req, res) => { responses.push(res); }, { backgroundGraceMs: 100 });
-  x.connect(); await until(x.relay.connected);
+  const agent = x.connect(); await until(x.relay.connected);
   const extractionBody = JSON.stringify({ model: "gemma4:12b", stream: false, messages: [{ role: "user", content: "extract" }] });
   const extraction = fetch(x.url + "/api/chat", { method: "POST", body: extractionBody, headers }).then((r) => r.text());
-  await new Promise((r) => setTimeout(r, 30));
+  await until(() => agent.pending() === 1);
   assert.equal(x.received.length, 0);
   const chat = fetch(x.url + "/api/chat", { method: "POST", body, headers }).then((r) => r.text());
   await until(() => responses.length === 1);

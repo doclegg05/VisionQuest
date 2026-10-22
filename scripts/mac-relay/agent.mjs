@@ -97,7 +97,10 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
     });
   };
   run();
-  return { stop() { stopped = true; clearTimeout(reconnect); clearInterval(heartbeat); abortAll(); socket?.terminate(); } };
+  return {
+    pending: () => active.size,
+    stop() { stopped = true; clearTimeout(reconnect); clearInterval(heartbeat); abortAll(); socket?.terminate(); },
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
