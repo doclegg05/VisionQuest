@@ -33,9 +33,9 @@ export function allowedRequest(method, path, body) {
   try {
     const parsed = JSON.parse(body);
     // Ollama uses Go JSON decoding, which also matches case-insensitive keys.
-    const aliasedModel = parsed !== null && typeof parsed === "object" &&
-      Object.keys(parsed).some((key) => key !== "model" && key.toLowerCase() === "model");
-    return !aliasedModel && inferenceSchema.safeParse(parsed).success;
+    const aliasedControl = parsed !== null && typeof parsed === "object" &&
+      Object.keys(parsed).some((key) => ["model", "stream"].includes(key.toLowerCase()) && key !== key.toLowerCase());
+    return !aliasedControl && inferenceSchema.safeParse(parsed).success;
   } catch { return false; }
 }
 

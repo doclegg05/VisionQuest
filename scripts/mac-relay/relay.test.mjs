@@ -342,3 +342,17 @@ test("preemption never extends the original caller deadline", async (t) => {
   // The restarted computation is cancelled by the original adapter deadline.
   assert.equal(x.relay.connected(), true);
 });
+
+
+test("case-variant stream controls cannot bypass background classification", async (t) => {
+  const x = await setup(t); x.connect(); await until(x.relay.connected);
+  for (const streamKey of ["Stream", "STREAM", "sTrEaM"]) {
+    for (const canonical of [{}, { stream: true }, { stream: false }]) {
+      const input = { model: "gemma4:12b", ...canonical, [streamKey]: false };
+      assert.equal(allowedRequest("POST", "/api/chat", JSON.stringify(input)), false);
+      assert.equal((await fetch(x.url + "/api/chat", { method: "POST", headers,
+        body: JSON.stringify(input) })).status, 400);
+    }
+  }
+  assert.equal(x.received.length, 0);
+});
