@@ -1,3 +1,4 @@
+import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-only";
 /**
  * Local (Ollama-compatible) embedding provider (Phase 3: local embeddings
  * capability). Same EmbeddingProvider contract as GeminiEmbeddingProvider so
@@ -144,8 +145,10 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   private async callNativeEmbed(
     texts: string[],
   ): Promise<number[][] | "not-found"> {
+    assertLocalDemoTarget(this.baseUrl, this.model);
     const response = await fetch(`${this.baseUrl}/api/embed`, {
       method: "POST",
+      ...(isDemoLocalOnlyRequired() ? { redirect: "error" as const } : {}),
       headers: this.headers,
       body: JSON.stringify({ model: this.model, input: texts }),
     });
@@ -172,8 +175,10 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   }
 
   private async callOpenAiEmbed(texts: string[]): Promise<number[][]> {
+    assertLocalDemoTarget(this.baseUrl, this.model);
     const response = await fetch(`${this.baseUrl}/v1/embeddings`, {
       method: "POST",
+      ...(isDemoLocalOnlyRequired() ? { redirect: "error" as const } : {}),
       headers: this.headers,
       body: JSON.stringify({ model: this.model, input: texts }),
     });

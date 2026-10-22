@@ -1,3 +1,4 @@
+import { isDemoLocalOnlyRequired } from "./demo-local-only";
 import { getPlainConfigValue } from "@/lib/system-config";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { isSafeAiProviderUrl } from "@/lib/validation";
@@ -149,7 +150,10 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
 /**
  * Resolve a provider for a specific task.
  *
- * Two settings decide the outcome, in this order:
+ * Demo deployments override both settings: COHORT_DEMO_MODE or
+ * COHORT_DEMO_LOCAL_ONLY forces local inference, including preferCloud and
+ * system/background work. Raw cloud providers refuse too.
+ * Otherwise two settings decide the outcome, in this order:
  *
  *  1. `ai_provider` decides WHICH provider is configured. `"local"` serves
  *     every call from the local model and never consults the policy below;
@@ -182,6 +186,8 @@ export async function resolveAiProvider(
   // widen the routing rule, and the cloud provider ignores roles entirely
   // (Gemini is one model for every job).
   const role = request.role ?? roleForTask(request.task);
+
+  if (isDemoLocalOnlyRequired()) return getLocalProvider(role);
 
   const providerType = await getConfiguredProviderType();
   const cloudRequested =

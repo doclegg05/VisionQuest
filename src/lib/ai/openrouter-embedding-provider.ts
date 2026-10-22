@@ -1,3 +1,4 @@
+import { assertCloudInferenceAllowed } from "./demo-local-only";
 /**
  * Eval-only OpenRouter embedding provider: Google's gemini-embedding-001,
  * the model production embeds with, reached through OpenRouter.
@@ -121,6 +122,7 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
     texts: string[],
     opts: { taskType: EmbeddingTaskType; callSite?: string; studentId?: string | null },
   ): Promise<number[][]> {
+    assertCloudInferenceAllowed();
     void opts;
     if (texts.length === 0) throw new Error("embed requires at least one text");
     if (texts.some((text) => text.trim().length === 0)) throw new Error("embed received an empty text");
@@ -135,6 +137,7 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
   }
 
   private async embedBatch(batch: string[]): Promise<EmbeddingReply> {
+    assertCloudInferenceAllowed();
     const body = {
       model: this.model,
       input: batch,

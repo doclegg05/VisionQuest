@@ -1,3 +1,4 @@
+import { assertCloudInferenceAllowed } from "./demo-local-only";
 /**
  * Resolve the active embedding provider based on SystemConfig `ai_provider`
  * (Phase 3: local embeddings capability), under the same cloud policy as
@@ -61,6 +62,7 @@ function isEmbeddingProvider(value: unknown): value is EmbeddingProvider {
 function readEvalEmbeddingOverride(): EmbeddingProvider | null {
   const value: unknown = Reflect.get(globalThis, EVAL_EMBEDDING_OVERRIDE_KEY);
   if (value === undefined || value === null) return null;
+  assertCloudInferenceAllowed();
   const marker = appServerMarker();
   if (marker) {
     throw new Error(
@@ -177,6 +179,8 @@ export async function resolveEmbeddingProvider(
     return provider;
   }
 
+  assertCloudInferenceAllowed();
+
   // Throws AiCloudRefusedError (after the blocked audit event) when the
   // policy refuses this sensitivity on a cloud model.
   const policy = await enforceCloudPolicy({
@@ -204,5 +208,6 @@ export async function getActiveEmbeddingModel(): Promise<string> {
     const config = await readLocalAiProviderConfig();
     return config.embeddingModel ?? DEFAULT_LOCAL_EMBEDDING_MODEL;
   }
+  assertCloudInferenceAllowed();
   return new GeminiEmbeddingProvider("").model;
 }

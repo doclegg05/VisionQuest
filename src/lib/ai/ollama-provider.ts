@@ -1,3 +1,4 @@
+import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-only";
 import { randomUUID } from "crypto";
 import { buildLocalAiHeaders, DEFAULT_LOCAL_AI_AUTH_MODE } from "./local-auth";
 import { estimateTokens } from "../llm-usage-estimate";
@@ -648,6 +649,7 @@ export class OllamaProvider implements AIProvider {
     timeoutMs: number,
     streaming: boolean,
   ): Promise<ChatFetchResult> {
+    assertLocalDemoTarget(url, this.model);
     const controller = new AbortController();
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -664,7 +666,7 @@ export class OllamaProvider implements AIProvider {
           }, timeoutMs);
         }),
         (async (): Promise<ChatFetchResult> => {
-          const response = await fetch(url, { ...init, signal: controller.signal });
+          const response = await fetch(url, { ...init, signal: controller.signal, ...(isDemoLocalOnlyRequired() ? { redirect: "error" } : {}) });
           // Also dispose of a late response from a transport ignoring abort.
           if (controller.signal.aborted) {
             void response.body?.cancel().catch(() => undefined);
