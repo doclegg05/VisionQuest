@@ -97,7 +97,8 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
       embeddingModel: null,
       authMode: "bearer",
       apiStyle: "ollama",
-      numCtxRaw: null,
+      // Compact Sage plus tool schemas already exceeds 8K before chat history.
+      numCtxRaw: "16384",
       reasoningRaw: "off",
       maxOutputTokensRaw: null,
       apiKey: process.env.VQ_MAC_RELAY_APP_TOKEN?.trim() || null,
