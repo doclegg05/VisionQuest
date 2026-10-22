@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export const AGENT_PATH = "/__visionquest/local-ai/agent";
 export const MODEL = "gemma4:12b";
+export const LOCAL_MODELS = [MODEL, "gemma4:12b-mlx"];
 export const MAX_BODY = 2 * 1024 * 1024;
 export const MAX_RESPONSE = 16 * 1024 * 1024;
 export const MAX_BUFFER = 4 * 1024 * 1024;
@@ -20,7 +21,7 @@ export const requestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("request"), id: idSchema, method: z.enum(["GET", "POST"]), path: z.string().max(40), body: z.string().max(MAX_BODY) }).strict(),
   z.object({ type: z.literal("cancel"), id: idSchema }).strict(),
 ]);
-const inferenceSchema = z.object({ model: z.literal(MODEL), options: z.object({
+const inferenceSchema = z.object({ model: z.enum(LOCAL_MODELS), options: z.object({
   num_ctx: z.number().int().min(1024).max(32768).optional(),
   num_predict: z.number().int().min(1).max(8192).optional(),
 }).passthrough().optional() }).passthrough();

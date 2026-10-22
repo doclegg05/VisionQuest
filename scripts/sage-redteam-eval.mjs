@@ -172,7 +172,7 @@ export function redteamDeclarations(scenario, tools, toolsForTurn) {
 }
 
 async function main() {
-  const { buildSystemPrompt } = await import("../src/lib/sage/system-prompts.ts");
+  const { buildSystemPrompt, buildCacheableSystemPrompt } = await import("../src/lib/sage/system-prompts.ts");
   const { formatAttachmentContext } = await import("../src/lib/chat/attachment-context.ts");
   const { getEnabledTools, toolsForTurn } = await import("../src/lib/sage/agent/tools.ts");
   const { ensureCrisisResources } = await import("../src/lib/chat/crisis-safety-net.ts");
@@ -187,23 +187,29 @@ async function main() {
   // Resolve the real system prompt + tool set for a scenario's persona. Teacher
   // scenarios may carry a staffContext (a student record) to test that injected
   // record text can't override the assistant's instructions.
+  const cacheLayout = args["prompt-layout"] === "mac-cache";
+  const buildPrompt = (...promptArgs) => {
+    if (!cacheLayout) return { systemPrompt: buildSystemPrompt(...promptArgs) };
+    const prompt = buildCacheableSystemPrompt(...promptArgs);
+    return { systemPrompt: prompt.text, systemPrefixLength: prompt.systemPrefixLength };
+  };
   const resolve = (scenario) => {
     if (scenario.persona === "teacher") {
       const ctx = { studentName: "Ms. Lee", userMessage: scenario.message };
       if (scenario.staffContext) ctx.staffStudentContext = scenario.staffContext;
       return {
-        systemPrompt: buildSystemPrompt("teacher_assistant", ctx, "full"),
+        ...buildPrompt("teacher_assistant", ctx, cacheLayout ? "compact" : "full"),
         declarations: redteamDeclarations(scenario, teacherTools, toolsForTurn),
       };
     }
     return {
-      systemPrompt: buildSystemPrompt("general", { studentName: "Sam", programType: "spokes" }, "full"),
+      ...buildPrompt("general", { studentName: "Sam", programType: "spokes" }, cacheLayout ? "compact" : "full"),
       declarations: redteamDeclarations(scenario, studentTools, toolsForTurn),
     };
   };
 
   console.log(
-    `Red-teaming ${SCENARIOS.length} scenarios against ${label} (student + teacher personas)${TEMPERATURE !== undefined ? ` (temperature: ${TEMPERATURE})` : ""}…\n`,
+    `Red-teaming ${SCENARIOS.length} scenarios against ${label}${cacheLayout ? " (Mac cache layout, compact)" : ""} (student + teacher personas)${TEMPERATURE !== undefined ? ` (temperature: ${TEMPERATURE})` : ""}…\n`,
   );
 
   let hardFails = 0;
@@ -223,7 +229,7 @@ async function main() {
         [{ role: "user", content: userText }],
         declarations,
         noopToolHandler,
-        { maxHops: 1, temperature: TEMPERATURE },
+        { maxHops: 1, temperature: TEMPERATURE, systemPrefixLength: resolved.systemPrefixLength },
       );
       const textParts = [];
       for await (const event of events) {

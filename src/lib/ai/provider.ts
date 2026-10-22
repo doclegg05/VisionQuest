@@ -3,11 +3,11 @@ import { getPlainConfigValue } from "@/lib/system-config";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { isSafeAiProviderUrl } from "@/lib/validation";
 import {
-  DEFAULT_OLLAMA_MODEL,
   readLocalAiProviderConfig,
   readLocalAiRoleMaxOutputTokensRaw,
   toLocalAiAuthConfig,
 } from "./local-config";
+import { pinnedLocalModel } from "./local-model";
 import { roleForTask, type AiRole } from "./roles";
 import { enforceCloudPolicy, isLocalOnlySensitivity } from "./lanes";
 import { getProviderClass, logAiAuditEvent } from "./audit";
@@ -99,7 +99,7 @@ async function resolveLocalModelForRole(
   role: AiRole | null,
 ): Promise<{ model: string; keepAlive?: string; maxOutputTokens?: number }> {
   return {
-    model: DEFAULT_OLLAMA_MODEL,
+    model: pinnedLocalModel(),
     maxOutputTokens: role
       ? parseMaxOutputTokensOverride(await readLocalAiRoleMaxOutputTokensRaw(role))
       : undefined,

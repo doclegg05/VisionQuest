@@ -38,6 +38,9 @@ export type OnUsage = (usage: TokenUsage) => void;
  */
 export interface GenerationOptions {
   temperature?: number;
+  /** Trusted prefix boundary in the complete systemPrompt. Native Ollama may
+   * split here for cache reuse; providers ignoring it retain all prompt text. */
+  systemPrefixLength?: number;
 }
 
 /**
@@ -145,6 +148,8 @@ export interface ToolStreamOptions {
   onUsage?: OnUsage;
   /** Optional sampling temperature override — see GenerationOptions. */
   temperature?: number;
+  /** Same complete-prompt prefix boundary as GenerationOptions. */
+  systemPrefixLength?: number;
 }
 
 /**
