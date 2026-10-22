@@ -42,5 +42,8 @@ it("VisionQuest adapter retrieves matching synthetic documents through the real 
   });
   assert.equal(rejected.status, 400);
   const tags = await (await fetch(`${endpoint}/api/tags`)).json();
-  assert.deepEqual(tags.models.map((entry: { name: string }) => entry.name).sort(), ["gemma4:12b", "google/embeddinggemma-2"]);
+  const names = tags.models.map((entry: { name: string }) => entry.name);
+  assert.ok(names.includes("google/embeddinggemma-2"));
+  assert.ok(names.includes("gemma4:12b"));
+  assert.ok(names.every((name: string) => ["gemma4:12b", "gemma4:12b-mlx", "google/embeddinggemma-2"].includes(name)));
 });

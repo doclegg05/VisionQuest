@@ -712,9 +712,14 @@ async function main() {
   const allCases = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
   const cases = FAMILIES ? allCases.filter((c) => FAMILIES.includes(c.family)) : allCases;
 
-  const { provider, label } = await resolveEvalProvider();
+  let { provider, label } = await resolveEvalProvider();
   const { getEnabledTools, getToolByName } = await import("../src/lib/sage/agent/tools.ts");
-  const { buildSystemPrompt } = await import("../src/lib/sage/system-prompts.ts");
+  let { buildSystemPrompt, buildCacheableSystemPrompt } = await import("../src/lib/sage/system-prompts.ts");
+  if (args["prompt-layout"] === "mac-cache") {
+    const { withMacEvalPromptLayout } = await import("./lib/sage-eval-prompt-layout.mjs");
+    ({ provider, buildSystemPrompt } = withMacEvalPromptLayout(provider, buildCacheableSystemPrompt));
+    label += " (Mac cache layout, compact)";
+  }
   const { getDocumentContext } = await import("../src/lib/sage/knowledge-base-server.ts");
   const { assessReadability } = await import("../src/lib/sage/readability.ts");
   const { ensureCrisisResources } = await import("../src/lib/chat/crisis-safety-net.ts");

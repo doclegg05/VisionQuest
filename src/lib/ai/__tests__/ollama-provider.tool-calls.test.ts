@@ -177,18 +177,20 @@ describe("OllamaProvider tool call ids", { concurrency: false }, () => {
     const handlerCalls: Array<{ callId: string | undefined; name: string }> = [];
     const events: ToolStreamEvent[] = [];
     for await (const event of native.streamWithTools(
-      "sys",
+      "static context",
       [{ role: "user", content: "Hi" }],
       TOOLS,
       async (call) => {
         handlerCalls.push({ callId: call.callId, name: call.name });
         return { response: { ok: true }, summary: "ok", status: "success" as const };
       },
+      { systemPrefixLength: 6 },
     )) {
       events.push(event);
     }
 
     const secondBody = JSON.parse(String(mockFetch.mock.calls[1].arguments[1]?.body));
+    assert.deepEqual(secondBody.messages.slice(0, 2), [{ role: "system", content: "static" }, { role: "system", content: " context" }]);
     const assistantHistory = secondBody.messages.find((message: { role: string; tool_calls?: unknown[] }) => message.role === "assistant" && message.tool_calls);
     assert.deepEqual(assistantHistory.tool_calls.map((call: { function: { arguments: unknown } }) => call.function.arguments), [{ id: "1" }, {}]);
 

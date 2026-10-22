@@ -69,7 +69,7 @@ makes Sage unavailable. Cloud fallback stays blocked.
 ## Boundaries and verification
 
 - Only GET health/tags/version and POST chat/generate/show are allowed.
-- Every POST must name `gemma4:12b`; pull/delete, embeddings, arbitrary paths, and
+- Every POST must name `gemma4:12b` or `gemma4:12b-mlx`; pull/delete, embeddings, arbitrary paths, and
   cloud models are refused. The bridge and agent both enforce the model boundary.
 - Four requests maximum, 2 MiB input, 16 MiB output, bounded socket buffering,
   and a three-minute request deadline. Capacity exhaustion returns an error.
@@ -111,3 +111,52 @@ This improves contention after a student reply without disabling discovery,
 classroom confirmation, mood, or memory extraction. It does not eliminate the
 cost of processing a fresh prompt. Measure first visible text separately from
 whole-reply completion, and report uncached and reused-prefix results separately.
+
+## MLX prompt cache (optional local 12B variant)
+
+`VQ_MAC_RELAY_MODEL=gemma4:12b-mlx` selects Ollama's MLX Gemma 4 12B
+variant on the same Mac. Omit the setting or use `gemma4:12b` to retain the
+original GGUF runner and prompt layout. Other values fail closed. Install the
+MLX weights locally and update **both** the persistent agent protocol and bridge
+before changing Render's setting. The relay accepts only these two local tags;
+this does not enable cloud models, model downloads through the relay, or new
+embedding models.
+
+For the MLX variant, Sage places shared instructions in the first native system
+message, followed by Ollama's tool definitions, then changing student/staff
+context in a second system message. Every original prompt section remains
+present. The trusted boundary is internal metadata, never supplied by the
+browser. Other provider formats continue receiving the entire system prompt.
+All generation paths retain usage accounting and the same output limits.
+
+The prefix cache contains model attention state, not saved replies. Ollama must
+match the input tokens before reusing it; identity, record context, and questions
+are still sent on every turn. Cold starts and cache eviction remain slow. Keep
+`keep_alive` at the configured eight hours and warm both demo roles with two
+different synthetic conversations after model restart, before a demo. Do not
+promise warm latency for the first cold request or during active background
+inference. The agent still prioritizes waiting interactive requests.
+
+On 2026-10-22, the actual compact discovery prompt plus 33 tools measured locally:
+first two synthetic students 70.6/79.7 seconds to first text; third student
+4.2 seconds (9.4 seconds complete); different question 7.9 seconds (12.4 complete).
+These are individual observations, not a percentile or a hosted acceptance test.
+
+Evaluate the actual layout entirely on the Mac:
+
+```sh
+OLLAMA_URL=http://127.0.0.1:11434 OLLAMA_NUM_CTX=16384 OLLAMA_AUTH_MODE=none \
+  node --import tsx scripts/sage-redteam-eval.mjs --provider=ollama \
+  --model=gemma4:12b-mlx --temperature=0 --prompt-layout=mac-cache
+OLLAMA_URL=http://127.0.0.1:11434 OLLAMA_NUM_CTX=16384 OLLAMA_AUTH_MODE=none \
+  node --import tsx scripts/sage-chat-harness.mjs --provider=ollama \
+  --model=gemma4:12b-mlx --temperature=0 --prompt-layout=mac-cache \
+  --families=tool,guardrail,confirmation --strict
+```
+
+Before activation, require passing safety/tool checks and fresh-user timing
+through Render. Alternate roles and identities, verify a real read-only tool
+continuation, and verify fail-closed behavior while the Mac agent is stopped.
+After a Render deploy, reconnect the Mac agent to the new instance before the
+hosted checks. Roll back by restoring `VQ_MAC_RELAY_MODEL=gemma4:12b` and
+reconnecting after that deploy; no student data or vector index migration occurs.

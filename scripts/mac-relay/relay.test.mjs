@@ -218,3 +218,12 @@ test("extraction grace lets an arriving chat start first without resetting extra
   assert.equal(JSON.parse(x.received[1].body).stream, false);
   responses[1].end('{"done":true}'); await extraction;
 });
+
+ test("only the two approved local 12B variants cross the relay", () => {
+  for (const model of ["gemma4:12b", "gemma4:12b-mlx"]) {
+    assert.equal(allowedRequest("POST", "/api/chat", JSON.stringify({ model })), true);
+  }
+  for (const model of ["gemma4:12b-cloud", "gemma4:26b", "gemma4:12b-mlx-cloud"]) {
+    assert.equal(allowedRequest("POST", "/api/chat", JSON.stringify({ model })), false);
+  }
+});

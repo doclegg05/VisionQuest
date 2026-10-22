@@ -425,6 +425,28 @@ function toOpenAIMessages(
   ];
 }
 
+function nativeMessages(messages: OpenAIMessage[], systemPrefixLength?: number) {
+  const first = messages[0];
+  const canSplit = first?.role === "system" && typeof systemPrefixLength === "number" && Number.isSafeInteger(systemPrefixLength) &&
+    systemPrefixLength > 0 && systemPrefixLength < first.content.length;
+  const complete = canSplit ? [
+    { ...first, content: first.content.slice(0, systemPrefixLength) },
+    { role: "system" as const, content: first.content.slice(systemPrefixLength) },
+    ...messages.slice(1),
+  ] : messages;
+  // The shared transcript keeps OpenAI argument strings. Native Ollama needs
+  // objects, including on continuation hops with the same stable prefix.
+  return complete.map((message) => ({
+    ...message,
+    ...(message.tool_calls ? {
+      tool_calls: message.tool_calls.map((call) => ({
+        ...call,
+        function: { ...call.function, arguments: parseToolArguments(call.function.arguments) },
+      })),
+    } : {}),
+  }));
+}
+
 export class OllamaProvider implements AIProvider {
   readonly name = "ollama";
   private readonly baseUrl: string;
@@ -784,7 +806,7 @@ export class OllamaProvider implements AIProvider {
       },
       {
         model: this.model,
-        messages: openAIMessages,
+        messages: nativeMessages(openAIMessages, options?.systemPrefixLength),
         stream: false,
         truncate: false,
         ...this.nativeReasoningParams,
@@ -904,7 +926,7 @@ export class OllamaProvider implements AIProvider {
       },
       {
         model: this.model,
-        messages: openAIMessages,
+        messages: nativeMessages(openAIMessages, options?.systemPrefixLength),
         stream: true,
         truncate: false,
         ...this.nativeReasoningParams,
@@ -1301,12 +1323,13 @@ export class OllamaProvider implements AIProvider {
     conversation: OpenAIMessage[],
     ollamaTools: OllamaToolPayload[],
     temperature?: number,
+    systemPrefixLength?: number,
   ): AsyncGenerator<string, HopResult> {
     let lastError: unknown = null;
     let yieldedAny = false;
 
     for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
-      const hopGen = this.streamHopOnce(conversation, ollamaTools, temperature);
+      const hopGen = this.streamHopOnce(conversation, ollamaTools, temperature, systemPrefixLength);
 
       try {
         while (true) {
@@ -1365,6 +1388,7 @@ export class OllamaProvider implements AIProvider {
     if (tools.length === 0) {
       for await (const text of this.streamResponse(systemPrompt, messages, options?.onUsage, {
         temperature: options?.temperature,
+        systemPrefixLength: options?.systemPrefixLength,
       })) {
         yield { kind: "text", text };
       }
@@ -1384,7 +1408,7 @@ export class OllamaProvider implements AIProvider {
     for (let hop = 0; hop < maxHops; hop++) {
       // Stream one hop. The inner generator yields text strings as they
       // arrive and returns a final summary with collected tool calls.
-      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools, options?.temperature);
+      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools, options?.temperature, options?.systemPrefixLength);
       const accumulatedText: string[] = [];
       let hopResult: HopResult;
 
@@ -1477,6 +1501,7 @@ export class OllamaProvider implements AIProvider {
     conversation: OpenAIMessage[],
     ollamaTools: OllamaToolPayload[],
     temperature?: number,
+    systemPrefixLength?: number,
   ): AsyncGenerator<string, HopResult> {
     const openAIBody = {
       model: this.model,
@@ -1490,17 +1515,7 @@ export class OllamaProvider implements AIProvider {
     };
     const nativeBody = {
       model: this.model,
-      // Native Ollama requires argument objects in replayed assistant calls;
-      // the shared conversation retains strings for OpenAI-compatible servers.
-      messages: conversation.map((message) => ({
-        ...message,
-        ...(message.tool_calls ? {
-          tool_calls: message.tool_calls.map((call) => ({
-            ...call,
-            function: { ...call.function, arguments: parseToolArguments(call.function.arguments) },
-          })),
-        } : {}),
-      })),
+      messages: nativeMessages(conversation, systemPrefixLength),
       stream: true,
       truncate: false,
       tools: ollamaTools,
@@ -1714,7 +1729,7 @@ export class OllamaProvider implements AIProvider {
       },
       {
         model: this.model,
-        messages: openAIMessages,
+        messages: nativeMessages(openAIMessages, options?.systemPrefixLength),
         stream: false,
         truncate: false,
         format: "json",

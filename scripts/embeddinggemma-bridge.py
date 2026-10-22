@@ -22,6 +22,7 @@ import torch
 from sentence_transformers import SentenceTransformer
 
 CHAT = "gemma4:12b"
+CHAT_MODELS = (CHAT, "gemma4:12b-mlx")
 EMBED = "google/embeddinggemma-2"
 OLLAMA = "http://127.0.0.1:11434"
 MODEL_DIR = Path(os.environ.get("VQ_EMBEDDING_MODEL_DIR", str(Path.home() / ".local/share/visionquest/embeddinggemma-2/model")))
@@ -54,7 +55,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=5) as response:
                     tags = json.load(response)
-                entries = [entry for entry in tags["models"] if entry["name"] == CHAT]
+                entries = [entry for entry in tags["models"] if entry["name"] in CHAT_MODELS]
             except (OSError, ValueError):
                 entries = []
             entries.append({"name": EMBED, "model": EMBED, "capabilities": ["embedding"],
@@ -102,8 +103,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, {"capabilities": ["embedding"], "model_info": {"general.architecture": "embedding_gemma2", "embedding_gemma2.embedding_length": 768}})
             if self.path not in ("/api/chat", "/api/show", "/api/generate", "/v1/chat/completions"):
                 return self.respond(404, {"error": "Unknown endpoint"})
-            if body.get("model") != CHAT:
-                raise ValueError("VisionQuest only serves gemma4:12b for local generative requests")
+            if body.get("model") not in CHAT_MODELS:
+                raise ValueError("VisionQuest only serves local Gemma 4 12B variants for generative requests")
             request = urllib.request.Request(OLLAMA + self.path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(request, timeout=300) as response:
                 self.send_response(response.status)

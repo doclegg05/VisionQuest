@@ -7,7 +7,8 @@ import {
 } from "./roles";
 import type { LocalAIAuthConfig, LocalAIAuthMode, LocalAiApiStyle } from "./types";
 
-export const DEFAULT_OLLAMA_MODEL = "gemma4:12b";
+import { pinnedLocalModel } from "./local-model";
+export { DEFAULT_OLLAMA_MODEL } from "./local-model";
 /** Native 768-dim local embedding model; matches EMBEDDING_DIMENSIONS. */
 export const DEFAULT_LOCAL_EMBEDDING_MODEL = "nomic-embed-text";
 
@@ -93,7 +94,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
   if (process.env.VQ_MAC_RELAY_ENABLED === "true") {
     return {
       url: "http://127.0.0.1:11437",
-      model: DEFAULT_OLLAMA_MODEL,
+      model: pinnedLocalModel(),
       embeddingModel: null,
       authMode: "bearer",
       apiStyle: "ollama",
@@ -141,7 +142,7 @@ export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig
 
   return {
     url,
-    model: DEFAULT_OLLAMA_MODEL,
+    model: pinnedLocalModel(),
     embeddingModel: embeddingModelConfig || firstEnvValue(EMBEDDING_MODEL_ENV_VARS),
     authMode: resolveLocalAiAuthMode(authModeRaw),
     apiStyle: resolveLocalAiApiStyle(apiStyleConfig || firstEnvValue(API_STYLE_ENV_VARS)),
@@ -200,7 +201,7 @@ export async function readLocalAiRoleModelWithSource(
 ): Promise<{ value: string | null; source: "config" | "env" | null }> {
   // VisionQuest uses one local generative model; old overrides cannot reactivate larger models.
   void role;
-  return { value: DEFAULT_OLLAMA_MODEL, source: null };
+  return { value: pinnedLocalModel(), source: null };
 }
 
 /** Which roles are pinned by an environment variable the admin UI cannot clear. */
@@ -251,5 +252,5 @@ export function resolveRoleModel(
   void role;
   void roleModels;
   void globalModel;
-  return DEFAULT_OLLAMA_MODEL;
+  return pinnedLocalModel();
 }
