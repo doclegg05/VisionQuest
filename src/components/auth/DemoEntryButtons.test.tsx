@@ -32,10 +32,10 @@ function buttonTags(html: string): string[] {
 describe("DemoEntryButtons (first render)", () => {
   const html = renderToString(withAppRouter(<DemoEntryButtons />));
 
-  it("offers one button to try the demo as a student and one as an instructor", () => {
+  it("offers one button to explore as a student and one as an instructor", () => {
     assert.equal(buttonTags(html).length, 2);
-    assert.ok(html.includes(">Try the demo as a student</button>"));
-    assert.ok(html.includes(">Try the demo as an instructor</button>"));
+    assert.ok(html.includes(">Explore as a student</button>"));
+    assert.ok(html.includes(">Explore as an instructor</button>"));
   });
 
   it("says it is a demo before the choice, once, above both buttons", () => {

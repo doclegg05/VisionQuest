@@ -29,8 +29,8 @@ function render(props: { googleAuthEnabled: boolean; demoEnabled: boolean }) {
 
 const INSTRUCTOR_NOTE = "Your instructor will provide your username and password.";
 const GOOGLE_OFF_NOTE = "Google sign-in is not enabled in this environment.";
-const STUDENT_BUTTON = "Try the demo as a student";
-const INSTRUCTOR_BUTTON = "Try the demo as an instructor";
+const STUDENT_BUTTON = "Explore as a student";
+const INSTRUCTOR_BUTTON = "Explore as an instructor";
 const OR_DIVIDER = ">or</span>";
 
 function count(html: string, text: string): number {
