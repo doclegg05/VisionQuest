@@ -32,10 +32,11 @@ export function allowedRequest(method, path, body) {
   if (method !== "POST" || !["/api/chat", "/api/generate", "/api/show"].includes(path)) return false;
   try {
     const parsed = JSON.parse(body);
-    // Ollama uses Go JSON decoding, which also matches case-insensitive keys.
-    const aliasedControl = parsed !== null && typeof parsed === "object" &&
-      Object.keys(parsed).some((key) => ["model", "stream"].includes(key.toLowerCase()) && key !== key.toLowerCase());
-    return !aliasedControl && inferenceSchema.safeParse(parsed).success;
+    // Go folds ASCII and Unicode field aliases. Accept only canonical API
+    // field names at the top level; message/tool payloads retain Unicode.
+    const canonicalKeys = parsed !== null && typeof parsed === "object" &&
+      Object.keys(parsed).every((key) => /^[a-z][a-z0-9_]*$/.test(key));
+    return canonicalKeys && inferenceSchema.safeParse(parsed).success;
   } catch { return false; }
 }
 

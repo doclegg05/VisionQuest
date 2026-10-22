@@ -67,7 +67,9 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
         const forward = async ({ signal = controller.signal, commit = () => {} } = {}) => {
           let response = await fetch(new URL(frame.path, upstream), {
             method: frame.method,
-            body: frame.method === "POST" ? frame.body : undefined,
+            // Forward the same parsed values validation inspected. Go can merge
+            // duplicate raw object fields differently from JavaScript.
+            body: frame.method === "POST" ? JSON.stringify(JSON.parse(frame.body)) : undefined,
             headers: { "content-type": "application/json" },
             signal,
             redirect: "error",

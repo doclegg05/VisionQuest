@@ -346,7 +346,7 @@ test("preemption never extends the original caller deadline", async (t) => {
 
 test("case-variant stream controls cannot bypass background classification", async (t) => {
   const x = await setup(t); x.connect(); await until(x.relay.connected);
-  for (const streamKey of ["Stream", "STREAM", "sTrEaM"]) {
+  for (const streamKey of ["Stream", "STREAM", "sTrEaM", "ſtream", "Ｓtream"]) {
     for (const canonical of [{}, { stream: true }, { stream: false }]) {
       const input = { model: "gemma4:12b", ...canonical, [streamKey]: false };
       assert.equal(allowedRequest("POST", "/api/chat", JSON.stringify(input)), false);
@@ -355,4 +355,27 @@ test("case-variant stream controls cannot bypass background classification", asy
     }
   }
   assert.equal(x.received.length, 0);
+});
+
+
+test("canonical API controls preserve Unicode inside message and tool data", () => {
+  assert.equal(allowedRequest("POST", "/api/chat", JSON.stringify({
+    model: "gemma4:12b-mlx", stream: false,
+    messages: [{ role: "user", content: "¿Cómo preparo mi currículum?" }],
+    tools: [{ type: "function", function: { name: "example", parameters: {
+      type: "object", properties: { "año": { type: "string" } },
+    } } }],
+  })), true);
+  assert.equal(allowedRequest("POST", "/api/chat", JSON.stringify({
+    model: "gemma4:12b-mlx", Options: { num_ctx: 1000000 },
+  })), false);
+});
+
+
+test("native forwarding normalizes duplicate fields to the validated values", async (t) => {
+  const x = await setup(t); x.connect(); await until(x.relay.connected);
+  const raw = '{"model":"gemma4:12b","options":{"num_ctx":1000000},"options":{},"stream":false,"stream":true}';
+  const response = await fetch(x.url + "/api/chat", { method: "POST", headers, body: raw });
+  assert.equal(response.status, 200); await response.text();
+  assert.equal(x.received[0].body, JSON.stringify({ model: "gemma4:12b", options: {}, stream: true }));
 });

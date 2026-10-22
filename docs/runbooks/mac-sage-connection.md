@@ -69,6 +69,9 @@ makes Sage unavailable. Cloud fallback stays blocked.
 ## Boundaries and verification
 
 - Only GET health/tags/version and POST chat/generate/show are allowed.
+- Top-level API fields must use canonical lowercase ASCII names. Unicode message
+  and tool content is retained. Validated JSON is normalized before native
+  forwarding so duplicate fields cannot change interpretation in Ollama.
 - Every POST must name `gemma4:12b` or `gemma4:12b-mlx`; pull/delete, embeddings, arbitrary paths, and
   cloud models are refused. The Render adapter and Mac agent independently enforce
   the model boundary; model listings expose only the two approved tags.
