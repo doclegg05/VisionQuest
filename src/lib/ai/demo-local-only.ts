@@ -5,7 +5,7 @@ import { isCohortDemoEnabled } from "@/lib/demo/config";
  * These switches never rewrite the normal provider or embedding configuration.
  */
 export function isDemoLocalOnlyRequired(): boolean {
-  return isCohortDemoEnabled() ||
+  return isCohortDemoEnabled() || process.env.VQ_MAC_RELAY_ENABLED === "true" ||
     process.env.COHORT_DEMO_LOCAL_ONLY?.trim().toLowerCase() === "true";
 }
 

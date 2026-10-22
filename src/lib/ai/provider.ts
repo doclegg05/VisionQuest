@@ -152,7 +152,7 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
  * Resolve a provider for a specific task.
  *
  * Demo deployments override both settings: COHORT_DEMO_MODE or
- * COHORT_DEMO_LOCAL_ONLY forces local inference, including preferCloud and
+ * COHORT_DEMO_LOCAL_ONLY (also VQ_MAC_RELAY_ENABLED) forces local inference, including preferCloud and
  * system/background work. Raw cloud providers refuse too.
  * Otherwise two settings decide the outcome, in this order:
  *

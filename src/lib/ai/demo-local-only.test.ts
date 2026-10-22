@@ -15,6 +15,7 @@ let gemini: typeof import("./gemini-provider");
 let geminiEmbedding: typeof import("./gemini-embedding-provider");
 let openrouter: typeof import("./openrouter-provider");
 let openrouterEmbedding: typeof import("./openrouter-embedding-provider");
+const savedRelay = process.env.VQ_MAC_RELAY_ENABLED;
 const savedMode = process.env.COHORT_DEMO_MODE;
 const savedOrigin = process.env.COHORT_DEMO_LOCAL_AI_ORIGIN;
 const savedFence = process.env.COHORT_DEMO_LOCAL_ONLY;
@@ -35,6 +36,7 @@ beforeEach(() => {
   process.env.COHORT_DEMO_MODE = "true";
   process.env.COHORT_DEMO_LOCAL_AI_ORIGIN = "http://localhost:11434";
   delete process.env.COHORT_DEMO_LOCAL_ONLY;
+  delete process.env.VQ_MAC_RELAY_ENABLED;
   values.clear();
   values.set("ai_provider", "cloud");
   values.set("ai_provider_url", "http://localhost:11434");
@@ -42,6 +44,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   mock.restoreAll();
+  if (savedRelay === undefined) delete process.env.VQ_MAC_RELAY_ENABLED;
+  else process.env.VQ_MAC_RELAY_ENABLED = savedRelay;
   if (savedOrigin === undefined) delete process.env.COHORT_DEMO_LOCAL_AI_ORIGIN;
   else process.env.COHORT_DEMO_LOCAL_AI_ORIGIN = savedOrigin;
   if (savedMode === undefined) delete process.env.COHORT_DEMO_MODE;
@@ -116,4 +120,11 @@ test("demo refuses an unapproved or mismatched local endpoint before resolution"
   process.env.COHORT_DEMO_LOCAL_AI_ORIGIN = "https://approved.example";
   await assert.rejects(resolveAiProvider({ studentId: "synthetic", task: "legacy", sensitivity: "system" }), /does not match/);
   assert.equal(resolveKey.mock.callCount(), 0);
+});
+
+
+test("enabling the Mac connection also fences cloud inference independently of demo entry", () => {
+  process.env.COHORT_DEMO_MODE = "false";
+  process.env.VQ_MAC_RELAY_ENABLED = "true";
+  assert.throws(assertCloudInferenceAllowed, refusal);
 });
