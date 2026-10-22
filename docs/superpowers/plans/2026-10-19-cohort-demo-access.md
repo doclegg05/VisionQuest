@@ -436,3 +436,18 @@ Expected: every command exits 0 with 0 lint errors. The forms-delivery staging t
 
 - [ ] **Step 3: Open a draft PR against `main`.** The body quotes the red and green run for each of the spec's 9 anti-goals (for anti-goal 9, the passing proxy test and the existing Origin check it relies on), the security review result, the CI run link, and Britt's step: set `COHORT_DEMO_MODE=true` in the Render dashboard after merge, then click both buttons on the live site. End it with a test-plan checklist.
 - [ ] **Step 4: Bind the PR** with the ccd_pr tools and offer Auto-fix.
+
+## 2026-10-22 continuation
+
+PR #268 was already merged on October 21 and its verify/e2e checks passed. The current site runs main at `8756bf0e`; demo mode was initially disabled. Britt authorized activation on the existing service in Render My Workspace. Activation and live verification are tracked separately from the follow-up code.
+
+Follow-up: use the requested “Explore as a student” / “Explore as an instructor” labels and add an owner-only, preview-first roster reset. Reset archives marked demo students instead of deleting their history; it requires demo access disabled and a restart before reuse. Shared instructor settings and global content are retained.
+
+### Activation evidence, October 22
+
+- Existing Render service `srv-d6q55avafjfc73c9lne0`, confirmed workspace `tea-d6k8coma2pns73fhm5ug`; merged only `COHORT_DEMO_MODE=true` into its environment. No new service or database.
+- Deploy `dep-dbd1r8bl550s73df3c70` is live at main commit `8756bf0e668cab570ba6861c1f95fc5115a4877f` (14:33 UTC).
+- Live browser: both original “Try the demo…” buttons visible; student reaches `/welcome` with privacy notice, returning session shows Continue as, instructor sees four starters plus the new visitor and can save a fictional note.
+- Live permission requests: admin AI-provider GET, Sage-snippet POST, MFA setup POST and teacher export GET all return 403. Class list contains only Cohort Demo Class. Cross-origin demo student POST returns 403.
+- Follow-up PR #271: reset tool plus requested Explore labels. Local full suite 7,496 passed, one skipped, zero failures; focused demo/auth/proxy suite 207 passed. Typecheck, auth audit and readability pass. ESLint zero errors, 391 existing warnings. Full tests ran outside sandbox because the S3 fallback fixture binds localhost.
+- Reset helper tested with a mocked transaction; no live reset executed. The follow-up is not deployed and GitHub CI was queued at handoff. Live off-switch revocation was covered by local tests, not toggled again during the live walkthrough.

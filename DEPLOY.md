@@ -293,7 +293,7 @@ psql "DIRECT_URL" < backup.sql
 
 ## Cohort demo mode
 
-For the AI Leadership Academy cohort (Oct 15 to Dec 18, 2026). With the switch on, the sign-in page keeps its username and password form and adds two buttons, "Try the demo as a student" and "Try the demo as an instructor". The student button makes a new mock student and opens the first-day welcome steps. The instructor button signs the visitor in to one shared demo instructor, who sees only the "Cohort Demo Class" and its students. Nothing is emailed or texted for a demo account.
+For the AI Leadership Academy cohort (Oct 15 to Dec 18, 2026). With the switch on, the sign-in page keeps its username and password form and adds two buttons, "Explore as a student" and "Explore as an instructor". The student button makes a new mock student and opens the first-day welcome steps. The instructor button signs the visitor in to one shared demo instructor, who sees only the "Cohort Demo Class" and its students. Nothing is emailed or texted for a demo account.
 
 This opens the site to anyone with the link, so turn it on only while every record in the live database is mock data. That was true on 2026-10-19.
 
@@ -329,6 +329,20 @@ Two limits are fixed in code. One network can start 10 new demo students an hour
 4. Open the sign-in page and check that the demo buttons are gone and the Google block is back.
 
 After that, the demo endpoints answer 404, and any demo session that is still open stops working on its next request. Demo accounts have no password, so nobody can sign in to one again. The demo students, the demo instructor and the "Cohort Demo Class" stay in the database until someone deletes them, which this change does not do.
+
+### Reset the fictional roster (owner operation)
+
+The reset tool defaults to a preview and never deletes student records. It archives and disables marked demo students in the owned demo class, invalidates their sessions and the shared instructor session, and frees the four starter login slots. On the next server start and demo entry, bootstrap creates fresh starter students. Historical chats, goals, files and audit records remain attached to the archived rows. Instructor settings and shared program content are unchanged. Daily usage counters are not cleared.
+
+1. Turn demo mode off in Render and wait for the deployment to finish on every instance.
+2. Run from this checkout with `ADMIN_DATABASE_URL` supplied securely in the environment (the script never loads `.env.local`):
+   ```sh
+   node --import tsx scripts/reset-demo-roster.ts
+   node --import tsx scripts/reset-demo-roster.ts --apply --confirm-demo-disabled
+   ```
+3. Re-enable demo mode in Render and wait for the restart/deployment. The restart clears the bootstrap cache. Enter as the instructor and check the four fresh starter students.
+
+The tool refuses a class not owned by the marked demo instructor, unmarked students in the demo roster, and selected students enrolled in another class. Preview reports counts only. Apply is transactional; any error rolls back all changes. Keep the switch off until the reset finishes. There is no reset endpoint available to public demo visitors. This is a roster reset, not deletion of demo history or instructor settings.
 
 ## Chat-First Rebuild (June 2026) — operational notes
 
