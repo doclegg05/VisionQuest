@@ -98,7 +98,10 @@ Next startup resumes; demo model requests remain safely unavailable.
 
 The Mac agent admits at most four pending requests and forwards one inference at
 a time. Streaming chat runs before waiting non-streaming extraction calls;
-within each class, requests keep arrival order. It does not interrupt an active
+within each class, requests keep arrival order. Extraction waits up to 10 seconds
+from arrival before becoming eligible, giving the next chat a chance to arrive.
+This grace is not reset by later requests and does not extend the deadline.
+It does not interrupt an active
 inference. Health and model metadata bypass the inference queue. Queued work
 keeps its original 180-second deadline and disconnect cancellation; no requests
 are replayed. Four already-admitted requests can still cause a new request to

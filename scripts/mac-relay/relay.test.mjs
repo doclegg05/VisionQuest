@@ -38,7 +38,7 @@ async function setup(t, handler, options = {}) {
   const publicUrl = `http://127.0.0.1:${relay.front.address().port}`;
   let agent;
   const connect = () => {
-    agent = connectMacAgent({ relayUrl: publicUrl.replace("http:", "ws:") + AGENT_PATH, agentToken, upstreamUrl: `http://127.0.0.1:${upstream.address().port}`, allowLoopbackWs: true });
+    agent = connectMacAgent({ relayUrl: publicUrl.replace("http:", "ws:") + AGENT_PATH, agentToken, upstreamUrl: `http://127.0.0.1:${upstream.address().port}`, allowLoopbackWs: true, backgroundGraceMs: options.backgroundGraceMs ?? 0 });
     return agent;
   };
   t.after(async () => {
@@ -198,4 +198,23 @@ test("cancelled queued inference never reaches the Mac and metadata bypasses the
   release(); await first;
   await new Promise((r) => setTimeout(r, 50));
   assert.deepEqual(x.received.map((r) => r.path), ["/api/chat", "/api/tags"]);
+});
+
+test("extraction grace lets an arriving chat start first without resetting extraction eligibility", async (t) => {
+  const responses = [];
+  const x = await setup(t, (_req, res) => { responses.push(res); }, { backgroundGraceMs: 100 });
+  x.connect(); await until(x.relay.connected);
+  const extractionBody = JSON.stringify({ model: "gemma4:12b", stream: false, messages: [{ role: "user", content: "extract" }] });
+  const extraction = fetch(x.url + "/api/chat", { method: "POST", body: extractionBody, headers }).then((r) => r.text());
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(x.received.length, 0);
+  const chat = fetch(x.url + "/api/chat", { method: "POST", body, headers }).then((r) => r.text());
+  await until(() => responses.length === 1);
+  assert.equal(JSON.parse(x.received[0].body).stream, true);
+  // Let extraction's original grace expire while chat is running.
+  await new Promise((r) => setTimeout(r, 110));
+  responses[0].end('{"done":true}'); await chat;
+  await until(() => responses.length === 2);
+  assert.equal(JSON.parse(x.received[1].body).stream, false);
+  responses[1].end('{"done":true}'); await extraction;
 });

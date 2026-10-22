@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createInferenceQueue } from "./inference-queue.mjs";
 import { AGENT_PATH, MAX_BODY, MAX_PENDING, REQUEST_TIMEOUT, allowedRequest, parseFrame, requestSchema, sendFrame, validToken } from "./protocol.mjs";
 
-export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://127.0.0.1:11436", reconnectMs = 1000, allowLoopbackWs = false, onState = () => {} }) {
+export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://127.0.0.1:11436", reconnectMs = 1000, allowLoopbackWs = false, backgroundGraceMs = 10_000, onState = () => {} }) {
   const endpoint = new URL(relayUrl);
   const upstream = new URL(upstreamUrl);
   if (!validToken(agentToken) || endpoint.pathname !== AGENT_PATH || endpoint.search || endpoint.hash || endpoint.username || endpoint.password ||
@@ -21,7 +21,7 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
   let heartbeat;
   let attempts = 0;
   const active = new Map();
-  const enqueueInference = createInferenceQueue();
+  const enqueueInference = createInferenceQueue({ backgroundGraceMs });
   const abortAll = () => { for (const controller of active.values()) controller.abort(); active.clear(); };
   const run = () => {
     if (stopped) return;
