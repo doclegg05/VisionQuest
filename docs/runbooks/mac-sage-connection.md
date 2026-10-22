@@ -3,12 +3,12 @@
 The Mac initiates an authenticated WSS connection to the existing VisionQuest web
 service. No Mac port is publicly exposed, and no DNS, new hosting service, tunnel
 account, or historical LeggAI credentials are involved. Inference remains on the
-Mac's `gemma4:12b` with a 16K context window through the existing loopback bridge at port 11436.
+Mac's approved Gemma 4 12B variant with a 16K context window through native Ollama on loopback port 11434.
 
 ```text
 Browser → existing Render HTTPS app → authenticated loopback adapter :11437
                                         ↕ authenticated WSS
-                               Mac agent → 127.0.0.1:11436 → Ollama
+                               Mac agent → native Ollama 127.0.0.1:11434
 ```
 
 This implementation supports the service's current **single instance**. Do not
@@ -50,7 +50,7 @@ Its `config.json` must be owner-only (0600), in an owner-only directory (0700):
 {
   "relayUrl": "wss://visionquest.onrender.com/__visionquest/local-ai/agent",
   "agentToken": "<dedicated agent token>",
-  "upstreamUrl": "http://127.0.0.1:11436"
+  "upstreamUrl": "http://127.0.0.1:11434"
 }
 ```
 
@@ -62,16 +62,18 @@ to prevent idle sleep while enabled. It restarts on failure and at login. It doe
 not change global power settings or prevent display sleep. Logging contains only
 connection state, never prompts, replies, authorization headers, or tokens.
 
-The Mac must remain powered on and logged in; the existing model bridge also runs
-as a per-user LaunchAgent. Logging out, stopping the bridge, or losing networking
+The Mac must remain powered on and logged in with Ollama running.
+Logging out, stopping Ollama, or losing networking
 makes Sage unavailable. Cloud fallback stays blocked.
 
 ## Boundaries and verification
 
 - Only GET health/tags/version and POST chat/generate/show are allowed.
 - Every POST must name `gemma4:12b` or `gemma4:12b-mlx`; pull/delete, embeddings, arbitrary paths, and
-  cloud models are refused. The bridge and agent both enforce the model boundary.
-- Four requests maximum, 2 MiB input, 16 MiB output, bounded socket buffering,
+  cloud models are refused. The Render adapter and Mac agent independently enforce
+  the model boundary; model listings expose only the two approved tags.
+- Twelve requests maximum, at most eight background requests, 2 MiB input,
+  16 MiB output, bounded socket buffering,
   and a three-minute request deadline. Capacity exhaustion returns an error.
 - Tokens are checked before any model data is handled. Rotate both tokens after
   suspected disclosure; update Render and the private agent config together.
@@ -96,17 +98,30 @@ Next startup resumes; demo model requests remain safely unavailable.
 
 ## Interactive priority
 
-The Mac agent admits at most four pending requests and forwards one inference at
-a time. Streaming chat runs before waiting non-streaming extraction calls;
-within each class, requests keep arrival order. Extraction waits up to 10 seconds
-from arrival before becoming eligible, giving the next chat a chance to arrive.
-This grace is not reset by later requests and does not extend the deadline.
-It does not interrupt an active
-inference. Health and model metadata bypass the inference queue. Queued work
-keeps its original 180-second deadline and disconnect cancellation; no requests
-are replayed. Four already-admitted requests can still cause a new request to
-receive a busy response. This is scheduling, not extra model capacity.
+The Mac agent admits at most twelve pending requests, including no more than
+eight non-streaming background requests. This leaves four slots for interactive
+chat and metadata. It forwards one inference at a time. Streaming chat runs
+before waiting non-streaming extraction. Extraction initially waits 10 seconds
+before becoming eligible, giving the next chat a chance to arrive.
 
+On native Ollama, a new chat cancels an active background computation **only
+before response headers have been committed**. The same background request waits
+another 10 seconds and can recompute after chat; its caller receives at most one
+response. The original 180-second deadline is never extended. Caller cancellation,
+disconnects, timeouts, and genuine inference failures are not retried. Committed
+responses and other interactive chats are never interrupted. Pure model computation
+may repeat; application-side extraction effects occur only after its final result.
+
+Existing installations must change the private config's `upstreamUrl` from port
+11436 to `http://127.0.0.1:11434` and reinstall the agent sources. The installer
+preserves existing configuration and credentials. Preemption remains disabled
+for the older buffering bridge because HTTP cancellation there does not promptly
+stop Ollama compute. The embedding bridge can continue running independently;
+this change neither routes embeddings through the relay nor changes their model.
+
+Health and metadata bypass inference scheduling. The total admission bound still
+applies, so twelve occupied slots can produce a busy response. This is scheduling,
+not extra model capacity.
 This improves contention after a student reply without disabling discovery,
 classroom confirmation, mood, or memory extraction. It does not eliminate the
 cost of processing a fresh prompt. Measure first visible text separately from
@@ -117,7 +132,7 @@ whole-reply completion, and report uncached and reused-prefix results separately
 `VQ_MAC_RELAY_MODEL=gemma4:12b-mlx` selects Ollama's MLX Gemma 4 12B
 variant on the same Mac. Omit the setting or use `gemma4:12b` to retain the
 original GGUF runner and prompt layout. Other values fail closed. Install the
-MLX weights locally and update **both** the persistent agent protocol and bridge
+MLX weights locally and update the persistent agent protocol
 before changing Render's setting. The relay accepts only these two local tags;
 this does not enable cloud models, model downloads through the relay, or new
 embedding models.

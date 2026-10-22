@@ -3,9 +3,9 @@ import { pathToFileURL } from "node:url";
 import { WebSocket } from "ws";
 import { z } from "zod";
 import { createInferenceQueue } from "./inference-queue.mjs";
-import { AGENT_PATH, MAX_BODY, MAX_PENDING, REQUEST_TIMEOUT, allowedRequest, parseFrame, requestSchema, sendFrame, validToken } from "./protocol.mjs";
+import { AGENT_PATH, MAX_BODY, MAX_PENDING, MAX_BACKGROUND_PENDING, LOCAL_MODELS, isBackgroundRequest, REQUEST_TIMEOUT, allowedRequest, parseFrame, requestSchema, sendFrame, validToken } from "./protocol.mjs";
 
-export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://127.0.0.1:11436", reconnectMs = 1000, allowLoopbackWs = false, backgroundGraceMs = 10_000, onState = () => {} }) {
+export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://127.0.0.1:11434", reconnectMs = 1000, allowLoopbackWs = false, backgroundGraceMs = 10_000, onState = () => {} }) {
   const endpoint = new URL(relayUrl);
   const upstream = new URL(upstreamUrl);
   if (!validToken(agentToken) || endpoint.pathname !== AGENT_PATH || endpoint.search || endpoint.hash || endpoint.username || endpoint.password ||
@@ -21,8 +21,9 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
   let heartbeat;
   let attempts = 0;
   const active = new Map();
-  const enqueueInference = createInferenceQueue({ backgroundGraceMs });
-  const abortAll = () => { for (const controller of active.values()) controller.abort(); active.clear(); };
+  // Cancellation must reach native Ollama, not a buffering HTTP bridge.
+  const enqueueInference = createInferenceQueue({ backgroundGraceMs, preemptBackground: upstream.port === "11434" || allowLoopbackWs });
+  const abortAll = () => { for (const { controller } of active.values()) controller.abort(); active.clear(); };
   const run = () => {
     if (stopped) return;
     const ws = new WebSocket(endpoint, { headers: { Authorization: `Bearer ${agentToken}` }, maxPayload: MAX_BODY * 6 + 1024, perMessageDeflate: false, handshakeTimeout: 15_000, followRedirects: false });
@@ -48,24 +49,35 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
     ws.on("message", async (raw, binary) => {
       const frame = binary ? null : parseFrame(raw, requestSchema);
       if (!frame) return ws.close(1008, "Invalid relay frame");
-      if (frame.type === "cancel") { active.get(frame.id)?.abort(); return; }
+      if (frame.type === "cancel") { active.get(frame.id)?.controller.abort(); return; }
       if (active.has(frame.id)) return ws.close(1008, "Duplicate request");
       if (active.size >= MAX_PENDING || !allowedRequest(frame.method, frame.path, frame.body) || Buffer.byteLength(frame.body) > MAX_BODY) {
         try { sendFrame(ws, { type: "error", id: frame.id }); } catch { ws.terminate(); }
         return;
       }
+      const background = isBackgroundRequest(frame.method, frame.path, frame.body);
+      if (background && [...active.values()].filter((item) => item.background).length >= MAX_BACKGROUND_PENDING) {
+        try { sendFrame(ws, { type: "error", id: frame.id }); } catch { ws.terminate(); }
+        return;
+      }
       const controller = new AbortController();
-      active.set(frame.id, controller);
+      active.set(frame.id, { controller, background });
       const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
       try {
-        const forward = async () => {
-          const response = await fetch(new URL(frame.path, upstream), {
+        const forward = async ({ signal = controller.signal, commit = () => {} } = {}) => {
+          let response = await fetch(new URL(frame.path, upstream), {
             method: frame.method,
             body: frame.method === "POST" ? frame.body : undefined,
             headers: { "content-type": "application/json" },
-            signal: controller.signal,
+            signal,
             redirect: "error",
           });
+          signal.throwIfAborted();
+          if (frame.method === "GET" && frame.path === "/api/tags" && response.ok) {
+            const tags = await response.json();
+            response = new Response(JSON.stringify({ models: (tags.models ?? []).filter((entry) => LOCAL_MODELS.includes(entry.name)) }), { headers: { "content-type": "application/json" } });
+          }
+          commit();
           const rawType = response.headers.get("content-type")?.split(";")[0];
           const contentType = ["application/json", "application/x-ndjson", "text/event-stream"].includes(rawType) ? rawType : "application/json";
           sendFrame(ws, { type: "start", id: frame.id, status: response.status, contentType });
@@ -82,7 +94,7 @@ export function connectMacAgent({ relayUrl, agentToken, upstreamUrl = "http://12
         if (frame.method === "POST" && ["/api/chat", "/api/generate"].includes(frame.path)) {
           // Sage streams interactive replies; structured extraction uses
           // stream:false. Keep health/model metadata independent of this queue.
-          const interactive = JSON.parse(frame.body).stream !== false;
+          const interactive = !background;
           await enqueueInference(forward, { signal: controller.signal, interactive });
         } else {
           await forward();

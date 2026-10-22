@@ -16,7 +16,7 @@ if (existsSync(configPath) !== existsSync(renderPath)) throw new Error("Incomple
 if (!existsSync(configPath)) {
   const agentToken = randomBytes(32).toString("hex");
   const appToken = randomBytes(32).toString("hex");
-  writeFileSync(configPath, JSON.stringify({ relayUrl: "wss://visionquest.onrender.com/__visionquest/local-ai/agent", agentToken, upstreamUrl: "http://127.0.0.1:11436" }, null, 2) + "\n", { mode: 0o600, flag: "wx" });
+  writeFileSync(configPath, JSON.stringify({ relayUrl: "wss://visionquest.onrender.com/__visionquest/local-ai/agent", agentToken, upstreamUrl: "http://127.0.0.1:11434" }, null, 2) + "\n", { mode: 0o600, flag: "wx" });
   writeFileSync(renderPath, JSON.stringify([
     { key: "VQ_MAC_RELAY_ENABLED", value: "true" },
     { key: "VQ_MAC_RELAY_AGENT_TOKEN", value: agentToken },

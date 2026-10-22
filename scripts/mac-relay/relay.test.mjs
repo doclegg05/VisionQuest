@@ -151,14 +151,14 @@ test("case-variant model aliases cannot override the pinned model", async (t) =>
   assert.equal(x.received.length, 0);
 });
 
-test("interactive chat overtakes queued extraction calls without dropping them", async (t) => {
+test("interactive chat overtakes queued extraction calls without interrupting another chat", async (t) => {
   const responses = [];
   const x = await setup(t, (_req, res) => { responses.push(res); });
   const agent = x.connect(); await until(x.relay.connected);
   const post = (stream, label, signal) => fetch(x.url + "/api/chat", { method: "POST", headers, signal,
     body: JSON.stringify({ model: "gemma4:12b", stream, messages: [{ role: "user", content: label }] }),
   }).then(async (r) => ({ status: r.status, body: await r.text() }));
-  const first = post(false, "background one");
+  const first = post(true, "active foreground");
   await until(() => responses.length === 1);
   const second = post(false, "background two");
   const interactive = post(true, "foreground");
@@ -226,4 +226,119 @@ test("extraction grace lets an arriving chat start first without resetting extra
   for (const model of ["gemma4:12b-cloud", "gemma4:26b", "gemma4:12b-mlx-cloud"]) {
     assert.equal(allowedRequest("POST", "/api/chat", JSON.stringify({ model })), false);
   }
+});
+
+test("a chat interrupts uncommitted extraction and extraction completes exactly once afterward", async (t) => {
+  let attempts = 0;
+  let cancelled = false;
+  const x = await setup(t, (_req, res) => {
+    const input = JSON.parse(x.received.at(-1).body);
+    if (input.stream === false && ++attempts === 1) {
+      res.on("close", () => { cancelled = true; });
+      return;
+    }
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ result: input.stream === false ? "extraction" : "chat" }));
+  });
+  x.connect(); await until(x.relay.connected);
+  const extraction = fetch(x.url + "/api/chat", { method: "POST", headers,
+    body: JSON.stringify({ model: "gemma4:12b", stream: false }),
+  }).then((r) => r.json());
+  await until(() => attempts === 1);
+  const chat = await fetch(x.url + "/api/chat", { method: "POST", headers, body, signal: AbortSignal.timeout(1500) });
+  assert.deepEqual(await chat.json(), { result: "chat" });
+  assert.deepEqual(await extraction, { result: "extraction" });
+  await until(() => cancelled);
+  assert.equal(attempts, 2);
+});
+
+test("background fan-out leaves room for an interactive request", async (t) => {
+  const x = await setup(t, null, { backgroundGraceMs: 10_000 });
+  const agent = x.connect(); await until(x.relay.connected);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const jobs = Array.from({ length: 8 }, () => fetch(x.url + "/api/chat", { method: "POST", headers,
+    body: JSON.stringify({ model: "gemma4:12b", stream: false }), signal: controller.signal,
+  }).then((r) => r.text()).catch(() => null));
+  await until(() => agent.pending() === 8);
+  const overflow = await fetch(x.url + "/api/chat", { method: "POST", headers, body: JSON.stringify({ model: "gemma4:12b", stream: false }) });
+  assert.equal(overflow.status, 503);
+  const chat = await fetch(x.url + "/api/chat", { method: "POST", headers, body });
+  assert.equal(chat.status, 200);
+  assert.match(await chat.text(), /local .*reply/s);
+  controller.abort(); await Promise.all(jobs);
+});
+
+test("committed background responses are never restarted", async (t) => {
+  const responses = [];
+  const x = await setup(t, (_req, res) => {
+    responses.push(res); res.writeHead(200, { "content-type": "application/json" }); res.flushHeaders();
+  });
+  const agent = x.connect(); await until(x.relay.connected);
+  const first = await fetch(x.url + "/api/chat", { method: "POST", headers, body: JSON.stringify({ model: "gemma4:12b", stream: false }) });
+  const firstBody = first.text();
+  const chat = fetch(x.url + "/api/chat", { method: "POST", headers, body }).then((r) => r.text());
+  await until(() => agent.pending() === 2);
+  assert.equal(responses.length, 1);
+  responses[0].end('{"ok":true}'); await firstBody;
+  await until(() => responses.length === 2);
+  responses[1].end('{"done":true}'); await chat;
+  assert.equal(x.received.length, 2);
+});
+
+test("caller cancellation while extraction is preempted prevents its restart", async (t) => {
+  const responses = [];
+  const x = await setup(t, (_req, res) => responses.push(res));
+  const agent = x.connect(); await until(x.relay.connected);
+  const controller = new AbortController();
+  const extraction = fetch(x.url + "/api/chat", { method: "POST", headers, signal: controller.signal,
+    body: JSON.stringify({ model: "gemma4:12b", stream: false }),
+  }).catch(() => null);
+  await until(() => responses.length === 1);
+  const chat = fetch(x.url + "/api/chat", { method: "POST", headers, body }).then((r) => r.text());
+  await until(() => responses.length === 2);
+  controller.abort(); await extraction;
+  await until(() => agent.pending() === 1);
+  responses[1].end('{"done":true}'); await chat;
+  await until(() => agent.pending() === 0);
+  assert.equal(responses.length, 2);
+});
+
+test("the total admission bound still applies to concurrent foreground requests", async (t) => {
+  const x = await setup(t, () => {});
+  const agent = x.connect(); await until(x.relay.connected);
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const jobs = Array.from({ length: 12 }, () => fetch(x.url + "/api/chat", { method: "POST", headers, body,
+    signal: controller.signal }).catch(() => null));
+  await until(() => agent.pending() === 12);
+  assert.equal((await fetch(x.url + "/api/chat", { method: "POST", headers, body })).status, 503);
+  assert.equal(x.received.length, 1);
+  controller.abort(); await Promise.all(jobs);
+});
+
+test("native model metadata reveals only the two VisionQuest model tags", async (t) => {
+  const x = await setup(t, (_req, res) => res.end(JSON.stringify({ models: [
+    { name: "unrelated:model" }, { name: "gemma4:12b" }, { name: "gemma4:12b-mlx" },
+  ] })));
+  x.connect(); await until(x.relay.connected);
+  const response = await fetch(x.url + "/api/tags", { headers });
+  assert.deepEqual((await response.json()).models, [{ name: "gemma4:12b" }, { name: "gemma4:12b-mlx" }]);
+});
+
+test("preemption never extends the original caller deadline", async (t) => {
+  const x = await setup(t, (_req, res) => {
+    if (x.received.length === 2) { res.writeHead(200); res.end('{}'); }
+  }, { requestTimeout: 180, backgroundGraceMs: 10 });
+  x.connect(); await until(x.relay.connected);
+  const background = fetch(x.url + '/api/chat', { method: 'POST', headers,
+    body: JSON.stringify({ model: 'gemma4:12b', stream: false }) });
+  await until(() => x.received.length === 1);
+  await new Promise((r) => setTimeout(r, 90));
+  const chat = await fetch(x.url + '/api/chat', { method: 'POST', headers, body });
+  assert.equal(chat.status, 200); await chat.text();
+  assert.equal((await background).status, 504);
+  await until(() => x.received.length === 3);
+  // The restarted computation is cancelled by the original adapter deadline.
+  assert.equal(x.relay.connected(), true);
 });

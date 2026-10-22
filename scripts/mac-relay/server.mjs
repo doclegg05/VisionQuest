@@ -1,7 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
-import { AGENT_PATH, MAX_BODY, MAX_RESPONSE, MAX_BUFFER, MAX_PENDING, REQUEST_TIMEOUT, authorized, validToken, allowedRequest, parseFrame, responseSchema, sendFrame } from "./protocol.mjs";
+import { AGENT_PATH, MAX_BODY, MAX_RESPONSE, MAX_BUFFER, MAX_PENDING, MAX_BACKGROUND_PENDING, isBackgroundRequest, REQUEST_TIMEOUT, authorized, validToken, allowedRequest, parseFrame, responseSchema, sendFrame } from "./protocol.mjs";
 
 function json(res, status, value) {
   if (res.headersSent) return res.destroy();
@@ -89,6 +89,10 @@ export async function startRelay({ agentToken, appToken, publicPort, nextPort, l
       body = Buffer.concat(chunks).toString("utf8");
       if (!allowedRequest(req.method, req.url, body)) return fail(id, 400);
       if (!pending.has(id) || !agent) return;
+      entry.background = isBackgroundRequest(req.method, req.url, body);
+      if (entry.background && [...pending.values()].filter((item) => item.background).length > MAX_BACKGROUND_PENDING) {
+        return fail(id, 503);
+      }
       sendFrame(agent, { type: "request", id, method: req.method, path: req.url, body });
     } catch { fail(id); }
   });

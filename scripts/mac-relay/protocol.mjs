@@ -7,7 +7,8 @@ export const LOCAL_MODELS = [MODEL, "gemma4:12b-mlx"];
 export const MAX_BODY = 2 * 1024 * 1024;
 export const MAX_RESPONSE = 16 * 1024 * 1024;
 export const MAX_BUFFER = 4 * 1024 * 1024;
-export const MAX_PENDING = 4;
+export const MAX_PENDING = 12;
+export const MAX_BACKGROUND_PENDING = 8;
 export const REQUEST_TIMEOUT = 180_000;
 export const idSchema = z.string().uuid();
 const base64 = z.string().max(100_000).regex(/^[A-Za-z0-9+/]*={0,2}$/);
@@ -56,4 +57,9 @@ export function parseFrame(raw, schema) {
 export function sendFrame(socket, message) {
   if (socket.readyState !== 1 || socket.bufferedAmount > MAX_BUFFER) throw new Error("Relay connection unavailable");
   socket.send(JSON.stringify(message));
+}
+
+/** Metadata is never background inference. Call only after allowedRequest. */
+export function isBackgroundRequest(method, path, body) {
+  return method === "POST" && ["/api/chat", "/api/generate"].includes(path) && JSON.parse(body).stream === false;
 }
