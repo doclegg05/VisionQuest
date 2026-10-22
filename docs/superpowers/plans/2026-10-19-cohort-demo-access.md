@@ -436,3 +436,9 @@ Expected: every command exits 0 with 0 lint errors. The forms-delivery staging t
 
 - [ ] **Step 3: Open a draft PR against `main`.** The body quotes the red and green run for each of the spec's 9 anti-goals (for anti-goal 9, the passing proxy test and the existing Origin check it relies on), the security review result, the CI run link, and Britt's step: set `COHORT_DEMO_MODE=true` in the Render dashboard after merge, then click both buttons on the live site. End it with a test-plan checklist.
 - [ ] **Step 4: Bind the PR** with the ccd_pr tools and offer Auto-fix.
+
+## 2026-10-22 continuation
+
+PR #268 was already merged on October 21 and its verify/e2e checks passed. The current site runs main at `8756bf0e`; demo mode was initially disabled. Britt authorized activation on the existing service in Render My Workspace. Activation and live verification are tracked separately from the follow-up code.
+
+Follow-up: use the requested “Explore as a student” / “Explore as an instructor” labels and add an owner-only, preview-first roster reset. Reset archives marked demo students instead of deleting their history; it requires demo access disabled and a restart before reuse. Shared instructor settings and global content are retained.

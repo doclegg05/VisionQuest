@@ -19,8 +19,8 @@ import {
  */
 describe("demo sign-in copy", () => {
   it("says it is a demo on both buttons", () => {
-    assert.equal(DEMO_ENTER_STUDENT, "Try the demo as a student");
-    assert.equal(DEMO_ENTER_INSTRUCTOR, "Try the demo as an instructor");
+    assert.equal(DEMO_ENTER_STUDENT, "Explore as a student");
+    assert.equal(DEMO_ENTER_INSTRUCTOR, "Explore as an instructor");
   });
 
   it("shows progress while the request runs", () => {
