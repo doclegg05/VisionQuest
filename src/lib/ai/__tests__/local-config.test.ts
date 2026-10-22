@@ -105,3 +105,28 @@ describe("VisionQuest local model policy", () => {
     assert.equal(resolveRoleModel(null, {}, "gemma4:26b"), "gemma4:12b");
   });
 });
+
+describe("VisionQuest outbound Mac connection", () => {
+  afterEach(() => { process.env = { ...originalEnv }; });
+  it("uses only its loopback adapter and dedicated token, without reading legacy settings", async () => {
+    process.env.VQ_MAC_RELAY_ENABLED = "true";
+    process.env.VQ_MAC_RELAY_APP_TOKEN = "b".repeat(64);
+    mockGetPlainConfigValue.mock.resetCalls();
+    mockGetConfigValue.mock.resetCalls();
+    const config = await readLocalAiProviderConfig();
+    assert.equal(config.url, "http://127.0.0.1:11437");
+    assert.equal(config.model, "gemma4:12b");
+    assert.equal(config.authMode, "bearer");
+    assert.equal(config.apiKey, "b".repeat(64));
+    assert.equal(config.apiStyle, "ollama");
+    assert.equal(config.cloudflareAccessClientSecret, null);
+    assert.equal(mockGetPlainConfigValue.mock.callCount(), 0);
+    assert.equal(mockGetConfigValue.mock.callCount(), 0);
+  });
+  it("does not inherit another API key if the dedicated token is missing", async () => {
+    process.env.VQ_MAC_RELAY_ENABLED = "true";
+    delete process.env.VQ_MAC_RELAY_APP_TOKEN;
+    process.env.AI_PROVIDER_API_KEY = "unrelated-key";
+    assert.equal((await readLocalAiProviderConfig()).apiKey, null);
+  });
+});

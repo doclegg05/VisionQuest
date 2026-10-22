@@ -392,3 +392,7 @@ reachable from Render. Do not enable a new tunnel or change DNS as part of this
 switch. Verify the existing transport separately; if it is unavailable, Sage
 reports an outage while the portal remains usable. Hosted Ollama `:cloud` tags,
 known cloud API endpoints, and HTTP redirects are refused in demo mode.
+
+The VisionQuest-specific outbound Mac connection uses the existing Render address
+and keeps model ports private. See [Mac Sage connection](docs/runbooks/mac-sage-connection.md)
+for installation, credentials, single-instance limits, verification, and rollback.

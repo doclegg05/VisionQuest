@@ -88,6 +88,26 @@ async function getSecretConfigOrEnv(
 }
 
 export async function readLocalAiProviderConfig(): Promise<LocalAiProviderConfig> {
+  // The outbound Mac connection owns this loopback adapter. Never inherit a
+  // historical tunnel URL or its credentials while this deployment switch is on.
+  if (process.env.VQ_MAC_RELAY_ENABLED === "true") {
+    return {
+      url: "http://127.0.0.1:11437",
+      model: DEFAULT_OLLAMA_MODEL,
+      embeddingModel: null,
+      authMode: "bearer",
+      apiStyle: "ollama",
+      numCtxRaw: null,
+      reasoningRaw: "off",
+      maxOutputTokensRaw: null,
+      apiKey: process.env.VQ_MAC_RELAY_APP_TOKEN?.trim() || null,
+      apiKeySource: "env",
+      cloudflareAccessClientId: null,
+      cloudflareAccessClientIdSource: null,
+      cloudflareAccessClientSecret: null,
+      cloudflareAccessClientSecretSource: null,
+    };
+  }
   const [
     url,
     embeddingModelConfig,
