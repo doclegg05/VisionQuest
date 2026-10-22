@@ -121,6 +121,10 @@ describe("OllamaProvider tool call ids", { concurrency: false }, () => {
       events.push(event);
     }
 
+    const secondBody = JSON.parse(String(mockFetch.mock.calls[1].arguments[1]?.body));
+    const assistantHistory = secondBody.messages.find((message: { role: string; tool_calls?: unknown[] }) => message.role === "assistant" && message.tool_calls);
+    assert.deepEqual(assistantHistory.tool_calls.map((call: { function: { arguments: unknown } }) => call.function.arguments), ['{"id":"1"}', "{}"]);
+
     const toolCalls = events.filter((e): e is ToolCallEvent => e.kind === "tool_call");
     assert.deepEqual(
       toolCalls.map((c) => c.callId),
@@ -183,6 +187,10 @@ describe("OllamaProvider tool call ids", { concurrency: false }, () => {
     )) {
       events.push(event);
     }
+
+    const secondBody = JSON.parse(String(mockFetch.mock.calls[1].arguments[1]?.body));
+    const assistantHistory = secondBody.messages.find((message: { role: string; tool_calls?: unknown[] }) => message.role === "assistant" && message.tool_calls);
+    assert.deepEqual(assistantHistory.tool_calls.map((call: { function: { arguments: unknown } }) => call.function.arguments), [{ id: "1" }, {}]);
 
     const toolCalls = events.filter((e): e is ToolCallEvent => e.kind === "tool_call");
     const results = events.filter((e): e is ToolResultEvent => e.kind === "tool_result");
