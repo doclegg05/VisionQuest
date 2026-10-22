@@ -1490,7 +1490,17 @@ export class OllamaProvider implements AIProvider {
     };
     const nativeBody = {
       model: this.model,
-      messages: conversation,
+      // Native Ollama requires argument objects in replayed assistant calls;
+      // the shared conversation retains strings for OpenAI-compatible servers.
+      messages: conversation.map((message) => ({
+        ...message,
+        ...(message.tool_calls ? {
+          tool_calls: message.tool_calls.map((call) => ({
+            ...call,
+            function: { ...call.function, arguments: parseToolArguments(call.function.arguments) },
+          })),
+        } : {}),
+      })),
       stream: true,
       truncate: false,
       tools: ollamaTools,
