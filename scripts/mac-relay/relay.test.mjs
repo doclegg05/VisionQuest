@@ -136,3 +136,17 @@ test("malformed private agent configuration never appears in startup logs", (t) 
     assert.doesNotMatch(result.stdout + result.stderr, /SECRET-MARKER/);
   }
 });
+
+
+test("case-variant model aliases cannot override the pinned model", async (t) => {
+  const x = await setup(t); x.connect(); await until(x.relay.connected);
+  for (const alias of ["MODEL", "Model", "mOdEl"]) {
+    const input = JSON.stringify({ model: "gemma4:12b", [alias]: "gemma4:cloud" });
+    assert.equal(allowedRequest("POST", "/api/chat", input), false);
+    assert.equal((await fetch(x.url + "/api/chat", { method: "POST", body: input, headers })).status, 400);
+  }
+  for (const input of ["null", "[]", "{", '{"model":"gemma4:12b"}']) {
+    assert.equal(allowedRequest("POST", "/api/chat", input), input.includes("gemma4"));
+  }
+  assert.equal(x.received.length, 0);
+});
