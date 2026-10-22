@@ -3,7 +3,7 @@
 The Mac initiates an authenticated WSS connection to the existing VisionQuest web
 service. No Mac port is publicly exposed, and no DNS, new hosting service, tunnel
 account, or historical LeggAI credentials are involved. Inference remains on the
-Mac's `gemma4:12b` through the existing loopback bridge at port 11436.
+Mac's `gemma4:12b` with a 16K context window through the existing loopback bridge at port 11436.
 
 ```text
 Browser → existing Render HTTPS app → authenticated loopback adapter :11437

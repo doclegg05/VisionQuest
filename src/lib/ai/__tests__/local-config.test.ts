@@ -119,6 +119,8 @@ describe("VisionQuest outbound Mac connection", () => {
     assert.equal(config.authMode, "bearer");
     assert.equal(config.apiKey, "b".repeat(64));
     assert.equal(config.apiStyle, "ollama");
+    // The real compact Sage prompt plus tools exceeded the old 8K window.
+    assert.ok(Number(config.numCtxRaw) >= 16384);
     assert.equal(config.cloudflareAccessClientSecret, null);
     assert.equal(mockGetPlainConfigValue.mock.callCount(), 0);
     assert.equal(mockGetConfigValue.mock.callCount(), 0);
