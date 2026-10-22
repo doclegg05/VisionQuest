@@ -383,7 +383,11 @@ embedding-dependent memory work can remain pending or fail. Switching to local
 embeddings requires a separately approved index migration.
 
 The Render server must reach an authenticated, owner-approved endpoint for the
-Mac's local model. A model listening on the Mac's loopback address alone is not
+Mac's local model. Set `COHORT_DEMO_LOCAL_AI_ORIGIN` to that verified origin
+(scheme, host, and optional port only), matching the configured provider URL.
+Until it is explicitly pinned, demo inference fails before network access; the
+saved legacy URL is not implicitly trusted. The origin pin is an operator trust
+decision, not proof that an arbitrary remote server is local. A model listening on the Mac's loopback address alone is not
 reachable from Render. Do not enable a new tunnel or change DNS as part of this
 switch. Verify the existing transport separately; if it is unavailable, Sage
 reports an outage while the portal remains usable. Hosted Ollama `:cloud` tags,

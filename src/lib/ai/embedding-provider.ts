@@ -1,4 +1,4 @@
-import { assertCloudInferenceAllowed } from "./demo-local-only";
+import { assertCloudInferenceAllowed, assertLocalDemoTarget } from "./demo-local-only";
 /**
  * Resolve the active embedding provider based on SystemConfig `ai_provider`
  * (Phase 3: local embeddings capability), under the same cloud policy as
@@ -92,6 +92,7 @@ async function getLocalEmbeddingProvider(): Promise<EmbeddingProvider> {
       "Local AI server URL is invalid. Use localhost/127.0.0.1/::1 or a public http/https endpoint.",
     );
   }
+  assertLocalDemoTarget(config.url, config.embeddingModel ?? DEFAULT_LOCAL_EMBEDDING_MODEL);
   return new OllamaEmbeddingProvider(
     config.url,
     config.embeddingModel ?? DEFAULT_LOCAL_EMBEDDING_MODEL,

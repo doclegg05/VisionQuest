@@ -16,6 +16,7 @@ let geminiEmbedding: typeof import("./gemini-embedding-provider");
 let openrouter: typeof import("./openrouter-provider");
 let openrouterEmbedding: typeof import("./openrouter-embedding-provider");
 const savedMode = process.env.COHORT_DEMO_MODE;
+const savedOrigin = process.env.COHORT_DEMO_LOCAL_AI_ORIGIN;
 const savedFence = process.env.COHORT_DEMO_LOCAL_ONLY;
 const messages = [{ role: "user" as const, content: "Hello" }];
 const refusal = /Local AI only/;
@@ -32,6 +33,7 @@ before(async () => {
 });
 beforeEach(() => {
   process.env.COHORT_DEMO_MODE = "true";
+  process.env.COHORT_DEMO_LOCAL_AI_ORIGIN = "http://localhost:11434";
   delete process.env.COHORT_DEMO_LOCAL_ONLY;
   values.clear();
   values.set("ai_provider", "cloud");
@@ -40,6 +42,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   mock.restoreAll();
+  if (savedOrigin === undefined) delete process.env.COHORT_DEMO_LOCAL_AI_ORIGIN;
+  else process.env.COHORT_DEMO_LOCAL_AI_ORIGIN = savedOrigin;
   if (savedMode === undefined) delete process.env.COHORT_DEMO_MODE;
   else process.env.COHORT_DEMO_MODE = savedMode;
   if (savedFence === undefined) delete process.env.COHORT_DEMO_LOCAL_ONLY;
@@ -97,8 +101,19 @@ test("all direct cloud generation and embedding paths refuse before network", as
 
 test("Ollama hosted models and cloud API endpoints cannot masquerade as local", () => {
   for (const url of ["https://ollama.com", "https://api.openai.com", "https://openrouter.ai/api", "https://generativelanguage.googleapis.com"]) {
+    process.env.COHORT_DEMO_LOCAL_AI_ORIGIN = new URL(url).origin;
     assert.throws(() => assertLocalDemoTarget(url, "gemma4:12b"), refusal);
   }
+  process.env.COHORT_DEMO_LOCAL_AI_ORIGIN = "http://localhost:11434";
   assert.throws(() => assertLocalDemoTarget("http://localhost:11434", "model:cloud"), refusal);
   assert.doesNotThrow(() => assertLocalDemoTarget("http://localhost:11434", "gemma4:12b"));
+});
+
+
+test("demo refuses an unapproved or mismatched local endpoint before resolution", async () => {
+  delete process.env.COHORT_DEMO_LOCAL_AI_ORIGIN;
+  await assert.rejects(resolveAiProvider({ studentId: "synthetic", task: "legacy", sensitivity: "system" }), /approved endpoint origin is required/);
+  process.env.COHORT_DEMO_LOCAL_AI_ORIGIN = "https://approved.example";
+  await assert.rejects(resolveAiProvider({ studentId: "synthetic", task: "legacy", sensitivity: "system" }), /does not match/);
+  assert.equal(resolveKey.mock.callCount(), 0);
 });

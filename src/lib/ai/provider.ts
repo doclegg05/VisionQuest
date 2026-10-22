@@ -1,4 +1,4 @@
-import { isDemoLocalOnlyRequired } from "./demo-local-only";
+import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-only";
 import { getPlainConfigValue } from "@/lib/system-config";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { isSafeAiProviderUrl } from "@/lib/validation";
@@ -121,6 +121,7 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
   const { model, keepAlive, maxOutputTokens } = await resolveLocalModelForRole(
     role,
   );
+  assertLocalDemoTarget(config.url, model);
   return new OllamaProvider(
     config.url,
     model,
