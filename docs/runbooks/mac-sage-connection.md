@@ -194,7 +194,8 @@ conversation and source-message IDs. An enqueue failure or Render restart leaves
 the intent available for recovery. This path replaces immediate student/staff
 memory fan-out; discovery, goals, classroom confirmation and mood keep their
 existing behavior. The per-turn fan-out cap does not discard queued memory;
-the daily memory ceiling still applies (200 per account by default).
+the daily memory ceiling still applies (200 student turns and 100 staff turns per account by default; retries do not
+consume allowance again).
 
 One memory job runs at a time across processes, with a five-minute database
 lease and a thirty-second heartbeat. The write checks and locks that lease so

@@ -348,3 +348,11 @@ it("durable staff extraction rejects invalid shapes instead of completing empty"
   await assert.rejects(extractAndStoreStaffMemories({ provider: providerReturning("{}"), staffId: "teacher-1",
     staffRole: "teacher", conversationId: "conv-1", messages: STAFF_MESSAGES, throwOnError: true }), /Staff memory extraction failed/);
 });
+
+it("a durable staff retry does not consume its daily allowance again", async () => {
+  resetAll();
+  mockRateLimitDaily.mock.mockImplementation(async () => ({ success: false }));
+  await extractAndStoreStaffMemories({ provider: providerReturning("[]"), staffId: "teacher-1", staffRole: "teacher",
+    conversationId: "conv-1", messages: STAFF_MESSAGES, throwOnError: true, dailyLimitReserved: true });
+  assert.equal(mockRateLimitDaily.mock.callCount(), 0);
+});

@@ -18,7 +18,7 @@ mock.module("@/lib/db", { namedExports: { prismaAdmin: {
   message: { findFirst: async (input: { where: { role: string } }) => sourceExists && input.where.role === "assistant" ? ({ createdAt: new Date() }) : null,
     findMany: async () => [{ role: "assistant", content: "Try a morning class." }, { role: "user", content: "I can study mornings." }] },
   backgroundJob: { updateMany: async (input: Record<string, unknown>) => { writes.push(input); return { count: 1 }; } },
-  $transaction: async (fn: (tx: unknown) => unknown) => fn({ $executeRaw: async () => 1,
+  $transaction: async (fn: (tx: unknown) => unknown) => fn({ student: { findUnique: async () => ({ role }) }, $executeRaw: async () => 1,
     $queryRaw: async (sql: TemplateStringsArray) => sql.join("").includes("count(*)") ? [{ count: BigInt(0) }] : sql.join("").trim().startsWith("SELECT id FROM") ? (leaseHeld ? [{ id: "job" }] : []) : claimed ? [{ id: "job", attempts: 2, payload: JSON.stringify({ studentId: "student-1", conversationId: "conv-1", sourceMessageId: "msg-1" }) }] : [], backgroundJob: { updateMany: async () => ({ count: 1 }), findFirst: async () => null, create: async (input: unknown) => { enqueued.push(input); return { id: "job" }; } } }),
 } } });
 mock.module("@/lib/ai", { namedExports: { resolveAiProvider: async (input: unknown) => { extracts.push({ input, context: getRlsContext() }); return { name: "ollama" }; } } });
@@ -66,6 +66,7 @@ it("staff work uses the current staff role and staff extractor", async () => {
   role = "teacher";
   await jobs.processMemoryJob();
   assert.equal((extracts[1] as { staffRole: string }).staffRole, "teacher");
+  assert.equal((extracts[1] as { dailyLimitReserved: boolean }).dailyLimitReserved, true);
 });
 
 it("a reclaimed lease cannot write memories even when its inference finishes", async () => {

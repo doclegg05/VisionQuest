@@ -96,6 +96,8 @@ Return [] if nothing durable about the staff member was shared.`;
 export interface ExtractStaffMemoriesParams {
   provider: AIProvider;
   throwOnError?: boolean;
+  /** Durable admission already counted this source message, once. */
+  dailyLimitReserved?: boolean;
   storeGuard?: <T>(write: (transaction?: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
   /** The signed-in staff member. Becomes the memory subject. */
   staffId: string;
@@ -147,6 +149,7 @@ export async function extractAndStoreStaffMemories({
   conversationId,
   messages,
   throwOnError = false,
+  dailyLimitReserved = false,
   storeGuard = async (write) => write(),
 }: ExtractStaffMemoriesParams): Promise<ExtractMemoriesResult> {
   const empty: ExtractMemoriesResult = { stored: 0, deduped: 0, rejected: 0 };
@@ -164,7 +167,7 @@ export async function extractAndStoreStaffMemories({
     // rateLimitDaily() carries that policy itself: it never throws, and logs
     // when it falls back (see the failure-policy note in @/lib/rate-limit).
     const limit = staffExtractDailyLimit();
-    const limiter = await rateLimitDaily(`sage-staff-memory-extract:${staffId}`, limit);
+    const limiter = dailyLimitReserved ? { success: true } : await rateLimitDaily(`sage-staff-memory-extract:${staffId}`, limit);
     if (!limiter.success) {
       logger.warn("Staff memory extraction daily limit reached; skipping this turn", {
         conversationId,

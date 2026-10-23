@@ -23,8 +23,10 @@ export async function enqueueMemoryJob(input: MemoryJobInput): Promise<void> {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(82610423)`;
     const dedupeKey = `sage-memory:${input.sourceMessageId}`;
     if (await tx.backgroundJob.findFirst({ where: { dedupeKey }, select: { id: true } })) return;
-    const raw = Number.parseInt(process.env.SAGE_MEMORY_EXTRACT_DAILY_LIMIT ?? "", 10);
-    const limit = Number.isFinite(raw) && raw > 0 ? raw : 200;
+    const owner = await tx.student.findUnique({ where: { id: input.studentId }, select: { role: true } });
+    const isStudent = owner?.role === "student";
+    const raw = Number.parseInt((isStudent ? process.env.SAGE_MEMORY_EXTRACT_DAILY_LIMIT : process.env.SAGE_STAFF_MEMORY_EXTRACT_DAILY_LIMIT) ?? "", 10);
+    const limit = Number.isFinite(raw) && raw > 0 ? raw : isStudent ? 200 : 100;
     const [{ count }] = await tx.$queryRaw<{ count: bigint }[]>`SELECT count(*) AS count
       FROM visionquest."BackgroundJob" WHERE type = 'sage_memory'
         AND payload::jsonb->>'studentId' = ${input.studentId}
@@ -58,7 +60,7 @@ export async function runMemoryJob(input: MemoryJobInput, storeGuard?: <T>(write
       sensitivity: student.role === "student" ? "student_record" : "staff_entered" });
     const common = { provider, conversationId: input.conversationId, messages, throwOnError: true, storeGuard };
     if (student.role === "student") await extractAndStoreMemories({ ...common, studentId: input.studentId });
-    else await extractAndStoreStaffMemories({ ...common, staffId: input.studentId, staffRole: student.role });
+    else await extractAndStoreStaffMemories({ ...common, staffId: input.studentId, staffRole: student.role, dailyLimitReserved: true });
     invalidateChatContext(input.studentId);
     await logAiAuditEvent({ actorId: input.studentId, actorRole: student.role, targetId: input.conversationId,
       route: "background:memory-job", task: "sage_post_response", sensitivity: student.role === "student" ? "student_record" : "staff_entered",
