@@ -149,6 +149,11 @@ describe("resolveStudentMention", () => {
 });
 
 describe("shouldAttemptStaffStudentContext", () => {
+  it("resolves a student lookup at the start of a sentence regardless of case", () => {
+    for (const lead of ["Look up", "LOOK UP", "look up"]) {
+      assert.equal(shouldAttemptStaffStudentContext(`${lead} the fictional demo student Maya Torres and briefly summarize her orientation progress. Do not change anything.`), true);
+    }
+  });
   it("skips general teacher planning messages", () => {
     assert.equal(
       shouldAttemptStaffStudentContext("Help me plan tomorrow's lesson about goal setting."),

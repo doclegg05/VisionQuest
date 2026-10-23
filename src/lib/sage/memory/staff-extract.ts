@@ -77,11 +77,11 @@ HARD PRIVACY RULE — this is not student-record storage:
 - Never write a fact about a student, named or unnamed.
 - Never include any person's name, a student ID, an email address, or a phone number.
 - Never include anything a student disclosed, or any personal circumstance of any student.
-- If the conversation was only about individual students, return [].
+- If the conversation was only about individual students, return {"memories": []}.
 
 Start every fact with "${STAFF_FACT_SUBJECT}" followed by a lowercase verb, as one self-contained sentence: "${STAFF_FACT_SUBJECT} prefers three-bullet answers with the action first.", "${STAFF_FACT_SUBJECT} reviews flagged students every Monday before class.", "${STAFF_FACT_SUBJECT} cannot approve placements and routes them to the coordinator." A fact that does not start with "${STAFF_FACT_SUBJECT}" is discarded. Refer to the instructor as "they" or "their", never "he" or "she". Never put a name anywhere in the sentence.
 
-Respond with ONLY a JSON array (no prose). Each element:
+Respond with ONLY a JSON object with a memories array: {"memories": [...]}. Each array element:
 {
   "kind": "episodic" | "semantic" | "procedural",
   "content": "One self-contained sentence, max 500 chars.",
@@ -89,9 +89,9 @@ Respond with ONLY a JSON array (no prose). Each element:
   "confidence": 0.0-1.0
 }
 
-If your output format requires a JSON object rather than an array, return {"memories": [ ...the same elements... ]} — never a single bare element.
+Always include the memories key, even when its array is empty.
 
-Return [] if nothing durable about the staff member was shared.`;
+If nothing durable about the staff member was shared, return exactly {"memories": []}. Never return {}.`;
 
 export interface ExtractStaffMemoriesParams {
   provider: AIProvider;

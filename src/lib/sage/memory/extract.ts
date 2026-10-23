@@ -46,7 +46,7 @@ Include facts like: goals and career interests, stable preferences (schedule, le
 
 Do NOT include: greetings or small talk, one-off transient states ("tired today"), facts about other people by name, anything medical/legal/financial beyond what the student volunteered as a circumstance, or restatements of what Sage said.
 
-Respond with ONLY a JSON array (no prose). Each element:
+Respond with ONLY a JSON object with a memories array: {"memories": [...]}. Each array element:
 {
   "kind": "episodic" | "semantic" | "procedural",
   "content": "One self-contained sentence, max 500 chars.",
@@ -54,9 +54,9 @@ Respond with ONLY a JSON array (no prose). Each element:
   "confidence": 0.0-1.0
 }
 
-If your output format requires a JSON object rather than an array, return {"memories": [ ...the same elements... ]} — never a single bare element.
+Always include the memories key, even when its array is empty.
 
-Return [] if nothing durable was shared.`;
+If nothing durable was shared, return exactly {"memories": []}. Never return {}.`;
 
 export interface ExtractMemoriesParams {
   provider: AIProvider;

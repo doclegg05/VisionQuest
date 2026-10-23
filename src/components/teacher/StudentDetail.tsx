@@ -548,7 +548,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 onGoalAction={handleGoalAction}
               />
               <SageInsightList
-                studentId={studentId}
+                studentId={data.student.id}
                 title="Sage Coaching Notes"
                 limit={8}
               />
