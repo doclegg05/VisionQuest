@@ -3,6 +3,7 @@ import { prismaAdmin as prisma } from "@/lib/db";
 import { normalizeEmail, normalizeStudentId } from "@/lib/auth";
 import { generatePasswordResetToken } from "@/lib/password-reset";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
+import { deferAfterResponse } from "@/lib/after-response";
 import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { isValidEmail } from "@/lib/validation";
@@ -61,6 +62,24 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
   }
 
+  // An unknown login answers right after the lookup above, so a real account
+  // must too: awaiting the token writes and the SMTP exchange here made the
+  // response time reveal which logins have an account (CWE-208). The work
+  // runs after the response instead, and a failed send is only logged.
+  const recipient = { id: student.id, displayName: student.displayName, email: student.email };
+  const appBaseUrl = getAppBaseUrl(req);
+  deferAfterResponse(() => sendPasswordResetEmail(recipient, appBaseUrl));
+
+  return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
+});
+
+interface ResetRecipient {
+  id: string;
+  displayName: string;
+  email: string;
+}
+
+async function sendPasswordResetEmail(student: ResetRecipient, appBaseUrl: string): Promise<void> {
   const { token, tokenHash, expiresAt } = generatePasswordResetToken();
 
   await prisma.passwordResetToken.deleteMany({
@@ -75,7 +94,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
   });
 
-  const resetUrl = `${getAppBaseUrl(req)}/reset-password?token=${encodeURIComponent(token)}`;
+  const resetUrl = `${appBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
 
   try {
     await sendEmail({
@@ -107,10 +126,5 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     await prisma.passwordResetToken.deleteMany({
       where: { studentId: student.id, tokenHash },
     });
-    return NextResponse.json({
-      error: "We could not send the reset email right now. Please try again shortly.",
-    }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
-});
+}

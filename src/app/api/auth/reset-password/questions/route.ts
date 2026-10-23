@@ -29,30 +29,27 @@ const RESET_ERROR =
 const ACCOUNT_LIMIT_ATTEMPTS = 5;
 const ACCOUNT_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
+/**
+ * Stands in for an account whose answers must not be checked: unknown,
+ * locked, staff, or without a full question set. Every lookup misses, so each
+ * answer runs against auth's dummy hash instead.
+ */
 const NO_STORED_ANSWERS: ReadonlyMap<string, string> = new Map();
 
 /**
- * Checks every answer, one KDF run per question, before combining the
- * results. Stopping at the first wrong answer made the response time count
- * the leading correct ones, so each answer could be confirmed on its own.
+ * Runs one KDF per answer on every request and only then combines the
+ * results. Stopping at the first wrong answer, or skipping the KDF for an
+ * account that cannot recover, lets response time show which answers were
+ * right and whether the login exists.
  */
-function allAnswersMatch(
+function verifyEveryAnswer(
   answers: SecurityQuestionAnswers,
-  storedHashes: ReadonlyMap<string, string>,
+  storedAnswers: ReadonlyMap<string, string>,
 ): boolean {
   const results = Object.entries(answers).map(([questionKey, answer]) =>
-    verifySecurityAnswer(answer, storedHashes.get(questionKey)),
+    verifySecurityAnswer(answer, storedAnswers.get(questionKey)),
   );
   return results.every(Boolean);
-}
-
-/**
- * Runs the same KDF work as a real answer check, against no stored hashes,
- * for a refusal that comes before the check. A locked, unknown, or
- * unconfigured account then takes as long to refuse as a wrong answer.
- */
-function spendAnswerCheckTime(answers: SecurityQuestionAnswers): void {
-  allAnswersMatch(answers, NO_STORED_ANSWERS);
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -114,7 +111,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     // counted, the lockout is recorded once per window below, and the running
     // total stays visible in the rate-limit table.
     if (!accountRl.success) {
-      spendAnswerCheckTime(securityQuestionsResult.answers);
+      // Same KDF work as every other refusal, so a locked account is not
+      // answered faster than an unknown one.
+      verifyEveryAnswer(securityQuestionsResult.answers, NO_STORED_ANSWERS);
       return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
     }
 
@@ -139,24 +138,19 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  if (!student || !hasConfiguredSecurityQuestionSet(student.securityQuestionAnswers.map((item) => item.questionKey))) {
-    spendAnswerCheckTime(securityQuestionsResult.answers);
-    return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
-  }
+  // Unknown, unconfigured, and staff accounts are refused only after the same
+  // three KDF runs a real attempt costs, and with the same response as a
+  // wrong answer: a fast reply or a distinct status would confirm the login.
+  const canRecover =
+    student !== null &&
+    hasConfiguredSecurityQuestionSet(student.securityQuestionAnswers.map((item) => item.questionKey)) &&
+    !isStaffRole(student.role);
+  const storedAnswers = canRecover
+    ? new Map(student.securityQuestionAnswers.map((item) => [item.questionKey, item.answerHash]))
+    : NO_STORED_ANSWERS;
+  const answersMatch = verifyEveryAnswer(securityQuestionsResult.answers, storedAnswers);
 
-  if (isStaffRole(student.role)) {
-    return NextResponse.json(
-      { error: "Security question recovery is only available for student accounts." },
-      { status: 403 },
-    );
-  }
-
-  const storedAnswers = new Map(
-    student.securityQuestionAnswers.map((item) => [item.questionKey, item.answerHash])
-  );
-  const answersMatch = allAnswersMatch(securityQuestionsResult.answers, storedAnswers);
-
-  if (!answersMatch) {
+  if (!student || !canRecover || !answersMatch) {
     return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
   }
 
