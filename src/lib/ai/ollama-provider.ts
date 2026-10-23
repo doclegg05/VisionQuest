@@ -1,3 +1,4 @@
+import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-only";
 import { randomUUID } from "crypto";
 import { buildLocalAiHeaders, DEFAULT_LOCAL_AI_AUTH_MODE } from "./local-auth";
 import { estimateTokens } from "../llm-usage-estimate";
@@ -424,6 +425,28 @@ function toOpenAIMessages(
   ];
 }
 
+function nativeMessages(messages: OpenAIMessage[], systemPrefixLength?: number) {
+  const first = messages[0];
+  const canSplit = first?.role === "system" && typeof systemPrefixLength === "number" && Number.isSafeInteger(systemPrefixLength) &&
+    systemPrefixLength > 0 && systemPrefixLength < first.content.length;
+  const complete = canSplit ? [
+    { ...first, content: first.content.slice(0, systemPrefixLength) },
+    { role: "system" as const, content: first.content.slice(systemPrefixLength) },
+    ...messages.slice(1),
+  ] : messages;
+  // The shared transcript keeps OpenAI argument strings. Native Ollama needs
+  // objects, including on continuation hops with the same stable prefix.
+  return complete.map((message) => ({
+    ...message,
+    ...(message.tool_calls ? {
+      tool_calls: message.tool_calls.map((call) => ({
+        ...call,
+        function: { ...call.function, arguments: parseToolArguments(call.function.arguments) },
+      })),
+    } : {}),
+  }));
+}
+
 export class OllamaProvider implements AIProvider {
   readonly name = "ollama";
   private readonly baseUrl: string;
@@ -648,6 +671,7 @@ export class OllamaProvider implements AIProvider {
     timeoutMs: number,
     streaming: boolean,
   ): Promise<ChatFetchResult> {
+    assertLocalDemoTarget(url, this.model);
     const controller = new AbortController();
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -664,7 +688,7 @@ export class OllamaProvider implements AIProvider {
           }, timeoutMs);
         }),
         (async (): Promise<ChatFetchResult> => {
-          const response = await fetch(url, { ...init, signal: controller.signal });
+          const response = await fetch(url, { ...init, signal: controller.signal, ...(isDemoLocalOnlyRequired() ? { redirect: "error" } : {}) });
           // Also dispose of a late response from a transport ignoring abort.
           if (controller.signal.aborted) {
             void response.body?.cancel().catch(() => undefined);
@@ -782,7 +806,7 @@ export class OllamaProvider implements AIProvider {
       },
       {
         model: this.model,
-        messages: openAIMessages,
+        messages: nativeMessages(openAIMessages, options?.systemPrefixLength),
         stream: false,
         truncate: false,
         ...this.nativeReasoningParams,
@@ -902,7 +926,7 @@ export class OllamaProvider implements AIProvider {
       },
       {
         model: this.model,
-        messages: openAIMessages,
+        messages: nativeMessages(openAIMessages, options?.systemPrefixLength),
         stream: true,
         truncate: false,
         ...this.nativeReasoningParams,
@@ -1299,12 +1323,13 @@ export class OllamaProvider implements AIProvider {
     conversation: OpenAIMessage[],
     ollamaTools: OllamaToolPayload[],
     temperature?: number,
+    systemPrefixLength?: number,
   ): AsyncGenerator<string, HopResult> {
     let lastError: unknown = null;
     let yieldedAny = false;
 
     for (let attempt = 0; attempt <= STREAM_STARTUP_RETRY_DELAYS_MS.length; attempt++) {
-      const hopGen = this.streamHopOnce(conversation, ollamaTools, temperature);
+      const hopGen = this.streamHopOnce(conversation, ollamaTools, temperature, systemPrefixLength);
 
       try {
         while (true) {
@@ -1363,6 +1388,7 @@ export class OllamaProvider implements AIProvider {
     if (tools.length === 0) {
       for await (const text of this.streamResponse(systemPrompt, messages, options?.onUsage, {
         temperature: options?.temperature,
+        systemPrefixLength: options?.systemPrefixLength,
       })) {
         yield { kind: "text", text };
       }
@@ -1382,7 +1408,7 @@ export class OllamaProvider implements AIProvider {
     for (let hop = 0; hop < maxHops; hop++) {
       // Stream one hop. The inner generator yields text strings as they
       // arrive and returns a final summary with collected tool calls.
-      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools, options?.temperature);
+      const hopGen = this.streamHopWithStartupRetry(conversation, ollamaTools, options?.temperature, options?.systemPrefixLength);
       const accumulatedText: string[] = [];
       let hopResult: HopResult;
 
@@ -1475,6 +1501,7 @@ export class OllamaProvider implements AIProvider {
     conversation: OpenAIMessage[],
     ollamaTools: OllamaToolPayload[],
     temperature?: number,
+    systemPrefixLength?: number,
   ): AsyncGenerator<string, HopResult> {
     const openAIBody = {
       model: this.model,
@@ -1488,7 +1515,7 @@ export class OllamaProvider implements AIProvider {
     };
     const nativeBody = {
       model: this.model,
-      messages: conversation,
+      messages: nativeMessages(conversation, systemPrefixLength),
       stream: true,
       truncate: false,
       tools: ollamaTools,
@@ -1702,7 +1729,7 @@ export class OllamaProvider implements AIProvider {
       },
       {
         model: this.model,
-        messages: openAIMessages,
+        messages: nativeMessages(openAIMessages, options?.systemPrefixLength),
         stream: false,
         truncate: false,
         format: "json",

@@ -4,8 +4,8 @@
  * it all in one place.
  */
 export const DEMO_SIGNIN_NOTE = "This is a demo with made-up students. Pick one to look around.";
-export const DEMO_ENTER_STUDENT = "Try the demo as a student";
-export const DEMO_ENTER_INSTRUCTOR = "Try the demo as an instructor";
+export const DEMO_ENTER_STUDENT = "Explore as a student";
+export const DEMO_ENTER_INSTRUCTOR = "Explore as an instructor";
 export const DEMO_CONTINUE_AS_PREFIX = "Continue as";
 export const DEMO_ENTRY_FAILED = "We could not start the demo. Please try again.";
 export const DEMO_ENTRY_PENDING = "Starting the demo...";

@@ -37,6 +37,11 @@ export interface DetectedAlert {
  * detectedAt marks when the current spell of the alert began: queue ordering
  * and the instructor resolution-time metric read it. A new or reopened alert
  * starts a spell at `now`; an alert that is already open keeps its date.
+ *
+ * `prev` is what the detector read earlier in its transaction. The status
+ * change only applies while the row still holds that state, so a teacher's
+ * dismiss or snooze that commits after the read is kept (PR #248 review):
+ * Postgres re-checks an UPDATE's WHERE against the latest committed row.
  */
 export async function writeDetectedAlert(
   tx: Prisma.TransactionClient,
@@ -52,29 +57,39 @@ export async function writeDetectedAlert(
     sourceId: alert.sourceId,
   };
 
-  if (isHeldByTeacher(prev, now)) {
-    await tx.studentAlert.update({ where: { alertKey: alert.alertKey }, data: text });
+  if (!prev) {
+    // A row that appeared since the read gets text only: its state is unknown.
+    await tx.studentAlert.upsert({
+      where: { alertKey: alert.alertKey },
+      update: text,
+      create: {
+        studentId: alert.studentId,
+        alertKey: alert.alertKey,
+        type: alert.type,
+        ...text,
+        status: "open",
+        detectedAt: now,
+      },
+    });
     return;
   }
 
-  const reopening = prev?.status !== "open";
-  await tx.studentAlert.upsert({
-    where: { alertKey: alert.alertKey },
-    update: {
-      ...text,
-      status: "open",
-      ...(reopening ? { detectedAt: now } : {}),
-      resolvedAt: null,
-      snoozedUntil: null,
-      snoozedBy: null,
-    },
-    create: {
-      studentId: alert.studentId,
-      alertKey: alert.alertKey,
-      type: alert.type,
-      ...text,
-      status: "open",
-      detectedAt: now,
-    },
-  });
+  if (!isHeldByTeacher(prev, now)) {
+    const reopening = prev.status !== "open";
+    const { count } = await tx.studentAlert.updateMany({
+      where: { alertKey: alert.alertKey, status: prev.status, snoozedUntil: prev.snoozedUntil },
+      data: {
+        ...text,
+        status: "open",
+        ...(reopening ? { detectedAt: now } : {}),
+        resolvedAt: null,
+        snoozedUntil: null,
+        snoozedBy: null,
+      },
+    });
+    if (count > 0) return;
+  }
+
+  // Held by a teacher, or changed since the read: keep its status.
+  await tx.studentAlert.update({ where: { alertKey: alert.alertKey }, data: text });
 }

@@ -270,13 +270,13 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                     type="text"
                     value={mfaToken}
                     onChange={(e) => setMfaToken(e.target.value)}
-                    placeholder="123456 or deadbeef"
+                    placeholder="123456 or ABCD-EFGH-IJKL-MNOP"
                     autoComplete="one-time-code"
                     required
                     className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                   />
                   <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">
-                    Backup codes are eight characters long and each one can only be used once.
+                    Each backup code works only once. You can skip the dashes.
                   </p>
                 </div>
 

@@ -257,3 +257,18 @@ describe("withUsageLogging", () => {
     });
   });
 });
+
+it("usage logging preserves generation options on plain and structured paths", async () => {
+  const options = { systemPrefixLength: 6, temperature: 0 };
+  const seen: unknown[] = [];
+  const provider = fakeProvider({
+    generateResponse: async (_s, _m, _u, o) => { seen.push(o); return "ok"; },
+    generateStructuredResponse: async (_s, _m, _u, o) => { seen.push(o); return "{}"; },
+    streamResponse: async function* (_s, _m, _u, o) { seen.push(o); yield "ok"; },
+  });
+  const logged = withUsageLogging(provider, { studentId: null, callSite: "test" });
+  await logged.generateResponse("static context", MESSAGES, undefined, options);
+  await logged.generateStructuredResponse("static context", MESSAGES, undefined, options);
+  for await (const chunk of logged.streamResponse("static context", MESSAGES, undefined, options)) assert.equal(chunk, "ok");
+  assert.deepEqual(seen, [options, options, options]);
+});

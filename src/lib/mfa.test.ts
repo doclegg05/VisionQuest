@@ -1,13 +1,82 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
 import {
   claimBackupCode,
   claimTotpCounter,
   consumeBackupCode,
+  generateBackupCodes,
   hashBackupCodes,
   type BackupCodeClaimClient,
   type TotpCounterClaimClient,
 } from "./mfa";
+
+// ---------------------------------------------------------------------------
+// Backup-code strength and storage. A copy of Student.mfaBackupCodes must not
+// be enough to recover the codes: each new code carries at least 80 random
+// bits, and its stored hash depends on a server-held key that is not in the
+// database. Entries written before this change (unsalted SHA-256 of an
+// 8-hex-character code) keep working until they are spent or regenerated.
+// ---------------------------------------------------------------------------
+
+function withEncryptionKey<T>(keyByte: number, run: () => T): T {
+  const previous = process.env.API_KEY_ENCRYPTION_KEY;
+  process.env.API_KEY_ENCRYPTION_KEY = Buffer.alloc(32, keyByte).toString("base64");
+  try {
+    return run();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.API_KEY_ENCRYPTION_KEY;
+    } else {
+      process.env.API_KEY_ENCRYPTION_KEY = previous;
+    }
+  }
+}
+
+function legacySha256(code: string): string {
+  return createHash("sha256").update(code).digest("hex");
+}
+
+describe("backup code strength and storage", () => {
+  it("generates codes with at least 80 random bits, grouped for typing from paper", () => {
+    const codes = generateBackupCodes();
+
+    assert.equal(codes.length, 8);
+    for (const code of codes) {
+      // 16 base32 characters = 80 bits, shown as four groups of four.
+      assert.match(code, /^[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$/);
+    }
+    assert.equal(new Set(codes).size, codes.length);
+  });
+
+  it("stores a marked, keyed hash that a database copy alone cannot check", () => {
+    const [code] = generateBackupCodes();
+    const normalized = code!.replace(/-/g, "");
+
+    const [stored] = withEncryptionKey(1, () => hashBackupCodes([code!]));
+    const [storedUnderOtherKey] = withEncryptionKey(2, () => hashBackupCodes([code!]));
+
+    // Distinguishable from a legacy entry, which is bare SHA-256 hex.
+    assert.doesNotMatch(stored!, /^[a-f0-9]{64}$/);
+    assert.notEqual(stored, legacySha256(normalized));
+    assert.notEqual(stored, legacySha256(normalized.toLowerCase()));
+    // The hash depends on the server key, so guesses cannot be tested offline.
+    assert.notEqual(stored, storedUnderOtherKey);
+  });
+
+  it("accepts a new code typed in any case, with spaces or hyphens, once, beside legacy entries", () => {
+    const [code] = generateBackupCodes();
+    const legacy = legacySha256("deadbeef");
+    const stored = [...hashBackupCodes([code!]), legacy];
+
+    const remaining = consumeBackupCode(stored, ` ${code!.toLowerCase().replace(/-/g, " ")} `);
+    assert.deepEqual(remaining, [legacy]);
+    assert.equal(consumeBackupCode(remaining ?? [], code!), null);
+
+    // A code printed before the change still works against its SHA-256 entry.
+    assert.deepEqual(consumeBackupCode(remaining ?? [], "DEAD-BEEF"), []);
+  });
+});
 
 describe("consumeBackupCode", () => {
   it("removes a matching code and rejects reuse", () => {

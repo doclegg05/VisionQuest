@@ -240,7 +240,11 @@ describe("POST /api/internal/evidence-gap-detection", () => {
 
     await POST(request("Bearer test-cron-secret"));
 
-    const { update } = alertUpsert.mock.calls[0].arguments[0];
+    // The reopen is a guarded updateMany keyed on the alert, not the
+    // id-keyed updateMany that resolves gaps that are now met.
+    const reopen = alertUpdateMany.mock.calls.find((call: any) => call.arguments[0].where.alertKey);
+    assert.equal(reopen.arguments[0].where.status, "snoozed");
+    const update = reopen.arguments[0].data;
     assert.equal(update.status, "open");
     assert.equal(update.snoozedUntil, null);
     assert.equal(update.snoozedBy, null);

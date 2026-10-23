@@ -253,3 +253,35 @@ describe("OllamaProvider on an Ollama endpoint", { concurrency: false }, () => {
     assert.match(urlOf(1), /\/api\/chat$/);
   });
 });
+
+describe("trusted prompt prefix boundaries", { concurrency: false }, () => {
+  beforeEach(() => mockFetch.mock.resetCalls());
+  const prompt = "Trusted instructions\n\nStudent-specific context";
+  const boundary = "Trusted instructions".length;
+  const expected = [
+    { role: "system", content: prompt.slice(0, boundary) },
+    { role: "system", content: prompt.slice(boundary) },
+    ...USER,
+  ];
+  it("preserves the complete prompt and user input on every native entry point", async () => {
+    mockFetch.mock.mockImplementation(async () => nativeJson("hello"));
+    await provider().generateResponse(prompt, USER, undefined, { systemPrefixLength: boundary });
+    assert.deepEqual(bodyOf(0).messages, expected);
+    await provider().generateStructuredResponse(prompt, USER, undefined, { systemPrefixLength: boundary });
+    assert.deepEqual(bodyOf(1).messages, expected);
+    mockFetch.mock.mockImplementation(async () => nativeStream("hello"));
+    await drain(provider().streamResponse(prompt, USER, undefined, { systemPrefixLength: boundary }));
+    assert.deepEqual(bodyOf(2).messages, expected);
+    await drain(provider().streamWithTools(prompt, USER, TOOLS, async () => ({ ok: true }), { systemPrefixLength: boundary }));
+    assert.deepEqual(bodyOf(3).messages, expected);
+    await drain(provider().streamWithTools(prompt, USER, [], async () => ({ ok: true }), { systemPrefixLength: boundary }));
+    assert.deepEqual(bodyOf(4).messages, expected);
+  });
+  it("ignores invalid boundaries without dropping instructions", async () => {
+    mockFetch.mock.mockImplementation(async () => nativeJson("hello"));
+    for (const systemPrefixLength of [-1, 0, prompt.length, prompt.length + 1, NaN, 1.5]) {
+      await provider().generateResponse(prompt, USER, undefined, { systemPrefixLength });
+      assert.deepEqual(bodyOf(mockFetch.mock.calls.length - 1).messages, [{ role: "system", content: prompt }, ...USER]);
+    }
+  });
+});

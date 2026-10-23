@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
 import { prisma } from "@/lib/db";
@@ -7,26 +8,23 @@ import { DEMO_PUBLIC_PAGE_REFUSAL } from "@/lib/demo/copy";
 import { parseBody, shareCredentialSchema } from "@/lib/schemas";
 import { READY_TO_WORK_FAMILY_CERT_TYPES } from "@/lib/certifications";
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-}
+/**
+ * The slug is the only thing between the public /credentials/[slug] page and
+ * anyone who wants to list participants, so it is random, never derived from
+ * the student. It used to be the slugified login username, which put half of
+ * the account's credentials in every shared link and made pages guessable.
+ * Hex keeps the alphabet inside the old slugs' `[a-z0-9-]`. 12 bytes = 96 bits.
+ */
+const SLUG_BYTES = 12;
 
-async function ensureUniqueSlug(base: string) {
-  const root = base || "credential";
-  let suffix = 0;
-
+async function ensureUniqueSlug() {
   while (true) {
-    const candidate = suffix === 0 ? root : `${root}-${suffix}`;
+    const candidate = randomBytes(SLUG_BYTES).toString("hex");
     const existing = await prisma.publicCredentialPage.findUnique({
       where: { slug: candidate },
       select: { id: true },
     });
     if (!existing) return candidate;
-    suffix += 1;
   }
 }
 
@@ -89,7 +87,7 @@ export const POST = withAuth(async (session, req: Request) => {
   const existing = await prisma.publicCredentialPage.findUnique({
     where: { studentId: session.id },
   });
-  const slug = existing?.slug || await ensureUniqueSlug(slugify(session.studentId));
+  const slug = existing?.slug || await ensureUniqueSlug();
 
   const page = await prisma.publicCredentialPage.upsert({
     where: { studentId: session.id },

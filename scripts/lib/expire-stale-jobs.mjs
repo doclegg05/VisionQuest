@@ -73,7 +73,7 @@ export function planExpiry({ groups, before, today, reason }) {
     before,
     total,
     byType,
-    where: { status: "pending", createdAt: { lt: before } },
+    where: { status: "pending", type: { not: "sage_memory" }, createdAt: { lt: before } },
     data: { status: EXPIRED_STATUS, error: buildExpiryError({ today, reason }) },
   };
 }

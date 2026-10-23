@@ -5,7 +5,8 @@ import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
 import { chatLimitsFor } from "@/lib/chat/chat-limits";
 import { getDemoLimits } from "@/lib/demo/config";
 import { DEMO_SAGE_LIMIT } from "@/lib/demo/copy";
-import { buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
+import { usesMacPromptCache } from "@/lib/ai/local-model";
+import { buildCacheableSystemPrompt, buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
 import { promptStageForMessage } from "@/lib/sage/stage";
 import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
 import { getMemoryContext, getStaffMemoryContext } from "@/lib/sage/memory/retrieve";
@@ -640,6 +641,13 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
 
   // Build system prompt — staff (teacher/admin/coordinator) get a streamlined path
   let systemPrompt: string;
+  let systemPrefixLength: number | undefined;
+  const buildTurnPrompt = (...args: Parameters<typeof buildSystemPrompt>) => {
+    if (!usesMacPromptCache()) return buildSystemPrompt(...args);
+    const prompt = buildCacheableSystemPrompt(...args);
+    systemPrefixLength = prompt.systemPrefixLength;
+    return prompt.text;
+  };
   let recentActivityBlock = "";
 
   if (isStaffChat) {
@@ -648,7 +656,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       : session.role === "coordinator"
         ? "coordinator_assistant"
         : "teacher_assistant";
-    systemPrompt = buildSystemPrompt(staffStage, {
+    systemPrompt = buildTurnPrompt(staffStage, {
       studentName: session.displayName,
       userMessage,
       staffStudentContext,
@@ -683,8 +691,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         : undefined;
 
     systemPrompt =
-      promptContext.priorConversationContext +
-      buildSystemPrompt(promptStage, {
+      buildTurnPrompt(promptStage, {
         studentName: session.displayName,
         programType: studentProgramType,
         classroomConfirmedAt: studentClassroomConfirmedAt,
@@ -707,6 +714,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         coachingArcContext: promptContext.coachingArcContext,
         selfMetricsLine: selfMetricLineFromBundle(bundle),
       }, promptTier);
+    systemPrompt = systemPrefixLength === undefined
+      ? promptContext.priorConversationContext + systemPrompt
+      : systemPrompt + promptContext.priorConversationContext;
 
     // RECENT ACTIVITY — what actually happened since the last conversation,
     // built from bundle fields every turn already pays to fetch
@@ -1118,6 +1128,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           const agentEvents = runAgentTurn({
             provider: loggedProvider,
             systemPrompt,
+            systemPrefixLength,
             messages: allMessages,
             session,
             conversationId: conversation.id,
@@ -1173,10 +1184,10 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             // the route drives done via sendEvent({ done: true }) below.
           }
         } else if (useNonStreaming) {
-          fullResponse = await loggedProvider.generateResponse(systemPrompt, allMessages);
+          fullResponse = await loggedProvider.generateResponse(systemPrompt, allMessages, undefined, { systemPrefixLength });
           sendEvent({ text: fullResponse }, "text");
         } else {
-          for await (const chunk of loggedProvider.streamResponse(systemPrompt, allMessages)) {
+          for await (const chunk of loggedProvider.streamResponse(systemPrompt, allMessages, undefined, { systemPrefixLength })) {
             fullResponse += chunk;
             sendEvent({ text: chunk }, "text");
           }
@@ -1218,7 +1229,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             persisted: persisted.length,
           });
         }
-        const assistantMessage = await saveMessage(conversation.id, session.id, "assistant", persisted);
+        const assistantMessage = await saveMessage(conversation.id, session.id, "assistant", persisted, { memoryIntent: true });
         await logAiAuditEvent({
           actorId: session.id,
           actorRole: session.role,
@@ -1282,7 +1293,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           // directly, instead of entering that pipeline behind a flag.
           // Reuses the already-resolved chat `provider`, so the staff_entered
           // FERPA routing decided at the top of this route is inherited.
-          void extractAndStoreStaffMemories({
+          if (process.env.VQ_MAC_RELAY_ENABLED !== "true") void extractAndStoreStaffMemories({
             provider,
             staffId: session.id,
             staffRole: session.role,

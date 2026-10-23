@@ -657,7 +657,7 @@ function joinPromptSections(sections: PromptSection[]): string {
     .join("\n\n---\n\n");
 }
 
-export function buildSystemPrompt(
+function buildSystemPromptSections(
   stage: ConversationStage,
   context: {
     studentName?: string;
@@ -683,7 +683,7 @@ export function buildSystemPrompt(
     selfMetricsLine?: string;
   } = {},
   tier: PromptTier = "full",
-): string {
+): PromptSection[] {
   const programType: ProgramType = normalizeProgramType(
     typeof context.programType === "string" ? context.programType : null,
   );
@@ -771,7 +771,7 @@ export function buildSystemPrompt(
     }
     parts.push({ name: "procedural.rag_grounding", content: RAG_GROUNDING_INSTRUCTION });
     parts.push({ name: "safety.private_instructions", content: PRIVATE_INSTRUCTIONS_BOUNDARY });
-    return joinPromptSections(parts);
+    return parts;
   }
 
   // Build the prompt with program-aware knowledge base and addendum.
@@ -909,9 +909,29 @@ export function buildSystemPrompt(
   parts.push({ name: "procedural.rag_grounding", content: RAG_GROUNDING_INSTRUCTION });
   parts.push({ name: "safety.private_instructions", content: PRIVATE_INSTRUCTIONS_BOUNDARY });
 
-  let result = joinPromptSections(parts);
-  result = result.replace(/\{[a-z_]+\}/g, "");
-  return result;
+  return parts.map((part) => ({ ...part, content: part.content.replace(/\{[a-z_]+\}/g, "") }));
+}
+
+export function buildSystemPrompt(...args: Parameters<typeof buildSystemPromptSections>): string {
+  return joinPromptSections(buildSystemPromptSections(...args));
+}
+
+/** Keep changing student/context sections after the shared instruction prefix.
+ * Nothing is removed: native Ollama can place its tool declarations between
+ * these two system messages; other providers still receive the complete text.
+ */
+export function buildCacheableSystemPrompt(...args: Parameters<typeof buildSystemPromptSections>): {
+  text: string;
+  systemPrefixLength: number;
+} {
+  const staticNames = new Set([
+    "surface", "safety", "state.program", "semantic.platform", "semantic.program",
+    "action.tools", "procedural.rag_grounding",
+  ]);
+  const sections = buildSystemPromptSections(...args);
+  const prefix = joinPromptSections(sections.filter((section) => staticNames.has(section.name)));
+  const context = joinPromptSections(sections.filter((section) => !staticNames.has(section.name)));
+  return { text: `${prefix}\n\n---\n\n${context}`, systemPrefixLength: prefix.length };
 }
 
 /**

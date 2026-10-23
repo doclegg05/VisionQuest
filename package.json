@@ -15,7 +15,7 @@
     "test:joblisting": "tsx --test src/lib/job-board/job-listing-unique.db.test.ts",
     "test:api": "tsx --test --experimental-test-module-mocks src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",
     "test:forms:delivery": "tsx --test --experimental-test-module-mocks src/lib/spokes/forms-delivery.test.ts src/lib/spokes/forms-delivery.s3fallback.test.ts src/lib/spokes/forms-delivery.route.test.ts",
-    "test:relay": "node --test scripts/__tests__/ollama-relay.test.mjs",
+    "test:relay": "node --test scripts/__tests__/ollama-relay.test.mjs scripts/mac-relay/relay.test.mjs",
     "test:process-tools": "node --test scripts/memory/*.test.mjs scripts/terminal/__tests__/*.test.mjs scripts/git-hooks/__tests__/*.test.mjs",
     "memory:validate": "node scripts/memory/validate-memory-file.mjs",
     "test:smoke": "node scripts/run-smoke-public-routes.mjs",
@@ -127,6 +127,7 @@
     "tailwindcss": "^4.2.4",
     "tsx": "^4.20.6",
     "typescript": "^5",
+    "ws": "8.22.0",
     "zod": "^4.4.3"
   },
   "overrides": {

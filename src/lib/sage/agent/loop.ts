@@ -17,6 +17,7 @@ import type { AgentEvent, AgentTool, AgentToolCallRecord } from "./types";
 interface AgentTurnOptions {
   provider: AIProvider;
   systemPrompt: string;
+  systemPrefixLength?: number;
   messages: ChatMessage[];
   session: Session;
   conversationId: string;
@@ -35,7 +36,7 @@ interface AgentTurnOptions {
 export async function* runAgentTurn(
   options: AgentTurnOptions,
 ): AsyncGenerator<AgentEvent> {
-  const { provider, systemPrompt, messages, session, conversationId, targetStudentId, toolNames, maxHops, hasAttachment } =
+  const { provider, systemPrompt, systemPrefixLength, messages, session, conversationId, targetStudentId, toolNames, maxHops, hasAttachment } =
     options;
 
   const role = session.role || "student";
@@ -43,7 +44,7 @@ export async function* runAgentTurn(
 
   // No tools available or provider can't function-call → fall back to plain stream.
   if (enabledTools.length === 0 || !provider.streamWithTools) {
-    yield* runFallbackStream(provider, systemPrompt, messages);
+    yield* runFallbackStream(provider, systemPrompt, messages, systemPrefixLength);
     return;
   }
 
@@ -75,7 +76,7 @@ export async function* runAgentTurn(
         records.set(callId, record);
         return toHandlerResult(record);
       },
-      { maxHops: maxHops ?? 8 },
+      { maxHops: maxHops ?? 8, systemPrefixLength },
     );
 
     for await (const event of stream) {
@@ -192,9 +193,10 @@ async function* runFallbackStream(
   provider: AIProvider,
   systemPrompt: string,
   messages: ChatMessage[],
+  systemPrefixLength?: number,
 ): AsyncGenerator<AgentEvent> {
   const finalChunks: string[] = [];
-  for await (const chunk of provider.streamResponse(systemPrompt, messages)) {
+  for await (const chunk of provider.streamResponse(systemPrompt, messages, undefined, { systemPrefixLength })) {
     finalChunks.push(chunk);
     yield { type: "text", text: chunk };
   }

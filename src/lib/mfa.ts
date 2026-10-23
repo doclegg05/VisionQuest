@@ -1,10 +1,25 @@
 import { randomBytes, createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { encrypt, decrypt } from "./crypto";
+import { encrypt, decrypt, deriveKey } from "./crypto";
 
 // --- Base32 encoding/decoding (RFC 4648) ---
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-const BACKUP_CODE_RE = /^[a-f0-9]{8}$/;
+
+// --- Backup-code format ---
+
+const BACKUP_CODE_COUNT = 8;
+/** 10 random bytes = 80 bits, shown as 16 base32 characters. */
+const BACKUP_CODE_BYTES = 10;
+const BACKUP_CODE_GROUP_LENGTH = 4;
+/**
+ * Marks a stored entry as an HMAC-SHA256 keyed by a key derived from the
+ * server's encryption key, which is not in the database. An entry without the
+ * marker is a legacy unsalted SHA-256 of an 8-hex-character code; those keep
+ * verifying until they are spent or regenerated.
+ */
+const BACKUP_CODE_HMAC_PREFIX = "v2:";
+const BACKUP_CODE_HMAC_KEY_LABEL = "visionquest/mfa-backup-code/v2";
+const LEGACY_BACKUP_CODE_RE = /^[a-f0-9]{8}$/;
 
 function base32Encode(buffer: Buffer): string {
   let bits = 0;
@@ -139,46 +154,77 @@ export function verifyTotp(
 }
 
 /**
- * Generate 8 backup codes (8 hex characters each) for account recovery.
+ * Generate 8 backup codes for account recovery, each 80 random bits shown as
+ * four groups of four base32 characters (e.g. "ABCD-EFGH-IJKL-MNOP").
  * These should be displayed once to the user and stored hashed.
  */
 export function generateBackupCodes(): string[] {
-  const codes: string[] = [];
-  for (let i = 0; i < 8; i++) {
-    codes.push(randomBytes(4).toString("hex"));
-  }
-  return codes;
+  return Array.from({ length: BACKUP_CODE_COUNT }, () =>
+    formatBackupCode(base32Encode(randomBytes(BACKUP_CODE_BYTES))),
+  );
 }
 
+function formatBackupCode(raw: string): string {
+  const groups: string[] = [];
+  for (let i = 0; i < raw.length; i += BACKUP_CODE_GROUP_LENGTH) {
+    groups.push(raw.slice(i, i + BACKUP_CODE_GROUP_LENGTH));
+  }
+  return groups.join("-");
+}
+
+/** Ignore case, spaces and hyphens, so a code typed from paper still matches. */
 export function normalizeBackupCode(token: string): string {
+  return token.replace(/[\s-]/g, "").toUpperCase();
+}
+
+function normalizeLegacyBackupCode(token: string): string {
   return token.trim().toLowerCase().replace(/[^a-f0-9]/g, "");
 }
 
+/**
+ * Keyed hash for storage. The HMAC key is derived from the server-held
+ * encryption key, so a copy of the database alone cannot test guesses.
+ */
 export function hashBackupCode(code: string): string {
-  return createHash("sha256").update(normalizeBackupCode(code)).digest("hex");
+  const mac = createHmac("sha256", deriveKey(BACKUP_CODE_HMAC_KEY_LABEL))
+    .update(normalizeBackupCode(code))
+    .digest("hex");
+  return `${BACKUP_CODE_HMAC_PREFIX}${mac}`;
 }
 
 export function hashBackupCodes(codes: string[]): string[] {
   return codes.map(hashBackupCode);
 }
 
+/** The hash a legacy entry holds for this candidate, or null if it cannot be one. */
+function legacyBackupCodeHash(candidate: string): string | null {
+  const normalized = normalizeLegacyBackupCode(candidate);
+  if (!LEGACY_BACKUP_CODE_RE.test(normalized)) {
+    return null;
+  }
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+function hashesMatch(storedHash: string, candidateHash: string): boolean {
+  if (storedHash.length !== candidateHash.length) {
+    return false;
+  }
+  return timingSafeEqual(Buffer.from(storedHash), Buffer.from(candidateHash));
+}
+
 export function consumeBackupCode(
   storedHashes: string[],
   candidate: string,
 ): string[] | null {
-  const normalized = normalizeBackupCode(candidate);
-  if (!BACKUP_CODE_RE.test(normalized)) {
-    return null;
-  }
-
-  const candidateHash = hashBackupCode(normalized);
-  const candidateBuffer = Buffer.from(candidateHash);
+  // Only derive the HMAC key when the list holds a keyed entry, so an account
+  // that still has only legacy entries verifies exactly as it did before.
+  const hasKeyedEntry = storedHashes.some((hash) => hash.startsWith(BACKUP_CODE_HMAC_PREFIX));
+  const keyedHash = hasKeyedEntry ? hashBackupCode(candidate) : null;
+  const legacyHash = legacyBackupCodeHash(candidate);
 
   for (const [index, storedHash] of storedHashes.entries()) {
-    if (storedHash.length !== candidateHash.length) {
-      continue;
-    }
-    if (timingSafeEqual(Buffer.from(storedHash), candidateBuffer)) {
+    const candidateHash = storedHash.startsWith(BACKUP_CODE_HMAC_PREFIX) ? keyedHash : legacyHash;
+    if (candidateHash !== null && hashesMatch(storedHash, candidateHash)) {
       return storedHashes.filter((_, currentIndex) => currentIndex !== index);
     }
   }

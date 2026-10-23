@@ -1,3 +1,4 @@
+import { assertCloudInferenceAllowed } from "./demo-local-only";
 /**
  * OpenRouter (https://openrouter.ai) through its OpenAI-compatible chat API.
  *
@@ -568,6 +569,7 @@ export class OpenRouterProvider implements AIProvider {
     onUsage?: OnUsage,
     options?: GenerationOptions,
   ): AsyncGenerator<string> {
+    assertCloudInferenceAllowed();
     assertMessages(messages);
     const body = buildRequestBody(this.model, systemPrompt, toWireMessages(messages), {
       stream: true,
@@ -598,6 +600,7 @@ export class OpenRouterProvider implements AIProvider {
     onToolCall: ToolCallHandler,
     options?: ToolStreamOptions,
   ): AsyncGenerator<ToolStreamEvent> {
+    assertCloudInferenceAllowed();
     assertMessages(messages);
     const maxHops = Math.max(1, options?.maxHops ?? DEFAULT_MAX_HOPS);
     const extra = {
@@ -636,6 +639,7 @@ export class OpenRouterProvider implements AIProvider {
     onUsage?: OnUsage,
     options?: GenerationOptions,
   ): Promise<string> {
+    assertCloudInferenceAllowed();
     assertMessages(messages);
     const body = buildRequestBody(this.model, systemPrompt, toWireMessages(messages), {
       ...extra,
@@ -735,6 +739,7 @@ export class OpenRouterProvider implements AIProvider {
   }
 
   private async send(body: Record<string, unknown>, signal: AbortSignal, timeoutMs: number): Promise<Response> {
+    assertCloudInferenceAllowed();
     let response: Response;
     try {
       response = await this.fetchImpl(this.url, {

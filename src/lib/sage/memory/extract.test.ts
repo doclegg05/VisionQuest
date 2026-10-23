@@ -263,6 +263,36 @@ describe("extractAndStoreMemories", () => {
     assert.deepEqual(result, { stored: 0, deduped: 2, rejected: 0 });
   });
 
+  it("stores memories without contacting an embedding provider in local-only demos", async () => {
+    process.env.COHORT_DEMO_LOCAL_ONLY = "true";
+    try {
+      mockEmbedTexts.mock.mockImplementation(async () => { throw new Error("cloud embeddings forbidden"); });
+      const result = await extractAndStoreMemories({ provider: providerReturning(VALID_JSON),
+        studentId: "stu-1", conversationId: "conv-1", messages: MESSAGES, throwOnError: true });
+      assert.equal(result.stored, 2);
+      assert.equal(mockEmbedTexts.mock.callCount(), 0);
+      assert.equal(mockCreate.mock.callCount(), 2);
+      assert.equal(mockExecuteRaw.mock.callCount(), 1); // lock only; no vector write
+    } finally { delete process.env.COHORT_DEMO_LOCAL_ONLY; }
+  });
+
+  it("retries invalid JSON shapes but accepts a valid empty extraction", async () => {
+    for (const raw of ["{}", "42", "true", '{"status":"busy"}']) {
+      await assert.rejects(extractAndStoreMemories({ provider: providerReturning(raw), studentId: "stu-1",
+        conversationId: "conv-1", messages: MESSAGES, throwOnError: true }), /Memory extraction failed/);
+    }
+    assert.deepEqual(await extractAndStoreMemories({ provider: providerReturning("[]"), studentId: "stu-1",
+      conversationId: "conv-1", messages: MESSAGES, throwOnError: true }), { stored: 0, deduped: 0, rejected: 0 });
+  });
+
+  it("rejects failed inference for durable jobs instead of reporting empty success", async () => {
+    await assert.rejects(extractAndStoreMemories({
+      provider: { name: "ollama", generateStructuredResponse: async () => { throw new Error("busy"); } } as any,
+      studentId: "stu-1", conversationId: "conv-1", messages: MESSAGES,
+      throwOnError: true,
+    }), /Memory extraction failed/);
+  });
+
   it("returns zeros and never throws when the provider fails", async () => {
     const provider = {
       name: "mock",

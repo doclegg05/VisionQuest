@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   hashPassword,
+  invalidateSessionCache,
   setSessionCookie,
   signMfaSessionToken,
   setMfaSessionCookie,
@@ -87,6 +88,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       mfaEnabled: student.mfaEnabled,
     };
   });
+  invalidateSessionCache(result.studentId);
 
   // Mailbox control must not skip the second factor (security finding F66).
   // Same contract as the login route: an MFA-enabled account gets the

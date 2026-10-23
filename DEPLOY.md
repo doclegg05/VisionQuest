@@ -293,7 +293,7 @@ psql "DIRECT_URL" < backup.sql
 
 ## Cohort demo mode
 
-For the AI Leadership Academy cohort (Oct 15 to Dec 18, 2026). With the switch on, the sign-in page keeps its username and password form and adds two buttons, "Try the demo as a student" and "Try the demo as an instructor". The student button makes a new mock student and opens the first-day welcome steps. The instructor button signs the visitor in to one shared demo instructor, who sees only the "Cohort Demo Class" and its students. Nothing is emailed or texted for a demo account.
+For the AI Leadership Academy cohort (Oct 15 to Dec 18, 2026). With the switch on, the sign-in page keeps its username and password form and adds two buttons, "Explore as a student" and "Explore as an instructor". The student button makes a new mock student and opens the first-day welcome steps. The instructor button signs the visitor in to one shared demo instructor, who sees only the "Cohort Demo Class" and its students. Nothing is emailed or texted for a demo account.
 
 This opens the site to anyone with the link, so turn it on only while every record in the live database is mock data. That was true on 2026-10-19.
 
@@ -330,6 +330,20 @@ Two limits are fixed in code. One network can start 10 new demo students an hour
 
 After that, the demo endpoints answer 404, and any demo session that is still open stops working on its next request. Demo accounts have no password, so nobody can sign in to one again. The demo students, the demo instructor and the "Cohort Demo Class" stay in the database until someone deletes them, which this change does not do.
 
+### Reset the fictional roster (owner operation)
+
+The reset tool defaults to a preview and never deletes student records. It archives and disables marked demo students in the owned demo class, invalidates their sessions and the shared instructor session, and frees the four starter login slots. On the next server start and demo entry, bootstrap creates fresh starter students. Historical chats, goals, files and audit records remain attached to the archived rows. Instructor settings and shared program content are unchanged. Daily usage counters are not cleared.
+
+1. Turn demo mode off in Render and wait for the deployment to finish on every instance.
+2. Run from this checkout with `ADMIN_DATABASE_URL` supplied securely in the environment (the script never loads `.env.local`):
+   ```sh
+   node --import tsx scripts/reset-demo-roster.ts
+   node --import tsx scripts/reset-demo-roster.ts --apply --confirm-demo-disabled
+   ```
+3. Re-enable demo mode in Render and wait for the restart/deployment. The restart clears the bootstrap cache. Enter as the instructor and check the four fresh starter students.
+
+The tool refuses a class not owned by the marked demo instructor, unmarked students in the demo roster, and selected students enrolled in another class. Preview reports counts only. Apply is transactional; any error rolls back all changes. Keep the switch off until the reset finishes. There is no reset endpoint available to public demo visitors. This is a roster reset, not deletion of demo history or instructor settings.
+
 ## Chat-First Rebuild (June 2026) — operational notes
 
 - **Kill switches** (env vars, all default ON): `SAGE_AGENT_ENABLED=false` (agent tools),
@@ -347,3 +361,38 @@ After that, the demo endpoints answer 404, and any demo session that is still op
 - All migrations are additive and apply automatically via `prisma migrate deploy`.
 - E2E locally: `BASE_URL=http://localhost:3100 PORT=3100 npx playwright test` if port 3000
   is occupied (config honors BASE_URL/PORT).
+
+
+### Demo Sage: local inference only
+
+Public demo mode overrides the saved provider setting for the entire service,
+including instructor, system, and background work. Generative requests use the
+configured local endpoint and the pinned `gemma4:12b` model. Direct Gemini and
+OpenRouter inference is refused before network access; `preferCloud` cannot
+bypass the restriction. A local outage never falls back to a cloud model.
+
+Set `COHORT_DEMO_LOCAL_ONLY=true` alongside `COHORT_DEMO_MODE=true` and retain it
+when closing demo entry, so queued demo work remains protected. This safeguard
+also applies to non-demo accounts on this service while either flag is true.
+It does not alter the saved provider settings. Restoring ordinary cloud behavior
+requires explicitly clearing both flags after demo jobs have drained.
+
+Cloud embeddings are blocked without selecting another embedding model or
+reindexing stored vectors. Document retrieval falls back to keyword search;
+embedding-dependent memory work can remain pending or fail. Switching to local
+embeddings requires a separately approved index migration.
+
+The Render server must reach an authenticated, owner-approved endpoint for the
+Mac's local model. Set `COHORT_DEMO_LOCAL_AI_ORIGIN` to that verified origin
+(scheme, host, and optional port only), matching the configured provider URL.
+Until it is explicitly pinned, demo inference fails before network access; the
+saved legacy URL is not implicitly trusted. The origin pin is an operator trust
+decision, not proof that an arbitrary remote server is local. A model listening on the Mac's loopback address alone is not
+reachable from Render. Do not enable a new tunnel or change DNS as part of this
+switch. Verify the existing transport separately; if it is unavailable, Sage
+reports an outage while the portal remains usable. Hosted Ollama `:cloud` tags,
+known cloud API endpoints, and HTTP redirects are refused in demo mode.
+
+The VisionQuest-specific outbound Mac connection uses the existing Render address
+and keeps model ports private. See [Mac Sage connection](docs/runbooks/mac-sage-connection.md)
+for installation, credentials, single-instance limits, verification, and rollback.

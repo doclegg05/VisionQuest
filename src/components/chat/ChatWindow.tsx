@@ -62,6 +62,30 @@ const REQUESTED_STAGE_OPENERS = {
   career_profile_review: STAGE_OPENERS.career_profile_review,
 } as const;
 
+/**
+ * Message text from an "Ask Sage" deep link (?prompt=, or ?topic= with ?name=).
+ * Anyone can write these URLs, so the text only prefills the input box: the
+ * user reads it and presses Send themselves. It is never sent on load (F19).
+ */
+function buildDeepLinkPrefill(searchParams: Pick<URLSearchParams, "get">): string {
+  const prompt = searchParams.get("prompt")?.trim();
+  const topic = searchParams.get("topic");
+  const name = searchParams.get("name");
+
+  if (prompt) return prompt.slice(0, 1000);
+  if (topic === "form" && name) {
+    return `Can you tell me about the "${name}" form? What is it for and what do I need to know about it?`;
+  }
+  if (topic === "cert" && name) {
+    return `I'd like to learn about the ${name} certification. What does it involve and how do I get started?`;
+  }
+  if (topic === "platform" && name) {
+    return `Can you help me understand how to use ${name}? How do I get started with it?`;
+  }
+  if (name) return `I have a question about ${name}.`;
+  return "";
+}
+
 function formatToolName(tool: string | undefined): string {
   if (!tool) return "Sage tool";
   return tool
@@ -198,6 +222,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       ? REQUESTED_STAGE_OPENERS[requestedStage as keyof typeof REQUESTED_STAGE_OPENERS]
       : null;
   const { checkProgression } = useProgression();
+  // Read once on mount, like the deep-link effect this replaces.
+  const [deepLinkPrefill] = useState(() => buildDeepLinkPrefill(searchParams));
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -569,34 +595,6 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener]
   );
 
-  // Deep link: auto-send a contextual first message when arriving from "Ask Sage" links
-  useEffect(() => {
-    const prompt = searchParams.get("prompt")?.trim();
-    const topic = searchParams.get("topic");
-    const name = searchParams.get("name");
-
-    if (messages.length === 0 && !conversationId) {
-      let autoMessage = "";
-      if (prompt) {
-        autoMessage = prompt.slice(0, 1000);
-      } else if (topic === "form" && name) {
-        autoMessage = `Can you tell me about the "${name}" form? What is it for and what do I need to know about it?`;
-      } else if (topic === "cert" && name) {
-        autoMessage = `I'd like to learn about the ${name} certification. What does it involve and how do I get started?`;
-      } else if (topic === "platform" && name) {
-        autoMessage = `Can you help me understand how to use ${name}? How do I get started with it?`;
-      } else if (name) {
-        autoMessage = `I have a question about ${name}.`;
-      }
-
-      // Auto-send after a brief delay to let the UI render
-      if (autoMessage) {
-        setTimeout(() => handleSend(autoMessage), 500);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => {
     if (!showSidebar) return;
 
@@ -738,7 +736,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           <ChatErrorBanner message={chatError} settingsHref={getRoleSettingsPath(role)} />
         )}
 
-        <ChatInput onSend={handleSend} disabled={isLoading} role={role} />
+        <ChatInput onSend={handleSend} disabled={isLoading} role={role} initialMessage={deepLinkPrefill} />
       </div>
 
       {showSidebar && (

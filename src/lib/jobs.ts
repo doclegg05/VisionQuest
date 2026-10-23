@@ -118,7 +118,7 @@ export async function claimPendingJobs(limit: number): Promise<ClaimedJob[]> {
         attempts = attempts + 1
     WHERE id IN (
       SELECT id FROM visionquest."BackgroundJob"
-      WHERE status = 'pending' AND attempts < 3
+      WHERE status = 'pending' AND attempts < 3 AND type <> 'sage_memory'
       ORDER BY "createdAt" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
@@ -135,6 +135,7 @@ export async function claimPendingJobById(jobId: string): Promise<ClaimedJob[]> 
         attempts = attempts + 1
     WHERE id = ${jobId}
       AND status = 'pending'
+      AND type <> 'sage_memory'
       AND attempts < 3
     RETURNING id, type, payload, attempts
   `);

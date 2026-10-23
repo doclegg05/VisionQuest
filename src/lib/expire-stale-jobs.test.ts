@@ -74,7 +74,7 @@ describe("planExpiry", () => {
 
   it("targets only pending rows created before the cutoff and sets a terminal status", () => {
     const plan = planExpiry({ groups: [], before, today: "2026-09-02", reason: "r" });
-    assert.deepEqual(plan.where, { status: "pending", createdAt: { lt: before } });
+    assert.deepEqual(plan.where, { status: "pending", type: { not: "sage_memory" }, createdAt: { lt: before } });
     assert.deepEqual(plan.data, { status: "failed", error: "expired by operator on 2026-09-02: r" });
   });
 

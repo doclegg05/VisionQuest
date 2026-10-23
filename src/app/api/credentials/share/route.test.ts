@@ -90,3 +90,49 @@ describe("GET/POST /api/credentials/share — reader uses the Ready-to-Work fami
     assert.deepEqual(findArgs.where.certType.in, [...READY_TO_WORK_FAMILY_CERT_TYPES]);
   });
 });
+
+describe("POST /api/credentials/share — the public slug does not reveal the login username (F7)", () => {
+  const completedCert = { id: "cert-3", status: "completed", completedAt: new Date() };
+
+  beforeEach(() => {
+    mockCertificationFindFirst.mock.resetCalls();
+    mockPageFindUnique.mock.resetCalls();
+    mockPageUpsert.mock.resetCalls();
+    mockCertificationFindFirst.mock.mockImplementation(async () => completedCert);
+    mockPageFindUnique.mock.mockImplementation(async () => null);
+    mockPageUpsert.mock.mockImplementation(async (args: any) => ({ ...args.create }));
+  });
+
+  async function publishNewPage(): Promise<string> {
+    const res = await route.POST(
+      mockRequest("/api/credentials/share", { method: "POST", body: { isPublic: true } }),
+    );
+    assert.equal(res.status, 200);
+    const upsertArgs = mockPageUpsert.mock.calls.at(-1)?.arguments[0] as any;
+    return upsertArgs.create.slug as string;
+  }
+
+  it("a new page gets a random, URL-safe slug that is not derived from session.studentId", async () => {
+    const first = await publishNewPage();
+    const second = await publishNewPage();
+
+    assert.equal(session.studentId, "testuser");
+    for (const slug of [first, second]) {
+      assert.ok(!slug.includes(session.studentId), `slug "${slug}" must not contain the login username`);
+      assert.match(slug, /^[a-f0-9]{24}$/);
+    }
+    assert.notEqual(first, second, "two new pages must not get the same predictable slug");
+  });
+
+  it("an existing page keeps the slug it already has, so shared links keep working", async () => {
+    mockPageFindUnique.mock.mockImplementation(async () => ({ id: "page-1", slug: "testuser" }));
+
+    const res = await route.POST(
+      mockRequest("/api/credentials/share", { method: "POST", body: { isPublic: true } }),
+    );
+    assert.equal(res.status, 200);
+    const upsertArgs = mockPageUpsert.mock.calls[0].arguments[0] as any;
+    assert.equal(upsertArgs.create.slug, "testuser");
+    assert.equal(mockPageFindUnique.mock.callCount(), 1, "no new slug is minted for an existing page");
+  });
+});

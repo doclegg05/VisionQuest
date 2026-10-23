@@ -1,12 +1,13 @@
+import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-only";
 import { getPlainConfigValue } from "@/lib/system-config";
 import { resolveApiKey } from "@/lib/chat/api-key";
 import { isSafeAiProviderUrl } from "@/lib/validation";
 import {
-  DEFAULT_OLLAMA_MODEL,
   readLocalAiProviderConfig,
   readLocalAiRoleMaxOutputTokensRaw,
   toLocalAiAuthConfig,
 } from "./local-config";
+import { pinnedLocalModel } from "./local-model";
 import { roleForTask, type AiRole } from "./roles";
 import { enforceCloudPolicy, isLocalOnlySensitivity } from "./lanes";
 import { getProviderClass, logAiAuditEvent } from "./audit";
@@ -98,7 +99,8 @@ async function resolveLocalModelForRole(
   role: AiRole | null,
 ): Promise<{ model: string; keepAlive?: string; maxOutputTokens?: number }> {
   return {
-    model: DEFAULT_OLLAMA_MODEL,
+    model: pinnedLocalModel(),
+    keepAlive: process.env.VQ_MAC_RELAY_ENABLED === "true" ? "-1s" : undefined,
     maxOutputTokens: role
       ? parseMaxOutputTokensOverride(await readLocalAiRoleMaxOutputTokensRaw(role))
       : undefined,
@@ -120,6 +122,7 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
   const { model, keepAlive, maxOutputTokens } = await resolveLocalModelForRole(
     role,
   );
+  assertLocalDemoTarget(config.url, model);
   return new OllamaProvider(
     config.url,
     model,
@@ -149,7 +152,10 @@ async function getLocalProvider(role: AiRole | null = null): Promise<AIProvider>
 /**
  * Resolve a provider for a specific task.
  *
- * Two settings decide the outcome, in this order:
+ * Demo deployments override both settings: COHORT_DEMO_MODE or
+ * COHORT_DEMO_LOCAL_ONLY (also VQ_MAC_RELAY_ENABLED) forces local inference, including preferCloud and
+ * system/background work. Raw cloud providers refuse too.
+ * Otherwise two settings decide the outcome, in this order:
  *
  *  1. `ai_provider` decides WHICH provider is configured. `"local"` serves
  *     every call from the local model and never consults the policy below;
@@ -182,6 +188,8 @@ export async function resolveAiProvider(
   // widen the routing rule, and the cloud provider ignores roles entirely
   // (Gemini is one model for every job).
   const role = request.role ?? roleForTask(request.task);
+
+  if (isDemoLocalOnlyRequired()) return getLocalProvider(role);
 
   const providerType = await getConfiguredProviderType();
   const cloudRequested =
