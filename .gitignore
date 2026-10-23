@@ -141,3 +141,6 @@ reports/benchmarks/raw/*.json
 
 # SPOKES design review screenshots (e2e/spokes-visual.spec.ts)
 spokes-visual/
+
+# Env runner logs (scripts/terminal/run-with-env.mjs)
+reports/terminal/

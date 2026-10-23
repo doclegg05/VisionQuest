@@ -9,7 +9,7 @@ Agents should read docs based on what they are doing. Do not read everything —
 
 ### Level 0: Always Read First
 - **This file (CLAUDE.md)** — project overview, operating rules, production environment, design context
-- **[.claude/MEMORY.md](./.claude/MEMORY.md)** — project state and handoff: current status, last session, open items, engineering decisions log, architecture notes, known issues (imported below, so it loads with this file)
+- **[.claude/MEMORY.md](./.claude/MEMORY.md)** — project state and handoff: current status, last session pointer, open items, architecture notes, known issues (imported below, so it loads with this file). Session history lives in `.claude/handoffs/`; decisions in `docs/decisions/engineering-log.md`
 
 ### Level 1: Product-Shaping Work
 Read before any change that affects what users see or how workflows behave.
@@ -57,7 +57,7 @@ and an agent that doesn't know they exist will draw confident, incomplete conclu
 - `docs/archive/SETUP_WIZARD_PLAN.md` — frozen planning artifact
 
 ## Project Memory (state, handoff, engineering decisions)
-The live handoff — current status, last session, open items, engineering decisions log, architecture notes, and known issues — is maintained in `.claude/MEMORY.md` and imported here so it loads with this file. Update it at the end of every session.
+The live handoff (current status, last session pointer, open items, architecture notes, and known issues) is maintained in `.claude/MEMORY.md` and imported here so it loads with this file. At session end, write a new `.claude/handoffs/YYYY-MM-DD-<slug>.md` and repoint the `## Last Session` lines at it. Edit other `.claude/MEMORY.md` sections only when their facts change. Append decisions to `docs/decisions/engineering-log.md`. `npm run memory:validate` enforces the shape.
 
 @.claude/MEMORY.md
 

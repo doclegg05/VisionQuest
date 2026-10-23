@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# post-checkout: regenerate the Prisma client after a branch switch that changed
+# prisma/schema.prisma, but only in a checkout that has its own node_modules.
+# Without one, `prisma generate` would rewrite the main checkout's shared client.
+# Enable with: git config core.hooksPath scripts/git-hooks
+# Always exits 0 so a checkout never fails because of this hook.
+
+old="$1"
+new="$2"
+flag="$3"
+
+# Only branch checkouts (flag 1); never a new worktree or clone (all-zero old sha).
+[ "$flag" = "1" ] || exit 0
+case "$old" in
+  ''|*[!0]*) ;;
+  *) exit 0 ;;
+esac
+
+# Act only when diff reports a real change (exit 1). Exit 128 means an error.
+git diff --quiet "$old" "$new" -- prisma/schema.prisma >/dev/null 2>&1
+[ "$?" -eq 1 ] || exit 0
+
+top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+
+if [ -d "$top/node_modules/.prisma" ]; then
+  (cd "$top" && npx prisma generate) || echo "post-checkout: prisma generate failed; run it by hand"
+else
+  echo "post-checkout: schema changed but this checkout has no own node_modules; run npm ci here before prisma generate"
+fi
+
+exit 0

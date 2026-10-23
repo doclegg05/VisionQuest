@@ -70,8 +70,9 @@ export async function run(ctx) {
         },
       );
     } catch (error) {
-      // The real suite has known-failing cases (see .claude/MEMORY.md's
-      // "13 known post-response logger failures" note) — a non-zero exit
+      // The real suite has known-failing cases (see
+      // `.claude/handoffs/2026-08-21-morning-resume-button-up-164-merge.md`, the 13
+      // post-response logger failures); a non-zero exit
       // from the combined run is expected, NOT a reason to discard the
       // coverage data it still wrote. Only a missing lcov file is fatal.
       if (!existsSync(lcovOut)) {

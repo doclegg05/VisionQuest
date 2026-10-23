@@ -8,6 +8,7 @@
     "start": "node scripts/start-production.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "typecheck:clean": "node -e \"require('fs').rmSync('tsconfig.tsbuildinfo',{force:true})\" && tsc --noEmit",
     "test": "tsx --test --experimental-test-module-mocks \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
     "test:rls": "tsx --test src/lib/rls.test.ts",
     "test:ratelimit": "tsx --test src/lib/rate-limit.db.test.ts",
@@ -15,6 +16,8 @@
     "test:api": "tsx --test --experimental-test-module-mocks src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",
     "test:forms:delivery": "tsx --test --experimental-test-module-mocks src/lib/spokes/forms-delivery.test.ts src/lib/spokes/forms-delivery.s3fallback.test.ts src/lib/spokes/forms-delivery.route.test.ts",
     "test:relay": "node --test scripts/__tests__/ollama-relay.test.mjs scripts/mac-relay/relay.test.mjs",
+    "test:process-tools": "node --test scripts/memory/*.test.mjs scripts/terminal/__tests__/*.test.mjs scripts/git-hooks/__tests__/*.test.mjs",
+    "memory:validate": "node scripts/memory/validate-memory-file.mjs",
     "test:smoke": "node scripts/run-smoke-public-routes.mjs",
     "test:smoke:api": "python scripts/smoke_api_routes.py",
     "test:e2e": "playwright test",
@@ -79,7 +82,7 @@
     "bench:compare": "node scripts/bench/compare.mjs",
     "bench:validate": "node scripts/bench/validate.mjs",
     "bench:test": "node --test \"scripts/bench/__tests__/*.test.mjs\"",
-    "pipelines:validate": "npm run ci-pipeline:validate && npm run a11y-pipeline:validate && npm run bench:validate"
+    "pipelines:validate": "npm run ci-pipeline:validate && npm run a11y-pipeline:validate && npm run bench:validate && npm run memory:validate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1042.0",

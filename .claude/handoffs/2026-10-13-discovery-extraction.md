@@ -1,0 +1,6 @@
+# Prior Session (2026-10-13, discovery extraction)
+- **Date**: 2026-10-13 (discovery extraction swallowed its own failures)
+- **What we worked on**: see Current Status. Shown red before the fix: 6 extractor tests (provider throws, non-JSON, four non-object JSON values) and 4 post-response integration tests (both failure kinds upserted, both empty kinds upserted). The empty-write guard was proven to bite on its own: stubbing it to `false` with the fixed extractor fails exactly the two empty-reply tests. `npm test` 6001/6001, eslint exit 0, tsc exit 0 after `npx prisma generate` (this worktree's client predated the Connect models; the main checkout's client was left alone, checked by mtime).
+- **What we decided**: a parsed pass with no signal is not a failure, so it is not retried or dead-lettered, but it writes nothing, because each pass replaces the stored fields wholesale. One visible consequence: until a discovery turn carries a signal, the student has no CareerDiscovery row and the teacher card reads "Not Started" rather than "In Progress". `post-response.test.ts`'s discovery fixture was all-empty and expected a write; it now carries one interest, with the assertion unchanged.
+- **Where we left off**: draft PR open from `bug/discovery-extraction-swallows-failures`, not merged. Follow-ups found and left out of this branch are in Open Items.
+

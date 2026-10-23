@@ -5,7 +5,7 @@ import { detectCrisisSignal } from "./crisis-detection";
 // ---------------------------------------------------------------------------
 // B1 — the three MEANS families: firearms, hanging, jumping, in both languages.
 //
-// `.claude/MEMORY.md` named this the largest remaining crisis-coverage gap, and
+// `docs/decisions/closed-items.md` records this as the largest remaining crisis-coverage gap, and
 // the crisis-en / crisis-es benchmarks put a number on it: means_firearm,
 // means_hanging and means_jumping all scored 0/n before this change (16/13/12
 // English rows, 11/10/9 Spanish). Every MUST_DETECT phrase below was a verified

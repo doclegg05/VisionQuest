@@ -369,7 +369,7 @@ describe("syncInterventionNotifications recipient scoping (D8)", () => {
   it("falls back program-wide when the instructor join throws under RLS", async () => {
     // Under a student's RLS context the enrollment→instructor join raises
     // Prisma's inconsistency error rather than returning zero rows
-    // (.claude/MEMORY.md, 2026-09-02). The crisis path catches it; so does this.
+    // (`.claude/handoffs/2026-09-02-session.md`). The crisis path catches it; so does this.
     mockAdminEnrollmentFindMany.mock.mockImplementation(async () => {
       throw new Error("Inconsistent query result: Field instructor is required to return data");
     });
