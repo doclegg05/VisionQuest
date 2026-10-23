@@ -56,6 +56,19 @@ describe("retrieveMemories", () => {
     mockQueryRaw.mock.mockImplementation(async () => [row()]);
   });
 
+  it("retrieves local-only memory with subject and suppression boundaries, no embeddings", async () => {
+    process.env.COHORT_DEMO_LOCAL_ONLY = "true";
+    try {
+      const result = await retrieveMemories("student", "stu-1", "morning classes");
+      assert.equal(result.length, 1);
+      assert.equal(mockEmbedQuery.mock.callCount(), 0);
+      const call = mockQueryRaw.mock.calls[0].arguments;
+      assert.ok(call.includes("stu-1"));
+      assert.ok(call.includes("student"));
+      assert.match(call[0].join("?"), /"suppressedByStaff" = false/);
+    } finally { delete process.env.COHORT_DEMO_LOCAL_ONLY; }
+  });
+
   it("returns scored memories ordered by combined score", async () => {
     mockQueryRaw.mock.mockImplementation(async () => [
       // closer but old + low confidence

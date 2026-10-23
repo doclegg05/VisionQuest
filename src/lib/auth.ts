@@ -3,6 +3,9 @@ import { cookies } from "next/headers";
 import { prismaAdmin } from "./db";
 import { cached, invalidatePrefix } from "./cache";
 import { isCohortDemoEnabled, type DemoAccountKind } from "./demo/config";
+import { errorForLog } from "./log-error";
+import { logger } from "./logger";
+import { isSessionTokenRevoked, revokeSessionToken } from "./session-revocation";
 import {
   signToken as signSessionToken,
   verifyToken as verifySessionToken,
@@ -176,6 +179,9 @@ export async function getSession() {
 
   const claims = verifyToken(token);
   if (!claims) return null;
+  // Logout revokes the presented token server-side. A store failure throws,
+  // like the Student lookup below: no session on an unknown answer.
+  if (await isSessionTokenRevoked(token)) return null;
 
   // Cache session lookups for 10s to reduce DB hits (keyed by user ID + session version)
   const cacheKey = `session:${claims.sub}:${claims.sv}`;
@@ -217,8 +223,26 @@ export function invalidateSessionCache(studentId: string) {
   invalidatePrefix(`session:${studentId}`);
 }
 
+/** Our tokens always carry `exp`; the fallback is the 7-day TOKEN_TTL. */
+function revocationExpiry(claims: SessionClaims): Date {
+  return claims.exp !== undefined
+    ? new Date(claims.exp * 1000)
+    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+}
+
 export async function clearSession() {
   const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+  const claims = token ? verifyToken(token) : null;
+  if (token && claims) {
+    try {
+      await revokeSessionToken(token, revocationExpiry(claims));
+    } catch (error) {
+      // Logout still signs the browser out and answers as it always has. The
+      // token stays valid until it expires, as it did before revocation.
+      logger.error("session_revocation_failed", { error: errorForLog(error) });
+    }
+  }
   cookieStore.delete(COOKIE_NAME);
 }
 

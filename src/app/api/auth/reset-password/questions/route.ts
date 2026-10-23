@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
+import { hashPassword, invalidateSessionCache, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
@@ -175,6 +175,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
     return updatedStudent;
   });
+  invalidateSessionCache(result.id);
 
   await setSessionCookie(result.id, result.role, result.sessionVersion);
 

@@ -7,6 +7,7 @@ import { matchJobToClusters } from "./cluster-matcher";
 import { filterQualityJobs } from "./job-quality";
 import { groupDuplicateJobs } from "./duplicates";
 import { ALL_JOB_SOURCE_ADAPTERS } from "./adapters/registry";
+import { fetchSourceJobs } from "./adapters/shared";
 import { classifyJobProximity } from "./recommendation";
 import { normalizeJobWorkMode } from "./work-mode";
 import { inferEmploymentType } from "./employment-type";
@@ -232,7 +233,7 @@ async function scrapeConfig(configId: string, options: RunScrapeOptions): Promis
     const adapterResults = await Promise.allSettled(
       activeAdapters.map(async (adapter) => {
         try {
-          const jobs = await adapter.fetchJobs(config.region, config.radius);
+          const jobs = await fetchSourceJobs(() => adapter.fetchJobs(config.region, config.radius));
           await completeSourceResult(scrapeRunId, adapter.source, jobs.length);
           return { source: adapter.source, jobs };
         } catch (error) {

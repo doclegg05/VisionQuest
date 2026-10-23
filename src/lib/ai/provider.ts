@@ -100,6 +100,7 @@ async function resolveLocalModelForRole(
 ): Promise<{ model: string; keepAlive?: string; maxOutputTokens?: number }> {
   return {
     model: pinnedLocalModel(),
+    keepAlive: process.env.VQ_MAC_RELAY_ENABLED === "true" ? "-1s" : undefined,
     maxOutputTokens: role
       ? parseMaxOutputTokensOverride(await readLocalAiRoleMaxOutputTokensRaw(role))
       : undefined,

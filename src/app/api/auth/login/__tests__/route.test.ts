@@ -18,6 +18,9 @@ import { mockRequest } from "@/lib/test-helpers";
 // end to end.
 // ---------------------------------------------------------------------------
 
+// The route keys the unknown-login limiter bucket on an HMAC under JWT_SECRET.
+process.env.JWT_SECRET = "test-secret-for-login-route-limiter-keys";
+
 type CookieRecord = { studentId: string; role: string; sessionVersion: number; flags: { httpOnly: true; sameSite: "strict"; path: "/" } };
 const cookieSets: CookieRecord[] = [];
 const mfaCookieSets: string[] = [];
@@ -428,5 +431,123 @@ describe("POST /api/auth/login — per-account limit is not an existence oracle"
 
     assert.equal(res.status, 429);
     assert.equal(mockFindUnique.mock.callCount(), 0, "the IP bucket refuses before any lookup");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-login limiter runs on both paths: no timing oracle
+//
+// 2026-10-22 Claude Security scan, F12. The dummy scrypt equalized the CPU
+// cost of an unknown login, but the per-account limiter — an INSERT ... ON
+// CONFLICT round trip — ran only when the account existed, so real accounts
+// answered about one database round trip slower than unknown logins. Both
+// paths now spend one limiter round trip with the same limit and window. A
+// real account stays keyed on its id, so the email and student-ID aliases of
+// one account still share one 5-per-window budget.
+// ---------------------------------------------------------------------------
+
+describe("POST /api/auth/login — unknown logins do the same limiter work as real accounts", () => {
+  beforeEach(() => {
+    cookieSets.length = 0;
+    mfaCookieSets.length = 0;
+    mockFindUnique.mock.resetCalls();
+    mockUpdate.mock.resetCalls();
+    mockRateLimit.mock.resetCalls();
+    mockLogAuditEvent.mock.resetCalls();
+    mockVerifyPasswordSafeWithStatus.mock.resetCalls();
+    mockRateLimit.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 4,
+      resetTime: Date.now() + 60_000,
+      degraded: false,
+    }));
+    mockLogAuditEvent.mock.mockImplementation(async () => undefined);
+    mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({
+      valid: false,
+      needsRehash: false,
+    }));
+  });
+
+  const realAccount = () => ({
+    id: "stu-1",
+    studentId: "alice",
+    displayName: "Alice",
+    email: "alice@example.com",
+    role: "student",
+    passwordHash: "scrypt$abc$def",
+    authProvider: "password",
+    isActive: true,
+    mfaEnabled: false,
+    sessionVersion: 1,
+  });
+
+  /** Sends one failed login and answers the limiter calls it made, past the per-IP one. */
+  async function perLoginLimiterCalls(login: string): Promise<Array<[string, number, number]>> {
+    mockRateLimit.mock.resetCalls();
+    await loginRoute.POST(
+      mockRequest("/api/auth/login", {
+        method: "POST",
+        body: { studentId: login, password: "wrong-password" },
+      }) as never,
+    );
+    const calls = mockRateLimit.mock.calls.map(
+      (c: { arguments: [string, number, number] }) => c.arguments,
+    );
+    assert.ok(calls[0]?.[0].startsWith("login:"), "the per-IP bucket is checked first");
+    return calls.slice(1);
+  }
+
+  it("spends one per-login limiter round trip for an unknown login, same limit and window as a real account", async () => {
+    mockFindUnique.mock.mockImplementation(async () => realAccount());
+    const real = await perLoginLimiterCalls("alice");
+
+    mockFindUnique.mock.mockImplementation(async () => null);
+    const unknown = await perLoginLimiterCalls("ghost");
+
+    assert.deepEqual(real, [["login:user:stu-1", 5, 15 * 60 * 1000]], "a real account stays keyed on its id");
+    assert.equal(unknown.length, 1, "an unknown login must do the same limiter round trip a real account does");
+    assert.deepEqual(unknown.map(([, limit, windowMs]) => [limit, windowMs]), [[5, 15 * 60 * 1000]]);
+  });
+
+  it("keys an unknown login on the normalized login, never on its plaintext or a real account's namespace", async () => {
+    mockFindUnique.mock.mockImplementation(async () => null);
+
+    const [[first]] = await perLoginLimiterCalls("Ghost@Example.com");
+    const [[variant]] = await perLoginLimiterCalls("  ghost@example.COM ");
+    const [[other]] = await perLoginLimiterCalls("ghost2@example.com");
+
+    assert.equal(first, variant, "case and whitespace variants of one login share one bucket");
+    assert.notEqual(first, other);
+    assert.ok(first.startsWith("login:"), "same key family as the real-account bucket");
+    assert.ok(!first.startsWith("login:user:"), "cannot collide with a real account's bucket");
+    assert.ok(!first.toLowerCase().includes("ghost"), "the typed login does not reach the limiter key");
+  });
+
+  it("answers a spent unknown-login bucket exactly like a locked account: the generic 401", async () => {
+    // Refuse every per-login bucket; admit only the first (per-IP) call.
+    let call = 0;
+    mockRateLimit.mock.mockImplementation(async () => ({
+      success: call++ % 2 === 0,
+      remaining: 0,
+      resetTime: Date.now() + 60_000,
+      degraded: false,
+    }));
+
+    mockFindUnique.mock.mockImplementation(async () => realAccount());
+    const locked = await loginRoute.POST(
+      mockRequest("/api/auth/login", { method: "POST", body: { studentId: "alice", password: "x" } }) as never,
+    );
+    mockFindUnique.mock.mockImplementation(async () => null);
+    const unknown = await loginRoute.POST(
+      mockRequest("/api/auth/login", { method: "POST", body: { studentId: "ghost", password: "x" } }) as never,
+    );
+
+    assert.equal(locked.status, 401);
+    assert.equal(unknown.status, 401, "an unknown login past its limit is not told apart with a 429");
+    assert.equal(await locked.text(), await unknown.text());
+    const actions = mockLogAuditEvent.mock.calls.map(
+      (c: { arguments: [{ action: string }] }) => c.arguments[0].action,
+    );
+    assert.deepEqual(actions, ["auth.login_failed_rate_limited", "auth.login_failed"]);
   });
 });

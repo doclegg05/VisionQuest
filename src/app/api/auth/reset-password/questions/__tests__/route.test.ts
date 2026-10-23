@@ -44,6 +44,7 @@ mock.module("@/lib/auth", {
   namedExports: {
     getSession: async () => null,
     hashPassword: (password: string) => ({ hash: `scrypt$salt$hashed-${password}`, salt: "salt" }),
+    invalidateSessionCache: () => undefined,
     normalizeStudentId: (raw: string) =>
       raw.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9@._-]/g, ""),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
@@ -213,6 +214,7 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.equal(res.status, 400);
     assert.match(body.error, /could not verify/i);
     assert.deepEqual(limiterKeys(), [`reset-password-questions:${IP}`]);
+    assert.deepEqual(checkedHashes(), DUMMY_CHECKS, "an unknown account costs the same three checks");
     assert.equal(mockTransaction.mock.callCount(), 0);
     assert.equal(cookieSets.length, 0);
   });
@@ -304,6 +306,7 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.equal(res.status, 400);
     assert.deepEqual(storedHashesChecked(), DUMMY_WORK);
     assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(cookieSets.length, 0);
   });
 
   it("refuses staff accounts with the generic reset error, without touching the password", async () => {

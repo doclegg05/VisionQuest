@@ -149,9 +149,14 @@ All generation paths retain usage accounting and the same output limits.
 
 The prefix cache contains model attention state, not saved replies. Ollama must
 match the input tokens before reusing it; identity, record context, and questions
-are still sent on every turn. Cold starts and cache eviction remain slow. Keep
-`keep_alive` at the configured eight hours and warm both demo roles with two
-different synthetic conversations after model restart, before a demo. Do not
+are still sent on every turn. Cold starts and cache eviction remain slow. The Render app automatically prepares each demo role with its shared system/tool
+prefix at startup and every fifteen minutes. Preparation is
+non-streaming, preemptible background work; it never executes tools or stores
+conversations. Failed preparation retries after one minute. Relay-backed model
+requests use `keep_alive: "-1s"` so overnight idleness does not unload Sage.
+After a Mac/model restart, allow initial preparation to complete before opening
+a demo; it still requires real Mac computation (about two minutes in the local
+2026-10-23 test). Do not
 promise warm latency for the first cold request or during active background
 inference. The agent still prioritizes waiting interactive requests.
 
@@ -178,3 +183,67 @@ continuation, and verify fail-closed behavior while the Mac agent is stopped.
 After a Render deploy, reconnect the Mac agent to the new instance before the
 hosted checks. Roll back by restoring `VQ_MAC_RELAY_MODEL=gemma4:12b` and
 reconnecting after that deploy; no student data or vector index migration occurs.
+
+
+## Durable demo memory (2026-10-23)
+
+With the Mac relay enabled, saving a completed model reply also commits a memory
+intent in that message's metadata. Deterministic replies and interrupted partial
+replies do not enqueue memory inference. A ten-second worker reconciles up to 25 intents
+at a time into `BackgroundJob` rows of type `sage_memory`, storing only owner,
+conversation and source-message IDs. An enqueue failure or Render restart leaves
+the intent available for recovery. This path replaces immediate student/staff
+memory fan-out; discovery, goals, classroom confirmation and mood keep their
+existing behavior. The per-turn fan-out cap does not discard queued memory;
+the daily memory ceiling still applies (200 student turns and 100 staff turns per account by default; retries do not
+consume allowance again).
+
+One memory job runs at a time across processes, with a five-minute database
+lease and a thirty-second heartbeat. The write checks and locks that lease so
+an old attempt cannot save memories after reclamation. Busy/outage/invalid-output
+failures stay pending with exponential retry from thirty seconds to fifteen
+minutes. Jobs beyond the 24-hour recovery window become visibly failed. Daily
+ceiling skips are recorded as failed with a specific no-inference reason rather
+than blocking other accounts' admission. The general job processor excludes
+this type; the app's worker owns its scheduling. `SAGE_MEMORY_ENABLED=false`
+stops new intents and processing. Keep the relay/local-only guards enabled while
+draining work.
+
+Local-only deployments save pseudonymized memories without embeddings and use
+owner-scoped keyword/confidence/recency retrieval. Exact-content and suppressed
+memory dedupe remains; semantic-vector dedupe is unavailable in this mode.
+Existing vectors and their model provenance are unchanged. Re-enabling vector
+memory later requires a separate backfill decision for unembedded rows.
+No cloud inference or embedding call is required for this memory path.
+
+Operator checks (aggregate only; do not print job payloads or memory content):
+
+```sql
+SELECT status, count(*), max(attempts) AS max_attempts,
+       min("createdAt") AS oldest
+FROM visionquest."BackgroundJob" WHERE type = 'sage_memory'
+GROUP BY status;
+```
+
+For acceptance, run consecutive synthetic student/staff chats, wait for their
+memory jobs to drain, and verify saved memories are usable by their owner only.
+Stop/reconnect the Mac agent during an extraction and verify automatic retry
+without cloud fallback. Inspect failed jobs rather than treating empty extraction
+results as proof of persistence. Rollback retains jobs and message intents;
+restoring this worker within its 24-hour recovery window resumes them. Old code's
+general job processor does not recognize this job type, so pause job processing
+before rolling back to a release older than this worker.
+
+
+### Cache snapshot boundary
+
+Preparation sends one system-only request per demo role, containing the real
+shared instruction prefix and tool declarations. It omits identities, dynamic
+context and user turns. This places Ollama MLX's explicit end-of-prompt snapshot
+inside the reusable prefix. Two full prompts with different names only created
+an inferred branch snapshot, which could disappear after background extraction:
+a hosted recall then recognized 7,319 tokens but restored only six and took
+110 seconds to first text. The prefix-only probe retained the shared state after
+six divergent background requests and reduced prompt processing to about four
+seconds for both roles. Queue waiting and dynamic context still add latency;
+these timings are not a universal response-time guarantee.

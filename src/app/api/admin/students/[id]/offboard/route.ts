@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAdminAuth, badRequest, notFound } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
+import { invalidateSessionCache } from "@/lib/auth";
 import { withdrawConnectionsForConsentRevocation } from "@/lib/connect/connections";
 import { generateStudentArchive } from "@/lib/student-archive";
 import { logAuditEvent } from "@/lib/audit";
@@ -80,6 +81,7 @@ export const POST = withAdminAuth(
         where: { id: studentId },
         data: { isActive: false, sessionVersion: { increment: 1 } },
       });
+      invalidateSessionCache(studentId);
 
       await logAuditEvent({
         actorId: session.id,
@@ -158,6 +160,7 @@ export const POST = withAdminAuth(
       },
       select: { isActive: true, offboardedAt: true },
     });
+    invalidateSessionCache(studentId);
 
     await logAuditEvent({
       actorId: session.id,

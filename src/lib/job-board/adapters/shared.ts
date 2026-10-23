@@ -1,8 +1,54 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import type { NormalizedJob } from "../types";
 
 export const JOB_SCOUT_USER_AGENT = "VisionQuest Job Scout/0.1";
+
+/**
+ * What one adapter's requests did during a scrape. fetchJson and fetchText
+ * return null on failure so a multi-board adapter can skip one dead board,
+ * which also makes a total outage look like a source with no jobs. This tally
+ * lets fetchSourceJobs tell the two apart (PR #248 review).
+ */
+interface SourceRequestTally {
+  attempted: number;
+  failed: number;
+  lastFailure: string | null;
+}
+
+const requestTally = new AsyncLocalStorage<SourceRequestTally>();
+
+function recordRequest(failure: string | null): void {
+  const tally = requestTally.getStore();
+  if (!tally) return;
+  tally.attempted++;
+  if (failure) {
+    tally.failed++;
+    tally.lastFailure = failure;
+  }
+}
+
+// A fixed label, never the error message: some request URLs carry API keys
+// (see FetchLogOptions.logUrl) and this text is stored on the source result.
+function requestErrorLabel(error: unknown): string {
+  return error instanceof Error && error.name === "TimeoutError" ? "timed out" : "network error";
+}
+
+/**
+ * Runs one adapter's fetch and throws when every request it made failed, so
+ * the scrape engine records the source as failed instead of as an empty
+ * success. A source that made no requests (unconfigured) or got at least one
+ * answer passes its jobs through unchanged.
+ */
+export async function fetchSourceJobs(fetchJobs: () => Promise<NormalizedJob[]>): Promise<NormalizedJob[]> {
+  const tally: SourceRequestTally = { attempted: 0, failed: 0, lastFailure: null };
+  const jobs = await requestTally.run(tally, fetchJobs);
+  if (tally.attempted > 0 && tally.failed === tally.attempted) {
+    throw new Error(`every request failed (last: ${tally.lastFailure})`);
+  }
+  return jobs;
+}
 
 const QUERY_STOPWORDS = new Set([
   "a",
@@ -50,11 +96,15 @@ export async function fetchJson<T>(
     });
     if (!response.ok) {
       logger.warn("Job source request failed", { url: logUrl, status: response.status });
+      recordRequest(`HTTP ${response.status}`);
       return null;
     }
-    return (await response.json()) as T;
+    const body = (await response.json()) as T;
+    recordRequest(null);
+    return body;
   } catch (error) {
     logger.warn("Job source request errored", { url: logUrl, error: errorForLog(error) });
+    recordRequest(requestErrorLabel(error));
     return null;
   }
 }
@@ -72,11 +122,15 @@ export async function fetchText(url: string, init: RequestInit = {}): Promise<st
     });
     if (!response.ok) {
       logger.warn("Job source request failed", { url, status: response.status });
+      recordRequest(`HTTP ${response.status}`);
       return null;
     }
-    return response.text();
+    const text = await response.text();
+    recordRequest(null);
+    return text;
   } catch (error) {
     logger.warn("Job source request errored", { url, error: errorForLog(error) });
+    recordRequest(requestErrorLabel(error));
     return null;
   }
 }

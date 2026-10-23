@@ -1,3 +1,4 @@
+import { isDemoLocalOnlyRequired } from "@/lib/ai/demo-local-only";
 /**
  * Subject-scoped memory retrieval (Phase 2).
  *
@@ -64,6 +65,19 @@ export async function retrieveMemories(
   limit: number = DEFAULT_LIMIT,
 ): Promise<RetrievedMemory[]> {
   try {
+    if (isDemoLocalOnlyRequired()) {
+      // Keyword relevance plus confidence/recency, scoped exactly like vector
+      // retrieval. No embedding model change or mixed vector spaces.
+      const rows = await prisma.$queryRaw<MemoryRow[]>`
+        SELECT id, kind, content, category, confidence, "validFrom", 0.5 AS distance
+        FROM "visionquest"."SageMemory"
+        WHERE "subjectType" = ${subjectType} AND "subjectId" = ${subjectId}
+          AND "validTo" IS NULL AND "suppressedByStaff" = false
+        ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', ${query})) DESC,
+          confidence DESC, "validFrom" DESC
+        LIMIT ${Math.max(1, Math.min(limit, CANDIDATE_POOL))}::int`;
+      return rows.map(row => ({ ...row, score: scoreMemory(row, new Date()) }));
+    }
     // Attribute the query embedding to the student when the subject is one, so
     // LlmCallLog.studentId and the AI audit event carry the actor (FERPA review
     // W5). Staff subjects keep a null id: the query is theirs, not a student's.

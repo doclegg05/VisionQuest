@@ -21,7 +21,7 @@ import { studentLogKey } from "@/lib/log-keys";
 import { rateLimit } from "@/lib/rate-limit";
 import { sendSms } from "@/lib/sms";
 
-import { composeSmsBody } from "./sms-policy-shared";
+import { composeSmsBody, normalizedPhone } from "./sms-policy-shared";
 
 /** Long enough to walk to where the phone is, short enough to be single-use. */
 export const VERIFY_CODE_TTL_MS = 10 * 60 * 1000;
@@ -46,9 +46,14 @@ export type VerifyConfirmResult =
  * a support query, a query log -- straight back into the live code. Binding
  * the digest to the account also means a hash lifted from one row cannot be
  * replayed against another, and there is no reason to want that portability.
+ *
+ * Also bound to the number the code was texted to, normalised the same way the
+ * settings route compares numbers. The number can change while the send is in
+ * flight, so a code is only worth anything against the number that received it.
  */
-export function hashVerifyCode(code: string, studentId: string): string {
-  return createHash("sha256").update(`${studentId}:${code}`).digest("hex");
+export function hashVerifyCode(code: string, studentId: string, destination: string): string {
+  const phone = normalizedPhone(destination) ?? destination;
+  return createHash("sha256").update(`${studentId}:${phone}:${code}`).digest("hex");
 }
 
 /**
@@ -159,7 +164,7 @@ export async function sendVerificationCode(input: {
   await prisma.notificationPreference.update({
     where: { id: pref.id },
     data: {
-      smsVerifyCodeHash: hashVerifyCode(code, input.studentId),
+      smsVerifyCodeHash: hashVerifyCode(code, input.studentId, pref.destination),
       smsVerifyExpiresAt: new Date(now.getTime() + VERIFY_CODE_TTL_MS),
     },
   });
@@ -191,9 +196,15 @@ export async function confirmVerificationCode(input: {
   const now = input.now ?? new Date();
   const pref = await prisma.notificationPreference.findUnique({
     where: { studentId_channel: { studentId: input.studentId, channel: "sms" } },
-    select: { id: true, smsVerifyCodeHash: true, smsVerifyExpiresAt: true, smsConsentAt: true },
+    select: {
+      id: true,
+      destination: true,
+      smsVerifyCodeHash: true,
+      smsVerifyExpiresAt: true,
+      smsConsentAt: true,
+    },
   });
-  if (!pref?.smsVerifyCodeHash || !pref.smsVerifyExpiresAt) {
+  if (!pref?.destination || !pref.smsVerifyCodeHash || !pref.smsVerifyExpiresAt) {
     return { ok: false, reason: "no_pending_code" };
   }
   if (pref.smsVerifyExpiresAt.getTime() <= now.getTime()) {
@@ -201,13 +212,19 @@ export async function confirmVerificationCode(input: {
   }
 
   const expected = Buffer.from(pref.smsVerifyCodeHash, "hex");
-  const received = Buffer.from(hashVerifyCode(input.code.trim(), input.studentId), "hex");
+  const received = Buffer.from(
+    hashVerifyCode(input.code.trim(), input.studentId, pref.destination),
+    "hex",
+  );
   if (expected.length !== received.length || !timingSafeEqual(expected, received)) {
     return { ok: false, reason: "wrong_code" };
   }
 
-  await prisma.notificationPreference.update({
-    where: { id: pref.id },
+  // Only if the number is still the one the code was checked against: a
+  // settings change between the read and this write would otherwise stamp
+  // consent for a number that never received the code.
+  const stamped = await prisma.notificationPreference.updateMany({
+    where: { id: pref.id, destination: pref.destination },
     data: {
       // The point of the whole flow: consent is stamped HERE, by a code that
       // arrived on the handset, and nowhere else.
@@ -218,6 +235,7 @@ export async function confirmVerificationCode(input: {
       smsVerifyExpiresAt: null,
     },
   });
+  if (stamped.count === 0) return { ok: false, reason: "no_pending_code" };
   logger.info("SMS consent confirmed by code", {
     channel: "sms",
     student: studentLogKey(input.studentId),

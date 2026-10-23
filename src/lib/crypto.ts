@@ -19,6 +19,15 @@ function getEncryptionKey(): Buffer {
   return key;
 }
 
+/**
+ * Derive a 32-byte key for one purpose from API_KEY_ENCRYPTION_KEY with
+ * HKDF-SHA256. The label binds the result to that purpose, so a derived key
+ * never equals the encryption key or a key derived for another label.
+ */
+export function deriveKey(label: string): Buffer {
+  return Buffer.from(crypto.hkdfSync("sha256", getEncryptionKey(), Buffer.alloc(0), label, 32));
+}
+
 export function encrypt(plaintext: string): string {
   const key = getEncryptionKey();
   const iv = crypto.randomBytes(IV_LENGTH);

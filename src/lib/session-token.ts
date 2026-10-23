@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { DEMO_ACCOUNT_KINDS, type DemoAccountKind } from "./demo/config";
 
@@ -13,6 +14,14 @@ export interface SessionClaims {
    * without a database lookup. Real accounts never carry the key at all.
    */
   demo?: DemoAccountKind;
+  /**
+   * Random per-token id, so two tokens minted in the same second for one
+   * account (the shared demo instructor) differ and logout can revoke just
+   * one of them. Tokens issued before it was added have none.
+   */
+  jti?: string;
+  /** Expiry in seconds since the epoch, set by jsonwebtoken from TOKEN_TTL. */
+  exp?: number;
 }
 
 export interface MfaSessionClaims {
@@ -39,7 +48,7 @@ export function signToken(
   sessionVersion: number,
   options: { demo?: DemoAccountKind } = {},
 ): string {
-  // A real account's payload stays exactly {sub, role, sv}: no `demo` key.
+  // A real account's claims stay {sub, role, sv}, plus the jti below: no `demo` key.
   const claims: SessionClaims = {
     sub: studentId,
     role,
@@ -49,6 +58,7 @@ export function signToken(
   return jwt.sign(claims, getJwtSecret(), {
     expiresIn: TOKEN_TTL,
     algorithm: "HS256",
+    jwtid: randomUUID(),
   });
 }
 

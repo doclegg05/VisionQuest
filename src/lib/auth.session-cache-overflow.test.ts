@@ -44,7 +44,7 @@ mock.module("next/headers", {
 mock.module("./db", {
   namedExports: {
     prisma: {},
-    prismaAdmin: { student: { findUnique: mockStudentFindUnique } },
+    prismaAdmin: { student: { findUnique: mockStudentFindUnique }, sageConfirmationUse: { findUnique: async () => null } },
   },
 });
 
