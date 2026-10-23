@@ -63,7 +63,7 @@ const STUDENT_CONTEXT_INTENT_PATTERN =
 const PRONOUN_REFERENCE_PATTERN = /\b(?:he|she|they|him|her|them|his|hers|their)\b/i;
 
 const STUDENT_REFERENCE_LEAD_PATTERN =
-  /\b(?:for|about|with|on|check|review|pull|load|look\s+up|tell\s+me\s+about)\s+([A-Za-z][A-Za-z0-9._'-]*)/g;
+  /\b(?:for|about|with|on|check|review|pull|load|look\s+up|tell\s+me\s+about)\s+([A-Za-z][A-Za-z0-9._'-]*)/gi;
 
 const NON_STUDENT_REFERENCE_WORDS = new Set([
   "class",
