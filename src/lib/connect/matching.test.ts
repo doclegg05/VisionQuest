@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding covers Prisma methods with different signatures. */
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
+import { mockTeacherSession } from "@/lib/test-helpers";
 
 /**
  * rankStudentsForLead / rankLeadsForStudent — the loading half of the matcher.
@@ -21,6 +22,11 @@ function record<T>(name: string, value: (args: any) => T) {
 }
 
 const ROSTER_SIZE = 30;
+
+/** A regular teacher sees every class (single SPOKES staff workspace). */
+const teacher = mockTeacherSession();
+/** The shared cohort demo instructor is held to the one class it teaches. */
+const demoInstructor = mockTeacherSession({ id: "demo-instructor", demoAccount: "instructor" });
 
 function makeEnrollments(count: number) {
   return Array.from({ length: count }, (_, index) => ({
@@ -137,7 +143,7 @@ beforeEach(() => {
 
 describe("rankStudentsForLead", () => {
   it("splits the roster into fits and hard-blocked students", async () => {
-    const result = await matching.rankStudentsForLead("lead-1");
+    const result = await matching.rankStudentsForLead("lead-1", { viewer: teacher });
     assert.ok(result);
     assert.equal(result.fits.length + result.blocked.length, ROSTER_SIZE);
     assert.equal(
@@ -152,13 +158,13 @@ describe("rankStudentsForLead", () => {
   });
 
   it("sorts fits best-first", async () => {
-    const result = await matching.rankStudentsForLead("lead-1");
+    const result = await matching.rankStudentsForLead("lead-1", { viewer: teacher });
     const scores = result!.fits.map((entry) => entry.fit.score);
     assert.deepEqual(scores, [...scores].sort((a, b) => b - a));
   });
 
   it("issues a fixed four queries for a roster of thirty (N+1 guard)", async () => {
-    await matching.rankStudentsForLead("lead-1");
+    await matching.rankStudentsForLead("lead-1", { viewer: teacher });
     assert.deepEqual(
       calls,
       [
@@ -172,7 +178,7 @@ describe("rankStudentsForLead", () => {
   });
 
   it("reads work profiles for the whole roster in one batched call", async () => {
-    await matching.rankStudentsForLead("lead-1");
+    await matching.rankStudentsForLead("lead-1", { viewer: teacher });
     const args = mockWorkProfileFindMany.mock.calls.at(-1)?.arguments[0];
     assert.equal(
       args.where.studentId.in.length,
@@ -186,11 +192,11 @@ describe("rankStudentsForLead", () => {
       calls.push("jobLead.findUnique");
       return null;
     });
-    assert.equal(await matching.rankStudentsForLead("nope"), null);
+    assert.equal(await matching.rankStudentsForLead("nope", { viewer: teacher }), null);
   });
 
   it("reports the subsidy flags as known/unknown, never as a bare boolean", async () => {
-    const result = await matching.rankStudentsForLead("lead-1");
+    const result = await matching.rankStudentsForLead("lead-1", { viewer: teacher });
     assert.equal(result!.subsidyFlags.eip, "known");
     assert.equal(result!.subsidyFlags.esp, "unknown");
   });
@@ -198,14 +204,14 @@ describe("rankStudentsForLead", () => {
 
 describe("summarizeLeadFits", () => {
   it("counts fits and blocks per lead", async () => {
-    const [counts] = await matching.summarizeLeadFits(["lead-1"]);
+    const [counts] = await matching.summarizeLeadFits(["lead-1"], { viewer: teacher });
     assert.equal(counts.jobLeadId, "lead-1");
     assert.equal(counts.fitCount, ROSTER_SIZE / 2);
     assert.equal(counts.blockedCount, ROSTER_SIZE / 2);
   });
 
   it("costs the same three queries for one lead as for many (N+1 guard)", async () => {
-    await matching.summarizeLeadFits(["lead-1", "lead-2", "lead-3"]);
+    await matching.summarizeLeadFits(["lead-1", "lead-2", "lead-3"], { viewer: teacher });
     assert.deepEqual(
       calls,
       ["jobLead.findMany", "enrollment.findMany", "workProfile.findMany", "application.findMany"],
@@ -214,7 +220,7 @@ describe("summarizeLeadFits", () => {
   });
 
   it("does nothing at all for an empty list", async () => {
-    assert.deepEqual(await matching.summarizeLeadFits([]), []);
+    assert.deepEqual(await matching.summarizeLeadFits([], { viewer: teacher }), []);
     assert.deepEqual(calls, [], "an empty board must not touch the database");
   });
 });
@@ -296,19 +302,19 @@ describe("rankLeadsForStudent", () => {
 
 describe("rankRoster", () => {
   it("gives every student their best leads", async () => {
-    const roster = await matching.rankRoster({ leadsPerStudent: 3 });
+    const roster = await matching.rankRoster({ viewer: teacher, leadsPerStudent: 3 });
     assert.equal(roster.length, ROSTER_SIZE);
     // Half the roster has the verified forklift card the lead requires.
     assert.equal(roster.filter((entry) => entry.leads.length > 0).length, ROSTER_SIZE / 2);
   });
 
   it("caps the shortlist per student", async () => {
-    const roster = await matching.rankRoster({ leadsPerStudent: 1 });
+    const roster = await matching.rankRoster({ viewer: teacher, leadsPerStudent: 1 });
     assert.ok(roster.every((entry) => entry.leads.length <= 1));
   });
 
   it("costs four queries for the whole roster (N+1 guard)", async () => {
-    await matching.rankRoster();
+    await matching.rankRoster({ viewer: teacher });
     assert.deepEqual(
       calls,
       ["jobLead.findMany", "enrollment.findMany", "workProfile.findMany", "application.findMany"],
@@ -346,7 +352,7 @@ describe("candidate loading", () => {
       },
     ]);
 
-    const result = await matching.rankStudentsForLead("lead-1");
+    const result = await matching.rankStudentsForLead("lead-1", { viewer: teacher });
     assert.equal(result!.fits.length + result!.blocked.length, 1, "one person, one row");
   });
 
@@ -378,11 +384,82 @@ describe("candidate loading", () => {
 
     // The lead is scoped to class-1, whose region matches its location, so the
     // location axis only scores if the class-1 row won the dedupe.
-    const result = await matching.rankStudentsForLead("lead-1");
+    const result = await matching.rankStudentsForLead("lead-1", { viewer: teacher });
     assert.equal(result!.fits.length, 1);
     assert.ok(
       result!.fits[0].fit.score > 40,
       `expected the class-1 region to be used, score was ${result!.fits[0].fit.score}`,
     );
+  });
+});
+
+describe("candidate pool for a viewer held to their own classes", () => {
+  // Two classes on one program. The cohort demo instructor teaches only
+  // class-demo; a regular teacher may see both. Each row remembers who teaches
+  // its class, and the fake applies the `class.instructors.some` filter the way
+  // Postgres would, so the pool a viewer gets is the rows the query can reach.
+  const INSTRUCTORS_BY_CLASS: Record<string, string[]> = {
+    "class-demo": [demoInstructor.id],
+    "class-other": ["tch-other"],
+  };
+
+  function row(classId: string, id: string) {
+    return {
+      classId,
+      class: { jobConfig: { region: "Beckley, WV" } },
+      student: { id, displayName: `Student ${id}`, careerDiscovery: null, resumeData: null, certifications: [] },
+    };
+  }
+
+  const TWO_CLASSES = [
+    row("class-demo", "demo-1"),
+    row("class-demo", "demo-2"),
+    row("class-other", "other-1"),
+    row("class-other", "other-2"),
+  ];
+  const DEMO_CLASS_IDS = ["demo-1", "demo-2"];
+  const EVERYONE = ["demo-1", "demo-2", "other-1", "other-2"];
+
+  const programWideLead = { ...leadRow, classId: null };
+
+  beforeEach(() => {
+    mockLeadFindUnique.mock.mockImplementation(async () => programWideLead);
+    mockLeadFindMany.mock.mockImplementation(async () => [programWideLead]);
+    mockEnrollmentFindMany.mock.mockImplementation(async (args: any) => {
+      const instructorId = args?.where?.class?.instructors?.some?.instructorId;
+      return TWO_CLASSES.filter(
+        (entry) => instructorId === undefined || INSTRUCTORS_BY_CLASS[entry.classId].includes(instructorId),
+      );
+    });
+  });
+
+  afterEach(() => {
+    mockLeadFindUnique.mock.restore();
+    mockLeadFindMany.mock.restore();
+    mockEnrollmentFindMany.mock.restore();
+  });
+
+  it("keeps the demo instructor's Connect roster to its own class", async () => {
+    const roster = await matching.rankRoster({ viewer: demoInstructor, leadsPerStudent: 3 });
+    assert.deepEqual(roster.map((entry) => entry.studentId).sort(), DEMO_CLASS_IDS);
+  });
+
+  it("names no student outside the demo instructor's class among a lead's blocked students", async () => {
+    const [counts] = await matching.summarizeLeadFits([programWideLead.id], { viewer: demoInstructor });
+    assert.equal(counts.fitCount + counts.blockedCount, DEMO_CLASS_IDS.length);
+    for (const blocked of counts.blocked) {
+      assert.ok(DEMO_CLASS_IDS.includes(blocked.studentId), `${blocked.studentId} is outside the demo class`);
+    }
+  });
+
+  it("ranks a program-wide lead against the demo instructor's class only", async () => {
+    const result = await matching.rankStudentsForLead(programWideLead.id, { viewer: demoInstructor });
+    const pool = [...result!.fits, ...result!.blocked].map((entry) => entry.studentId).sort();
+    assert.deepEqual(pool, DEMO_CLASS_IDS);
+  });
+
+  it("still gives a regular teacher every class", async () => {
+    const roster = await matching.rankRoster({ viewer: teacher, leadsPerStudent: 3 });
+    assert.deepEqual(roster.map((entry) => entry.studentId).sort(), EVERYONE);
   });
 });

@@ -16,8 +16,9 @@
 
 import { Prisma } from "@prisma/client";
 
-import { forbidden } from "@/lib/api-error";
+import { forbidden, type Session } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
+import { buildManagedStudentWhere, canManageAnyClassFor } from "@/lib/classroom";
 import { prisma, prismaAdmin } from "@/lib/db";
 import { DEMO_NO_SEND_REFUSAL } from "@/lib/demo/copy";
 import { isDemoStudentId } from "@/lib/demo/accounts";
@@ -362,13 +363,18 @@ export async function connectionProvenance(connectionId: string, studentId: stri
  * The console's pipeline board: live connections for students this actor
  * manages, with the frozen packet's field list so Send can show what goes.
  *
- * Runs in the caller's RLS context, so `connection_read`'s
- * `managed_student_ids()` gate decides the roster — this helper adds no
- * scoping of its own and must not need to.
+ * Runs in the caller's RLS context, where `connection_read`'s
+ * `managed_student_ids()` gate is the backstop. A viewer who may not manage
+ * every class (the cohort demo instructor) is also held to its own classes
+ * here, because on 2026-10-23 the live Connect page showed the demo instructor
+ * another class's students that RLS should have hidden.
  */
-export async function listConnectionsForConsole(limit = 50) {
+export async function listConnectionsForConsole(viewer: Session, limit = 50) {
   const rows = await prisma.connection.findMany({
-    where: { status: { notIn: [...TERMINAL_CONNECTION_STATUSES] } },
+    where: {
+      status: { notIn: [...TERMINAL_CONNECTION_STATUSES] },
+      ...(canManageAnyClassFor(viewer) ? {} : { student: buildManagedStudentWhere(viewer) }),
+    },
     orderBy: { statusChangedAt: "desc" },
     take: limit,
     select: {
