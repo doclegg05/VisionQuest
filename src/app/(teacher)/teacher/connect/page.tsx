@@ -78,7 +78,7 @@ export default async function ConnectPage() {
     rlsContext,
     async () => {
     const [openLeads, employerRows, rosterRows, classRows] = await Promise.all([
-      listLeads({ status: "open", limit: MAX_BOARD_LEADS }),
+      listLeads({ viewer: session, status: "open", limit: MAX_BOARD_LEADS }),
       listEmployers(),
       rankRoster({ viewer: session, leadsPerStudent: 3 }),
       listConnectClasses(session),

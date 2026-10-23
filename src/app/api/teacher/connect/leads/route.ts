@@ -52,7 +52,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   }
   const query = parsed.data;
 
-  const leads = await listLeads({ status: query.status, employerId: query.employerId });
+  const leads = await listLeads({ viewer: session, status: query.status, employerId: query.employerId });
 
   if (query.fitCounts !== "1") {
     return NextResponse.json({ leads });
