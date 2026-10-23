@@ -195,7 +195,11 @@ describe("POST /api/internal/goal-stale-detection", () => {
 
     await POST(request("Bearer test-cron-secret"));
 
-    const { update } = alertUpsert.mock.calls[0].arguments[0];
+    // The reopen is a guarded updateMany keyed on the alert, not the
+    // id-keyed updateMany that resolves alerts no longer found.
+    const reopen = alertUpdateMany.mock.calls.find((call: any) => call.arguments[0].where.alertKey);
+    assert.equal(reopen.arguments[0].where.status, "resolved");
+    const update = reopen.arguments[0].data;
     assert.equal(update.status, "open");
     assert.equal(update.resolvedAt, null);
   });
