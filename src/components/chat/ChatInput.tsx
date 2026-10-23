@@ -13,10 +13,12 @@ interface ChatInputProps {
   disabled?: boolean;
   compact?: boolean;
   role?: ChatRole;
+  /** Text placed in the box on mount. It is only sent when the user presses Send. */
+  initialMessage?: string;
 }
 
-export default function ChatInput({ onSend, disabled, compact, role = "student" }: ChatInputProps) {
-  const [message, setMessage] = useState("");
+export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage }: ChatInputProps) {
+  const [message, setMessage] = useState(initialMessage ?? "");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [serverCommands, setServerCommands] = useState<SlashCommand[] | undefined>();
   const [focused, setFocused] = useState(false);
@@ -36,6 +38,13 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
     }
     prevDisabledRef.current = disabled;
   }, [disabled]);
+
+  useEffect(() => {
+    // Grow the box to fit prefilled text so the user can read all of it before Send.
+    const el = textareaRef.current;
+    if (!el || !initialMessage) return;
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, [initialMessage]);
 
   useEffect(() => {
     let cancelled = false;
