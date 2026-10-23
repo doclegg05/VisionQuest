@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() is deliberately loose for test scaffolding. */
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { after, before, beforeEach, describe, it, mock } from "node:test";
 import {
   mockAdminSession,
   mockTeacherSession,
@@ -20,6 +20,40 @@ const mockStudentFindUnique = mock.fn() as any;
 const mockStudentUpdate = mock.fn() as any;
 const mockGenerateStudentArchive = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
+
+// ---- The student's own session, read through the real getSession(). ----
+// The row getSession() loads with prismaAdmin, and the student's cookie.
+type SessionRow = {
+  id: string;
+  studentId: string;
+  displayName: string;
+  role: string;
+  sessionVersion: number;
+  isActive: boolean;
+  demoAccount: null;
+};
+let sessionRow: SessionRow = {
+  id: STUDENT_ID,
+  studentId: "test-student",
+  displayName: "Test Student",
+  role: "student",
+  sessionVersion: 1,
+  isActive: true,
+  demoAccount: null,
+};
+let sessionCookie: string | null = null;
+const mockAdminStudentFindUnique = mock.fn(async (_args: unknown) => sessionRow);
+
+mock.module("next/headers", {
+  namedExports: {
+    cookies: async () => ({
+      get: (name: string) =>
+        name === "vq-session" && sessionCookie
+          ? { name, value: sessionCookie }
+          : undefined,
+    }),
+  },
+});
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -65,6 +99,11 @@ mock.module("@/lib/db", {
         update: mockStudentUpdate,
       },
     },
+    prismaAdmin: {
+      student: {
+        findUnique: mockAdminStudentFindUnique,
+      },
+    },
   },
 });
 
@@ -91,9 +130,22 @@ mock.module("@/lib/logger", {
 });
 
 let route: Awaited<typeof import("./route")>;
+let auth: Awaited<typeof import("@/lib/auth")>;
+let originalJwtSecret: string | undefined;
 
 before(async () => {
+  originalJwtSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = "t".repeat(40);
   route = await import("./route");
+  auth = await import("@/lib/auth");
+});
+
+after(() => {
+  if (originalJwtSecret === undefined) {
+    delete process.env.JWT_SECRET;
+  } else {
+    process.env.JWT_SECRET = originalJwtSecret;
+  }
 });
 
 beforeEach(() => {
@@ -250,5 +302,51 @@ describe("POST /api/admin/students/:id/offboard", () => {
     const auditArgs = mockLogAuditEvent.mock.calls[0].arguments[0];
     assert.equal(auditArgs.action, "student.offboard");
     assert.equal(auditArgs.metadata.alreadyOffboarded, true);
+  });
+});
+
+// getSession() caches the account row for 10 s under session:<id>:<sv>. The
+// offboard must clear that entry once its UPDATE has run, or the old cookie
+// keeps authenticating from the stale row (old sv, isActive=true) until the
+// entry expires. Each case uses its own sessionVersion so a stale entry left
+// by one case cannot leak into the next.
+describe("POST /api/admin/students/:id/offboard: session revocation", () => {
+  async function assertCachedSessionEndsAtOnce(sessionVersion: number) {
+    sessionRow = { ...sessionRow, isActive: true, sessionVersion };
+    sessionCookie = auth.signToken(STUDENT_ID, "student", sessionVersion);
+    mockStudentUpdate.mock.mockImplementation(async () => {
+      sessionRow = {
+        ...sessionRow,
+        isActive: false,
+        sessionVersion: sessionRow.sessionVersion + 1,
+      };
+      return {
+        isActive: false,
+        offboardedAt: new Date("2026-07-20T12:00:00.000Z"),
+      };
+    });
+
+    // The student's last request before the offboard fills the cache.
+    assert.equal((await auth.getSession())?.id, STUDENT_ID);
+
+    const res = await callRoute();
+    assert.equal(res.status, 200);
+    assert.equal(mockStudentUpdate.mock.callCount(), 1);
+
+    // The same cookie must stop working now, not when the cache expires.
+    assert.equal(await auth.getSession(), null);
+  }
+
+  it("first offboard ends the student's cached session immediately", async () => {
+    await assertCachedSessionEndsAtOnce(3);
+  });
+
+  it("repeat offboard ends the student's cached session immediately", async () => {
+    mockStudentFindUnique.mock.mockImplementation(async () => ({
+      id: STUDENT_ID,
+      isActive: true,
+      offboardedAt: new Date("2026-07-01T09:30:00.000Z"),
+    }));
+    await assertCachedSessionEndsAtOnce(7);
   });
 });

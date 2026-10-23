@@ -44,6 +44,7 @@ mock.module("@/lib/auth", {
   namedExports: {
     getSession: async () => null,
     hashPassword: (password: string) => ({ hash: `scrypt$salt$hashed-${password}`, salt: "salt" }),
+    invalidateSessionCache: () => undefined,
     normalizeStudentId: (raw: string) =>
       raw.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9@._-]/g, ""),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
