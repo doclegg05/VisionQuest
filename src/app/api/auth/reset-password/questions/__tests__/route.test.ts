@@ -214,7 +214,7 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.equal(res.status, 400);
     assert.match(body.error, /could not verify/i);
     assert.deepEqual(limiterKeys(), [`reset-password-questions:${IP}`]);
-    assert.deepEqual(checkedHashes(), DUMMY_CHECKS, "an unknown account costs the same three checks");
+    assert.deepEqual(storedHashesChecked(), DUMMY_WORK, "an unknown account costs the same three checks");
     assert.equal(mockTransaction.mock.callCount(), 0);
     assert.equal(cookieSets.length, 0);
   });
