@@ -1,10 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- the fake transaction records loosely typed Prisma args. */
+/* eslint-disable @typescript-eslint/no-explicit-any -- the fake alert store reads loosely typed Prisma args. */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { isHeldByTeacher, writeDetectedAlert, type DetectedAlert } from "./alert-hold";
+import { isHeldByTeacher, writeDetectedAlert, type AlertHoldState, type DetectedAlert } from "./alert-hold";
 
 const NOW = new Date("2026-10-15T10:35:00.000Z");
+const EARLIER = new Date("2026-10-01T09:00:00.000Z");
 
 describe("isHeldByTeacher", () => {
   it("holds a dismissed alert", () => {
@@ -36,19 +37,47 @@ const ALERT: DetectedAlert = {
   sourceId: "goal-1",
 };
 
-function fakeTx() {
-  const calls: { upsert: any[]; update: any[] } = { upsert: [], update: [] };
+type Row = Record<string, any>;
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  return a === b;
+}
+
+// A one-table stand-in for the transaction: it applies each write to stored
+// rows the way Postgres would, so tests assert on the alert a teacher would
+// see rather than on the shape of the Prisma call.
+function fakeAlertStore(initial?: Row) {
+  const rows = new Map<string, Row>();
+  if (initial) rows.set(initial.alertKey, { ...initial });
+  const matches = (row: Row, where: Row) => Object.entries(where).every(([k, v]) => sameValue(row[k], v));
   const tx = {
     studentAlert: {
-      upsert: async (args: unknown) => {
-        calls.upsert.push(args);
+      upsert: async ({ where, create, update }: any) => {
+        const row = rows.get(where.alertKey);
+        rows.set(where.alertKey, row ? { ...row, ...update } : { ...create });
       },
-      update: async (args: unknown) => {
-        calls.update.push(args);
+      update: async ({ where, data }: any) => {
+        const row = rows.get(where.alertKey);
+        if (!row) throw new Error("No 'StudentAlert' record was found for an update.");
+        rows.set(where.alertKey, { ...row, ...data });
+      },
+      updateMany: async ({ where, data }: any) => {
+        let count = 0;
+        for (const [key, row] of rows) {
+          if (!matches(row, where)) continue;
+          rows.set(key, { ...row, ...data });
+          count++;
+        }
+        return { count };
       },
     },
   };
-  return { tx: tx as never, calls };
+  return { tx: tx as never, row: () => rows.get(ALERT.alertKey) };
+}
+
+function storedAlert(state: AlertHoldState, over: Row = {}): Row {
+  return { ...ALERT, title: "Old title", detectedAt: EARLIER, ...state, ...over };
 }
 
 // detectedAt is when the current spell of the alert began: queue ordering and
@@ -56,9 +85,10 @@ function fakeTx() {
 // spell; rewriting an alert that is already open must not reset it.
 describe("writeDetectedAlert detectedAt", () => {
   it("stamps a new alert with the detection time", async () => {
-    const { tx, calls } = fakeTx();
-    await writeDetectedAlert(tx, undefined, ALERT, NOW);
-    assert.equal(calls.upsert[0].create.detectedAt, NOW);
+    const store = fakeAlertStore();
+    await writeDetectedAlert(store.tx, undefined, ALERT, NOW);
+    assert.equal(store.row()?.status, "open");
+    assert.equal(store.row()?.detectedAt, NOW);
   });
 
   it("restarts detectedAt when it reopens a resolved alert or an expired snooze", async () => {
@@ -66,16 +96,55 @@ describe("writeDetectedAlert detectedAt", () => {
       { status: "resolved", snoozedUntil: null },
       { status: "snoozed", snoozedUntil: new Date(NOW.getTime() - 60_000) },
     ]) {
-      const { tx, calls } = fakeTx();
-      await writeDetectedAlert(tx, prev, ALERT, NOW);
-      assert.equal(calls.upsert[0].update.detectedAt, NOW, `reopening a ${prev.status} alert`);
-      assert.equal(calls.upsert[0].update.status, "open");
+      const store = fakeAlertStore(storedAlert(prev));
+      await writeDetectedAlert(store.tx, prev, ALERT, NOW);
+      assert.equal(store.row()?.status, "open", `reopening a ${prev.status} alert`);
+      assert.equal(store.row()?.detectedAt, NOW, `reopening a ${prev.status} alert`);
+      assert.equal(store.row()?.snoozedUntil, null);
     }
   });
 
   it("keeps detectedAt on an alert that is already open", async () => {
-    const { tx, calls } = fakeTx();
-    await writeDetectedAlert(tx, { status: "open", snoozedUntil: null }, ALERT, NOW);
-    assert.equal("detectedAt" in calls.upsert[0].update, false);
+    const prev = { status: "open", snoozedUntil: null };
+    const store = fakeAlertStore(storedAlert(prev));
+    await writeDetectedAlert(store.tx, prev, ALERT, NOW);
+    assert.equal(store.row()?.detectedAt, EARLIER);
+    assert.equal(store.row()?.title, ALERT.title);
+  });
+});
+
+describe("writeDetectedAlert and a teacher's hold", () => {
+  it("refreshes only the text of an alert the teacher has dismissed", async () => {
+    const prev = { status: "dismissed", snoozedUntil: null };
+    const store = fakeAlertStore(storedAlert(prev));
+    await writeDetectedAlert(store.tx, prev, ALERT, NOW);
+    assert.equal(store.row()?.status, "dismissed");
+    assert.equal(store.row()?.title, ALERT.title);
+  });
+
+  // PR #248 review (Greptile P1, "Teacher choices get overwritten"): the
+  // detectors read every alert's state first, then write one by one. A
+  // teacher's dismiss or snooze that commits between that read and this
+  // write must survive it.
+  it("keeps a teacher's dismiss that lands after the detector read the alert", async () => {
+    const readByDetector = { status: "open", snoozedUntil: null };
+    const store = fakeAlertStore(storedAlert({ status: "dismissed", snoozedUntil: null }));
+
+    await writeDetectedAlert(store.tx, readByDetector, ALERT, NOW);
+
+    assert.equal(store.row()?.status, "dismissed");
+    assert.equal(store.row()?.title, ALERT.title);
+  });
+
+  it("keeps a teacher's snooze that lands after the detector read the alert", async () => {
+    const until = new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const readByDetector = { status: "open", snoozedUntil: null };
+    const store = fakeAlertStore(storedAlert({ status: "snoozed", snoozedUntil: until }, { snoozedBy: "teacher-1" }));
+
+    await writeDetectedAlert(store.tx, readByDetector, ALERT, NOW);
+
+    assert.equal(store.row()?.status, "snoozed");
+    assert.equal(store.row()?.snoozedUntil, until);
+    assert.equal(store.row()?.snoozedBy, "teacher-1");
   });
 });
