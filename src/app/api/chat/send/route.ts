@@ -1293,7 +1293,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           // directly, instead of entering that pipeline behind a flag.
           // Reuses the already-resolved chat `provider`, so the staff_entered
           // FERPA routing decided at the top of this route is inherited.
-          void extractAndStoreStaffMemories({
+          if (process.env.VQ_MAC_RELAY_ENABLED !== "true") void extractAndStoreStaffMemories({
             provider,
             staffId: session.id,
             staffRole: session.role,

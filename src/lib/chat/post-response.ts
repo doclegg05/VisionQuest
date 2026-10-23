@@ -196,7 +196,9 @@ function planPostResponseModelSteps(input: {
     goals: !isDiscoveryStage,
     discovery: isDiscoveryStage,
     classroom_confirmation: input.classroomConfirmedAt === null,
-    memory: process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false",
+    // Mac deployment memory is admitted from persisted message intents by
+    // the durable worker, outside this immediate per-turn model-call budget.
+    memory: process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false" && process.env.VQ_MAC_RELAY_ENABLED !== "true",
   };
 
   const status = new Map<PostResponseModelStep, ModelStepStatus>();

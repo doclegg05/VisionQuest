@@ -29,6 +29,12 @@ export async function register() {
     await runBootProbes();
 
     await import("../sentry.server.config");
+    if (process.env.VQ_MAC_RELAY_ENABLED === "true" && process.env.NEXT_PHASE !== "phase-production-build") {
+      const { startMemoryWorker } = await import("@/lib/sage/memory/jobs");
+      startMemoryWorker();
+      const { startMacWarmup } = await import("@/lib/sage/mac-warmup");
+      startMacWarmup();
+    }
   }
 
   if (process.env.NEXT_RUNTIME === "edge") {

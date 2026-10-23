@@ -343,3 +343,8 @@ describe("student chat extraction is unchanged by the staff path", () => {
   assert.equal(sent.at(-1).role, "user");
   assert.deepEqual(sent.slice(1, -1), transcript);
  });
+
+it("durable staff extraction rejects invalid shapes instead of completing empty", async () => {
+  await assert.rejects(extractAndStoreStaffMemories({ provider: providerReturning("{}"), staffId: "teacher-1",
+    staffRole: "teacher", conversationId: "conv-1", messages: STAFF_MESSAGES, throwOnError: true }), /Staff memory extraction failed/);
+});

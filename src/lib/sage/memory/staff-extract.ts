@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { extractionTranscript } from "../extraction-transcript";
 /**
  * Durable memory for STAFF chat turns.
@@ -17,8 +18,8 @@ import { extractionTranscript } from "../extraction-transcript";
  * extraction is the only post-response step staff get, and it is impossible to
  * accidentally get the others.
  *
- * Never throws to the caller: a failed extraction must not surface as a chat
- * error.
+ * Direct chat callers retain non-fatal behavior. Durable workers opt into
+ * throwing on failure so an unsuccessful extraction is retried.
  */
 
 import { logAiAuditEvent, getProviderClass, policyDecisionForProvider } from "@/lib/ai/audit";
@@ -29,6 +30,7 @@ import type { AIProvider } from "@/lib/ai/types";
 import {
   memoryCandidateSchema,
   parseExtractionItems,
+  unwrapItemList,
   type ExtractionItem,
   type MemoryCandidate,
 } from "./schema";
@@ -93,6 +95,8 @@ Return [] if nothing durable about the staff member was shared.`;
 
 export interface ExtractStaffMemoriesParams {
   provider: AIProvider;
+  throwOnError?: boolean;
+  storeGuard?: <T>(write: (transaction?: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
   /** The signed-in staff member. Becomes the memory subject. */
   staffId: string;
   /** Session role, for the audit trail only. */
@@ -142,6 +146,8 @@ export async function extractAndStoreStaffMemories({
   staffRole,
   conversationId,
   messages,
+  throwOnError = false,
+  storeGuard = async (write) => write(),
 }: ExtractStaffMemoriesParams): Promise<ExtractMemoriesResult> {
   const empty: ExtractMemoriesResult = { stored: 0, deduped: 0, rejected: 0 };
 
@@ -195,7 +201,9 @@ export async function extractAndStoreStaffMemories({
       raw,
     });
 
-    const { accepted, rejected: schemaRejected } = parseExtractionItems(parseModelJson(raw));
+    const parsed = parseModelJson(raw);
+    if (throwOnError && unwrapItemList(parsed) === null) throw new Error("Invalid staff memory extraction JSON");
+    const { accepted, rejected: schemaRejected } = parseExtractionItems(parsed);
     const { safe, rejected: filterRejected } = keepFramedStaffSafeItems(accepted, conversationId);
 
     const rejected = schemaRejected + filterRejected;
@@ -213,16 +221,18 @@ export async function extractAndStoreStaffMemories({
         }),
       );
 
-    const { stored, deduped } = await storeMemoryCandidates(candidates, {
+    const { stored, deduped } = await storeGuard((transaction) => storeMemoryCandidates(candidates, {
+      transaction,
       usage: { studentId: staffId, callSite: "sage_staff_memory_extract" },
       semanticDedupe: true,
-    });
+    }));
     return { stored, deduped, rejected };
   } catch (error) {
     logger.error("Staff memory extraction failed (non-fatal)", {
       conversationId,
       error: errorForLog(error),
     });
+    if (throwOnError) throw new Error("Staff memory extraction failed");
     return empty;
   }
 }
