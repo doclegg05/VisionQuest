@@ -378,7 +378,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       // is in flight. Discard it if the user sends a second message before SSE
       // arrives (handled by checking messages.length in the SSE reader below).
       const isFirstMessage = !conversationId && messages.length === 0;
-      if (isFirstMessage) {
+      if (isFirstMessage && role === "student") {
         if (requestedStageOpener) {
           setOptimisticGreeting(requestedStageOpener);
         } else {
