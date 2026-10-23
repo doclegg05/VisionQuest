@@ -22,6 +22,9 @@ import { mockRequest } from "@/lib/test-helpers";
 // src/lib/rate-limit.db.test.ts.
 // ---------------------------------------------------------------------------
 
+// The route keys the unknown-login limiter bucket on an HMAC under JWT_SECRET.
+process.env.JWT_SECRET = "test-secret-for-login-route-limiter-keys";
+
 /** Mirrors the per-IP limit in ../route.ts. */
 const IP_LIMIT = 10;
 /** Mirrors the per-user limit in ../route.ts. */

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
+import { hashPassword, invalidateSessionCache, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   hasConfiguredSecurityQuestionSet,
   validateSecurityQuestionAnswers,
+  type SecurityQuestionAnswers,
 } from "@/lib/security-questions";
 import { verifySecurityAnswer } from "@/lib/security-question-auth";
 import { isValidEmail } from "@/lib/validation";
@@ -27,6 +28,32 @@ const RESET_ERROR =
  */
 const ACCOUNT_LIMIT_ATTEMPTS = 5;
 const ACCOUNT_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+const NO_STORED_ANSWERS: ReadonlyMap<string, string> = new Map();
+
+/**
+ * Checks every answer, one KDF run per question, before combining the
+ * results. Stopping at the first wrong answer made the response time count
+ * the leading correct ones, so each answer could be confirmed on its own.
+ */
+function allAnswersMatch(
+  answers: SecurityQuestionAnswers,
+  storedHashes: ReadonlyMap<string, string>,
+): boolean {
+  const results = Object.entries(answers).map(([questionKey, answer]) =>
+    verifySecurityAnswer(answer, storedHashes.get(questionKey)),
+  );
+  return results.every(Boolean);
+}
+
+/**
+ * Runs the same KDF work as a real answer check, against no stored hashes,
+ * for a refusal that comes before the check. A locked, unknown, or
+ * unconfigured account then takes as long to refuse as a wrong answer.
+ */
+function spendAnswerCheckTime(answers: SecurityQuestionAnswers): void {
+  allAnswersMatch(answers, NO_STORED_ANSWERS);
+}
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = clientIpBucket(req);
@@ -87,6 +114,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     // counted, the lockout is recorded once per window below, and the running
     // total stays visible in the rate-limit table.
     if (!accountRl.success) {
+      spendAnswerCheckTime(securityQuestionsResult.answers);
       return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
     }
 
@@ -112,6 +140,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   if (!student || !hasConfiguredSecurityQuestionSet(student.securityQuestionAnswers.map((item) => item.questionKey))) {
+    spendAnswerCheckTime(securityQuestionsResult.answers);
     return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
   }
 
@@ -125,10 +154,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const storedAnswers = new Map(
     student.securityQuestionAnswers.map((item) => [item.questionKey, item.answerHash])
   );
-  const answersMatch = Object.entries(securityQuestionsResult.answers).every(([questionKey, answer]) => {
-    const storedHash = storedAnswers.get(questionKey);
-    return storedHash ? verifySecurityAnswer(answer, storedHash) : false;
-  });
+  const answersMatch = allAnswersMatch(securityQuestionsResult.answers, storedAnswers);
 
   if (!answersMatch) {
     return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
@@ -155,6 +181,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
     return updatedStudent;
   });
+  invalidateSessionCache(result.id);
 
   await setSessionCookie(result.id, result.role, result.sessionVersion);
 

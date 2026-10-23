@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
 import {
@@ -17,6 +18,21 @@ import { parseBody, loginSchema } from "@/lib/schemas";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { getJwtSecret } from "@/lib/session-token";
+
+/**
+ * Per-login limiter key for a login that names no account. An HMAC of the
+ * normalized login under the server's JWT secret: case and whitespace variants
+ * share one bucket, the typed login never reaches the limiter table (the
+ * storage key is only a plain sha256 of this, and logins are guessable), and
+ * the `login:unknown:` namespace cannot collide with a real `login:user:<id>`.
+ */
+function unknownLoginLimiterKey(normalizedLogin: string): string {
+  const digest = createHmac("sha256", getJwtSecret())
+    .update(`login-limiter:${normalizedLogin}`)
+    .digest("hex");
+  return `login:unknown:${digest}`;
+}
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = clientIpBucket(req);
@@ -30,9 +46,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const password = body.password.trim();
 
   const isEmail = login.includes("@");
+  const normalizedLogin = isEmail ? normalizeEmail(login) : normalizeStudentId(login);
   const student = isEmail
-    ? await prisma.student.findUnique({ where: { email: normalizeEmail(login) } })
-    : await prisma.student.findUnique({ where: { studentId: normalizeStudentId(login) } });
+    ? await prisma.student.findUnique({ where: { email: normalizedLogin } })
+    : await prisma.student.findUnique({ where: { studentId: normalizedLogin } });
 
   // Per-user rate limit — prevents distributed brute force against a single
   // account. The refusal is deliberately NOT a 429: this route is reachable
@@ -43,11 +60,21 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // exactly like a wrong password and exactly like an unknown login, the
   // attempt is still counted above, and the limit itself is unchanged.
   // Precedent and identical reasoning: reset-password/questions/route.ts.
-  let accountLocked = false;
-  if (student) {
-    const userRl = await rateLimit(`login:user:${student.id}`, 5, 15 * 60 * 1000);
-    accountLocked = !userRl.success;
-  }
+  //
+  // The limiter round trip runs for unknown logins too (2026-10-22 scan, F12):
+  // it ran only for real accounts, so they answered one database round trip
+  // slower, which the dummy KDF below could not hide. A real account stays
+  // keyed on its id, so its email and student-ID aliases share one budget. The
+  // unknown-login key is computed on every request so both paths do the same
+  // work and fail alike. An unknown login can never sign in, so its spent
+  // bucket changes nothing it is told; only a real account counts as locked.
+  const unknownLoginKey = unknownLoginLimiterKey(normalizedLogin);
+  const userRl = await rateLimit(
+    student ? `login:user:${student.id}` : unknownLoginKey,
+    5,
+    15 * 60 * 1000,
+  );
+  const accountLocked = student !== null && !userRl.success;
 
   // Consolidate all failure cases into a single generic response to prevent account enumeration.
   // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.

@@ -285,7 +285,9 @@ export const TOOLS: readonly ToolDefinition[] = [
     description:
       "Sage writes a structured observation about a student to the SageInsight table. Closed-loop step 5/10 (docs/plans/2026-04-29-sage-closed-loop.md).",
     endpoint: { method: "POST", path: "/api/sage/insights" },
-    requiredRoles: ["student", "teacher", "admin"],
+    // No "student": staff see these rows as Sage's own observations, and Sage
+    // writes in-process via recordInsight(), so a student POST could only forge one.
+    requiredRoles: ["teacher", "admin"],
     tokenBudget: 1000,
     auditLevel: "full",
     rateLimit: { maxPerHour: 60 },

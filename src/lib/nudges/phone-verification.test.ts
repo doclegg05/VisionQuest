@@ -24,14 +24,28 @@ const state = {
   rateLimitOk: true,
   rateLimitDegraded: false,
   otherStudentMatch: null as { id: string } | null,
+  // Hooks that let a test run a concurrent settings change at a chosen moment.
+  onSms: null as null | (() => void),
+  afterRead: null as null | (() => void),
 };
 
 const preferenceDelegate = {
-  findUnique: mock.fn(async () => state.pref),
+  findUnique: mock.fn(async () => {
+    const snapshot = state.pref ? { ...state.pref } : null;
+    state.afterRead?.();
+    return snapshot;
+  }),
   findFirst: mock.fn(async (_args: { where: Record<string, unknown> }) => state.otherStudentMatch),
   update: mock.fn(async ({ data }: any) => {
     state.updates.push(data);
     return state.pref;
+  }),
+  // Like the database: the write lands only if every `where` field still matches.
+  updateMany: mock.fn(async ({ where, data }: any) => {
+    const row = state.pref as any;
+    const matches = row !== null && Object.entries(where).every(([k, v]) => row[k] === v);
+    if (matches) state.updates.push(data);
+    return { count: matches ? 1 : 0 };
   }),
 };
 
@@ -45,6 +59,7 @@ mock.module("@/lib/sms", {
   namedExports: {
     sendSms: mock.fn(async (to: string, body: string) => {
       state.smsCalls.push({ to, body });
+      state.onSms?.();
       return state.smsResult;
     }),
     isSmsDeliveryConfigured: () => true,
@@ -90,6 +105,8 @@ beforeEach(() => {
   state.rateLimitOk = true;
   state.rateLimitDegraded = false;
   state.otherStudentMatch = null;
+  state.onSms = null;
+  state.afterRead = null;
 });
 
 describe("sending the code", () => {
@@ -102,7 +119,7 @@ describe("sending the code", () => {
     const code = state.smsCalls[0].body.match(/code is (\d{6})/)?.[1];
     assert.ok(code, `no code in: ${state.smsCalls[0].body}`);
     const stored = state.updates[0];
-    assert.equal(stored.smsVerifyCodeHash, verification.hashVerifyCode(code, STUDENT));
+    assert.equal(stored.smsVerifyCodeHash, verification.hashVerifyCode(code, STUDENT, PHONE));
     assert.notEqual(stored.smsVerifyCodeHash, code, "the code itself is never stored");
     assert.equal(
       (stored.smsVerifyExpiresAt as Date).getTime() - NOW.getTime(),
@@ -151,10 +168,14 @@ describe("sending the code", () => {
     // Unsalted, a million sha256s cover the whole code space, so any leaked
     // hash — a backup, a query log — is the live code. Binding it to the
     // account also stops a hash lifted from one row being replayed at another.
-    const mine = verification.hashVerifyCode("123456", STUDENT);
-    const theirs = verification.hashVerifyCode("123456", "stu_2");
+    const mine = verification.hashVerifyCode("123456", STUDENT, PHONE);
+    const theirs = verification.hashVerifyCode("123456", "stu_2", PHONE);
     assert.notEqual(mine, theirs, "the same code must not hash alike for two students");
-    assert.equal(mine, verification.hashVerifyCode("123456", STUDENT), "and it is deterministic");
+    assert.equal(
+      mine,
+      verification.hashVerifyCode("123456", STUDENT, PHONE),
+      "and it is deterministic",
+    );
   });
 
   it("keeps the message inside one segment and names SPOKES", () => {
@@ -171,7 +192,7 @@ describe("confirming the code", () => {
       id: "pref_1",
       destination: PHONE,
       smsConsentAt: null,
-      smsVerifyCodeHash: verification.hashVerifyCode(code, STUDENT),
+      smsVerifyCodeHash: verification.hashVerifyCode(code, STUDENT, PHONE),
       smsVerifyExpiresAt: new Date(NOW.getTime() + expiresInMs),
     };
   }
@@ -222,7 +243,7 @@ describe("confirming the code", () => {
       id: "pref_1",
       destination: PHONE,
       smsConsentAt: null,
-      smsVerifyCodeHash: verification.hashVerifyCode("123456", "stu_other"),
+      smsVerifyCodeHash: verification.hashVerifyCode("123456", "stu_other", PHONE),
       smsVerifyExpiresAt: new Date(NOW.getTime() + verification.VERIFY_CODE_TTL_MS),
     };
     const result = await verification.confirmVerificationCode({
@@ -242,6 +263,52 @@ describe("confirming the code", () => {
     });
     assert.deepEqual(result, { ok: false, reason: "no_pending_code" });
     assert.equal(state.updates.length, 0);
+  });
+});
+
+describe("a number changed while a code is in flight", () => {
+  const OTHER_PHONE = "+13045559999";
+
+  // What PUT /api/notifications/preferences does to the row on a new number.
+  function changeNumberTo(destination: string) {
+    state.pref = {
+      ...(state.pref as PrefRow),
+      destination,
+      smsConsentAt: null,
+      smsVerifyCodeHash: null,
+      smsVerifyExpiresAt: null,
+    };
+  }
+
+  it("a code texted to the old number does not confirm the new one", async () => {
+    // The number changes during the Twilio send, and the late hash write lands
+    // on the row that now holds the new, never-texted number.
+    state.onSms = () => changeNumberTo(OTHER_PHONE);
+    await verification.sendVerificationCode({ studentId: STUDENT, now: NOW });
+    assert.equal(state.smsCalls[0].to, PHONE);
+    state.pref = { ...(state.pref as PrefRow), ...(state.updates[0] as Partial<PrefRow>) };
+    state.updates = [];
+
+    const code = state.smsCalls[0].body.match(/code is (\d{6})/)?.[1] ?? "";
+    const result = await verification.confirmVerificationCode({ studentId: STUDENT, code, now: NOW });
+    assert.equal(result.ok, false);
+    assert.equal(state.updates.length, 0, "consent must not be stamped for the new number");
+  });
+
+  it("consent is not stamped if the number changes between the check and the write", async () => {
+    state.pref = {
+      ...(state.pref as PrefRow),
+      smsVerifyCodeHash: verification.hashVerifyCode("123456", STUDENT, PHONE),
+      smsVerifyExpiresAt: new Date(NOW.getTime() + verification.VERIFY_CODE_TTL_MS),
+    };
+    state.afterRead = () => changeNumberTo(OTHER_PHONE);
+    const result = await verification.confirmVerificationCode({
+      studentId: STUDENT,
+      code: "123456",
+      now: NOW,
+    });
+    assert.deepEqual(result, { ok: false, reason: "no_pending_code" });
+    assert.equal(state.updates.length, 0, "consent must not be stamped for the new number");
   });
 });
 

@@ -532,4 +532,23 @@ describe("TokenVault timing", () => {
     t.diagnostic(`rehydrate 30 kB ${rElapsed.toFixed(2)} ms`);
     assert.ok(rElapsed < 50, `rehydrate took ${rElapsed.toFixed(1)} ms`);
   });
+
+  it("pseudonymizes 10,000-character runs with no whitespace in linear time (F18)", (t) => {
+    // A student can send 10,000 characters of chat with no space in them. The
+    // pre-fix EMAIL family retried such a run from every index: about 150 ms
+    // of blocked event loop per pass on an Apple M4, several passes per turn.
+    const vault = TokenVault.fromIdentity({ studentName: "Jordan Lee", studentEmail: "jordan.lee@example.com" });
+    const inputs = ["a".repeat(10_000), "@a".repeat(5_000)];
+    vault.pseudonymize(inputs[0]); // compile the regexes once
+    let best = Number.POSITIVE_INFINITY;
+    for (let run = 0; run < 3; run += 1) {
+      const start = performance.now();
+      for (const text of inputs) assert.equal(vault.pseudonymize(text), text);
+      best = Math.min(best, performance.now() - start);
+    }
+    t.diagnostic(`pseudonymize over two 10,000-char runs: ${best.toFixed(2)} ms`);
+    assert.ok(best < 25, `pseudonymize took ${best.toFixed(1)} ms`);
+    // The run-start anchor drops no address, even at the end of a long run.
+    assert.equal(vault.pseudonymize(`${"a".repeat(10_000)}@x.org`), "[EMAIL_1]");
+  });
 });

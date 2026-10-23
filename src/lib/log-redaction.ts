@@ -17,9 +17,18 @@
  * definition instead of carrying a second copy. Global regexes carry
  * `lastIndex` between calls: consumers that do anything other than a single
  * `String.prototype.replace` must construct their own instance from `.source`.
+ *
+ * The leading lookbehind lets a match start only where a run of local-part
+ * characters starts. It drops no match: every character a match can hold is a
+ * local-part character, and the domain after an "@" does not depend on where
+ * the local part began, so if the run's first character cannot start a match
+ * no later character in that run can, and if it can, the greedy local part
+ * has already reached the run's last valid "@". Without it, a long run with no
+ * address in it (a student's 10,000 "a"s) was retried from every index, an
+ * O(n^2) scan on the shared event loop (F18).
  */
 export const EMAIL_PATTERN =
-  /[^\s<>()[\]:;,"]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/g;
+  /(?<![^\s<>()[\]:;,"])[^\s<>()[\]:;,"]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/g;
 
 /**
  * Matches E.164 numbers and separator-formatted ones only. A bare run of digits
