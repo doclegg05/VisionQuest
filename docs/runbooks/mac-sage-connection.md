@@ -149,8 +149,8 @@ All generation paths retain usage accounting and the same output limits.
 
 The prefix cache contains model attention state, not saved replies. Ollama must
 match the input tokens before reusing it; identity, record context, and questions
-are still sent on every turn. Cold starts and cache eviction remain slow. The Render app automatically prepares both demo roles with two different
-synthetic conversations at startup and every fifteen minutes. Preparation is
+are still sent on every turn. Cold starts and cache eviction remain slow. The Render app automatically prepares each demo role with its shared system/tool
+prefix at startup and every fifteen minutes. Preparation is
 non-streaming, preemptible background work; it never executes tools or stores
 conversations. Failed preparation retries after one minute. Relay-backed model
 requests use `keep_alive: "-1s"` so overnight idleness does not unload Sage.
@@ -233,3 +233,17 @@ results as proof of persistence. Rollback retains jobs and message intents;
 restoring this worker within its 24-hour recovery window resumes them. Old code's
 general job processor does not recognize this job type, so pause job processing
 before rolling back to a release older than this worker.
+
+
+### Cache snapshot boundary
+
+Preparation sends one system-only request per demo role, containing the real
+shared instruction prefix and tool declarations. It omits identities, dynamic
+context and user turns. This places Ollama MLX's explicit end-of-prompt snapshot
+inside the reusable prefix. Two full prompts with different names only created
+an inferred branch snapshot, which could disappear after background extraction:
+a hosted recall then recognized 7,319 tokens but restored only six and took
+110 seconds to first text. The prefix-only probe retained the shared state after
+six divergent background requests and reduced prompt processing to about four
+seconds for both roles. Queue waiting and dynamic context still add latency;
+these timings are not a universal response-time guarantee.

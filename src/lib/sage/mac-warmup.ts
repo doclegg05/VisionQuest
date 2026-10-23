@@ -1,4 +1,4 @@
-/** Prepare the real demo-role instruction/tool prefixes with synthetic inputs.
+/** Prepare the real demo-role instruction/tool prefixes without user-specific context.
  * This never executes tools, reads student records, or stores a conversation.
  * stream:false makes preparation interruptible by interactive chat at the Mac.
  */
@@ -12,22 +12,23 @@ import { logger } from "@/lib/logger";
 import { errorForLog } from "@/lib/log-error";
 
 export function buildMacWarmupRequests() {
-  return (["student", "teacher"] as const).flatMap(role => ["Amber", "Boris"].map(name => {
+  return (["student", "teacher"] as const).map(role => {
     const prompt = buildCacheableSystemPrompt(role === "student" ? "discovery" : "teacher_assistant",
-      { studentName: name, programType: "spokes", userMessage: "Hello" }, "compact");
+      { programType: "spokes" }, "compact");
     return {
       model: MAC_MLX_MODEL, think: false, stream: false, keep_alive: "-1s",
+      // A system-only request puts Ollama's explicit end-of-prompt snapshot
+      // before dynamic context. Identity-divergent full prompts create an
+      // inferred branch snapshot that MLX may compact away after extraction.
       messages: [
         { role: "system", content: prompt.text.slice(0, prompt.systemPrefixLength) },
-        { role: "system", content: prompt.text.slice(prompt.systemPrefixLength) },
-        { role: "user", content: `${name}: hello` },
       ],
       tools: toolsForTurn(getEnabledTools(role), { hasAttachment: false }).map(tool => ({ type: "function", function: {
         name: tool.name, description: tool.description, parameters: tool.parameters,
       } })),
       options: { num_ctx: 16384, num_predict: 1, temperature: 0 },
     };
-  }));
+  });
 }
 
 export async function warmMacSage(): Promise<void> {
