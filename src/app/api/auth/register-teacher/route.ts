@@ -10,9 +10,26 @@ import { logger } from "@/lib/logger";
 import { parseBody, registerStaffSchema } from "@/lib/schemas";
 import { promoteTeacherToAdmin, PROMOTION_IGNORED_FIELDS } from "@/lib/promote-staff-account";
 
+function isQuote(char: string): boolean {
+  return char === "'" || char === '"';
+}
+
+/**
+ * Trims whitespace, then strips leading and trailing runs of ' and ".
+ *
+ * Index scan, not a regex: /['"]+$/ backtracks quadratically on a long quote
+ * run that does not end the string, and the key arrives unauthenticated with
+ * no length cap (Claude Security F2). Returns the same string the old
+ * `.trim().replace(/^['"]+|['"]+$/g, "")` did, for every input.
+ */
 function normalizeKey(value: unknown): string {
   if (typeof value !== "string") return "";
-  return value.trim().replace(/^['"]+|['"]+$/g, "");
+  const trimmed = value.trim();
+  let start = 0;
+  let end = trimmed.length;
+  while (start < end && isQuote(trimmed[start])) start += 1;
+  while (end > start && isQuote(trimmed[end - 1])) end -= 1;
+  return trimmed.slice(start, end);
 }
 
 const TEACHER_KEY = normalizeKey(process.env.TEACHER_KEY || "");

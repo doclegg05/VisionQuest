@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { after, before, beforeEach, describe, it, mock } from "node:test";
 import { mockRequest } from "@/lib/test-helpers";
 import { fleschKincaidGrade, PLAIN_LANGUAGE_IDEAL_GRADE } from "@/lib/sage/readability";
@@ -756,6 +757,39 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
         1,
         "an IP-refused request must not spend a unit of the per-key allowance",
       );
+    });
+  });
+
+  // ── Key normalization (Claude Security F2, 2026-10-22) ──────────────────
+  // The quote strip was /^['"]+|['"]+$/g, which backtracks quadratically on a
+  // long quote run that does not end the string. The key has no length cap,
+  // so one unauthenticated request could stall the event loop for minutes.
+  describe("registration key normalization", () => {
+    const legacyNormalize = (s: string) => s.trim().replace(/^['"]+|['"]+$/g, "");
+    const sha256 = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
+    /** The normalized key, seen through the per-key limiter's digest. */
+    async function keyDigestFor(registrationKey: string) {
+      mockRateLimit.mock.resetCalls();
+      await registerRoute.POST(promotionRequest({ registrationKey, role: "teacher" }) as never);
+      return (mockRateLimit.mock.calls[2].arguments[0] as string).replace("register-staff:key:", "");
+    }
+
+    it("strips exactly what the old regex stripped", async () => {
+      // "" is refused by the schema; "   " reaches the normalizer and trims to "".
+      const cases = ["   ", "'''", `'"'"`, `"'abc'"`, `a'b"c`, `'a'b'`, "  'abc'  ", "' abc '", "'  ' abc",
+        "abc", "\t\"abc\n", "'abc", "abc'", `''abc''def''`, "a'''''a", "‘key’"];
+      for (const input of cases) {
+        assert.equal(await keyDigestFor(input), sha256(legacyNormalize(input)), JSON.stringify(input));
+      }
+    });
+
+    it("handles a long run of inner quotes in linear time", async () => {
+      const longKey = `a${"'".repeat(150_000)}a`;
+      const started = performance.now();
+      const digest = await keyDigestFor(longKey);
+      const elapsedMs = performance.now() - started;
+      assert.equal(digest, sha256(longKey), "inner quotes are kept");
+      assert.ok(elapsedMs < 1_000, `normalizing took ${elapsedMs.toFixed(0)} ms`);
     });
   });
 });
