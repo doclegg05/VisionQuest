@@ -259,7 +259,9 @@ test.describe("A visitor's demo: the student, then the instructor", () => {
     // is waited on until the demo class shows, so the absence is not just a
     // page that has not loaded yet.
     const page = await instructor.newPage();
-    for (const path of ["/teacher", "/teacher/classes", "/teacher/orientation"]) {
+    // /teacher/connect matches students to job leads across a roster, which
+    // once read every class's enrollments rather than the instructor's own.
+    for (const path of ["/teacher", "/teacher/classes", "/teacher/orientation", "/teacher/connect"]) {
       await page.goto(path);
       const body = page.locator("body");
       await expect(body, `${path} never showed the demo class`).toContainText(demoClassName, { timeout: 20_000 });

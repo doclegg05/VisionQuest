@@ -49,18 +49,55 @@ function urlPathForRouteFile(relativeFile: string): string {
   return ["/api", ...segments].join("/");
 }
 
-/** "METHOD /api/path" for every handler of the given methods under src/app/api. */
-function routeKeysFor(wanted: readonly string[]): string[] {
-  const keys: string[] = [];
+/** "METHOD /api/path" → the route file's source, for every handler of the given methods under src/app/api. */
+function routeSourcesFor(wanted: readonly string[]): Map<string, string> {
+  const sources = new Map<string, string>();
   const files = readdirSync(API_DIR, { recursive: true, encoding: "utf8" })
     .filter((file) => path.basename(file) === "route.ts")
     // A folder that starts with an underscore is private to Next.js and has no URL.
     .filter((file) => !file.split(path.sep).some((segment) => segment.startsWith("_")));
   for (const file of files) {
-    const methods = exportedMethods(readFileSync(path.join(API_DIR, file), "utf8"), wanted);
-    for (const method of methods) keys.push(`${method} ${urlPathForRouteFile(file)}`);
+    const source = readFileSync(path.join(API_DIR, file), "utf8");
+    for (const method of exportedMethods(source, wanted)) sources.set(`${method} ${urlPathForRouteFile(file)}`, source);
   }
-  return keys.sort();
+  return sources;
+}
+
+/** "METHOD /api/path" for every handler of the given methods under src/app/api. */
+function routeKeysFor(wanted: readonly string[]): string[] {
+  return [...routeSourcesFor(wanted).keys()].sort();
+}
+
+/**
+ * The WRITE_ALLOW entries that touch only the caller's own rows, or whose
+ * student check lives outside the route file. Every other allowed write acts
+ * on a student or a class and must check it in the route itself.
+ */
+const ALLOWED_WITHOUT_A_ROUTE_CHECK: Readonly<Record<string, string>> = {
+  "POST /api/teacher/availability": "the caller's own appointment slots",
+  "DELETE /api/teacher/availability/[id]": "the caller's own appointment slots",
+  "POST /api/chat/send":
+    "the caller's own conversation; a named student resolves in src/lib/sage/staff-student-context.ts and Sage's tools check it in src/lib/sage/agent/executor.ts",
+  "POST /api/chat/tool-confirm": "src/lib/sage/agent/executor.ts checks the target student",
+  "DELETE /api/auth/session": "signs the caller out",
+  "POST /api/notifications": "the caller's own notifications",
+  "DELETE /api/chat/conversations/[id]": "the caller's own conversation",
+  "POST /api/sage/panel/dismiss": "dismissPanel in src/lib/sage/panel-data.ts checks the student",
+  "POST /api/demo/student": "demo entry, before any session exists",
+  "POST /api/demo/instructor": "demo entry, before any session exists",
+};
+
+/** The helpers that hold a teacher to the students and classes they may manage. */
+const MANAGE_CHECKS = [
+  "assertStaffCanManageStudent",
+  "assertStaffCanManageClass",
+  "buildManagedStudentWhere",
+  "listManagedStudentIds",
+] as const;
+
+/** Route source with block and line comments removed, so only code is searched. */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
 const listed = [...DEMO_INSTRUCTOR_WRITE_ALLOW, ...DEMO_INSTRUCTOR_WRITE_DENY];
@@ -100,6 +137,37 @@ describe("demo instructor route walk", () => {
         ? getKeys.some((key) => matchesRoutePattern(entry, "GET", key.split(" ")[1]))
         : getKeys.includes(entry);
       assert.ok(covered, `${entry} matches no GET handler under src/app/api`);
+    }
+  });
+
+  // The file header's rule for WRITE_ALLOW: a route acts on one student or one
+  // class "through assertStaffCanManageStudent or assertStaffCanManageClass".
+  // Without that check, only RLS and an unguessable id keep the demo
+  // instructor inside its class.
+  it("checks the student or class in every allowed write that acts on one", () => {
+    const sources = routeSourcesFor(MUTATING_METHODS);
+    for (const entry of DEMO_INSTRUCTOR_WRITE_ALLOW) {
+      if (entry in ALLOWED_WITHOUT_A_ROUTE_CHECK) continue;
+      // A call, not a mention: an import or a comment naming the helper must not count.
+      const code = withoutComments(sources.get(entry) ?? "");
+      assert.ok(
+        MANAGE_CHECKS.some((check) => new RegExp(`\\b${check}\\s*\\(`).test(code)),
+        `${entry} is on WRITE_ALLOW but its route calls none of ${MANAGE_CHECKS.join(", ")}`,
+      );
+    }
+  });
+
+  it("counts a manage check only when the route calls it", () => {
+    const importedOnly = 'import { assertStaffCanManageStudent } from "@/lib/classroom";\n// assertStaffCanManageStudent(session, id)\n';
+    const called = `${importedOnly}await assertStaffCanManageStudent(session, goal.studentId);\n`;
+    const calls = (source: string) => /\bassertStaffCanManageStudent\s*\(/.test(withoutComments(source));
+    assert.equal(calls(importedOnly), false);
+    assert.equal(calls(called), true);
+  });
+
+  it("exempts only entries that are on WRITE_ALLOW", () => {
+    for (const entry of Object.keys(ALLOWED_WITHOUT_A_ROUTE_CHECK)) {
+      assert.ok(DEMO_INSTRUCTOR_WRITE_ALLOW.includes(entry), `${entry} is exempted but not allowed`);
     }
   });
 });

@@ -78,18 +78,17 @@ export default async function ConnectPage() {
     rlsContext,
     async () => {
     const [openLeads, employerRows, rosterRows, classRows] = await Promise.all([
-      listLeads({ status: "open", limit: MAX_BOARD_LEADS }),
+      listLeads({ viewer: session, status: "open", limit: MAX_BOARD_LEADS }),
       listEmployers(),
-      rankRoster({ leadsPerStudent: 3 }),
+      rankRoster({ viewer: session, leadsPerStudent: 3 }),
       listConnectClasses(session),
     ]);
 
-    // The pipeline board. Read inside the same RLS context as everything else
-    // on this page, so `connection_read`'s managed_student_ids() gate decides
-    // the roster rather than anything this page does.
-    const connectionRows = await listConnectionsForConsole();
+    // The pipeline board, held to the classes this viewer may manage, with
+    // `connection_read`'s managed_student_ids() gate under it as the backstop.
+    const connectionRows = await listConnectionsForConsole(session);
 
-    const counts = await summarizeLeadFits(openLeads.map((lead) => lead.id));
+    const counts = await summarizeLeadFits(openLeads.map((lead) => lead.id), { viewer: session });
     const countsByLead = new Map(counts.map((entry) => [entry.jobLeadId, entry]));
 
     return {

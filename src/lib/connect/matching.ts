@@ -23,6 +23,8 @@
 // denormalised `employerName`, and why there are two selects below.
 // =============================================================================
 
+import type { Session } from "@/lib/api-error";
+import { canManageAnyClassFor } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
 import { ENROLLED_STATUSES } from "./classes";
@@ -44,6 +46,9 @@ import { parseStoredResumeData } from "@/lib/resume";
 export const MAX_CANDIDATES = 100;
 /** Most leads ranked for one student in a single call. */
 export const MAX_LEADS = 100;
+
+/** The staff session a roster is loaded for. It decides which classes' students are candidates. */
+export type RosterViewer = Pick<Session, "id" | "role" | "demoAccount">;
 
 /** A certification only clears a must-have when an instructor verified it. */
 const VERIFIED = "verified";
@@ -255,12 +260,26 @@ interface Candidate {
  * deduped by student id — otherwise they would appear twice on the board and
  * be counted twice in "N fit". When a classId is named, the row for THAT class
  * wins, because it carries the region the location score uses.
+ *
+ * The pool is the viewer's to see. A viewer who may manage any class (every
+ * regular teacher and admin) gets the whole program; anyone else, the cohort
+ * demo instructor included, gets only classes they are an assigned instructor
+ * of. The enrollment RLS policy should narrow a teacher the same way, but on
+ * 2026-10-23 the live Connect page showed the demo instructor another class's
+ * students, so this filter does not lean on it.
  */
-async function loadCandidates(classId: string | null, limit: number): Promise<Candidate[]> {
+async function loadCandidates(
+  classId: string | null,
+  limit: number,
+  viewer: RosterViewer,
+): Promise<Candidate[]> {
   const rows = (await prisma.studentClassEnrollment.findMany({
     where: {
       status: { in: [...ENROLLED_STATUSES] },
       ...(classId ? { classId } : {}),
+      ...(canManageAnyClassFor(viewer)
+        ? {}
+        : { class: { instructors: { some: { instructorId: viewer.id } } } }),
       student: { isActive: true, role: "student" },
     },
     // Over-fetch so the cap still yields `limit` DISTINCT students after
@@ -342,12 +361,12 @@ export interface LeadMatchResult {
  * session that cannot see it gets null rather than a leak — the class check
  * lives here rather than at the call site, because this function is what the
  * console's drill-in and any future route both go through. The candidate pool
- * is the lead's class when it names one, and every enrolled student when the
- * lead is program-wide.
+ * is the lead's class when it names one, and every enrolled student the
+ * viewer may see when the lead is program-wide.
  */
 export async function rankStudentsForLead(
   jobLeadId: string,
-  options: { limit?: number } = {},
+  options: { viewer: RosterViewer; limit?: number },
 ): Promise<LeadMatchResult | null> {
   const limit = Math.min(options.limit ?? MAX_CANDIDATES, MAX_CANDIDATES);
 
@@ -362,7 +381,7 @@ export async function rankStudentsForLead(
   const lead = toMatchLead(row);
 
   // 2 — the candidate pool, one query with every scoring input selected.
-  const candidates = await loadCandidates(row.classId, limit);
+  const candidates = await loadCandidates(row.classId, limit, options.viewer);
   const capped = candidates.length > limit;
   const roster = candidates.slice(0, limit);
   const studentIds = roster.map((candidate) => candidate.student.id);
@@ -460,7 +479,7 @@ export const MAX_BLOCKED_SHOWN = 5;
  */
 export async function summarizeLeadFits(
   jobLeadIds: string[],
-  options: { limit?: number } = {},
+  options: { viewer: RosterViewer; limit?: number },
 ): Promise<LeadFitCounts[]> {
   if (jobLeadIds.length === 0) return [];
   const limit = Math.min(options.limit ?? MAX_CANDIDATES, MAX_CANDIDATES);
@@ -471,7 +490,7 @@ export async function summarizeLeadFits(
   })) as LeadRow[];
   if (leadRows.length === 0) return [];
 
-  const candidates = (await loadCandidates(null, limit)).slice(0, limit);
+  const candidates = (await loadCandidates(null, limit, options.viewer)).slice(0, limit);
   const studentIds = candidates.map((candidate) => candidate.student.id);
 
   const [workProfiles, withdrawnRows] = await Promise.all([
@@ -550,7 +569,7 @@ export interface RosterEntry {
  * numbers, one page load.
  */
 export async function rankRoster(
-  options: { classId?: string | null; limit?: number; leadsPerStudent?: number } = {},
+  options: { viewer: RosterViewer; classId?: string | null; limit?: number; leadsPerStudent?: number },
 ): Promise<RosterEntry[]> {
   const limit = Math.min(options.limit ?? MAX_CANDIDATES, MAX_CANDIDATES);
   const leadsPerStudent = options.leadsPerStudent ?? 3;
@@ -566,7 +585,7 @@ export async function rankRoster(
     select: LEAD_STAFF_SELECT,
   })) as LeadRow[];
 
-  const candidates = (await loadCandidates(options.classId ?? null, limit)).slice(0, limit);
+  const candidates = (await loadCandidates(options.classId ?? null, limit, options.viewer)).slice(0, limit);
   const studentIds = candidates.map((candidate) => candidate.student.id);
 
   const [workProfiles, withdrawnRows] = await Promise.all([

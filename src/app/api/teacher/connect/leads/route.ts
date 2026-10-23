@@ -38,7 +38,7 @@ const listQuerySchema = z.object({
   fitCounts: z.enum(["0", "1"]).optional(),
 });
 
-export const GET = withTeacherAuth(async (_session, req: Request) => {
+export const GET = withTeacherAuth(async (session, req: Request) => {
   const url = new URL(req.url);
   const parsed = listQuerySchema.safeParse({
     status: url.searchParams.get("status") ?? undefined,
@@ -52,7 +52,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
   }
   const query = parsed.data;
 
-  const leads = await listLeads({ status: query.status, employerId: query.employerId });
+  const leads = await listLeads({ viewer: session, status: query.status, employerId: query.employerId });
 
   if (query.fitCounts !== "1") {
     return NextResponse.json({ leads });
@@ -61,7 +61,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
   // Only open leads are worth counting: a filled or closed lead hard-blocks
   // everyone, so its counts would read "0 fit / 30 blocked" and mean nothing.
   const openLeadIds = leads.filter((lead) => lead.status === "open").map((lead) => lead.id);
-  const counts = await summarizeLeadFits(openLeadIds);
+  const counts = await summarizeLeadFits(openLeadIds, { viewer: session });
   const byLead = new Map(counts.map((entry) => [entry.jobLeadId, entry]));
 
   // Counts only. summarizeLeadFits also carries the blocked students' NAMES

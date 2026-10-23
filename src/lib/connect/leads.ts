@@ -20,7 +20,8 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
-import { notFound } from "@/lib/api-error";
+import { notFound, type Session } from "@/lib/api-error";
+import { canManageAnyClassFor } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
 import { type ClassActor, assertClassIsManaged } from "./classes";
@@ -187,13 +188,30 @@ export const LEAD_LIST_SELECT = {
 
 export const MAX_LEAD_PAGE = 200;
 
-export async function listLeads(
-  options: { status?: string; employerId?: string; limit?: number } = {},
-) {
+/**
+ * The leads board. A viewer who may manage any class (every regular teacher
+ * and admin) sees every lead. Anyone else, the cohort demo instructor
+ * included, sees program-wide leads and leads scoped to a class they teach,
+ * never a lead that belongs to another class.
+ */
+export async function listLeads(options: {
+  viewer: Pick<Session, "id" | "role" | "demoAccount">;
+  status?: string;
+  employerId?: string;
+  limit?: number;
+}) {
   return prisma.jobLead.findMany({
     where: {
       ...(options.status ? { status: options.status } : {}),
       ...(options.employerId ? { employerId: options.employerId } : {}),
+      ...(canManageAnyClassFor(options.viewer)
+        ? {}
+        : {
+            OR: [
+              { classId: null },
+              { class: { instructors: { some: { instructorId: options.viewer.id } } } },
+            ],
+          }),
     },
     orderBy: [{ status: "asc" }, { postedAt: "desc" }, { id: "asc" }],
     take: Math.min(options.limit ?? MAX_LEAD_PAGE, MAX_LEAD_PAGE),

@@ -3,6 +3,7 @@ import { badRequest, conflict, notFound, withTeacherAuth } from "@/lib/api-error
 import { syncStudentAlerts } from "@/lib/advising";
 import { afterWrite } from "@/lib/after-write";
 import { logAuditEvent } from "@/lib/audit";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
   isGoalResourceLinkStatus,
@@ -69,6 +70,10 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
   if (!goal) {
     throw notFound("Goal not found.");
   }
+
+  // Same check as PATCH /api/goal-resource-links/[id]. A regular teacher may
+  // manage any student; the cohort demo instructor only its own class's.
+  await assertStaffCanManageStudent(session, goal.studentId);
 
   if (!goalCountsTowardPlan(goal.status)) {
     throw badRequest("Resources can only be linked to goals that are still part of the student's plan.");
