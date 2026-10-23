@@ -100,7 +100,7 @@ async function main() {
   try {
     console.log(`expire-stale-background-jobs ${new Date().toISOString()} target=${describeConnection(url)} mode=${parsed.apply ? "APPLY" : "dry-run"}`);
 
-    const where = { status: "pending", createdAt: { lt: parsed.before } };
+    const where = { status: "pending", type: { not: "sage_memory" }, createdAt: { lt: parsed.before } };
     const beforeGroups = await countPendingByType(prisma, where);
     const plan = planExpiry({ groups: beforeGroups, before: parsed.before, today, reason: parsed.reason });
 

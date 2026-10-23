@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { extractionTranscript } from "../extraction-transcript";
 /**
  * Post-response memory extraction for STUDENT chat (Phase 2, Mem0 ADD-only
@@ -14,8 +15,8 @@ import { extractionTranscript } from "../extraction-transcript";
  * shared with the staff-chat extractor (./staff-extract.ts) and the
  * deterministic operation-memory writer (./operation-memory.ts).
  *
- * Never throws to the caller: a failed extraction must not surface as a chat
- * error.
+ * Direct chat callers retain non-fatal behavior. Durable workers opt into
+ * throwing on failure so an unsuccessful extraction is retried.
  */
 
 import { logLlmCall } from "@/lib/llm-usage";
@@ -30,6 +31,7 @@ import type { AIProvider } from "@/lib/ai/types";
 import {
   memoryCandidateSchema,
   parseExtractionItems,
+  unwrapItemList,
   type MemoryCandidate,
 } from "./schema";
 import { storeMemoryCandidates } from "./store";
@@ -58,6 +60,9 @@ Return [] if nothing durable was shared.`;
 
 export interface ExtractMemoriesParams {
   provider: AIProvider;
+  /** Durable workers must observe failures to retry, rather than accept empty success. */
+  throwOnError?: boolean;
+  storeGuard?: <T>(write: (transaction?: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
   studentId: string;
   conversationId: string;
   messages: { role: "user" | "model"; content: string }[];
@@ -118,6 +123,8 @@ export async function extractAndStoreMemories({
   studentId,
   conversationId,
   messages,
+  throwOnError = false,
+  storeGuard = async (write) => write(),
 }: ExtractMemoriesParams): Promise<ExtractMemoriesResult> {
   const empty: ExtractMemoriesResult = { stored: 0, deduped: 0, rejected: 0 };
 
@@ -175,7 +182,9 @@ export async function extractAndStoreMemories({
       raw,
     });
 
-    const { accepted, rejected } = parseExtractionItems(parseModelJson(raw));
+    const parsed = parseModelJson(raw);
+    if (throwOnError && unwrapItemList(parsed) === null) throw new Error("Invalid memory extraction JSON");
+    const { accepted, rejected } = parseExtractionItems(parsed);
     if (accepted.length === 0) return { ...empty, rejected };
 
     // Pin subject identity and provenance server-side, then re-validate the
@@ -192,16 +201,18 @@ export async function extractAndStoreMemories({
         }),
       );
 
-    const { stored, deduped } = await storeMemoryCandidates(candidates, {
+    const { stored, deduped } = await storeGuard((transaction) => storeMemoryCandidates(candidates, {
+      transaction,
       usage: { studentId, callSite: "sage_memory_extract" },
       semanticDedupe: true,
-    });
+    }));
     return { stored, deduped, rejected };
   } catch (error) {
     logger.error("Memory extraction failed (non-fatal)", {
       conversationId,
       error: errorForLog(error),
     });
+    if (throwOnError) throw new Error("Memory extraction failed");
     return empty;
   }
 }

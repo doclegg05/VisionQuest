@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+import { isDemoLocalOnlyRequired } from "@/lib/ai/demo-local-only";
 /**
  * Shared write path for every Sage memory producer.
  *
@@ -106,6 +108,8 @@ export interface StoreMemoriesResult {
 }
 
 export interface StoreMemoriesOptions {
+  /** Durable job writes share the transaction that locks their lease. */
+  transaction?: Prisma.TransactionClient;
   /** Attribution for the embedding call's token accounting. */
   usage: { studentId: string; callSite: string };
   /**
@@ -169,7 +173,7 @@ async function pseudonymizeCandidates(
  */
 export async function storeMemoryCandidates(
   rawCandidates: MemoryCandidate[],
-  { usage, semanticDedupe }: StoreMemoriesOptions,
+  { usage, semanticDedupe, transaction }: StoreMemoriesOptions,
 ): Promise<StoreMemoriesResult> {
   if (rawCandidates.length === 0) return { stored: 0, deduped: 0 };
 
@@ -184,9 +188,10 @@ export async function storeMemoryCandidates(
   // while a subject lock is held.
   const candidates = await pseudonymizeCandidates(rawCandidates, usage.studentId);
 
-  return withSubjectLock(subjectId, async () => {
+  const writer = transaction ?? prisma;
+  const write = async () => {
     const hashes = candidates.map((candidate) => sourceHashFor(candidate));
-    const existing = await prisma.sageMemory.findMany({
+    const existing = await writer.sageMemory.findMany({
       where: {
         subjectType,
         subjectId,
@@ -197,7 +202,11 @@ export async function storeMemoryCandidates(
     });
     const existingHashes = new Set(existing.map((row) => row.sourceHash));
 
-    const fresh = candidates.filter((_, i) => !existingHashes.has(hashes[i]));
+    const fresh = candidates.filter((_, i) => {
+      if (existingHashes.has(hashes[i])) return false;
+      existingHashes.add(hashes[i]);
+      return true;
+    });
     let deduped = candidates.length - fresh.length;
     if (fresh.length === 0) return { stored: 0, deduped };
 
@@ -208,7 +217,8 @@ export async function storeMemoryCandidates(
     // cloud embeddings API — declared here rather than inferred by the
     // facade, so the write path cannot drift to "system" unnoticed.
     const sensitivity = subjectType === "teacher" ? "staff_entered" : "student_record";
-    const { vectors, model: activeModel } = await embedTextsWithModel(
+    const lexicalOnly = isDemoLocalOnlyRequired();
+    const { vectors, model: activeModel } = lexicalOnly ? { vectors: [] as number[][], model: null } : await embedTextsWithModel(
       fresh.map((candidate) => candidate.content),
       { taskType: "RETRIEVAL_DOCUMENT", usage: { ...usage, sensitivity } },
     );
@@ -219,12 +229,12 @@ export async function storeMemoryCandidates(
     const insertedVectors: number[][] = [];
     for (let i = 0; i < fresh.length; i++) {
       const candidate = fresh[i];
-      const vectorLiteral = toVectorLiteral(vectors[i]);
+      const vectorLiteral = lexicalOnly ? null : toVectorLiteral(vectors[i]);
 
-      if (semanticDedupe) {
+      if (semanticDedupe && !lexicalOnly) {
         // Layer 2: rephrased versions of facts already in the DB (the hash
         // layer only catches near-verbatim restatements).
-        const semanticDup = await prisma.$queryRaw<{ id: string }[]>`
+        const semanticDup = await writer.$queryRaw<{ id: string }[]>`
           SELECT id FROM "visionquest"."SageMemory"
           WHERE "subjectType" = ${candidate.subjectType}
             AND "subjectId" = ${candidate.subjectId}
@@ -247,8 +257,9 @@ export async function storeMemoryCandidates(
         }
       }
 
+      if (transaction) await transaction.$executeRaw`SAVEPOINT memory_candidate`;
       try {
-        const row = await prisma.sageMemory.create({
+        const row = await writer.sageMemory.create({
           data: {
             subjectType: candidate.subjectType,
             subjectId: candidate.subjectId,
@@ -262,16 +273,21 @@ export async function storeMemoryCandidates(
           },
           select: { id: true },
         });
-        await prisma.$executeRaw`
+        if (!lexicalOnly) await writer.$executeRaw`
           UPDATE "visionquest"."SageMemory"
           SET embedding = ${vectorLiteral}::vector(768),
               "embeddingModel" = ${activeModel}
           WHERE id = ${row.id}
         `;
-        insertedVectors.push(vectors[i]);
+        if (!lexicalOnly) insertedVectors.push(vectors[i]);
         stored++;
+        if (transaction) await transaction.$executeRaw`RELEASE SAVEPOINT memory_candidate`;
       } catch (error) {
         if (isUniqueViolation(error)) {
+          if (transaction) {
+            await transaction.$executeRaw`ROLLBACK TO SAVEPOINT memory_candidate`;
+            await transaction.$executeRaw`RELEASE SAVEPOINT memory_candidate`;
+          }
           deduped++; // raced with a concurrent write — index did its job
         } else {
           throw error;
@@ -280,5 +296,10 @@ export async function storeMemoryCandidates(
     }
 
     return { stored, deduped };
-  });
+  };
+  if (transaction) {
+    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${subjectId})::bigint)`;
+    return write();
+  }
+  return withSubjectLock(subjectId, write);
 }
