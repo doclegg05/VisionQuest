@@ -1229,7 +1229,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
             persisted: persisted.length,
           });
         }
-        const assistantMessage = await saveMessage(conversation.id, session.id, "assistant", persisted);
+        const assistantMessage = await saveMessage(conversation.id, session.id, "assistant", persisted, { memoryIntent: true });
         await logAiAuditEvent({
           actorId: session.id,
           actorRole: session.role,

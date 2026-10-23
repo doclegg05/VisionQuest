@@ -187,8 +187,9 @@ reconnecting after that deploy; no student data or vector index migration occurs
 
 ## Durable demo memory (2026-10-23)
 
-With the Mac relay enabled, saving an assistant message also commits a memory
-intent in that message's metadata. A ten-second worker reconciles up to 25 intents
+With the Mac relay enabled, saving a completed model reply also commits a memory
+intent in that message's metadata. Deterministic replies and interrupted partial
+replies do not enqueue memory inference. A ten-second worker reconciles up to 25 intents
 at a time into `BackgroundJob` rows of type `sage_memory`, storing only owner,
 conversation and source-message IDs. An enqueue failure or Render restart leaves
 the intent available for recovery. This path replaces immediate student/staff

@@ -41,7 +41,7 @@ export async function enqueueMemoryJob(input: MemoryJobInput): Promise<void> {
 }
 
 export async function runMemoryJob(input: MemoryJobInput, storeGuard?: <T>(write: (transaction?: Prisma.TransactionClient) => Promise<T>) => Promise<T>): Promise<void> {
-  if (!input.studentId || !input.conversationId || !input.sourceMessageId) throw new Error("Invalid memory job references");
+  if (!input.studentId || !input.conversationId || !input.sourceMessageId) throw Object.assign(new Error("Invalid memory job references"), { code: "E_MEMORY_REFERENCE_INVALID" });
   const student = await prismaAdmin.student.findUnique({ where: { id: input.studentId }, select: { role: true, isActive: true } });
   // Deleted/disabled users must not keep generating new memories.
   if (!student?.isActive) return;
@@ -49,7 +49,7 @@ export async function runMemoryJob(input: MemoryJobInput, storeGuard?: <T>(write
     id: input.sourceMessageId, studentId: input.studentId, conversationId: input.conversationId,
     role: "assistant", conversation: { studentId: input.studentId },
   }, select: { createdAt: true } });
-  if (!source) throw new Error("Memory source is unavailable or belongs to another account");
+  if (!source) throw Object.assign(new Error("Memory source is unavailable or belongs to another account"), { code: "E_MEMORY_SOURCE_UNAVAILABLE" });
   const rows = await prismaAdmin.message.findMany({ where: {
     studentId: input.studentId, conversationId: input.conversationId,
     createdAt: { lte: source.createdAt }, role: { in: ["user", "assistant"] },
@@ -126,23 +126,26 @@ export async function processMemoryJob(): Promise<void> {
     }, 30_000);
     heartbeat.unref();
     try {
-      await runMemoryJob(JSON.parse(job.payload), async write => prismaAdmin.$transaction(async tx => {
+      let input: MemoryJobInput;
+      try { input = JSON.parse(job.payload); }
+      catch { throw Object.assign(new Error("Invalid memory job payload"), { code: "E_MEMORY_PAYLOAD_INVALID" }); }
+      await runMemoryJob(input, async write => prismaAdmin.$transaction(async tx => {
         // Hold the job row through the write. A reclaimed/expired attempt may
         // finish inference but cannot write memories or mark the job complete.
         const held = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM visionquest."BackgroundJob"
           WHERE id = ${job.id} AND status = 'processing' AND attempts = ${job.attempts}
             AND "startedAt" >= NOW() - INTERVAL '5 minutes' FOR UPDATE`;
-        if (!held.length) throw new Error("Memory job lease lost");
+        if (!held.length) throw Object.assign(new Error("Memory job lease lost"), { code: "E_MEMORY_LEASE_LOST" });
         const result = await write(tx);
         await tx.backgroundJob.updateMany({ where, data: { status: "completed", completedAt: new Date(), error: null } });
         return result;
       }, { timeout: 30_000 }));
       await prismaAdmin.backgroundJob.updateMany({ where, data: { status: "completed", completedAt: new Date(), error: null } });
-    } catch {
+    } catch (error) {
       // Never persist provider messages or transcript fragments in job errors.
       const delay = Math.min(900_000, 30_000 * 2 ** Math.min(job.attempts - 1, 5));
       await prismaAdmin.backgroundJob.updateMany({ where, data: { status: "pending", error: "Memory work deferred; automatic retry scheduled", startedAt: new Date(Date.now() + delay) } });
-      logger.info("Sage memory work deferred", { jobId: job.id, attempt: job.attempts, delayMs: delay });
+      logger.info("Sage memory work deferred", { jobId: job.id, attempt: job.attempts, delayMs: delay, error: errorForLog(error) });
     } finally { clearInterval(heartbeat); }
   } finally { running = false; }
 }

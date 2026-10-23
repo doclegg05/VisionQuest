@@ -202,7 +202,11 @@ export async function storeMemoryCandidates(
     });
     const existingHashes = new Set(existing.map((row) => row.sourceHash));
 
-    const fresh = candidates.filter((_, i) => !existingHashes.has(hashes[i]));
+    const fresh = candidates.filter((_, i) => {
+      if (existingHashes.has(hashes[i])) return false;
+      existingHashes.add(hashes[i]);
+      return true;
+    });
     let deduped = candidates.length - fresh.length;
     if (fresh.length === 0) return { stored: 0, deduped };
 
@@ -253,6 +257,7 @@ export async function storeMemoryCandidates(
         }
       }
 
+      if (transaction) await transaction.$executeRaw`SAVEPOINT memory_candidate`;
       try {
         const row = await writer.sageMemory.create({
           data: {
@@ -276,8 +281,13 @@ export async function storeMemoryCandidates(
         `;
         if (!lexicalOnly) insertedVectors.push(vectors[i]);
         stored++;
+        if (transaction) await transaction.$executeRaw`RELEASE SAVEPOINT memory_candidate`;
       } catch (error) {
         if (isUniqueViolation(error)) {
+          if (transaction) {
+            await transaction.$executeRaw`ROLLBACK TO SAVEPOINT memory_candidate`;
+            await transaction.$executeRaw`RELEASE SAVEPOINT memory_candidate`;
+          }
           deduped++; // raced with a concurrent write — index did its job
         } else {
           throw error;
