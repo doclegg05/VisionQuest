@@ -7,11 +7,14 @@ export function hashSecurityAnswer(answer: string): string {
 }
 
 /**
- * Always runs the KDF, even with no usable stored hash (it checks against a
- * dummy one and never matches), so the time a check takes does not show
- * whether a stored answer exists.
+ * Always runs the KDF. A missing or unusable stored hash is checked against
+ * auth's dummy hash and never matches, so a caller can spend the same time on
+ * an answer whether or not there is a real hash behind it.
  */
-export function verifySecurityAnswer(answer: string, storedHash: string | null | undefined): boolean {
+export function verifySecurityAnswer(
+  answer: string,
+  storedHash: string | null | undefined,
+): boolean {
   return verifyPasswordSafe(normalizeSecurityAnswer(answer), storedHash);
 }
 

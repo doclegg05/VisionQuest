@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import test from "node:test";
 import { hashSecurityAnswer, verifySecurityAnswer } from "./security-question-auth";
 import {
@@ -45,6 +46,17 @@ test("verifySecurityAnswer matches normalized answers", () => {
 
   assert.ok(verifySecurityAnswer("st marys", stored));
   assert.ok(!verifySecurityAnswer("washington", stored));
+});
+
+test("verifySecurityAnswer runs the KDF and never matches when no usable hash is stored", (t) => {
+  const scrypt = t.mock.method(crypto, "scryptSync");
+
+  for (const stored of [undefined, null, "", "not-a-hash"]) {
+    assert.equal(verifySecurityAnswer("st marys", stored), false);
+  }
+
+  // One dummy-hash KDF per answer, so a missing hash costs what a real one does.
+  assert.equal(scrypt.mock.callCount(), 4);
 });
 
 test("hasConfiguredSecurityQuestionSet only passes when every preset key is present", () => {
