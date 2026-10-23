@@ -103,6 +103,10 @@ mock.module("@/lib/db", {
       student: {
         findUnique: mockAdminStudentFindUnique,
       },
+      // F10's getSession revocation check reads this; F9's tests reach getSession.
+      sageConfirmationUse: {
+        findUnique: async () => null,
+      },
     },
   },
 });
