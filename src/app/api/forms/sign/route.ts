@@ -10,6 +10,7 @@ import { syncStudentAlerts } from "@/lib/advising";
 import { afterWrite } from "@/lib/after-write";
 import { parseBody } from "@/lib/schemas";
 import { decodeSignaturePng, SIGNATURE_DATA_URL_PREFIX } from "@/lib/signature-png";
+import { fileBelongsToStudent } from "@/lib/forms/signature-files";
 
 // Signature is a base64 PNG data URL — body length capped to keep upstream
 // `Buffer.from(base64Data, "base64")` size bounded (existing 500_000 byte limit
@@ -61,10 +62,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
     const targetStudentId = await resolveTargetStudentId(session, studentId);
 
-    if (fileId && !await prisma.fileUpload.findFirst({
-      where: { id: fileId, studentId: targetStudentId },
-      select: { id: true },
-    })) {
+    if (fileId && !(await fileBelongsToStudent(fileId, targetStudentId))) {
       throw forbidden("File does not belong to this student.");
     }
 
