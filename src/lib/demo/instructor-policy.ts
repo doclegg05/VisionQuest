@@ -294,6 +294,7 @@ export const DEMO_INSTRUCTOR_READ_DENY: readonly string[] = [
   "GET /api/teacher/failed-extractions",
   "GET /api/teacher/forms/responses",
   "GET /api/teacher/export/**",
+  "GET /api/teacher/classes/export-packets",
   "GET /api/teacher/audit/**",
 ];
 

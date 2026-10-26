@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Writable } from "node:stream";
 import archiver from "archiver";
-import { prisma } from "@/lib/db";
+import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { assertStaffCanManageClass, listManagedStudentIds } from "@/lib/classroom";
+import { tryLogAuditEvent } from "@/lib/audit";
+import { listCohortPacketStudents } from "@/lib/teacher/cohort-packets";
 import { downloadFile } from "@/lib/storage";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+
+const classIdSchema = z.string().cuid();
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -15,7 +19,12 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const classId = searchParams.get("classId") || undefined;
+  const rawClassId = searchParams.get("classId") || undefined;
+  const parsedClassId = rawClassId === undefined ? null : classIdSchema.safeParse(rawClassId);
+  if (parsedClassId && !parsedClassId.success) {
+    return NextResponse.json({ error: "Invalid class id" }, { status: 400 });
+  }
+  const classId = parsedClassId?.data;
 
   if (classId) {
     try {
@@ -34,25 +43,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No students found for this class scope" }, { status: 404 });
   }
 
-  const students = await prisma.student.findMany({
-    where: { id: { in: studentIds } },
-    include: {
-      spokesRecord: true,
-      formSubmissions: {
-        where: { formId: { in: ["orientation-intake", "student-intake"] } },
-        orderBy: { updatedAt: "desc" },
-        take: 1,
-      },
-    },
-  });
-
-  // Collect file IDs from submissions
-  const fileIds = students.map((s) => s.formSubmissions[0]?.fileId).filter(Boolean) as string[];
-  const files = await prisma.fileUpload.findMany({
-    where: { id: { in: fileIds } },
-    select: { id: true, storageKey: true, filename: true },
-  });
-  const fileMap = new Map(files.map((f) => [f.id, f]));
+  const students = await listCohortPacketStudents(studentIds);
 
   // Create ZIP in memory
   const chunks: Buffer[] = [];
@@ -73,12 +64,10 @@ export async function GET(req: NextRequest) {
   const missing: string[] = [];
 
   for (const student of students) {
-    const sub = student.formSubmissions[0];
-    const file = sub ? fileMap.get(sub.fileId) : null;
     let pdfBuffer: Buffer | null = null;
 
-    if (file) {
-      const downloaded = await downloadFile(file.storageKey);
+    if (student.storageKey) {
+      const downloaded = await downloadFile(student.storageKey);
       if (downloaded) {
         pdfBuffer = downloaded.buffer;
       } else {
@@ -98,8 +87,8 @@ export async function GET(req: NextRequest) {
     // just stripped of (review B4b); it does not become acceptable at scale.
     // A student with no archived packet is reported as missing.
     if (pdfBuffer) {
-      const cleanLastName = (student.spokesRecord?.lastName || student.displayName.split(" ").slice(1).join(" ") || "Student").replace(/[^a-zA-Z0-9]/g, "_");
-      const cleanFirstName = (student.spokesRecord?.firstName || student.displayName.split(" ")[0] || "Participant").replace(/[^a-zA-Z0-9]/g, "_");
+      const cleanLastName = (student.lastName || student.displayName.split(" ").slice(1).join(" ") || "Student").replace(/[^a-zA-Z0-9]/g, "_");
+      const cleanFirstName = (student.firstName || student.displayName.split(" ")[0] || "Participant").replace(/[^a-zA-Z0-9]/g, "_");
       const filename = `${cleanLastName}_${cleanFirstName}_SPOKES_Intake.pdf`;
       archive.append(pdfBuffer, { name: filename });
     } else {
@@ -128,6 +117,20 @@ export async function GET(req: NextRequest) {
   }
 
   await archive.finalize();
+
+  // One row per delivered export. Counts only: no student id or name goes in
+  // the payload. A failed write is logged by tryLogAuditEvent and must not
+  // withhold a download that is already built.
+  const included = students.length - missing.length;
+  await tryLogAuditEvent({
+    actorId: session.id,
+    actorRole: session.role,
+    action: "teacher.class.packets_exported",
+    targetType: "class",
+    targetId: classId ?? null,
+    summary: `Exported ${included} intake packet(s); ${missing.length} missing.`,
+    metadata: { included, missing: missing.length },
+  });
 
   const zipBuffer = Buffer.concat(chunks);
   const classSuffix = classId ? `_${classId.slice(-6)}` : "";

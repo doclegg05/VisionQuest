@@ -367,3 +367,12 @@ describe("matchesRoutePattern", () => {
     assert.equal(matchesRoutePattern("", "POST", "/api/orientation"), false);
   });
 });
+
+describe("cohort intake packet export", () => {
+  it("is denied to the demo instructor (signed intake packets are real PII)", () => {
+    assert.equal(
+      isDemoInstructorRequestAllowed("GET", "/api/teacher/classes/export-packets"),
+      false,
+    );
+  });
+});
