@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import * as Dialog from "@radix-ui/react-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { getRoleHomePath, getRoleSettingsPath } from "@/lib/role-home";
 import { type NavPhase, type NavItem } from "@/lib/nav-progression";
@@ -318,8 +319,15 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             );
           })()}
 
-          {/* Tab 5: More */}
-          <button
+          {/* Student sheet uses a focus-trapped dialog with automatic focus restoration. */}
+          {role === "student" ? <Dialog.Root>
+            <Dialog.Trigger asChild><button type="button" className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-label="More navigation options"><DotsThreeOutline size={22} /><span className="text-xs font-medium">More</span></button></Dialog.Trigger>
+            <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[80] bg-black/50 md:hidden" /><Dialog.Content className="fixed bottom-3 left-3 right-3 z-[81] max-h-[80dvh] overflow-y-auto rounded-2xl bg-[var(--surface-card)] p-5 text-[var(--ink-strong)] md:hidden">
+              <Dialog.Title className="font-display text-lg font-semibold">Your workspace</Dialog.Title><Dialog.Description className="sr-only">Choose a page or update your settings.</Dialog.Description>
+              <div className="mt-4 grid grid-cols-2 gap-2">{mobileMore.map((item) => <Dialog.Close asChild key={item.href}><Link href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 hover:bg-[var(--surface-soft)]"><item.icon size={20} />{item.label}</Link></Dialog.Close>)}</div>
+              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-3">{settingsHref && <Dialog.Close asChild><Link className="min-h-11 py-2" href={settingsHref}>Settings</Link></Dialog.Close>}<button className="min-h-11 py-2" onClick={handleLogout}>Log out</button><Dialog.Close className="secondary-button px-4 py-2">Close menu</Dialog.Close></div>
+            </Dialog.Content></Dialog.Portal>
+          </Dialog.Root> : <button
             ref={moreButtonRef}
             onClick={() => setMoreOpen(!moreOpen)}
             type="button"
@@ -331,7 +339,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             <DotsThreeOutline size={22} weight={isMoreActive ? "fill" : "regular"} className={isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
             <span className={`text-xs font-medium ${isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>More</span>
             {isMoreActive && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
-          </button>
+          </button>}
         </div>
       </nav>
 
@@ -421,6 +429,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
         </nav>
 
         <div className="relative border-t border-white/10 p-4">
+          {role === "student" && <div className="mb-3 flex flex-wrap items-center gap-4">{settingsHref && <Link href={settingsHref} aria-current={isActive(settingsHref) ? "page" : undefined} className="flex min-h-11 items-center gap-2 text-sm"><Gear size={18} />Settings</Link>}<button onClick={handleLogout} className="flex min-h-11 items-center gap-2 text-sm"><SignOut size={18} />Log out</button></div>}
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <p className="break-words text-sm font-semibold leading-5">{studentName}</p>

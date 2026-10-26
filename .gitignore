@@ -102,6 +102,7 @@ test-results/
 
 # Local runtime workspaces (audit logs, uploads, scratch dirs)
 local_*/
+/.developer-preview/
 
 # Analysis report artifacts (root-level)
 COMPETITIVE_ANALYSIS_2026.md

@@ -18,25 +18,40 @@ mock.module("@/lib/db", {
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
     embedQuery: mockEmbedQuery,
+    embedTextsWithModel: async () => {
+      const model = activeModel;
+      return { vectors: [await mockEmbedQuery()], model };
+    },
     toVectorLiteral: (v: number[]) => `[${v.join(",")}]`,
     EMBEDDING_DIMENSIONS: 768,
   },
 });
 
 const ACTIVE_MODEL = "gemini-embedding-001";
+let activeModel = ACTIVE_MODEL;
 mock.module("@/lib/ai/embedding-provider", {
   namedExports: {
-    getActiveEmbeddingModel: async () => ACTIVE_MODEL,
+    getActiveEmbeddingModel: async () => activeModel,
   },
 });
 
-// Cache passthrough so every test exercises the underlying embed call.
+const queryCache = new Map<string, unknown>();
 mock.module("@/lib/cache", {
   namedExports: {
-    cached: (_key: string, _ttl: number, fetcher: () => Promise<unknown>) => fetcher(),
+    cached: async (key: string, _ttl: number, fetcher: () => Promise<unknown>) => {
+      if (queryCache.has(key)) return queryCache.get(key);
+      const value = await fetcher();
+      queryCache.set(key, value);
+      return value;
+    },
     invalidate: () => undefined,
     invalidatePrefix: () => undefined,
   },
+});
+
+beforeEach(() => {
+  queryCache.clear();
+  activeModel = ACTIVE_MODEL;
 });
 
 let hybridSearchDocuments: typeof import("./hybrid-retrieval").hybridSearchDocuments;
@@ -88,6 +103,38 @@ describe("hybridSearchDocuments", () => {
       ftsRank: 2,
       bestDistance: 0.31,
     });
+  });
+
+  it("shares concurrent query embeddings and keeps cached vectors scoped to their model", async () => {
+    await Promise.all([
+      hybridSearchDocuments("dress code", "student", 3),
+      hybridSearchDocuments("dress code", "student", 3),
+    ]);
+    assert.equal(mockEmbedQuery.mock.callCount(), 1);
+    await hybridSearchDocuments("dress code", "student", 3);
+    assert.equal(mockEmbedQuery.mock.callCount(), 1);
+    activeModel = "different-model";
+    await hybridSearchDocuments("dress code", "student", 3);
+    assert.equal(mockEmbedQuery.mock.callCount(), 2);
+    assert.ok(mockQueryRaw.mock.calls.at(-1).arguments.includes("different-model"));
+  });
+
+  it("keeps the producing model when configuration changes during embedding", async () => {
+    mockEmbedQuery.mock.mockImplementation(async () => {
+      activeModel = "new-model";
+      return new Array(768).fill(0.1);
+    });
+    await hybridSearchDocuments("dress code", "student", 3);
+    const params = mockQueryRaw.mock.calls[0].arguments;
+    assert.ok(params.includes(ACTIVE_MODEL));
+    assert.ok(!params.includes("new-model"));
+  });
+
+  it("retries after a failed embedding instead of caching the failure", async () => {
+    mockEmbedQuery.mock.mockImplementationOnce(async () => { throw new Error("offline"); });
+    assert.equal(await hybridSearchDocuments("dress code", "student", 3), null);
+    assert.ok(await hybridSearchDocuments("dress code", "student", 3));
+    assert.equal(mockEmbedQuery.mock.callCount(), 2);
   });
 
   it("passes role, query_model, and a widened fetch limit through to the SQL call", async () => {

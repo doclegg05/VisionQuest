@@ -44,17 +44,26 @@ export function toVectorLiteral(vector: number[]): string {
  */
 export async function embedTexts(
   texts: string[],
-  { taskType, usage }: EmbedTextsOptions,
+  options: EmbedTextsOptions,
 ): Promise<number[][]> {
+  return (await embedTextsWithModel(texts, options)).vectors;
+}
+
+/** Keep vectors and their producing model together even if config changes in flight. */
+export async function embedTextsWithModel(
+  texts: string[],
+  { taskType, usage }: EmbedTextsOptions,
+): Promise<{ vectors: number[][]; model: string }> {
   const provider = await resolveEmbeddingProvider({
     studentId: usage?.studentId ?? null,
     callSite: usage?.callSite,
   });
-  return provider.embed(texts, {
+  const vectors = await provider.embed(texts, {
     taskType,
     callSite: usage?.callSite,
     studentId: usage?.studentId ?? null,
   });
+  return { vectors, model: provider.model };
 }
 
 /** Embed a single retrieval query. */

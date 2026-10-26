@@ -118,6 +118,7 @@ export function PathToEmployment({
         </div>
         <div
           role="progressbar"
+          aria-label="Your path to employment"
           aria-valuenow={completedCount}
           aria-valuemin={0}
           aria-valuemax={steps.length}

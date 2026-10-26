@@ -1,457 +1,115 @@
 "use client";
 
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Fire,
-  Star,
-  Target,
-  ArrowRight,
-  CalendarDots,
-  ChatCircle,
-  BookOpen,
-  Briefcase,
-  ClipboardText,
-  Certificate,
-} from "@phosphor-icons/react";
-import { AnimatedSection } from "@/components/ui/AnimatedSection";
-import AssignedFormsCard from "@/components/student/AssignedFormsCard";
-import AskSageLink from "@/components/sage/AskSageLink";
-import SageInsightList from "@/components/sage/SageInsightList";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import * as Toast from "@radix-ui/react-toast";
+import { QueryClient, QueryClientProvider, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { DashboardActivity, DashboardOverview } from "@/lib/dashboard/readers";
+import type { TaskDto, TaskPage } from "@/lib/dashboard/tasks";
+import { taskQuerySchema, type TaskDetails, type TaskQuery } from "@/lib/dashboard/task-schemas";
+import { dashboardFetch, dashboardKey, freshness, optimisticTasks, taskKey } from "@/lib/dashboard/query";
+import { TaskTable } from "@/components/dashboard/TaskTable";
+import type { DashboardSupport } from "@/lib/dashboard/support";
+import { PathToEmployment } from "@/components/progression/PathToEmployment";
+import type { ReactNode } from "react";
+import styles from "@/components/dashboard/dashboard.module.css";
 
-interface DashboardClientProps {
-  studentName: string;
-  level: number;
-  xpProgress: {
-    current: number;
-    nextTarget: number;
-    prevTarget: number;
-    ratio: number;
-  };
-  currentStreak: number;
-  longestStreak: number;
-  achievements: { key: string; label: string; desc: string }[];
-  nextAppointment: {
-    id: string;
-    title: string;
-    startsAt: string;
-    endsAt: string;
-    locationType: string;
-    locationLabel: string | null;
-  } | null;
-  tasks: {
-    id: string;
-    title: string;
-    dueAt: string | null;
-    priority: string;
-    status: string;
-  }[];
-  alertCount: number;
-  lastLevelUp: { level: number; at: string; reason: string } | null;
-  hasGoals: boolean;
-  orientationComplete: boolean;
-  certificationsStarted: number;
-  platformsVisited: number;
-  resumeCreated: boolean;
-  orientationProgress: { completed: number; total: number };
-  incompleteOrientationItems: { id: string; label: string }[];
+const TaskCharts = dynamic(() => import("@/components/dashboard/TaskCharts"), { ssr: false, loading: () => <p role="status">Loading task charts…</p> });
+export interface DashboardClientProps {
+  sessionId: string;
+  initialOverview?: DashboardOverview;
+  initialActivity?: DashboardActivity;
+  initialTasks?: TaskPage;
+  initialSupport?: DashboardSupport;
+  moodContent?: ReactNode;
 }
 
-export default function DashboardClient({
-  studentName,
-  level,
-  xpProgress,
-  currentStreak,
-  longestStreak,
-  achievements,
-  nextAppointment,
-  tasks,
-  alertCount,
-  lastLevelUp,
-  hasGoals,
-  orientationComplete,
-  certificationsStarted,
-  platformsVisited,
-  resumeCreated,
-  orientationProgress,
-  incompleteOrientationItems,
-}: DashboardClientProps) {
-  const dateFormatter = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+/** Private cache lives only inside this session's mounted dashboard. */
+export default function DashboardClient(props: DashboardClientProps) {
+  return <SessionDashboard key={props.sessionId} {...props} />;
+}
+function SessionDashboard(props: DashboardClientProps) {
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { ...freshness, gcTime: 5 * 60_000 } } }));
+  useEffect(() => () => { client.clear(); }, [client]);
+  return <QueryClientProvider client={client}><DashboardWorkspace {...props} /></QueryClientProvider>;
+}
+function RegionStatus({ loading, error, refreshing, hasData, fetchedAt, retry }: {
+  loading: boolean; error: boolean; refreshing: boolean; hasData: boolean; fetchedAt?: string; retry: () => void;
+}) {
+  return <div className="my-3 text-sm text-[var(--ink-muted)]" aria-live="polite">
+    {loading ? "Loading your records…" : error ? <><span>{hasData ? "Showing last saved data. Refresh failed; these records may be out of date." : "This section could not load. Other sections are still available."}</span> <button className="min-h-11 underline" onClick={retry}>Try again</button></> : refreshing ? "Refreshing…" : fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })} UTC · checks every 30 seconds while visible` : null}
+  </div>;
+}
+function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initialTasks, initialSupport, moodContent }: DashboardClientProps) {
+  const client = useQueryClient();
+  const router = useRouter();
+  const [query, setQuery] = useState<TaskQuery>(() => taskQuerySchema.parse({}));
+  const [notice, setNotice] = useState<{ message: string; open: boolean }>({ message: "", open: false });
+  const root = dashboardKey(sessionId);
+  const pending = useIsMutating({ mutationKey: root }) > 0;
+  const options = { ...freshness, enabled: !pending };
+  const overview = useQuery({ ...options, queryKey: [...root, "overview"], queryFn: ({ signal }) => dashboardFetch<DashboardOverview>("/api/dashboard/overview", { signal }), initialData: initialOverview, initialDataUpdatedAt: initialOverview ? Date.parse(initialOverview.fetchedAt) : undefined });
+  const activity = useQuery({ ...options, queryKey: [...root, "activity"], queryFn: ({ signal }) => dashboardFetch<DashboardActivity>("/api/dashboard/activity", { signal }), initialData: initialActivity, initialDataUpdatedAt: initialActivity ? Date.parse(initialActivity.fetchedAt) : undefined });
+  const support = useQuery({ ...options, queryKey: [...root, "support"], queryFn: ({ signal }) => dashboardFetch<DashboardSupport>("/api/dashboard/support", { signal }), initialData: initialSupport, initialDataUpdatedAt: initialSupport ? Date.parse(initialSupport.fetchedAt) : undefined });
+  const params = new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]));
+  const isDefault = JSON.stringify(query) === JSON.stringify(taskQuerySchema.parse({}));
+  const tasks = useQuery({ ...options, queryKey: [...taskKey(sessionId), query], queryFn: ({ signal }) => dashboardFetch<TaskPage>(`/api/tasks?${params}`, { signal }), initialData: isDefault ? initialTasks : undefined, initialDataUpdatedAt: initialTasks ? Date.parse(initialTasks.fetchedAt) : undefined });
+  type Mutation = { url: string; method: string; body: unknown; updates?: { id: string; patch: Partial<TaskDto> }[] };
+  const mutation = useMutation({
+    mutationKey: root,
+    mutationFn: ({ url, method, body }: Mutation) => dashboardFetch<{ audited?: boolean; alertsSynced?: boolean }>(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+    onMutate: async (variables) => {
+      await client.cancelQueries({ queryKey: root });
+      return { rollback: optimisticTasks(client, taskKey(sessionId), variables.updates ?? []) };
+    },
+    onError: (error, _variables, context) => { context?.rollback(); setNotice({ open: true, message: error.message }); },
+    onSuccess: (result) => { setNotice({ open: true, message: result.audited === false || result.alertsSynced === false ? "Task saved. Some follow-up updates are delayed; your instructor may need to check them." : "Task saved." }); router.refresh(); },
+    onSettled: () => { void client.invalidateQueries({ queryKey: root }); },
   });
-
-  const recentAchievements = achievements.slice(-3).reverse();
-
-  // Determine "next step" dynamically based on student state
-  const nextStep = !orientationComplete
-      ? {
-          label: "Complete orientation checklist",
-          detail: `${orientationProgress.completed} of ${orientationProgress.total} items done`,
-          reason: "Finish this first so your goals, learning, and advising work from the same baseline.",
-          ctaLabel: "Finish orientation",
-          sagePrompt: "Help me finish my orientation checklist. Walk me through the next unfinished step in simple steps.",
-          href: "/orientation",
-          icon: ClipboardText,
-        }
-      : !hasGoals
-        ? {
-            label: "Set your first goal",
-            detail: "Talk to Sage or add one manually",
-            reason: "A confirmed goal lets the rest of VisionQuest recommend the right training and proof items.",
-            ctaLabel: "Choose a goal",
-            sagePrompt: "Help me turn my career interests into one clear goal I can confirm today.",
-            href: "/goals",
-            icon: Target,
-          }
-        : certificationsStarted === 0
-          ? {
-              label: "Start a certification",
-              detail: "Browse available certifications",
-              reason: "One active credential gives you a concrete skill target and something to show employers.",
-              ctaLabel: "Find training",
-              sagePrompt: "Help me pick the first certification or learning platform that best supports my goals.",
-              href: "/learning",
-              icon: Certificate,
-            }
-          : !resumeCreated
-            ? {
-                label: "Build your resume",
-                detail: "Create your professional portfolio",
-                reason: "Your resume turns your goals, certifications, and work samples into proof you can use.",
-                ctaLabel: "Start portfolio",
-                sagePrompt: "Help me start my resume and portfolio. Tell me the first proof item I should add.",
-                href: "/portfolio",
-                icon: Briefcase,
-              }
-            : {
-                label: "Check in with Sage",
-                detail: "Get coaching on your next move",
-                reason: "You have the core pieces started. Use Sage to choose the highest-value action for today.",
-                ctaLabel: "Open Sage",
-                sagePrompt: "Review my current VisionQuest progress and help me choose the best next action for today.",
-                href: "/chat",
-                icon: ChatCircle,
-              };
-
-  // Suggested actions (context-aware pills) — merged into "What's Next" section
-  const actions: { label: string; href: string; icon: typeof Target }[] = [];
-  if (!orientationComplete) actions.push({ label: "Orientation", href: "/orientation", icon: ClipboardText });
-  if (!hasGoals) actions.push({ label: "Set Goals", href: "/goals", icon: Target });
-  if (certificationsStarted === 0) actions.push({ label: "Certifications", href: "/learning", icon: Certificate });
-  if (platformsVisited === 0) actions.push({ label: "Learning", href: "/learning", icon: BookOpen });
-  if (!resumeCreated) actions.push({ label: "Resume", href: "/portfolio", icon: Briefcase });
-
-  const NextStepIcon = nextStep.icon;
-  const journeySteps = [
-    { label: "Start", complete: orientationComplete, active: !orientationComplete },
-    { label: "Goal", complete: hasGoals, active: orientationComplete && !hasGoals },
-    {
-      label: "Learn",
-      complete: certificationsStarted > 0 || platformsVisited > 0,
-      active: orientationComplete && hasGoals && certificationsStarted === 0 && platformsVisited === 0,
-    },
-    {
-      label: "Proof",
-      complete: resumeCreated,
-      active: orientationComplete && hasGoals && (certificationsStarted > 0 || platformsVisited > 0) && !resumeCreated,
-    },
-    { label: "Apply", complete: false, active: orientationComplete && hasGoals && resumeCreated },
-  ];
-
-  return (
-    <div className="space-y-4">
-      {/* Hero Banner (simplified — no XP bar) */}
-      <AnimatedSection>
-        <div className="page-hero">
-          <div className="flex-1">
-            <p className="page-eyebrow">
-              Level {level} Explorer
-            </p>
-            <h1 className="page-title">
-              Welcome back, {studentName}
-            </h1>
-            <div className="mt-4">
-              <Link href="/chat" prefetch={false} className="primary-button px-5 py-3 text-sm">
-                <Image
-                  src="/images/sage-new-chat-symbol.png"
-                  alt=""
-                  width={16}
-                  height={25}
-                  className="h-6 w-auto"
-                />
-                Open Sage
-              </Link>
-            </div>
-          </div>
-        </div>
-      </AnimatedSection>
-
-      {/* ── Section 1: Mountain Progress ── rendered in page.tsx above this component */}
-
-      <AnimatedSection delay={0.08}>
-        <SageInsightList hideWhenEmpty />
-      </AnimatedSection>
-
-      {/* ── Section 2: What's Next ── */}
-      <AnimatedSection delay={0.12}>
-        <div className="surface-section p-5">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-                Do This Next
-              </p>
-              <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">{nextStep.label}</h2>
-            </div>
-            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
-              Most important today
-            </span>
-          </div>
-
-          {/* Primary next step */}
-          <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] p-4">
-            <div className="flex items-start gap-4">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent-green)] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)]">
-                <NextStepIcon size={22} weight="bold" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
-                  Next action
-                </p>
-                <p className="mt-0.5 text-sm text-[var(--ink-muted)]">{nextStep.detail}</p>
-                <p className="mt-2 text-sm leading-6 text-[var(--ink-strong)]">{nextStep.reason}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href={nextStep.href} prefetch={false} className="primary-button px-4 py-2.5 text-sm">
-                    {nextStep.ctaLabel}
-                    <ArrowRight size={16} weight="bold" />
-                  </Link>
-                  <AskSageLink prompt={nextStep.sagePrompt} label="Ask Sage to help" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-5">
-            {journeySteps.map((step, index) => (
-              <div
-                key={step.label}
-                className={`rounded-xl border px-3 py-2 ${
-                  step.complete
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : step.active
-                      ? "border-[rgba(15,154,146,0.35)] bg-[rgba(15,154,146,0.1)] text-[var(--ink-strong)]"
-                      : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--ink-muted)]"
-                }`}
-              >
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.14em]">Step {index + 1}</p>
-                <p className="mt-1 text-sm font-semibold">{step.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Incomplete orientation items */}
-          {!orientationComplete && incompleteOrientationItems.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-muted)]">
-                Orientation steps remaining
-              </p>
-              {incompleteOrientationItems.map((item) => (
-                <Link
-                  key={item.id}
-                  href="/orientation"
-                  className="flex items-center gap-2 rounded-lg border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] px-3 py-2 text-sm transition-colors hover:bg-[var(--badge-warning-bg)]"
-                >
-                  <span className="text-[var(--badge-warning-text)]">○</span>
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {/* Quick action pills */}
-          {actions.length > 0 && (
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                After that
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {actions.map((action) => {
-                  const ActionIcon = action.icon;
-                  return (
-                    <Link
-                      key={action.href}
-                      href={action.href}
-                      prefetch={false}
-                      className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--ink-strong)] transition-transform hover:-translate-y-0.5"
-                    >
-                      <ActionIcon size={16} weight="bold" className="text-[var(--accent-blue)]" />
-                      {action.label}
-                      <ArrowRight size={14} weight="bold" className="text-[var(--ink-faint)]" />
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </AnimatedSection>
-
-      {/* ── Section 3: Your Progress ── */}
-      <AnimatedSection delay={0.24}>
-        <div className="surface-section p-5">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">
-            Your Progress
-          </h2>
-
-          {/* Stats row */}
-          <div className="flex flex-wrap items-center gap-4">
-            {/* XP Level */}
-            <div className="flex items-center gap-2">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[var(--accent-blue)] to-[var(--accent-green)] text-white">
-                <span className="text-sm font-bold">{level}</span>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Level</p>
-                <div className="mt-0.5 h-1.5 w-24 rounded-full bg-[var(--surface-overlay)]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[var(--accent-blue)] to-[var(--accent-green)]"
-                    style={{ width: `${xpProgress.ratio * 100}%` }}
-                  />
-                </div>
-                <p className="mt-0.5 text-xs text-[var(--ink-faint)]">{xpProgress.current} / {xpProgress.nextTarget} XP</p>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="hidden h-10 w-px bg-[var(--border)] sm:block" />
-
-            {/* Streak */}
-            <div className="flex items-center gap-2">
-              <Fire size={24} weight="fill" className="text-orange-400" />
-              <div>
-                <p className="text-lg font-bold text-[var(--ink-strong)]">{currentStreak}</p>
-                <p className="text-xs text-[var(--ink-muted)]">day streak {longestStreak > currentStreak && <span className="text-[var(--ink-faint)]">&middot; best {longestStreak}</span>}</p>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="hidden h-10 w-px bg-[var(--border)] sm:block" />
-
-            {/* Achievement count */}
-            <div className="flex items-center gap-2">
-              <Star size={24} weight="fill" className="text-[var(--accent-gold)]" />
-              <div>
-                <p className="text-lg font-bold text-[var(--ink-strong)]">{achievements.length}</p>
-                <p className="text-xs text-[var(--ink-muted)]">achievements</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent achievements */}
-          {recentAchievements.length > 0 && (
-            <div className="mt-4 space-y-2 border-t border-[var(--border)] pt-4">
-              {recentAchievements.map((a) => (
-                <div key={a.key} className="flex items-center gap-2.5 text-sm">
-                  <Star size={16} weight="fill" className="shrink-0 text-[var(--accent-gold)]" />
-                  <span className="font-medium text-[var(--ink-strong)]">{a.label}</span>
-                  <span className="text-xs text-[var(--ink-muted)]">{a.desc}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Last level up */}
-          {lastLevelUp && (
-            <div className="mt-3 rounded-xl bg-[rgba(15,154,146,0.08)] px-3 py-2 text-xs text-[var(--ink-strong)]">
-              Reached Level {lastLevelUp.level} — {lastLevelUp.reason}
-            </div>
-          )}
-        </div>
-      </AnimatedSection>
-
-      {/* ── Section 3b: Paperwork (Phase 4 Forms Hub) ── */}
-      <AnimatedSection delay={0.30}>
-        <AssignedFormsCard />
-      </AnimatedSection>
-
-      {/* ── Section 4: Advising ── */}
-      <AnimatedSection delay={0.36}>
-        <div className="surface-section p-5">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)]">Advising</h2>
-              <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                Appointments and follow-ups.
-              </p>
-            </div>
-            <Link href="/appointments" prefetch={false} className="text-sm font-semibold text-[var(--accent-green)]">
-              Open
-            </Link>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              {nextAppointment ? (
-                <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4">
-                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-blue)]">
-                    <CalendarDots size={14} weight="bold" />
-                    Next Appointment
-                  </p>
-                  <p className="mt-2 font-display text-xl text-[var(--ink-strong)]">{nextAppointment.title}</p>
-                  <p className="mt-2 text-sm text-[var(--ink-muted)]">
-                    {dateFormatter.format(new Date(nextAppointment.startsAt))}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    {nextAppointment.locationLabel || nextAppointment.locationType.replace("_", " ")}
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
-                  No appointment scheduled. Your advising appointments will show up here.
-                </div>
-              )}
-            </div>
-
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-semibold text-[var(--ink-strong)]">Follow-ups</p>
-                {alertCount > 0 && (
-                  <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-red)]">
-                    {alertCount} alert{alertCount === 1 ? "" : "s"}
-                  </span>
-                )}
-              </div>
-              {tasks.length === 0 ? (
-                <p className="text-sm text-[var(--ink-muted)]">No open follow-up tasks right now.</p>
-              ) : (
-                <div className="space-y-2">
-                  {tasks.map((task) => (
-                    <div key={task.id} className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          task.priority === "high"
-                            ? "bg-[rgba(224,85,85,0.12)] text-[var(--accent-red)]"
-                            : task.priority === "low"
-                              ? "bg-[var(--surface-overlay)] text-[var(--ink-muted)]"
-                              : "bg-[rgba(211,178,87,0.12)] text-[var(--accent-gold)]"
-                        }`}>
-                          {task.priority}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                        {task.dueAt ? `Due ${dateFormatter.format(new Date(task.dueAt))}` : "No due date"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </AnimatedSection>
+  const save = async (values: TaskDetails, task?: TaskDto) => {
+    await mutation.mutateAsync({ url: task ? `/api/tasks/${task.id}` : "/api/tasks", method: task ? "PATCH" : "POST", body: task ? { ...values, updatedAt: task.updatedAt } : values });
+  };
+  const remove = async (task: TaskDto) => {
+    await mutation.mutateAsync({ url: `/api/tasks/${task.id}`, method: "DELETE", body: { updatedAt: task.updatedAt } });
+  };
+  const setStatus = (selected: TaskDto[], status: string) => {
+    mutation.mutate({ url: "/api/tasks/bulk-status", method: "PATCH", body: { status, tasks: selected.map(({ id, updatedAt }) => ({ id, updatedAt })) }, updates: selected.map(({ id }) => ({ id, patch: { status } })) });
+  };
+  return <Toast.Provider duration={6000}>
+    <div className={`${styles.workspace} min-w-0 space-y-6 text-[var(--ink-strong)]`}>
+      <section aria-label="Your next action">
+        {support.data && <PathToEmployment {...support.data.nextStep} />}
+        <RegionStatus loading={support.isPending} error={support.isError} refreshing={support.isFetching && !support.isPending} hasData={!!support.data} fetchedAt={support.data?.fetchedAt} retry={() => { void support.refetch(); }} />
+        {!support.data && support.isError && <Link className="underline" href="/goals">Review your plan while this section is unavailable</Link>}
+      </section>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl font-semibold">Your recorded progress</h2><button disabled={pending || overview.isFetching || activity.isFetching || tasks.isFetching} className="secondary-button px-4 py-2 text-sm" onClick={() => { void client.invalidateQueries({ queryKey: root }); router.refresh(); }}>Refresh dashboard</button></div>
+      <section aria-label="Outcome summaries">
+        <RegionStatus loading={overview.isPending} error={overview.isError} refreshing={overview.isFetching && !overview.isPending} hasData={!!overview.data} fetchedAt={overview.data?.fetchedAt} retry={() => { void overview.refetch(); }} />
+        {overview.data && <dl className="grid gap-x-8 gap-y-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] p-5 sm:grid-cols-2 xl:grid-cols-4">{overview.data.outcomes.map((outcome) => <div key={outcome.label} className="min-w-0"><dt className="font-semibold">{outcome.label}</dt><dd className="mt-2"><p className="text-lg font-semibold leading-snug">{outcome.value}</p><p className="mt-2 text-sm leading-relaxed text-[var(--ink-muted)]">{outcome.detail}</p><Link className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--accent-secondary)] underline underline-offset-4" href={outcome.href}>View {outcome.label.toLowerCase()}</Link></dd></div>)}</dl>}
+      </section>
+      <section aria-labelledby="tasks-heading" className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] p-4 sm:p-6">
+        <TaskTable data={tasks.data} query={query} setQuery={setQuery} pending={pending || tasks.isFetching} save={save} remove={remove} setStatus={setStatus} />
+        <RegionStatus loading={tasks.isPending} error={tasks.isError} refreshing={tasks.isFetching && !tasks.isPending} hasData={!!tasks.data} fetchedAt={tasks.data?.fetchedAt} retry={() => { void tasks.refetch(); }} />
+      </section>
+      <section aria-label="Advising and support" className="rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] p-4 sm:p-6">
+        <h2 className="font-display text-xl font-semibold">Advising and support</h2>
+        {support.data ? <div className="mt-4 grid gap-6 sm:grid-cols-2">
+          <div><h3 className="font-semibold">Follow-up alerts</h3><p className="mt-2 text-sm">{support.data.alertCount ? `${support.data.alertCount} alerts need your attention.` : "No follow-up alerts right now."}</p><Link className="inline-flex min-h-11 items-center underline" href="/appointments">View advising</Link></div>
+          <div><h3 className="font-semibold">Next appointment</h3>{support.data.appointment ? <><p className="mt-2 break-words">{support.data.appointment.title}</p><p className="mt-1 text-sm">{new Date(support.data.appointment.startsAt).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" })} Eastern</p><p className="text-sm">{support.data.appointment.locationLabel}</p></> : <p className="mt-2 text-sm">No upcoming appointment recorded.</p>}<Link className="inline-flex min-h-11 items-center underline" href="/appointments">Open appointments</Link></div>
+          {support.data.orientationItems.length > 0 && <div><h3 className="font-semibold">Next orientation items</h3><ul className="mt-2 list-inside list-disc text-sm">{support.data.orientationItems.map((item) => <li key={item.id}>{item.label}</li>)}</ul><Link className="inline-flex min-h-11 items-center underline" href="/orientation">Continue orientation</Link></div>}
+          {moodContent}
+        </div> : <p className="mt-3 text-sm">{support.isPending ? "Loading advising…" : "Advising is unavailable. Retry Your next action above, or open appointments."} <Link className="underline" href="/appointments">Open appointments</Link></p>}
+        {support.isError && support.data && <p className="mt-3 text-sm" role="status">Showing last loaded advising data. <button className="min-h-11 underline" onClick={() => { void support.refetch(); }}>Retry advising</button></p>}
+      </section>
+      <section aria-labelledby="activity-heading" className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] p-4 sm:p-6">
+        <h2 id="activity-heading" className="font-display text-xl font-semibold">Task activity</h2>
+        <RegionStatus loading={activity.isPending} error={activity.isError} refreshing={activity.isFetching && !activity.isPending} hasData={!!activity.data} fetchedAt={activity.data?.fetchedAt} retry={() => { void activity.refetch(); }} />
+        {activity.data && <TaskCharts data={activity.data} />}
+      </section>
     </div>
-  );
+    <Toast.Root open={notice.open} onOpenChange={(open) => setNotice((value) => ({ ...value, open }))} className={`${styles.notice} rounded-xl border border-[var(--border)] p-4 text-[var(--ink-strong)] shadow-lg`}><Toast.Description>{notice.message}</Toast.Description><Toast.Close className="mt-2 min-h-11 underline">Dismiss</Toast.Close></Toast.Root>
+    <Toast.Viewport className="fixed bottom-24 right-4 z-[120] w-[calc(100%-2rem)] max-w-sm md:bottom-6" />
+  </Toast.Provider>;
 }

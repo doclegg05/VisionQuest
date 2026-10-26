@@ -158,13 +158,17 @@ export async function backfillProgramDocumentEmbeddings(
       let pages: { pageNumber: number; text: string }[] | null = null;
       if (extractable) {
         const download = await downloadFile(doc.storageKey);
-        if (download) {
-          const extraction = await extractPagesFromBuffer(download.buffer, ext);
-          // Flatten pages to a single string for PII check, then discard if PII found.
-          if (extraction) {
-            const fullText = extraction.pages.map((p) => p.text).join("\n");
-            pages = !containsPII(fullText) ? extraction.pages : null;
-          }
+        if (!download) {
+          // A local fallback miss is not proof that the remote object is
+          // missing. Never replace an existing passage index with an empty
+          // one just because this worker cannot access its source.
+          throw new Error("Source unavailable through configured storage/local fallback; check storage access before backfill");
+        }
+        const extraction = await extractPagesFromBuffer(download.buffer, ext);
+        // Flatten pages to a single string for PII check, then discard if PII found.
+        if (extraction) {
+          const fullText = extraction.pages.map((p) => p.text).join("\n");
+          pages = !containsPII(fullText) ? extraction.pages : null;
         }
       }
       if (!pages) tally.noText++;
@@ -235,7 +239,7 @@ export async function buildDryRunManifest(
         skipped.push({
           id: doc.id,
           title: doc.title,
-          reason: "file not found in storage — cannot download",
+          reason: "source not found through configured storage/local fallback — remote existence not verified",
         });
         onProgress?.(`  SKIP ${doc.title}: not found in storage`);
         continue;

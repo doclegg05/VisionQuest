@@ -86,3 +86,18 @@ test("chunkPages captures nearest heading as sectionTitle", () => {
   const chunks = chunkPages(pages);
   assert.match(chunks[0].sectionTitle ?? "", /ATTENDANCE/i);
 });
+
+test("multiple sections on a page retain their own headings and carry forward", () => {
+  const chunks = chunkPages([
+    { pageNumber: 4, text: "Introductory text.\nATTENDANCE\nAttend each class.\nCERTIFICATION\nPass the exam." },
+    { pageNumber: 5, text: "Exam continuation." },
+  ]);
+  assert.deepEqual(chunks.map(({ sectionTitle, pageNumber }) => ({ sectionTitle, pageNumber })), [
+    { sectionTitle: null, pageNumber: 4 },
+    { sectionTitle: "ATTENDANCE", pageNumber: 4 },
+    { sectionTitle: "CERTIFICATION", pageNumber: 4 },
+    { sectionTitle: "CERTIFICATION", pageNumber: 5 },
+  ]);
+  assert.match(chunks[1].content, /Attend each class/);
+  assert.doesNotMatch(chunks[1].content, /exam/);
+});

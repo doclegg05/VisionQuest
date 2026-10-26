@@ -7,7 +7,7 @@ export default function DashboardError(props: { error: Error & { digest?: string
     <SegmentError
       {...props}
       title="We couldn't load your dashboard"
-      message="This page didn't load. Try again in a moment."
+      message="Your dashboard could not load. Try again; your saved work has not been removed. You can still open Sage."
       backHref="/chat"
       backLabel="Talk to Sage"
     />

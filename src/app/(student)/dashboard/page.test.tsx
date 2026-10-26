@@ -8,6 +8,9 @@ import {
   STUDENT_ID,
 } from "@/lib/student-alerts.test-support";
 
+// Node does not process CSS modules; the browser harness verifies their real styles.
+mock.module("@/components/dashboard/dashboard.module.css", { defaultExport: { workspace: "workspace" } });
+
 // How many intake FormSubmission rows the student has. Mutable so a test can
 // drive the signature banner's branch; 0 = the banner shows.
 let intakeSubmissionCount = 0;
@@ -64,7 +67,17 @@ mock.module("@/lib/progression/student-next-step", {
   },
 });
 
-mock.module("@/components/chat/ChatWindow", { defaultExport: () => null });
+mock.module("./DashboardClient", { defaultExport: (props: { initialSupport?: { alertCount: number } }) => {
+  if (props.initialSupport) ambientRenders.push(props.initialSupport);
+  return null;
+} });
+mock.module("@/lib/dashboard/readers", { namedExports: {
+  readOverview: async () => ({ outcomes: [], fetchedAt: new Date().toISOString() }),
+  readActivity: async () => ({ statuses: [], completions: [], unknownCompletionDates: 0, fetchedAt: new Date().toISOString() }),
+} });
+mock.module("@/lib/dashboard/tasks", { namedExports: {
+  readTasks: async () => ({ tasks: [], total: 0, page: 1, pageSize: 10, fetchedAt: new Date().toISOString() }),
+} });
 mock.module("@/components/dashboard/sage/SagePanels", {
   namedExports: { SagePanels: () => null },
 });
@@ -73,15 +86,6 @@ mock.module("@/components/progression/PathToEmployment", {
 });
 
 const ambientRenders: Array<{ alertCount: number }> = [];
-
-mock.module("@/components/dashboard/AmbientPanels", {
-  namedExports: {
-    AmbientPanels: (props: { alertCount: number }) => {
-      ambientRenders.push(props);
-      return null;
-    },
-  },
-});
 
 let DashboardPage: typeof import("./page").default;
 
@@ -94,7 +98,7 @@ describe("DashboardPage alert count", () => {
     renderToString(await DashboardPage());
 
     const ambient = ambientRenders.at(-1);
-    assert.ok(ambient, "AmbientPanels was not rendered");
+    assert.ok(ambient, "Dashboard support was not provided");
     assert.equal(ambient.alertCount, 1);
   });
 });

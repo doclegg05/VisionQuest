@@ -167,6 +167,10 @@ const eslintConfig = defineConfig([
     // Agent worktrees (harness-managed checkouts) — repo-wide lint must not
     // walk them; they appear and vanish mid-run.
     ".claude/**",
+    // Generated developer-preview snapshot (contains a full .next build) and
+    // throwaway design prototypes — neither is shipped source.
+    ".developer-preview/**",
+    "prototypes/**",
   ]),
 ]);
 

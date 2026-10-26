@@ -50,7 +50,7 @@ function splitIntoSegments(text: string, maxChars: number): string[] {
 export interface ChunkWithProvenance {
   content: string;
   tokenCount: number;
-  pageNumber: number;
+  pageNumber: number | null;
   sectionTitle: string | null;
 }
 
@@ -76,20 +76,29 @@ export function chunkPages(
   let currentSection: string | null = null;
 
   for (const page of pages) {
-    // Track the latest heading seen on this page (carries forward across pages).
+    // Flush at each heading so earlier text never inherits a later section.
+    // A section can continue onto the next page, but chunks cannot span pages.
+    let sectionLines: string[] = [];
+    const flushSection = () => {
+      for (const content of chunkText(sectionLines.join("\n"), options)) {
+        out.push({
+          content,
+          tokenCount: Math.ceil(content.length / 4),
+          pageNumber: page.pageNumber,
+          sectionTitle: currentSection,
+        });
+      }
+      sectionLines = [];
+    };
     for (const line of page.text.split("\n")) {
       const heading = detectHeading(line);
-      if (heading) currentSection = heading;
+      if (heading) {
+        flushSection();
+        currentSection = heading;
+      }
+      sectionLines.push(line);
     }
-    // chunkText already does boundary-aware ~512-token splitting; reuse it per page.
-    for (const content of chunkText(page.text, options)) {
-      out.push({
-        content,
-        tokenCount: Math.ceil(content.length / 4),
-        pageNumber: page.pageNumber,
-        sectionTitle: currentSection,
-      });
-    }
+    flushSection();
   }
   return out;
 }

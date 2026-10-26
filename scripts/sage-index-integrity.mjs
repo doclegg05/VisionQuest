@@ -54,13 +54,16 @@ function duplicateTitles(rows) {
 
 async function main() {
   const { getActiveEmbeddingModel } = await import("../src/lib/ai/embedding-provider.ts");
-  const { mapLocalPathToStorageKey } = await import("../src/lib/storage.ts");
+  const { mapLocalPathToStorageKey, isObjectStorageConfigured } = await import("../src/lib/storage.ts");
   const activeModel = await getActiveEmbeddingModel();
 
   const docs = await prisma.$queryRawUnsafe(
     `SELECT d.id, d.title, d."storageKey", d."isActive", d."usedBySage",
             (d.embedding IS NOT NULL) AS "hasEmbedding", d."embeddingModel",
             COUNT(c.id)::int AS "chunkCount",
+            COUNT(c.id) FILTER (WHERE c."tokenCount" IS NULL)::int AS "missingTokenCounts",
+            COUNT(c.id) FILTER (WHERE c."pageNumber" IS NULL)::int AS "missingPageNumbers",
+            COUNT(c.id) FILTER (WHERE btrim(c.content) = '')::int AS "emptyChunks",
             COUNT(c.id) FILTER (WHERE c.embedding IS NULL)::int AS "missingChunkEmbeddings",
             COUNT(c.id) FILTER (
               WHERE c."embeddingModel" IS DISTINCT FROM $1
@@ -87,6 +90,16 @@ async function main() {
   const docsStaleModel = retrievable.filter((doc) => doc.embeddingModel !== activeModel);
   const docsWithStaleChunks = retrievable.filter((doc) => doc.staleChunkEmbeddings > 0);
   const docsWithNoChunks = retrievable.filter((doc) => doc.chunkCount === 0);
+
+  const duplicatePassages = await prisma.$queryRaw`
+    SELECT md5(c.content) AS fingerprint, COUNT(*)::int AS copies,
+           array_agg(DISTINCT d."storageKey" ORDER BY d."storageKey") AS "sourceKeys"
+    FROM "visionquest"."DocumentChunk" c
+    JOIN "visionquest"."ProgramDocument" d ON d.id = c."documentId"
+    WHERE d."isActive" AND d."usedBySage"
+    GROUP BY md5(c.content) HAVING COUNT(*) > 1
+    ORDER BY COUNT(*) DESC, md5(c.content)
+  `;
 
   let local = { available: false };
   const docsRoot = path.resolve(process.cwd(), "docs-upload");
@@ -117,6 +130,11 @@ async function main() {
   const report = {
     generatedAt: new Date().toISOString(),
     activeEmbeddingModel: activeModel,
+    sourceAccess: {
+      objectStorageConfigured: isObjectStorageConfigured(),
+      mode: isObjectStorageConfigured() ? "object_storage_with_bundled_fallback" : "local_and_bundled_only",
+      note: "A failed local download does not prove the remote source is missing. Verify storage access before reindexing.",
+    },
     documents: {
       total: docs.length,
       active: docs.filter((doc) => doc.isActive).length,
@@ -129,6 +147,19 @@ async function main() {
       })),
       retrievableWithNoChunks: docsWithNoChunks.map((doc) => doc.storageKey),
       duplicateTitles: duplicateTitles(docs),
+      duplicatePassages,
+      // Stable source keys make this a machine-actionable repair queue. Unknown
+      // page provenance requires source re-extraction, never a guessed page 1.
+      repairQueue: retrievable.flatMap((doc) => {
+        const actions = [];
+        if (!doc.hasEmbedding || doc.embeddingModel !== activeModel) actions.push("embed_document");
+        if (doc.missingChunkEmbeddings || doc.staleChunkEmbeddings) actions.push("reembed_passages");
+        if (!doc.chunkCount) actions.push("review_body_extraction");
+        if (doc.missingPageNumbers) actions.push("reextract_page_provenance");
+        if (doc.missingTokenCounts) actions.push("estimate_tokens");
+        if (doc.emptyChunks) actions.push("remove_empty_passages_at_reingestion");
+        return actions.length ? [{ sourceKey: doc.storageKey, actions }] : [];
+      }),
     },
     memories: memories[0],
     localSources: local,

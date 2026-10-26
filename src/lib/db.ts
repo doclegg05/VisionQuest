@@ -297,3 +297,15 @@ export const prisma = appClient
  * is the only enforcement today.)
  */
 export const prismaAdmin: PrismaClient = adminClient;
+
+/** Interactive transactions must set RLS on the SAME connection as their writes.
+ * Do not use the per-query extension inside an interactive transaction.
+ */
+export async function withAppTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  const ctx = getRlsContext() ?? await tryLoadContextFromHeaders();
+  if (!ctx) throw new Error("Authenticated transaction requires RLS context");
+  return appClient.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.current_user_id', ${ctx.userId}, true), set_config('app.current_role', ${ctx.role}, true), set_config('app.current_student_id', ${ctx.studentId}, true)`;
+    return work(tx);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}

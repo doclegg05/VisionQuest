@@ -9,6 +9,7 @@ import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
 import { afterWrite } from "@/lib/after-write";
 import { parseBody } from "@/lib/schemas";
+import { decodeSignaturePng, SIGNATURE_DATA_URL_PREFIX } from "@/lib/signature-png";
 
 // Signature is a base64 PNG data URL — body length capped to keep upstream
 // `Buffer.from(base64Data, "base64")` size bounded (existing 500_000 byte limit
@@ -54,19 +55,29 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     }
 
     // Validate signature is a base64 PNG data URL
-    if (!signature.startsWith("data:image/png;base64,")) {
+    if (!signature.startsWith(SIGNATURE_DATA_URL_PREFIX)) {
       throw badRequest("Signature must be a PNG data URL.");
     }
 
     const targetStudentId = await resolveTargetStudentId(session, studentId);
 
-    // Decode and upload signature image
-    const base64Data = signature.replace(/^data:image\/png;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-
-    if (buffer.length > 500_000) {
-      throw badRequest("Signature image too large.");
+    if (fileId && !await prisma.fileUpload.findFirst({
+      where: { id: fileId, studentId: targetStudentId },
+      select: { id: true },
+    })) {
+      throw forbidden("File does not belong to this student.");
     }
+
+    const decoded = await decodeSignaturePng(signature);
+    if (!decoded.ok) {
+      if (decoded.reason === "too_large") throw badRequest("Signature image too large.");
+      if (decoded.reason === "undecodable") {
+        logger.warn("Signature image rejected", { actorRole: session.role, surface: "forms/sign", detail: decoded.detail });
+        throw badRequest("Signature must contain a valid PNG image (maximum 4096 pixels per side and 4 megapixels).");
+      }
+      throw badRequest("Signature must contain a valid PNG image.");
+    }
+    const { buffer } = decoded;
 
     const storageKey = generateStorageKey(targetStudentId, `signature-${formId}.png`);
     await uploadFile(storageKey, buffer, "image/png");

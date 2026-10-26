@@ -15,7 +15,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { logger } from "@/lib/logger";
-import { embedQuery, toVectorLiteral } from "@/lib/ai/embeddings";
+import { embedTextsWithModel, toVectorLiteral } from "@/lib/ai/embeddings";
 import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
 import { tokenizeForRetrieval } from "./retrieval-tokens";
 
@@ -138,11 +138,40 @@ export function buildWebsearchQuery(userMessage: string): string {
   return tokens.join(" OR ");
 }
 
+interface QueryVector { vector: number[]; model: string }
+const pendingQueryEmbeddings = new Map<string, Promise<QueryVector>>();
+
+async function getQueryVector(userMessage: string) {
+  // Reading the configured model is cheap; resolving credentials/provider is
+  // deferred until a cache miss so warm queries do not add database round trips.
+  const model = await getActiveEmbeddingModel();
+  const digest = createHash("sha256")
+    .update(JSON.stringify([model, userMessage])).digest("hex");
+  const key = `sage:qe:${digest}`;
+  // Documents and passages can ask concurrently. Share the in-flight request,
+  // but never reuse an embedding across model changes or cache rejected work.
+  let pending = pendingQueryEmbeddings.get(key);
+  if (!pending) {
+    pending = cached(key, QUERY_EMBED_CACHE_TTL_SECONDS, async () => {
+      const result = await embedTextsWithModel([userMessage], {
+        taskType: "RETRIEVAL_QUERY", usage: { callSite: "sage_embedding_query", studentId: null },
+      });
+      if (result.model !== model) throw new Error("Embedding model changed before query embedding; retry retrieval");
+      const [vector] = result.vectors;
+      toVectorLiteral(vector);
+      return { vector, model: result.model };
+    });
+    pendingQueryEmbeddings.set(key, pending);
+  }
+  try {
+    return await pending;
+  } finally {
+    if (pendingQueryEmbeddings.get(key) === pending) pendingQueryEmbeddings.delete(key);
+  }
+}
+
 export async function getQueryEmbedding(userMessage: string): Promise<number[]> {
-  const digest = createHash("sha1").update(userMessage).digest("hex");
-  return cached(`sage:qe:${digest}`, QUERY_EMBED_CACHE_TTL_SECONDS, () =>
-    embedQuery(userMessage),
-  );
+  return (await getQueryVector(userMessage)).vector;
 }
 
 /**
@@ -156,8 +185,11 @@ export async function hybridSearchDocuments(
   limit: number,
 ): Promise<HybridDocResult[] | null> {
   let vectorLiteral: string;
+  let queryModel: string;
   try {
-    vectorLiteral = toVectorLiteral(await getQueryEmbedding(userMessage));
+    const query = await getQueryVector(userMessage);
+    vectorLiteral = toVectorLiteral(query.vector);
+    queryModel = query.model;
   } catch (error) {
     logger.warn("Hybrid retrieval: query embedding failed, falling back to keyword scoring", {
       error: String(error),
@@ -166,7 +198,6 @@ export async function hybridSearchDocuments(
   }
 
   const queryText = buildWebsearchQuery(userMessage);
-  const queryModel = await getActiveEmbeddingModel();
 
   // Fetch beyond the caller's limit so rows removed by dedupe and the relative
   // cutoffs below can backfill from cut-survivors instead of shrinking the set.
@@ -287,8 +318,9 @@ export async function getBestChunks(
 ): Promise<Map<string, ChunkPassage[]>> {
   if (documentIds.length === 0) return new Map();
   try {
-    const vectorLiteral = toVectorLiteral(await getQueryEmbedding(userMessage));
-    const queryModel = await getActiveEmbeddingModel();
+    const query = await getQueryVector(userMessage);
+    const vectorLiteral = toVectorLiteral(query.vector);
+    const queryModel = query.model;
     const queryText = buildWebsearchQuery(userMessage);
     const rows = await prisma.$queryRaw<BestChunkRow[]>`
       SELECT "documentId", "content", "pageNumber", "sectionTitle", distance
@@ -312,7 +344,7 @@ export async function getBestChunks(
           AND c."embeddingModel" = ${queryModel}
       ) ranked
       WHERE rn <= ${perDoc}
-      ORDER BY "documentId", distance
+      ORDER BY "documentId", rn
     `;
     const map = new Map<string, ChunkPassage[]>();
     for (const r of rows) {

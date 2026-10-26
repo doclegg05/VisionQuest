@@ -26,7 +26,7 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
           onClick={() => setMode("draw")}
           className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
             mode === "draw"
-              ? "bg-[var(--accent-strong)] text-white"
+              ? "bg-[var(--ink-strong)] text-[var(--surface-base)]"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
           }`}
         >
@@ -37,7 +37,7 @@ export default function SignaturePad({ onSign, onCancel }: SignaturePadProps) {
           onClick={() => setMode("type")}
           className={`flex-1 px-4 py-2 text-xs font-semibold transition-colors ${
             mode === "type"
-              ? "bg-[var(--accent-strong)] text-white"
+              ? "bg-[var(--ink-strong)] text-[var(--surface-base)]"
               : "bg-[var(--surface-muted)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
           }`}
         >
@@ -218,11 +218,12 @@ function DrawPad({
 
   return (
     <>
-      <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--surface-raised)]">
+      {/* Keep document ink dark for exported PDFs; use paper white in both themes. */}
+      <div ref={containerRef} className="relative overflow-hidden rounded-xl border-2 border-dashed border-gray-400 bg-white">
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label="Signature drawing area. Use the text input below for an accessible alternative."
+          aria-label="Signature drawing area. Choose Type above to type your signature instead."
           className="block cursor-crosshair touch-none"
           onMouseDown={startStroke}
           onMouseMove={draw}
@@ -233,12 +234,12 @@ function DrawPad({
           onTouchEnd={endStroke}
         />
         <div className="pointer-events-none absolute left-6 right-6" style={{ bottom: "24px" }}>
-          <div className="border-b border-[var(--border-strong)]" />
-          <p className="mt-1 text-center text-xs text-[var(--ink-muted)]">Sign above this line</p>
+          <div className="border-b border-gray-400" />
+          <p className="mt-1 text-center text-xs text-gray-600">Sign above this line</p>
         </div>
         {!hasStrokes && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <p className="text-sm text-[var(--ink-faint)]">Draw your signature here</p>
+            <p className="text-sm text-gray-600">Draw your signature here</p>
           </div>
         )}
       </div>
@@ -312,7 +313,7 @@ function TypePad({
           {trimmed && (
             <div className="mt-4 border-t border-[var(--border)] pt-3">
               <p className="text-xs text-[var(--ink-muted)] mb-1">Preview</p>
-              <p className="font-serif text-2xl italic text-[#1a2a3a]">{trimmed}</p>
+              <p className="rounded-lg bg-white p-3 font-serif text-2xl italic text-[#1a2a3a]">{trimmed}</p>
             </div>
           )}
         </div>
@@ -367,7 +368,7 @@ function SignatureButtons({
           type="button"
           onClick={onSubmit}
           disabled={!canSubmit}
-          className="primary-button px-5 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-[var(--ink-strong)] px-5 py-2 text-xs font-semibold text-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Sign & Submit
         </button>

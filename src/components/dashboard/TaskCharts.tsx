@@ -1,0 +1,19 @@
+"use client";
+
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import Link from "next/link";
+import type { DashboardActivity } from "@/lib/dashboard/readers";
+
+export default function TaskCharts({ data }: { data: DashboardActivity }) {
+  const total = data.statuses.reduce((sum, item) => sum + item.count, 0);
+  if (!total) return <p className="py-4">No tasks recorded yet. Add a task above or <Link className="underline" href="/goals">review your goals</Link>.</p>;
+  return <>
+    <p className="mt-2 text-sm text-[var(--ink-muted)]">Current task counts and the last 30 days of recorded completions (UTC). Not historical readiness or verified program completion. Reopened or deleted tasks no longer appear as completions.</p>
+    {data.unknownCompletionDates > 0 && <p className="mt-2 text-sm">{data.unknownCompletionDates} completed tasks have no recorded completion date and are excluded from the line chart.</p>}
+    <div className="mt-5 grid min-w-0 gap-8 xl:grid-cols-2">
+      <figure className="min-w-0"><figcaption className="mb-3 font-semibold">Task completions by date</figcaption><div className="h-64" aria-hidden="true"><ResponsiveContainer width="100%" height="100%"><LineChart accessibilityLayer={false} data={data.completions} margin={{ left: 0, right: 16, bottom: 20 }}><CartesianGrid stroke="var(--border)" strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={(v: string) => v.slice(5)} label={{ value: "Completion date (UTC)", position: "insideBottom", offset: -12 }} tick={{ fill: "var(--ink-muted)", fontSize: 12 }} /><YAxis allowDecimals={false} width={40} tick={{ fill: "var(--ink-muted)" }} /><Tooltip contentStyle={{ background: "var(--surface-card)", color: "var(--ink-strong)", borderColor: "var(--border)" }} /><Line type="linear" dataKey="count" name="Tasks completed" stroke="var(--accent-green)" strokeWidth={2} dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer></div></figure>
+      <figure className="min-w-0"><figcaption className="mb-3 font-semibold">All tasks by current status</figcaption><div className="h-64" aria-hidden="true"><ResponsiveContainer width="100%" height="100%"><BarChart accessibilityLayer={false} data={data.statuses.map((s) => ({ ...s, status: s.status.replaceAll("_", " ") }))} margin={{ left: 0, right: 16, bottom: 20 }}><CartesianGrid stroke="var(--border)" strokeDasharray="3 3" /><XAxis dataKey="status" tick={{ fill: "var(--ink-muted)", fontSize: 12 }} /><YAxis allowDecimals={false} width={40} tick={{ fill: "var(--ink-muted)" }} /><Tooltip contentStyle={{ background: "var(--surface-card)", color: "var(--ink-strong)", borderColor: "var(--border)" }} /><Bar dataKey="count" name="Number of tasks" fill="var(--accent-blue)" isAnimationActive={false} label={{ position: "top", fill: "var(--ink-strong)" }} /></BarChart></ResponsiveContainer></div></figure>
+    </div>
+    <details className="mt-4"><summary className="cursor-pointer py-2 font-medium">View chart values as text</summary><div className="grid gap-5 sm:grid-cols-2"><table className="w-full text-left text-sm"><caption className="py-2 text-left font-semibold">Completions · UTC · last 30 days</caption><thead><tr><th scope="col">Date</th><th scope="col">Tasks completed</th></tr></thead><tbody>{data.completions.map((d) => <tr key={d.date}><th scope="row" className="py-1 font-normal">{d.date}</th><td>{d.count}</td></tr>)}</tbody></table><table className="h-fit w-full text-left text-sm"><caption className="py-2 text-left font-semibold">Current task counts</caption><thead><tr><th scope="col">Status</th><th scope="col">Number of tasks</th></tr></thead><tbody>{data.statuses.map((d) => <tr key={d.status}><th scope="row" className="py-2 font-normal">{d.status.replaceAll("_", " ")}</th><td>{d.count}</td></tr>)}</tbody></table></div></details>
+  </>;
+}

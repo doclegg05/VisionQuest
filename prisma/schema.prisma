@@ -1171,6 +1171,9 @@ model ProgramDocument {
 // no chunks — their doc-level embedding (title + sageContextNote) suffices.
 // Manual SQL (see migrations): HNSW index DocumentChunk_embedding_hnsw_idx,
 // RLS policies mirroring program_document_read/write.
+// AI readers can also use the security-invoker ai_knowledge_passages view
+// (20260910124749_optimize_sage_ai_retrieval). It projects approved active
+// summaries + body passages with source keys, fingerprints, and provenance.
 model DocumentChunk {
   id             String                      @id @default(cuid())
   documentId     String

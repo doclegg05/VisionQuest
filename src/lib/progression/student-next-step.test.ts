@@ -214,11 +214,9 @@ test("nextStepShortLabel names the current step from the same result", () => {
 });
 
 // Charter contract: the student journey has exactly ONE next-action engine.
-// The dashboard's "Next up" hint must derive from the same
-// StudentNextStepResult as the Current Target strip — never from an
-// independent heuristic (the old findNextGap picked the lowest readiness
-// dimension and could disagree with the strip).
-test("dashboard derives its next hint from StudentNextStepResult, not a second engine", () => {
+// Dashboard support is shared by SSR and polling and renders the canonical
+// result directly, never the retired DashboardClient heuristic.
+test("dashboard renders StudentNextStepResult, not a second engine", () => {
   const testDir = dirname(fileURLToPath(import.meta.url));
   const dashboardSource = readFileSync(
     join(testDir, "../../app/(student)/dashboard/page.tsx"),
@@ -229,10 +227,12 @@ test("dashboard derives its next hint from StudentNextStepResult, not a second e
     !dashboardSource.includes("findNextGap"),
     "dashboard must not run an independent next-gap engine (findNextGap)",
   );
-  assert.ok(
-    dashboardSource.includes("nextGap={nextStepShortLabel(nextStep)}"),
-    "dashboard's nextGap must derive from the StudentNextStepResult via nextStepShortLabel",
-  );
+  const supportSource = readFileSync(join(testDir, "../dashboard/support.ts"), "utf8");
+  const clientSource = readFileSync(join(testDir, "../../app/(student)/dashboard/DashboardClient.tsx"), "utf8");
+  assert.ok(dashboardSource.includes("readSupport(session.id, readinessData)"));
+  assert.ok(supportSource.includes("getStudentNextStep(studentId, readiness)"));
+  assert.ok(clientSource.includes("<PathToEmployment {...support.data.nextStep}"));
+  assert.ok(!clientSource.includes("findNextGap") && !clientSource.includes("const nextStep ="));
 });
 
 test("open advising work blocks the follow-up step after applications start", () => {

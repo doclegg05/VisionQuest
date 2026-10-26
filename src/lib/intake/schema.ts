@@ -22,6 +22,29 @@ export const INTAKE_GENDERS = [
   "Prefer not to say",
 ] as const;
 
+export const INTAKE_RACE_OPTIONS = [
+  "American Indian or Alaska Native",
+  "Asian",
+  "Black or African American",
+  "Native Hawaiian or Other Pacific Islander",
+  "White",
+  "Two or more races",
+  "Prefer not to say",
+] as const;
+
+export const INTAKE_ETHNICITY_OPTIONS = [
+  "Hispanic or Latino",
+  "Not Hispanic or Latino",
+  "Prefer not to say",
+] as const;
+
+export const INTAKE_PRIMARY_LANGUAGES = [
+  "English",
+  "Spanish",
+  "Other",
+  "Prefer not to say",
+] as const;
+
 export const INTAKE_SIGNATURE_METHODS = ["drawn", "uploaded", "typed_affirmation"] as const;
 export type IntakeSignatureMethod = (typeof INTAKE_SIGNATURE_METHODS)[number];
 

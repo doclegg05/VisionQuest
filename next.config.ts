@@ -18,6 +18,13 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "*": [
       "**/*.md",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/.env*",
+      ".git/**",
+      ".codex/**",
+      "prototypes/**",
+      "scratch/**",
       "docs/**",
       "docs-upload/**",
       "uploads/**",

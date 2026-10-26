@@ -81,7 +81,10 @@ export function proxy(request: NextRequest) {
       process.env.INTAKE_WEBHOOK_SECRET,
     );
 
-    if (!isInternal && !isUrlHostMatch(origin, host) && !isUrlHostMatch(referer, host)) {
+    // An explicit Origin is authoritative; Referer is only a fallback when
+    // Origin is absent, never a way to override a mismatched/null Origin.
+    const trustedSource = isUrlHostMatch(origin !== null ? origin : referer, host);
+    if (!isInternal && !trustedSource) {
       return NextResponse.json(
         { error: "Forbidden: origin mismatch." },
         { status: 403 },

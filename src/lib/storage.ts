@@ -222,7 +222,7 @@ async function findInContentDir(
   const exactMatch = await search(CONTENT_DIR);
   if (exactMatch) {
     try {
-      const buffer = await fs.readFile(exactMatch);
+      const buffer = await fs.readFile(/*turbopackIgnore: true*/ exactMatch);
       return { buffer, mimeType: inferMimeType(exactMatch) };
     } catch {
       return null;
@@ -239,7 +239,7 @@ async function findInContentDir(
       normalizedCandidate.includes(normalizedTarget)
     ) {
       try {
-        const buffer = await fs.readFile(filePath);
+        const buffer = await fs.readFile(/*turbopackIgnore: true*/ filePath);
         return { buffer, mimeType: inferMimeType(filePath) };
       } catch {
         continue;

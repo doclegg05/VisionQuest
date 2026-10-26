@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import sharp from "sharp";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import type { Session } from "@/lib/api-error";
 import { studentLogKey } from "@/lib/log-keys";
@@ -12,12 +13,14 @@ import { mockRequest, mockStudentSession } from "@/lib/test-helpers";
 
 // requiresSignature: true in src/lib/spokes/forms.ts
 const FORM_ID = "attendance-contract";
-const SIGNATURE = `data:image/png;base64,${Buffer.from("fake-png-bytes").toString("base64")}`;
+let SIGNATURE: string;
+let validPng: Buffer;
 
 const student = mockStudentSession();
 let currentSession: Session | null = student;
 
 const mockUploadFile = mock.fn<(key: string, buffer: Buffer, mimeType: string) => Promise<void>>();
+const mockFileUploadFindFirst = mock.fn(async (_args: unknown): Promise<{ id: string } | null> => null);
 const mockFileUploadCreate = mock.fn<
   (args: { data: Record<string, unknown> }) => Promise<{ id: string }>
 >();
@@ -41,7 +44,7 @@ mock.module("@/lib/auth", {
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
-      fileUpload: { create: mockFileUploadCreate },
+      fileUpload: { create: mockFileUploadCreate, findFirst: mockFileUploadFindFirst },
       formSubmission: { upsert: mockFormSubmissionUpsert },
     },
   },
@@ -80,6 +83,8 @@ mock.module("@/lib/logger", {
 let route: typeof import("./route");
 
 before(async () => {
+  validPng = await sharp({ create: { width: 64, height: 24, channels: 4, background: "#123456" } }).png().toBuffer();
+  SIGNATURE = `data:image/png;base64,${validPng.toString("base64")}`;
   route = await import("./route");
 });
 
@@ -135,6 +140,15 @@ describe("POST /api/forms/sign", () => {
     assert.equal(mockError.mock.callCount(), 0);
   });
 
+  it("rejects a foreign file before uploading a signature", async () => {
+    const res = await post({ formId: FORM_ID, signature: SIGNATURE, fileId: "cabcdefghijklmnopqrstuvwx" });
+    assert.equal(res.status, 403);
+    assert.equal(mockUploadFile.mock.callCount(), 0);
+    assert.deepEqual(mockFileUploadFindFirst.mock.calls.at(-1)?.arguments[0], {
+      where: { id: "cabcdefghijklmnopqrstuvwx", studentId: student.id }, select: { id: true },
+    });
+  });
+
   it("rejects a body with no signature before touching storage or the database", async () => {
     const res = await post({ formId: FORM_ID });
 
@@ -153,6 +167,28 @@ describe("POST /api/forms/sign", () => {
     assert.equal(res.status, 400);
     assert.equal((await res.json()).error, "Signature must be a PNG data URL.");
     assert.equal(mockUploadFile.mock.callCount(), 0);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
+  });
+
+  it("rejects empty, invalid base64, garbage, truncated and disguised non-PNG images without writes", async () => {
+    const jpeg = await sharp(validPng).jpeg().toBuffer();
+    for (const payload of ["", "!!!", "A", Buffer.from("not a PNG").toString("base64"), validPng.subarray(0, Math.floor(validPng.length / 2)).toString("base64"), validPng.subarray(0, -1).toString("base64"), validPng.subarray(0, -12).toString("base64"), jpeg.toString("base64")]) {
+      const res = await post({ formId: FORM_ID, signature: `data:image/png;base64,${payload}` });
+      assert.equal(res.status, 400);
+      assert.equal(mockUploadFile.mock.callCount(), 0);
+      assert.equal(mockFileUploadCreate.mock.callCount(), 0);
+      assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
+    }
+  });
+
+  it("bounds decoded dimensions, pixel count and encoded image size", async () => {
+    for (const [width, height] of [[4097, 1], [1, 4097], [2001, 2000]]) {
+      const oversized = await sharp({ create: { width, height, channels: 3, background: "white" } }).png().toBuffer();
+      assert.equal((await post({ formId: FORM_ID, signature: `data:image/png;base64,${oversized.toString("base64")}` })).status, 400);
+    }
+    assert.equal((await post({ formId: FORM_ID, signature: `data:image/png;base64,${Buffer.alloc(500_001).toString("base64")}` })).status, 400);
+    assert.equal(mockUploadFile.mock.callCount(), 0);
+    assert.equal(mockFileUploadCreate.mock.callCount(), 0);
     assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
   });
 

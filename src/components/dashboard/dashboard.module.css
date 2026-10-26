@@ -1,0 +1,41 @@
+/* Dashboard-only contrast; preserve shared buttons on other surfaces. */
+.dialog,
+.notice {
+  /* Portals cannot inherit workspace tokens; use an existing opaque surface. */
+  background: var(--surface-base);
+}
+
+.workspace :global(.primary-button),
+.dialog :global(.primary-button) {
+  color: var(--royal);
+  background-image: linear-gradient(135deg, var(--accent), var(--accent) 42%, #62c977 54%, var(--accent));
+}
+
+.workspace :focus-visible,
+.dialog :focus-visible,
+.notice :focus-visible {
+  outline: 2px solid var(--ink-strong);
+  outline-offset: 2px;
+}
+
+.workspace button:disabled,
+.dialog button:disabled {
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+  box-shadow: none;
+  /* Keep labels legible rather than fading the whole control. */
+  border: 1px dashed var(--ink-muted);
+}
+.workspace :global(.secondary-button),
+.dialog :global(.secondary-button) {
+  color: var(--ink-strong);
+  background: var(--surface-base);
+  border-color: var(--border-strong);
+}
+
+.workspace :global(.secondary-button):hover,
+.dialog :global(.secondary-button):hover {
+  background: var(--surface-base);
+  border-color: var(--ink-muted);
+}
