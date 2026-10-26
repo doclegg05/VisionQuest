@@ -39,7 +39,8 @@ function TaskDialogBody({ task, onOpenChange, disabled, save, remove }: Omit<Tas
   const attempt = async (values: TaskDetails, base: string | undefined) => {
     try { await save(values, task, base); onOpenChange(false); }
     catch (error) {
-      if (task && isStatus(error, 409)) { await loadConflict(task.id); return; }
+      // PATCH reports a task deleted elsewhere as 404; loadConflict's GET then confirms and shows the deleted state.
+      if (task && (isStatus(error, 409) || isStatus(error, 404))) { await loadConflict(task.id); return; }
       form.setError("root", { message: messageOf(error) });
     }
   };
