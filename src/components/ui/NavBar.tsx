@@ -41,11 +41,8 @@ export const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
 ];
 
-const COORDINATOR_ITEMS: NavItem[] = [
-  { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 },
+export const COORDINATOR_ITEMS: NavItem[] = [
   { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 },
-  { href: "/teacher/library", label: "Library & Forms", icon: Books, phase: 1 },
-  { href: "/teacher/chat", label: "Sage AI", icon: ChatCircle, phase: 1 },
 ];
 
 /**
@@ -61,14 +58,18 @@ export const ADMIN_ITEMS: NavItem[] = [
 ];
 
 /**
- * Admin sidebar: admin-only entries first, then the coordinator and staff
- * entries the admin also uses. Admin has its own Sage (/admin/chat) and
+ * Admin sidebar: admin-only entries first, then the roster, coordinator and
+ * staff entries the admin also uses. Admin has its own Sage (/admin/chat) and
  * Library (/admin/library), so the teacher copies are dropped, and an href
- * shared by the coordinator and staff lists appears once.
+ * shared by two lists appears once. The roster entry is named explicitly
+ * because COORDINATOR_ITEMS no longer carries it (coordinators cannot open
+ * /teacher), and the admin's order must not change with that list.
  */
-const ADMIN_NAV_ITEMS: NavItem[] = [
+const ADMIN_ROSTER_ITEM: NavItem = STAFF_ITEMS[0];
+export const ADMIN_NAV_ITEMS: NavItem[] = [
   ...ADMIN_ITEMS,
-  ...COORDINATOR_ITEMS.filter((item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library"),
+  ADMIN_ROSTER_ITEM,
+  ...COORDINATOR_ITEMS,
   ...STAFF_ITEMS.filter((item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library"),
 ].filter((item, index, all) => all.findIndex((other) => other.href === item.href) === index);
 
