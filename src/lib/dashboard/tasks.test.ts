@@ -68,15 +68,15 @@ describe("task input boundaries", () => {
 });
 function auditCalls() { return audit.mock.calls.map((c) => c.arguments[0] as Record<string, unknown>); }
 describe("task audit rows", () => {
-  it("files every row under the student with a readable summary and the task id in metadata", async () => {
+  it("matches main's target per action: created under the student, updated and deleted under the task", async () => {
     await service.createPersonalTask(session, createTaskSchema.parse({ title: "Call the shelter" }));
     await service.updateTasks(session, [{ id: id1, patch: { status: "completed" } }]);
     await service.deletePersonalTask(session, id2, version);
     const [created, updated, deleted] = auditCalls();
-    for (const row of [created, updated, deleted]) {
-      assert.equal(row.targetType, "student"); assert.equal(row.targetId, session.id);
-      assert.notEqual(row.summary, row.action);
-    }
+    for (const row of [created, updated, deleted]) assert.notEqual(row.summary, row.action);
+    assert.equal(created.targetType, "student"); assert.equal(created.targetId, session.id);
+    assert.equal(updated.targetType, "task"); assert.equal(updated.targetId, id1);
+    assert.equal(deleted.targetType, "task"); assert.equal(deleted.targetId, id2);
     assert.equal(created.action, "task.created"); assert.equal(created.summary, 'Created task "Call the shelter".');
     assert.equal(updated.action, "task.updated"); assert.equal(updated.summary, 'Updated task "Practice interview" to completed.');
     assert.equal(deleted.action, "task.deleted"); assert.equal(deleted.summary, 'Deleted task "Practice interview".');
@@ -87,7 +87,7 @@ describe("task audit rows", () => {
     const bulk = auditCalls();
     assert.equal(bulk.length, 2);
     assert.deepEqual(bulk.map((r) => (r.metadata as { taskId: string }).taskId).sort(), [id1, id2]);
-    assert.ok(bulk.every((r) => r.targetType === "student" && /^Updated task ".+" to completed\.$/.test(String(r.summary))));
+    assert.ok(bulk.every((r) => r.targetType === "task" && /^Updated task ".+" to completed\.$/.test(String(r.summary))));
   });
   it("uses main's follow-up wording when staff assign a task", async () => {
     await service.createAssignedTask({ ...session, id: "teacher-1", role: "teacher" }, session.id, createTaskSchema.parse({ title: "Bring ID" }));

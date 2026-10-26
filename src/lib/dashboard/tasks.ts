@@ -78,17 +78,22 @@ async function transaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>
     throw error;
   }
 }
-// Audit rows are filed under the student (existing audit queries filter on
-// targetType=student) with a readable summary; the task id rides in metadata.
+// Matches origin/main per action: task.created files under the student
+// (targetType "student"); task.updated files under the task (targetType
+// "task"). task.deleted has no main precedent and follows task.updated.
+// The task id rides in metadata either way.
 function auditSummary(action: string, task: StudentTask, assigned: boolean) {
   if (action === "task.created") return `Created ${assigned ? "follow-up " : ""}task "${task.title}".`;
   if (action === "task.deleted") return `Deleted task "${task.title}".`;
   return `Updated task "${task.title}" to ${task.status}.`;
 }
 async function afterCommit(session: Session, tasks: StudentTask[], action: string, assigned = false) {
+  const underStudent = action === "task.created";
   const audits = await Promise.all(tasks.map((task) => tryLogAuditEvent({
-    actorId: session.id, actorRole: session.role, action, targetType: "student", targetId: task.studentId,
-    summary: auditSummary(action, task, assigned), metadata: { taskId: task.id, status: task.status },
+    actorId: session.id, actorRole: session.role, action,
+    targetType: underStudent ? "student" : "task", targetId: underStudent ? task.studentId : task.id,
+    summary: auditSummary(action, task, assigned),
+    metadata: { taskId: task.id, studentId: task.studentId, status: task.status },
   })));
   let alertsSynced = true;
   for (const studentId of new Set(tasks.map((task) => task.studentId))) {
