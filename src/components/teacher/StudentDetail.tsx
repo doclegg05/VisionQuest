@@ -13,6 +13,7 @@ import OverviewTab from "./student-detail/OverviewTab";
 import GoalsPlanTab from "./student-detail/GoalsPlanTab";
 import ProgressTab from "./student-detail/ProgressTab";
 import OperationsTab from "./student-detail/OperationsTab";
+import { toIsoDueAt } from "@/lib/dashboard/due-date";
 import {
   buildFormReviewBody,
   reviewResultMessage,
@@ -322,7 +323,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       const response = await fetch(`/api/teacher/students/${studentId}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(taskForm),
+        body: JSON.stringify({ ...taskForm, dueAt: toIsoDueAt(taskForm.dueAt) }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
