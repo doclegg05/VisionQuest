@@ -25,3 +25,9 @@ export function optimisticTasks(client: QueryClient, key: readonly unknown[], up
   }
   return () => { for (const [queryKey, page] of snapshots) client.setQueryData(queryKey, page); };
 }
+
+/** The task dialog shows its own conflict panel, so a "Refresh" toast would contradict it and invite losing the draft. */
+export function shouldShowMutationNotice(error: Error, variables: { quietConflicts?: boolean }): boolean {
+  const conflictOrGone = error instanceof DashboardFetchError && (error.status === 409 || error.status === 404);
+  return !(variables.quietConflicts && conflictOrGone);
+}

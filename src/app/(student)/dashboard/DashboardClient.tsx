@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider, useIsMutating, useMutation, useQuery,
 import type { DashboardActivity, DashboardOverview } from "@/lib/dashboard/readers";
 import type { TaskDto, TaskPage } from "@/lib/dashboard/tasks";
 import { taskQuerySchema, type TaskDetails, type TaskQuery } from "@/lib/dashboard/task-schemas";
-import { dashboardFetch, dashboardKey, freshness, optimisticTasks, taskKey } from "@/lib/dashboard/query";
+import { dashboardFetch, dashboardKey, freshness, optimisticTasks, shouldShowMutationNotice, taskKey } from "@/lib/dashboard/query";
 import { TaskTable } from "@/components/dashboard/TaskTable";
 import type { DashboardSupport } from "@/lib/dashboard/support";
 import { PathToEmployment } from "@/components/progression/PathToEmployment";
@@ -56,7 +56,7 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
   const params = new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]));
   const isDefault = JSON.stringify(query) === JSON.stringify(taskQuerySchema.parse({}));
   const tasks = useQuery({ ...options, queryKey: [...taskKey(sessionId), query], queryFn: ({ signal }) => dashboardFetch<TaskPage>(`/api/tasks?${params}`, { signal }), initialData: isDefault ? initialTasks : undefined, initialDataUpdatedAt: initialTasks ? Date.parse(initialTasks.fetchedAt) : undefined });
-  type Mutation = { url: string; method: string; body: unknown; updates?: { id: string; patch: Partial<TaskDto> }[] };
+  type Mutation = { url: string; method: string; body: unknown; updates?: { id: string; patch: Partial<TaskDto> }[]; quietConflicts?: boolean };
   const mutation = useMutation({
     mutationKey: root,
     mutationFn: ({ url, method, body }: Mutation) => dashboardFetch<{ audited?: boolean; alertsSynced?: boolean }>(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
@@ -64,12 +64,12 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
       await client.cancelQueries({ queryKey: root });
       return { rollback: optimisticTasks(client, taskKey(sessionId), variables.updates ?? []) };
     },
-    onError: (error, _variables, context) => { context?.rollback(); setNotice({ open: true, message: error.message }); },
+    onError: (error, variables, context) => { context?.rollback(); if (shouldShowMutationNotice(error, variables)) setNotice({ open: true, message: error.message }); },
     onSuccess: (result) => { setNotice({ open: true, message: result.audited === false || result.alertsSynced === false ? "Task saved. Some follow-up updates are delayed; your instructor may need to check them." : "Task saved." }); router.refresh(); },
     onSettled: () => { void client.invalidateQueries({ queryKey: root }); },
   });
   const save = async (values: TaskDetails, task?: TaskDto, version?: string) => {
-    await mutation.mutateAsync({ url: task ? `/api/tasks/${task.id}` : "/api/tasks", method: task ? "PATCH" : "POST", body: task ? { ...values, updatedAt: version ?? task.updatedAt } : values });
+    await mutation.mutateAsync({ url: task ? `/api/tasks/${task.id}` : "/api/tasks", method: task ? "PATCH" : "POST", body: task ? { ...values, updatedAt: version ?? task.updatedAt } : values, quietConflicts: !!task });
   };
   const remove = async (task: TaskDto) => {
     await mutation.mutateAsync({ url: `/api/tasks/${task.id}`, method: "DELETE", body: { updatedAt: task.updatedAt } });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { QueryClient } from "@tanstack/react-query";
-import { dashboardKey, freshness, optimisticTasks, taskKey } from "./query";
+import { DashboardFetchError, dashboardKey, freshness, optimisticTasks, shouldShowMutationNotice, taskKey } from "./query";
 import type { TaskPage } from "./tasks";
 
 it("optimistic status updates snapshot all affected task pages and roll back without touching another session", () => {
@@ -23,4 +23,14 @@ it("keeps freshness bounded and private query scopes distinct", () => {
   assert.equal(freshness.refetchIntervalInBackground, false);
   assert.equal(freshness.refetchOnReconnect, true);
   assert.equal(freshness.refetchOnWindowFocus, true);
+});
+
+it("the dialog owns 409 and 404 messaging only when its edit save asked for quiet conflicts", () => {
+  const conflict = new DashboardFetchError("A task has changed. Refresh before saving.", 409);
+  const gone = new DashboardFetchError("Task not found.", 404);
+  assert.equal(shouldShowMutationNotice(conflict, { quietConflicts: true }), false);
+  assert.equal(shouldShowMutationNotice(gone, { quietConflicts: true }), false);
+  assert.equal(shouldShowMutationNotice(conflict, {}), true);
+  assert.equal(shouldShowMutationNotice(new DashboardFetchError("Server error", 500), { quietConflicts: true }), true);
+  assert.equal(shouldShowMutationNotice(new Error("offline"), { quietConflicts: true }), true);
 });
