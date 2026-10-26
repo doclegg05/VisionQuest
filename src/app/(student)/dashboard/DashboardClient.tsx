@@ -68,8 +68,8 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
     onSuccess: (result) => { setNotice({ open: true, message: result.audited === false || result.alertsSynced === false ? "Task saved. Some follow-up updates are delayed; your instructor may need to check them." : "Task saved." }); router.refresh(); },
     onSettled: () => { void client.invalidateQueries({ queryKey: root }); },
   });
-  const save = async (values: TaskDetails, task?: TaskDto) => {
-    await mutation.mutateAsync({ url: task ? `/api/tasks/${task.id}` : "/api/tasks", method: task ? "PATCH" : "POST", body: task ? { ...values, updatedAt: task.updatedAt } : values });
+  const save = async (values: TaskDetails, task?: TaskDto, version?: string) => {
+    await mutation.mutateAsync({ url: task ? `/api/tasks/${task.id}` : "/api/tasks", method: task ? "PATCH" : "POST", body: task ? { ...values, updatedAt: version ?? task.updatedAt } : values });
   };
   const remove = async (task: TaskDto) => {
     await mutation.mutateAsync({ url: `/api/tasks/${task.id}`, method: "DELETE", body: { updatedAt: task.updatedAt } });

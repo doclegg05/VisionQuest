@@ -4,10 +4,13 @@ import type { TaskDto, TaskPage } from "./tasks";
 export const dashboardKey = (sessionId: string) => ["dashboard", sessionId] as const;
 export const taskKey = (sessionId: string) => [...dashboardKey(sessionId), "tasks"] as const;
 export const freshness = { staleTime: 30_000, refetchOnWindowFocus: true, refetchOnReconnect: true, refetchInterval: 30_000, refetchIntervalInBackground: false, retry: 1 } as const;
+export class DashboardFetchError extends Error {
+  constructor(message: string, readonly status: number) { super(message); this.name = "DashboardFetchError"; }
+}
 export async function dashboardFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Could not save or load your work. Try again.");
+  if (!response.ok) throw new DashboardFetchError(data.error || "Could not save or load your work. Try again.", response.status);
   return data;
 }
 export function optimisticTasks(client: QueryClient, key: readonly unknown[], updates: { id: string; patch: Partial<TaskDto> }[]) {

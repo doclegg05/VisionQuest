@@ -24,6 +24,7 @@ const tx = {
   appointment: { findFirst: async () => null },
   studentTask: {
     findUnique: async ({ where }: { where: { id: string } }) => rows.find((r) => r.id === where.id) ?? null,
+    findFirst: async ({ where }: { where: { id: string; studentId: string } }) => rows.find((r) => r.id === where.id && r.studentId === where.studentId) ?? null,
     findUniqueOrThrow: async ({ where }: { where: { id: string } }) => rows.find((r) => r.id === where.id)!,
     count: async () => rows.length,
     findMany: async (args: { skip: number; take: number }) => { lastListArgs = args; return rows.slice(args.skip, args.skip + args.take); },
@@ -125,5 +126,18 @@ describe("owned task mutations", () => {
     const result = await service.readTasks(session.id, taskQuerySchema.parse({ page: 2, pageSize: 1, search: "Practice", status: "open" }));
     assert.equal(result.tasks[0].id, id2); assert.equal(result.total, 2);
     assert.deepEqual(lastListArgs, { where: { studentId: session.id, status: "open", OR: [{ title: { contains: "Practice", mode: "insensitive" } }, { description: { contains: "Practice", mode: "insensitive" } }] }, orderBy: [{ dueAt: "asc" }, { id: "asc" }], skip: 1, take: 1 });
+  });
+});
+describe("single task read", () => {
+  it("readTask returns the owner's task", async () => {
+    const result = await service.readTask(session, id1);
+    assert.equal(result.id, id1); assert.equal(result.updatedAt, version);
+  });
+  it("readTask hides another student's task as not found", async () => {
+    rows[0].studentId = "other";
+    await assert.rejects(service.readTask(session, id1), (error: { statusCode?: number }) => error.statusCode === 404);
+  });
+  it("readTask rejects staff sessions", async () => {
+    await assert.rejects(service.readTask({ ...session, role: "teacher" }, id1), (error: { statusCode?: number }) => error.statusCode === 403);
   });
 });

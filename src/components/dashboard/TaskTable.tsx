@@ -10,7 +10,7 @@ import { formatDueDate } from "./format-due-date";
 
 interface TaskActions {
   pending: boolean;
-  save: (values: TaskDetails, task?: TaskDto) => Promise<void>;
+  save: (values: TaskDetails, task?: TaskDto, version?: string) => Promise<void>;
   remove: (task: TaskDto) => Promise<void>;
   setStatus: (tasks: TaskDto[], status: string) => void;
 }

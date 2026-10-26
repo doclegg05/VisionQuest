@@ -41,6 +41,16 @@ export async function readTasks(studentId: string, query: TaskQuery): Promise<Ta
   });
 }
 
+export async function readTask(session: Session, id: string): Promise<TaskDto> {
+  requireStudent(session);
+  return withAppTransaction(async (tx) => {
+    // Scoped by owner so another student's task is indistinguishable from a missing one.
+    const task = await tx.studentTask.findFirst({ where: { id, studentId: session.id } });
+    if (!task) throw notFound("Task not found.");
+    return taskDto(task);
+  });
+}
+
 export function authorizeTask(session: Session, task: StudentTask, details: boolean) {
   if (!isStaffRole(session.role) && (session.role !== "student" || task.studentId !== session.id)) throw forbidden();
   if (details && !isStaffRole(session.role) && task.createdById !== session.id) {
