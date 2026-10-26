@@ -6,11 +6,11 @@ The later follow-up supersedes earlier outstanding-check notes below. Dev-login 
 
 **Verified locally on 2026-10-26:**
 - Dependencies: `npm audit` reports 0 vulnerabilities after upgrading next 16.3.4 to 16.4.3, @sentry/nextjs to 10.76.2, zod to 4.6.7 and nodemailer 9.1.1 to 10.2.1, with overrides for sharp 0.35.5, dompurify 3.4.17, fast-uri 3.1.9 and source-map-js 1.2.2. brace-expansion is patched per minimatch line via `npm update`. The pre-upgrade audit showed critical Next.js RCE advisories. `eslint-plugin-react-hooks` stays pinned at 7.0.1; removing the pin means fixing 4 set-state-in-effect sites first.
-- Tests and build: 3,414/3,414 unit tests, developer-preview tests 20/20, and `npm run build` (25 form PDFs staged) in Britt's terminal. In Claude's sandbox, typecheck, `npx eslint .` (0 errors) and `prisma validate` pass, and the unit suite passes except 3 known sandbox-only failures that pass in Britt's terminal.
+- Tests and build: 3,414/3,414 unit tests, developer-preview tests 20/20, and `npm run build` (25 form PDFs staged) in Britt's terminal earlier on 2026-10-26, before the dependency upgrade and the later task changes. The full suite and production build have not been re-run in Britt's terminal since those changes. Separately, after the changes, Claude's sandbox ran typecheck, `npx eslint .` (0 errors) and `prisma validate` (all pass), and the unit suite (passes except 3 known sandbox-only failures that pass in Britt's terminal).
 - CSP: fixed, browser verification pending. Browser-reachable Zod schemas now import `@/lib/zod-csp` (jitless), enforced by a lint guard. The developer preview cannot start in Claude's sandbox, so no zero-violation result is claimed for `/intake` or `/dashboard` yet.
 - Manual browser checks still owed by Britt: task draft survives refresh, staff "View details", edit-conflict and deleted-task recovery, intake email/skip/focus behavior, and the CSP listener on `/intake` and `/dashboard`.
 
-**Resolved:** the `@prisma/config` to `deepmerge-ts@8.0.2` override. Evidence is in [dependency security](dashboard-dependency-security.md): compatibility tests, Prisma generation/migration, and a local build.
+**Resolved:** the `@prisma/config` to `deepmerge-ts@8.0.2` override. Evidence is in [dependency security](dashboard-dependency-security.md): compatibility tests, Prisma generation/migration, and a local build. That evidence predates today's Task 1 upgrade; today's audit (0 findings) was taken after it.
 
 **Still unverified (deployment only):** deployed identity and RLS parity, Linux behavior, production permissions, revocation of old dev-login sessions (`sessionVersion` bump), and migration approval.
 
