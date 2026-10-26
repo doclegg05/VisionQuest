@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,6 +21,7 @@ import {
   INTAKE_ETHNICITY_OPTIONS,
   INTAKE_PRIMARY_LANGUAGES,
 } from "@/lib/intake/schema";
+import { demographicsForSubmit, validateIntakeStep1 } from "@/lib/intake/step-validation";
 
 const CAREER_TRACK_OPTIONS = [
   { id: "Healthcare / CNA", label: "Healthcare & CNA", icon: "🏥", desc: "Nursing assistant, phlebotomy, CPR certification" },
@@ -74,6 +75,19 @@ export default function IntakeClient() {
   const prefilledCounty = searchParams.get("county") || "";
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Only one step heading is rendered at a time, so one ref serves all three.
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const hasMountedRef = useRef(false);
+
+  // Move focus to the new step's heading after Continue/Back. Skipped on first
+  // mount so the page does not jump on load.
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    stepHeadingRef.current?.focus();
+  }, [step]);
   const [isPending, startTransition] = useTransition();
 
   // Form Fields: Identity & Name
@@ -135,24 +149,9 @@ export default function IntakeClient() {
     signatureName.trim().length > 0 && ferpaConsent && policyConsent && signatureConsent;
 
   const validateStep1 = () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      setErrorMessage("Please enter your legal first and last name.");
-      return false;
-    }
-    if (!birthDate) {
-      setErrorMessage("Please provide your date of birth.");
-      return false;
-    }
-    if (!county) {
-      setErrorMessage("Please select your West Virginia county.");
-      return false;
-    }
-    if (!phone.trim()) {
-      setErrorMessage("Please provide a phone number where instructors can reach you.");
-      return false;
-    }
-    setErrorMessage(null);
-    return true;
+    const message = validateIntakeStep1({ firstName, lastName, birthDate, county, phone, email });
+    setErrorMessage(message);
+    return message === null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,10 +195,13 @@ export default function IntakeClient() {
             emergencyContactName: emergencyContactName.trim() || null,
             emergencyContactPhone: emergencyContactPhone.trim() || null,
             emergencyContactRelation: emergencyContactRelation.trim() || null,
-            gender: wishNotToIdentify ? "Prefer not to say" : (gender || null),
-            race: wishNotToIdentify ? "Prefer not to say" : (race || null),
-            ethnicity: wishNotToIdentify ? "Prefer not to say" : (ethnicity || null),
-            primaryLanguage: wishNotToIdentify ? "Prefer not to say" : (primaryLanguage || "English"),
+            ...demographicsForSubmit({
+              skip: wishNotToIdentify,
+              gender,
+              race,
+              ethnicity,
+              primaryLanguage,
+            }),
             caseNumber: caseNumber.trim() || null,
             programTrack,
             educationalLevel,
@@ -336,7 +338,11 @@ export default function IntakeClient() {
                   <IdentificationCard size={24} weight="bold" />
                 </div>
                 <div>
-                  <h1 className="font-display text-xl font-bold text-[var(--ink-strong)]">
+                  <h1
+                    ref={stepHeadingRef}
+                    tabIndex={-1}
+                    className="font-display text-xl font-bold text-[var(--ink-strong)]"
+                  >
                     About You & Your Location
                   </h1>
                   <p className="text-xs text-[var(--ink-muted)]">
@@ -591,7 +597,11 @@ export default function IntakeClient() {
                   <GraduationCap size={24} weight="bold" />
                 </div>
                 <div>
-                  <h1 className="font-display text-xl font-bold text-[var(--ink-strong)]">
+                  <h1
+                    ref={stepHeadingRef}
+                    tabIndex={-1}
+                    className="font-display text-xl font-bold text-[var(--ink-strong)]"
+                  >
                     Demographics & Goals
                   </h1>
                   <p className="text-xs text-[var(--ink-muted)]">
@@ -608,16 +618,7 @@ export default function IntakeClient() {
                       id={wishNotToIdentifyId}
                       type="checkbox"
                       checked={wishNotToIdentify}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setWishNotToIdentify(checked);
-                        if (checked) {
-                          setGender("Prefer not to say");
-                          setRace("Prefer not to say");
-                          setEthnicity("Prefer not to say");
-                          setPrimaryLanguage("Prefer not to say");
-                        }
-                      }}
+                      onChange={(e) => setWishNotToIdentify(e.target.checked)}
                       className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border)] text-[var(--accent)]"
                     />
                     <div>
@@ -848,7 +849,11 @@ export default function IntakeClient() {
                   <ShieldCheck size={24} weight="bold" />
                 </div>
                 <div>
-                  <h1 className="font-display text-xl font-bold text-[var(--ink-strong)]">
+                  <h1
+                    ref={stepHeadingRef}
+                    tabIndex={-1}
+                    className="font-display text-xl font-bold text-[var(--ink-strong)]"
+                  >
                     Agreements & Digital Signature
                   </h1>
                   <p className="text-xs text-[var(--ink-muted)]">
