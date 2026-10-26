@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import type { z } from "zod";
 import { DashboardFetchError, dashboardFetch } from "@/lib/dashboard/query";
 import { createTaskSchema, type TaskDetails } from "@/lib/dashboard/task-schemas";
 import type { TaskDto } from "@/lib/dashboard/tasks";

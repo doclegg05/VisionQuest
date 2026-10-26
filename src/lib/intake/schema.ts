@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod-csp";
 import { WV_COUNTIES } from "@/lib/spokes/student-profile-form";
 
 export const INTAKE_EDUCATIONAL_LEVELS = [

@@ -91,6 +91,46 @@ const studentAlertDirectRead = {
 // under vq_app is a live question (see F7, "give dev a vq_app login"), and
 // flipping it to an error before that is answered would break the gate
 // without telling anyone anything true. Settle it, then add the glob.
+const appPrismaPattern = {
+  regex: "(^|/)db$",
+  importNames: ["prisma"],
+  message:
+    "No request session here, so the app prisma client has no RLS context and fails closed under vq_app. Import prismaAdmin for cross-student rows, and run per-student lib helpers inside withStudentRlsContext from @/lib/rls-context.",
+};
+
+// Browser-reachable code must not value-import plain "zod": Zod 4's JIT
+// capability probe calls new Function, which logs CSP violations under the
+// strict nonce-based CSP. @/lib/zod-csp re-exports z after jitless config.
+// Flat config replaces a rule wholesale per file, so src/lib/intake/**, which
+// also carries the appPrisma restriction above, gets its own block that
+// merges both.
+const zodCspPath = {
+  name: "zod",
+  message: "Import z from @/lib/zod-csp in browser-reachable code.",
+  allowTypeImports: true,
+};
+const browserZodImports = {
+  files: [
+    "src/components/**",
+    "src/app/**/*Client.tsx",
+    "src/lib/dashboard/**",
+  ],
+  ignores: ["src/lib/zod-csp.ts"],
+  rules: {
+    "no-restricted-imports": ["error", { paths: [zodCspPath] }],
+  },
+};
+const intakeZodImports = {
+  files: ["src/lib/intake/**"],
+  ignores: ["src/lib/zod-csp.ts"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      { paths: [zodCspPath], patterns: [appPrismaPattern] },
+    ],
+  },
+};
+
 const appPrismaImportWithoutSession = {
   files: [
     "src/app/api/internal/**",
@@ -105,12 +145,7 @@ const appPrismaImportWithoutSession = {
       "error",
       {
         patterns: [
-          {
-            regex: "(^|/)db$",
-            importNames: ["prisma"],
-            message:
-              "No request session here, so the app prisma client has no RLS context and fails closed under vq_app. Import prismaAdmin for cross-student rows, and run per-student lib helpers inside withStudentRlsContext from @/lib/rls-context.",
-          },
+          appPrismaPattern,
         ],
       },
     ],
@@ -157,6 +192,8 @@ const eslintConfig = defineConfig([
     },
   },
   appPrismaImportWithoutSession,
+  browserZodImports,
+  intakeZodImports,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

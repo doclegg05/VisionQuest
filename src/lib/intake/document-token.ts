@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { z } from "zod";
+import { z } from "@/lib/zod-csp";
 
 /**
  * The document verification token: one implementation of one MAC.
