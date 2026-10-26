@@ -43,9 +43,12 @@ const ALL_TASKS: AiTask[] = [
   "resume_assist",
   "resume_extract",
   "tailor_application",
+  "explain_job",
+  "draft_endorsement",
   "public_form_lookup",
   "public_program_help",
   "chat_file_gist",
+  "embedding",
 ];
 
 describe("AI role taxonomy", () => {
@@ -57,7 +60,10 @@ describe("AI role taxonomy", () => {
     const unclassified = ALL_TASKS.filter((task) => roleForTask(task) === null);
     assert.deepEqual(
       unclassified.sort(),
-      ["legacy", "public_form_lookup"],
+      // `embedding` is served by the embedding resolver (its own model key),
+      // never a generative role — unclassified by design, like the
+      // deterministic form lookup.
+      ["embedding", "legacy", "public_form_lookup"],
       "a task became unclassified (or stopped being) — it would silently fall back to the global model",
     );
     for (const task of ALL_TASKS) {

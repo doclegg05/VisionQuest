@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prismaAdmin as prisma } from "./db";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { studentLogKey } from "./log-keys";
 
@@ -11,6 +12,8 @@ import { studentLogKey } from "./log-keys";
  * - Automatic retry on failure (up to 3 attempts)
  * - Job deduplication via unique key
  * - Processing via inline execution or cron endpoint
+ * - A claim is a lease: a job's result is written only while its claim
+ *   still holds the row (see finishClaimedJob)
  *
  * Jobs are stored in the BackgroundJob table and processed in order.
  */
@@ -105,6 +108,9 @@ interface ClaimedJob {
  *     re-check it — just decide failed vs pending based on the post-increment.
  */
 export async function claimPendingJobs(limit: number): Promise<ClaimedJob[]> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error("Job claim limit must be an integer between 1 and 100");
+  }
   return prisma.$queryRaw<ClaimedJob[]>(Prisma.sql`
     UPDATE visionquest."BackgroundJob"
     SET status = 'processing',
@@ -112,7 +118,7 @@ export async function claimPendingJobs(limit: number): Promise<ClaimedJob[]> {
         attempts = attempts + 1
     WHERE id IN (
       SELECT id FROM visionquest."BackgroundJob"
-      WHERE status = 'pending' AND attempts < 3
+      WHERE status = 'pending' AND attempts < 3 AND type <> 'sage_memory'
       ORDER BY "createdAt" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
@@ -129,6 +135,7 @@ export async function claimPendingJobById(jobId: string): Promise<ClaimedJob[]> 
         attempts = attempts + 1
     WHERE id = ${jobId}
       AND status = 'pending'
+      AND type <> 'sage_memory'
       AND attempts < 3
     RETURNING id, type, payload, attempts
   `);
@@ -153,6 +160,36 @@ function redactPayloadStudentIds(message: string, payload: Record<string, unknow
   return ids.reduce((text, id) => text.split(id).join(studentLogKey(id)), message);
 }
 
+type JobResult = Prisma.BackgroundJobUpdateManyMutationInput & { status: "completed" | "failed" | "pending" };
+
+/**
+ * Write a claimed job's result, only while this claim still holds the row.
+ *
+ * A claim is a lease: the row must still be "processing" under the attempt
+ * number the claim set. attempts goes up by one on every claim and nothing
+ * lowers it, so it names one claim; startedAt comes from NOW(), which is not
+ * guaranteed to differ between two claims. Something else may have taken the
+ * row while the handler ran: retireStaleScrapeRuns fails a scrape job that
+ * has run past two hours so a crashed run stops blocking the class. Writing
+ * anyway would flip that retired job back to "completed", or to "pending"
+ * for another try beside its replacement. Returns whether the write landed.
+ */
+async function finishClaimedJob(job: ClaimedJob, result: JobResult): Promise<boolean> {
+  const { count } = await prisma.backgroundJob.updateMany({
+    where: { id: job.id, status: "processing", attempts: job.attempts },
+    data: result,
+  });
+  if (count === 0) {
+    logger.warn("Job claim no longer held; its result was not written", {
+      type: job.type,
+      jobId: job.id,
+      attempt: job.attempts,
+      outcome: result.status,
+    });
+  }
+  return count > 0;
+}
+
 async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
   if (claimed.length === 0) return 0;
 
@@ -164,10 +201,7 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
       const handler = JOB_HANDLERS[job.type];
       if (!handler) {
         logger.error("Unknown job type", { type: job.type, jobId: job.id });
-        await prisma.backgroundJob.update({
-          where: { id: job.id },
-          data: { status: "failed", error: `Unknown job type: ${job.type}` },
-        });
+        await finishClaimedJob(job, { status: "failed", error: `Unknown job type: ${job.type}` });
         continue;
       }
 
@@ -175,22 +209,19 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
       payload = parsed;
       await handler(parsed);
 
-      await prisma.backgroundJob.update({
-        where: { id: job.id },
-        data: { status: "completed", completedAt: new Date() },
-      });
-      processed++;
+      if (await finishClaimedJob(job, { status: "completed", completedAt: new Date() })) {
+        processed++;
+      }
     } catch (err) {
       const rawMessage = err instanceof Error ? err.message : String(err);
       const errorMsg = redactPayloadStudentIds(rawMessage, payload);
-      logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts, error: errorMsg });
+      // The redacted message goes to BackgroundJob.error below; the log line
+      // keeps the name and code.
+      logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts, error: errorForLog(err) });
 
-      await prisma.backgroundJob.update({
-        where: { id: job.id },
-        data: {
-          status: job.attempts >= 3 ? "failed" : "pending",
-          error: errorMsg,
-        },
+      await finishClaimedJob(job, {
+        status: job.attempts >= 3 ? "failed" : "pending",
+        error: errorMsg,
       });
     }
   }
@@ -202,14 +233,26 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
  * Process pending jobs. Call this from a cron endpoint or inline after enqueuing.
  * Returns the number of jobs processed successfully.
  */
+// Inline requests and cron share capacity. Excess work stays durable in the DB,
+// rather than accumulating promises or claiming rows that cannot run yet.
+let activeWorkers = 0;
+const MAX_WORKERS = 4;
+async function runWorker(claim: () => Promise<ClaimedJob[]>): Promise<number> {
+  if (activeWorkers >= MAX_WORKERS) return 0;
+  activeWorkers++;
+  try {
+    return await processClaimedJobs(await claim());
+  } finally {
+    activeWorkers--;
+  }
+}
+
 export async function processJobs(limit = 10): Promise<number> {
-  const claimed = await claimPendingJobs(limit);
-  return processClaimedJobs(claimed);
+  return runWorker(() => claimPendingJobs(limit));
 }
 
 export async function processJobById(jobId: string): Promise<number> {
-  const claimed = await claimPendingJobById(jobId);
-  return processClaimedJobs(claimed);
+  return runWorker(() => claimPendingJobById(jobId));
 }
 
 // ─── Job handler registry ───────────────────────────────────────────────────

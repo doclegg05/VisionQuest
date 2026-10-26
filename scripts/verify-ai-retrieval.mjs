@@ -16,6 +16,7 @@ const before = readFileSync(new URL("../prisma/migrations/20260710131500_search_
   .replaceAll("sage_hybrid_search", "sage_hybrid_search_before");
 const migration = readFileSync(new URL("../prisma/migrations/20260910124749_optimize_sage_ai_retrieval/migration.sql", import.meta.url), "utf8");
 const timestampMigration = readFileSync(new URL("../prisma/migrations/20260910130409_clarify_ai_passage_timestamp/migration.sql", import.meta.url), "utf8");
+const extractionMigration = readFileSync(new URL("../prisma/migrations/20260910135415_track_ai_passage_extraction/migration.sql", import.meta.url), "utf8");
 const sql = `
 BEGIN;
 SET LOCAL statement_timeout = '90s';
@@ -73,6 +74,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA visionquest TO vq_app;
 ${before}
 ${migration}
 ${timestampMigration}
+${extractionMigration}
 ANALYZE visionquest."ProgramDocument";
 ANALYZE visionquest."DocumentChunk";
 DO $$ DECLARE q vector; term text; viewer text; model text; mismatches int; BEGIN
@@ -95,6 +97,8 @@ DO $$ DECLARE q vector; term text; viewer text; model text; mismatches int; BEGI
     THEN RAISE EXCEPTION 'Keyword-only body recall lost'; END IF;
   IF EXISTS(SELECT FROM visionquest."DocumentChunk" WHERE "tokenCount" IS NULL OR "pageNumber" IS NOT NULL)
     THEN RAISE EXCEPTION 'Metadata backfill invalid'; END IF;
+  IF EXISTS(SELECT FROM visionquest.ai_knowledge_passages WHERE record_kind='body' AND extraction_method <> 'unknown')
+    THEN RAISE EXCEPTION 'Legacy extraction provenance mislabeled'; END IF;
   IF has_table_privilege('anon','visionquest.ai_knowledge_passages','SELECT')
     OR has_table_privilege('authenticated','visionquest.ai_knowledge_passages','SELECT')
     THEN RAISE EXCEPTION 'Passages exposed to API roles'; END IF;

@@ -245,9 +245,9 @@ export default function IntakeClient() {
   if (successMessage) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--background)] px-4 py-12">
-        <div className="w-full max-w-xl rounded-3xl border border-[var(--border)] bg-[var(--surface-card)] p-8 shadow-xl">
+        <div className="w-full max-w-xl rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-8 shadow-xl">
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-success-soft text-success">
               <CheckCircle size={40} weight="fill" />
             </div>
 
@@ -323,7 +323,7 @@ export default function IntakeClient() {
         {errorMessage ? (
           <div
             role="alert"
-            className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
+            className="mt-6 rounded-2xl border border-danger bg-danger-soft p-4 text-sm text-danger"
           >
             {errorMessage}
           </div>
@@ -332,7 +332,7 @@ export default function IntakeClient() {
         <form onSubmit={handleSubmit} className="mt-6">
           {/* STEP 1: Personal, Address & Contact Details */}
           {step === 1 && (
-            <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-card)] p-6 shadow-sm sm:p-8">
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-sm sm:p-8">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-muted)] text-[var(--accent)]">
                   <IdentificationCard size={24} weight="bold" />
@@ -441,7 +441,7 @@ export default function IntakeClient() {
                       value={streetAddress}
                       onChange={(e) => setStreetAddress(e.target.value)}
                       placeholder="e.g. 124 Main Street, Apt 3B"
-                      className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                      className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                     />
                   </div>
 
@@ -456,7 +456,7 @@ export default function IntakeClient() {
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
                         placeholder="e.g. Summersville"
-                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                       />
                     </div>
                     <div>
@@ -468,7 +468,7 @@ export default function IntakeClient() {
                         required
                         value={county}
                         onChange={(e) => setCounty(e.target.value)}
-                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                       >
                         <option value="">Select county</option>
                         {WV_COUNTIES.map((c) => (
@@ -489,7 +489,7 @@ export default function IntakeClient() {
                         onChange={(e) => setZipCode(e.target.value)}
                         placeholder="26651"
                         maxLength={10}
-                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                       />
                     </div>
                   </div>
@@ -542,7 +542,7 @@ export default function IntakeClient() {
                         value={emergencyContactName}
                         onChange={(e) => setEmergencyContactName(e.target.value)}
                         placeholder="Name of contact"
-                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                       />
                     </div>
                     <div>
@@ -555,7 +555,7 @@ export default function IntakeClient() {
                         value={emergencyContactPhone}
                         onChange={(e) => setEmergencyContactPhone(e.target.value)}
                         placeholder="(304) 555-0199"
-                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                       />
                     </div>
                     <div>
@@ -568,7 +568,7 @@ export default function IntakeClient() {
                         value={emergencyContactRelation}
                         onChange={(e) => setEmergencyContactRelation(e.target.value)}
                         placeholder="e.g. Spouse, Parent"
-                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                       />
                     </div>
                   </div>
@@ -591,7 +591,7 @@ export default function IntakeClient() {
 
           {/* STEP 2: Demographics, Program & Career Goals */}
           {step === 2 && (
-            <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-card)] p-6 shadow-sm sm:p-8">
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-sm sm:p-8">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-muted)] text-[var(--accent)]">
                   <GraduationCap size={24} weight="bold" />
@@ -641,7 +641,7 @@ export default function IntakeClient() {
                           id={genderId}
                           value={gender}
                           onChange={(e) => setGender(e.target.value)}
-                          className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                          className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                         >
                           <option value="">Select gender...</option>
                           {INTAKE_GENDERS.map((g) => (
@@ -658,7 +658,7 @@ export default function IntakeClient() {
                           id={raceId}
                           value={race}
                           onChange={(e) => setRace(e.target.value)}
-                          className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                          className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                         >
                           <option value="">Select race...</option>
                           {INTAKE_RACE_OPTIONS.map((r) => (
@@ -675,7 +675,7 @@ export default function IntakeClient() {
                           id={ethnicityId}
                           value={ethnicity}
                           onChange={(e) => setEthnicity(e.target.value)}
-                          className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                          className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                         >
                           <option value="">Select ethnicity...</option>
                           {INTAKE_ETHNICITY_OPTIONS.map((eth) => (
@@ -692,7 +692,7 @@ export default function IntakeClient() {
                           id={languageId}
                           value={primaryLanguage}
                           onChange={(e) => setPrimaryLanguage(e.target.value)}
-                          className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                          className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                         >
                           {INTAKE_PRIMARY_LANGUAGES.map((lang) => (
                             <option key={lang} value={lang}>{lang}</option>
@@ -801,7 +801,7 @@ export default function IntakeClient() {
                         value={caseNumber}
                         onChange={(e) => setCaseNumber(e.target.value)}
                         placeholder="e.g. 10293847"
-                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-card)]"
+                        className="field mt-1.5 w-full px-4 py-2.5 text-sm bg-[var(--surface-raised)]"
                       />
                     </div>
                   )}
@@ -826,7 +826,7 @@ export default function IntakeClient() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
+                  className="pointer-coarse:min-h-11 flex items-center gap-1.5 rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
                 >
                   <ArrowLeft size={16} /> Back
                 </button>
@@ -843,7 +843,7 @@ export default function IntakeClient() {
 
           {/* STEP 3: Agreements & Electronic Signature */}
           {step === 3 && (
-            <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-card)] p-6 shadow-sm sm:p-8">
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-sm sm:p-8">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-muted)] text-[var(--accent)]">
                   <ShieldCheck size={24} weight="bold" />
@@ -882,7 +882,7 @@ export default function IntakeClient() {
                 </div>
 
                 {/* Electronic Signature Box */}
-                <div className="rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface-card)] p-5">
+                <div className="rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface-raised)] p-5">
                   <label
                     htmlFor={signatureNameId}
                     className="block text-xs font-semibold uppercase tracking-wider text-[var(--accent)]"
@@ -956,7 +956,7 @@ export default function IntakeClient() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
+                  className="pointer-coarse:min-h-11 flex items-center gap-1.5 rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-muted)]"
                 >
                   <ArrowLeft size={16} /> Back
                 </button>

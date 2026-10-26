@@ -7,6 +7,7 @@ import {
 } from "@/lib/orientation-step-resources";
 import { fetchWelcomeRoutingFacts } from "@/lib/progression/welcome-completion";
 import { shouldLeaveWelcome } from "@/lib/progression/welcome-routing";
+import { DemoPrivacyNotice } from "@/components/demo/DemoPrivacyNotice";
 import WelcomeFlow from "./WelcomeFlow";
 
 export default async function WelcomePage() {
@@ -56,12 +57,21 @@ export default async function WelcomePage() {
     (item) => item.progress[0]?.completed,
   ).length;
 
+  // The first screen a demo student sees has no chat box yet, so the privacy
+  // warning goes here, read from the server session.
   return (
-    <WelcomeFlow
-      studentName={session.displayName}
-      quickWinItems={quickWinItems}
-      totalOrientationItems={totalOrientationItems}
-      completedOrientationCount={completedOrientationCount}
-    />
+    <>
+      {session.demoAccount === "student" && (
+        <div className="mx-auto max-w-lg px-4 pt-2">
+          <DemoPrivacyNotice />
+        </div>
+      )}
+      <WelcomeFlow
+        studentName={session.displayName}
+        quickWinItems={quickWinItems}
+        totalOrientationItems={totalOrientationItems}
+        completedOrientationCount={completedOrientationCount}
+      />
+    </>
   );
 }

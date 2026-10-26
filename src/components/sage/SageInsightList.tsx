@@ -112,7 +112,7 @@ export default function SageInsightList({
           </p>
         </div>
         {insights.length > 0 ? (
-          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-success">
             {insights.length} active
           </span>
         ) : null}
@@ -156,7 +156,7 @@ export default function SageInsightList({
                   disabled={updatingId === insight.id}
                   title="Dismiss Sage note"
                   aria-label="Dismiss Sage note"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[var(--border)] text-[var(--ink-muted)] transition hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)] disabled:opacity-50"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[var(--ink-muted)] transition hover:bg-[var(--surface-interactive)] hover:text-[var(--ink-strong)] disabled:opacity-50"
                 >
                   <X size={15} weight="bold" />
                 </button>

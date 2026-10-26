@@ -1,6 +1,13 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { resolveAiProvider } from "@/lib/ai/provider";
+import { AiCloudRefusedError } from "@/lib/ai/lanes";
+import {
+  getProviderClass,
+  logAiAuditEvent,
+  policyDecisionForProvider,
+} from "@/lib/ai/audit";
+import type { AIProvider } from "@/lib/ai/types";
 import { prisma } from "@/lib/db";
 import { withUsageLogging } from "@/lib/llm-usage";
 import type {
@@ -266,43 +273,136 @@ async function generateGroundedPlan(
   studentId: string,
   source: TailoringSource,
 ): Promise<TailoringPlan> {
-  const baseProvider = await resolveAiProvider({
-    studentId,
-    task: "tailor_application",
-    sensitivity: "student_record",
-  });
+  // AI audit: the student asked Sage to tailor their own application, so
+  // they are both actor and target.
+  const aiAudit = {
+    actorId: studentId,
+    actorRole: "student",
+    targetId: studentId,
+    route: "sage_agent.tailor_application",
+    task: "tailor_application" as const,
+    sensitivity: "student_record" as const,
+  };
+  let baseProvider: AIProvider;
+  try {
+    baseProvider = await resolveAiProvider({
+      studentId,
+      task: aiAudit.task,
+      sensitivity: aiAudit.sensitivity,
+    });
+  } catch (error) {
+    // A policy refusal is audited by the resolver; anything else here.
+    if (!(error instanceof AiCloudRefusedError)) {
+      await logAiAuditEvent({
+        ...aiAudit,
+        policyDecision: "blocked",
+        status: "blocked",
+        providerName: null,
+        providerClass: "none",
+        allowCloud: false,
+        reason: error instanceof Error ? error.message : String(error),
+        errorCode: "LOCAL_AI_UNAVAILABLE",
+      });
+    }
+    throw error;
+  }
+  const providerClass = getProviderClass(baseProvider.name);
+  const providerAudit = {
+    ...aiAudit,
+    policyDecision: policyDecisionForProvider(baseProvider.name),
+    providerName: baseProvider.name,
+    providerClass,
+    allowCloud: providerClass === "cloud",
+  };
+  const grounding =
+    `[GROUNDING_DATA_START]\n${sanitizeForPrompt(source.grounding)}\n[GROUNDING_DATA_END]\n\n` +
+    "Select the strongest exact facts for this application.";
+  await logAiAuditEvent({ ...providerAudit, status: "routed", inputChars: grounding.length });
+
   const provider = withUsageLogging(baseProvider, {
     studentId,
     callSite: "sage_agent.tailor_application",
   });
-  const raw = await provider.generateStructuredResponse(
-    TAILORING_SYSTEM_PROMPT,
-    [
-      {
-        role: "user",
-        content:
-          `[GROUNDING_DATA_START]\n${sanitizeForPrompt(source.grounding)}\n[GROUNDING_DATA_END]\n\n` +
-          "Select the strongest exact facts for this application.",
-      },
-    ],
-    undefined,
-    { temperature: 0 },
-  );
-  const plan = tailoringPlanSchema.parse(JSON.parse(raw));
-  assertTailoringPlanGrounded(plan, source);
-  return plan;
+  try {
+    const raw = await provider.generateStructuredResponse(
+      TAILORING_SYSTEM_PROMPT,
+      [{ role: "user", content: grounding }],
+      undefined,
+      { temperature: 0 },
+    );
+    const plan = tailoringPlanSchema.parse(JSON.parse(raw));
+    assertTailoringPlanGrounded(plan, source);
+    await logAiAuditEvent({
+      ...providerAudit,
+      status: "completed",
+      inputChars: grounding.length,
+      outputChars: raw.length,
+    });
+    return plan;
+  } catch (error) {
+    await logAiAuditEvent({
+      ...providerAudit,
+      status: "failed",
+      errorCode: error instanceof GroundingViolationError ? "ungrounded_plan" : "provider_error",
+      reason: String(error).slice(0, 200),
+    });
+    throw error;
+  }
+}
+
+/**
+ * WHICH opening the tailored documents belong to.
+ *
+ * `ResumeVersion` and `CoverLetter` each carry two nullable FKs — one to a
+ * scraped `JobListing`, one to a Match & Connect `JobLead` — and exactly one
+ * must be set (a CHECK constraint enforces it). The first cut of the Phase 4
+ * packet passed a JobLead id into the `jobListingId` column and then tried to
+ * re-key the rows afterwards: the FK rejected the insert with P2003, the
+ * re-key never ran, and a bare `catch` turned every packet into one with no
+ * résumé at all, silently. The discriminator makes that unrepresentable.
+ */
+export type TailoringTarget =
+  | { kind: "listing"; id: string }
+  | { kind: "lead"; id: string };
+
+function targetColumns(target: TailoringTarget) {
+  return target.kind === "lead"
+    ? { jobLeadId: target.id, jobListingId: null }
+    : { jobListingId: target.id, jobLeadId: null };
+}
+
+/**
+ * The same invariant the CHECK constraints enforce, asserted before the write.
+ *
+ * The database is the real guarantee — `ResumeVersion_one_opening` and
+ * `CoverLetter_one_opening` reject a row with both columns set or neither, for
+ * every writer including a future one that never reads this file. This is here
+ * because a constraint violation arrives as an opaque P2010 several frames
+ * away from the mistake, and because `targetColumns` is one careless edit away
+ * from spreading both keys into the same row.
+ */
+function assertExactlyOneOpening(columns: {
+  jobLeadId: string | null;
+  jobListingId: string | null;
+}): void {
+  const set = [columns.jobLeadId, columns.jobListingId].filter(Boolean).length;
+  if (set !== 1) {
+    throw new GroundingViolationError(
+      "A tailored document must belong to exactly one opening.",
+    );
+  }
 }
 
 export async function createTailoredApplication(
   studentId: string,
-  jobListingId: string,
+  target: TailoringTarget,
   source: TailoringSource,
 ): Promise<{
   resumeVersionId: string;
   coverLetterId: string;
   version: number;
 }> {
-  if (source.job.id !== jobListingId) {
+  if (source.job.id !== target.id) {
     throw new GroundingViolationError("The gathered job does not match the requested listing.");
   }
 
@@ -310,14 +410,24 @@ export async function createTailoredApplication(
   const resume = renderTailoredResume(source, plan);
   const coverLetter = renderCoverLetter(source, plan);
 
+  const columns = targetColumns(target);
+  assertExactlyOneOpening(columns);
+  // The version scan filters on the SAME column the write uses, or a lead's
+  // first résumé would collide with the version numbering of some unrelated
+  // listing.
+  const scope =
+    target.kind === "lead"
+      ? { studentId, jobLeadId: target.id }
+      : { studentId, jobListingId: target.id };
+
   const [latestResume, latestLetter] = await Promise.all([
     prisma.resumeVersion.findFirst({
-      where: { studentId, jobListingId },
+      where: scope,
       orderBy: { version: "desc" },
       select: { version: true },
     }),
     prisma.coverLetter.findFirst({
-      where: { studentId, jobListingId },
+      where: scope,
       orderBy: { version: "desc" },
       select: { version: true },
     }),
@@ -328,14 +438,14 @@ export async function createTailoredApplication(
     prisma.resumeVersion.create({
       data: {
         studentId,
-        jobListingId,
+        ...columns,
         version,
         content: resume as unknown as Prisma.InputJsonValue,
       },
       select: { id: true },
     }),
     prisma.coverLetter.create({
-      data: { studentId, jobListingId, version, content: coverLetter },
+      data: { studentId, ...columns, version, content: coverLetter },
       select: { id: true },
     }),
   ]);

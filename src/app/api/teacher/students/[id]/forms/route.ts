@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { tryLogAuditEvent } from "@/lib/audit";
 import { syncStudentAlerts } from "@/lib/advising";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { awardEvent } from "@/lib/progression/events";
 import { withTeacherAuth, type Session } from "@/lib/api-error";
@@ -23,9 +24,15 @@ export const GET = withTeacherAuth(async (
   });
 
   // Get file details for each submission
+  // Scoped to the student in the path, not just to the ids the submissions
+  // name. `FormSubmission.fileId` is written by /api/forms/sign, and if a row
+  // ever points at another student's upload (the pre-fix bug, or a legacy row
+  // written before the ownership check existed) this view would render and
+  // link the victim's file as if it were this student's. Reading nothing is
+  // the right failure here: `file` is already nullable and the UI handles it.
   const fileIds = submissions.map(s => s.fileId).filter(Boolean);
   const files = await prisma.fileUpload.findMany({
-    where: { id: { in: fileIds } },
+    where: { id: { in: fileIds }, studentId: id },
     select: { id: true, filename: true, mimeType: true, uploadedAt: true },
   });
   const fileMap = new Map(files.map(f => [f.id, f]));
@@ -213,7 +220,7 @@ export const PATCH = withTeacherAuth(async (
         mutate: (state) => { state.xp += 20; },
       });
     } catch (err) {
-      logger.error("Failed to award form approval XP", { error: String(err) });
+      logger.error("Failed to award form approval XP", { error: errorForLog(err) });
     }
   }
 

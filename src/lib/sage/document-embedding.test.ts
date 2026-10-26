@@ -68,6 +68,7 @@ describe("buildChunkRows", () => {
       tokenCount: 5,
       pageNumber: 4,
       sectionTitle: "ATTENDANCE",
+      extractionMethod: "unknown",
     });
   });
 });
@@ -163,9 +164,10 @@ describe("embedProgramDocument", () => {
     assert.equal(result.chunkCount, 205);
     assert.equal(mockExecuteRaw.mock.callCount(), 4);
     const inserts = mockExecuteRaw.mock.calls.slice(1).map((call: any) => call.arguments[0]);
-    assert.deepEqual(inserts.map((sql: any) => sql.values.length), [900, 900, 45]);
+    assert.deepEqual(inserts.map((sql: any) => sql.values.length), [1000, 1000, 50]);
     assert.equal(inserts[2].values[2], 200);
     assert.equal(inserts[2].values[7], 201);
+    assert.equal(inserts[2].values[9], "text");
     assert.equal(mockChunkCreate.mock.callCount(), 0);
   });
 });

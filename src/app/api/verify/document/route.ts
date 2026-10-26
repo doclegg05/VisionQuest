@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prismaAdmin } from "@/lib/db";
 import { MIN_SECRET_LENGTH, verifyDocumentToken } from "@/lib/intake/document-token";
 import { rateLimit } from "@/lib/rate-limit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
@@ -155,7 +156,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     logger.error("Document verification lookup failed", {
       alert: "document_verify_lookup_failed",
-      error: String(error),
+      error: errorForLog(error),
     });
     return refuse(
       "verification_unavailable",

@@ -62,8 +62,10 @@ async function main() {
             (d.embedding IS NOT NULL) AS "hasEmbedding", d."embeddingModel",
             COUNT(c.id)::int AS "chunkCount",
             COUNT(c.id) FILTER (WHERE c."tokenCount" IS NULL)::int AS "missingTokenCounts",
-            COUNT(c.id) FILTER (WHERE c."pageNumber" IS NULL)::int AS "missingPageNumbers",
+            COUNT(c.id) FILTER (WHERE c."pageNumber" IS NULL AND lower(d."storageKey") LIKE '%.pdf')::int AS "missingPageNumbers",
             COUNT(c.id) FILTER (WHERE btrim(c.content) = '')::int AS "emptyChunks",
+            COUNT(c.id) FILTER (WHERE c.content ~* '^([[:space:]]|--[[:space:]]*[0-9]+[[:space:]]+of[[:space:]]+[0-9]+[[:space:]]*--|Print|Reset|Clear Form|Submit)*$')::int AS "noiseChunks",
+            COUNT(c.id) FILTER (WHERE c."extractionMethod" = 'unknown')::int AS "unknownExtractionMethods",
             COUNT(c.id) FILTER (WHERE c.embedding IS NULL)::int AS "missingChunkEmbeddings",
             COUNT(c.id) FILTER (
               WHERE c."embeddingModel" IS DISTINCT FROM $1
@@ -80,7 +82,10 @@ async function main() {
             COUNT(*) FILTER (WHERE "validTo" IS NULL AND embedding IS NULL)::int AS "missingEmbedding",
             COUNT(*) FILTER (
               WHERE "validTo" IS NULL AND "embeddingModel" IS DISTINCT FROM $1
-            )::int AS "staleEmbedding"
+            )::int AS "staleEmbedding",
+            COUNT(*) FILTER (
+              WHERE "validTo" IS NULL AND (embedding IS NULL OR "embeddingModel" IS DISTINCT FROM $1)
+            )::int AS "embeddingRepairs"
      FROM "visionquest"."SageMemory"`,
     activeModel,
   );
@@ -88,7 +93,7 @@ async function main() {
   const retrievable = docs.filter((doc) => doc.isActive && doc.usedBySage);
   const docsMissingEmbedding = retrievable.filter((doc) => !doc.hasEmbedding);
   const docsStaleModel = retrievable.filter((doc) => doc.embeddingModel !== activeModel);
-  const docsWithStaleChunks = retrievable.filter((doc) => doc.staleChunkEmbeddings > 0);
+  const docsWithStaleChunks = retrievable.filter((doc) => doc.staleChunkEmbeddings > 0 || doc.missingChunkEmbeddings > 0);
   const docsWithNoChunks = retrievable.filter((doc) => doc.chunkCount === 0);
 
   const duplicatePassages = await prisma.$queryRaw`
@@ -144,6 +149,7 @@ async function main() {
       retrievableWithStaleChunks: docsWithStaleChunks.map((doc) => ({
         storageKey: doc.storageKey,
         staleChunks: doc.staleChunkEmbeddings,
+        missingChunkEmbeddings: doc.missingChunkEmbeddings,
       })),
       retrievableWithNoChunks: docsWithNoChunks.map((doc) => doc.storageKey),
       duplicateTitles: duplicateTitles(docs),
@@ -158,6 +164,8 @@ async function main() {
         if (doc.missingPageNumbers) actions.push("reextract_page_provenance");
         if (doc.missingTokenCounts) actions.push("estimate_tokens");
         if (doc.emptyChunks) actions.push("remove_empty_passages_at_reingestion");
+        if (doc.noiseChunks) actions.push("remove_parser_noise_at_reingestion");
+        if (doc.unknownExtractionMethods) actions.push("record_extraction_method");
         return actions.length ? [{ sourceKey: doc.storageKey, actions }] : [];
       }),
     },
@@ -165,14 +173,15 @@ async function main() {
     localSources: local,
   };
 
-  const documentEmbeddingRepairs = new Set([
-    ...report.documents.retrievableMissingEmbedding,
-    ...report.documents.retrievableStaleModel,
-  ]).size;
-  // staleEmbedding includes null/missing model provenance, so count it once.
-  const strictFailures = documentEmbeddingRepairs
-    + report.documents.retrievableWithStaleChunks.length
-    + report.memories.staleEmbedding
+  // Count each affected document once, including missing vectors whose model
+  // tag happens to be current. Flat text/images correctly have no PDF page.
+  const strictFailures = retrievable.filter((doc) =>
+    !doc.hasEmbedding || doc.embeddingModel !== activeModel
+    || doc.staleChunkEmbeddings || doc.missingChunkEmbeddings
+    || doc.missingTokenCounts || doc.missingPageNumbers
+    || doc.emptyChunks || doc.noiseChunks || doc.unknownExtractionMethods
+  ).length
+    + report.memories.embeddingRepairs
     + (local.available ? local.missingDatabaseRows.length : 0);
 
   if (args.json) {

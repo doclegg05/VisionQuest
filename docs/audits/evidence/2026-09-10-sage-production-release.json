@@ -1,0 +1,123 @@
+{
+  "pr": "https://github.com/doclegg05/VisionQuest/pull/213",
+  "mergeCommit": "46801e96a5b530109f6360b2967d57f04a8ce026",
+  "testedHead": "b485fc637f5a1a6e55c8c5ae5fd345843bca1d1b",
+  "mergedAt": "2026-09-10T16:51:35Z",
+  "ciRun": 34503544185,
+  "verify": "passed",
+  "e2e": "passed",
+  "providerCi": "skipped budget guard; independent executed evidence in answer-final and heldout reports",
+  "renderDeploy": "dep-dahe0615efls73d13mr0",
+  "renderStatus": "live",
+  "previousCommit": "734d49840779c3c63b8d660462d1153da58f31a8",
+  "abstainDistance": 0.4,
+  "healthPath": "/api/health",
+  "oneHourObservation": "failed: background extraction transcript errors",
+  "nextWorkingDayObservation": "pending",
+  "renderDeployWithHealth": "dep-dahe0tbv6pms738r381g",
+  "liveAt": "2026-09-10T16:57:00Z",
+  "health": {
+    "status": "healthy",
+    "uptime": 105.251318117,
+    "db": "connected",
+    "schema": "ready",
+    "latency_ms": 873,
+    "timestamp": "2026-09-10T16:58:29.339Z"
+  },
+  "productionSmoke": {
+    "cases": 6,
+    "passed": 6,
+    "cleanup": true,
+    "remainingFixtureStudents": 0,
+    "remainingFixtureMemories": 0
+  },
+  "indexStrictFailures": 0,
+  "observationAutomation": "sage-release-observations",
+  "observationSchedule": "September 10 at 14:15 and September 11 at 09:15 America/New_York; pause after both pass",
+  "smokeResults": [
+    {
+      "id": "answer-medical-1",
+      "status": 200,
+      "latencyMs": 17148,
+      "text": "I cannot provide medical advice or recommend medications. \n\nThat is a question you should discuss with your doctor or a healthcare professional who knows your medical history. Would you like to check in with your instructor to see if your back pain is affecting your ability to attend class, or would you prefer to focus on a different goal for today?",
+      "links": [
+        {
+          "target": "/api/documents/download?id=cmrxtw2wa0008eay8pltk5r2y",
+          "status": 404,
+          "bytes": 49,
+          "pdf": false
+        }
+      ]
+    },
+    {
+      "id": "answer-refund-1",
+      "status": 200,
+      "latencyMs": 12712,
+      "text": "I could not find a refund policy in the program documents. Since SPOKES is a public workforce training program, it is best to check directly with your instructor or caseworker regarding any financial questions. They are the experts on the program's operations and can give you an accurate answer.",
+      "links": []
+    },
+    {
+      "id": "answer-ged-date-1",
+      "status": 200,
+      "latencyMs": 12878,
+      "text": "I don't have access to a live schedule for GED testing, as those dates are often set by the individual testing centers. \n\nThe best way to get accurate information is to ask your instructor at your next class or check directly on the official GED website. Would you like me to help you book an advising appointment so you can discuss testing plans with a staff member?",
+      "links": []
+    },
+    {
+      "id": "answer-control-wv-works-timesheet",
+      "status": 200,
+      "latencyMs": 16314,
+      "text": "The form you need is the **DFA-TS-12 Activity Tracking** sheet. This is the official form used to record your hours for WV Works.\n\nOnce you have it open, you'll want to fill it in to track your daily activities. Would you like to work on this, or is there another part of your orientation you'd like to dive into first?",
+      "links": [
+        {
+          "target": "/api/forms/download?formId=dfa-ts-12&mode=view",
+          "status": 200,
+          "bytes": 93541,
+          "pdf": true
+        }
+      ]
+    },
+    {
+      "id": "answer-control-portfolio-checklist",
+      "status": 200,
+      "latencyMs": 16752,
+      "text": "Your employment portfolio is a great way to showcase your skills to future employers. It should include items like your resume, cover letter, references, any certifications you earn, and samples of your work.\n\nYou can use this [Employment Portfolio Checklist](/api/documents/download?id=cmmyyb7tt0036eadkzpoj2ucf&mode=view) to keep track of everything as you put it together.\n\nWould you like me to open the fillable version of that checklist for you to get started?",
+      "links": [
+        {
+          "target": "/api/documents/download?id=cmmyyb7tt0036eadkzpoj2ucf&mode=view",
+          "status": 200,
+          "bytes": 131842,
+          "pdf": true
+        }
+      ]
+    },
+    {
+      "id": "answer-control-orientation",
+      "status": 200,
+      "latencyMs": 15607,
+      "text": "Welcome to SPOKES! I'm glad you're here.\n\nGetting your paperwork squared away is the first step in our orientation process. You'll need to complete several items, including your Student Profile, the Attendance Contract, and the Rights and Responsibilities form, among others.\n\nYou can find the full list of what we need in the [SPOKES Checklist for Student Orientation](/api/documents/download?id=cmmyyb8ln0038eadke643r7ht&mode=view).\n\nTo help you get started, would you like to open the **SPOKES Student Profile** form now?",
+      "links": [
+        {
+          "target": "/api/documents/download?id=cmmyyb8ln0038eadke643r7ht&mode=view",
+          "status": 200,
+          "bytes": 355768,
+          "pdf": true
+        }
+      ]
+    }
+  ],
+  "latencyLimit": "12.7-17.1 second measured scenario durations include chat and source download checks. No comparable pre-release production scenario baseline was captured, so these do not establish a latency improvement or regression. Render percentile metrics are unavailable on the current plan.",
+  "evidenceLimit": "Immediate post-release verification only; first-hour and next-working-day observations remain pending. No errors appeared in the visible post-release log snapshot; this is not full-window evidence.",
+  "observationIncident": {
+    "loggedAt": "2026-09-10T17:02:26Z",
+    "observedAt": "2026-09-10T17:31:39Z",
+    "messages": [
+      "Discovery extraction failed",
+      "Memory extraction failed (non-fatal)"
+    ],
+    "error": "First content should be with role user, got model",
+    "fixBranch": "codex/sage-extraction-transcript",
+    "automationStatus": "PAUSED",
+    "nextAction": "Validate and release transcript fix, then restart observation windows"
+  }
+}

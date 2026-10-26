@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { getOrientationStepDetail } from "@/lib/orientation-step-resources";
 import {
@@ -262,9 +262,15 @@ export default function OrientationWizard() {
     advanceStep(form, pendingCount);
   }
 
+  // A second tap that lands before React has re-rendered with
+  // `submitting=true` would start a second submit; the ref closes that gap.
+  const signInFlightRef = useRef(false);
+
   async function handleSign(dataUrl: string) {
     const step = steps[currentStep];
     if (!step) return;
+    if (signInFlightRef.current) return;
+    signInFlightRef.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -282,6 +288,7 @@ export default function OrientationWizard() {
     } catch {
       setError("Submission failed. Please try again.");
     } finally {
+      signInFlightRef.current = false;
       setSubmitting(false);
     }
   }
@@ -367,7 +374,7 @@ export default function OrientationWizard() {
         <button
           type="button"
           onClick={() => { setError(null); setLoading(true); void fetchData(); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="inline-flex min-h-11 items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           Try Again
         </button>
@@ -533,7 +540,7 @@ export default function OrientationWizard() {
             type="button"
             onClick={handleAcknowledge}
             disabled={submitting}
-            className="primary-button px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="primary-button min-h-11 px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Sending..." : "Mark done — your instructor will verify"}
           </button>
@@ -558,19 +565,20 @@ export default function OrientationWizard() {
         {step.type === "sign" && hasRead && (
           showSignature ? (
             <div>
-              {submitting && (
-                <p className="mb-2 text-xs text-[var(--ink-muted)]">Submitting...</p>
-              )}
+              <p role="status" aria-live="polite" className="mb-2 text-sm text-[var(--ink-muted)]">
+                {submitting ? "Saving your signature. This can take a few seconds." : ""}
+              </p>
               <SignaturePad
                 onSign={handleSign}
                 onCancel={() => setShowSignature(false)}
+                submitting={submitting}
               />
             </div>
           ) : (
             <button
               type="button"
               onClick={() => setShowSignature(true)}
-              className="primary-button px-6 py-2.5 text-sm"
+              className="primary-button min-h-11 px-6 py-2.5 text-sm"
             >
               Sign & Continue →
             </button>
@@ -583,7 +591,7 @@ export default function OrientationWizard() {
             type="button"
             onClick={handleAcknowledge}
             disabled={!hasRead || submitting}
-            className="primary-button px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="primary-button min-h-11 px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Saving..." : "Continue →"}
           </button>
@@ -595,7 +603,7 @@ export default function OrientationWizard() {
             type="button"
             onClick={handleAcknowledge}
             disabled={submitting}
-            className="primary-button px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="primary-button min-h-11 px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Saving..." : "Continue →"}
           </button>
@@ -608,7 +616,7 @@ export default function OrientationWizard() {
             type="button"
             onClick={handleSkipNoPdf}
             disabled={submitting}
-            className="primary-button px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="primary-button min-h-11 px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting
               ? step.isLastForItem ? "Sending..." : "Saving..."

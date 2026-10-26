@@ -1,9 +1,8 @@
 import { prisma, prismaAdmin } from "./db";
 import { isStaffRole } from "./api-error";
-import { logger } from "./logger";
-import { redactContactInfo } from "./log-redaction";
-import { sendEmail, isEmailDeliveryConfigured } from "./email";
-import { sendSms } from "./sms";
+import { isEmailDeliveryConfigured } from "./email";
+import { scheduleNotificationChannelDelivery } from "./notification-channel-delivery";
+import { buildNotificationSms } from "./nudges/sms-policy-shared";
 import { buildNotificationEmail } from "./email-templates";
 
 /**
@@ -14,6 +13,36 @@ const connections = new Map<string, Set<WritableStreamDefaultWriter<Uint8Array>>
 
 const encoder = new TextEncoder();
 const MAX_CONNECTIONS_PER_USER = 5;
+const MAX_CONNECTIONS = 500;
+let connectionCount = 0;
+const writers = new WeakMap<WritableStreamDefaultWriter<Uint8Array>, { pending: number; cleanup: () => void }>();
+
+/** Bounded writes shared by live events, replay and heartbeats. */
+export async function writeConnection(writer: WritableStreamDefaultWriter<Uint8Array>, chunk: Uint8Array): Promise<boolean> {
+  const state = writers.get(writer);
+  if (!state) return false;
+  if (state.pending >= 8 || chunk.byteLength > 65_536) {
+    state.cleanup();
+    return false;
+  }
+  state.pending++;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      writer.write(chunk),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("SSE write deadline")), 5_000);
+      }),
+    ]);
+    return true;
+  } catch {
+    state.cleanup();
+    return false;
+  } finally {
+    clearTimeout(timer);
+    state.pending--;
+  }
+}
 
 /**
  * Which Prisma client persists a Notification and reads its cooldown window.
@@ -43,7 +72,9 @@ export interface NotificationOptions {
 export function addConnection(
   userId: string,
   writer: WritableStreamDefaultWriter<Uint8Array>,
+  onDisconnect: () => void = () => {},
 ): () => void {
+  if (connectionCount >= MAX_CONNECTIONS) throw new Error("SSE capacity reached");
   let set = connections.get(userId);
   if (!set) {
     set = new Set();
@@ -54,20 +85,31 @@ export function addConnection(
   if (set.size >= MAX_CONNECTIONS_PER_USER) {
     const oldest = set.values().next().value;
     if (oldest) {
-      set.delete(oldest);
-      oldest.close().catch(() => { /* already closed */ });
+      writers.get(oldest)?.cleanup();
+      // Eviction may have removed the now-empty map entry.
+      connections.set(userId, set);
     }
   }
 
   set.add(writer);
-
-  return () => {
+  connectionCount++;
+  let closed = false;
+  const cleanup = () => {
+    if (closed) return;
+    closed = true;
+    writers.delete(writer);
+    connectionCount--;
     set!.delete(writer);
     // Only delete from map if we haven't been replaced by a new set
     if (set!.size === 0 && connections.get(userId) === set) {
       connections.delete(userId);
     }
+    void writer.abort().catch(() => {});
+    onDisconnect();
   };
+  writers.set(writer, { pending: 0, cleanup });
+  void writer.closed.catch(() => {}).finally(cleanup);
+  return cleanup;
 }
 
 /**
@@ -134,21 +176,8 @@ async function persistAndPush(
   });
   const chunk = encoder.encode(`data: ${data}\n\n`);
 
-  // Collect dead writers first, then evict (avoid mutating Set during iteration)
-  const dead: WritableStreamDefaultWriter<Uint8Array>[] = [];
-  for (const writer of set) {
-    try {
-      await writer.write(chunk);
-    } catch {
-      dead.push(writer);
-    }
-  }
-  for (const w of dead) set.delete(w);
-  if (dead.length > 0) {
-    // No userId: it is the student UUID, and server logs carry no student identifier.
-    logger.debug("Removed dead SSE connections", { removed: dead.length, remaining: set.size });
-  }
-  if (set.size === 0) connections.delete(userId);
+  // A slow connection cannot serialize delivery to healthy connections.
+  await Promise.all([...set].map((writer) => writeConnection(writer, chunk)));
 }
 
 export async function sendNotificationWithCooldown(
@@ -195,7 +224,9 @@ interface MultiChannelResult {
 
 /**
  * Send a notification across all channels the student has enabled.
- * In-app notification always fires (with cooldown); email and SMS are fire-and-forget.
+ * In-app notification always fires (with cooldown). Email/SMS are either admitted
+ * for immediate delivery or durably queued before returning. A true channel flag
+ * means accepted, not provider-confirmed delivery. Queue failures reject.
  */
 export async function sendMultiChannelNotification(
   studentId: string,
@@ -211,7 +242,7 @@ export async function sendMultiChannelNotification(
   const [student, preferences] = await Promise.all([
     prisma.student.findUnique({
       where: { id: studentId },
-      select: { email: true },
+      select: { email: true, role: true },
     }),
     prisma.notificationPreference.findMany({
       where: { studentId, enabled: true },
@@ -224,46 +255,34 @@ export async function sendMultiChannelNotification(
   const emailPref = preferences.find((p) => p.channel === "email");
   const smsPref = preferences.find((p) => p.channel === "sms");
 
-  // Email — fire-and-forget
+  // Overflow is persisted, never silently skipped.
   if (emailPref && isEmailDeliveryConfigured()) {
     const destination = emailPref.destination ?? student?.email ?? null;
     if (destination) {
-      void (async () => {
-        try {
-          await sendEmail({
-            to: destination,
-            subject: payload.title,
-            text: `${payload.title}\n\n${payload.body}\n\n${actionUrl}`,
-            html: buildNotificationEmail(payload.title, payload.body, actionUrl),
-          });
-          logger.info("Notification email sent", { channel: "email", type: payload.type });
-        } catch (err) {
-          logger.error("Notification email failed", {
-            channel: "email",
-            type: payload.type,
-            error: redactContactInfo(String(err)),
-          });
-        }
-      })();
+      await scheduleNotificationChannelDelivery({
+        channel: "email",
+        notificationType: payload.type,
+        studentId,
+        to: destination,
+        subject: payload.title,
+        text: `${payload.title}\n\n${payload.body}\n\n${actionUrl}`,
+        html: buildNotificationEmail(payload.title, payload.body, actionUrl, { role: student?.role }),
+      });
       result.email = true;
     }
   }
 
-  // SMS — fire-and-forget
-  if (smsPref) {
-    const phoneNumber = smsPref.destination ?? null;
-    if (phoneNumber) {
-      void (async () => {
-        const maxLen = 160;
-        const raw = `${payload.title}: ${payload.body} — ${actionUrl}`;
-        const smsBody = raw.length > maxLen ? raw.slice(0, maxLen - 1) + "…" : raw;
-        const sent = await sendSms(phoneNumber, smsBody);
-        if (sent) {
-          logger.info("Notification SMS sent", { channel: "sms", type: payload.type });
-        }
-      })();
-      result.sms = true;
-    }
+  // Store identity, never an authorised phone snapshot. Every attempt must
+  // re-enter the current consent/quiet-hours/cap policy, including durable work.
+  if (smsPref?.destination) {
+    await scheduleNotificationChannelDelivery({
+      channel: "sms",
+      notificationType: payload.type,
+      studentId,
+      templateKey: `notification:${payload.type}`,
+      body: buildNotificationSms(payload.title, actionUrl),
+    });
+    result.sms = true;
   }
 
   return result;

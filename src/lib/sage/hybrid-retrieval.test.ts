@@ -98,7 +98,7 @@ describe("hybridSearchDocuments", () => {
       title: "SPOKES Dress Code Policy",
       storageKey: "orientation/dress-code.pdf",
       sageContextNote: "Explains the dress code.",
-      score: 0.03,
+      score: 0.04,
       semanticRank: 1,
       ftsRank: 2,
       bestDistance: 0.31,
@@ -144,8 +144,8 @@ describe("hybridSearchDocuments", () => {
     // Tagged template: arguments[0] is the strings array, rest are params.
     const params = args.slice(1);
     assert.ok(params.includes("staff"), `expected role param, got ${JSON.stringify(params)}`);
-    // Fetches limit*2+2 candidates so dedupe/cutoff drops can backfill.
-    assert.ok(params.includes(16), `expected widened limit param, got ${JSON.stringify(params)}`);
+    // Retain enough candidates for equivalent form editions and exact titles.
+    assert.ok(params.includes(24), `expected widened limit param, got ${JSON.stringify(params)}`);
     // The active embedding model is threaded as the query_model guard arg.
     assert.ok(
       params.includes(ACTIVE_MODEL),
@@ -293,6 +293,36 @@ describe("hybridSearchDocuments", () => {
       delete process.env.SAGE_RAG_DISTANCE_MARGIN;
       delete process.env.SAGE_RAG_MIN_SCORE_RATIO;
     }
+  });
+
+  it("retains an exact named topic outside the narrow relative distance margin", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "generic", title: "SPOKES Certifications", score: 0.039, best_distance: 0.24 }),
+      dbRow({ id: "specific", title: "QuickBooks Module Descriptor", score: 0.038, best_distance: 0.29 }),
+      dbRow({ id: "noise", title: "Attendance Contract", score: 0.035, best_distance: 0.4 }),
+    ]);
+    const results = await hybridSearchDocuments("Can I work on QuickBooks certification in SPOKES?", "student", 3);
+    assert.deepEqual(results?.map((r) => r.id), ["specific", "generic"]);
+  });
+
+  it("chooses a competitive fillable edition without merging different revisions", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "print", title: "DFA TS 12 Rev 2024", score: 0.038, best_distance: 0.25 }),
+      dbRow({ id: "fillable", title: "DFA TS 12 Rev 2024 Fillable", score: 0.036, best_distance: 0.27 }),
+      dbRow({ id: "old", title: "DFA TS 12 Rev 2023", score: 0.035, best_distance: 0.28 }),
+    ]);
+    const results = await hybridSearchDocuments("Which timesheet form do I need?", "student", 3);
+    assert.deepEqual(results?.map((r) => r.id), ["fillable", "old"]);
+  });
+
+  it("preserves family relevance when the canonical edition alone falls below the score cutoff", async () => {
+    mockQueryRaw.mock.mockImplementation(async () => [
+      dbRow({ id: "loud", title: "Support Services", score: 0.038, best_distance: 0.34 }),
+      dbRow({ id: "print", title: "DFA TS 12 Rev 2024", score: 0.036, best_distance: 0.23 }),
+      dbRow({ id: "fillable", title: "DFA TS 12 Rev 2024 Fillable", score: 0.032, best_distance: 0.25 }),
+    ]);
+    const results = await hybridSearchDocuments("Which timesheet do I need?", "student", 3);
+    assert.deepEqual(results?.map((r) => r.id), ["fillable"]);
   });
 
   it("caps returned rows at the caller's limit after filtering", async () => {

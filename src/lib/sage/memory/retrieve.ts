@@ -1,3 +1,4 @@
+import { isDemoLocalOnlyRequired } from "@/lib/ai/demo-local-only";
 /**
  * Subject-scoped memory retrieval (Phase 2).
  *
@@ -10,8 +11,8 @@
  */
 
 import { prisma } from "@/lib/db";
-import { embedQuery, toVectorLiteral } from "@/lib/ai/embeddings";
-import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
+import { embedTextsWithModel, toVectorLiteral } from "@/lib/ai/embeddings";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sanitizeForPrompt } from "../system-prompts";
 import { looksLikeStudentReference } from "./staff-privacy";
@@ -64,8 +65,31 @@ export async function retrieveMemories(
   limit: number = DEFAULT_LIMIT,
 ): Promise<RetrievedMemory[]> {
   try {
-    const vectorLiteral = toVectorLiteral(await embedQuery(query));
-    const queryModel = await getActiveEmbeddingModel();
+    if (isDemoLocalOnlyRequired()) {
+      // Keyword relevance plus confidence/recency, scoped exactly like vector
+      // retrieval. No embedding model change or mixed vector spaces.
+      const rows = await prisma.$queryRaw<MemoryRow[]>`
+        SELECT id, kind, content, category, confidence, "validFrom", 0.5 AS distance
+        FROM "visionquest"."SageMemory"
+        WHERE "subjectType" = ${subjectType} AND "subjectId" = ${subjectId}
+          AND "validTo" IS NULL AND "suppressedByStaff" = false
+        ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', ${query})) DESC,
+          confidence DESC, "validFrom" DESC
+        LIMIT ${Math.max(1, Math.min(limit, CANDIDATE_POOL))}::int`;
+      return rows.map(row => ({ ...row, score: scoreMemory(row, new Date()) }));
+    }
+    // Attribute the query embedding to the student when the subject is one, so
+    // LlmCallLog.studentId and the AI audit event carry the actor (FERPA review
+    // W5). Staff subjects keep a null id: the query is theirs, not a student's.
+    const { vectors: [queryVector], model: queryModel } = await embedTextsWithModel([query], {
+      taskType: "RETRIEVAL_QUERY",
+      usage: {
+        callSite: "sage_memory_retrieve_query",
+        studentId: subjectType === "student" ? subjectId : null,
+        sensitivity: subjectType === "student" ? "student_record" : "staff_entered",
+      },
+    });
+    const vectorLiteral = toVectorLiteral(queryVector);
 
     const rows = await prisma.$queryRaw<MemoryRow[]>`
       SELECT id, kind, content, category, confidence, "validFrom",
@@ -89,7 +113,7 @@ export async function retrieveMemories(
     logger.warn("Memory retrieval failed (non-fatal)", {
       subjectType,
       subjectId,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return [];
   }

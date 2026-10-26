@@ -1,0 +1,119 @@
+{
+  "$comment": "E4 (docs/plans/2026-09-07-todo-completion-plan.md §4, veto window). Every duration here is an owner-behalf proposal, reversible by editing the number here AND the matching row in docs/DATA_RETENTION_POLICY.md — a test (src/lib/retention-purge.test.ts) asserts the two agree for every category with a fixed numeric duration. `days` is null only for a category whose duration is a grant-required reporting period rather than a fixed number the program controls.",
+  "updated": "2026-09-07",
+  "categories": [
+    {
+      "key": "accountProfile",
+      "label": "Account & profile (name, email, credentials, MFA)",
+      "amount": 12,
+      "unit": "months",
+      "anchor": "after program exit",
+      "days": 365
+    },
+    {
+      "key": "goalsProgression",
+      "label": "Goals & progression (goals, XP, progression events)",
+      "amount": null,
+      "unit": "grant-period",
+      "anchor": null,
+      "days": null
+    },
+    {
+      "key": "chatTranscripts",
+      "label": "Chat transcripts (Sage conversations)",
+      "amount": 3,
+      "unit": "years",
+      "anchor": "after last activity",
+      "days": 1095
+    },
+    {
+      "key": "uploads",
+      "label": "Uploaded documents & signed compliance forms",
+      "amount": 3,
+      "unit": "years",
+      "anchor": "after last activity",
+      "days": 1095
+    },
+    {
+      "key": "moodEntries",
+      "label": "Mood entries",
+      "amount": 12,
+      "unit": "months",
+      "anchor": "after program exit",
+      "days": 365
+    },
+    {
+      "key": "aiAuditLlmLogs",
+      "label": "AI audit & LLM call logs",
+      "amount": 24,
+      "unit": "months",
+      "anchor": null,
+      "days": 730
+    },
+    {
+      "key": "staffAuditLogs",
+      "label": "Staff audit logs (who did what)",
+      "amount": 7,
+      "unit": "years",
+      "anchor": null,
+      "days": 2555
+    },
+    {
+      "key": "alertsInterventions",
+      "label": "Alerts & interventions",
+      "amount": 12,
+      "unit": "months",
+      "anchor": "after program exit",
+      "days": 365
+    },
+    {
+      "key": "workAvailability",
+      "label": "Work availability & household constraints",
+      "amount": 12,
+      "unit": "months",
+      "anchor": "after program exit",
+      "days": 365
+    },
+    {
+      "key": "employerIntroductions",
+      "label": "Employer introductions (the disclosure record)",
+      "amount": 3,
+      "unit": "years",
+      "anchor": null,
+      "days": 1095
+    },
+    {
+      "key": "outboundMessages",
+      "label": "Outbound messages we sent (SMS + email)",
+      "amount": 3,
+      "unit": "years",
+      "anchor": null,
+      "days": 1095
+    },
+    {
+      "key": "smsConsentRecord",
+      "label": "SMS consent record",
+      "amount": 3,
+      "unit": "years",
+      "anchor": "after revocation",
+      "days": 1095
+    },
+    {
+      "key": "rateLimitRows",
+      "label": "Rate-limit rows (security counters, not student data)",
+      "amount": 30,
+      "unit": "days",
+      "anchor": null,
+      "days": 30
+    },
+    {
+      "key": "failedExtractions",
+      "label": "Failed AI extractions (dead-letter queue for teacher review)",
+      "amount": 90,
+      "unit": "days",
+      "anchor": null,
+      "days": 90
+    }
+  ],
+  "purgeable": ["rateLimitRows", "failedExtractions"]
+}

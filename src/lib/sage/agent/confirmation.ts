@@ -68,6 +68,27 @@ export function createConfirmationToken(payload: ConfirmationPayload, clock: Dat
   return `${expiresAt}.${signatureFor(payload, expiresAt)}`;
 }
 
+/** The expiry a prefix names, or null unless it is spelled EXACTLY as
+ *  createConfirmationToken writes it.
+ *
+ *  Number.parseInt was the wrong reader here: it tolerates leading
+ *  whitespace, a leading "+", leading zeros and trailing garbage, so
+ *  " 1788733123662", "+1788733123662", "01788733123662" and
+ *  "1788733123662x" all recovered the same expiry — and therefore the same
+ *  expected HMAC — while being five DIFFERENT strings. The single-use claim
+ *  in confirmation-use.ts keys on sha256 of the whole token, so each spelling
+ *  bought a fresh claim and one approved card executed unlimited times.
+ *  Requiring String(expiresAt) === prefix admits exactly one spelling per
+ *  expiry, which is what makes the claim's key a faithful identity for the
+ *  authorization the token carries. The token FORMAT is unchanged — a token
+ *  createConfirmationToken produced still parses, so cards already in flight
+ *  keep working for the rest of their TTL. */
+function canonicalExpiry(prefix: string): number | null {
+  const expiresAt = Number(prefix);
+  if (!Number.isSafeInteger(expiresAt) || String(expiresAt) !== prefix) return null;
+  return expiresAt;
+}
+
 /**
  * The expiry stamped in a token's prefix, or null when the prefix doesn't
  * parse. Purely syntactic — it proves nothing about the signature, so only
@@ -77,8 +98,8 @@ export function createConfirmationToken(payload: ConfirmationPayload, clock: Dat
 export function confirmationTokenExpiry(token: string): Date | null {
   const separator = token.indexOf(".");
   if (separator === -1) return null;
-  const expiresAt = Number.parseInt(token.slice(0, separator), 10);
-  return Number.isFinite(expiresAt) ? new Date(expiresAt) : null;
+  const expiresAt = canonicalExpiry(token.slice(0, separator));
+  return expiresAt === null ? null : new Date(expiresAt);
 }
 
 export function verifyConfirmationToken(
@@ -89,9 +110,14 @@ export function verifyConfirmationToken(
   const separator = token.indexOf(".");
   if (separator === -1) return false;
 
-  const expiresAt = Number.parseInt(token.slice(0, separator), 10);
-  if (!Number.isFinite(expiresAt) || clock.getTime() > expiresAt) return false;
+  const expiresAt = canonicalExpiry(token.slice(0, separator));
+  if (expiresAt === null || clock.getTime() > expiresAt) return false;
 
+  // The signature half needs no separate canonicalization: `expected` is
+  // fixed-length lowercase hex from digest("hex"), the length guard below
+  // rejects anything longer or shorter (so trailing junk cannot ride along),
+  // and timingSafeEqual then compares the bytes exactly — a non-hex character
+  // in `provided` is simply a byte that does not match.
   const provided = token.slice(separator + 1);
   const expected = signatureFor(payload, expiresAt);
   if (provided.length !== expected.length) return false;

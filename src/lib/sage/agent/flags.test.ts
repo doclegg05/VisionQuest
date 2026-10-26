@@ -74,11 +74,11 @@ describe("isAgentLoopEnabled", () => {
 });
 
 describe("isTierAllowedInMode — full matrix", () => {
-  const tiers: RiskTier[] = ["read", "mutate_reversible", "mutate_consequential"];
+  const tiers: RiskTier[] = ["read", "read_ai", "mutate_reversible", "mutate_consequential"];
   const expected: Record<AgentMode, Record<RiskTier, boolean>> = {
-    off: { read: false, mutate_reversible: false, mutate_consequential: false },
-    readonly: { read: true, mutate_reversible: false, mutate_consequential: false },
-    full: { read: true, mutate_reversible: true, mutate_consequential: true },
+    off: { read: false, read_ai: false, mutate_reversible: false, mutate_consequential: false },
+    readonly: { read: true, read_ai: true, mutate_reversible: false, mutate_consequential: false },
+    full: { read: true, read_ai: true, mutate_reversible: true, mutate_consequential: true },
   };
   for (const mode of ["off", "readonly", "full"] as AgentMode[]) {
     for (const tier of tiers) {
@@ -110,11 +110,14 @@ describe("getEnabledTools — mode filtering per role", () => {
   });
 
   it("readonly yields only read-tier tools", () => {
+    // Both read tiers: read_ai changes no state either, it just costs a
+    // generation, which its rate-limit tier handles rather than mode gating.
+    const readTiers: ReadonlySet<RiskTier> = new Set(["read", "read_ai"]);
     for (const role of ["student", "teacher", "admin"]) {
       const tools = getEnabledTools(role, "readonly");
       assert.ok(tools.length > 0, `readonly should expose read tools for ${role}`);
       for (const tool of tools) {
-        assert.equal(tool.riskTier, "read", `${tool.name} leaked into readonly`);
+        assert.ok(readTiers.has(tool.riskTier), `${tool.name} leaked into readonly`);
       }
     }
   });
@@ -143,7 +146,12 @@ describe("getEnabledTools — mode filtering per role", () => {
 
 describe("tier exhaustiveness — every registered tool declares a valid tier", () => {
   it("all tools across all roles have a known riskTier", () => {
-    const valid: ReadonlySet<RiskTier> = new Set(["read", "mutate_reversible", "mutate_consequential"]);
+    const valid: ReadonlySet<RiskTier> = new Set([
+      "read",
+      "read_ai",
+      "mutate_reversible",
+      "mutate_consequential",
+    ]);
     const seen = new Map<string, RiskTier>();
     for (const role of ["student", "teacher", "admin"]) {
       for (const tool of getEnabledTools(role, "full")) seen.set(tool.name, tool.riskTier);

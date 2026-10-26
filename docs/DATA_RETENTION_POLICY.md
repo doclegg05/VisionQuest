@@ -1,7 +1,7 @@
 # Data Retention & Offboarding Policy
 
-**Status**: Draft — retention durations marked `OWNER-CONFIRM` are proposals awaiting program-owner sign-off.
-**Last updated**: 2026-07-20 (P0-4, first slice of the data-lifecycle/privacy layer)
+**Status**: Draft. Every duration in the table below is an owner-behalf proposal recorded in `docs/plans/2026-09-07-todo-completion-plan.md` §4 (the veto-window table) — marked `PROPOSED 2026-09-07` rather than left as an open `OWNER-CONFIRM` blank, and reversible by editing the number here (and in `config/retention-policy.json`, which this table agrees with — see E4). None of these durations is a commitment until Britt confirms or edits them.
+**Last updated**: 2026-09-07 (E4, docs/plans/2026-09-07-todo-completion-plan.md)
 **Applies to**: All VisionQuest production data. Students are TANF/SNAP recipients — treat every class below as sensitive.
 
 ## Purpose & Scope
@@ -12,20 +12,68 @@ VisionQuest stores personal data about adults in a public-assistance workforce p
 
 | Data class | Where it lives | Proposed retention | At expiry |
 |---|---|---|---|
-| Account & profile (name, email, credentials, MFA) | `Student` row | 12 months after program exit `OWNER-CONFIRM` | Anonymize (keep row for referential integrity; strip name/email/credentials) |
-| Goals & progression (goals, XP, progression events) | `Goal`, `Progression`, `ProgressionEvent` | Grant-required outcome-reporting period `OWNER-CONFIRM` | Anonymize into aggregate outcome records, then purge row-level data |
-| Chat transcripts (Sage conversations) | `Conversation`, `Message` | 12 months after program exit `OWNER-CONFIRM` | Purge |
-| Uploaded documents & signed compliance forms | `FileUpload`, `FormSubmission`, `FormResponse` + Supabase Storage | Grant-required period `OWNER-CONFIRM` | Purge after export (signed forms go in the export bundle first) |
-| Mood entries | `MoodEntry` | 12 months after program exit `OWNER-CONFIRM` | Purge |
-| AI audit & LLM call logs | `LlmCallLog`, `SageInsight`, safety-report records | 24 months `OWNER-CONFIRM` | Purge |
-| Staff audit logs (who did what) | `AuditLog` | 3 years `OWNER-CONFIRM` | Purge |
-| Alerts & interventions | `StudentAlert`, case notes | 12 months after program exit `OWNER-CONFIRM` | Purge |
+| Account & profile (name, email, credentials, MFA) | `Student` row | 12 months after program exit `PROPOSED 2026-09-07` | Anonymize (keep row for referential integrity; strip name/email/credentials) |
+| Goals & progression (goals, XP, progression events) | `Goal`, `Progression`, `ProgressionEvent` | Grant-required outcome-reporting period `PROPOSED 2026-09-07` | Anonymize into aggregate outcome records, then purge row-level data |
+| Chat transcripts (Sage conversations) | `Conversation`, `Message` | 3 years after last activity `PROPOSED 2026-09-07` | Purge |
+| Uploaded documents & signed compliance forms | `FileUpload`, `FormSubmission`, `FormResponse` + Supabase Storage | 3 years after last activity `PROPOSED 2026-09-07` | Purge after export (signed forms go in the export bundle first) |
+| Mood entries | `MoodEntry` | 12 months after program exit `PROPOSED 2026-09-07` | Purge |
+| AI audit & LLM call logs | `LlmCallLog`, `SageInsight`, safety-report records | 24 months `PROPOSED 2026-09-07` | Purge |
+| Staff audit logs (who did what) | `AuditLog` | 7 years `PROPOSED 2026-09-07` | Purge |
+| Alerts & interventions | `StudentAlert`, case notes | 12 months after program exit `PROPOSED 2026-09-07` | Purge |
+| Work availability & household constraints | `StudentWorkProfile` | 12 months after program exit `PROPOSED 2026-09-07` | Purge |
+| Employer introductions (the disclosure record) | `Connection`, `ConnectionEvent` | 3 years `PROPOSED 2026-09-07` | Purge |
+| Outbound messages we sent (SMS + email) | `OutboundMessage` | 3 years `PROPOSED 2026-09-07` | Purge |
+| SMS consent record | `NotificationPreference.smsConsentAt` / `.smsRevokedAt` | 3 years after revocation `PROPOSED 2026-09-07` | Purge with the row |
+| Rate-limit rows (security counters, not student data) | `RateLimitEntry` | 30 days `PROPOSED 2026-09-07` | Purge (see `scripts/retention-purge.mjs` — automated, dry-run by default) |
+| Failed AI extractions (dead-letter queue for teacher review) | `FailedExtraction` | 90 days `PROPOSED 2026-09-07` | Purge (see `scripts/retention-purge.mjs` — automated, dry-run by default) |
 
-"Program exit" = the student's `offboardedAt` timestamp (set by the offboarding flow below).
+"Program exit" = the student's `offboardedAt` timestamp (set by the offboarding flow below). These durations are also recorded machine-readably in `config/retention-policy.json`, which `scripts/retention-purge.mjs` reads and a unit test (`src/lib/retention-purge.test.ts`) checks against this table so the two cannot silently drift apart.
+
+### Why the four Match & Connect rows are modelled on `AuditLog`, not on "12 months after exit"
+
+Every other student row above answers "how long do we keep what we learned about
+this person". These four answer a different question — "how long can we prove
+what we DID" — and that is the audit-log question, so they take the audit-log
+duration.
+
+- **`Connection` / `ConnectionEvent`** are the record that a student's résumé
+  and certifications were sent to a named employer, who approved it, when, and
+  what came back. If anyone ever asks whether a disclosure was authorised, this
+  is the answer; deleting it a year after exit would destroy the evidence while
+  the employer relationship, and any dispute about it, outlives the student's
+  enrolment.
+- **`OutboundMessage`** is the log the SMS layer exists to produce — what was
+  sent, to which KIND of recipient, and when. It is what a TCPA question is
+  answered from ("we sent this, on this date, against this consent record"), so
+  it has to outlive the consent it was sent under.
+- **`NotificationPreference.smsConsentAt` / `.smsRevokedAt`** is that consent
+  record. It is kept for the same window AFTER revocation rather than deleted
+  on STOP: "they told us to stop and we did, on this date" is exactly the fact
+  worth being able to show.
+
+Note on `OutboundMessage.toId`: it is **untyped polymorphic** — a `Student.id`
+or an `EmployerContact.id` depending on `toKind`, with no foreign key, by the
+same reasoning `AuditLog` uses. A purge that removes students or employer
+contacts will therefore leave rows whose `toId` resolves to nothing, and that
+is intended: the log records that a message went out, not who can still be
+looked up today. Any purge job must treat these tables as append-only history
+keyed on `sentAt`, never as child rows to cascade.
 
 ## Export-Before-Purge Rule
 
-**No student data may be purged or anonymized until a full export bundle exists.** The export is a ZIP archive (signed forms, signatures, certification evidence, portfolio files, resume data, plus a `manifest.json`) generated by `src/lib/student-archive.ts` and stored under `archives/<studentId>/` in Supabase Storage. The offboarding endpoint enforces this ordering: if the export fails, the student is left untouched.
+**No student data may be purged or anonymized until a full export bundle exists.** The export is a ZIP archive generated by `src/lib/student-archive.ts` and stored under `archives/<studentId>/` in Supabase Storage. The offboarding endpoint enforces this ordering: if the export fails, the student is left untouched.
+
+**As of ticket D5 (2026-09-07), the export covers every one of the 42 Prisma models with a direct `studentId` FK to `Student`** — the `offboarding-completeness` benchmark (`config/benchmarks/offboarding-completeness.json`, `gate` tier, floor 0) enforces this in CI, so a future model with a `studentId` FK that is neither exported nor exempted fails the PR that adds it. The bundle carries:
+
+- **Signed compliance files, as files**: form submissions and their signatures, certification evidence, portfolio item files, and general/resume uploads (`forms/`, `signatures/`, `certifications/`, `portfolio/`, `files/`).
+- **Structured data, as JSON**: résumé data (current version and every prior `ResumeVersion`), cover letters, the work profile, employer introductions (`Connection`), Sage transcripts (`Conversation`/`Message`, ordered — the largest single addition), Sage's own insights and daily/weekly panels, goals with their linked resources, career-exploration results (`CareerDiscovery`/`CareerCampaign`/`CoachingArc`), vision-board items, mood entries, job-search activity (`Application`/`StudentSavedJob`/`Wager`), advising records (tasks, appointments, event registrations, orientation checklist progress), digital form answers (`FormResponse`, distinct from signed-PDF form submissions), consent decisions, the SPOKES/DoHS intake record, class enrollment history, the public credential page's own content, notification channel preferences (consent fields only — never the SMS verification-code hash, an authentication artifact excluded the same way `PasswordResetToken` is), every notification the student was sent, staff-authored case notes (every category, including `risk` — none is documented staff-confidential today) and alerts about the student, and dead-lettered failed extractions (a capped snapshot of the student's own message).
+- **Exempted, never exported** (reasons in `config/benchmarks/fixtures/archive-exemptions.json`): `Progression` and `ProgressionEvent` (re-derivable bookkeeping, no free text), `LlmCallLog` (cost/metering only, never the prompt or reply), `PasswordResetToken` and `SecurityQuestionAnswer` (authentication artifacts — hashes with no evidentiary meaning to the student).
+
+De-identification is never applied to this export: it is the student's own record of their own words, choices, and what they were told, not data leaving the program for a third party. A message that happens to name another person is exported verbatim for that reason. The archive is built fully in memory before upload; `src/lib/student-archive.ts` logs a warning (not a hard failure) if a single student's ZIP exceeds 25 MB, since a transcript that large would be exceptional and the export-before-purge rule above must not gain new ways to fail.
+
+## Reporting Disclosures (funder statistical reports)
+
+Some student data leaves the program as a **row-per-student statistical report to the SPOKES grant's state funder** (DoHS/WVDE) — e.g. the DoHS-facing export in `src/lib/connect/dohs-export-shared.ts` (Match & Connect Phase 6). Despite the "aggregate" framing this section used to carry, each row identifies one student (spokesId, enrollment/exit dates, employer, wage, retention flags) — it is not a summarized or de-identified rollup. This is **program-administration disclosure**, required as a condition of the grant, and is legally and operationally distinct from a **third-party employer referral** (the `employer_referral` consent scope `src/lib/consent.ts` / `workforce-batch-query.ts` gate on): a referral discloses one student's identity and materials to one named employer for a hiring decision; a statistical report discloses enrollment/placement/retention figures to the funder that is already the legal basis for the program's own existence. No per-student consent scope applies to the latter, and none should be added on the theory that it "shares student data" — that would conflate two different disclosures with two different legal bases. The export is instructor-scoped (an instructor may only report on students they manage) and every run is audit-logged (actor, class, row count — never a student id, per `.claude/rules/security.md`).
 
 ## Manual Offboarding Procedure (admin-only)
 
@@ -46,7 +94,7 @@ Data is **not deleted** at offboarding. Offboarding = export + deactivate + time
 
 ## Not Yet Implemented (deliberately deferred)
 
-- **Automated purge / retention enforcement (no cron)** — deferred until the manual flow is proven. `docs/PRODUCT_DECISIONS.md` Step 5 (Automation Readiness Test) requires that "the manual version already works" before automating; automating a broken process produces broken results faster. Purge is also not failure-reversible, which fails the readiness test outright today.
+- **Automated purge / retention enforcement for student data (no cron)** — deferred until the manual flow is proven. `docs/PRODUCT_DECISIONS.md` Step 5 (Automation Readiness Test) requires that "the manual version already works" before automating; automating a broken process produces broken results faster. Purge is also not failure-reversible, which fails the readiness test outright today. **As of E4 (2026-09-07), two non-student-data categories are the exception**: `npm run retention:purge` (`scripts/retention-purge.mjs`) counts and, with `--apply`, deletes expired `RateLimitEntry` rows and `FailedExtraction` rows older than their table's proposed duration above — dry-run by default, never a student identifier in its output. Chat transcripts, uploads, and every other student-linked category are deliberately left out of this first cut; they wait for export-before-purge automation per the rule above.
 - **Self-serve student data export (DSAR)** — students cannot yet request their own bundle; an admin must run the offboarding/archive flow on their behalf.
 - **Cascade hard-delete** — no endpoint hard-deletes a student and their relations. All current operations are soft (deactivate + timestamp) with export.
 

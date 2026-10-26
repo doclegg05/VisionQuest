@@ -1,5 +1,6 @@
 import { badRequest, forbidden, type Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
+import { isDemoInstructor } from "@/lib/demo/guards";
 
 export const NON_ARCHIVED_ENROLLMENT_STATUSES = [
   "active",
@@ -23,6 +24,49 @@ export const STAFF_CAN_MANAGE_ANY: readonly string[] = ["admin", "teacher", "coo
 
 export function canManageAnyClass(role: string): boolean {
   return STAFF_CAN_MANAGE_ANY.includes(role);
+}
+
+/**
+ * `canManageAnyClass` for a whole session. The shared demo instructor is a real
+ * `teacher` row, so its role alone would show it every class and student in
+ * the program. It is held to the classes it is an assigned instructor of, the
+ * same branch non-staff roles already take. Every other session answers
+ * exactly as `canManageAnyClass(session.role)` does.
+ */
+export function canManageAnyClassFor(session: Pick<Session, "role" | "demoAccount">): boolean {
+  return canManageAnyClass(session.role) && !isDemoInstructor(session);
+}
+
+/**
+ * Roles allowed to take an admin/coordinator-only action. This is a
+ * PRIVILEGE TIER, not a scope breadth.
+ *
+ * Read it against `STAFF_CAN_MANAGE_ANY` above, which answers a different
+ * question:
+ *
+ *   canManageAnyClass(role)            → "may this role see students outside
+ *                                        the classes they teach?" (BREADTH —
+ *                                        teacher: yes, single staff workspace)
+ *   canPerformElevatedStaffAction(role) → "may this role take an action
+ *                                        reserved to admins/coordinators?"
+ *                                        (TIER — teacher: no)
+ *
+ * They disagree about `teacher` on purpose, and that disagreement is the
+ * whole point. Two routes once used the breadth predicate as a tier gate
+ * while their own error copy said "admins and coordinators": the form-response
+ * CSV export (a plain teacher could stream every non-draft response) and
+ * student class reassignment (a plain teacher could move a student between
+ * classes, changing programType/cohort attribution, with the audit row
+ * recorded as if by admin authority).
+ *
+ * Do NOT merge these two lists, and do not add `teacher` here to make a call
+ * site compile — a call site that needs teachers wants `canManageAnyClass`.
+ * `src/lib/classroom.test.ts` pins the pair apart.
+ */
+export const ELEVATED_STAFF: readonly string[] = ["admin", "coordinator"];
+
+export function canPerformElevatedStaffAction(role: string): boolean {
+  return ELEVATED_STAFF.includes(role);
 }
 
 export function normalizeClassCode(value: string) {
@@ -59,7 +103,7 @@ export function normalizeInstructorIds(instructorIds: string[]): string[] {
  * UNSCOPED student where-clause by design (single SPOKES staff workspace —
  * the teacher dashboard, exports, and reports list across classes), and
  * non-staff roles are narrowed to classes where they are an assigned
- * instructor.
+ * instructor. So is the demo instructor (see `canManageAnyClassFor`).
  */
 export function buildManagedStudentWhere(
   session: Session,
@@ -86,7 +130,7 @@ export function buildManagedStudentWhere(
     };
   }
 
-  const canManageAny = canManageAnyClass(session.role);
+  const canManageAny = canManageAnyClassFor(session);
 
   if (canManageAny && !classId) {
     return baseWhere;
@@ -122,7 +166,7 @@ export function buildStudentIdentifierWhere(identifier: string) {
 }
 
 export async function assertStaffCanManageClass(session: Session, classId: string) {
-  const canManageAny = canManageAnyClass(session.role);
+  const canManageAny = canManageAnyClassFor(session);
   const managedClass = await prisma.spokesClass.findFirst({
     where: {
       id: classId,
@@ -229,7 +273,7 @@ export async function listManagedClasses(session: Session, options: { includeArc
   return prisma.spokesClass.findMany({
     where: {
       ...(includeArchived ? {} : { status: { not: "archived" } }),
-      ...(canManageAnyClass(session.role)
+      ...(canManageAnyClassFor(session)
         ? {}
         : {
             instructors: {

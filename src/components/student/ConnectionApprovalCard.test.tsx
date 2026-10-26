@@ -1,0 +1,173 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { renderToString } from "react-dom/server";
+
+import { PACKET_FIELD_LABELS } from "@/lib/connect/packet-shared";
+import { assessReadability, PLAIN_LANGUAGE_MAX_GRADE } from "@/lib/sage/readability";
+
+import { ConnectionApprovalCard, type PendingConnection } from "./ConnectionApprovalCard";
+
+/**
+ * The approval card is the consent moment for the whole feature, and it is
+ * also the piece most likely to exist but be unreachable — the proxy.ts
+ * lesson. So this file checks two different things: that the card says what a
+ * student needs before tapping, and that something actually renders it.
+ */
+function connection(overrides: Partial<PendingConnection> = {}): PendingConnection {
+  return {
+    id: "conn-1",
+    jobTitle: "Production Associate",
+    employerName: "Mountain Metal",
+    location: "Beckley, WV",
+    // Packet field KEYS. The card renders each label from
+    // PACKET_FIELD_LABELS, so a copy edit cannot silently drop a row from the
+    // consent list while the employer still receives the value.
+    fields: [
+      "candidate_name",
+      "resume",
+      "verified_certifications",
+      "availability",
+      "earliest_start",
+      "endorsement",
+    ],
+    endorsement: "Dana came to every class and earned the forklift card.",
+    candidateName: "Dana R.",
+    certifications: ["Forklift Operator"],
+    availabilitySummary: "Weekdays: mornings, afternoons",
+    earliestStart: "2026-09-15",
+    subsidyLine: null,
+    hasResume: true,
+    ...overrides,
+  };
+}
+
+describe("ConnectionApprovalCard", () => {
+  it("shows the exact field list ON the screen with the button, not behind a link", () => {
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    for (const key of connection().fields) {
+      const label = PACKET_FIELD_LABELS[key];
+      assert.ok(html.includes(label), `the card hid "${label}" from the student`);
+    }
+    assert.ok(html.includes("OK, send it"));
+    // Informed consent means the list and the decision are in one place.
+    assert.ok(!html.includes("See details"));
+    assert.ok(!html.includes("Learn more"));
+  });
+
+  it("shows the endorsement text the teacher wrote", () => {
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    assert.ok(html.includes("Dana came to every class and earned the forklift card."));
+  });
+
+  it("says plainly that nothing is sent yet and that it can be taken back", () => {
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    assert.ok(html.includes("Nothing is sent until you say OK."));
+    assert.ok(html.includes("take it back"));
+  });
+
+  it("offers exactly ONE decision, plus a way to walk away that decides nothing", () => {
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    assert.ok(html.includes("OK, send it"));
+    assert.ok(html.includes("Not right now"));
+    // "Not right now" hides the card locally. What must NOT appear is a second
+    // control that records a refusal — a student who is unsure has not said no.
+    assert.ok(!html.toLowerCase().includes("decline"));
+    assert.ok(!html.toLowerCase().includes("reject"));
+    assert.ok(!html.toLowerCase().includes("say no"));
+  });
+
+  it("shows the VALUES an employer would see, not just the field names", () => {
+    // The employer page renders the availability line, the start date and the
+    // cert names; a card listing only "The days and times you can work" would
+    // be asking a student to consent to a category.
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    assert.ok(html.includes("Dana R."));
+    assert.ok(html.includes("Forklift Operator"));
+    assert.ok(html.includes("Weekdays: mornings, afternoons"));
+    assert.ok(html.includes("2026-09-15"));
+  });
+
+  it("says the résumé is not ready rather than letting a student consent to a blank", () => {
+    const html = renderToString(
+      <ConnectionApprovalCard connection={connection({ hasResume: false })} />,
+    );
+    assert.match(html, /still putting your résumé together/);
+  });
+
+  it("discloses that saying OK also grants the standing permission", () => {
+    // approveConnection calls grantConsent, so this tap does two things. The
+    // card has to say the second one out loud.
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    assert.match(html, /ask about other jobs later/);
+    assert.match(html, /turn this off any time in Settings/);
+  });
+
+  it("reads at or below the plain-language ceiling", () => {
+    // Teacher surfaces are outside the readability gate's globs and this one
+    // is student-facing but assembled from props, so it is checked here with
+    // the same helper the gate uses.
+    // Scored on the RENDERED text, not the source: the sentences are assembled
+    // from props, so a source scan would grade the template rather than what a
+    // student actually reads.
+    const html = renderToString(<ConnectionApprovalCard connection={connection()} />);
+    const text = html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&[a-z]+;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const grade = assessReadability(text, { maxGrade: PLAIN_LANGUAGE_MAX_GRADE });
+    assert.ok(
+      grade.withinTarget,
+      `the card reads at grade ${grade.grade}, over the ceiling of ${PLAIN_LANGUAGE_MAX_GRADE}`,
+    );
+  });
+
+  it("IS RENDERED: a page mounts the panel that mounts this card", () => {
+    // The card and the API route can both be perfect and the feature still be
+    // dead if nothing renders them. Pin the chain by source.
+    const panel = readFileSync(
+      join(process.cwd(), "src/components/student/PendingConnectionsPanel.tsx"),
+      "utf8",
+    );
+    assert.match(panel, /ConnectionApprovalCard/);
+    assert.match(panel, /\/api\/connect\/pending/);
+
+    const careerPage = readFileSync(
+      join(process.cwd(), "src/app/(student)/career/page.tsx"),
+      "utf8",
+    );
+    assert.match(careerPage, /PendingConnectionsPanel/);
+    assert.match(careerPage, /<PendingConnectionsPanel \/>/);
+  });
+
+  it("IS RENDERED: the console's students board mounts the propose button", () => {
+    const board = readFileSync(
+      join(process.cwd(), "src/components/teacher/connect/StudentsBoard.tsx"),
+      "utf8",
+    );
+    assert.match(board, /<ProposeConnectionButton/);
+
+    const button = readFileSync(
+      join(process.cwd(), "src/components/teacher/connect/ProposeConnectionButton.tsx"),
+      "utf8",
+    );
+    assert.match(button, /\/api\/teacher\/connect\/connections/);
+  });
+
+  it("IS RENDERED: /memory mounts the disclosure log", () => {
+    const memoryPage = readFileSync(
+      join(process.cwd(), "src/app/(student)/memory/page.tsx"),
+      "utf8",
+    );
+    assert.match(memoryPage, /<SharedWithEmployersPanel \/>/);
+
+    const panel = readFileSync(
+      join(process.cwd(), "src/components/student/SharedWithEmployersPanel.tsx"),
+      "utf8",
+    );
+    assert.match(panel, /\/api\/connect\/shared/);
+  });
+});

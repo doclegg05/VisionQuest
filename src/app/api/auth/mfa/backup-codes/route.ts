@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertNotDemoAccount } from "@/lib/demo/guards";
 import { logAuditEvent } from "@/lib/audit";
 import { parseBody } from "@/lib/schemas";
 import { generateBackupCodes, hashBackupCodes, verifyTotp } from "@/lib/mfa";
@@ -12,6 +13,9 @@ const backupCodeRegenerationSchema = z.object({
 });
 
 export const POST = withTeacherAuth(async (session, req: NextRequest) => {
+  // Before the limiter and the body, so a demo visitor costs no work.
+  assertNotDemoAccount(session);
+
   const rl = await rateLimit(`mfa-backup:${session.id}`, 3, 5 * 60 * 1000);
   if (!rl.success) {
     return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
@@ -55,13 +59,23 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
 
   const backupCodes = generateBackupCodes();
 
-  await prisma.student.update({
-    where: { id: student.id },
+  // Spending the counter and replacing recovery codes must be one conditional write.
+  const changed = await prisma.student.updateMany({
+    where: {
+      id: student.id,
+      mfaEnabled: true,
+      mfaSecret: student.mfaSecret,
+      mfaLastUsedCounter: student.mfaLastUsedCounter,
+    },
     data: {
       mfaBackupCodes: hashBackupCodes(backupCodes),
       ...(counter != null ? { mfaLastUsedCounter: counter } : {}),
     },
   });
+
+  if (changed.count !== 1) {
+    return NextResponse.json({ error: "Invalid MFA code. Please try again." }, { status: 401 });
+  }
 
   await logAuditEvent({
     actorId: student.id,

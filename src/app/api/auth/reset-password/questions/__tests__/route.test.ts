@@ -44,6 +44,7 @@ mock.module("@/lib/auth", {
   namedExports: {
     getSession: async () => null,
     hashPassword: (password: string) => ({ hash: `scrypt$salt$hashed-${password}`, salt: "salt" }),
+    invalidateSessionCache: () => undefined,
     normalizeStudentId: (raw: string) =>
       raw.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9@._-]/g, ""),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
@@ -120,6 +121,16 @@ function auditActions(): string[] {
     (call: { arguments: [{ action: string }] }) => call.arguments[0].action,
   );
 }
+
+/** The stored hash each answer was verified against, in call order. */
+function storedHashesChecked(): unknown[] {
+  return mockVerifySecurityAnswer.mock.calls.map(
+    (call: { arguments: [string, unknown] }) => call.arguments[1],
+  );
+}
+
+/** No stored hash: the real helper runs the KDF against auth's dummy hash. */
+const DUMMY_WORK = [undefined, undefined, undefined];
 
 function studentRecord(overrides: Record<string, unknown> = {}) {
   return {
@@ -203,6 +214,7 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.equal(res.status, 400);
     assert.match(body.error, /could not verify/i);
     assert.deepEqual(limiterKeys(), [`reset-password-questions:${IP}`]);
+    assert.deepEqual(storedHashesChecked(), DUMMY_WORK, "an unknown account costs the same three checks");
     assert.equal(mockTransaction.mock.callCount(), 0);
     assert.equal(cookieSets.length, 0);
   });
@@ -221,7 +233,11 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.equal(unknownRes.status, 400);
     assert.equal(res.status, 400);
     assert.deepEqual(body, unknownBody, "locked and unknown accounts get the same response");
-    assert.equal(mockVerifySecurityAnswer.mock.callCount(), 0, "answers are not checked once locked");
+    assert.deepEqual(
+      storedHashesChecked(),
+      [...DUMMY_WORK, ...DUMMY_WORK],
+      "a locked account's answers are not checked; both requests spend dummy KDF work",
+    );
     assert.equal(mockTransaction.mock.callCount(), 0);
     assert.equal(cookieSets.length, 0);
 
@@ -288,19 +304,88 @@ describe("POST /api/auth/reset-password/questions", () => {
     const res = await questionsRoute.POST(resetRequest() as never);
 
     assert.equal(res.status, 400);
-    assert.equal(mockVerifySecurityAnswer.mock.callCount(), 0);
-    assert.equal(mockTransaction.mock.callCount(), 0);
-  });
-
-  it("returns 403 for staff accounts without touching the password", async () => {
-    mockFindFirst.mock.mockImplementation(async () => studentRecord({ role: "teacher" }));
-
-    const res = await questionsRoute.POST(resetRequest() as never);
-
-    assert.equal(res.status, 403);
+    assert.deepEqual(storedHashesChecked(), DUMMY_WORK);
     assert.equal(mockTransaction.mock.callCount(), 0);
     assert.equal(cookieSets.length, 0);
   });
+
+  it("refuses staff accounts with the generic reset error, without touching the password", async () => {
+    mockFindFirst.mock.mockImplementation(async () => studentRecord({ role: "teacher" }));
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+    const body = (await res.json()) as { error: string };
+
+    assert.equal(res.status, 400);
+    assert.match(body.error, /could not verify/i);
+    assert.deepEqual(storedHashesChecked(), DUMMY_WORK, "staff answers are never checked");
+    assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(cookieSets.length, 0);
+  });
+
+  it("checks every answer even after a wrong one, so timing does not show which answers matched", async () => {
+    mockVerifySecurityAnswer.mock.mockImplementation(
+      (_answer: string, storedHash: string) => storedHash !== "hash:birth_city",
+    );
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(
+      storedHashesChecked(),
+      ANSWER_ROWS.map((row) => row.answerHash),
+    );
+    assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(cookieSets.length, 0);
+  });
+
+  // Every refusal must cost the same three KDF runs and read the same as a
+  // wrong answer on a real student account; otherwise response time or the
+  // status confirms the login exists. The verifier is left answering "match"
+  // so the refusal cannot be resting on the dummy hash failing.
+  const refusedAccounts: { name: string; arrange: () => void }[] = [
+    {
+      name: "an unknown login",
+      arrange: () => mockFindFirst.mock.mockImplementation(async () => null),
+    },
+    {
+      name: "an account with no complete question set",
+      arrange: () =>
+        mockFindFirst.mock.mockImplementation(async () =>
+          studentRecord({ securityQuestionAnswers: ANSWER_ROWS.slice(0, 2) }),
+        ),
+    },
+    {
+      name: "a staff account",
+      arrange: () =>
+        mockFindFirst.mock.mockImplementation(async () => studentRecord({ role: "teacher" })),
+    },
+    {
+      name: "a locked account",
+      arrange: () => blockLimiterWhen((key) => key === `reset-password-questions:user:${STUDENT.id}`),
+    },
+  ];
+
+  for (const { name, arrange } of refusedAccounts) {
+    it(`gives ${name} the same KDF work and response as a wrong answer`, async () => {
+      mockVerifySecurityAnswer.mock.mockImplementation(() => false);
+      const wrongRes = await questionsRoute.POST(resetRequest() as never);
+      const wrongBody = await wrongRes.json();
+      const wrongWork = mockVerifySecurityAnswer.mock.callCount();
+
+      mockVerifySecurityAnswer.mock.resetCalls();
+      mockVerifySecurityAnswer.mock.mockImplementation(() => true);
+      arrange();
+      const res = await questionsRoute.POST(resetRequest() as never);
+      const body = await res.json();
+
+      assert.equal(wrongWork, 3);
+      assert.equal(res.status, wrongRes.status);
+      assert.deepEqual(body, wrongBody);
+      assert.deepEqual(storedHashesChecked(), DUMMY_WORK);
+      assert.equal(mockTransaction.mock.callCount(), 0);
+      assert.equal(cookieSets.length, 0);
+    });
+  }
 
   it("resets the password, bumps the session version, and issues a session on matching answers", async () => {
     const res = await questionsRoute.POST(resetRequest() as never);

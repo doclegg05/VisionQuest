@@ -51,8 +51,8 @@ export default function PdfPreviewModal({
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
                   status === "approved"
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                    ? "bg-success-soft text-success"
+                    : "bg-warning-soft text-warning"
                 }`}
               >
                 {status === "approved" ? "State Certified & Approved" : "Pending Review"}
@@ -69,7 +69,7 @@ export default function PdfPreviewModal({
               <button
                 type="button"
                 onClick={onCounterSign}
-                className="flex items-center gap-1.5 rounded-xl border border-sky-600 bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-sky-700 active:scale-95 cursor-pointer"
+                className="pointer-coarse:min-h-11 flex items-center gap-1.5 rounded-xl border border-info bg-info px-3.5 py-2 text-xs font-bold text-on-info shadow-sm transition-all hover:bg-info active:scale-95 cursor-pointer"
               >
                 <PenNib size={15} weight="bold" />
                 Counter-Sign & Approve
@@ -79,7 +79,7 @@ export default function PdfPreviewModal({
             <button
               type="button"
               onClick={handlePrint}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-base)] px-3.5 py-2 text-xs font-bold text-[var(--ink-strong)] shadow-sm transition-all hover:bg-[var(--surface-muted)] active:scale-95 cursor-pointer"
+              className="pointer-coarse:min-h-11 flex items-center gap-1.5 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-base)] px-3.5 py-2 text-xs font-bold text-[var(--ink-strong)] shadow-sm transition-all hover:bg-[var(--surface-muted)] active:scale-95 cursor-pointer"
               title="Print official document"
             >
               <Printer size={16} weight="bold" />
@@ -89,7 +89,7 @@ export default function PdfPreviewModal({
             <a
               href={downloadUrl}
               download
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-base)] px-3.5 py-2 text-xs font-bold text-[var(--ink-strong)] shadow-sm transition-all hover:bg-[var(--surface-muted)] active:scale-95"
+              className="pointer-coarse:min-h-11 flex items-center gap-1.5 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-base)] px-3.5 py-2 text-xs font-bold text-[var(--ink-strong)] shadow-sm transition-all hover:bg-[var(--surface-muted)] active:scale-95"
               title="Download PDF file"
             >
               <DownloadSimple size={16} weight="bold" />
@@ -99,7 +99,7 @@ export default function PdfPreviewModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-[var(--border)] p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] cursor-pointer ml-1"
+              className="pointer-coarse:min-h-11 rounded-xl border border-[var(--border)] p-2 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] cursor-pointer ml-1"
               aria-label="Close modal"
             >
               <X size={18} />
@@ -108,7 +108,7 @@ export default function PdfPreviewModal({
         </div>
 
         {/* PDF Viewer Body */}
-        <div className="relative flex-1 bg-slate-900/10 dark:bg-black/30">
+        <div className="relative flex-1 bg-surface-muted">
           <iframe
             ref={iframeRef}
             src={`${downloadUrl}#toolbar=1`}

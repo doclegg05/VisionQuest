@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
-import { mockTeacherSession, mockRequest } from "@/lib/test-helpers";
+import { matchesWhere, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
 
 const session = mockTeacherSession();
 
@@ -16,6 +16,9 @@ const mockScrapeRunUpdate = mock.fn() as any;
 const mockEnqueueJob = mock.fn() as any;
 const mockProcessJobById = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
+const mockAdminRunUpdateMany = mock.fn(async () => ({ count: 0 })) as any;
+const mockAdminJobUpdateMany = mock.fn(async () => ({ count: 0 })) as any;
+const writeOrder: string[] = [];
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -74,6 +77,21 @@ mock.module("@/lib/classroom", {
 
 mock.module("@/lib/db", {
   namedExports: {
+    prismaAdmin: {
+      $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
+      jobScrapeRun: {
+        updateMany: (...args: unknown[]) => {
+          writeOrder.push("retire-runs");
+          return mockAdminRunUpdateMany(...args);
+        },
+      },
+      backgroundJob: {
+        updateMany: (...args: unknown[]) => {
+          writeOrder.push("retire-jobs");
+          return mockAdminJobUpdateMany(...args);
+        },
+      },
+    },
     prisma: {
       jobClassConfig: {
         findUnique: mockFindUnique,
@@ -85,7 +103,10 @@ mock.module("@/lib/db", {
       jobScrapeRun: {
         findFirst: mockScrapeRunFindFirst,
         findMany: mockScrapeRunFindMany,
-        create: mockScrapeRunCreate,
+        create: (...args: unknown[]) => {
+          writeOrder.push("create-run");
+          return mockScrapeRunCreate(...args);
+        },
         update: mockScrapeRunUpdate,
       },
     },
@@ -244,6 +265,44 @@ describe("teacher job route authorization", () => {
     assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-1"]);
   });
 
+  // The body goes through parseBody (.claude/rules/api-conventions.md), so a
+  // bad body is a 400 before any class or queue work.
+  it("answers 400 for a body that is not JSON", async () => {
+    const req = new Request("http://localhost:3000/api/teacher/jobs/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not json",
+    });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.equal(mockAssertStaffCanManageClass.mock.callCount(), 0);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
+  it("answers 400 when sources is not a list of source names", async () => {
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1", sources: "jsearch" },
+    });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
+  it("answers 400 without a classId", async () => {
+    const req = mockRequest("/api/teacher/jobs/refresh", { method: "POST", body: {} });
+
+    const res = await refreshRoute.POST(req as never);
+
+    assert.equal(res.status, 400);
+    assert.match(JSON.stringify(await res.json()), /classId is required/);
+    assert.equal(mockEnqueueJob.mock.callCount(), 0);
+  });
+
   it("queues a retry for requested enabled sources", async () => {
     const req = mockRequest("/api/teacher/jobs/refresh", {
       method: "POST",
@@ -293,6 +352,67 @@ describe("teacher job route authorization", () => {
     assert.equal(mockEnqueueJob.mock.callCount(), 0);
     assert.equal(mockProcessJobById.mock.callCount(), 1);
     assert.deepEqual(mockProcessJobById.mock.calls[0]?.arguments, ["job-existing"]);
+  });
+
+  // A run that crashed mid-scrape stays "processing" forever. Treating it as
+  // in progress would answer "Scrape already in progress" to every Refresh
+  // from then on, so only a run that started, or was queued, in the last two
+  // hours counts (the same window the weekly sweep uses,
+  // src/lib/job-board/scrape-runs.ts).
+  it("treats only a run started or queued in the last two hours as already in progress", async () => {
+    const now = Date.now();
+    const hoursAgo = (hours: number) => new Date(now - hours * 60 * 60 * 1000);
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1" },
+    });
+
+    await refreshRoute.POST(req as never);
+
+    const where = (mockScrapeRunFindFirst.mock.calls[0]?.arguments[0] as { where: Record<string, unknown> }).where;
+    const inProgress = (status: string, createdHoursAgo: number, startedHoursAgo: number | null) =>
+      matchesWhere(
+        {
+          classConfigId: "config-1",
+          status,
+          createdAt: hoursAgo(createdHoursAgo),
+          startedAt: startedHoursAgo === null ? null : hoursAgo(startedHoursAgo),
+        },
+        where,
+      );
+    assert.equal(inProgress("processing", 3, 3), false, "a run that started three hours ago has crashed");
+    assert.equal(inProgress("processing", 3, 0.5), true, "a run queued long ago but started recently is live");
+    assert.equal(inProgress("queued", 0.5, null), true, "a run queued half an hour ago is waiting");
+    assert.equal(inProgress("queued", 2.1, null), false, "a run queued over two hours ago is dead");
+    assert.equal(inProgress("completed", 0.5, 0.5), false, "a finished run is not in progress");
+  });
+
+  // A crashed refresh leaves its run and its scrape_jobs job "processing".
+  // enqueueJob would hand the replacement run that dead job (same dedupe key)
+  // and processJobById claims only pending jobs, so nothing would start.
+  it("retires a stuck run and its background job before queuing a replacement", async () => {
+    writeOrder.length = 0;
+    mockAdminRunUpdateMany.mock.resetCalls();
+    mockAdminJobUpdateMany.mock.resetCalls();
+    const req = mockRequest("/api/teacher/jobs/refresh", {
+      method: "POST",
+      body: { classId: "class-1" },
+    });
+
+    await refreshRoute.POST(req as never);
+
+    assert.deepEqual(writeOrder.slice(0, 3), ["retire-runs", "retire-jobs", "create-run"]);
+    const jobWhere = mockAdminJobUpdateMany.mock.calls[0]?.arguments[0].where;
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const deadJob = (dedupeKey: string) =>
+      matchesWhere(
+        { type: "scrape_jobs", dedupeKey, status: "processing", createdAt: threeHoursAgo, startedAt: threeHoursAgo },
+        jobWhere,
+      );
+    assert.equal(deadJob("scrape:config-1"), true, "the class's whole-class refresh job");
+    assert.equal(deadJob("scrape:config-1:talroo"), true, "the class's partial refresh job");
+    assert.equal(deadJob("scrape:config-10"), false, "another class's job");
+    assert.equal(mockEnqueueJob.mock.calls.at(-1)?.arguments[0].dedupeKey, "scrape:config-1");
   });
 
   it("returns scrape status after checking class ownership", async () => {

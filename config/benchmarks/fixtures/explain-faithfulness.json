@@ -1,0 +1,630 @@
+{
+  "version": 1,
+  "note": "Ground truth is the MUTATION, not a later reading of the text: each wrong case is a faithful explanation with exactly one clause changed. That is why the labels can be trusted without a human relabelling them.",
+  "generator": "scripts/bench/generate-explain-fixtures.mjs",
+  "counts": {
+    "total": 50,
+    "faithful": 20,
+    "wrong": 30
+  },
+  "wrongByKind": {
+    "wage": 7,
+    "hours": 8,
+    "place": 8,
+    "requirement": 7
+  },
+  "postings": [
+    {
+      "id": "posting_01",
+      "title": "Production Associate",
+      "company": "Ridgeline Metal Works",
+      "location": "Beckley, WV",
+      "salary": "$14 to $17 an hour",
+      "employmentType": "Full time, 40 hours a week",
+      "description": "Ridgeline Metal Works needs a production associate on the day shift. You move parts, run a press, and check finished work. The team trains you on the job. You need an OSHA 10 card."
+    },
+    {
+      "id": "posting_02",
+      "title": "Warehouse Selector",
+      "company": "Blackwater Logistics",
+      "location": "Charleston, WV",
+      "salary": "$16 an hour",
+      "employmentType": "Part time, 24 hours a week",
+      "description": "Blackwater Logistics is hiring a warehouse selector for evenings. You pull orders and load pallets. Lifting is part of the job. A forklift card helps but is not required."
+    },
+    {
+      "id": "posting_03",
+      "title": "Certified Nursing Assistant",
+      "company": "New River Care Home",
+      "location": "Oak Hill, WV",
+      "salary": "$18 an hour",
+      "employmentType": "Full time, 36 hours a week",
+      "description": "New River Care Home is hiring a CNA for the night shift. You help residents with daily care and keep notes. You need a CNA licence and a background check."
+    },
+    {
+      "id": "posting_04",
+      "title": "Front Desk Associate",
+      "company": "Cheat River Hospitality",
+      "location": "Morgantown, WV",
+      "salary": null,
+      "employmentType": "Part time, 20 hours a week",
+      "description": "Cheat River Hospitality wants a friendly front desk associate. You greet guests, take bookings, and answer the phone. Weekend shifts are part of the job."
+    },
+    {
+      "id": "posting_05",
+      "title": "Grocery Stocker",
+      "company": "Kanawha Valley Grocers",
+      "location": "Charleston, WV",
+      "salary": "$13 an hour",
+      "employmentType": null,
+      "description": "Kanawha Valley Grocers needs a stocker for the early morning crew. You unload trucks and fill shelves before the store opens."
+    },
+    {
+      "id": "posting_06",
+      "title": "Machine Operator",
+      "company": "Coalfield Machine & Tool",
+      "location": "Princeton, WV",
+      "salary": "$19 to $23 an hour",
+      "employmentType": "Full time, 45 hours a week",
+      "description": "Coalfield Machine and Tool is hiring a machine operator. You set up the machine, run parts, and measure them. Overtime is offered. You need an NCCER core card."
+    },
+    {
+      "id": "posting_07",
+      "title": "Print Finisher",
+      "company": "Appalachian Print & Sign",
+      "location": "Huntington, WV",
+      "salary": "$15 an hour",
+      "employmentType": "Part time, 28 hours a week",
+      "description": "Appalachian Print and Sign needs a print finisher. You cut, fold, and pack finished work. Careful hands matter more than experience."
+    },
+    {
+      "id": "posting_08",
+      "title": "Home Health Aide",
+      "company": "Seneca Home Health",
+      "location": "Elkins, WV",
+      "salary": "$17 an hour",
+      "employmentType": "Full time, 40 hours a week",
+      "description": "Seneca Home Health is hiring aides to visit clients at home. You help with meals, cleaning, and getting around. You need a driver's license and CPR training."
+    },
+    {
+      "id": "posting_09",
+      "title": "Building Supply Cashier",
+      "company": "Elk Fork Building Supply",
+      "location": "Ripley, WV",
+      "salary": "$14 an hour",
+      "employmentType": "Part time, 25 hours a week",
+      "description": "Elk Fork Building Supply wants a cashier. You ring up sales, help customers find items, and keep the front tidy."
+    },
+    {
+      "id": "posting_10",
+      "title": "Data Entry Clerk",
+      "company": "Mountain State Data Services",
+      "location": "Fairmont, WV",
+      "salary": "$16 an hour",
+      "employmentType": "Full time, 40 hours a week",
+      "description": "Mountain State Data Services needs a data entry clerk. You type records, check them, and fix errors. The work is quiet and steady."
+    }
+  ],
+  "cases": [
+    {
+      "id": "posting_01_faithful_full",
+      "postingId": "posting_01",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would move parts and check finished work at Ridgeline Metal Works. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $14 to $17 an hour.\nMust-haves: You need an OSHA 10 card.\nHow you'd get there: The job is in Beckley, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_01_faithful_quiet",
+      "postingId": "posting_01",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would move parts and check finished work at Ridgeline Metal Works. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Beckley, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_01_wrong_wage",
+      "postingId": "posting_01",
+      "faithful": false,
+      "mutation": {
+        "kind": "wage",
+        "from": "$14 to $17 an hour",
+        "to": "$22 an hour"
+      },
+      "why": "One clause changed: wage \"$14 to $17 an hour\" became \"$22 an hour\". Everything else is correct.",
+      "explanation": "What you'd do: You would move parts and check finished work at Ridgeline Metal Works. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $22 an hour.\nMust-haves: You need an OSHA 10 card.\nHow you'd get there: The job is in Beckley, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_01_wrong_hours",
+      "postingId": "posting_01",
+      "faithful": false,
+      "mutation": {
+        "kind": "hours",
+        "from": "Full time, 40 hours a week",
+        "to": "60 hours a week"
+      },
+      "why": "One clause changed: hours \"Full time, 40 hours a week\" became \"60 hours a week\". Everything else is correct.",
+      "explanation": "What you'd do: You would move parts and check finished work at Ridgeline Metal Works. The team trains you on the job.\nHours: Full time, 60 hours a week.\nPay: $14 to $17 an hour.\nMust-haves: You need an OSHA 10 card.\nHow you'd get there: The job is in Beckley, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_01_wrong_place",
+      "postingId": "posting_01",
+      "faithful": false,
+      "mutation": {
+        "kind": "place",
+        "from": "Beckley, WV",
+        "to": "Roanoke, VA"
+      },
+      "why": "One clause changed: place \"Beckley, WV\" became \"Roanoke, VA\". Everything else is correct.",
+      "explanation": "What you'd do: You would move parts and check finished work at Ridgeline Metal Works. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $14 to $17 an hour.\nMust-haves: You need an OSHA 10 card.\nHow you'd get there: The job is in Roanoke, VA. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_02_faithful_full",
+      "postingId": "posting_02",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would pull orders and load pallets at Blackwater Logistics. The team trains you on the job.\nHours: Part time, 24 hours a week.\nPay: $16 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Charleston, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_02_faithful_quiet",
+      "postingId": "posting_02",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would pull orders and load pallets at Blackwater Logistics. The team trains you on the job.\nHours: Part time, 24 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Charleston, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_02_wrong_hours",
+      "postingId": "posting_02",
+      "faithful": false,
+      "mutation": {
+        "kind": "hours",
+        "from": "Part time, 24 hours a week",
+        "to": "60 hours a week"
+      },
+      "why": "One clause changed: hours \"Part time, 24 hours a week\" became \"60 hours a week\". Everything else is correct.",
+      "explanation": "What you'd do: You would pull orders and load pallets at Blackwater Logistics. The team trains you on the job.\nHours: Full time, 60 hours a week.\nPay: $16 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Charleston, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_02_wrong_place",
+      "postingId": "posting_02",
+      "faithful": false,
+      "mutation": {
+        "kind": "place",
+        "from": "Charleston, WV",
+        "to": "Roanoke, VA"
+      },
+      "why": "One clause changed: place \"Charleston, WV\" became \"Roanoke, VA\". Everything else is correct.",
+      "explanation": "What you'd do: You would pull orders and load pallets at Blackwater Logistics. The team trains you on the job.\nHours: Part time, 24 hours a week.\nPay: $16 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Roanoke, VA. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_02_wrong_requirement",
+      "postingId": "posting_02",
+      "faithful": false,
+      "mutation": {
+        "kind": "requirement",
+        "from": "(the posting asks for no CDL)",
+        "to": "CDL"
+      },
+      "why": "One clause changed: requirement \"(the posting asks for no CDL)\" became \"CDL\". Everything else is correct.",
+      "explanation": "What you'd do: You would pull orders and load pallets at Blackwater Logistics. The team trains you on the job.\nHours: Part time, 24 hours a week.\nPay: $16 an hour.\nMust-haves: You need a CDL to apply.\nHow you'd get there: The job is in Charleston, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_03_faithful_full",
+      "postingId": "posting_03",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would help residents with daily care at New River Care Home. The team trains you on the job.\nHours: Full time, 36 hours a week.\nPay: $18 an hour.\nMust-haves: You need a CNA licence and a background check.\nHow you'd get there: The job is in Oak Hill, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_03_faithful_quiet",
+      "postingId": "posting_03",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would help residents with daily care at New River Care Home. The team trains you on the job.\nHours: Full time, 36 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Oak Hill, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_03_wrong_place",
+      "postingId": "posting_03",
+      "faithful": false,
+      "mutation": {
+        "kind": "place",
+        "from": "Oak Hill, WV",
+        "to": "Roanoke, VA"
+      },
+      "why": "One clause changed: place \"Oak Hill, WV\" became \"Roanoke, VA\". Everything else is correct.",
+      "explanation": "What you'd do: You would help residents with daily care at New River Care Home. The team trains you on the job.\nHours: Full time, 36 hours a week.\nPay: $18 an hour.\nMust-haves: You need a CNA licence and a background check.\nHow you'd get there: The job is in Roanoke, VA. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_03_wrong_requirement",
+      "postingId": "posting_03",
+      "faithful": false,
+      "mutation": {
+        "kind": "requirement",
+        "from": "(the posting asks for no CDL)",
+        "to": "CDL"
+      },
+      "why": "One clause changed: requirement \"(the posting asks for no CDL)\" became \"CDL\". Everything else is correct.",
+      "explanation": "What you'd do: You would help residents with daily care at New River Care Home. The team trains you on the job.\nHours: Full time, 36 hours a week.\nPay: $18 an hour.\nMust-haves: You need a CDL to apply.\nHow you'd get there: The job is in Oak Hill, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_03_wrong_wage",
+      "postingId": "posting_03",
+      "faithful": false,
+      "mutation": {
+        "kind": "wage",
+        "from": "$18 an hour",
+        "to": "$22 an hour"
+      },
+      "why": "One clause changed: wage \"$18 an hour\" became \"$22 an hour\". Everything else is correct.",
+      "explanation": "What you'd do: You would help residents with daily care at New River Care Home. The team trains you on the job.\nHours: Full time, 36 hours a week.\nPay: $22 an hour.\nMust-haves: You need a CNA licence and a background check.\nHow you'd get there: The job is in Oak Hill, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_04_faithful_full",
+      "postingId": "posting_04",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would greet guests and take bookings at Cheat River Hospitality. The team trains you on the job.\nHours: Part time, 20 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Morgantown, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_04_faithful_quiet",
+      "postingId": "posting_04",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would greet guests and take bookings at Cheat River Hospitality. The team trains you on the job.\nHours: Part time, 20 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Morgantown, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_04_wrong_requirement",
+      "postingId": "posting_04",
+      "faithful": false,
+      "mutation": {
+        "kind": "requirement",
+        "from": "(the posting asks for no CDL)",
+        "to": "CDL"
+      },
+      "why": "One clause changed: requirement \"(the posting asks for no CDL)\" became \"CDL\". Everything else is correct.",
+      "explanation": "What you'd do: You would greet guests and take bookings at Cheat River Hospitality. The team trains you on the job.\nHours: Part time, 20 hours a week.\nPay: The posting doesn't say.\nMust-haves: You need a CDL to apply.\nHow you'd get there: The job is in Morgantown, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_04_wrong_wage",
+      "postingId": "posting_04",
+      "faithful": false,
+      "mutation": {
+        "kind": "wage",
+        "from": "(no pay stated)",
+        "to": "$22 an hour"
+      },
+      "why": "One clause changed: wage \"(no pay stated)\" became \"$22 an hour\". Everything else is correct.",
+      "explanation": "What you'd do: You would greet guests and take bookings at Cheat River Hospitality. The team trains you on the job.\nHours: Part time, 20 hours a week.\nPay: $22 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Morgantown, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_04_wrong_hours",
+      "postingId": "posting_04",
+      "faithful": false,
+      "mutation": {
+        "kind": "hours",
+        "from": "Part time, 20 hours a week",
+        "to": "60 hours a week"
+      },
+      "why": "One clause changed: hours \"Part time, 20 hours a week\" became \"60 hours a week\". Everything else is correct.",
+      "explanation": "What you'd do: You would greet guests and take bookings at Cheat River Hospitality. The team trains you on the job.\nHours: Full time, 60 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Morgantown, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_05_faithful_full",
+      "postingId": "posting_05",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would unload trucks and fill shelves at Kanawha Valley Grocers. The team trains you on the job.\nHours: The posting doesn't say.\nPay: $13 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Charleston, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_05_faithful_quiet",
+      "postingId": "posting_05",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would unload trucks and fill shelves at Kanawha Valley Grocers. The team trains you on the job.\nHours: The posting doesn't say.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Charleston, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_05_wrong_wage",
+      "postingId": "posting_05",
+      "faithful": false,
+      "mutation": {
+        "kind": "wage",
+        "from": "$13 an hour",
+        "to": "$22 an hour"
+      },
+      "why": "One clause changed: wage \"$13 an hour\" became \"$22 an hour\". Everything else is correct.",
+      "explanation": "What you'd do: You would unload trucks and fill shelves at Kanawha Valley Grocers. The team trains you on the job.\nHours: The posting doesn't say.\nPay: $22 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Charleston, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_05_wrong_hours",
+      "postingId": "posting_05",
+      "faithful": false,
+      "mutation": {
+        "kind": "hours",
+        "from": "(no hours stated)",
+        "to": "60 hours a week"
+      },
+      "why": "One clause changed: hours \"(no hours stated)\" became \"60 hours a week\". Everything else is correct.",
+      "explanation": "What you'd do: You would unload trucks and fill shelves at Kanawha Valley Grocers. The team trains you on the job.\nHours: Full time, 60 hours a week.\nPay: $13 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Charleston, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_05_wrong_place",
+      "postingId": "posting_05",
+      "faithful": false,
+      "mutation": {
+        "kind": "place",
+        "from": "Charleston, WV",
+        "to": "Roanoke, VA"
+      },
+      "why": "One clause changed: place \"Charleston, WV\" became \"Roanoke, VA\". Everything else is correct.",
+      "explanation": "What you'd do: You would unload trucks and fill shelves at Kanawha Valley Grocers. The team trains you on the job.\nHours: The posting doesn't say.\nPay: $13 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Roanoke, VA. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_06_faithful_full",
+      "postingId": "posting_06",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would set up the machine and measure parts at Coalfield Machine & Tool. The team trains you on the job.\nHours: Full time, 45 hours a week.\nPay: $19 to $23 an hour.\nMust-haves: You need an NCCER core card.\nHow you'd get there: The job is in Princeton, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_06_faithful_quiet",
+      "postingId": "posting_06",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would set up the machine and measure parts at Coalfield Machine & Tool. The team trains you on the job.\nHours: Full time, 45 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Princeton, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_06_wrong_hours",
+      "postingId": "posting_06",
+      "faithful": false,
+      "mutation": {
+        "kind": "hours",
+        "from": "Full time, 45 hours a week",
+        "to": "60 hours a week"
+      },
+      "why": "One clause changed: hours \"Full time, 45 hours a week\" became \"60 hours a week\". Everything else is correct.",
+      "explanation": "What you'd do: You would set up the machine and measure parts at Coalfield Machine & Tool. The team trains you on the job.\nHours: Full time, 60 hours a week.\nPay: $19 to $23 an hour.\nMust-haves: You need an NCCER core card.\nHow you'd get there: The job is in Princeton, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_06_wrong_place",
+      "postingId": "posting_06",
+      "faithful": false,
+      "mutation": {
+        "kind": "place",
+        "from": "Princeton, WV",
+        "to": "Roanoke, VA"
+      },
+      "why": "One clause changed: place \"Princeton, WV\" became \"Roanoke, VA\". Everything else is correct.",
+      "explanation": "What you'd do: You would set up the machine and measure parts at Coalfield Machine & Tool. The team trains you on the job.\nHours: Full time, 45 hours a week.\nPay: $19 to $23 an hour.\nMust-haves: You need an NCCER core card.\nHow you'd get there: The job is in Roanoke, VA. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_06_wrong_requirement",
+      "postingId": "posting_06",
+      "faithful": false,
+      "mutation": {
+        "kind": "requirement",
+        "from": "(the posting asks for no CDL)",
+        "to": "CDL"
+      },
+      "why": "One clause changed: requirement \"(the posting asks for no CDL)\" became \"CDL\". Everything else is correct.",
+      "explanation": "What you'd do: You would set up the machine and measure parts at Coalfield Machine & Tool. The team trains you on the job.\nHours: Full time, 45 hours a week.\nPay: $19 to $23 an hour.\nMust-haves: You need a CDL to apply.\nHow you'd get there: The job is in Princeton, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_07_faithful_full",
+      "postingId": "posting_07",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would cut, fold, and pack finished work at Appalachian Print & Sign. The team trains you on the job.\nHours: Part time, 28 hours a week.\nPay: $15 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Huntington, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_07_faithful_quiet",
+      "postingId": "posting_07",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would cut, fold, and pack finished work at Appalachian Print & Sign. The team trains you on the job.\nHours: Part time, 28 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Huntington, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_07_wrong_place",
+      "postingId": "posting_07",
+      "faithful": false,
+      "mutation": {
+        "kind": "place",
+        "from": "Huntington, WV",
+        "to": "Roanoke, VA"
+      },
+      "why": "One clause changed: place \"Huntington, WV\" became \"Roanoke, VA\". Everything else is correct.",
+      "explanation": "What you'd do: You would cut, fold, and pack finished work at Appalachian Print & Sign. The team trains you on the job.\nHours: Part time, 28 hours a week.\nPay: $15 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Roanoke, VA. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_07_wrong_requirement",
+      "postingId": "posting_07",
+      "faithful": false,
+      "mutation": {
+        "kind": "requirement",
+        "from": "(the posting asks for no CDL)",
+        "to": "CDL"
+      },
+      "why": "One clause changed: requirement \"(the posting asks for no CDL)\" became \"CDL\". Everything else is correct.",
+      "explanation": "What you'd do: You would cut, fold, and pack finished work at Appalachian Print & Sign. The team trains you on the job.\nHours: Part time, 28 hours a week.\nPay: $15 an hour.\nMust-haves: You need a CDL to apply.\nHow you'd get there: The job is in Huntington, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_07_wrong_wage",
+      "postingId": "posting_07",
+      "faithful": false,
+      "mutation": {
+        "kind": "wage",
+        "from": "$15 an hour",
+        "to": "$22 an hour"
+      },
+      "why": "One clause changed: wage \"$15 an hour\" became \"$22 an hour\". Everything else is correct.",
+      "explanation": "What you'd do: You would cut, fold, and pack finished work at Appalachian Print & Sign. The team trains you on the job.\nHours: Part time, 28 hours a week.\nPay: $22 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Huntington, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_08_faithful_full",
+      "postingId": "posting_08",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would help clients with meals and getting around at Seneca Home Health. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $17 an hour.\nMust-haves: You need a driver's license and CPR training.\nHow you'd get there: The job is in Elkins, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_08_faithful_quiet",
+      "postingId": "posting_08",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would help clients with meals and getting around at Seneca Home Health. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Elkins, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_08_wrong_requirement",
+      "postingId": "posting_08",
+      "faithful": false,
+      "mutation": {
+        "kind": "requirement",
+        "from": "(the posting asks for no CDL)",
+        "to": "CDL"
+      },
+      "why": "One clause changed: requirement \"(the posting asks for no CDL)\" became \"CDL\". Everything else is correct.",
+      "explanation": "What you'd do: You would help clients with meals and getting around at Seneca Home Health. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $17 an hour.\nMust-haves: You need a CDL to apply.\nHow you'd get there: The job is in Elkins, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_08_wrong_wage",
+      "postingId": "posting_08",
+      "faithful": false,
+      "mutation": {
+        "kind": "wage",
+        "from": "$17 an hour",
+        "to": "$22 an hour"
+      },
+      "why": "One clause changed: wage \"$17 an hour\" became \"$22 an hour\". Everything else is correct.",
+      "explanation": "What you'd do: You would help clients with meals and getting around at Seneca Home Health. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $22 an hour.\nMust-haves: You need a driver's license and CPR training.\nHow you'd get there: The job is in Elkins, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_08_wrong_hours",
+      "postingId": "posting_08",
+      "faithful": false,
+      "mutation": {
+        "kind": "hours",
+        "from": "Full time, 40 hours a week",
+        "to": "60 hours a week"
+      },
+      "why": "One clause changed: hours \"Full time, 40 hours a week\" became \"60 hours a week\". Everything else is correct.",
+      "explanation": "What you'd do: You would help clients with meals and getting around at Seneca Home Health. The team trains you on the job.\nHours: Full time, 60 hours a week.\nPay: $17 an hour.\nMust-haves: You need a driver's license and CPR training.\nHow you'd get there: The job is in Elkins, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_09_faithful_full",
+      "postingId": "posting_09",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would ring up sales and help customers at Elk Fork Building Supply. The team trains you on the job.\nHours: Part time, 25 hours a week.\nPay: $14 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Ripley, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_09_faithful_quiet",
+      "postingId": "posting_09",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would ring up sales and help customers at Elk Fork Building Supply. The team trains you on the job.\nHours: Part time, 25 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Ripley, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_09_wrong_wage",
+      "postingId": "posting_09",
+      "faithful": false,
+      "mutation": {
+        "kind": "wage",
+        "from": "$14 an hour",
+        "to": "$22 an hour"
+      },
+      "why": "One clause changed: wage \"$14 an hour\" became \"$22 an hour\". Everything else is correct.",
+      "explanation": "What you'd do: You would ring up sales and help customers at Elk Fork Building Supply. The team trains you on the job.\nHours: Part time, 25 hours a week.\nPay: $22 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Ripley, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_09_wrong_hours",
+      "postingId": "posting_09",
+      "faithful": false,
+      "mutation": {
+        "kind": "hours",
+        "from": "Part time, 25 hours a week",
+        "to": "60 hours a week"
+      },
+      "why": "One clause changed: hours \"Part time, 25 hours a week\" became \"60 hours a week\". Everything else is correct.",
+      "explanation": "What you'd do: You would ring up sales and help customers at Elk Fork Building Supply. The team trains you on the job.\nHours: Full time, 60 hours a week.\nPay: $14 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Ripley, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_09_wrong_place",
+      "postingId": "posting_09",
+      "faithful": false,
+      "mutation": {
+        "kind": "place",
+        "from": "Ripley, WV",
+        "to": "Roanoke, VA"
+      },
+      "why": "One clause changed: place \"Ripley, WV\" became \"Roanoke, VA\". Everything else is correct.",
+      "explanation": "What you'd do: You would ring up sales and help customers at Elk Fork Building Supply. The team trains you on the job.\nHours: Part time, 25 hours a week.\nPay: $14 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Roanoke, VA. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_10_faithful_full",
+      "postingId": "posting_10",
+      "faithful": true,
+      "mutation": null,
+      "why": "Every fact restated from the posting, nothing added.",
+      "explanation": "What you'd do: You would type and check records at Mountain State Data Services. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $16 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Fairmont, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_10_faithful_quiet",
+      "postingId": "posting_10",
+      "faithful": true,
+      "mutation": null,
+      "why": "Says 'doesn't say' where the model would be guessing. Silence is not a fabrication.",
+      "explanation": "What you'd do: You would type and check records at Mountain State Data Services. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: The posting doesn't say.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Fairmont, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_10_wrong_hours",
+      "postingId": "posting_10",
+      "faithful": false,
+      "mutation": {
+        "kind": "hours",
+        "from": "Full time, 40 hours a week",
+        "to": "60 hours a week"
+      },
+      "why": "One clause changed: hours \"Full time, 40 hours a week\" became \"60 hours a week\". Everything else is correct.",
+      "explanation": "What you'd do: You would type and check records at Mountain State Data Services. The team trains you on the job.\nHours: Full time, 60 hours a week.\nPay: $16 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Fairmont, WV. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_10_wrong_place",
+      "postingId": "posting_10",
+      "faithful": false,
+      "mutation": {
+        "kind": "place",
+        "from": "Fairmont, WV",
+        "to": "Roanoke, VA"
+      },
+      "why": "One clause changed: place \"Fairmont, WV\" became \"Roanoke, VA\". Everything else is correct.",
+      "explanation": "What you'd do: You would type and check records at Mountain State Data Services. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $16 an hour.\nMust-haves: The posting doesn't say.\nHow you'd get there: The job is in Roanoke, VA. Ask your instructor about a ride."
+    },
+    {
+      "id": "posting_10_wrong_requirement",
+      "postingId": "posting_10",
+      "faithful": false,
+      "mutation": {
+        "kind": "requirement",
+        "from": "(the posting asks for no CDL)",
+        "to": "CDL"
+      },
+      "why": "One clause changed: requirement \"(the posting asks for no CDL)\" became \"CDL\". Everything else is correct.",
+      "explanation": "What you'd do: You would type and check records at Mountain State Data Services. The team trains you on the job.\nHours: Full time, 40 hours a week.\nPay: $16 an hour.\nMust-haves: You need a CDL to apply.\nHow you'd get there: The job is in Fairmont, WV. Ask your instructor about a ride."
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import { fileURLToPath } from "node:url";
 import { ALL_INACTIVITY_ALERT_TYPES } from "./inactivity";
+import { NUDGE_ALERT_TYPES } from "./nudges/schedule-shared";
 import { WELLBEING_ALERT_TYPE } from "./sage/wellbeing-card";
 import {
   createStudentAlertStore,
@@ -32,14 +33,14 @@ beforeEach(() => {
 const EXPECTED_WHERE = {
   studentId: STUDENT_ID,
   status: "open",
-  type: { in: ["overdue_task", "missed_appointment"] },
+  type: { in: ["overdue_task", "missed_appointment", "connect_weekly_jobs_ready"] },
 };
 
 describe("STUDENT_VISIBLE_ALERT_TYPES", () => {
-  it("is exactly the two follow-up types the Advising page promises", () => {
+  it("is exactly the types written for a student to read", () => {
     assert.deepEqual(
       [...helper.STUDENT_VISIBLE_ALERT_TYPES],
-      ["overdue_task", "missed_appointment"],
+      ["overdue_task", "missed_appointment", "connect_weekly_jobs_ready"],
     );
   });
 
@@ -48,6 +49,17 @@ describe("STUDENT_VISIBLE_ALERT_TYPES", () => {
     assert.ok(!visible.includes(WELLBEING_ALERT_TYPE));
     for (const type of ALL_INACTIVITY_ALERT_TYPES) {
       assert.ok(!visible.includes(type), `${type} must stay staff-only`);
+    }
+  });
+
+  it("admits only the ONE Match & Connect nudge type the student asked for", () => {
+    // The other four are instructor triage: an employer who has not opened a
+    // packet, one who has not answered, an unconfirmed interview, and a lost
+    // placement. Each names an employer and second-guesses the student.
+    const visible: readonly string[] = helper.STUDENT_VISIBLE_ALERT_TYPES;
+    for (const type of Object.values(NUDGE_ALERT_TYPES)) {
+      const expected = type === NUDGE_ALERT_TYPES.weeklyJobsReady;
+      assert.equal(visible.includes(type), expected, `${type} visibility`);
     }
   });
 });
@@ -59,8 +71,13 @@ describe("listStudentVisibleAlerts", () => {
     assert.equal(store.findMany.mock.callCount(), 1);
     const call = store.findMany.mock.calls[0].arguments[0];
     assert.deepEqual(call.where, EXPECTED_WHERE);
+    // `type` is selected on purpose (Match & Connect Phase 5): the Advising
+    // page renders `connect_weekly_jobs_ready` as an answer with a link rather
+    // than as a triage card, so it needs to tell the allowlisted types apart.
+    // The pin stays exact so a future select cannot quietly widen.
     assert.deepEqual(call.select, {
       id: true,
+      type: true,
       severity: true,
       title: true,
       summary: true,

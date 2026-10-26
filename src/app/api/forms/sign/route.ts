@@ -3,11 +3,13 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
 import { afterWrite } from "@/lib/after-write";
+import { deferAfterResponse } from "@/lib/after-response";
 import { parseBody } from "@/lib/schemas";
 import { decodeSignaturePng, SIGNATURE_DATA_URL_PREFIX } from "@/lib/signature-png";
 import { fileBelongsToStudent } from "@/lib/forms/signature-files";
@@ -62,8 +64,12 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
     const targetStudentId = await resolveTargetStudentId(session, studentId);
 
+    // A client-supplied fileId must be the target student's own upload: staff
+    // views render FormSubmission.fileId without re-scoping (6b106c8d). Checked
+    // before any write, and answered as not-found so it never confirms that
+    // another student's file exists.
     if (fileId && !(await fileBelongsToStudent(fileId, targetStudentId))) {
-      throw forbidden("File does not belong to this student.");
+      throw badRequest("Attached file was not found.");
     }
 
     const decoded = await decodeSignaturePng(signature);
@@ -120,12 +126,18 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     });
 
     // The submission is saved. The alert sync is best-effort from here:
-    // a failure is logged, never reported as a failed signature.
-    await afterWrite(() => syncStudentAlerts(targetStudentId), {
-      surface: "forms/sign",
-      effect: "syncStudentAlerts",
-      studentId: targetStudentId,
-    });
+    // a failure is logged, never reported as a failed signature — and it
+    // runs AFTER the response is sent. Awaiting it here is what held the
+    // student's "Submitting..." for ~45 s on 2026-09-07 (see
+    // src/lib/after-response.ts); the teacher queue can catch up a moment
+    // later.
+    deferAfterResponse(() =>
+      afterWrite(() => syncStudentAlerts(targetStudentId), {
+        surface: "forms/sign",
+        effect: "syncStudentAlerts",
+        studentId: targetStudentId,
+      }),
+    );
 
     return NextResponse.json({
       submission,
@@ -133,7 +145,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     });
   } catch (error) {
     if (error instanceof Error && error.name === "ApiError") throw error;
-    logger.error("Signature submission error", { error: String(error) });
+    logger.error("Signature submission error", { error: errorForLog(error) });
     return NextResponse.json({ error: "Signature submission failed." }, { status: 500 });
   }
 });

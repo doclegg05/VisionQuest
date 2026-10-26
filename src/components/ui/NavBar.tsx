@@ -17,7 +17,9 @@ import {
   UserCircle,
   SignOut,
   Books,
+  Handshake,
   WarningCircle,
+  ChartBar,
 } from "@phosphor-icons/react";
 import { ThemeToggle } from "./ThemeToggle";
 import BrandLockup from "./BrandLockup";
@@ -28,6 +30,7 @@ export const STAFF_ITEMS: NavItem[] = [
   { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
   { href: "/teacher/library", label: "Library", icon: Books, phase: 1 },
+  { href: "/teacher/connect", label: "Connect", icon: Handshake, phase: 1 },
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
   {
     href: "/teacher/failed-extractions",
@@ -45,12 +48,29 @@ const COORDINATOR_ITEMS: NavItem[] = [
   { href: "/teacher/chat", label: "Sage AI", icon: ChatCircle, phase: 1 },
 ];
 
-const ADMIN_ITEMS: NavItem[] = [
-  { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 },
-  { href: "/admin", label: "Admin & Ops", icon: Wrench, phase: 1 },
-  { href: "/admin/library", label: "Library & Forms", icon: Books, phase: 1 },
-  { href: "/admin/chat", label: "Sage AI", icon: ChatCircle, phase: 1 },
+/**
+ * Admin-only sidebar entries. Exported so a test can pin which surfaces are
+ * admin-only: the benchmark dashboard 404s for a teacher who types its URL,
+ * and this list is the only place it is ever advertised.
+ */
+export const ADMIN_ITEMS: NavItem[] = [
+  { href: "/admin/chat", label: "Sage", icon: ChatCircle, phase: 1 },
+  { href: "/admin", label: "Admin", icon: Wrench, phase: 1 },
+  { href: "/admin/library", label: "Library", icon: Books, phase: 1 },
+  { href: "/teacher/admin/benchmarks", label: "Benchmarks", icon: ChartBar, phase: 1 },
 ];
+
+/**
+ * Admin sidebar: admin-only entries first, then the coordinator and staff
+ * entries the admin also uses. Admin has its own Sage (/admin/chat) and
+ * Library (/admin/library), so the teacher copies are dropped, and an href
+ * shared by the coordinator and staff lists appears once.
+ */
+const ADMIN_NAV_ITEMS: NavItem[] = [
+  ...ADMIN_ITEMS,
+  ...COORDINATOR_ITEMS.filter((item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library"),
+  ...STAFF_ITEMS.filter((item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library"),
+].filter((item, index, all) => all.findIndex((other) => other.href === item.href) === index);
 
 interface NavBarProps {
   studentName: string;
@@ -99,7 +119,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
       : role === "admin"
-        ? ADMIN_ITEMS
+        ? ADMIN_NAV_ITEMS
         : role === "coordinator"
           ? COORDINATOR_ITEMS
           : STAFF_ITEMS;
@@ -208,9 +228,9 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       <Link
         key={item.href}
         href={item.href}
-        className={`premium-nav-link mb-1 flex items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
+        className={`premium-nav-link mb-1 flex min-h-11 items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
           active
-            ? "premium-nav-link-active bg-gradient-to-r from-[#37b550] to-[#2a8a3c] text-white shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
+            ? "premium-nav-link-active bg-[var(--accent-green)] text-[var(--on-accent)] shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
             : "premium-nav-link-idle text-white/90 hover:text-white"
         }`}
         aria-current={active ? "page" : undefined}
@@ -250,7 +270,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           <button
             onClick={handleLogout}
             type="button"
-            className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)]"
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-overlay)] hover:text-[var(--ink-strong)]"
             aria-label="Log out"
           >
             Log out
@@ -272,8 +292,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const active = isActive(item.href);
             return (
               <Link href={item.href} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
-                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
-                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-success" : "text-[var(--ink-muted)]"} />
+                <span className={`text-xs font-medium ${active ? "text-success" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -286,8 +306,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const active = isActive(item.href);
             return (
               <Link href={item.href} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
-                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
-                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-success" : "text-[var(--ink-muted)]"} />
+                <span className={`text-xs font-medium ${active ? "text-success" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -296,13 +316,13 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {/* Tab 3: Sage — elevated center FAB */}
           <Link
             href="/chat"
-            className="flex flex-col items-center gap-0.5 px-3"
+            className="flex min-h-11 flex-col items-center gap-0.5 px-3"
             aria-label="Open Sage chat"
           >
-            <div className={`-mt-4 grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-[#37b550] to-[#2a8a3c] text-white shadow-[0_4px_16px_var(--glow-green)] transition-transform active:scale-95 ${pathname === "/chat" ? "animate-glow-pulse" : ""}`}>
+            <div className={`-mt-4 grid h-11 w-11 place-items-center rounded-full bg-[var(--accent-green)] text-[var(--on-accent)] shadow-[0_4px_16px_var(--glow-green)] transition-transform active:scale-95 ${pathname === "/chat" ? "animate-glow-pulse" : ""}`}>
               <ChatCircle size={22} weight="fill" />
             </div>
-            <span className={`text-xs font-medium ${pathname === "/chat" ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>Sage</span>
+            <span className={`text-xs font-medium ${pathname === "/chat" ? "text-success" : "text-[var(--ink-muted)]"}`}>Sage</span>
           </Link>
 
           {/* Tab 4: Learning */}
@@ -312,8 +332,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             const active = isActive(item.href);
             return (
               <Link href={item.href} className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-current={active ? "page" : undefined}>
-                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
-                <span className={`text-xs font-medium ${active ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
+                <IconComponent size={22} weight={active ? "fill" : "regular"} className={active ? "text-success" : "text-[var(--ink-muted)]"} />
+                <span className={`text-xs font-medium ${active ? "text-success" : "text-[var(--ink-muted)]"}`}>{item.label}</span>
                 {active && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
               </Link>
             );
@@ -322,10 +342,10 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {/* Student sheet uses a focus-trapped dialog with automatic focus restoration. */}
           {role === "student" ? <Dialog.Root>
             <Dialog.Trigger asChild><button type="button" className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-label="More navigation options"><DotsThreeOutline size={22} /><span className="text-xs font-medium">More</span></button></Dialog.Trigger>
-            <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[80] bg-black/50 md:hidden" /><Dialog.Content className="fixed bottom-3 left-3 right-3 z-[81] max-h-[80dvh] overflow-y-auto rounded-2xl bg-[var(--surface-card)] p-5 text-[var(--ink-strong)] md:hidden">
+            <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[80] bg-black/50 md:hidden" /><Dialog.Content className="fixed bottom-3 left-3 right-3 z-[81] max-h-[80dvh] overflow-y-auto rounded-2xl bg-[var(--surface-raised)] p-5 text-[var(--ink-strong)] md:hidden">
               <Dialog.Title className="font-display text-lg font-semibold">Your workspace</Dialog.Title><Dialog.Description className="sr-only">Choose a page or update your settings.</Dialog.Description>
               <div className="mt-4 grid grid-cols-2 gap-2">{mobileMore.map((item) => <Dialog.Close asChild key={item.href}><Link href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 hover:bg-[var(--surface-soft)]"><item.icon size={20} />{item.label}</Link></Dialog.Close>)}</div>
-              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-3">{settingsHref && <Dialog.Close asChild><Link className="min-h-11 py-2" href={settingsHref}>Settings</Link></Dialog.Close>}<button className="min-h-11 py-2" onClick={handleLogout}>Log out</button><Dialog.Close className="secondary-button px-4 py-2">Close menu</Dialog.Close></div>
+              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-3">{settingsHref && <Dialog.Close asChild><Link className="inline-flex items-center pointer-coarse:min-h-11 min-h-11 py-2" href={settingsHref}>Settings</Link></Dialog.Close>}<button className="min-h-11 py-2" onClick={handleLogout}>Log out</button><Dialog.Close className="secondary-button px-4 py-2">Close menu</Dialog.Close></div>
             </Dialog.Content></Dialog.Portal>
           </Dialog.Root> : <button
             ref={moreButtonRef}
@@ -336,8 +356,8 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             aria-haspopup="dialog"
             aria-label="More navigation options"
           >
-            <DotsThreeOutline size={22} weight={isMoreActive ? "fill" : "regular"} className={isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"} />
-            <span className={`text-xs font-medium ${isMoreActive ? "text-[var(--accent-green)]" : "text-[var(--ink-muted)]"}`}>More</span>
+            <DotsThreeOutline size={22} weight={isMoreActive ? "fill" : "regular"} className={isMoreActive ? "text-success" : "text-[var(--ink-muted)]"} />
+            <span className={`text-xs font-medium ${isMoreActive ? "text-success" : "text-[var(--ink-muted)]"}`}>More</span>
             {isMoreActive && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
           </button>}
         </div>
@@ -363,7 +383,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   key={item.href}
                   href={item.href}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     isActive(item.href)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
@@ -379,7 +399,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 <Link
                   href={settingsHref}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
                     isActive(settingsHref)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
@@ -441,7 +461,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 ref={profileButtonRef}
                 onClick={() => setProfileOpen(!profileOpen)}
                 type="button"
-                className="rounded-full border border-white/12 p-1.5 text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                className="inline-flex size-11 items-center justify-center rounded-full border border-white/12 text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                 aria-label="Profile menu"
                 aria-expanded={profileOpen}
                 aria-haspopup="menu"
@@ -465,7 +485,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 <Link
                   href={settingsHref}
                   onClick={() => setProfileOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                  className="flex min-h-11 items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                   role="menuitem"
                 >
                   <Gear size={16} weight="regular" />
@@ -482,7 +502,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                   handleLogout();
                 }}
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-white/90 transition-colors hover:bg-[var(--surface-raised)]/10 hover:text-white"
                 role="menuitem"
               >
                 <SignOut size={16} weight="regular" />
@@ -499,7 +519,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           <button
             onClick={() => setSageMiniOpen((v) => !v)}
             type="button"
-            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl text-[#f0efe8] shadow-[0_8px_30px_var(--glow-green)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)]" : "bg-gradient-to-br from-[#37b550] to-[#2a8a3c]"}`}
+            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl shadow-[0_8px_30px_var(--glow-green)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)] text-[#f0efe8]" : "bg-[var(--accent-green)] text-[var(--on-accent)]"}`}
             aria-label={sageMiniOpen ? "Close Sage chat" : "Open Sage chat"}
             aria-expanded={sageMiniOpen}
           >

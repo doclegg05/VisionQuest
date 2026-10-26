@@ -8,6 +8,7 @@ import { JobFilters, type JobProximityFilter } from "@/components/jobs/JobFilter
 import { BandedJobList } from "@/components/jobs/BandedJobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
 import type { JobTrackingUpdate } from "@/components/jobs/JobCard";
+import { describeSaveError, SaveJobError } from "@/lib/job-board/save-error";
 import AskSageLink from "@/components/sage/AskSageLink";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import type { JobBand } from "@/lib/job-board/job-bands-response";
@@ -138,15 +139,21 @@ export default function CareerHub({
     };
   }, [cluster, proximity, sort, debouncedKeyword, postedWithinDays, minPay, jobType, refreshKey]);
 
+  // VQ-R-016: a failed save used to be silently dropped here — the button
+  // reset and the student never knew why. A non-ok response now throws a
+  // SaveJobError carrying plain-language copy (see save-error.ts), which
+  // JobCard's Save/Update button catches and shows inline.
   const handleSaveJob = useCallback(async (jobId: string, updates?: JobTrackingUpdate) => {
     const res = await fetch("/api/jobs/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobListingId: jobId, ...(updates ?? {}) }),
     });
-    if (res.ok) {
-      setRefreshKey((key) => key + 1);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}) as { code?: string });
+      throw new SaveJobError(describeSaveError(body.code), body.code);
     }
+    setRefreshKey((key) => key + 1);
   }, []);
 
   const matchedCount =
@@ -165,28 +172,28 @@ export default function CareerHub({
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="surface-section rounded-xl p-4 text-center">
-            <Briefcase size={24} className="mx-auto mb-1 text-[var(--primary)]" />
-            <p className="text-2xl font-bold text-[var(--text-primary)]">
+            <Briefcase size={24} className="mx-auto mb-1 text-info" />
+            <p className="text-2xl font-bold text-[var(--ink-strong)]">
               {jobsData?.totalActive ?? 0}
             </p>
-            <p className="text-xs text-[var(--text-secondary)]">Available</p>
+            <p className="text-xs text-[var(--ink-muted)]">Available</p>
           </div>
           <div className="surface-section rounded-xl p-4 text-center">
-            <MagnifyingGlass size={24} className="mx-auto mb-1 text-[var(--accent)]" />
-            <p className="text-2xl font-bold text-[var(--text-primary)]">{matchedCount}</p>
-            <p className="text-xs text-[var(--text-secondary)]">Matched</p>
+            <MagnifyingGlass size={24} className="mx-auto mb-1 text-success" />
+            <p className="text-2xl font-bold text-[var(--ink-strong)]">{matchedCount}</p>
+            <p className="text-xs text-[var(--ink-muted)]">Matched</p>
           </div>
           <div className="surface-section rounded-xl p-4 text-center">
-            <BookmarkSimple size={24} className="mx-auto mb-1 text-[var(--warning)]" />
-            <p className="text-2xl font-bold text-[var(--text-primary)]">
+            <BookmarkSimple size={24} className="mx-auto mb-1 text-warning" />
+            <p className="text-2xl font-bold text-[var(--ink-strong)]">
               {jobsData?.totalSaved ?? 0}
             </p>
-            <p className="text-xs text-[var(--text-secondary)]">Saved</p>
+            <p className="text-xs text-[var(--ink-muted)]">Saved</p>
           </div>
         </div>
 
         {jobsLoading && (
-          <div className="py-12 text-center text-[var(--text-secondary)]">
+          <div className="py-12 text-center text-[var(--ink-muted)]">
             Loading jobs...
           </div>
         )}
@@ -194,13 +201,13 @@ export default function CareerHub({
         {!jobsLoading && jobsData && (
           <div className="mt-6 space-y-6">
             {!hasPersonalizedMatches && (
-              <div className="surface-section rounded-xl border-l-4 border-[var(--warning)] p-4">
+              <div className="surface-section rounded-xl border-l-4 border-[var(--accent-gold)] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                    <p className="text-sm font-medium text-[var(--ink-strong)]">
                       Add career discovery or resume skills to unlock personalized job matches.
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                    <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">
                       Sage can use your interests, strengths, skills, and resume to give better matches.
                     </p>
                   </div>
@@ -219,7 +226,7 @@ export default function CareerHub({
             )}
 
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+              <h3 className="text-lg font-semibold text-[var(--ink-strong)]">
                 {proximity === "local"
                   ? "Local Jobs"
                   : proximity === "remote"
@@ -247,7 +254,7 @@ export default function CareerHub({
             </div>
 
             {jobsData.jobs.length === 0 ? (
-              <div className="surface-section rounded-xl p-6 text-center text-sm text-[var(--text-secondary)]">
+              <div className="surface-section rounded-xl p-6 text-center text-sm text-[var(--ink-muted)]">
                 {proximity === "local"
                   ? "No local jobs found in your class search area yet. Try switching to Remote or All, or ask your teacher to widen the search radius."
                   : proximity === "remote"

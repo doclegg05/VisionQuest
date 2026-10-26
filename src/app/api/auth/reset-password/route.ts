@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   hashPassword,
+  invalidateSessionCache,
   setSessionCookie,
   signMfaSessionToken,
   setMfaSessionCookie,
 } from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { hashPasswordResetToken } from "@/lib/password-reset";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -15,7 +17,7 @@ import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = clientIpBucket(req);
   const rl = await rateLimit(`reset-password:${ip}`, 10, 60 * 60 * 1000);
 
   if (!rl.success) {
@@ -86,6 +88,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       mfaEnabled: student.mfaEnabled,
     };
   });
+  invalidateSessionCache(result.studentId);
 
   // Mailbox control must not skip the second factor (security finding F66).
   // Same contract as the login route: an MFA-enabled account gets the

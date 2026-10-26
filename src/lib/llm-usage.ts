@@ -1,10 +1,12 @@
 import { prisma } from "./db";
+import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { estimateTokens } from "./llm-usage-estimate";
 import { SAGE_PROMPT_REVISION } from "./sage/prompt-revision";
 import type {
   AIProvider,
   ChatMessage,
+  GenerationOptions,
   OnUsage,
   ToolCallHandler,
   ToolDeclaration,
@@ -48,7 +50,7 @@ export async function logLlmCall(params: LogLlmCallParams): Promise<void> {
     });
   } catch (error) {
     // Token logging is non-critical; log and continue
-    logger.error("Failed to log LLM call", { error: String(error) });
+    logger.error("Failed to log LLM call", { error: errorForLog(error) });
   }
 }
 
@@ -186,13 +188,14 @@ export function withUsageLogging(
       systemPrompt: string,
       messages: ChatMessage[],
       onUsage?: OnUsage,
+      options?: GenerationOptions,
     ): Promise<string> {
       const startedAt = Date.now();
       let captured: TokenUsage | null = null;
       const result = await provider.generateResponse(systemPrompt, messages, (usage) => {
         captured = usage;
         onUsage?.(usage);
-      });
+      }, options);
       const usage =
         captured ?? fallbackUsage(systemPrompt.length + totalMessageChars(messages), result.length);
       record(usage, Date.now() - startedAt);
@@ -203,6 +206,7 @@ export function withUsageLogging(
       systemPrompt: string,
       messages: ChatMessage[],
       onUsage?: OnUsage,
+      options?: GenerationOptions,
     ): AsyncGenerator<string> {
       const startedAt = Date.now();
       let captured: TokenUsage | null = null;
@@ -210,7 +214,7 @@ export function withUsageLogging(
       for await (const chunk of provider.streamResponse(systemPrompt, messages, (usage) => {
         captured = usage;
         onUsage?.(usage);
-      })) {
+      }, options)) {
         outputChars += chunk.length;
         yield chunk;
       }
@@ -223,13 +227,14 @@ export function withUsageLogging(
       systemPrompt: string,
       messages: ChatMessage[],
       onUsage?: OnUsage,
+      options?: GenerationOptions,
     ): Promise<string> {
       const startedAt = Date.now();
       let captured: TokenUsage | null = null;
       const result = await provider.generateStructuredResponse(systemPrompt, messages, (usage) => {
         captured = usage;
         onUsage?.(usage);
-      });
+      }, options);
       const usage =
         captured ?? fallbackUsage(systemPrompt.length + totalMessageChars(messages), result.length);
       record(usage, Date.now() - startedAt);

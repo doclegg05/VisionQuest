@@ -1,7 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { parseSalaryToHourly } from "../salary-parser";
 import { inferJobWorkMode } from "../work-mode";
-import { logger } from "@/lib/logger";
+import { fetchJson, mapEachJob } from "./shared";
 
 /**
  * JSearch adapter — uses RapidAPI's JSearch endpoint.
@@ -24,6 +24,10 @@ interface JSearchResult {
   job_apply_link: string;
 }
 
+interface JSearchApiResponse {
+  data?: JSearchResult[];
+}
+
 export const jsearchAdapter: JobSourceAdapter = {
   source: "jsearch",
   sourceType: "api",
@@ -36,54 +40,48 @@ export const jsearchAdapter: JobSourceAdapter = {
     const apiKey = process.env.JSEARCH_API_KEY;
     if (!apiKey) return [];
 
-    try {
-      const params = new URLSearchParams({
-        query: `jobs in ${region}`,
-        num_pages: "2",
-        radius: String(radiusMiles),
-      });
+    const params = new URLSearchParams({
+      query: `jobs in ${region}`,
+      num_pages: "2",
+      radius: String(radiusMiles),
+    });
 
-      const res = await fetch(`https://${JSEARCH_HOST}/search?${params}`, {
-        headers: {
-          "x-rapidapi-key": apiKey,
-          "x-rapidapi-host": JSEARCH_HOST,
-        },
-      });
+    // fetchJson (VQ-R-019) applies a 30s AbortSignal.timeout so a stalled
+    // JSearch response cannot hang the whole refresh sweep.
+    const json = await fetchJson<JSearchApiResponse>(`https://${JSEARCH_HOST}/search?${params}`, {
+      headers: {
+        "x-rapidapi-key": apiKey,
+        "x-rapidapi-host": JSEARCH_HOST,
+      },
+    });
+    const results: JSearchResult[] = json?.data ?? [];
 
-      if (!res.ok) {
-        logger.error("JSearch API error", { status: res.status });
-        return [];
-      }
-
-      const json = await res.json();
-      const results: JSearchResult[] = json.data ?? [];
-
-      return results.map((r) => {
-        const salaryText = formatJSearchSalary(r);
-        return {
+    // mapEachJob isolates one malformed row (e.g. an unexpectedly-shaped
+    // item that throws while reading a field) from the rest of the batch —
+    // see its doc comment in ./shared for why that beats both the old
+    // swallow-everything try/catch and a plain .map().
+    return mapEachJob(results, "jsearch", (r) => {
+      const salaryText = formatJSearchSalary(r);
+      return {
+        title: r.job_title,
+        company: r.employer_name,
+        location: [r.job_city, r.job_state].filter(Boolean).join(", "),
+        workMode: inferJobWorkMode({
+          source: "jsearch",
           title: r.job_title,
           company: r.employer_name,
           location: [r.job_city, r.job_state].filter(Boolean).join(", "),
-          workMode: inferJobWorkMode({
-            source: "jsearch",
-            title: r.job_title,
-            company: r.employer_name,
-            location: [r.job_city, r.job_state].filter(Boolean).join(", "),
-            description: r.job_description,
-          }),
-          salary: salaryText,
-          salaryMin: parseSalaryToHourly(salaryText),
-          description: r.job_description?.slice(0, 5000) ?? "",
-          url: r.job_apply_link,
-          source: "jsearch",
-          sourceType: "api" as const,
-          sourceId: `jsearch:${r.job_id}`,
-        };
-      });
-    } catch (err) {
-      logger.error("JSearch adapter error", { error: String(err) });
-      return [];
-    }
+          description: r.job_description,
+        }),
+        salary: salaryText,
+        salaryMin: parseSalaryToHourly(salaryText),
+        description: r.job_description?.slice(0, 5000) ?? "",
+        url: r.job_apply_link,
+        source: "jsearch",
+        sourceType: "api" as const,
+        sourceId: `jsearch:${r.job_id}`,
+      };
+    });
   },
 };
 

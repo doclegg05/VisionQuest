@@ -6,16 +6,18 @@
 // translates into SSE frames.
 // =============================================================================
 
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import type { AIProvider, ChatMessage, ToolDeclaration } from "@/lib/ai/types";
 import type { Session } from "@/lib/api-error";
 import { executeAgentTool } from "./executor";
-import { getEnabledTools } from "./tools";
+import { getEnabledTools, toolsForTurn } from "./tools";
 import type { AgentEvent, AgentTool, AgentToolCallRecord } from "./types";
 
 interface AgentTurnOptions {
   provider: AIProvider;
   systemPrompt: string;
+  systemPrefixLength?: number;
   messages: ChatMessage[];
   session: Session;
   conversationId: string;
@@ -23,19 +25,26 @@ interface AgentTurnOptions {
   /** Override the role-based default tool subset (e.g., constrain to a single tool). */
   toolNames?: string[];
   maxHops?: number;
+  /**
+   * Whether this turn carries a file the user attached. Required, so every
+   * caller decides: without one, tools that need a fileUploadId are not
+   * offered (toolsForTurn).
+   */
+  hasAttachment: boolean;
 }
 
 export async function* runAgentTurn(
   options: AgentTurnOptions,
 ): AsyncGenerator<AgentEvent> {
-  const { provider, systemPrompt, messages, session, conversationId, targetStudentId, toolNames, maxHops } = options;
+  const { provider, systemPrompt, systemPrefixLength, messages, session, conversationId, targetStudentId, toolNames, maxHops, hasAttachment } =
+    options;
 
   const role = session.role || "student";
-  const enabledTools = filterTools(getEnabledTools(role), toolNames);
+  const enabledTools = filterTools(toolsForTurn(getEnabledTools(role), { hasAttachment }), toolNames);
 
   // No tools available or provider can't function-call → fall back to plain stream.
   if (enabledTools.length === 0 || !provider.streamWithTools) {
-    yield* runFallbackStream(provider, systemPrompt, messages);
+    yield* runFallbackStream(provider, systemPrompt, messages, systemPrefixLength);
     return;
   }
 
@@ -67,7 +76,7 @@ export async function* runAgentTurn(
         records.set(callId, record);
         return toHandlerResult(record);
       },
-      { maxHops: maxHops ?? 8 },
+      { maxHops: maxHops ?? 8, systemPrefixLength },
     );
 
     for await (const event of stream) {
@@ -113,7 +122,7 @@ export async function* runAgentTurn(
     }
   } catch (err) {
     logger.error("agent.loop: provider stream failed", {
-      err: err instanceof Error ? err.message : String(err),
+      err: errorForLog(err),
     });
     yield* settleUnresultedCalls(pendingCalls, records);
     yield {
@@ -184,9 +193,10 @@ async function* runFallbackStream(
   provider: AIProvider,
   systemPrompt: string,
   messages: ChatMessage[],
+  systemPrefixLength?: number,
 ): AsyncGenerator<AgentEvent> {
   const finalChunks: string[] = [];
-  for await (const chunk of provider.streamResponse(systemPrompt, messages)) {
+  for await (const chunk of provider.streamResponse(systemPrompt, messages, undefined, { systemPrefixLength })) {
     finalChunks.push(chunk);
     yield { type: "text", text: chunk };
   }

@@ -26,7 +26,7 @@ export interface EmbedProgramDocumentInput {
   /** Full extracted body text; chunk embeddings are skipped when absent. */
   text?: string | null;
   /** Page-structured input; when present, enables full provenance (tokenCount/pageNumber/sectionTitle). */
-  pages?: { pageNumber: number; text: string }[];
+  pages?: { pageNumber: number | null; text: string; extractionMethod?: "text" | "ocr" }[];
   usage?: EmbeddingUsageContext;
 }
 
@@ -41,6 +41,7 @@ export function buildChunkRows(chunks: ChunkWithProvenance[]) {
     tokenCount: c.tokenCount,
     pageNumber: c.pageNumber,
     sectionTitle: c.sectionTitle,
+    extractionMethod: c.extractionMethod ?? "unknown",
   }));
 }
 
@@ -68,6 +69,7 @@ export async function embedProgramDocument(
         // Flat text has no reliable physical page location.
         pageNumber: null,
         sectionTitle: null,
+        extractionMethod: "text" as const,
       }));
   const rows = buildChunkRows(provChunks);
   const chunkTexts = rows.map((r) => r.content);
@@ -101,12 +103,12 @@ export async function embedProgramDocument(
       const values = rows.slice(start, start + batchSize).map((row, index) => Prisma.sql`(
         ${randomUUID()}, ${docId}, ${row.chunkIndex}, ${row.content},
         ${chunkLiterals[start + index]}::vector(768), ${activeModel},
-        ${row.tokenCount}, ${row.pageNumber}, ${row.sectionTitle}, CURRENT_TIMESTAMP
+        ${row.tokenCount}, ${row.pageNumber}, ${row.sectionTitle}, ${row.extractionMethod}, CURRENT_TIMESTAMP
       )`);
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO "visionquest"."DocumentChunk"
           (id, "documentId", "chunkIndex", content, embedding, "embeddingModel",
-           "tokenCount", "pageNumber", "sectionTitle", "updatedAt")
+           "tokenCount", "pageNumber", "sectionTitle", "extractionMethod", "updatedAt")
         VALUES ${Prisma.join(values)}
       `);
     }

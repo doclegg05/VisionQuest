@@ -32,7 +32,7 @@ function constantTimeEqual(a: string, b: string): boolean {
 /**
  * Bearer authentication for the external-form caller.
  *
- * This deliberately does NOT fall back to `CRON_SECRET`. That fallback made
+ * This deliberately does NOT fall back to the cron bearer secret. That fallback made
  * the token authenticating every `/api/internal/*` cron endpoint double as the
  * webhook's password, so one leak at an external form vendor would have
  * reached the whole internal job surface — and because `INTAKE_WEBHOOK_SECRET`

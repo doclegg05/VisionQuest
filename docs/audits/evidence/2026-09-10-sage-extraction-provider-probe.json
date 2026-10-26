@@ -1,0 +1,91 @@
+{
+  "at": "2026-09-10T17:37:20.728Z",
+  "syntheticOnly": true,
+  "results": [
+    {
+      "name": "discovery",
+      "latencyMs": 2157,
+      "result": {
+        "interests": [
+          "repairing computers",
+          "IT support"
+        ],
+        "strengths": [],
+        "subjects": [
+          "computers"
+        ],
+        "problems": [],
+        "values": [],
+        "circumstances": [],
+        "cluster_scores": {
+          "office-admin": 0,
+          "finance-bookkeeping": 0,
+          "tech-digital": 1,
+          "creative-design": 0,
+          "customer-service": 0,
+          "career-readiness": 0,
+          "language-esl": 0
+        },
+        "summary": "The student has identified a clear goal in IT support and computer repair.",
+        "stage_complete": true,
+        "xp_events": [
+          "discovery_complete"
+        ],
+        "riasec_scores": {
+          "realistic": 0.8,
+          "investigative": 0.5,
+          "artistic": 0,
+          "social": 0,
+          "enterprising": 0,
+          "conventional": 0
+        },
+        "holland_code": "RI",
+        "national_career_clusters": [
+          {
+            "cluster_name": "Digital Technology",
+            "score": 1,
+            "spokes_mapping": [
+              "tech-digital"
+            ]
+          }
+        ],
+        "transferable_skills": [],
+        "work_values": [],
+        "assessment_summary": "The student presents a strong, singular interest in the technical field, specifically IT support and hardware repair. Their Holland profile reflects a Realistic and Investigative lean, suggesting a preference for hands-on troubleshooting and technical problem-solving. At this stage, they are focused on gaining employment in IT. We will proceed by identifying foundational technical certifications and job-readiness requirements for entry-level support roles."
+      }
+    },
+    {
+      "name": "goals",
+      "latencyMs": 984,
+      "result": {
+        "goals_found": [
+          {
+            "level": "bhag",
+            "content": "repair computers and find an IT support job",
+            "confidence": 1
+          }
+        ],
+        "stage_complete": true,
+        "insight": {
+          "category": "goal",
+          "content": "The student has a clear career interest in information technology and computer repair.",
+          "confidence": 1
+        }
+      }
+    },
+    {
+      "name": "memory",
+      "latencyMs": 940,
+      "result": {
+        "memories": [
+          {
+            "kind": "semantic",
+            "content": "The student's career goal is to work in IT support, specifically focusing on computer repair.",
+            "category": "goal",
+            "confidence": 1
+          }
+        ]
+      }
+    }
+  ]
+}

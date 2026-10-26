@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it, mock } from "node:test";
-import { mockStudentSession, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
+import { mockAdminSession, mockStudentSession, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
+import { DEMO_SAGE_LIMIT } from "@/lib/demo/copy";
 
 // ---------------------------------------------------------------------------
 // Request-level tests for POST /api/chat/send.
@@ -57,6 +58,7 @@ const mockCheckTokenQuota = mock.fn() as any;
 const mockWithUsageLogging = mock.fn() as any;
 const mockGetStudentProgramType = mock.fn() as any;
 const mockPrismaStudentFindUnique = mock.fn() as any;
+const mockFileUploadFindMany = mock.fn() as any;
 const mockFormatClustersForPrompt = mock.fn() as any;
 const mockRunAgentTurn = mock.fn() as any;
 const mockExecuteSlashCommand = mock.fn() as any;
@@ -262,12 +264,21 @@ mock.module("@/lib/db", {
       student: {
         findUnique: mockPrismaStudentFindUnique,
       },
+      fileUpload: {
+        findMany: mockFileUploadFindMany,
+      },
     },
     prismaAdmin: {
       student: {
         findUnique: mockPrismaStudentFindUnique,
       },
     },
+  },
+});
+
+mock.module("@/lib/chat/open-orientation-items", {
+  namedExports: {
+    loadOpenOrientationItems: async () => [],
   },
 });
 
@@ -390,6 +401,7 @@ function resetMocks() {
     mockWithUsageLogging,
     mockGetStudentProgramType,
     mockPrismaStudentFindUnique,
+    mockFileUploadFindMany,
     mockFormatClustersForPrompt,
     mockRunAgentTurn,
     mockExecuteSlashCommand,
@@ -480,6 +492,7 @@ function resetMocks() {
   mockShouldAttemptStaffStudentContext.mock.mockImplementation(() => false);
   mockGetStudentProgramType.mock.mockImplementation(async () => null);
   mockPrismaStudentFindUnique.mock.mockImplementation(async () => ({ classroomConfirmedAt: null }));
+  mockFileUploadFindMany.mock.mockImplementation(async () => []);
   mockAwardEvent.mock.mockImplementation(async () => undefined);
   mockFormatClustersForPrompt.mock.mockImplementation(() => "");
   mockRunAgentTurn.mock.mockImplementation(async function* () {
@@ -616,6 +629,221 @@ describe("POST /api/chat/send — rate limiting", () => {
     } finally {
       mockRateLimitsDisabled.mock.mockImplementation(() => false);
     }
+  });
+});
+
+describe("POST /api/chat/send: Sage limits for demo accounts", () => {
+  // Classic streamResponse() path, so a capturing provider can read the prompt.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  const previousDemoSageCap = process.env.COHORT_DEMO_SAGE_PER_DAY;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+    if (previousDemoSageCap === undefined) delete process.env.COHORT_DEMO_SAGE_PER_DAY;
+    else process.env.COHORT_DEMO_SAGE_PER_DAY = previousDemoSageCap;
+  });
+
+  const DEMO_WIDE_KEY = "chat-daily:demo-all";
+  const CRISIS_MESSAGE = "I just want to end it all";
+  const NORMAL_MESSAGE = "How do I finish my OSHA 10 certification?";
+  const EN_BLOCK = /call or text 988/;
+
+  // Every chat counter the route charges, in order, as "key:limit". The hourly
+  // and daily counters are separate mocks, so one shared log is what shows
+  // order. Other counters (crisis, staff memory) are not chat limits.
+  let charged: string[] = [];
+  const logCharge = (key: string, limit: number) => {
+    if (key.startsWith("chat:") || key.startsWith("chat-daily:")) charged.push(`${key}:${limit}`);
+  };
+
+  beforeEach(() => {
+    resetMocks();
+    delete process.env.COHORT_DEMO_SAGE_PER_DAY;
+    charged = [];
+    mockRateLimit.mock.mockImplementation(async (key: string, limit: number) => {
+      logCharge(key, limit);
+      return { success: true, remaining: 100, resetTime: Date.now() + 3600_000, degraded: false };
+    });
+    mockRateLimitDaily.mock.mockImplementation(async (key: string, limit: number) => {
+      logCharge(key, limit);
+      return { success: true, remaining: 100, resetTime: Date.now() + 3600_000, degraded: false };
+    });
+  });
+
+  function post(message = NORMAL_MESSAGE) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    return route.POST(req as never, { params: Promise.resolve({}) } as never);
+  }
+
+  const useCloud = () =>
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+  const demoStudent = () => mockStudentSession({ demoAccount: "student" });
+  const demoInstructor = () => mockTeacherSession({ demoAccount: "instructor" });
+
+  it("refuses past the demo-wide cap with crisis resources", async () => {
+    session = demoStudent();
+    mockRateLimitDaily.mock.mockImplementation(async (key: string, limit: number) => {
+      logCharge(key, limit);
+      return key === DEMO_WIDE_KEY
+        ? { success: false, remaining: 0, resetTime: Date.now() + 3600_000, degraded: false }
+        : { success: true, remaining: 100, resetTime: Date.now() + 3600_000, degraded: false };
+    });
+
+    const res = await post(CRISIS_MESSAGE);
+
+    assert.equal(res.status, 429);
+    const body = await res.json();
+    assert.ok(body.error.startsWith(DEMO_SAGE_LIMIT), "the demo wording comes first");
+    assert.match(body.error, EN_BLOCK);
+    assert.equal(mockSaveMessage.mock.callCount(), 0, "a refused message is not saved");
+    assert.ok(charged.includes(`${DEMO_WIDE_KEY}:2000`));
+  });
+
+  it("keeps the refusal plain when the message carries no crisis signal", async () => {
+    session = demoStudent();
+    mockRateLimitDaily.mock.mockImplementation(async () => ({
+      success: false,
+      remaining: 0,
+      resetTime: Date.now() + 3600_000,
+      degraded: false,
+    }));
+
+    const res = await post();
+
+    assert.equal(res.status, 429);
+    assert.equal((await res.json()).error, DEMO_SAGE_LIMIT);
+  });
+
+  it("charges the hour, the account's day and the demo-wide day, in that order", async () => {
+    session = demoStudent();
+    useCloud();
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.deepEqual(charged, [
+      `chat:${session.id}:40`,
+      `chat-daily:${session.id}:200`,
+      `${DEMO_WIDE_KEY}:2000`,
+    ]);
+  });
+
+  it("applies the demo-wide cap to a demo student on a local provider too", async () => {
+    session = demoStudent();
+
+    const res = await post();
+    await readSseBody(res);
+
+    // No per-account day on a local provider, but the demo-wide one is not
+    // about cost per account, so it stays.
+    assert.deepEqual(charged, [`chat:${session.id}:40`, `${DEMO_WIDE_KEY}:2000`]);
+  });
+
+  it("gives the demo instructor 300 an hour and 1000 a day, even on a local provider", async () => {
+    session = demoInstructor();
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.deepEqual(charged, [
+      `chat:${session.id}:300`,
+      `chat-daily:${session.id}:1000`,
+      `${DEMO_WIDE_KEY}:2000`,
+    ]);
+  });
+
+  it("reads the demo-wide cap from the environment on each request", async () => {
+    session = demoStudent();
+    process.env.COHORT_DEMO_SAGE_PER_DAY = "1234";
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.ok(charged.includes(`${DEMO_WIDE_KEY}:1234`), charged.join(", "));
+  });
+
+  it("never charges the demo-wide cap to a real account", async () => {
+    useCloud();
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.deepEqual(charged, [`chat:${session.id}:40`, `chat-daily:${session.id}:200`]);
+  });
+
+  it("skips the demo-wide cap when rate limits are disabled", async () => {
+    session = demoStudent();
+    mockRateLimitsDisabled.mock.mockImplementation(() => true);
+
+    const res = await post();
+    await readSseBody(res);
+
+    assert.deepEqual(charged, []);
+  });
+
+  describe("real accounts keep today's numbers", () => {
+    const rows = [
+      { who: "student", make: () => mockStudentSession(), hourly: 40, cloudDaily: 200 },
+      { who: "teacher", make: () => mockTeacherSession(), hourly: 60, cloudDaily: 400 },
+      {
+        who: "coordinator",
+        make: () => mockTeacherSession({ id: "crd-test-001", role: "coordinator" }),
+        hourly: 60,
+        cloudDaily: 400,
+      },
+      { who: "admin", make: () => mockAdminSession(), hourly: 120, cloudDaily: null },
+    ] as const;
+
+    for (const row of rows) {
+      it(`${row.who}, cloud provider`, async () => {
+        session = row.make();
+        useCloud();
+
+        await readSseBody(await post());
+
+        const expected = [`chat:${session.id}:${row.hourly}`];
+        if (row.cloudDaily !== null) expected.push(`chat-daily:${session.id}:${row.cloudDaily}`);
+        assert.deepEqual(charged, expected);
+      });
+
+      it(`${row.who}, local provider`, async () => {
+        session = row.make();
+
+        await readSseBody(await post());
+
+        assert.deepEqual(charged, [`chat:${session.id}:${row.hourly}`]);
+      });
+    }
+  });
+
+  it("measures the 80% daily warning against the demo instructor's own daily cap", async () => {
+    session = demoInstructor();
+    const captured = { systemPrompt: "" };
+    mockResolveAiProvider.mock.mockImplementation(async () => ({
+      ...makeFakeProvider("ollama"),
+      async *streamResponse(systemPrompt: string) {
+        captured.systemPrompt = systemPrompt;
+        yield "ok";
+      },
+    }));
+    // 150 left of 1000 is 85% used. Against the old 400 it would read 62%.
+    mockRateLimitDaily.mock.mockImplementation(async (key: string) => ({
+      success: true,
+      remaining: key === `chat-daily:${session.id}` ? 150 : 1500,
+      resetTime: Date.now() + 3600_000,
+      degraded: false,
+    }));
+
+    await readSseBody(await post());
+
+    assert.match(captured.systemPrompt, /used 85% of their daily message limit/);
   });
 });
 
@@ -1682,6 +1910,37 @@ describe("POST /api/chat/send — chat limit charged on a reply, not on a confir
     ]);
   });
 
+  it("refunds the demo-wide unit too when a demo account's turn ends in a confirm card", async () => {
+    session = mockStudentSession({ demoAccount: "student" });
+    mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+
+    const res = await post("Add a goal to finish my resume this week");
+    await readSseBody(res);
+
+    assert.deepEqual(refundCalls().sort(), [
+      ["chat-daily:demo-all", DAILY_RESET],
+      [`chat-daily:${session.id}`, DAILY_RESET],
+      [`chat:${session.id}`, HOURLY_RESET],
+    ]);
+  });
+
+  it("has nothing to refund for a demo-wide unit that came back degraded", async () => {
+    session = mockStudentSession({ demoAccount: "student" });
+    mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
+    mockRateLimitDaily.mock.mockImplementation(async () => ({
+      success: true,
+      remaining: 1999,
+      resetTime: DAILY_RESET,
+      degraded: true,
+    }));
+
+    const res = await post("Add a goal to finish my resume this week");
+    await readSseBody(res);
+
+    assert.deepEqual(refundCalls(), [[`chat:${session.id}`, HOURLY_RESET]]);
+  });
+
   it("refunds nothing when rate limits are disabled (nothing was consumed)", async () => {
     mockRateLimitsDisabled.mock.mockImplementation(() => true);
     mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
@@ -1875,5 +2134,303 @@ describe("POST /api/chat/send — 988 resources on the form-lookup exits (F60, R
     ]);
     const onBody = await postWithAgentMode("full", NORMAL_FORM_ASK);
     assert.doesNotMatch(onBody, /988/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC3 — de-identification through the real route.
+//
+// Every other suite here mocks `resolveAiProvider` and hands back a plain
+// double. These cases hand back the REAL decorator wrapped around that double,
+// which is what the resolver now returns for a cloud student_record call. The
+// point is the round trip through the actual streaming code path: the model
+// only ever sees tokens, and the student only ever sees their name.
+// ---------------------------------------------------------------------------
+describe("POST /api/chat/send — de-identification round trip (AC3)", () => {
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+  });
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  /** Chunks split mid-token, the way a real cloud stream splits them. */
+  const SPLIT_CHUNKS = ["Hey [STU", "DENT_FIRST_NA", "ME], nice work. Mail [STUDENT_EM", "AIL] when you can."];
+
+  async function withWrappedProvider(chunks: string[], prompt = "Coaching Test Student.") {
+    const { TokenVault } = await import("@/lib/ai/deidentify");
+    const { withDeidentification } = await import("@/lib/ai/with-deidentification");
+    const vault = TokenVault.fromIdentity({
+      studentName: "Test Student",
+      studentEmail: "test.student@example.org",
+    });
+    const inner = makeFakeProvider("gemini", chunks);
+    const seen: string[] = [];
+    const recording = {
+      ...inner,
+      async *streamResponse(systemPrompt: string, messages: unknown) {
+        seen.push(systemPrompt);
+        yield* inner.streamResponse(systemPrompt, messages as never);
+      },
+    };
+    mockResolveAiProvider.mock.mockImplementation(async () =>
+      withDeidentification(recording as never, vault),
+    );
+    mockBuildSystemPrompt.mock.mockImplementation(() => prompt);
+    return { seen };
+  }
+
+  it("streams the student's real name to the client from a token split across chunks", async () => {
+    await withWrappedProvider(SPLIT_CHUNKS);
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "hi, it's Test Student" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    const streamed = [...body.matchAll(/"text":"((?:[^"\\]|\\.)*)"/g)]
+      .map((m) => JSON.parse(`"${m[1]}"`))
+      .join("");
+    assert.equal(streamed, "Hey Test, nice work. Mail test.student@example.org when you can.");
+    assert.doesNotMatch(streamed, /STUDENT_FIRST_NAME|STUDENT_EMAIL/);
+  });
+
+  it("saves an assistant message identical to what the client was streamed", async () => {
+    await withWrappedProvider(SPLIT_CHUNKS);
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "hi, it's Test Student" },
+    });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const body = await readSseBody(res);
+
+    const streamed = [...body.matchAll(/"text":"((?:[^"\\]|\\.)*)"/g)]
+      .map((m) => JSON.parse(`"${m[1]}"`))
+      .join("");
+    const assistantCall = mockSaveMessage.mock.calls.find((call) => call.arguments[2] === "assistant");
+    assert.ok(assistantCall, "expected an assistant saveMessage call");
+    assert.equal(String(assistantCall!.arguments[3]), streamed);
+  });
+
+  it("hands the model tokens, never the student's name or email", async () => {
+    const { seen } = await withWrappedProvider(SPLIT_CHUNKS);
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "I'm Test Student, mail me at test.student@example.org" },
+    });
+    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0], "Coaching [STUDENT_NAME].");
+    assert.doesNotMatch(seen[0], /Test Student/);
+  });
+
+  it("passes the session role and display name to the resolver so the vault can be built", async () => {
+    await withWrappedProvider(["ok"]);
+    const req = mockRequest("/api/chat/send", {
+      method: "POST",
+      body: { message: "hi, it's Test Student" },
+    });
+    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    const request = mockResolveAiProvider.mock.calls[0].arguments[0] as {
+      sessionRole?: string;
+      sessionDisplayName?: string;
+    };
+    assert.equal(request.sessionRole, session.role);
+    assert.equal(request.sessionDisplayName, session.displayName);
+  });
+});
+
+describe("POST /api/chat/send — attachment-only tools follow the turn's files", () => {
+  // The agent loop drops tools that need a fileUploadId unless the turn
+  // carries a file (toolsForTurn). The route decides that, and only a file
+  // this student owns counts, so a forged attachment id unlocks nothing.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_MODE = "full";
+    delete process.env.SAGE_AGENT_ENABLED;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  const FILE_ID = "cjld2cjxh0000qzrmn831i7rn";
+
+  async function hasAttachmentFor(body: { message: string; attachmentIds?: string[] }) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+    assert.equal(mockRunAgentTurn.mock.callCount(), 1, "the agent loop should run once");
+    return mockRunAgentTurn.mock.calls[0].arguments[0].hasAttachment;
+  }
+
+  it("a turn with a file this student owns offers the file tools", async () => {
+    mockFileUploadFindMany.mock.mockImplementation(async () => [
+      { id: FILE_ID, filename: "signed-dress-code.pdf", gist: "A signed dress code form." },
+    ]);
+    assert.equal(await hasAttachmentFor({ message: "File this for me", attachmentIds: [FILE_ID] }), true);
+  });
+
+  it("attachment ids that match no file of this student's do not", async () => {
+    mockFileUploadFindMany.mock.mockImplementation(async () => []);
+    assert.equal(await hasAttachmentFor({ message: "File this for me", attachmentIds: [FILE_ID] }), false);
+  });
+
+  it("a turn with no attachment does not", async () => {
+    assert.equal(await hasAttachmentFor({ message: "Put my food handler card in my portfolio" }), false);
+  });
+});
+
+describe("POST /api/chat/send — the new message reaches the model once", () => {
+  // The route saves the user message BEFORE it loads the history window, so
+  // the window the database returns already ends with that message. These
+  // doubles keep that ordering honest: saveMessage writes to an in-memory
+  // transcript and getConversationContext reads it back, the way the real
+  // helpers read the Message table.
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  type Turn = { role: "user" | "model"; content: string };
+  const NEW_MESSAGE = "I passed my IC3 test today!";
+  const PRIOR_TURNS: Turn[] = [
+    { role: "user", content: "I have my IC3 test tomorrow." },
+    { role: "model", content: "You have prepared well. Get some sleep tonight." },
+  ];
+
+  function backHistoryWithTranscript(prior: Turn[]) {
+    const transcript: Turn[] = [...prior];
+    mockSaveMessage.mock.mockImplementation(
+      async (_conversationId: string, _studentId: string, role: "user" | "assistant", content: string) => {
+        transcript.push({ role: role === "user" ? "user" : "model", content });
+        return { id: `msg-${transcript.length}` };
+      },
+    );
+    mockGetConversationContext.mock.mockImplementation(async () => ({
+      messages: transcript.map((turn) => ({ ...turn })),
+      summaryInjected: false,
+      droppedForBudget: 0,
+      overBudget: false,
+    }));
+  }
+
+  function makeMessageCapturingProvider() {
+    const captured: { messages: Turn[] | null } = { messages: null };
+    const provider = {
+      name: "ollama",
+      async generateResponse(_systemPrompt: string, messages: Turn[]) {
+        captured.messages = messages;
+        return "Congratulations!";
+      },
+      async *streamResponse(_systemPrompt: string, messages: Turn[]) {
+        captured.messages = messages;
+        yield "Congratulations!";
+      },
+      async generateStructuredResponse() {
+        return "{}";
+      },
+    };
+    return { provider, captured };
+  }
+
+  function countNewMessage(messages: Turn[]): number {
+    return messages.filter((m) => m.role === "user" && m.content === NEW_MESSAGE).length;
+  }
+
+  async function send(message = NEW_MESSAGE) {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(res);
+  }
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it("student, streamed reply: the provider sees the prior turns and the new message once", async () => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    backHistoryWithTranscript(PRIOR_TURNS);
+    const { provider, captured } = makeMessageCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+
+    await send();
+
+    assert.ok(captured.messages, "expected the provider to be called");
+    assert.equal(countNewMessage(captured.messages!), 1);
+    assert.deepEqual(captured.messages, [...PRIOR_TURNS, { role: "user", content: NEW_MESSAGE }]);
+  });
+
+  it("student, agent loop: runAgentTurn gets the new message once", async () => {
+    process.env.SAGE_AGENT_ENABLED = "true";
+    delete process.env.SAGE_AGENT_MODE;
+    backHistoryWithTranscript(PRIOR_TURNS);
+
+    await send();
+
+    assert.equal(mockRunAgentTurn.mock.callCount(), 1);
+    const { messages } = mockRunAgentTurn.mock.calls[0].arguments[0] as { messages: Turn[] };
+    assert.equal(countNewMessage(messages), 1);
+    assert.deepEqual(messages.at(-1), { role: "user", content: NEW_MESSAGE });
+  });
+
+  it("student: post-response extraction gets the new message once", async () => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    backHistoryWithTranscript(PRIOR_TURNS);
+
+    await send();
+
+    assert.equal(mockHandlePostResponse.mock.callCount(), 1);
+    const { allMessages } = mockHandlePostResponse.mock.calls[0].arguments[0] as { allMessages: Turn[] };
+    assert.equal(countNewMessage(allMessages), 1);
+  });
+
+  it("staff (teacher) chat: the provider sees the new message once", async () => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    session = mockTeacherSession();
+    backHistoryWithTranscript(PRIOR_TURNS);
+    const { provider, captured } = makeMessageCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+
+    await send();
+
+    assert.equal(mockGetOrCreateTeacherConversation.mock.callCount(), 1);
+    assert.ok(captured.messages, "expected the provider to be called");
+    assert.equal(countNewMessage(captured.messages!), 1);
+  });
+
+  it("still appends the new message when the loaded window does not end with it", async () => {
+    // Defensive branch: a history load that misses the saved row (a second
+    // send landing in between, or a test double returning []) must not leave
+    // the model without the student's message.
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+    mockGetConversationContext.mock.mockImplementation(async () => ({ messages: [...PRIOR_TURNS] }));
+    const { provider, captured } = makeMessageCapturingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+
+    await send();
+
+    assert.deepEqual(captured.messages, [...PRIOR_TURNS, { role: "user", content: NEW_MESSAGE }]);
   });
 });

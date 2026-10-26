@@ -1,9 +1,10 @@
+import { isDemoLocalOnlyRequired } from "@/lib/ai/demo-local-only";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
-import { withAuth } from "@/lib/api-error";
+import { forbidden, withAuth } from "@/lib/api-error";
 import { parseBody, apiKeySchema } from "@/lib/schemas";
 import { GeminiProvider } from "@/lib/ai/gemini-provider";
 
@@ -37,6 +38,7 @@ export const GET = withAuth(async (session) => {
 });
 
 export const POST = withAuth(async (session, req: NextRequest) => {
+  if (isDemoLocalOnlyRequired()) throw forbidden("Cloud API keys are disabled in this demo.");
   const rl = await rateLimit(`api-key:${session.id}`, 5, 15 * 60 * 1000);
   if (!rl.success) {
     return Response.json({ error: "Too many attempts. Please try again later." }, { status: 429 });

@@ -19,6 +19,7 @@ import {
   reviewResultMessage,
   type FormReviewExtras,
 } from "./student-detail/form-review";
+import { useConfirm } from "@/components/ui/useConfirm";
 
 type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled";
 
@@ -41,6 +42,8 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
   const [certOutcomeVerifying, setCertOutcomeVerifying] = useState(false);
+  const [applicationVerifying, setApplicationVerifying] = useState<string | null>(null);
+  const [applicationVerifyError, setApplicationVerifyError] = useState<string | null>(null);
   const [orientationVerifying, setOrientationVerifying] = useState<string | null>(null);
   const [showResetPw, setShowResetPw] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -58,6 +61,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [reviewingFormId, setReviewingFormId] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [updatingAppointmentId, setUpdatingAppointmentId] = useState<string | null>(null);
+  const { confirm, prompt, confirmDialog } = useConfirm();
   const [appointmentForm, setAppointmentForm] = useState({
     title: "",
     description: "",
@@ -159,6 +163,38 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
   }
 
+  /**
+   * Per-application outcome verification (P1-4). `/api/teacher/outcomes/verify`
+   * has accepted `targetType: "application"` since P1-4 shipped, but nothing
+   * called it — so every placement in the grant report stayed "self-reported".
+   * This is the missing call site, not a new endpoint.
+   */
+  async function handleApplicationVerify(applicationId: string) {
+    setApplicationVerifying(applicationId);
+    setApplicationVerifyError(null);
+    try {
+      const res = await fetch("/api/teacher/outcomes/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetType: "application", targetId: applicationId }),
+      });
+      // A failed verify that silently reloaded left the row looking exactly as
+      // it did before, so the instructor would conclude the button did nothing
+      // and try again — or worse, assume it had worked. Say so, and do not
+      // reload: the data has not changed.
+      if (!res.ok) {
+        setApplicationVerifyError("Could not verify that.");
+        return;
+      }
+      await loadData();
+    } catch (err) {
+      console.error("Failed to verify application:", err instanceof Error ? err.message : "Unknown error");
+      setApplicationVerifyError("Could not verify that.");
+    } finally {
+      setApplicationVerifying(null);
+    }
+  }
+
   async function handleOrientationVerify(itemId: string, decision: "confirm" | "decline") {
     setOrientationVerifying(itemId);
     try {
@@ -192,7 +228,15 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
   async function handleResetPassword() {
     if (!newPassword || newPassword.length < 6) return;
-    if (!confirm("Reset password for this student? They will need the new password to log in.")) return;
+    if (
+      !(await confirm({
+        title: "Reset this student's password?",
+        message: "They will need the new password to log in.",
+        confirmLabel: "Reset password",
+      }))
+    ) {
+      return;
+    }
     setResetStatus("saving");
     try {
       const res = await fetch(`/api/teacher/students/${studentId}/reset-password`, {
@@ -416,9 +460,13 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     extras?: FormReviewExtras,
   ) {
     const notes = status === "rejected"
-      ? window.prompt("Optional note for the student:", "")
+      ? await prompt({
+          title: "Return this form to the student?",
+          label: "Note for the student (optional)",
+          confirmLabel: "Return form",
+        })
       : "";
-    if (status === "rejected" && notes === null) {
+    if (notes === null) {
       return;
     }
 
@@ -450,19 +498,19 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
-        <button onClick={loadData} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
+        <button onClick={loadData} className="primary-button px-4 py-2 pointer-coarse:min-h-11">
           Try Again
         </button>
       </div>
     );
   }
 
-  if (!data) return <p className="text-sm text-red-500">Student not found.</p>;
+  if (!data) return <p className="text-sm text-[var(--badge-error-text)]">Student not found.</p>;
 
   return (
     <div className="space-y-6">
-      <Link href="/teacher" className="text-sm text-[var(--accent-blue)] hover:text-[var(--ink-strong)]">
+      <Link href="/teacher" className="inline-flex items-center pointer-coarse:min-h-11 text-sm text-info hover:text-[var(--ink-strong)] hover:underline">
         &larr; Back to Class Dashboard
       </Link>
 
@@ -506,7 +554,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 onGoalAction={handleGoalAction}
               />
               <SageInsightList
-                studentId={studentId}
+                studentId={data.student.id}
                 title="Sage Coaching Notes"
                 limit={8}
               />
@@ -543,6 +591,9 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               onVerify={handleVerify}
               certOutcomeVerifying={certOutcomeVerifying}
               onCertOutcomeVerify={handleCertOutcomeVerify}
+              applicationVerifying={applicationVerifying}
+              applicationVerifyError={applicationVerifyError}
+              onApplicationVerify={handleApplicationVerify}
               orientationVerifying={orientationVerifying}
               onOrientationVerify={handleOrientationVerify}
               showAllConversations={showAllConversations}
@@ -601,6 +652,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
           ),
         }}
       </StudentDetailTabs>
+      {confirmDialog}
     </div>
   );
 }

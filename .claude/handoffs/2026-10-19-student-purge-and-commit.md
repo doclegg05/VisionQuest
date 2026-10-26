@@ -1,0 +1,12 @@
+# Prior Session (2026-10-16, student purge and commit)
+- **Date**: 2026-10-16
+- **What we worked on**:
+  - **Student purge.** Finished the one-time hard delete of six pre-FERPA student accounts (2026-10-15 ~19:10 UTC). Counts and leftovers are in Open Items, the reasoning is in the decision log, and no names are recorded here.
+  - **Commit.** Britt asked to commit all changes. A checkpoint commit made outside this session, `1047026a` at 08:12 -0400, had already taken the code, docs and memory. It left two folders untracked:
+    - `docs/audits/evidence/`: committed. The `~/.claude/hooks/ferpa-guard.sh` commit hook blocked it at first, because gitleaks reports 19 `generic-api-key` hits. All 19 were checked and are false positives: storage paths of three program PDFs in fields named `storageKey` and `sourceKey`. On Britt's go-ahead they are listed by fingerprint (`file:rule:line`) in a new repo-root `.gitleaksignore`. CI runs no secret scanner.
+    - `prototypes/visionquest-redesign/`: stays untracked, by Britt's choice. This session committed it, and Britt dropped that commit with `git reset HEAD~1` before any push. It is 44 MB, of which 26 MB is generated screenshots in `artifacts/`. Its signed-form PDFs use the made-up student "Maya Ellis".
+- **Where we left off**:
+  - **Not pushed.** The session sandbox blocks `git push`.
+  - **The prototype is untracked on purpose.** Its files are still on disk. It is not gitignored, so it shows in `git status`, and a later "commit all" would pick it up again unless it is left out.
+  - **`.gitleaksignore` entries are tied to line numbers.** If an evidence file is regenerated, its entries stop matching and the guard blocks again. Check the new hits before adding them.
+  - **Checks run.** eslint passed with 0 errors (54 old warnings), and `prisma validate` passed.

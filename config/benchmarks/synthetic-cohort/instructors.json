@@ -1,0 +1,23 @@
+[
+  {
+    "id": "cbenchinstr1",
+    "login": "bench-instructor-1",
+    "displayName": "Marlow Denbrook",
+    "email": "bench-instructor-1@test.local",
+    "role": "teacher"
+  },
+  {
+    "id": "cbenchinstr2",
+    "login": "bench-instructor-2",
+    "displayName": "Sela Hartsell",
+    "email": "bench-instructor-2@test.local",
+    "role": "teacher"
+  },
+  {
+    "id": "cbenchinstr3",
+    "login": "bench-instructor-3",
+    "displayName": "Odell Ridgelow",
+    "email": "bench-instructor-3@test.local",
+    "role": "teacher"
+  }
+]

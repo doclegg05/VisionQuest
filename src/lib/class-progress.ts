@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { parseState } from "@/lib/progression/engine";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { fetchReadinessDataForStudents } from "@/lib/progression/fetch-readiness-data";
 
 export interface ClassProgressStats {
   className: string;
@@ -52,33 +52,26 @@ export async function getClassProgress(studentId: string): Promise<ClassProgress
         )
       : 0;
 
-  // Readiness scores from progression state
-  const [progressions, bhagCompletions] = await Promise.all([
-    prisma.progression.findMany({
-      where: { studentId: { in: classmateIds } },
-      select: { studentId: true, state: true },
-    }),
-    prisma.goal.findMany({
-      where: { studentId: { in: classmateIds }, level: "bhag", status: "completed" },
-      select: { studentId: true },
-    }),
-  ]);
+  // This week's completions need the raw progression rows (see below), so
+  // this stays a direct query — separate from the readiness score, which now
+  // comes from the batched reconciled loader.
+  const progressions = await prisma.progression.findMany({
+    where: { studentId: { in: classmateIds } },
+    select: { studentId: true, state: true },
+  });
 
-  const bhagCompletedSet = new Set(bhagCompletions.map((g) => g.studentId));
-
+  // Ticket D1 (2026-09-07): the readiness score is the SAME reconciled
+  // mapping every other surface uses (readiness-consumers.ts), reached
+  // through the batched loader so a class of any size costs a constant
+  // number of queries. A classmate with no Progression row still gets a real
+  // reconciled score here (buildReadinessSnapshot starts from the initial
+  // state when progressionState is null) rather than the implicit 0 this
+  // loop used to produce by skipping them.
+  const readinessByStudent = await fetchReadinessDataForStudents(classmateIds);
   let readinessSum = 0;
-  for (const prog of progressions) {
-    const state = parseState(prog.state);
-    const completed = orientationMap.get(prog.studentId) || 0;
-    const readiness = computeReadinessScore({
-      ...state,
-      bhagCompleted: bhagCompletedSet.has(prog.studentId),
-      orientationProgress: { completed, total: totalOrientation },
-    });
-    readinessSum += readiness.score;
+  for (const id of classmateIds) {
+    readinessSum += readinessByStudent.get(id)?.readiness.score ?? 0;
   }
-
-  // Students without progression get 0 score — include them in the average
   const avgReadinessScore = Math.round(readinessSum / classmateIds.length);
 
   // Orientation completions this week

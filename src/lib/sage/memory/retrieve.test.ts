@@ -11,7 +11,7 @@ mock.module("@/lib/db", {
 
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
-    embedQuery: mockEmbedQuery,
+    embedTextsWithModel: async (texts: string[], opts: { usage: unknown }) => ({ vectors: [await mockEmbedQuery(texts[0], opts.usage)], model: "gemini-embedding-001" }),
     toVectorLiteral: (vector: number[]) => `[${vector.join(",")}]`,
   },
 });
@@ -54,6 +54,19 @@ describe("retrieveMemories", () => {
     mockQueryRaw.mock.resetCalls();
     mockEmbedQuery.mock.resetCalls();
     mockQueryRaw.mock.mockImplementation(async () => [row()]);
+  });
+
+  it("retrieves local-only memory with subject and suppression boundaries, no embeddings", async () => {
+    process.env.COHORT_DEMO_LOCAL_ONLY = "true";
+    try {
+      const result = await retrieveMemories("student", "stu-1", "morning classes");
+      assert.equal(result.length, 1);
+      assert.equal(mockEmbedQuery.mock.callCount(), 0);
+      const call = mockQueryRaw.mock.calls[0].arguments;
+      assert.ok(call.includes("stu-1"));
+      assert.ok(call.includes("student"));
+      assert.match(call[0].join("?"), /"suppressedByStaff" = false/);
+    } finally { delete process.env.COHORT_DEMO_LOCAL_ONLY; }
   });
 
   it("returns scored memories ordered by combined score", async () => {

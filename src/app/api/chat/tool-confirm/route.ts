@@ -4,6 +4,7 @@ import { withAuth, badRequest, isStaffRole } from "@/lib/api-error";
 import { executeAgentTool } from "@/lib/sage/agent/executor";
 import { verifyConfirmationToken } from "@/lib/sage/agent/confirmation";
 import { claimConfirmationToken } from "@/lib/sage/agent/confirmation-use";
+import { parseBody } from "@/lib/schemas";
 
 const confirmSchema = z.object({
   toolName: z.string().min(1).max(64),
@@ -23,10 +24,7 @@ const confirmSchema = z.object({
  * the executor runs; the executor then re-verifies inside the tool itself.
  */
 export const POST = withAuth(async (session, req: Request) => {
-  const body = confirmSchema.safeParse(await req.json());
-  if (!body.success) throw badRequest("Invalid confirmation request.");
-
-  const { toolName, args, token, conversationId, targetStudentId } = body.data;
+  const { toolName, args, token, conversationId, targetStudentId } = await parseBody(req, confirmSchema);
 
   // Staff-assisted flows only: a student must never confirm on behalf of
   // another student, so reject targetStudentId from non-staff sessions.

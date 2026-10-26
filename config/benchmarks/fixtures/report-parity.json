@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "cohort": "config/benchmarks/synthetic-cohort",
+  "note": "No corpus of its own — the population IS the cohort. This file carries the definitions the three counts are compared under, because each report answers 'how many people got a job' with a different mechanism and the comparison is only meaningful once those mechanisms are named.",
+  "definitions": {
+    "grant_kpi_placements": "computeGrantKpis(...).counts.placed — SpokesRecords whose `unsubsidizedEmploymentAt` is set. This is the number that goes to the state.",
+    "dohs_export_placed_rows": "buildDohsExportRows(...) rows whose `placed` is true. Derived from the same column, but through a different module, a different row shape and a timezone-sensitive date conversion — which is exactly why comparing them is worth doing rather than tautological.",
+    "funnel_hired_or_beyond": "computeFunnel(...).stages summed from `hired` onward. CUMULATIVE on purpose: the funnel's stage counts are mutually exclusive buckets holding each connection's FURTHEST stage, so a student now at `retained_60` appears only in that bucket. Counting the `hired` bucket alone would report 2 where 6 people have jobs."
+  },
+  "reportingWindow": {
+    "note": "Unbounded. The funnel filters connections by `createdAt` and the cohort spans about four months, so any window narrower than the cohort would drop connections from the funnel while leaving the SPOKES records untouched — the three counts would then legitimately disagree and this benchmark would be measuring the window."
+  },
+  "expectPlacements": 6
+}

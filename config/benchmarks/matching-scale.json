@@ -1,0 +1,32 @@
+{
+  "suite": "matching-scale",
+  "title": "Lead ranking at scale",
+  "area": "performance",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/matching-scale.mjs",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "p95_ms_per_student_at_10x",
+      "unit": "ms",
+      "direction": "lower",
+      "floor": 2000,
+      "tolerance": 100
+    },
+    {
+      "id": "p95_ms_per_student_at_50x",
+      "unit": "ms",
+      "direction": "lower",
+      "floor": null,
+      "reason": "Design §4.7 gives a floor only for the roughly-10x scale ('p95 ≤ 2s per student', adopted at 10x). No owner target exists yet for 50x; tracked as info until one is set."
+    },
+    {
+      "id": "scaling_exponent",
+      "unit": "count",
+      "direction": "lower",
+      "floor": null,
+      "reason": "Diagnostic only (log-log slope of p50_ms vs scale across 1x/10x/50x, from scripts/bench/lib/prng.mjs-seeded tiles of the synthetic cohort) — 0 is flat, 1 is linear, 2 is quadratic. Computed from p50, not p95 (PR review round 2, see notes) — a nearest-rank p95's top-5% sample is only 2-3 students at n=50 (1x) vs 125 at n=2500 (50x), so a couple of ordinary outliers (GC pause, host jitter) land IN the 1x p95 sample and are invisible in the 50x one, making cross-scale p95 comparison unreliable even though within-scale p95 is still the right statistic for the two floored metrics above. No target is set on the exponent itself; it exists so a super-linear regression in rankLeadFits or its sub-scorers is VISIBLE even while the two floored p95 metrics above still pass (a jump from flat to linear can clear a generous 2s floor for a while before it stops clearing it)."
+    }
+  ],
+  "notes": "In-process, no database (design §4.7's 'seeded DB' fixture is replaced per this task's instruction with an in-memory tiling of the committed synthetic cohort, deterministic via scripts/bench/lib/prng.mjs). Calls the REAL rankLeadFits (src/lib/connect/matching-shared.ts), timed alone — visibleLeadsFor (the RLS-scoped-query stand-in) runs before the clock starts, since this suite measures the ranker rather than the lookup. Program-wide leads (classId null) are kept as ONE shared copy across every scale rather than tiled, so each student's visible-lead count stays roughly flat (~10 program-wide + ~10 from their own tile's class) at 1x, 10x and 50x — see the scorer's header comment for why an untiled program-wide set is load-bearing (tiling it too would grow per-student work with the SQUARE of scale, a fixture artifact indistinguishable from a real regression). The 2000ms floor on the 10x metric is design §4.7's adopted default (plan item 1, floors marked †); it is far above the measured value (typically well under 1ms per student — rankLeadFits scores a couple dozen leads with simple arithmetic) on purpose, because the property under test is 'no accidental O(students) or O(totalLeads) cost crept into the per-student path', not a tight timing target. PROPOSED TIGHTER FLOOR (PR review round 2, for the coordinator/database-architect to confirm after the first real CI numbers land, not applied here): p95_ms_per_student_at_10x at ~50ms would still be >100x the measured ~0.4ms (vs. today's ~5000x), leaving room for a slower CI host or a heavier future sub-scorer while actually catching a regression well before it reaches 2s. WARM-UP FIX (PR review round 2): the previous design ran a per-scale warm-up (rankLeadFits over the first 20 of THAT scale's own students, discarded) immediately before timing the REST of that same scale — leaving the JIT still mid-warm-up for a few of the first TIMED calls right after. That mattered because of how nearest-rank percentiles dilute with n (see scaling_exponent's reason above): those few residual-cold calls landed inside 1x's p95 sample (n=50) and were invisible in 50x's (n=2500), so p95/p50 measured 6.8x at 1x but only 1.8x at 50x while p50 itself stayed flat (0.376 -> 0.256 -> 0.212ms) — a warm-up artifact, not a real trend, and it drove the exponent to between -0.16 and -0.58 across five runs. Fixed by ONE global warm-up before any scale is timed (WARMUP_PASSES=25 full repeats over the entire 1x cohort — the tiling design keeps every scale's per-student input SHAPE identical to 1x's, so this warms all three) and computing the exponent from p50. Five consecutive runs after the fix: -0.0136, -0.0028, -0.0043, 0.0027, -0.0128 (spread 0.016, comfortably inside the requested ±0.1 agreement); p95/p50 is now a stable ~1.8x at every scale and p50 itself is flat within measurement noise (0.227 / 0.219 / 0.217ms at 1x/10x/50x in one representative run)."
+}

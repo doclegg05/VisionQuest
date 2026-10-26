@@ -1,0 +1,6 @@
+# Prior Session (2026-10-15, HIG merge cleanup, PR #235)
+- **Date**: 2026-10-15 (HIG merge cleanup, branch `chore/ai-panel-help-text`)
+- **What we worked on**: Confirmed through the GitHub API that #223 (HIG Phase 2) merged to `main` at 16:28 UTC as merge commit `b43226b1`, and that #222 (Phase 1) closed unmerged at 16:30 UTC with every Phase 1 commit in `main` through #223. Cut `chore/ai-panel-help-text` from `b43226b1`. Removed the leftover from the web merge of #221 into #223 (`b870cbd1`), which kept both sides of a conflict: the "Answer length per job" section of `AiProviderPanel.tsx` still told teachers to leave a job blank and run a model bake-off, although #221 fixed every job to Gemma 4 12B and made the model fields read-only. The section now matches #221's single sentence and keeps #223's `--border` token. Updated the #222 and #223 Open Items.
+- **What we decided**: nothing new.
+- **Where we left off**: the chore PR is open against `main`. Not checked in a browser, because the dev server needs `.env.local`, which points at production. PR #232 also edits this file, so whichever merges second conflicts here: keep both entries, newest first. Left as found: the 2026-10-13 Current Status entry still calls #225 open, but it merged as `8c944ba6`.
+

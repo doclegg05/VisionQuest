@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
+import fs from "node:fs/promises";
 import {
   downloadBundledFile,
+  downloadFile,
+  uploadFile,
+  deleteFile,
+  storageObjectExists,
+  generateStorageKey,
+  validateFile,
   getPresignedDownloadUrl,
   isObjectStorageConfigured,
   mapLocalPathToStorageKey,
@@ -47,6 +54,44 @@ describe("downloadBundledFile", () => {
   it("rejects path traversal attempts", async () => {
     const result = await downloadBundledFile("../package.json");
     assert.equal(result, null);
+  });
+});
+
+describe("storage key boundary", () => {
+  const invalidKeys = ["../public.pdf", "forms/../../public.pdf", "forms/../public.pdf", "/public.pdf", "C:\\public.pdf", "forms\\public.pdf", "forms//public.pdf", "forms/./public.pdf", "public.pdf\u0000", ""];
+
+  it("does not let traversal fall through to content basename lookup", async () => {
+    const read = mock.method(fs, "readFile", async () => Buffer.from("%PDF-1.7"));
+    const list = mock.method(fs, "readdir", async () => [{ name: "public.pdf", isDirectory: () => false, isFile: () => true }]);
+    try {
+      for (const key of invalidKeys) {
+        assert.equal(await downloadBundledFile(key), null, key);
+        assert.equal(await downloadFile(key), null, key);
+      }
+      assert.equal(read.mock.callCount(), 0);
+      assert.equal(list.mock.callCount(), 0);
+    } finally {
+      read.mock.restore();
+      list.mock.restore();
+    }
+  });
+
+  it("rejects unsafe keys before write, delete, HEAD or signing", async () => {
+    for (const key of invalidKeys) {
+      await assert.rejects(uploadFile(key, Buffer.from("test"), "application/pdf"), /Invalid storage path/);
+      await assert.rejects(deleteFile(key), /Invalid storage path/);
+      await assert.rejects(storageObjectExists(key), /Invalid storage path/);
+      await assert.rejects(getPresignedDownloadUrl(key), /Invalid storage path/);
+    }
+  });
+
+  it("rejects unsafe namespaces and strips unsafe filename extensions", () => {
+    assert.throws(() => generateStorageKey("../student", "test.pdf"));
+    assert.throws(() => generateStorageKey("student/nested", "test.pdf"));
+    assert.match(generateStorageKey("student", "TEST.PDF"), /^student\/[a-f0-9-]+\.pdf$/);
+    assert.match(generateStorageKey("student", "test.pdf\r\nX: yes"), /^student\/[a-f0-9-]+$/);
+    assert.ok(validateFile({ size: 0, type: "application/pdf" }));
+    assert.ok(validateFile({ size: NaN, type: "application/pdf" }));
   });
 });
 

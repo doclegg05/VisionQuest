@@ -9,6 +9,7 @@ import {
 import { hashSecurityAnswers } from "@/lib/security-question-auth";
 import { logAuditEvent } from "@/lib/audit";
 import { isStaffRole, withAuth } from "@/lib/api-error";
+import { assertNotDemoAccount } from "@/lib/demo/guards";
 
 export const GET = withAuth(async (session) => {
   if (isStaffRole(session.role)) {
@@ -38,6 +39,10 @@ export const GET = withAuth(async (session) => {
 });
 
 export const POST = withAuth(async (session, req: NextRequest) => {
+  // First, ahead of the staff check: a demo visitor gets the demo wording, and
+  // does no work before it.
+  assertNotDemoAccount(session);
+
   if (isStaffRole(session.role)) {
     return Response.json(
       { error: "Security question recovery is only available for student accounts." },

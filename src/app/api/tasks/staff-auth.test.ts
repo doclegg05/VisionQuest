@@ -13,13 +13,20 @@ const notify = mock.fn(async () => {});
 mock.module("@/lib/auth", { namedExports: { getSession: async () => session } });
 mock.module("@/lib/dashboard/tasks", { namedExports: { createAssignedTask: create } });
 mock.module("@/lib/notifications", { namedExports: { sendNotification: notify } });
+// The route resolves the URL segment (row id or login id, #219) to the real
+// student row before creating the task, so the notification targets that row.
+const resolve = mock.fn(async (_actor: Session, identifier: string) => {
+  assert.equal(identifier, "synthetic-login");
+  return { id: "synthetic-student" };
+});
+mock.module("@/lib/classroom", { namedExports: { assertStaffCanManageStudent: resolve } });
 let route: typeof import("../teacher/students/[id]/tasks/route");
 before(async () => { route = await import("../teacher/students/[id]/tasks/route"); });
-beforeEach(() => { create.mock.resetCalls(); notify.mock.resetCalls(); });
+beforeEach(() => { create.mock.resetCalls(); notify.mock.resetCalls(); resolve.mock.resetCalls(); });
 function assign() {
-  return route.POST(new Request("http://localhost/api/teacher/students/synthetic-student/tasks", {
+  return route.POST(new Request("http://localhost/api/teacher/students/synthetic-login/tasks", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Synthetic task" }),
-  }), { params: Promise.resolve({ id: "synthetic-student" }) });
+  }), { params: Promise.resolve({ id: "synthetic-login" }) });
 }
 
 test("assignment rejects anonymous, student, coordinator, and unknown roles before service or notification", async () => {
@@ -29,6 +36,7 @@ test("assignment rejects anonymous, student, coordinator, and unknown roles befo
   }
   assert.equal(create.mock.callCount(), 0);
   assert.equal(notify.mock.callCount(), 0);
+  assert.equal(resolve.mock.callCount(), 0);
 });
 
 test("assignment passes authenticated teacher/admin and RLS identity to scoped service", async () => {
@@ -38,4 +46,5 @@ test("assignment passes authenticated teacher/admin and RLS identity to scoped s
   }
   assert.equal(create.mock.callCount(), 2);
   assert.equal(notify.mock.callCount(), 2);
+  assert.deepEqual(notify.mock.calls.map((call) => (call.arguments as unknown[])[0]), ["synthetic-student", "synthetic-student"]);
 });

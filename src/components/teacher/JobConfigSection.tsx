@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { Briefcase, ArrowClockwise } from "@phosphor-icons/react";
 import { DEFAULT_JOB_SOURCES, JOB_SOURCE_OPTIONS, getJobSourceMode } from "@/lib/job-board/source-options";
 import type { JobScrapeRunStatusResult, JobSourceHealthResult } from "@/lib/job-board/types";
@@ -57,6 +57,40 @@ const LOCAL_JOB_PRIORITY_OPTIONS: Array<{
   },
 ];
 
+/**
+ * True when "WV Local Jobs" (careeronestop) is on for this class but the
+ * CareerOneStop keys have not been set — the class's default local-jobs
+ * source would otherwise fail silently. `sourceHealth` empty means the
+ * status call hasn't returned yet, so this deliberately reports false rather
+ * than flashing the nudge before real data loads.
+ */
+export function shouldShowCareerOneStopNudge(
+  sources: string[],
+  sourceHealth: JobSourceHealthResult[],
+): boolean {
+  if (!sources.includes("careeronestop")) return false;
+  const status = sourceHealth.find((source) => source.source === "careeronestop");
+  return status ? !status.configured : false;
+}
+
+export function CareerOneStopUnconfiguredNotice({
+  sources,
+  sourceHealth,
+}: {
+  sources: string[];
+  sourceHealth: JobSourceHealthResult[];
+}) {
+  if (!shouldShowCareerOneStopNudge(sources, sourceHealth)) return null;
+  return (
+    <p
+      className="rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-danger"
+      role="alert"
+    >
+      WV Local Jobs is not on yet. Ask your admin to add the CareerOneStop keys.
+    </p>
+  );
+}
+
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
     const data = await res.json();
@@ -87,6 +121,10 @@ export function JobConfigSection() {
   const [sources, setSources] = useState<string[]>([...DEFAULT_JOB_SOURCES]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [localJobPriority, setLocalJobPriority] = useState<LocalJobPriority>("prefer_local");
+  const classSelectId = useId();
+  const regionId = useId();
+  const radiusId = useId();
+  const sourcesId = useId();
   const scrapeInProgress = scrapeRun?.status === "queued" || scrapeRun?.status === "processing";
   const failedSources = scrapeRun?.sourceResults
     .filter((source) => source.status === "failed")
@@ -237,18 +275,19 @@ export function JobConfigSection() {
   };
 
   if (classes.length === 0) {
-    return <p className="text-[var(--text-secondary)]">No classes found.</p>;
+    return <p className="text-[var(--ink-muted)]">No classes found.</p>;
   }
 
   return (
     <div className="space-y-6">
       {/* Class selector */}
       <div>
-        <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">Class</label>
+        <label htmlFor={classSelectId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">Class</label>
         <select
+          id={classSelectId}
           value={selectedClassId}
           onChange={(e) => setSelectedClassId(e.target.value)}
-          className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-xs"
+          className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-xs"
         >
           {classes.map((c) => (
             <option key={c.id} value={c.id}>
@@ -259,18 +298,18 @@ export function JobConfigSection() {
       </div>
 
       {loading ? (
-        <p className="text-[var(--text-secondary)]">Loading config...</p>
+        <p className="text-[var(--ink-muted)]">Loading config...</p>
       ) : (
         <>
           {/* Status display */}
           {config && (
             <div className="surface-section rounded-xl p-4 flex items-center justify-between">
               <div>
-                <p className="text-sm text-[var(--text-primary)]">
+                <p className="text-sm text-[var(--ink-strong)]">
                   <Briefcase size={16} className="inline mr-1" />
                   <strong>{activeJobCount}</strong> active jobs
                 </p>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                <p className="text-xs text-[var(--ink-muted)] mt-0.5">
                   Last refreshed: {config.lastScrapedAt
                     ? new Date(config.lastScrapedAt).toLocaleDateString()
                     : "Never"}
@@ -279,7 +318,7 @@ export function JobConfigSection() {
               <button
                 onClick={() => void handleRefresh()}
                 disabled={refreshing || scrapeInProgress}
-                className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 pointer-coarse:min-h-11"
               >
                 <ArrowClockwise size={16} className={refreshing || scrapeInProgress ? "animate-spin" : ""} />
                 {scrapeInProgress ? "Refreshing..." : refreshing ? "Queueing..." : "Refresh Now"}
@@ -291,8 +330,8 @@ export function JobConfigSection() {
             <div
               className={`rounded-lg border px-3 py-2 text-sm ${
                 jobBoardError
-                  ? "border-[var(--error)]/40 text-[var(--error)]"
-                  : "border-[var(--border)] text-[var(--text-secondary)]"
+                  ? "border-[var(--error)]/40 text-danger"
+                  : "border-[var(--border)] text-[var(--ink-muted)]"
               }`}
             >
               {jobBoardError ?? jobBoardNotice}
@@ -303,20 +342,20 @@ export function JobConfigSection() {
             <div className="surface-section rounded-xl p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">
+                  <p className="text-sm font-medium text-[var(--ink-strong)]">
                     Job Scout status: {scrapeRun.status}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  <p className="mt-1 text-xs text-[var(--ink-muted)]">
                     Sources {scrapeRun.completedSources}/{scrapeRun.totalSources}
                     {scrapeRun.failedSources > 0 ? `, ${scrapeRun.failedSources} failed` : ""}
                     {" · "}
                     {scrapeRun.totalFetched} fetched, {scrapeRun.totalUpserted} saved
                   </p>
                   {scrapeRun.error && (
-                    <p className="mt-2 text-xs text-[var(--error)]">{scrapeRun.error}</p>
+                    <p className="mt-2 text-xs text-danger">{scrapeRun.error}</p>
                   )}
                 </div>
-                <p className="text-xs text-[var(--text-secondary)]">
+                <p className="text-xs text-[var(--ink-muted)]">
                   {scrapeRun.completedAt
                     ? `Completed ${new Date(scrapeRun.completedAt).toLocaleString()}`
                     : scrapeRun.startedAt
@@ -329,17 +368,17 @@ export function JobConfigSection() {
                   {scrapeRun.sourceResults.map((source) => (
                     <div
                       key={source.id}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2"
+                      className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-[var(--text-primary)]">{source.source}</span>
-                        <span className="text-xs text-[var(--text-secondary)]">{source.status}</span>
+                        <span className="text-xs font-medium text-[var(--ink-strong)]">{source.source}</span>
+                        <span className="text-xs text-[var(--ink-muted)]">{source.status}</span>
                       </div>
-                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      <p className="mt-1 text-xs text-[var(--ink-muted)]">
                         {source.fetchedCount} fetched, {source.upsertedCount} saved
                       </p>
                       {source.error && (
-                        <p className="mt-1 text-xs text-[var(--error)]">{source.error}</p>
+                        <p className="mt-1 text-xs text-danger">{source.error}</p>
                       )}
                     </div>
                   ))}
@@ -350,7 +389,7 @@ export function JobConfigSection() {
                   type="button"
                   onClick={() => void handleRefresh(failedSources)}
                   disabled={refreshing}
-                  className="mt-3 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-elevated)] disabled:opacity-50"
+                  className="mt-3 inline-flex items-center justify-center rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-raised)] disabled:opacity-50 pointer-coarse:min-h-11"
                 >
                   Retry failed sources
                 </button>
@@ -362,13 +401,13 @@ export function JobConfigSection() {
             <div className="surface-section rounded-xl p-4">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">Source health</p>
-                  <p className="text-xs text-[var(--text-secondary)]">
+                  <p className="text-sm font-medium text-[var(--ink-strong)]">Source health</p>
+                  <p className="text-xs text-[var(--ink-muted)]">
                     Recent source reliability and configuration status.
                   </p>
                 </div>
                 {selectedUnavailableSources.length > 0 && (
-                  <p className="text-xs text-[var(--error)]">
+                  <p className="text-xs text-danger">
                     {selectedUnavailableSources.length} selected source
                     {selectedUnavailableSources.length === 1 ? "" : "s"} need configuration.
                   </p>
@@ -378,23 +417,23 @@ export function JobConfigSection() {
                 {selectedSourceHealth.map((source) => (
                   <div
                     key={source.source}
-                    className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2"
+                    className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-medium text-[var(--text-primary)]">{source.label}</span>
-                      <span className={`text-xs ${source.configured ? "text-[var(--text-secondary)]" : "text-[var(--error)]"}`}>
+                      <span className="text-xs font-medium text-[var(--ink-strong)]">{source.label}</span>
+                      <span className={`text-xs ${source.configured ? "text-[var(--ink-muted)]" : "text-danger"}`}>
                         {source.configured ? "configured" : "missing key"}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    <p className="mt-1 text-xs text-[var(--ink-muted)]">
                       {source.successRate === null ? "No recent runs" : `${source.successRate}% success`}
                       {source.lastStatus ? ` · last ${source.lastStatus}` : ""}
                     </p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    <p className="mt-1 text-xs text-[var(--ink-muted)]">
                       {source.lastFetchedCount} fetched, {source.lastUpsertedCount} saved
                     </p>
                     {source.lastError && (
-                      <p className="mt-1 text-xs text-[var(--error)]">{source.lastError}</p>
+                      <p className="mt-1 text-xs text-danger">{source.lastError}</p>
                     )}
                   </div>
                 ))}
@@ -404,17 +443,17 @@ export function JobConfigSection() {
 
           {recentRuns.length > 1 && (
             <div className="surface-section rounded-xl p-4">
-              <p className="text-sm font-medium text-[var(--text-primary)]">Recent scrape history</p>
+              <p className="text-sm font-medium text-[var(--ink-strong)]">Recent scrape history</p>
               <div className="mt-3 space-y-2">
                 {recentRuns.slice(0, 5).map((run) => (
                   <div
                     key={run.id}
                     className="flex flex-col gap-1 rounded-lg border border-[var(--border)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <p className="text-xs text-[var(--text-primary)]">
+                    <p className="text-xs text-[var(--ink-strong)]">
                       {run.status} · {run.completedSources}/{run.totalSources} sources · {run.totalUpserted} saved
                     </p>
-                    <p className="text-xs text-[var(--text-secondary)]">
+                    <p className="text-xs text-[var(--ink-muted)]">
                       {run.completedAt
                         ? new Date(run.completedAt).toLocaleString()
                         : new Date(run.queuedAt).toLocaleString()}
@@ -436,26 +475,28 @@ export function JobConfigSection() {
           {/* Config form */}
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">
+              <label htmlFor={regionId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
                 Region
               </label>
               <input
+                id={regionId}
                 type="text"
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
                 placeholder="e.g., Charleston, WV"
-                className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-sm"
+                className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm w-full max-w-sm"
               />
             </div>
 
             <div>
-              <label className="text-sm font-medium text-[var(--text-primary)] block mb-1">
+              <label htmlFor={radiusId} className="text-sm font-medium text-[var(--ink-strong)] block mb-1">
                 Search Radius
               </label>
               <select
+                id={radiusId}
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value))}
-                className="rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)] border border-[var(--border)] px-3 py-2 text-sm"
+                className="rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] border border-[var(--border)] px-3 py-2 text-sm"
               >
                 {RADIUS_OPTIONS.map((r) => (
                   <option key={r} value={r}>
@@ -466,10 +507,10 @@ export function JobConfigSection() {
             </div>
 
             <fieldset>
-              <legend className="text-sm font-medium text-[var(--text-primary)] mb-2">
+              <legend className="text-sm font-medium text-[var(--ink-strong)] mb-2">
                 Local vs remote priority
               </legend>
-              <p className="mb-3 text-xs text-[var(--text-secondary)]">
+              <p className="mb-3 text-xs text-[var(--ink-muted)]">
                 Controls how the job board ranks (or hides) jobs based on whether they are local to
                 your class region.
               </p>
@@ -480,8 +521,8 @@ export function JobConfigSection() {
                     htmlFor={`localJobPriority-${opt.value}`}
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                       localJobPriority === opt.value
-                        ? "border-[var(--primary)] bg-[var(--primary)]/10"
-                        : "border-[var(--border)] bg-[var(--surface-elevated)] hover:border-[var(--text-secondary)]"
+                        ? "border-[var(--accent-blue)] bg-[var(--badge-info-bg)]"
+                        : "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--ink-muted)]"
                     }`}
                   >
                     <input
@@ -494,10 +535,10 @@ export function JobConfigSection() {
                       className="mt-1"
                     />
                     <span className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                      <span className="text-sm font-medium text-[var(--ink-strong)]">
                         {opt.title}
                       </span>
-                      <span className="text-xs text-[var(--text-secondary)]">
+                      <span className="text-xs text-[var(--ink-muted)]">
                         {opt.description}
                       </span>
                     </span>
@@ -507,13 +548,14 @@ export function JobConfigSection() {
             </fieldset>
 
             <div>
-              <label className="text-sm font-medium text-[var(--text-primary)] block mb-2">
+              <p id={sourcesId} className="text-sm font-medium text-[var(--ink-strong)] block mb-2">
                 Job Sources
-              </label>
-              <div className="grid gap-3 lg:grid-cols-3">
+              </p>
+              <CareerOneStopUnconfiguredNotice sources={sources} sourceHealth={sourceHealth} />
+              <div role="group" aria-labelledby={sourcesId} className="mt-2 grid gap-3 lg:grid-cols-3">
                 {SOURCE_GROUPS.map((group) => (
                   <div key={group.mode} className="rounded-lg border border-[var(--border)] p-3">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                       {group.label}
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -524,10 +566,11 @@ export function JobConfigSection() {
                             <button
                               type="button"
                               onClick={() => toggleSource(opt.value)}
-                              className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                              aria-pressed={sources.includes(opt.value)}
+                              className={`inline-flex items-center pointer-coarse:min-h-11 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
                                 sources.includes(opt.value)
-                                  ? "bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]"
-                                  : "bg-[var(--surface-elevated)] border-[var(--border)] text-[var(--text-secondary)]"
+                                  ? "bg-[var(--badge-info-bg)] border-[var(--accent-blue)] text-[var(--badge-info-text)]"
+                                  : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-muted)]"
                               }`}
                             >
                               {opt.label}
@@ -538,7 +581,7 @@ export function JobConfigSection() {
                                 sources.includes(opt.value) &&
                                 !source.configured,
                             ) && (
-                              <span className="px-1 text-xs text-[var(--error)]">Unavailable</span>
+                              <span className="px-1 text-xs text-danger">Unavailable</span>
                             )}
                           </div>
                         ))}
@@ -556,7 +599,7 @@ export function JobConfigSection() {
                 onChange={(e) => setAutoRefresh(e.target.checked)}
                 className="rounded"
               />
-              <label htmlFor="autoRefresh" className="text-sm text-[var(--text-primary)]">
+              <label htmlFor="autoRefresh" className="text-sm text-[var(--ink-strong)]">
                 Auto-refresh every Monday at 6 AM
               </label>
             </div>
@@ -564,7 +607,7 @@ export function JobConfigSection() {
             <button
               onClick={handleSave}
               disabled={saving || !region.trim()}
-              className="px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 pointer-coarse:min-h-11"
             >
               {saving ? "Saving..." : config ? "Update Config" : "Enable Job Board"}
             </button>

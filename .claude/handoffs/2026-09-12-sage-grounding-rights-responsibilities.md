@@ -1,0 +1,6 @@
+# Prior Session (2026-09-12, sage-grounding rights/responsibilities)
+- **Date**: 2026-09-12 (sage-grounding rights/responsibilities, issue #217)
+- **What we worked on**: Nightly sage-grounding failed on `grounding-rights-responsibilities` (`expected one of [rights, responsibilities]`). Citation attachment to the retrieved context still passed; the generated reply did not name the form. Seeded the document title into `buildDocNote`, emit a notes-only identity passage, clarify that a supplied title+link establishes which document to open, and make the grounding harness form-tool stub return `Found "<title>"` like production `present_form`.
+- **What we decided**: Do not touch floors, unrelated suites, or commit-results workflow permissions. Prefer retrieval/citation/seed over a broad prompt rewrite; the one RAG sentence is scoped to document identity, not policy facts.
+- **Where we left off**: PR open against main from `cursor/sage-grounding-rights-8bc1`. Local evidence: knowledge-base, catalog-corpus, grounding-eval, sync, and system-prompt tests green; `bench:validate` 50/50. Live `npm run bench -- --suite=sage-grounding` needs GEMINI_API_KEY + migrated Postgres (nightly/CI have both).
+

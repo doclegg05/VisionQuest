@@ -1,17 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
-import { Manrope, Sora } from "next/font/google";
+import { cookies, headers } from "next/headers";
+import { DM_Serif_Display, Outfit } from "next/font/google";
+import { MotionProvider } from "@/components/ui/MotionProvider";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
-import { getThemeFromCookie, THEME_COOKIE } from "@/lib/theme";
+import { getThemePreferenceFromCookie, THEME_BOOT_SCRIPT, THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
-const manrope = Manrope({
+const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-body",
 });
 
-const sora = Sora({
+// One weight only: .font-display turns off synthetic bold (globals.css).
+const dmSerifDisplay = DM_Serif_Display({
   subsets: ["latin"],
+  weight: "400",
   variable: "--font-display",
 });
 
@@ -27,7 +30,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#10253e",
+  themeColor: [
+    // eslint-disable-next-line spokes/no-off-palette-color -- the viewport API takes literal colors; this is a SPOKES palette value
+    { media: "(prefers-color-scheme: light)", color: "#edf3f7" },
+    // eslint-disable-next-line spokes/no-off-palette-color -- the viewport API takes literal colors; this is a SPOKES palette value
+    { media: "(prefers-color-scheme: dark)", color: "#00133f" },
+  ],
 };
 
 export default async function RootLayout({
@@ -36,11 +44,15 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const theme = getThemeFromCookie(cookieStore.get(THEME_COOKIE)?.value);
+  const preference = getThemePreferenceFromCookie(cookieStore.get(THEME_COOKIE)?.value);
+  const nonce = (await headers()).get("x-csp-nonce") ?? undefined;
 
   return (
-    <html lang="en" data-theme={theme}>
-      <body className={`${manrope.variable} ${sora.variable} antialiased`}>
+    <html lang="en" data-theme={preference === "system" ? undefined : preference} suppressHydrationWarning>
+      <head>
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} suppressHydrationWarning />
+      </head>
+      <body className={`${outfit.variable} ${dmSerifDisplay.variable} antialiased`}>
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100]
@@ -49,8 +61,10 @@ export default async function RootLayout({
         >
           Skip to main content
         </a>
-        <ThemeProvider initialTheme={theme}>
-          {children}
+        <ThemeProvider initialPreference={preference}>
+          <MotionProvider>
+            {children}
+          </MotionProvider>
         </ThemeProvider>
       </body>
     </html>

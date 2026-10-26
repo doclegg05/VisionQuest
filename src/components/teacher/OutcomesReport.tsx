@@ -69,7 +69,7 @@ interface UpcomingEvent {
   registrationCount: number;
 }
 
-interface ReportPayload {
+export interface ReportPayload {
   summary: OutcomeSummary;
   funnel: FunnelItem[];
   attentionQueue: AttentionStudent[];
@@ -78,12 +78,12 @@ interface ReportPayload {
 }
 
 const SUMMARY_CARDS: Array<{ key: keyof OutcomeSummary; label: string; tone: string }> = [
-  { key: "studentsNeedingAttention", label: "Need attention", tone: "text-rose-800" },
-  { key: "activeStudents7d", label: "Active this week", tone: "text-emerald-700" },
-  { key: "applicationsInFlight", label: "Applications moving", tone: "text-sky-700" },
-  { key: "offers", label: "Offers recorded", tone: "text-amber-800" },
-  { key: "completedCertifications", label: "Certifications complete", tone: "text-violet-700" },
-  { key: "publicCredentialsLive", label: "Public credentials live", tone: "text-teal-700" },
+  { key: "studentsNeedingAttention", label: "Need attention", tone: "text-[var(--badge-error-text)]" },
+  { key: "activeStudents7d", label: "Active this week", tone: "text-[var(--badge-success-text)]" },
+  { key: "applicationsInFlight", label: "Applications moving", tone: "text-[var(--badge-info-text)]" },
+  { key: "offers", label: "Offers recorded", tone: "text-[var(--badge-success-text)]" },
+  { key: "completedCertifications", label: "Certifications complete", tone: "text-[var(--badge-success-text)]" },
+  { key: "publicCredentialsLive", label: "Public credentials live", tone: "text-[var(--badge-success-text)]" },
 ];
 
 export default function OutcomesReport() {
@@ -118,14 +118,19 @@ export default function OutcomesReport() {
   if (error || !data) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error || "Could not load reports."}</p>
-        <button onClick={() => void loadData()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <p className="text-[var(--badge-error-text)] mb-4">{error || "Could not load reports."}</p>
+        <button onClick={() => void loadData()} className="primary-button px-4 py-2 pointer-coarse:min-h-11">
           Try Again
         </button>
       </div>
     );
   }
 
+  return <OutcomesReportView data={data} />;
+}
+
+/** The loaded report, split from the fetch so it renders from a fixed payload. */
+export function OutcomesReportView({ data }: { data: ReportPayload }) {
   const dateFormatter = new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -186,7 +191,7 @@ export default function OutcomesReport() {
               <p className="text-sm font-semibold text-[var(--urgency-high-text)]">Open alerts</p>
               <p className="mt-2 text-2xl font-bold text-[var(--ink-strong)]">{data.summary.openAlerts}</p>
               <p className="mt-1 text-xs text-[var(--urgency-high-text)]">
-                {data.summary.highSeverityAlerts} high-severity issues
+                {data.summary.highSeverityAlerts} urgent alert{data.summary.highSeverityAlerts === 1 ? "" : "s"}
               </p>
             </div>
             <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-critical-bg)] p-4">
@@ -243,12 +248,12 @@ export default function OutcomesReport() {
                     </div>
                     <div className="flex gap-2 flex-wrap">
                       {student.highSeverityAlertCount > 0 ? (
-                        <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-800">
-                          {student.highSeverityAlertCount} high
+                        <span className="rounded-full bg-[var(--badge-error-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--badge-error-text)]">
+                          {student.highSeverityAlertCount} urgent
                         </span>
                       ) : null}
                       {student.openAlertCount > 0 ? (
-                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                        <span className="rounded-full bg-[var(--badge-warning-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--badge-warning-text)]">
                           {student.openAlertCount} alerts
                         </span>
                       ) : null}
@@ -310,7 +315,7 @@ export default function OutcomesReport() {
                           {application.student.displayName} • {application.opportunity.company}
                         </p>
                       </div>
-                      <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-sky-700">
+                      <span className="rounded-full bg-[var(--badge-info-bg)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--badge-info-text)]">
                         {application.status}
                       </span>
                     </div>

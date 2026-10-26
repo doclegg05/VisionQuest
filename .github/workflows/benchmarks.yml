@@ -1,0 +1,456 @@
+name: Benchmarks
+
+# Nightly benchmark run: the tiers that cannot go on every PR because they
+# need a migrated database, a seeded cohort, a paid key, or simply too much
+# wall-clock time.
+#
+#   --tier=nightly --compare   numbers with floors; a breach fails this run
+#                              and opens the tracking issue
+#   --tier=watch               numbers without consequence; reported, never
+#                              fails (design §3)
+#
+# Suites whose `requires` are unmet report `skipped` and are never a failure:
+# the model suites run only when OPENROUTER_API_KEY exists, the
+# prod-read-only ones only when BENCH_PROD_READONLY_URL does. Those secrets
+# are owner steps (design §9.7), so an unconfigured repository stays green and
+# says so in the results rather than going quiet.
+#
+# Model calls go through OpenRouter to production's model,
+# google/gemini-3.1-flash-lite, on synthetic fixtures only, the same route as
+# sage-evals.yml. The repo holds no Gemini key (issue #220: a revoked
+# GEMINI_API_KEY failed every call from 2026-10-07), so sage-latency, whose
+# floor is production's direct-to-Google p95 bar, reports skipped. Pinned by
+# src/lib/ci-benchmarks-openrouter.test.ts.
+#
+# "A number nobody reads is not a benchmark" (design §6): every run uploads
+# its results, main runs land them so the trend is in git, and any failure
+# opens or updates one issue.
+#
+# Permissions are split across two jobs on purpose. The job that RUNS the
+# suites executes scorer code and third-party test dependencies, so it holds
+# no write token at all — `contents: read`, and its checkout does not persist
+# credentials, so nothing it runs can push. Only `commit-results`, which runs
+# no suite code and merely downloads an artifact, is allowed to write, and
+# only on `main` — it pushes a dedicated branch and opens or updates one PR
+# rather than `git push` to protected `main` (GH006: pull request required,
+# status check "verify" expected). GitHub Actions has no step-level
+# permissions, so this is a job boundary rather than a step boundary.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *" # nightly 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    services:
+      # Same hermetic pgvector service as the RLS and e2e jobs in ci.yml, so a
+      # benchmark measures a real, migrated schema rather than a mock.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionquest_bench
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_bench"
+      # Hermetic CI Postgres has no pooler, so direct == pooled (schema.prisma
+      # declares directUrl and the Prisma CLI validates it).
+      DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_bench"
+      JWT_SECRET: "ci-test-secret-not-real-at-all-32"
+      API_KEY_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      APP_BASE_URL: "http://localhost:3000"
+      # Presence is what the runner's `requires` check reads. An unset secret
+      # is an empty string here, so openrouter/prod-readonly suites report
+      # `skipped` instead of failing. Values that reach a scorer through
+      # ctx.env are redacted out of every result file by
+      # scripts/bench/lib/redact.mjs before it is written.
+      # Secrets are mapped on the steps that run suites, never here: the
+      # OpenRouter key and the production read-only URL must not share a
+      # process (scripts/lib/sage-eval-provider.mjs refuses --provider=openrouter
+      # beside any non-local database URL, so OpenRouter sees synthetic data only).
+      # What the model suites measure: production's model, through OpenRouter.
+      # Pinned to DEFAULT_GEMINI_MODEL by src/lib/ci-benchmarks-openrouter.test.ts.
+      OPENROUTER_MODEL: google/gemini-3.1-flash-lite
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # This job runs benchmark scorers and their dependencies. Leaving a
+          # push token in .git/config for that code to find serves no purpose
+          # here — the commit-back happens in a separate job.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Validate benchmark suites
+        # Same gate as ci.yml. A malformed suite must stop the nightly before
+        # it writes half a result set.
+        run: npm run bench:validate
+
+      - name: Apply migrations to the benchmark database
+        run: |
+          npx prisma db execute --file scripts/test-support/supabase-roles.sql --schema prisma/schema.prisma
+          npx prisma migrate deploy
+
+      - name: Seed the synthetic benchmark cohort
+        # Owned by the Connect benchmark phase (A3); guarded so this workflow
+        # is correct before that script exists and needs no edit after.
+        run: |
+          if [ -f scripts/bench/seed-cohort.ts ]; then
+            npx tsx scripts/bench/seed-cohort.ts
+          else
+            echo "::notice::scripts/bench/seed-cohort.ts not present yet — cohort suites will report skipped."
+          fi
+
+      - name: Seed the catalog corpus for Sage grounding
+        # Hermetic Postgres is empty of ProgramDocument rows. sage-grounding
+        # calls getDocumentContext against that table; without this seed every
+        # case reports `got: none` (issue #208). Notes-only from catalog/; no
+        # PDF bytes or embeddings. The scorer also seeds itself so a local
+        # `--suite=sage-grounding` run does not depend on this step.
+        run: npx tsx scripts/bench/seed-catalog-corpus.mjs
+
+      - name: Nightly-tier benchmarks
+        id: nightly
+        # continue-on-error so the watch tier still runs and the regression
+        # issue is still filed; the job's own verdict is re-applied at the end.
+        # No OpenRouter key here, so the OpenRouter suites report skipped and
+        # the next step overwrites their results.
+        continue-on-error: true
+        run: npm run bench -- --tier=nightly --compare
+        env:
+          BENCH_PROD_READONLY_URL: ${{ secrets.BENCH_PROD_READONLY_URL }}
+
+      - name: Nightly-tier model benchmarks
+        id: nightly_models
+        # The nightly suites that require `openrouter`, in a process without
+        # the production read-only URL. Must run after the tier step above.
+        # The list is pinned to the configs by
+        # src/lib/ci-benchmarks-openrouter.test.ts.
+        continue-on-error: true
+        run: npm run bench -- --suite=explain-faithfulness,sage-grounding,sage-readability --compare
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Watch-tier benchmarks
+        # No --compare: watch numbers are reported, never enforced.
+        continue-on-error: true
+        run: npm run bench -- --tier=watch
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Benchmark summary
+        if: always()
+        # Suite titles, metric ids and error text end up inside this block, so
+        # the fence is five backticks and any run of three or more backticks in
+        # the content is neutralised — otherwise a suite could close the fence
+        # and write arbitrary markdown into the job summary.
+        run: |
+          npm run --silent bench:compare > bench-compare.txt 2>&1 || true
+          sed -i 's/`\{3,\}/[backticks]/g' bench-compare.txt
+          {
+            echo "## Benchmarks"
+            echo
+            echo '`````'
+            cat bench-compare.txt
+            echo '`````'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: reports/benchmarks/latest/
+          if-no-files-found: warn
+
+      - name: Open or update the regression issue
+        if: always() && (steps.nightly.outcome == 'failure' || steps.nightly_models.outcome == 'failure')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const { pathToFileURL } = require("url");
+
+            // Second line of defence: result files are already redacted by
+            // the runner (scripts/bench/lib/redact.mjs) before being written,
+            // but the issue body is public, so the same redactor runs again
+            // over whatever is about to be posted. It sees this step's env
+            // only; the OpenRouter key and the production read-only URL are
+            // mapped on the suite steps alone, so the runner's own pass is
+            // what covers them. If the module cannot be
+            // loaded for any reason, fall back to posting nothing but a link
+            // rather than posting unredacted text.
+            let redactSecrets = null;
+            try {
+              ({ redactSecrets } = await import(
+                pathToFileURL(path.join(process.cwd(), "scripts/bench/lib/redact.mjs")).href
+              ));
+            } catch (error) {
+              core.warning(`redact.mjs unavailable (${error.message}); omitting failure detail.`);
+            }
+            const safe = (text) => (redactSecrets ? String(redactSecrets(text)) : null);
+
+            const dir = "reports/benchmarks/latest";
+            const failures = [];
+            let files = [];
+            try {
+              files = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
+            } catch {
+              files = [];
+            }
+            for (const file of files) {
+              let result;
+              try {
+                result = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
+              } catch {
+                continue;
+              }
+              if (!["gate", "nightly"].includes(result.tier)) continue;
+              if (result.status === "error") {
+                const detail = safe((result.error || "").split("\n")[0]);
+                failures.push(
+                  `- **${safe(result.suite) ?? "a suite"}** — scorer error${detail ? `: ${detail}` : ""}`
+                );
+                continue;
+              }
+              for (const metric of result.metrics || []) {
+                if (metric.status !== "fail") continue;
+                failures.push(
+                  `- **${safe(result.suite)}.${safe(metric.id)}** — ${metric.value} against floor ${metric.floor}` +
+                    (metric.baseline != null ? ` (baseline ${metric.baseline})` : "")
+                );
+              }
+            }
+
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              "The nightly benchmark run reported a regression.",
+              "",
+              failures.length > 0
+                ? failures.join("\n")
+                : "The nightly run failed with no failing metric recorded — check the run log.",
+              "",
+              `Run: ${runUrl}`,
+              `Commit: ${context.sha}`,
+              "",
+              "Flake protocol (design §6): a gate-tier benchmark that fails is re-run at most once; a second failure is real.",
+              "Updating a floor or a baseline needs a recorded reason — see docs/runbooks/benchmarks.md.",
+            ].join("\n");
+
+            const title = "Benchmark regression";
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              per_page: 100,
+            });
+            const match = existing.data.find((issue) => issue.title === title && !issue.pull_request);
+
+            if (match) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body,
+              });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body: `Still failing as of ${new Date().toISOString()}.\n\n${failures.join("\n")}\n\nRun: ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+            }
+
+      - name: Fail the run when a nightly benchmark regressed
+        if: always() && (steps.nightly.outcome == 'failure' || steps.nightly_models.outcome == 'failure')
+        run: |
+          echo "::error::A nightly-tier benchmark crossed its floor. See the Benchmark regression issue."
+          exit 1
+
+  # The only job with a write token. It runs no suite code — it downloads the
+  # artifact the previous job produced and opens a results PR — so the token
+  # is never in scope while third-party code is executing.
+  #
+  # Direct `git push` to `main` is rejected by branch protection (GH006,
+  # 2026-09-09/10/11 nightly). The landing path is a reused branch + one PR.
+  commit-results:
+    needs: benchmarks
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
+    env:
+      RESULT_BRANCH: chore/nightly-benchmark-results
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: benchmark-results
+          path: reports/benchmarks/latest
+
+      - name: Commit results
+        id: commit
+        # The dashboard and the 90-day trend read committed results (design
+        # §5). [skip ci] keeps the merge from re-triggering the CI workflow.
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/benchmarks/latest
+          if git diff --cached --quiet; then
+            echo "No benchmark result changes to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "chore(bench): nightly benchmark results [skip ci]"
+
+          extra="$(git diff-tree --no-commit-id --name-only -r HEAD | grep -v '^reports/benchmarks/latest/' || true)"
+          if [ -n "$extra" ]; then
+            echo "::error::Results commit contains files outside reports/benchmarks/latest/:"
+            printf '%s\n' "$extra"
+            exit 1
+          fi
+
+          git push --force origin "HEAD:refs/heads/${RESULT_BRANCH}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the results PR
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        env:
+          HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
+        with:
+          script: |
+            const branch = process.env.RESULT_BRANCH;
+            const { owner, repo } = context.repo;
+            const head = `${owner}:${branch}`;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const title = "chore(bench): nightly benchmark results [skip ci]";
+            const body = [
+              "Nightly benchmark results for the dashboard and 90-day trend (`reports/benchmarks/latest/**`).",
+              "",
+              "Direct pushes to `main` are blocked by branch protection (GH006: pull request required, status check `verify` expected). This PR is the landing path; it does not change suites, floors, or scorers.",
+              "",
+              `Run: ${runUrl}`,
+              "",
+              "The diff is confined to redacted result JSON. `[skip ci]` avoids a full CI loop on result files.",
+              "",
+              "A path-gated `verify` check is posted for this SHA only after confirming every changed path is under `reports/benchmarks/latest/`. That is not a general bypass of branch protection — product PRs still run the real CI `verify` job. GITHUB_TOKEN events cannot trigger workflows (loop prevention), so the real job will not run here.",
+            ].join("\n");
+
+            const open = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              head,
+              base: "main",
+              per_page: 1,
+            });
+
+            let pr;
+            if (open.data.length > 0) {
+              pr = (
+                await github.rest.pulls.update({
+                  owner,
+                  repo,
+                  pull_number: open.data[0].number,
+                  title,
+                  body,
+                })
+              ).data;
+              core.info(`Updated ${pr.html_url}`);
+            } else {
+              try {
+                pr = (
+                  await github.rest.pulls.create({
+                    owner,
+                    repo,
+                    title,
+                    body,
+                    head: branch,
+                    base: "main",
+                  })
+                ).data;
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                if (/not permitted to create or approve pull requests/i.test(message)) {
+                  core.setFailed(
+                    "Enable 'Allow GitHub Actions to create and approve pull requests' under Settings → Actions → General. That is an Actions permission, not a branch-protection change."
+                  );
+                  return;
+                }
+                throw error;
+              }
+              core.info(`Opened ${pr.html_url}`);
+            }
+
+            const headSha = process.env.HEAD_SHA || pr.head.sha;
+            try {
+              await github.rest.checks.create({
+                owner,
+                repo,
+                name: "verify",
+                head_sha: headSha,
+                status: "completed",
+                conclusion: "success",
+                details_url: runUrl,
+                output: {
+                  title: "Result-only nightly commit",
+                  summary:
+                    "Diff is confined to reports/benchmarks/latest/. Full CI is skipped to avoid a nightly loop.",
+                },
+              });
+
+              // Give GitHub a moment to index the check before merge.
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: pr.number,
+                merge_method: "squash",
+                commit_title: title,
+                commit_message: `Nightly benchmark results from ${runUrl}.`,
+              });
+              core.info(`Merged ${pr.html_url}`);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              core.warning(
+                `Could not auto-merge (${message}). Results PR is open: ${pr.html_url}`
+              );
+            }

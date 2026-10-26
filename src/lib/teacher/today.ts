@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { type Session } from "@/lib/api-error";
+import { isUrgentSeverity } from "@/lib/alert-severity";
 import { buildManagedStudentWhere } from "@/lib/classroom";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 
@@ -84,9 +85,7 @@ export async function getTodayRoster(
     const lastMessageAt = student.messages[0]?.createdAt ?? null;
     const lastConversationAt = student.conversations[0]?.updatedAt ?? null;
     const lastActiveAt = mostRecent(lastMessageAt, lastConversationAt);
-    const highSeverityAlertCount = student.alerts.filter(
-      (alert) => alert.severity === "high" || alert.severity === "critical",
-    ).length;
+    const highSeverityAlertCount = student.alerts.filter((alert) => isUrgentSeverity(alert.severity)).length;
 
     return {
       id: student.id,

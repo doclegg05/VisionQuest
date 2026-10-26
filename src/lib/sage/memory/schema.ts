@@ -208,7 +208,7 @@ function looksLikeExtractionItem(value: object): boolean {
   return "content" in value && ("kind" in value || "category" in value);
 }
 
-function unwrapItemList(raw: unknown): unknown[] | null {
+export function unwrapItemList(raw: unknown): unknown[] | null {
   if (Array.isArray(raw)) return raw;
   if (typeof raw !== "object" || raw === null) return null;
 

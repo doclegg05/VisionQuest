@@ -73,7 +73,7 @@ export default function NotificationBell() {
         ref={triggerRef}
         onClick={() => setOpen(!open)}
         type="button"
-        className="relative grid h-9 w-9 place-items-center rounded-full transition-colors hover:bg-[var(--surface-raised)]/10"
+        className="relative grid h-11 w-11 place-items-center rounded-full transition-colors hover:bg-[var(--surface-raised)]/10"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -83,7 +83,7 @@ export default function NotificationBell() {
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unreadCount > 0 && (
-          <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--accent-strong)] px-1 text-xs font-bold text-white">
+          <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--accent-strong)] px-1 text-xs font-bold text-[var(--on-accent)]">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -103,7 +103,7 @@ export default function NotificationBell() {
               <button
                 onClick={markAllRead}
                 type="button"
-                className="text-xs font-medium text-[var(--accent-strong)] hover:underline"
+                className="inline-flex min-h-11 items-center text-xs font-medium text-success hover:underline"
               >
                 Mark all read
               </button>
@@ -118,7 +118,7 @@ export default function NotificationBell() {
                 const href = n.type.startsWith("nudge.")
                   ? studentInterventionHref(n.type)
                   : n.type.startsWith("teacher_nudge.")
-                    ? "/teacher-dashboard"
+                    ? "/teacher"
                     : n.type === "sage_daily_prompt"
                       ? "/chat"
                       : null;

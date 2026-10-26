@@ -145,3 +145,64 @@ describe("extractDiscoverySignals — cluster-name normalization at the write bo
     assert.deepEqual(result.national_career_clusters, []);
   });
 });
+
+// A failed extraction must REJECT. The caller (post-response) runs this inside
+// retryWithBackoff, which only retries and dead-letters to FailedExtraction
+// when the function throws. Before this guard the extractor caught its own
+// failures and resolved an all-empty result, so nothing was retried, nothing
+// was dead-lettered, and the caller wrote the empties over the student's
+// stored CareerDiscovery profile.
+describe("extractDiscoverySignals — failures reach the caller", () => {
+  const messages = [{ role: "user" as const, content: "I like fixing cars" }];
+
+  function providerReturning(raw: string): AIProvider {
+    return { generateStructuredResponse: async () => raw } as unknown as AIProvider;
+  }
+
+  it("rejects when the provider throws", async () => {
+    const provider = {
+      generateStructuredResponse: async () => {
+        throw new Error("provider unavailable");
+      },
+    } as unknown as AIProvider;
+
+    await assert.rejects(() => extractDiscoverySignals(provider, messages), /provider unavailable/);
+  });
+
+  it("rejects when the provider returns text that is not JSON", async () => {
+    await assert.rejects(
+      () => extractDiscoverySignals(providerReturning("Sure! Here are the signals: interests"), messages),
+      SyntaxError,
+    );
+  });
+
+  for (const raw of ["null", "[]", "\"no signals yet\"", "42"]) {
+    it(`rejects JSON that is not an object (${raw})`, async () => {
+      await assert.rejects(
+        () => extractDiscoverySignals(providerReturning(raw), messages),
+        /not a JSON object/,
+      );
+    });
+  }
+
+  it("still validates fields of a well-formed object instead of rejecting it", async () => {
+    const result = await extractDiscoverySignals(
+      providerReturning(JSON.stringify({ interests: "not-an-array", riasec_scores: { realistic: 7 } })),
+      messages,
+    );
+
+    assert.deepEqual(result.interests, []);
+    assert.equal(result.riasec_scores.realistic, 1);
+    assert.equal(result.holland_code, "R");
+  });
+});
+
+ it("keeps a model-first bounded transcript intact behind an analysis request", async () => {
+  const transcript = [{ role: "model" as const, content: "Do you prefer practical work?" }, { role: "user" as const, content: "Yes, repairing things." }, { role: "model" as const, content: "We can explore that." }];
+  let sent: typeof transcript = [];
+  const provider = { generateStructuredResponse: async (_prompt: string, messages: typeof transcript) => { sent = messages; return "{}"; } } as unknown as AIProvider;
+  await extractDiscoverySignals(provider, transcript);
+  assert.equal(sent[0].role, "user");
+  assert.equal(sent.at(-1)?.role, "user");
+  assert.deepEqual(sent.slice(1, -1), transcript);
+ });

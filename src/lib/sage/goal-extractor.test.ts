@@ -206,3 +206,12 @@ describe("extractGoals — retry exhaustion dead-letter", () => {
     assert.equal(mockRecordFailedExtraction.mock.callCount(), 0);
   });
 });
+
+ it("preserves a model-first goal transcript behind an analysis request", async () => {
+  const transcript = [{ role: "model" as const, content: "What would you like to achieve?" }, { role: "user" as const, content: "Find IT work." }];
+  const generate = mock.fn(async () => "{}");
+  await extractGoals({generateStructuredResponse: generate} as any, transcript, "bhag");
+  const sent = (generate.mock.calls[0].arguments as any)[1];
+  assert.equal(sent[0].role, "user");
+  assert.deepEqual(sent.slice(1, -1), transcript);
+ });

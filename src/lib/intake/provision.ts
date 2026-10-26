@@ -2,6 +2,8 @@ import { randomInt, randomUUID } from "node:crypto";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { hashPassword, normalizeEmail, normalizeStudentId } from "@/lib/auth";
 import { tryLogAuditEvent } from "@/lib/audit";
+import { invalidateChatContext } from "@/lib/cache";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import type { IntakePayload } from "./schema";
@@ -235,7 +237,7 @@ async function recordDuplicateIntakeAlert(matchedStudentId: string): Promise<voi
     logger.error("Could not record a duplicate intake submission for staff review", {
       alert: "intake_duplicate_alert_failed",
       student: studentLogKey(matchedStudentId),
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
   }
 }
@@ -253,7 +255,7 @@ async function stampPacket(
     logger.warn("Intake packet stamping failed", {
       alert: "intake_packet_stamp_failed",
       student: studentLogKey(studentDbId),
-      error: error instanceof Error ? error.message : String(error),
+      error: errorForLog(error),
     });
     return undefined;
   }
@@ -488,6 +490,10 @@ export async function provisionIntakeStudent(
 
     return { student: createdStudent, spokesRecord: createdSpokes };
   }, { maxWait: 10000, timeout: 25000 });
+
+  // prismaAdmin skips the write-through extension, so the orientation rows
+  // written above must drop the student's cached chat context by hand.
+  invalidateChatContext(student.id);
 
   // 5. Generate & stamp official PDF packet
   const pdfStorageKey = await stampPacket(student.id, student.studentId, payload);

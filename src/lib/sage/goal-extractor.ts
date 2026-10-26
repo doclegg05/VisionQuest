@@ -1,4 +1,6 @@
+import { extractionTranscript } from "./extraction-transcript";
 import type { AIProvider } from "@/lib/ai";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import {
@@ -146,10 +148,7 @@ export async function extractGoals(
   const recent = messages.slice(-10);
 
   const contextPrompt = `Current goal-setting stage: ${currentStage}\n\nAnalyze the conversation and extract goals:`;
-  const messagesWithContext = [
-    ...recent,
-    { role: "user" as const, content: contextPrompt },
-  ];
+  const messagesWithContext = extractionTranscript(recent, contextPrompt);
 
   const extractionPrompt = buildExtractionPrompt(
     normalizeProgramType(typeof programType === "string" ? programType : null),
@@ -187,7 +186,7 @@ export async function extractGoals(
       logger.warn("Goal extraction attempt failed", {
         attempt,
         maxAttempts: MAX_ATTEMPTS,
-        error: String(error),
+        error: errorForLog(error),
       });
       if (attempt < MAX_ATTEMPTS) {
         await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
@@ -217,7 +216,7 @@ export async function extractGoals(
   }
   logger.error("Goal extraction failed after retries — no goals created this turn", {
     attempts: MAX_ATTEMPTS,
-    error: String(lastError),
+    error: errorForLog(lastError),
     alert: "goal_extraction_exhausted",
   });
   return { goals_found: [], stage_complete: false, insight: null };

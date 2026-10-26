@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { withTeacherAuth } from "@/lib/api-error";
+import { assertNotDemoAccount } from "@/lib/demo/guards";
 import { logAuditEvent } from "@/lib/audit";
 import { generateMfaSecret, generateTotpUri } from "@/lib/mfa";
 
@@ -13,6 +14,9 @@ import { generateMfaSecret, generateTotpUri } from "@/lib/mfa";
  * The client must call /api/auth/mfa/verify with a valid token to finalize setup.
  */
 export const POST = withTeacherAuth(async (session) => {
+  // Before any read, so a demo visitor cannot start MFA on the shared account.
+  assertNotDemoAccount(session);
+
   const student = await prisma.student.findUnique({
     where: { id: session.id },
     select: { id: true, email: true, mfaEnabled: true, studentId: true, role: true },
@@ -34,10 +38,14 @@ export const POST = withTeacherAuth(async (session) => {
   const totpUri = generateTotpUri(secret, email);
 
   // Store the encrypted secret provisionally (mfaEnabled stays false until verified)
-  await prisma.student.update({
-    where: { id: student.id },
+  const changed = await prisma.student.updateMany({
+    where: { id: student.id, mfaEnabled: false },
     data: { mfaSecret: encrypted },
   });
+
+  if (changed.count !== 1) {
+    return NextResponse.json({ error: "MFA configuration changed. Please try again." }, { status: 409 });
+  }
 
   await logAuditEvent({
     actorId: student.id,

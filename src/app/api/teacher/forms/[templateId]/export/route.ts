@@ -1,5 +1,6 @@
 import { badRequest, forbidden, notFound, withTeacherAuth } from "@/lib/api-error";
-import { canManageAnyClass } from "@/lib/classroom";
+import { tryLogAuditEvent } from "@/lib/audit";
+import { buildManagedStudentWhere, canPerformElevatedStaffAction } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
   buildHeaderRow,
@@ -15,9 +16,24 @@ interface RouteContext {
   params: Promise<{ templateId: string }>;
 }
 
+// Bulk export of official SPOKES/DoHS intake answers. Two gates, both load
+// bearing:
+//
+//   withTeacherAuth              → staff only (teacher OR admin; coordinators
+//                                  are refused by the wrapper itself)
+//   canPerformElevatedStaffAction → admin/coordinator TIER
+//
+// Their intersection is admins. Coordinators are named in the tier predicate
+// but cannot reach this handler today, and admitting them here would be a
+// change of a different size: `rlsContextFor` collapses a coordinator session
+// to role="student", and `buildManagedStudentWhere` fails closed for
+// coordinators by design (see its Slice D invariant), so a coordinator would
+// need an explicitly region-scoped query — the getCoordinatorInterventionQueue
+// pattern — not simply a wider role list. Until that exists the honest error
+// message is "admins", not "admins and coordinators".
 export const GET = withTeacherAuth(async (session, req: Request, ctx: RouteContext) => {
-  if (!canManageAnyClass(session.role)) {
-    throw forbidden("CSV export is restricted to admins and coordinators.");
+  if (!canPerformElevatedStaffAction(session.role)) {
+    throw forbidden("Only admins can export this CSV.");
   }
 
   const { templateId } = await ctx.params;
@@ -41,7 +57,20 @@ export const GET = withTeacherAuth(async (session, req: Request, ctx: RouteConte
   const rangeFilter = buildRangeFilter(from, to);
   const PAGE_SIZE = 500;
 
+  // App-layer scope, so the query says what RLS would enforce rather than
+  // relying on who happens to reach the handler. Archived enrollments and
+  // deactivated accounts are included: a submitted official form is a record
+  // of something that happened, and dropping it would silently shorten the
+  // export. Today (admin only) this resolves to `{ role: "student" }`; if the
+  // gate ever widens, the narrowing arrives with it instead of being
+  // remembered.
+  const managedStudentWhere = buildManagedStudentWhere(session, {
+    includeArchivedEnrollments: true,
+    includeInactiveAccounts: true,
+  });
+
   const encoder = new TextEncoder();
+  let exportedRows = 0;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       controller.enqueue(encoder.encode(`${buildHeaderRow(schema)}\n`));
@@ -53,6 +82,7 @@ export const GET = withTeacherAuth(async (session, req: Request, ctx: RouteConte
             templateId,
             ...(rangeFilter ? { submittedAt: rangeFilter } : {}),
             status: { not: "draft" },
+            student: managedStudentWhere,
           },
           select: {
             id: true,
@@ -107,11 +137,33 @@ export const GET = withTeacherAuth(async (session, req: Request, ctx: RouteConte
             },
           };
           controller.enqueue(encoder.encode(`${buildResponseRow(schema, exportable)}\n`));
+          exportedRows += 1;
         }
 
         cursor = page.at(-1)?.id;
         if (page.length < PAGE_SIZE) break;
       }
+
+      // Audited after the rows are counted, so the row count is real rather
+      // than intended. AuditLog is admin-only under RLS and lives on the
+      // admin client, so a failed write is logged and swallowed rather than
+      // tearing down a stream whose bytes have already left (same reasoning
+      // as tryLogAuditEvent's doc block). No student identifier in the
+      // payload — the template and the count are the record
+      // (.claude/rules/security.md, Data Privacy).
+      await tryLogAuditEvent({
+        actorId: session.id,
+        actorRole: session.role,
+        action: "teacher.form.export",
+        targetType: "form_template",
+        targetId: templateId,
+        summary: `Exported ${exportedRows} response(s) for form template.`,
+        metadata: {
+          rowCount: exportedRows,
+          from: from ? from.toISOString() : null,
+          to: to ? to.toISOString() : null,
+        },
+      });
 
       controller.close();
     },

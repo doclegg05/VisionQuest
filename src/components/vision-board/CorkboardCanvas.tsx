@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useCallback, useEffect } from "react";
-import VisionBoardPin from "./VisionBoardPin";
+import { X } from "@phosphor-icons/react";
+import VisionBoardPin, { removePinLabel } from "./VisionBoardPin";
 import type { VisionBoardItemData } from "./VisionBoard";
 
 interface CorkboardCanvasProps {
@@ -83,7 +84,7 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
                     )}
                     {item.type === "goal" && (
                       <div>
-                        <span className="mb-1 inline-block rounded-full bg-[var(--accent-green)]/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-[var(--accent-green)]">Goal</span>
+                        <span className="mb-1 inline-block rounded-full bg-[var(--accent-green)]/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-success">Goal</span>
                         <p className="text-sm font-medium text-[var(--ink-strong)] break-words">{item.content}</p>
                       </div>
                     )}
@@ -91,10 +92,10 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
                   <button
                     onClick={() => onDelete(item.id)}
                     type="button"
-                    aria-label="Remove pin"
-                    className="shrink-0 rounded-full p-1.5 text-[var(--ink-faint)] hover:bg-red-50 hover:text-red-500 transition-colors"
+                    aria-label={removePinLabel(item)}
+                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-[var(--ink-muted)] transition-colors hover:bg-[var(--badge-error-bg)] hover:text-[var(--badge-error-text)]"
                   >
-                    ✕
+                    <X size={18} weight="bold" aria-hidden="true" />
                   </button>
                 </div>
               </div>

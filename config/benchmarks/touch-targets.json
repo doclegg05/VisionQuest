@@ -1,0 +1,19 @@
+{
+  "suite": "touch-targets",
+  "title": "Touch targets at 375px (student routes)",
+  "area": "a11y",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/touch-targets.mjs",
+  "fixture": "config/benchmarks/fixtures/touch-targets.json",
+  "requires": ["browser", "server"],
+  "metrics": [
+    {
+      "id": "undersized_targets",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    }
+  ],
+  "notes": "TIER PROMOTED TO GATE (Ticket D3, 2026-09-07): CI run 34072983383 measured 51 undersized elements across /dashboard, /career, /goals, /orientation, /settings, /appointments, /memory at 375x667. Every row got a named source-level fix — min-h-11/min-w-11 on the shared shell (NotificationBell h-9w-9->h-11w-11, NavBar's mobile log-out button, ChatWindow's sidebar toggle which matched the /dashboard-only 42x38 row exactly: icon 20 + px-2.5 padding 20 + border 2 = 42, and py-2 padding 16 + border 2 = 38), JobFilters' proximity tabs, JobCard's status select/Update button, StudentAdvisingHub's booking select/select/input, OrientationWelcomeVideo's download link, StudentPathwayPlan's Sage link, the universal AskSageLink component (min-h-10, 40px, was under the 44px floor on every route that uses it — appointments/career/dashboard/etc.), OpportunitiesHub/EventsHub's pill controls, and an sr-only-input-plus-peer-styled-visual-span pattern for the 6 settings checkboxes/radios (SMS consent + the 5 work-transport radios) — the collector measures the raw <input>'s own bounding box, so a taller wrapping <label> alone does not clear a violation; the real 20x20 checkbox is made a 1x1 .sr-only box (which the collector's own exclusion already treats as 'not a touch target a sighted user could tap'), and the label becomes the real 44px tap area. Fixed from source, not re-verified against a running browser in this container (no Playwright/BENCH_BASE_URL/DATABASE_URL here — standing worktree gotcha); CI's next run is the real measurement, and per the ticket the orchestrator routes any residual back to this ticket rather than silently reverting the gate."
+}

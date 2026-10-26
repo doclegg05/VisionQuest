@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: starter
     buildCommand: npm ci && npx prisma generate && npm run build
-    startCommand: npm run prisma:migrate:deploy && node .next/standalone/server.js
+    startCommand: npm run prisma:migrate:deploy && npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -13,6 +13,23 @@ services:
         sync: false
       - key: DIRECT_URL
         sync: false
+      # Both of these were set in the Render dashboard only, so this file did
+      # not show that production depends on them and a fresh service created
+      # from it would have started with RLS unenforced and prismaAdmin
+      # unprivileged — silently, in both cases. src/lib/boot-probes.ts now
+      # refuses to boot production without them; they are listed here so the
+      # blueprint says so too.
+      #
+      # ADMIN_DATABASE_URL is the `postgres` role (RLS-bypassing) that
+      # prismaAdmin uses for crons, job handlers and pre-auth routes. Unset, it
+      # falls back to DATABASE_URL (`vq_app`) and every cross-student read
+      # returns zero rows.
+      - key: ADMIN_DATABASE_URL
+        sync: false
+      # Compared against this exact string in src/lib/db.ts. Anything else and
+      # the Prisma RLS extension runs every query with no session context.
+      - key: RLS_CONTEXT_INJECTION
+        value: "true"
       - key: JWT_SECRET
         generateValue: true
       - key: TEACHER_KEY
@@ -81,6 +98,16 @@ services:
       # packets already printed, so treat it as long-lived.
       - key: DOCUMENT_VERIFICATION_SECRET
         generateValue: true
+      # SMS (Match & Connect Phase 5) — optional, and unset means OFF at every
+      # level: sendSms is a no-op and /api/sms/inbound rejects every request.
+      # TWILIO_AUTH_TOKEN also verifies Twilio's inbound X-Twilio-Signature.
+      # Enable steps: docs/runbooks/connect-nudges.md
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
       - key: SENTRY_DSN
         sync: false
       - key: NEXT_PUBLIC_SENTRY_DSN

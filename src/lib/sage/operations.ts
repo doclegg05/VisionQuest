@@ -66,7 +66,9 @@ export async function recordOperation(params: RecordOperationParams): Promise<vo
     action: `sage_tool.${params.toolName}.${params.status}`,
     targetType: "sage_operation",
     targetId: params.id,
-    summary: params.resultSummary ?? `${params.toolName} ${params.status}`,
+    // Free-text summaries stay in the access-controlled operation ledger.
+    // Ordinary audit logs must not copy student-authored content.
+    summary: `${params.toolName} ${params.status}`,
   });
 }
 
@@ -78,7 +80,7 @@ export async function recordOperation(params: RecordOperationParams): Promise<vo
 // user-authored free text in them — e.g. update_goal_status's confirm
 // summary includes `goal.content.slice(0, 80)`, and propose_resume_edit's
 // includes a preview of the student's actual resume section text. The
-// crisis-era "no transcript access" decision (MEMORY.md 2026-07-20) means a
+// crisis-era "no transcript access" decision (`docs/decisions/engineering-log.md`, 2026-07-20) means a
 // teacher-facing ledger view must never surface conversation-adjacent free
 // text, so the functions below are built ONLY from `toolName`, `status`,
 // and `actorType` — payload and resultSummary are never selected out of the

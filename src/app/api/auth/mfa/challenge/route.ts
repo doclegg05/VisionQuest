@@ -7,6 +7,7 @@ import {
   getMfaSessionToken,
   clearMfaSessionCookie,
 } from "@/lib/auth";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -42,7 +43,7 @@ const ACCOUNT_LOCKED_MESSAGE =
  * real session JWT cookie.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = clientIpBucket(req);
 
   // Rate limit MFA challenge attempts (5 attempts per 5 minutes per IP)
   const rl = await rateLimit(`mfa-challenge:${ip}`, 5, 5 * 60 * 1000);

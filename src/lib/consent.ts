@@ -14,7 +14,20 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 
-export const CONSENT_SCOPES = ["cloud_file_processing"] as const;
+export const CONSENT_SCOPES = [
+  "cloud_file_processing",
+  // Match & Connect: blanket, revocable permission to be introduced to an
+  // employer. Added in Phase 3 because the WorkForce WV batch is the first
+  // thing that sends a student's name outside the program and must not do so
+  // without it. Phase 4 adds the student-facing toggle, the per-disclosure
+  // approval card, and the /memory page section.
+  //
+  // Blanket is never enough on its own: each Connection still needs the
+  // student's tap on a card showing that packet's exact field list (design
+  // spec §4), and revoking this scope withdraws every non-terminal connection
+  // (see revokeConsent below).
+  "employer_referral",
+] as const;
 export type ConsentScope = (typeof CONSENT_SCOPES)[number];
 
 export const consentScopeSchema = z.enum(CONSENT_SCOPES);
@@ -62,6 +75,17 @@ export async function revokeConsent(
     data: { revokedAt: new Date() },
   });
   if (count === 0) return { revoked: false };
+
+  // Taking back permission to be introduced has to actually stop the
+  // introductions. Dynamically imported to keep the dependency one-way:
+  // connect/connections.ts imports this module for grantConsent, and a static
+  // import here would close the cycle.
+  if (scope === "employer_referral") {
+    const { withdrawConnectionsForConsentRevocation } = await import(
+      "@/lib/connect/connections"
+    );
+    await withdrawConnectionsForConsentRevocation(studentId, recordedBy);
+  }
 
   await logAuditEvent({
     actorId: recordedBy,

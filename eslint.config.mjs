@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import spokesPalette from "./eslint-rules/spokes-palette.mjs";
 
 // Selectors that apply to every linted file. ESLint flat config replaces a
 // rule's options wholesale when a later block sets the same rule, so any
@@ -25,9 +26,27 @@ const restrictedSyntaxEverywhere = [
   // identifier at any level (.claude/rules/security.md, Data Privacy).
   // Log studentLogKey(id) from src/lib/log-keys.ts when a failure needs to
   // be correlated, and redactContactInfo() for provider error text.
+  //
+  // homeZip / childcareHours / workProfile joined the list with
+  // StudentWorkProfile (Match & Connect Phase 2): a home ZIP beside a class
+  // roster is close to an address, and a childcare note is the student's own
+  // words about their household.
+  //
+  // Phase 4 adds the Connection identifiers. `connectionId` resolves to one
+  // student's disclosure record; `token` and `employerTokenHash` are a live
+  // capability URL for a stranger and its lookup key; `contactEmail` is a
+  // third party's address (which SMTP errors quote back — see
+  // redactContactInfo); `candidateName` is the student's own name, abbreviated
+  // but still theirs.
+  //
+  // destination / toNumber / fromNumber / smsTo / phone joined with the SMS
+  // layer (Phase 5). `destination` is the name the NotificationPreference
+  // column uses, so it is what a log line would naturally be called — and a
+  // phone number is the one identifier in this system that reaches a person
+  // directly, without anyone needing database access first.
   {
     selector:
-      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber)$/]",
+      "CallExpression[callee.object.name='logger'] Property[key.name=/^(studentId|targetStudentId|userId|studentEmail|phoneNumber|homeZip|childcareHours|workProfile|connectionId|token|employerTokenHash|contactEmail|candidateName|destination|toNumber|fromNumber|smsTo|phone)$/]",
     message:
       "No student identifier in server logs. Use studentLogKey(studentId) from @/lib/log-keys for a correlation key, or drop the field.",
   },
@@ -68,6 +87,114 @@ const studentAlertDirectRead = {
     "Student-facing code must not read StudentAlert directly; the table is the staff queue and RLS admits the student's own rows. Use listStudentVisibleAlerts / countStudentVisibleAlerts from src/lib/student-alerts.ts, the only sanctioned reader for student surfaces.",
 };
 
+// OpenRouter is an eval-only provider. Its data agreement does not cover
+// education records, so real student data must never reach it
+// (docs/superpowers/specs/2026-10-13-openrouter-test-bench-design.md).
+// The runtime check in OpenRouterProvider (assertNotAppServer) is the backstop;
+// these rules catch the import early. The regexes are unanchored so suffixed
+// specifiers (".js", "?raw", a trailing slash) still match, and the second
+// pattern stops app code re-exporting the eval chokepoint or the Jev client.
+// Flat config REPLACES a rule's options when two blocks set it for the same
+// file, so every block that sets no-restricted-imports or no-restricted-syntax
+// under src/ must include these too.
+const OPENROUTER_EVAL_ONLY_MESSAGE =
+  "OpenRouter is for evals and benchmarks on synthetic data only. Real student data must never reach OpenRouter. See docs/runbooks/openrouter-test-bench.md.";
+
+const openRouterEvalOnlyPatterns = [
+  { regex: "openrouter-(embedding-)?provider", message: OPENROUTER_EVAL_ONLY_MESSAGE },
+  { regex: "(^|/)scripts/(lib/sage-eval-provider|bench/suites/)", message: OPENROUTER_EVAL_ONLY_MESSAGE },
+];
+
+// no-restricted-imports never sees `import()`, so dynamic imports need a
+// syntax rule of their own.
+const openRouterDynamicImport = {
+  selector: "ImportExpression[source.value=/openrouter-(embedding-)?provider|scripts\\/(lib\\/sage-eval-provider|bench\\/suites\\/)/]",
+  message: OPENROUTER_EVAL_ONLY_MESSAGE,
+};
+
+// require() is a call, not an import, so it needs its own selector.
+const openRouterRequire = {
+  selector: "CallExpression[callee.name='require'][arguments.0.value=/openrouter-(embedding-)?provider|scripts\\/(lib\\/sage-eval-provider|bench\\/suites\\/)/]",
+  message: OPENROUTER_EVAL_ONLY_MESSAGE,
+};
+
+const openRouterSyntax = [openRouterDynamicImport, openRouterRequire];
+
+// A caught error's text is not safe to log. Prisma messages echo the failed
+// call's arguments, so an alertKey or a where clause puts a student id in the
+// log line, and the key-name selectors above cannot see inside a message. Log
+// errorForLog(error) from src/lib/log-error.ts, which keeps the error's name
+// and code (security audit on PR #240, 2026-10-15; all of src/ since the
+// follow-up). A catch whose try block calls only a mail or SMS provider may
+// add providerErrorText(error) from src/lib/log-redaction.ts.
+const RAW_ERROR_TEXT_MESSAGE =
+  "No raw error text in server logs: Prisma messages quote query arguments, including student ids. Log { error: errorForLog(error) } from @/lib/log-error.";
+// The raw error object is no better than its message: the logger runs
+// JSON.stringify on the entry, which drops `message` but keeps Prisma's
+// enumerable `meta`. A selector cannot tell which identifier a catch clause
+// bound, so the raw-object, template-literal and `+` forms go by the usual
+// names (`msg` and `message` too, in a template). Any identifier under an
+// error/err/cause key counts, since that is where a saved message lands;
+// under other keys only an error-named one does, because `reason` and the
+// like are ordinary enum fields. `+` is the only binary operator that builds
+// text (`err instanceof Error` is a BinaryExpression too). A helper that
+// returns the message, like scrape-engine's errorMessage(), goes by name.
+// src/lib/error-log-guard.test.ts lints a probe of every form.
+const IN_LOGGER = "CallExpression[callee.object.name='logger']";
+const ERROR_NAME = "/^(e|err|error)$|(Err|Error)$/";
+const TEXT_NAME = "/^(e|err|error|msg|errMsg|errorMsg|message)$|(Err|Error)$/";
+const rawErrorTextInLogs = [
+  `${IN_LOGGER} MemberExpression[property.name=/^(message|stack)$/]`,
+  `${IN_LOGGER} MemberExpression[property.value=/^(message|stack)$/]`,
+  `${IN_LOGGER} CallExpression[callee.name='String']`,
+  `${IN_LOGGER} CallExpression[callee.property.name='toString']`,
+  `${IN_LOGGER} CallExpression[callee.object.name='JSON'][callee.property.name='stringify']`,
+  `${IN_LOGGER} CallExpression:matches([callee.name='inspect'], [callee.object.name='util'])`,
+  `${IN_LOGGER} CallExpression:matches([callee.name=/[eE]rrorMessage$|^messageOf$/], [callee.property.name=/[eE]rrorMessage$|^messageOf$/])`,
+  `${IN_LOGGER} Property[key.name=/^(error|err|cause)$/] > :matches(Identifier, TSAsExpression, TSNonNullExpression).value`,
+  `${IN_LOGGER} Property > Identifier.value[name=${ERROR_NAME}]`,
+  `${IN_LOGGER} :matches(TemplateLiteral, BinaryExpression[operator='+']) > Identifier[name=${TEXT_NAME}]`,
+].map((selector) => ({ selector, message: RAW_ERROR_TEXT_MESSAGE }));
+
+// These hide a log call or its fields from every selector above: a context
+// object built before the call, and a logger method held in a variable or
+// passed along. Spread fields stay allowed (counts objects use them); the
+// LogContext type in src/lib/logger.ts refuses a raw student id in a spread.
+const HIDDEN_LOG_CALL_MESSAGE =
+  "Call logger.<level>() directly with an inline context object, so the no-PII log rules can see the fields. Log { error: errorForLog(error) } from @/lib/log-error.";
+const hiddenLogCalls = [
+  `${IN_LOGGER}[arguments.1.type='Identifier']`,
+  ":matches(VariableDeclarator, AssignmentExpression, ConditionalExpression, LogicalExpression, ArrayExpression, Property) > MemberExpression[object.name='logger']",
+  "CallExpression > MemberExpression.arguments[object.name='logger']",
+].map((selector) => ({ selector, message: HIDDEN_LOG_CALL_MESSAGE }));
+
+const SRC_FILES = ["src/**/*.{ts,tsx,js,jsx,mjs,mts,cts,cjs}"];
+
+// Every block under src/ that sets no-restricted-syntax builds its list here.
+// Flat config replaces a rule's options when a later block sets the same rule,
+// so a block that listed its selectors by hand silently dropped the groups it
+// forgot (the OpenRouter block switched off the teacher raw-palette rule that
+// way). src/lib/error-log-guard.test.ts lints a probe of each group at a path
+// owned by each block.
+function srcRestrictedSyntax(...extras) {
+  return ["error", ...restrictedSyntaxEverywhere, ...rawErrorTextInLogs, ...hiddenLogCalls, ...extras];
+}
+
+const openRouterEvalOnly = {
+  files: SRC_FILES,
+  // The eval-only OpenRouter family itself: the embedding provider reuses the
+  // chat provider's transport helpers, and each has its own test.
+  ignores: [
+    "src/lib/ai/openrouter-provider.test.ts",
+    "src/lib/ai/openrouter-embedding-provider.ts",
+    "src/lib/ai/openrouter-embedding-provider.test.ts",
+  ],
+  rules: {
+    "no-restricted-imports": ["error", { patterns: openRouterEvalOnlyPatterns }],
+    "no-restricted-syntax": srcRestrictedSyntax(...openRouterSyntax),
+  },
+};
+
 // Code with no request session: pg_cron reaches these routes with only a
 // bearer secret, and job handlers run from the processor. Nothing seeds an
 // RLS context, so the app client fails closed under vq_app (reads empty,
@@ -103,7 +230,8 @@ const appPrismaPattern = {
 // strict nonce-based CSP. @/lib/zod-csp re-exports z after jitless config.
 // Flat config replaces a rule wholesale per file, so src/lib/intake/**, which
 // also carries the appPrisma restriction above, gets its own block that
-// merges both.
+// merges both. Both blocks come after openRouterEvalOnly, so each repeats
+// openRouterEvalOnlyPatterns or it would switch that guard off.
 const zodCspPath = {
   name: "zod",
   message: "Import z from @/lib/zod-csp in browser-reachable code.",
@@ -118,7 +246,7 @@ const browserZodImports = {
   ],
   ignores: ["src/lib/zod-csp.ts"],
   rules: {
-    "no-restricted-imports": ["error", { paths: [zodCspPath] }],
+    "no-restricted-imports": ["error", { paths: [zodCspPath], patterns: openRouterEvalOnlyPatterns }],
   },
 };
 const intakeZodImports = {
@@ -127,7 +255,7 @@ const intakeZodImports = {
   rules: {
     "no-restricted-imports": [
       "error",
-      { paths: [zodCspPath], patterns: [appPrismaPattern] },
+      { paths: [zodCspPath], patterns: [appPrismaPattern, ...openRouterEvalOnlyPatterns] },
     ],
   },
 };
@@ -147,11 +275,89 @@ const appPrismaImportWithoutSession = {
       {
         patterns: [
           appPrismaPattern,
+          ...openRouterEvalOnlyPatterns,
         ],
       },
     ],
   },
 };
+
+// The browser's own dialogs are not accessible, cannot be styled to the app,
+// and block the page. Use useConfirm (confirm/alert/prompt) or useUndo
+// (HIG review D-24, 2026-10-09). Scope-aware: a `confirm` destructured from
+// useConfirm is a local binding, not the global.
+const nativeDialogGlobals = ["confirm", "alert", "prompt"].map((name) => ({
+  name,
+  message: `Use useConfirm() from @/components/ui/useConfirm instead of the browser's ${name}().`,
+}));
+const nativeDialogProperties = ["confirm", "alert", "prompt"].map((property) => ({
+  object: "window",
+  property,
+  message: `Use useConfirm() from @/components/ui/useConfirm instead of window.${property}().`,
+}));
+
+// Raw Tailwind palette colors ignore the theme: no dark values, no contrast
+// guarantee (HIG review D-26: 348 lines, zero dark: utilities in teacher
+// scope). Staff surfaces use the semantic tokens in globals.css instead.
+const RAW_PALETTE =
+  "(^|[\\s:])(bg|text|border|from|to|via|ring|divide|fill|stroke|outline|placeholder|decoration|accent|caret)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}([\\s/]|$)";
+const rawPaletteSyntax = [
+  {
+    selector: `Literal[value=/${RAW_PALETTE}/]`,
+    message: "Raw Tailwind palette color. Use a theme token from globals.css, e.g. text-[var(--badge-success-text)].",
+  },
+  {
+    selector: `TemplateElement[value.raw=/${RAW_PALETTE}/]`,
+    message: "Raw Tailwind palette color. Use a theme token from globals.css, e.g. text-[var(--badge-success-text)].",
+  },
+];
+
+// Folders not yet swept onto SPOKES role utilities (spec Design 6.4). The rule
+// only warns here. Each sweep PR deletes its entries; the last deletes the list.
+const SPOKES_UNSWEPT = [
+  "src/app/(coordinator)/coordinator/*",
+  "src/app/(student)/dashboard/*",
+  "src/app/(student)/forms/*",
+  "src/app/(student)/learning/*",
+  "src/app/(student)/welcome/*",
+  "src/app/forgot-password/*",
+  "src/app/reset-password/*",
+  "src/components/advising/*",
+  "src/components/auth/*",
+  "src/components/career/*",
+  "src/components/certifications/*",
+  "src/components/chat/*",
+  "src/components/connect/*",
+  "src/components/coordinator/*",
+  "src/components/dashboard/*",
+  "src/components/dashboard/sage/*",
+  "src/components/documents/*",
+  "src/components/goals/*",
+  "src/components/library/*",
+  "src/components/lms/*",
+  "src/components/orientation/*",
+  "src/components/portfolio/*",
+  "src/components/progression/*",
+  "src/components/sage/*",
+  "src/components/settings/*",
+  "src/components/spokes/*",
+  "src/components/student/*",
+  "src/components/teacher/*",
+  "src/components/teacher/class-overview/*",
+  "src/components/teacher/forms/*",
+  "src/components/teacher/student-detail/*",
+  "src/components/ui/*",
+  "src/components/vision-board/*",
+];
+
+// Document renderers outside the SPOKES spec (Design 9: PDFs, email, resume print).
+const SPOKES_OUT_OF_SCOPE = [
+  "src/lib/certificate-generator.ts",
+  "src/lib/email-templates.ts",
+  "src/lib/resume.ts",
+  "src/lib/resume-layout.ts",
+  "src/app/api/forms/orientation-packet/route.ts",
+];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -167,6 +373,24 @@ const eslintConfig = defineConfig([
         },
       ],
       "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere],
+      "no-restricted-globals": ["error", ...nativeDialogGlobals],
+      "no-restricted-properties": ["error", ...nativeDialogProperties],
+    },
+  },
+  // All of src/, the OpenRouter files that openRouterEvalOnly exempts included.
+  {
+    files: SRC_FILES,
+    rules: {
+      "no-restricted-syntax": srcRestrictedSyntax(),
+    },
+  },
+  openRouterEvalOnly,
+  // Staff surfaces: no raw palette colors. Comes after openRouterEvalOnly,
+  // which matches these files too and would otherwise replace this entry.
+  {
+    files: ["src/components/teacher/**", "src/app/(teacher)/**"],
+    rules: {
+      "no-restricted-syntax": srcRestrictedSyntax(...openRouterSyntax, ...rawPaletteSyntax),
     },
   },
   // Student-facing surfaces. Staff-only trees are excluded by name; the
@@ -184,14 +408,42 @@ const eslintConfig = defineConfig([
       "src/components/teacher/**",
       "src/app/api/teacher/**",
       "src/app/api/internal/**",
-      "src/app/api/cron/**",
       "src/app/api/admin/**",
       "src/app/api/coordinator/**",
     ],
     rules: {
-      "no-restricted-syntax": ["error", ...restrictedSyntaxEverywhere, studentAlertDirectRead],
+      "no-restricted-syntax": srcRestrictedSyntax(studentAlertDirectRead, ...openRouterSyntax),
     },
   },
+  // Student files already moved onto theme tokens: no raw palette colors, so
+  // they stay clean. This block must come after the student-surfaces block,
+  // whose no-restricted-syntax entry would otherwise replace it, and so it
+  // repeats that block's rules. Add a file here once it is converted.
+  {
+    files: ["src/components/certifications/CertTracker.tsx"],
+    rules: {
+      "no-restricted-syntax": srcRestrictedSyntax(studentAlertDirectRead, ...openRouterSyntax, ...rawPaletteSyntax),
+    },
+  },
+  {
+    plugins: { spokes: { rules: { "no-off-palette-color": spokesPalette } } },
+  },
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: ["src/**/*.test.ts", "src/**/*.test.tsx", ...SPOKES_OUT_OF_SCOPE],
+    rules: { "spokes/no-off-palette-color": "error" },
+  },
+  // Spread only while folders remain: ESLint can reject an empty `files` array,
+  // and the last sweep task deletes the list.
+  ...(SPOKES_UNSWEPT.length > 0
+    ? [
+        {
+          files: SPOKES_UNSWEPT,
+          ignores: ["src/**/*.test.ts", "src/**/*.test.tsx", ...SPOKES_OUT_OF_SCOPE],
+          rules: { "spokes/no-off-palette-color": "warn" },
+        },
+      ]
+    : []),
   appPrismaImportWithoutSession,
   browserZodImports,
   intakeZodImports,
@@ -209,6 +461,9 @@ const eslintConfig = defineConfig([
     // throwaway design prototypes — neither is shipped source.
     ".developer-preview/**",
     "prototypes/**",
+    // Third-party prebuilt bundles are not application source. Parsing these
+    // multi-megabyte files slows lint and reports unfixable upstream rules.
+    "prototypes/**/vendor/**",
   ]),
 ]);
 

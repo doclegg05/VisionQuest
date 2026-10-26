@@ -78,7 +78,7 @@ export function ConfirmToolCard({ label, summary, meta }: ConfirmToolCardProps) 
           type="button"
           onClick={confirm}
           disabled={state === "working"}
-          className="mt-2 min-h-11 rounded-full bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+          className="mt-2 min-h-11 rounded-full bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--on-accent)] transition-opacity disabled:opacity-60"
         >
           {state === "working" ? "Working…" : label}
         </button>

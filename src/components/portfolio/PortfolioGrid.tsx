@@ -267,7 +267,7 @@ export default function PortfolioGrid() {
   if (error) return (
     <div className="text-center py-12">
       <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchItems} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+      <button onClick={fetchItems} className="inline-flex min-h-11 items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
         Try Again
       </button>
     </div>
@@ -286,7 +286,7 @@ export default function PortfolioGrid() {
 
   return (
     <div className="space-y-6">
-      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png" className="hidden" />
+      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png" className="hidden" aria-label="Attach file" />
 
       {items.length === 0 && !showForm ? (
         <div className="surface-section px-5 py-10 text-center">
@@ -301,7 +301,7 @@ export default function PortfolioGrid() {
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="primary-button px-4 py-2.5 text-sm"
+              className="primary-button min-h-11 px-4 py-2.5 text-sm"
             >
               Add first item
             </button>
@@ -333,17 +333,17 @@ export default function PortfolioGrid() {
                       <div className="flex gap-2 mt-2">
                         {item.fileId && (
                           <a href={`/api/files/download?id=${item.fileId}`} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:text-blue-800">View file</a>
+                            className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800">View file</a>
                         )}
                         {item.url && (
                           <a href={item.url} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:text-blue-800">Open link ↗</a>
+                            className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800">Open link ↗</a>
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => startEdit(item)} className="text-xs text-blue-600 hover:text-blue-800 px-1">Edit</button>
-                      <button onClick={() => handleDelete(item.id)} className="text-xs text-red-500 hover:text-red-700 px-1">Del</button>
+                    <div className="flex gap-2">
+                      <button onClick={() => startEdit(item)} className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800 px-1">Edit</button>
+                      <button onClick={() => handleDelete(item.id)} className="inline-flex min-h-11 items-center text-xs text-red-500 hover:text-red-700 px-1">Del</button>
                     </div>
                   </div>
                 </div>
@@ -379,7 +379,7 @@ export default function PortfolioGrid() {
                       : "border-[var(--border)] hover:border-[var(--accent-secondary)]"
                   }`}
                 >
-                  <Icon size={28} weight="duotone" aria-hidden className="text-[var(--accent-secondary)]" />
+                  <Icon size={28} weight="duotone" aria-hidden className="text-info" />
                   <span className="text-sm font-semibold text-[var(--ink-strong)]">{opt.label}</span>
                   <span className="text-xs leading-4 text-[var(--ink-muted)]">{opt.desc}</span>
                 </button>
@@ -447,7 +447,7 @@ export default function PortfolioGrid() {
                       setForm({ ...form, fileId: "" });
                       setCertificationRequirementId("");
                     }}
-                    className="text-xs font-medium text-red-500 hover:text-red-700"
+                    className="inline-flex min-h-11 items-center text-xs font-medium text-red-500 hover:text-red-700"
                   >
                     Remove
                   </button>
@@ -457,7 +457,7 @@ export default function PortfolioGrid() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--border)] px-4 py-6 text-sm text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)] disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--border)] px-4 py-6 text-sm text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-info disabled:opacity-50"
                 >
                   {uploading ? (
                     <>
@@ -477,7 +477,7 @@ export default function PortfolioGrid() {
             {form.type === "certification" && !editingId && (
               <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="flex items-start gap-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--surface-raised)] text-[var(--accent-secondary)]">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--surface-raised)] text-info">
                     <Certificate size={20} weight="duotone" aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -513,7 +513,7 @@ export default function PortfolioGrid() {
 
                 <div className="mt-3 flex flex-col gap-2 text-xs leading-5 text-[var(--ink-muted)] sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-2">
-                    <WarningCircle size={16} weight="duotone" aria-hidden className="mt-0.5 shrink-0 text-[var(--accent-gold)]" />
+                    <WarningCircle size={16} weight="duotone" aria-hidden className="mt-0.5 shrink-0 text-warning" />
                     <span>
                       {selectedRequirement
                         ? selectedRequirement.needsVerify
@@ -529,7 +529,7 @@ export default function PortfolioGrid() {
                   <Link
                     href="/learning"
                     prefetch={false}
-                    className="inline-flex items-center gap-1 font-semibold text-[var(--accent-secondary)] hover:underline"
+                    className="inline-flex min-h-11 items-center gap-1 font-semibold text-info hover:underline"
                   >
                     Review steps
                     <ArrowSquareOut size={14} weight="bold" aria-hidden />
@@ -540,7 +540,7 @@ export default function PortfolioGrid() {
                   <button
                     type="button"
                     onClick={fetchCertificationData}
-                    className="mt-3 text-xs font-semibold text-[var(--accent-secondary)] hover:underline"
+                    className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-info hover:underline"
                   >
                     Try loading Ready to Work steps again
                   </button>
@@ -562,7 +562,7 @@ export default function PortfolioGrid() {
             <button
               type="button"
               onClick={resetForm}
-              className="text-sm font-medium text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
             >
               Cancel
             </button>
@@ -576,7 +576,7 @@ export default function PortfolioGrid() {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] p-5 text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)]"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] p-5 text-sm font-semibold text-[var(--ink-muted)] transition-colors hover:border-[var(--accent-secondary)] hover:text-info"
         >
           <span className="text-lg">+</span> Add Portfolio Item
         </button>

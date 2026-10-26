@@ -15,7 +15,7 @@ const variantStyles: Record<NonNullable<AskSageLinkProps["variant"]>, string> = 
   subtle:
     "rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]",
   ghost:
-    "rounded-full px-3 py-2 text-sm text-[var(--accent-secondary)] hover:bg-[var(--surface-muted)]",
+    "rounded-full px-3 py-2 text-sm text-info hover:bg-[var(--surface-muted)]",
 };
 
 export default function AskSageLink({
@@ -28,7 +28,7 @@ export default function AskSageLink({
     <Link
       href={`/chat?prompt=${encodeURIComponent(prompt)}`}
       prefetch={false}
-      className={`inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap font-semibold transition ${variantStyles[variant]} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap font-semibold transition ${variantStyles[variant]} ${className}`}
     >
       <ChatCircle size={17} weight="bold" />
       {label}

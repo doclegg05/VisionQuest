@@ -85,6 +85,7 @@ function ResetPasswordForm() {
           <input
             id="password"
             type="password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="At least 6 characters"
@@ -100,6 +101,7 @@ function ResetPasswordForm() {
           <input
             id="confirm-password"
             type="password"
+            autoComplete="new-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Re-enter your password"
@@ -125,7 +127,7 @@ function ResetPasswordForm() {
 
       <Link
         href="/"
-        className="mt-5 inline-block text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+        className="mt-5 inline-flex min-h-11 items-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
       >
         Back to sign in
       </Link>

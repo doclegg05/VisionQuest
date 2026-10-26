@@ -7,17 +7,64 @@
  * Every student_record / staff_entered chat turn is FERPA-routed to ONE local
  * Ollama endpoint behind a Cloudflare tunnel (`resolveAiProvider` in
  * src/lib/ai/provider.ts — see isLocalOnlySensitivity). Ollama serves
- * requests SERIALLY by default: nothing in this repo sets
- * OLLAMA_NUM_PARALLEL (grep confirms zero hits outside this file and
- * docs/superpowers/specs/2026-04-04-local-ai-migration-design.md, which
- * *planned* `OLLAMA_NUM_PARALLEL=4` for the Mac Studio ops setup but that
- * setting was never carried into any config this repo ships or documents as
- * applied). Measured single-call latency on the target model is ~20-21s per
- * reply. A class of 15 students sending one message each around the same
- * time therefore does not mean "15 replies in ~21s" — it means something
- * close to 15 x 21s ~= 5+ minutes for the last student, indistinguishable
- * from an outage from that student's chair. No load test or queue/backpressure
- * design existed before this script.
+ * requests SERIALLY by default unless OLLAMA_NUM_PARALLEL raises that.
+ *
+ * CORRECTED 2026-09-05 (.claude/MEMORY.md Known Issues, "sage-load-test.mjs's
+ * stated premise is wrong"): this comment used to claim nothing in this repo
+ * sets OLLAMA_NUM_PARALLEL. That was false —
+ * `scripts/install-local-ai-services.ps1:339` sets `OLLAMA_NUM_PARALLEL=4` as
+ * part of the shipped installer. What remains genuinely unconfirmed is
+ * whether that installer has actually been RUN on the live host, and
+ * therefore whether Ollama is serving this repo's real classroom traffic
+ * serially or 4-wide today — that is exactly the fact
+ * `npm run bench -- --suite=classroom-concurrency` (see below) exists to
+ * measure directly rather than assume either way, and it records the host it
+ * ran on (design §6, "record the host") so the number carries its own
+ * provenance instead of joining the pile of unrecorded-host local-model
+ * numbers this repo's history already has too many of.
+ *
+ * Measured single-call latency on the target model has been observed around
+ * ~20-21s per reply on at least one host (unrecorded — another instance of
+ * the same gap). If Ollama is in fact serial, a class of 15 students sending
+ * one message each around the same time does not mean "15 replies in ~21s"
+ * — it means something close to 15 x 21s ~= 5+ minutes for the last student,
+ * indistinguishable from an outage from that student's chair. No load test
+ * or queue/backpressure design existed before this script.
+ *
+ * CORRECTED 2026-09-07 (E3, docs/plans/2026-09-07-todo-completion-plan.md;
+ * see .claude/MEMORY.md Known Issues, "sage-load-test.mjs's stated premise is
+ * wrong"): the charter's own "15-student 9.0 min p50" figure was NEVER a
+ * measurement of 15 concurrent requests — it was `classroomSize x measured
+ * single-call p50` computed from a run at --concurrency=1, i.e. pure
+ * arithmetic extrapolation from a 1-way sample. Worse, 9.0min / 15 ≈ 36s,
+ * which did not even match this script's own documented ~20-21s single-call
+ * baseline at the time, and nothing in the report said "projected" out
+ * loud. The CLASSROOM VERDICT block below now gets its measured/projected
+ * decision and its arithmetic from the pure, unit-tested
+ * `scripts/lib/sage-load-test-projection.mjs` (see that file's header for
+ * the exact rule) rather than computing `classroomSize x p50` inline and
+ * printing it under a bare "p50" label:
+ *   - The per-reply pace (p50/p95 latency of one reply) is always labeled
+ *     MEASURED — it was read directly off real completed requests.
+ *   - The classroom-wait figure (how long the Nth student waits) is labeled
+ *     MEASURED only when this run actually sent >= --classroom-size
+ *     concurrent requests in one wave (--turns=1) — i.e. only when the
+ *     script ran the real N-way test from the FULL 15-WAY PROCEDURE below.
+ *     Any smaller run's classroom-wait figure is always labeled PROJECTED
+ *     and its basis string says exactly what was multiplied by what, so a
+ *     reader cannot mistake an extrapolation for a measurement again.
+ *
+ * THIS SCRIPT VS. THE BENCHMARK SUITE: this file remains the manual,
+ * exploratory instrument — full control over concurrency/turns/model/prompt
+ * size, verbose per-request output, JSON export. `scripts/bench/suites/
+ * classroom-concurrency.mjs` (`npm run bench -- --suite=classroom-concurrency`)
+ * is the CANONICAL, committed measurement: it imports this file's own
+ * `runClient` (no copied logic) and runs the fixed N=1/5/15 ladder the design
+ * asks for in one command, replacing the old "run N=1, then multiply p50 by
+ * classroomSize" PROJECTION below with three real runs. Reach for this
+ * script directly only when the suite's fixed ladder does not answer the
+ * question at hand (e.g. probing a single unusual N, or a longer
+ * multi-turn conversation).
  *
  * WHAT THIS SCRIPT DOES
  * ----------------------
@@ -99,9 +146,13 @@
  *      requests on one loaded model instead of a strict FIFO queue. This was
  *      part of the ORIGINAL plan (`OLLAMA_NUM_PARALLEL=4`, see
  *      docs/superpowers/specs/2026-04-04-local-ai-migration-design.md line
- *      ~199) but is not configured anywhere this repo controls today — it is
- *      a launchd/environment setting on the Mac Studio host, not app code.
- *      Cost: each parallel slot duplicates KV-cache VRAM for the model's full
+ *      ~199) and IS set by `scripts/install-local-ai-services.ps1:339` — so,
+ *      corrected from an earlier version of this comment, the repo does ship
+ *      a config that sets it. Whether that installer has been run on the
+ *      live Mac Studio host is a separate, still-open question this repo's
+ *      code cannot answer by itself; it is a launchd/environment effect on
+ *      the host, not something a static grep of app code settles. Cost: each
+ *      parallel slot duplicates KV-cache VRAM for the model's full
  *      context window (`num_ctx`, currently OllamaProvider.DEFAULT_NUM_CTX =
  *      8192 unless overridden by ai_provider_num_ctx) — measure free VRAM
  *      headroom on the actual host before raising this, since an
@@ -126,6 +177,11 @@
 
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
 import { percentile } from "./lib/percentile.mjs";
+import {
+  LABEL_MEASURED,
+  buildClassroomWait,
+  isAtOrPastTimeout,
+} from "./lib/sage-load-test-projection.mjs";
 import { writeFileSync } from "node:fs";
 
 loadEnvFile();
@@ -206,7 +262,7 @@ const SYNTHETIC_SECTIONS = [
  * cache the same way production's per-student personalization does, so the
  * measured numbers reflect the no-cache-benefit case a real classroom faces.
  */
-function buildSyntheticSystemPrompt(targetChars, clientIndex) {
+export function buildSyntheticSystemPrompt(targetChars, clientIndex) {
   const header =
     "=== SYNTHETIC LOAD-TEST PROMPT (scripts/sage-load-test.mjs) ===\n" +
     `SYNTHETIC STUDENT MARKER: student-${clientIndex}-${Date.now()} ` +
@@ -226,7 +282,7 @@ function buildSyntheticSystemPrompt(targetChars, clientIndex) {
 }
 
 /** Synthetic per-turn user message. No student data. */
-function syntheticUserMessage(clientIndex, turnIndex) {
+export function syntheticUserMessage(clientIndex, turnIndex) {
   return (
     `[SYNTHETIC LOAD TEST] Simulated student ${clientIndex}, turn ${turnIndex}: ` +
     `Give me one short, encouraging sentence about staying on track with a weekly goal. ` +
@@ -242,7 +298,7 @@ function syntheticUserMessage(clientIndex, turnIndex) {
 // length without touching production defaults.
 // ---------------------------------------------------------------------------
 
-async function createOllamaProvider({ url, model, maxOutputTokens }) {
+export async function createOllamaProvider({ url, model, maxOutputTokens }) {
   const { OllamaProvider } = await import("../src/lib/ai/ollama-provider.ts");
   const { resolveLocalAiAuthMode } = await import("../src/lib/ai/local-auth.ts");
 
@@ -273,7 +329,7 @@ async function createOllamaProvider({ url, model, maxOutputTokens }) {
 // exact strings OllamaProvider throws (src/lib/ai/ollama-provider.ts).
 // ---------------------------------------------------------------------------
 
-function classifyError(err) {
+export function classifyError(err) {
   const message = err instanceof Error ? err.message : String(err);
   if (/hit its .* output budget without emitting any visible content/.test(message)) {
     return { kind: "output_budget_exhausted", message };
@@ -297,7 +353,7 @@ function classifyError(err) {
 // Driver
 // ---------------------------------------------------------------------------
 
-async function runOneRequest({ args, systemPrompt, clientIndex, turnIndex, history, now }) {
+export async function runOneRequest({ args, systemPrompt, clientIndex, turnIndex, history, now }) {
   const queuedAtMs = now();
   const provider = await createOllamaProvider(args);
   const startedAtMs = now();
@@ -340,7 +396,7 @@ async function runOneRequest({ args, systemPrompt, clientIndex, turnIndex, histo
   }
 }
 
-async function runClient({ args, clientIndex, now }) {
+export async function runClient({ args, clientIndex, now }) {
   // Built once per client (not once per run) so concurrent clients never
   // share a cache-friendly identical prefix — see buildSyntheticSystemPrompt.
   const systemPrompt = buildSyntheticSystemPrompt(args.promptChars, clientIndex);
@@ -463,12 +519,13 @@ function report(allResults, wallClockMs, args) {
 
   console.log("\n--- CLASSROOM VERDICT ---");
   if (p50 === null) {
-    console.log("  No successful replies this run — cannot project a classroom wait time.");
+    console.log("  No successful replies this run — cannot report a classroom wait time.");
   } else {
-    const projectedP50Ms = args.classroomSize * p50;
-    const projectedP95Ms = args.classroomSize * (p95 ?? p50);
+    // Per-reply pace is always a real measurement of completed requests,
+    // however many ran — labeled explicitly so it is never confused with
+    // the classroom-wait figure below, which is not always a measurement.
     console.log(
-      `  Measured serial pace this run: p50=${fmtSec(p50)}/reply, p95=${fmtSec(p95 ?? p50)}/reply ` +
+      `  [${LABEL_MEASURED}] per-reply pace this run: p50=${fmtSec(p50)}/reply, p95=${fmtSec(p95 ?? p50)}/reply ` +
         `(n=${ok.length} successful replies, concurrency=${args.concurrency}, turns=${args.turns}).`,
     );
     console.log(
@@ -477,31 +534,53 @@ function report(allResults, wallClockMs, args) {
         `(fit ratio ${serialFitRatio === null ? "n/a" : serialFitRatio.toFixed(2)}) — ` +
         (serialFitRatio !== null && serialFitRatio > 0.85 && serialFitRatio < 1.3
           ? "consistent with full FIFO serialization (no parallel inference observed)."
-          : "NOT consistent with full serialization — investigate before trusting the projection below."),
+          : "NOT consistent with full serialization — investigate before trusting the figures below."),
+    );
+
+    // buildClassroomWait refuses to call this MEASURED unless this run
+    // actually sent >= classroomSize concurrent requests in one wave
+    // (turns=1) — see scripts/lib/sage-load-test-projection.mjs. Otherwise
+    // it is always PROJECTED (classroomSize x pace), and says so.
+    const p50Wait = buildClassroomWait({
+      classroomSize: args.classroomSize,
+      concurrency: args.concurrency,
+      turns: args.turns,
+      paceMs: p50,
+      observedWaitMs: wallClockMs,
+    });
+    const p95Wait = buildClassroomWait({
+      classroomSize: args.classroomSize,
+      concurrency: args.concurrency,
+      turns: args.turns,
+      paceMs: p95 ?? p50,
+      observedWaitMs: max ?? wallClockMs,
+    });
+
+    console.log(
+      `  Wait for the ${args.classroomSize}th student (all sending around the same time, one Ollama ` +
+        `instance serving them in submission order):`,
     );
     console.log(
-      `  Projected wait for the ${args.classroomSize}th student (all sending around the same time, ` +
-        `one Ollama instance serving them in submission order):`,
+      `    [${p50Wait.label}] p50 case = ${fmtSec(p50Wait.waitMs)} (~${(p50Wait.waitMs / 60000).toFixed(1)} min) — ${p50Wait.basis}`,
     );
     console.log(
-      `    ${args.classroomSize} x ${fmtSec(p50)} (p50 pace) = ${fmtSec(projectedP50Ms)} (~${(projectedP50Ms / 60000).toFixed(1)} min)`,
+      `    [${p95Wait.label}] p95 case (pessimistic) = ${fmtSec(p95Wait.waitMs)} (~${(p95Wait.waitMs / 60000).toFixed(1)} min) — ${p95Wait.basis}`,
     );
-    console.log(
-      `    ${args.classroomSize} x ${fmtSec(p95 ?? p50)} (p95 pace, pessimistic) = ${fmtSec(projectedP95Ms)} (~${(projectedP95Ms / 60000).toFixed(1)} min)`,
-    );
+
     const timeoutFlag = (label, ms) =>
-      ms >= NON_STREAMING_TIMEOUT_MS
+      isAtOrPastTimeout(ms, NON_STREAMING_TIMEOUT_MS)
         ? `  *** AT/PAST the ${fmtSec(NON_STREAMING_TIMEOUT_MS)} non-streaming request timeout ` +
           `(OllamaProvider.GENERATE_TIMEOUT_MS) — ${label} would see their request TIME OUT, not just arrive late. ***`
         : `  (${fmtSec(NON_STREAMING_TIMEOUT_MS - ms)} of headroom before the ${fmtSec(NON_STREAMING_TIMEOUT_MS)} non-streaming timeout)`;
-    console.log(`    p50 projection${timeoutFlag(`the ${args.classroomSize}th student`, projectedP50Ms)}`);
-    console.log(`    p95 projection${timeoutFlag(`the ${args.classroomSize}th student`, projectedP95Ms)}`);
-    if (args.concurrency < args.classroomSize) {
+    console.log(`    p50 case${timeoutFlag(`the ${args.classroomSize}th student`, p50Wait.waitMs)}`);
+    console.log(`    p95 case${timeoutFlag(`the ${args.classroomSize}th student`, p95Wait.waitMs)}`);
+
+    if (p50Wait.label !== LABEL_MEASURED) {
       console.log(
-        `  NOTE: this run used --concurrency=${args.concurrency}, a fraction of a full ` +
-          `${args.classroomSize}-student classroom. This projection extrapolates a small sample —` +
-          ` run the real ${args.classroomSize}-way test (see the FULL 15-WAY PROCEDURE in this ` +
-          `script's header comment) on a quiet box before treating it as a go/no-go number.`,
+        `  NOTE: this run used --concurrency=${args.concurrency} and --turns=${args.turns}, so the ` +
+          `wait figures above are PROJECTED, not measured — run the real ${args.classroomSize}-way, ` +
+          `single-turn test (see the FULL 15-WAY PROCEDURE in this script's header comment) on a ` +
+          `quiet box before treating this as a go/no-go number.`,
       );
     }
   }
@@ -549,7 +628,15 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// Guarded so scripts/bench/suites/classroom-concurrency.mjs can `import` this
+// file for its exported runClient/etc. without also triggering this script's
+// own CLI main() as a side effect (the same isMainModule guard the bench
+// runner's own --self-test bootstrap uses, symlink-safe unlike a raw
+// argv[1] string compare).
+const { isMainModule } = await import("./bench/lib/entry.mjs");
+if (isMainModule(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

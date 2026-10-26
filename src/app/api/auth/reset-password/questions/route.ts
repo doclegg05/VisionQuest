@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
+import { hashPassword, invalidateSessionCache, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   hasConfiguredSecurityQuestionSet,
   validateSecurityQuestionAnswers,
+  type SecurityQuestionAnswers,
 } from "@/lib/security-questions";
 import { verifySecurityAnswer } from "@/lib/security-question-auth";
 import { isValidEmail } from "@/lib/validation";
@@ -27,8 +29,31 @@ const RESET_ERROR =
 const ACCOUNT_LIMIT_ATTEMPTS = 5;
 const ACCOUNT_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
+/**
+ * Stands in for an account whose answers must not be checked: unknown,
+ * locked, staff, or without a full question set. Every lookup misses, so each
+ * answer runs against auth's dummy hash instead.
+ */
+const NO_STORED_ANSWERS: ReadonlyMap<string, string> = new Map();
+
+/**
+ * Runs one KDF per answer on every request and only then combines the
+ * results. Stopping at the first wrong answer, or skipping the KDF for an
+ * account that cannot recover, lets response time show which answers were
+ * right and whether the login exists.
+ */
+function verifyEveryAnswer(
+  answers: SecurityQuestionAnswers,
+  storedAnswers: ReadonlyMap<string, string>,
+): boolean {
+  const results = Object.entries(answers).map(([questionKey, answer]) =>
+    verifySecurityAnswer(answer, storedAnswers.get(questionKey)),
+  );
+  return results.every(Boolean);
+}
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = clientIpBucket(req);
   const rl = await rateLimit(`reset-password-questions:${ip}`, 5, 60 * 60 * 1000);
 
   if (!rl.success) {
@@ -86,6 +111,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     // counted, the lockout is recorded once per window below, and the running
     // total stays visible in the rate-limit table.
     if (!accountRl.success) {
+      // Same KDF work as every other refusal, so a locked account is not
+      // answered faster than an unknown one.
+      verifyEveryAnswer(securityQuestionsResult.answers, NO_STORED_ANSWERS);
       return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
     }
 
@@ -110,26 +138,19 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  if (!student || !hasConfiguredSecurityQuestionSet(student.securityQuestionAnswers.map((item) => item.questionKey))) {
-    return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
-  }
+  // Unknown, unconfigured, and staff accounts are refused only after the same
+  // three KDF runs a real attempt costs, and with the same response as a
+  // wrong answer: a fast reply or a distinct status would confirm the login.
+  const canRecover =
+    student !== null &&
+    hasConfiguredSecurityQuestionSet(student.securityQuestionAnswers.map((item) => item.questionKey)) &&
+    !isStaffRole(student.role);
+  const storedAnswers = canRecover
+    ? new Map(student.securityQuestionAnswers.map((item) => [item.questionKey, item.answerHash]))
+    : NO_STORED_ANSWERS;
+  const answersMatch = verifyEveryAnswer(securityQuestionsResult.answers, storedAnswers);
 
-  if (isStaffRole(student.role)) {
-    return NextResponse.json(
-      { error: "Security question recovery is only available for student accounts." },
-      { status: 403 },
-    );
-  }
-
-  const storedAnswers = new Map(
-    student.securityQuestionAnswers.map((item) => [item.questionKey, item.answerHash])
-  );
-  const answersMatch = Object.entries(securityQuestionsResult.answers).every(([questionKey, answer]) => {
-    const storedHash = storedAnswers.get(questionKey);
-    return storedHash ? verifySecurityAnswer(answer, storedHash) : false;
-  });
-
-  if (!answersMatch) {
+  if (!student || !canRecover || !answersMatch) {
     return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
   }
 
@@ -154,6 +175,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
     return updatedStudent;
   });
+  invalidateSessionCache(result.id);
 
   await setSessionCookie(result.id, result.role, result.sessionVersion);
 

@@ -55,9 +55,9 @@ export async function loadSageOperations(
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === "executed" || status === "confirmed") return "bg-emerald-100 text-emerald-700";
-  if (status === "failed" || status === "rejected") return "bg-rose-100 text-rose-800";
-  return "bg-amber-100 text-amber-800"; // proposed / unrecognized
+  if (status === "executed" || status === "confirmed") return "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]";
+  if (status === "failed" || status === "rejected") return "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]";
+  return "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]"; // proposed / unrecognized
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -141,14 +141,14 @@ export function SageActivityPanel({ studentId }: SageActivityPanelProps) {
 
   return (
     <div className="theme-card rounded-xl p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-secondary)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-info">
         Sage&apos;s activity
       </p>
       <p className="mt-1 text-xs text-[var(--ink-faint)]">
         Actions Sage has taken or proposed for this student — never conversation content.
       </p>
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[var(--badge-error-text)]">{error}</p>}
 
       {operations === null ? (
         <p className="mt-3 text-sm text-[var(--ink-faint)]">Loading…</p>
@@ -159,7 +159,7 @@ export function SageActivityPanel({ studentId }: SageActivityPanelProps) {
             <button
               onClick={loadMore}
               disabled={loadingMore}
-              className="mt-3 min-h-11 rounded-lg px-3 text-xs font-semibold text-[var(--accent-secondary)] hover:bg-[var(--surface-interactive)] disabled:opacity-50"
+              className="mt-3 min-h-11 rounded-lg px-3 text-xs font-semibold text-info hover:bg-[var(--surface-interactive)] disabled:opacity-50"
             >
               {loadingMore ? "Loading…" : "Load more"}
             </button>

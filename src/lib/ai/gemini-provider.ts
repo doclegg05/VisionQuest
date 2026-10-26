@@ -1,11 +1,14 @@
+import { assertCloudInferenceAllowed } from "./demo-local-only";
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type Content, type EnhancedGenerateContentResponse, type FunctionDeclaration, type GenerateContentStreamResult, type Part, type SafetySetting, type Schema, type SingleRequestOptions, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../llm-usage-estimate";
 import { GEMINI_MODEL as MODEL } from "@/lib/gemini";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import type {
   AIProvider,
   ChatMessage,
+  DescribeDocumentOptions,
   GenerationOptions,
   OnUsage,
   TokenUsage,
@@ -178,7 +181,7 @@ async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promi
         label,
         attempt: attempt + 1,
         maxAttempts: RETRY_DELAYS_MS.length + 1,
-        error: String(error),
+        error: errorForLog(error),
       });
       await sleep(RETRY_DELAYS_MS[attempt]);
     }
@@ -268,6 +271,7 @@ export class GeminiProvider implements AIProvider {
   }
 
   private getModel(systemInstruction?: string, options?: GenerationOptions) {
+    assertCloudInferenceAllowed();
     const genAI = new GoogleGenerativeAI(this.apiKey);
     return genAI.getGenerativeModel({
       model: MODEL,
@@ -374,6 +378,7 @@ export class GeminiProvider implements AIProvider {
     options?: GenerationOptions,
   ): Promise<string> {
     if (messages.length === 0) throw new Error("messages array must not be empty");
+    assertCloudInferenceAllowed();
     const genAI = new GoogleGenerativeAI(this.apiKey);
     const model = genAI.getGenerativeModel({
       model: MODEL,
@@ -405,6 +410,53 @@ export class GeminiProvider implements AIProvider {
     }, "generateStructuredResponse");
   }
 
+  /**
+   * Document understanding over inline bytes (the same inline_data transport
+   * the raw-fetch gist path used; switch to the Files API if 48h reuse across
+   * turns is ever needed). Non-streaming, so the whole call sits inside the
+   * request deadline and the transient-retry ladder like generateResponse.
+   */
+  async describeDocument(
+    buffer: Buffer,
+    mimeType: string,
+    prompt: string,
+    options?: DescribeDocumentOptions,
+  ): Promise<string> {
+    assertCloudInferenceAllowed();
+    const genAI = new GoogleGenerativeAI(this.apiKey);
+    const json = options?.responseFormat === "json";
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      safetySettings: SAFETY_SETTINGS,
+      ...(json
+        ? {
+            generationConfig: {
+              responseMimeType: "application/json",
+              // The schema is an OpenAPI subset the caller owns; the SDK
+              // types it as its own Schema union, so cast at the seam.
+              ...(options?.responseSchema
+                ? { responseSchema: options.responseSchema as unknown as Schema }
+                : {}),
+            },
+          }
+        : {}),
+    });
+
+    const parts: Part[] = [
+      { inlineData: { mimeType, data: buffer.toString("base64") } },
+      { text: prompt },
+    ];
+
+    return withTransientRetry(async () => {
+      const result = await this.withRequestDeadline((requestOptions) =>
+        model.generateContent({ contents: [{ role: "user", parts }] }, requestOptions),
+      );
+      const text = result.response.text();
+      reportUsage(options?.onUsage, result.response.usageMetadata, prompt, [], text);
+      return text;
+    }, "describeDocument");
+  }
+
   async *streamWithTools(
     systemPrompt: string,
     messages: ChatMessage[],
@@ -415,6 +467,7 @@ export class GeminiProvider implements AIProvider {
     if (messages.length === 0) throw new Error("messages array must not be empty");
     const maxHops = Math.max(1, options?.maxHops ?? 5);
 
+    assertCloudInferenceAllowed();
     const genAI = new GoogleGenerativeAI(this.apiKey);
     const geminiTools: Tool[] = tools.length
       ? [{ functionDeclarations: tools.map(toGeminiFunctionDeclaration) }]

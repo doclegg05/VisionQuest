@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "note": "Parameters for a 12-week dry run of the whole placement funnel over the synthetic cohort. No corpus: the connections come from config/benchmarks/synthetic-cohort/connections.json and everything that happens to them over the 12 weeks is drawn from `seed`, so the same run happens on every machine.",
+  "seed": "cohort-simulation:v1",
+  "weeks": 12,
+  "clockNote": "Day 0 is the cohort's own meta.epoch (2026-09-01T12:00:00Z), so nothing in this suite is relative to 'today' and the funnel counts do not drift with the calendar. The daily tick is 10:00 America/New_York, inside the send window, so a text that is deferred is deferred by the CAP and not by the hour the benchmark happened to run.",
+  "tickHourUtc": 14,
+  "probabilities": {
+    "note": "How the world answers, per day, per eligible connection. Tuned so the funnel reaches the day-30 and day-60 retention checkpoints inside 12 weeks while still leaving connections stalled at each stage — a simulation where everyone advances would never exercise the no-view, no-response or unanswered-retention rules. Day 90 is out of reach at 12 weeks by arithmetic, not by defect: a connection needs roughly three weeks to reach `started`, and 21 + 90 is past the end of the run. Lengthening the simulation to reach it would make every other number incomparable with the runs before it, so the coverage check requires a checkpoint's ask only where the window actually closed inside the run.",
+    "studentApproves": 0.45,
+    "instructorSends": 0.4,
+    "employerViews": 0.35,
+    "employerAnswers": 0.3,
+    "employerHires": 0.25,
+    "startsWork": 0.5,
+    "repliesToRetention": 0.6,
+    "retentionReplyIsYes": 0.85,
+    "staffCloses": 0.02
+  },
+  "smsPreference": {
+    "note": "Every simulated student is consented and reachable. This suite is about SCHEDULING, not consent — the consent invariant is nudge-consent's (design section 4.5), and modelling refusals here would only make this suite's counts depend on that suite's fixture.",
+    "enabled": true,
+    "destinationPrefix": "+1304555",
+    "consentedDaysBeforeEpoch": 30
+  },
+  "stuckDays": 30,
+  "stuckNote": "A connection that has not moved in this many simulated days, in a status that is not terminal. Counted per STUDENT, because the number a job developer acts on is 'how many of my people are stalled', not how many rows are.",
+  "expectations": {
+    "note": "The retention invariant, expressed as coverage rather than as a second copy of selectRetentionChecks. A connection that sat in a retention-eligible status across its checkpoint, with a full re-ask window on top, must have been asked at least once — that is the regression the retention chain already had (an unanswered day-30 text froze days 60 and 90 forever) and it is checkable from the simulation's own ledger without restating the selector's dedupe rules.",
+    "reaskGraceDays": 8
+  }
+}

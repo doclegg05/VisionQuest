@@ -2,6 +2,10 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { prismaAdmin } from "./db";
 import { cached, invalidatePrefix } from "./cache";
+import { isCohortDemoEnabled, type DemoAccountKind } from "./demo/config";
+import { errorForLog } from "./log-error";
+import { logger } from "./logger";
+import { isSessionTokenRevoked, revokeSessionToken } from "./session-revocation";
 import {
   signToken as signSessionToken,
   verifyToken as verifySessionToken,
@@ -130,9 +134,11 @@ export function verifyPasswordSafeWithStatus(
   password: string,
   stored: string | null | undefined,
 ): PasswordVerifyResult {
-  const target = stored && isKnownHashFormat(stored) ? stored : DUMMY_HASH;
+  const hasStoredHash = Boolean(stored && isKnownHashFormat(stored));
+  const target = hasStoredHash ? stored! : DUMMY_HASH;
   const result = verifyPasswordWithStatus(password, target);
-  return stored ? result : { valid: false, needsRehash: false };
+  // Dummy work equalizes timing; it must never authenticate a malformed hash.
+  return hasStoredHash ? result : { valid: false, needsRehash: false };
 }
 
 /** Boolean-only wrapper preserved for existing callers. */
@@ -148,8 +154,13 @@ export const verifyToken = verifySessionToken;
 
 // --- Session helpers ---
 
-export async function setSessionCookie(studentId: string, role: string, sessionVersion: number) {
-  const token = signToken(studentId, role, sessionVersion);
+export async function setSessionCookie(
+  studentId: string,
+  role: string,
+  sessionVersion: number,
+  options?: { demo?: DemoAccountKind },
+) {
+  const token = signToken(studentId, role, sessionVersion, options);
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
@@ -168,22 +179,42 @@ export async function getSession() {
 
   const claims = verifyToken(token);
   if (!claims) return null;
+  // Logout revokes the presented token server-side. A store failure throws,
+  // like the Student lookup below: no session on an unknown answer.
+  if (await isSessionTokenRevoked(token)) return null;
 
   // Cache session lookups for 10s to reduce DB hits (keyed by user ID + session version)
   const cacheKey = `session:${claims.sub}:${claims.sv}`;
   const student = await cached(cacheKey, 10, () =>
     prismaAdmin.student.findUnique({
       where: { id: claims.sub },
-      select: { id: true, studentId: true, displayName: true, role: true, sessionVersion: true, isActive: true },
+      select: {
+        id: true,
+        studentId: true,
+        displayName: true,
+        role: true,
+        sessionVersion: true,
+        isActive: true,
+        demoAccount: true,
+      },
     }),
   );
 
   if (!student || student.sessionVersion !== claims.sv || !student.isActive) return null;
+  // The switch is read here, after the cache, and not inside the cached
+  // lookup: turning demo mode off must end demo sessions at once, not when a
+  // cached row expires.
+  if (student.demoAccount && !isCohortDemoEnabled()) return null;
+  // The proxy fences on the token's demo claim and handlers read the row, so
+  // the two must agree in both directions. A real account has neither.
+  if ((claims.demo ?? null) !== (student.demoAccount ?? null)) return null;
   return {
     id: student.id,
     studentId: student.studentId,
     displayName: student.displayName,
     role: student.role,
+    // Real accounts get no demoAccount key at all.
+    ...(student.demoAccount ? { demoAccount: student.demoAccount } : {}),
   };
 }
 
@@ -192,8 +223,26 @@ export function invalidateSessionCache(studentId: string) {
   invalidatePrefix(`session:${studentId}`);
 }
 
+/** Our tokens always carry `exp`; the fallback is the 7-day TOKEN_TTL. */
+function revocationExpiry(claims: SessionClaims): Date {
+  return claims.exp !== undefined
+    ? new Date(claims.exp * 1000)
+    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+}
+
 export async function clearSession() {
   const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+  const claims = token ? verifyToken(token) : null;
+  if (token && claims) {
+    try {
+      await revokeSessionToken(token, revocationExpiry(claims));
+    } catch (error) {
+      // Logout still signs the browser out and answers as it always has. The
+      // token stays valid until it expires, as it did before revocation.
+      logger.error("session_revocation_failed", { error: errorForLog(error) });
+    }
+  }
   cookieStore.delete(COOKIE_NAME);
 }
 
@@ -222,7 +271,13 @@ export async function getMfaSessionToken(): Promise<string | null> {
 
 export async function clearMfaSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(MFA_COOKIE_NAME);
+  cookieStore.set(MFA_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 0,
+    path: "/api/auth/mfa",
+  });
 }
 
 // --- Normalize student ID ---

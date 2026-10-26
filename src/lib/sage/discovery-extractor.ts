@@ -1,5 +1,5 @@
 import type { AIProvider } from "@/lib/ai";
-import { logger } from "@/lib/logger";
+import { extractionTranscript } from "./extraction-transcript";
 import { CAREER_CLUSTERS } from "@/lib/spokes/career-clusters";
 import {
   NATIONAL_CAREER_CLUSTERS,
@@ -155,25 +155,6 @@ const EMPTY_RIASEC: RiasecScores = {
   conventional: 0,
 };
 
-const EMPTY_RESULT: DiscoveryResult = {
-  interests: [],
-  strengths: [],
-  subjects: [],
-  problems: [],
-  values: [],
-  circumstances: [],
-  cluster_scores: {},
-  summary: "",
-  stage_complete: false,
-  xp_events: [],
-  riasec_scores: EMPTY_RIASEC,
-  holland_code: "",
-  national_career_clusters: [],
-  transferable_skills: [],
-  work_values: [],
-  assessment_summary: "",
-};
-
 const RIASEC_KEYS: (keyof RiasecScores)[] = [
   "realistic",
   "investigative",
@@ -285,63 +266,73 @@ function validateWorkValues(raw: unknown): WorkValue[] {
     }));
 }
 
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Extract career signals from the recent discovery conversation.
+ *
+ * Throws on a provider error, on a reply that is not JSON, and on JSON that
+ * is not an object. It must not swallow those: the caller runs it inside
+ * retryWithBackoff, which retries and then dead-letters to FailedExtraction
+ * only when this function throws. Fields of a well-formed object are
+ * validated one by one instead, so a single bad field never fails the pass.
+ */
 export async function extractDiscoverySignals(
   provider: AIProvider,
   messages: { role: "user" | "model"; content: string }[],
 ): Promise<DiscoveryResult> {
-  try {
-    const recent = messages.slice(-10);
+  const recent = messages.slice(-10);
 
-    const contextPrompt = "Analyze the career discovery conversation and extract assessment signals:";
-    const messagesWithContext = [
-      ...recent,
-      { role: "user" as const, content: contextPrompt },
-    ];
+  const contextPrompt = "Analyze the career discovery conversation and extract assessment signals:";
+  const messagesWithContext = extractionTranscript(recent, contextPrompt);
 
-    const result = await provider.generateStructuredResponse(
-      DISCOVERY_EXTRACTION_PROMPT,
-      messagesWithContext,
-    );
-    const parsed = JSON.parse(result) as Record<string, unknown>;
-
-    // Validate SPOKES cluster_scores
-    const validClusterIds = new Set(CAREER_CLUSTERS.map((c) => c.id));
-    const cleanedScores: Record<string, number> = {};
-    const rawScores = (parsed.cluster_scores || {}) as Record<string, unknown>;
-    for (const [key, val] of Object.entries(rawScores)) {
-      if (validClusterIds.has(key) && typeof val === "number") {
-        cleanedScores[key] = clampScore(val);
-      }
-    }
-
-    // Validate RIASEC and compute Holland code
-    const riasec = validateRiasec(parsed.riasec_scores);
-    const hollandCode = computeHollandCode(riasec);
-
-    return {
-      interests: Array.isArray(parsed.interests) ? (parsed.interests as string[]) : [],
-      strengths: Array.isArray(parsed.strengths) ? (parsed.strengths as string[]) : [],
-      subjects: Array.isArray(parsed.subjects) ? (parsed.subjects as string[]) : [],
-      problems: Array.isArray(parsed.problems) ? (parsed.problems as string[]) : [],
-      values: Array.isArray(parsed.values) ? (parsed.values as string[]) : [],
-      circumstances: Array.isArray(parsed.circumstances) ? (parsed.circumstances as string[]) : [],
-      cluster_scores: cleanedScores,
-      summary: typeof parsed.summary === "string" ? (parsed.summary as string) : "",
-      stage_complete: parsed.stage_complete === true,
-      xp_events: Array.isArray(parsed.xp_events) ? (parsed.xp_events as string[]) : [],
-      riasec_scores: riasec,
-      holland_code: hollandCode,
-      national_career_clusters: validateNationalClusters(parsed.national_career_clusters),
-      transferable_skills: validateTransferableSkills(parsed.transferable_skills),
-      work_values: validateWorkValues(parsed.work_values),
-      assessment_summary: typeof parsed.assessment_summary === "string"
-        ? (parsed.assessment_summary as string)
-        : "",
-    };
-  } catch (error) {
-    logger.error("Discovery extraction failed", { error: String(error) });
-    return EMPTY_RESULT;
+  const result = await provider.generateStructuredResponse(
+    DISCOVERY_EXTRACTION_PROMPT,
+    messagesWithContext,
+  );
+  const parsed: unknown = JSON.parse(result);
+  if (!isJsonObject(parsed)) {
+    // The message carries no model output: it is logged, and the output can
+    // quote the student.
+    throw new Error("Discovery extraction reply is not a JSON object");
   }
+
+  // Validate SPOKES cluster_scores
+  const validClusterIds = new Set(CAREER_CLUSTERS.map((c) => c.id));
+  const cleanedScores: Record<string, number> = {};
+  const rawScores = (parsed.cluster_scores || {}) as Record<string, unknown>;
+  for (const [key, val] of Object.entries(rawScores)) {
+    if (validClusterIds.has(key) && typeof val === "number") {
+      cleanedScores[key] = clampScore(val);
+    }
+  }
+
+  // Validate RIASEC and compute Holland code
+  const riasec = validateRiasec(parsed.riasec_scores);
+  const hollandCode = computeHollandCode(riasec);
+
+  return {
+    interests: Array.isArray(parsed.interests) ? (parsed.interests as string[]) : [],
+    strengths: Array.isArray(parsed.strengths) ? (parsed.strengths as string[]) : [],
+    subjects: Array.isArray(parsed.subjects) ? (parsed.subjects as string[]) : [],
+    problems: Array.isArray(parsed.problems) ? (parsed.problems as string[]) : [],
+    values: Array.isArray(parsed.values) ? (parsed.values as string[]) : [],
+    circumstances: Array.isArray(parsed.circumstances) ? (parsed.circumstances as string[]) : [],
+    cluster_scores: cleanedScores,
+    summary: typeof parsed.summary === "string" ? (parsed.summary as string) : "",
+    stage_complete: parsed.stage_complete === true,
+    xp_events: Array.isArray(parsed.xp_events) ? (parsed.xp_events as string[]) : [],
+    riasec_scores: riasec,
+    holland_code: hollandCode,
+    national_career_clusters: validateNationalClusters(parsed.national_career_clusters),
+    transferable_skills: validateTransferableSkills(parsed.transferable_skills),
+    work_values: validateWorkValues(parsed.work_values),
+    assessment_summary: typeof parsed.assessment_summary === "string"
+      ? (parsed.assessment_summary as string)
+      : "",
+  };
 }
 
 /**

@@ -315,7 +315,7 @@ describe("POST /api/appointments/book", () => {
       }
     });
 
-    it("redacts contact info from a failed side effect before logging it", async () => {
+    it("logs a failed side effect by name, never the provider text it quotes", async () => {
       mockSendAppointmentConfirmation.mock.mockImplementation(async () => {
         throw new Error(
           "550 5.1.1 <student.a@example.org>: recipient rejected; callback +15551234567",
@@ -327,10 +327,10 @@ describe("POST /api/appointments/book", () => {
       assert.equal(result.status, 201);
       assert.equal(mockLoggerWarn.mock.callCount(), 1);
       const [, context] = mockLoggerWarn.mock.calls[0].arguments;
-      const loggedError = String(context?.error);
-      assert.doesNotMatch(loggedError, /student\.a@example\.org|5551234567/);
-      assert.match(loggedError, /\[email redacted\]/);
-      assert.match(loggedError, /\[phone redacted\]/);
+      // The effect may be a Prisma write as easily as the email, so the
+      // message stays out entirely; the step name is in the log message.
+      assert.deepEqual(context?.error, { name: "Error" });
+      assert.doesNotMatch(JSON.stringify(context), /student\.a@example\.org|5551234567|recipient rejected/);
     });
   });
 
@@ -366,6 +366,69 @@ describe("POST /api/appointments/book", () => {
       assert.equal(result.status, 403);
       assert.equal(mockListBookableAdvisors.mock.callCount(), 0);
       assert.equal(mockAppointmentCreate.mock.callCount(), 0);
+    });
+  });
+
+  describe("cohort demo: demo accounts book only the demo instructor", () => {
+    const DEMO_STUDENT = mockStudentSession({
+      id: "stu-demo-001",
+      studentId: "demostudent",
+      demoAccount: "student",
+    });
+    const DEMO_ADVISOR = {
+      advisorId: "tch-demo-001",
+      advisorName: "Demo Instructor",
+      slots: [SLOT],
+    };
+
+    // Stands in for listBookableAdvisors' audience filter: the demo audience
+    // is offered the demo instructor, everyone else the real advisor.
+    function audienceOf(args: unknown): string | undefined {
+      return (args as { audience?: string } | undefined)?.audience;
+    }
+
+    beforeEach(() => {
+      mockListBookableAdvisors.mock.mockImplementation(async (args) =>
+        audienceOf(args) === "demo" ? [DEMO_ADVISOR] : [ADVISOR],
+      );
+    });
+
+    it("refuses a demo student booking a real advisor's slot", async () => {
+      const result = await post(DEMO_STUDENT, { advisorId: ADVISOR.advisorId });
+
+      assert.equal(result.status, 409);
+      assert.equal(result.body.error, "That time slot is no longer available.");
+      assert.equal(mockAppointmentCreate.mock.callCount(), 0);
+      assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
+      assert.equal(mockSendAppointmentConfirmation.mock.callCount(), 0);
+    });
+
+    it("lets a demo student book the demo instructor", async () => {
+      const result = await post(DEMO_STUDENT, { advisorId: DEMO_ADVISOR.advisorId });
+
+      assert.equal(result.status, 201);
+      assert.equal(mockAppointmentCreate.mock.callCount(), 1);
+      const { data } = mockAppointmentCreate.mock.calls[0].arguments[0];
+      assert.equal(data.studentId, DEMO_STUDENT.id);
+      assert.equal(data.advisorId, DEMO_ADVISOR.advisorId);
+    });
+
+    it("refuses a real student booking the demo instructor's slot", async () => {
+      const result = await post(STUDENT_A, { advisorId: DEMO_ADVISOR.advisorId });
+
+      assert.equal(result.status, 409);
+      assert.equal(result.body.error, "That time slot is no longer available.");
+      assert.equal(mockAppointmentCreate.mock.callCount(), 0);
+    });
+
+    it("reads the open slots for the session's own audience", async () => {
+      await post(DEMO_STUDENT, { advisorId: DEMO_ADVISOR.advisorId });
+      await post(STUDENT_A);
+
+      assert.deepEqual(
+        mockListBookableAdvisors.mock.calls.map((call) => audienceOf(call.arguments[0])),
+        ["demo", "standard"],
+      );
     });
   });
 

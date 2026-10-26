@@ -1,3 +1,4 @@
+import { assertCloudInferenceAllowed } from "./demo-local-only";
 /**
  * Gemini embedding provider for semantic RAG (Phase 1, refactored into the
  * EmbeddingProvider interface in Phase 3).
@@ -46,6 +47,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
     texts: string[],
     opts: { taskType: EmbeddingTaskType; callSite?: string; studentId?: string | null },
   ): Promise<number[][]> {
+    assertCloudInferenceAllowed();
     if (texts.length === 0) {
       throw new Error("embed requires at least one text");
     }
@@ -88,6 +90,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
     texts: string[],
     taskType: EmbeddingTaskType,
   ): Promise<number[][]> {
+    assertCloudInferenceAllowed();
     const response = await fetch(
       `${API_BASE}/models/${this.model}:batchEmbedContents`,
       {

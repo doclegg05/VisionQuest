@@ -1,0 +1,33 @@
+{
+  "suite": "orientation-readiness",
+  "title": "Readiness, as every surface reports it",
+  "area": "journeys",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/orientation-readiness.mjs",
+  "fixture": "config/benchmarks/fixtures/orientation-readiness.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "consumer_disagreements",
+      "unit": "count",
+      "direction": "lower",
+      "tolerance": 0,
+      "floor": 0
+    },
+    {
+      "id": "denominator_is_all_items",
+      "unit": "count",
+      "direction": "higher",
+      "floor": 1,
+      "tolerance": 0
+    },
+    {
+      "id": "score_decreases_on_completion",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    }
+  ],
+  "notes": "Drives all seven readiness surfaces from one set of facts per cohort student through src/lib/progression/readiness-consumers.ts, the Prisma-free home of the mapping the product actually uses. Ticket D1 (2026-09-07, owner-approved: 'live rows win everywhere') unified the three mappings this suite used to compare into one — `progressionStateReadiness` and `rosterReadiness` are now thin wrappers around `reconciledReadiness`, and the roster's readiness score plus the class-progress panel's now come from a batched loader (`fetchReadinessDataForStudents`) that reconciles live certification, portfolio, resume and shared-page rows instead of trusting the stored `Progression.state` alone. `consumer_disagreements` accordingly moved from `info` (116 of 300 pairs, floor null) to a real gate at `floor: 0` — a future consumer registered under any mapping name gets the same reconciled behaviour by construction, so a regression here means a surface actually diverged, not that a product call is still open. `denominator_is_all_items` reads the five production queries that supply the orientation denominator and is 0 if any grew a `where` — the 2026-07-31 decision ('readiness counts ALL orientation items on every surface') lived in the QUERY, so a source check is what can catch it coming back. `score_decreases_on_completion` is the design's monotonicity half: completing an orientation item must never lower a score. Floors read in each metric's own direction; `denominator_is_all_items` is 1 or 0, so a floor of 1 means 'no offender'."
+}

@@ -9,6 +9,7 @@ import {
 import { logAuditEvent } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
 
@@ -27,7 +28,7 @@ export const POST = withTeacherAuth(async (
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const { id: studentId } = await params;
+  const { id: identifier } = await params;
   const body = await req.json();
 
   const title = typeof body.title === "string" ? body.title.trim() : "";
@@ -56,7 +57,8 @@ export const POST = withTeacherAuth(async (
     return NextResponse.json({ error: "Meeting URL must be valid." }, { status: 400 });
   }
 
-  const student = await assertStaffCanManageStudent(session, studentId);
+  const student = await assertStaffCanManageStudent(session, identifier);
+  const studentId = student.id;
 
   if (!student) {
     return NextResponse.json({ error: "Student not found." }, { status: 404 });
@@ -106,7 +108,7 @@ export const POST = withTeacherAuth(async (
   try {
     await sendAppointmentConfirmation(appointment.id);
   } catch (error) {
-    logger.error("Failed to send appointment confirmation", { error: String(error) });
+    logger.error("Failed to send appointment confirmation", { error: errorForLog(error) });
   }
 
   // Push in-app notification to student
@@ -114,7 +116,7 @@ export const POST = withTeacherAuth(async (
     type: "appointment",
     title: "New appointment scheduled",
     body: `"${title}" on ${startsAt.toLocaleDateString()}`,
-  }).catch((err) => logger.error("Failed to send notification", { error: String(err) }));
+  }).catch((err) => logger.error("Failed to send notification", { error: errorForLog(err) }));
 
   return NextResponse.json({ appointment });
 });

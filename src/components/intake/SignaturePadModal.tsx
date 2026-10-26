@@ -8,6 +8,12 @@ import {
   SIGNATURE_IMAGE_MIME_TYPES,
   parseSignatureImageDataUrl,
 } from "@/lib/intake/schema";
+import { SPOKES_COLORS } from "@/lib/spokes-palette";
+
+// Paper and ink for the exported signature PNG: SPOKES "light" and "dark"
+// (deep navy), fixed in both themes because the image is printed on white.
+const PAPER_COLOR = SPOKES_COLORS.get("light") ?? "white";
+const INK_COLOR = SPOKES_COLORS.get("dark") ?? "black";
 
 interface SignaturePadModalProps {
   isOpen: boolean;
@@ -69,7 +75,7 @@ async function prepareSignatureUpload(file: File): Promise<string> {
 
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Could not prepare that picture. Please try drawing instead.");
-  context.fillStyle = "#ffffff";
+  context.fillStyle = PAPER_COLOR;
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
@@ -126,7 +132,7 @@ export default function SignaturePadModal({
     const context = node.getContext("2d");
     if (!context) return;
     context.clearRect(0, 0, node.width, node.height);
-    context.strokeStyle = "#004777"; // Deep state navy
+    context.strokeStyle = INK_COLOR;
     context.lineWidth = 2.5;
     context.lineCap = "round";
     context.lineJoin = "round";
@@ -235,7 +241,7 @@ export default function SignaturePadModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-info-soft text-info">
               <PenNib size={20} weight="bold" />
             </div>
             <div>
@@ -248,7 +254,7 @@ export default function SignaturePadModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-raised)]"
+            className="pointer-coarse:min-h-11 rounded-lg p-1.5 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-raised)]"
             aria-label="Close modal"
           >
             <X size={18} />
@@ -260,7 +266,7 @@ export default function SignaturePadModal({
           {/* Signer Legal Name */}
           <div>
             <label htmlFor={nameFieldId} className="block text-xs font-semibold text-[var(--ink-muted)]">
-              Full Legal Signer Name <span className="text-red-500">*</span>
+              Full Legal Signer Name <span className="text-danger">*</span>
             </label>
             <input
               id={nameFieldId}
@@ -269,7 +275,7 @@ export default function SignaturePadModal({
               value={signerName}
               onChange={(e) => setSignerName(e.target.value)}
               placeholder="e.g. Morgan Vance"
-              className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-strong)] placeholder:text-[var(--ink-faint)] focus:border-sky-500 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--ink-strong)] placeholder:text-[var(--ink-faint)] focus:border-info focus:outline-none"
             />
           </div>
 
@@ -279,9 +285,9 @@ export default function SignaturePadModal({
               type="button"
               onClick={() => setMode("draw")}
               aria-pressed={mode === "draw"}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 transition-colors ${
+              className={`pointer-coarse:min-h-11 flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 transition-colors ${
                 mode === "draw"
-                  ? "bg-[var(--surface-base)] text-sky-700 shadow-sm dark:text-sky-300"
+                  ? "bg-[var(--surface-base)] text-info shadow-sm"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >
@@ -292,9 +298,9 @@ export default function SignaturePadModal({
               type="button"
               onClick={() => setMode("upload")}
               aria-pressed={mode === "upload"}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 transition-colors ${
+              className={`pointer-coarse:min-h-11 flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 transition-colors ${
                 mode === "upload"
-                  ? "bg-[var(--surface-base)] text-sky-700 shadow-sm dark:text-sky-300"
+                  ? "bg-[var(--surface-base)] text-info shadow-sm"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
               }`}
             >
@@ -326,17 +332,17 @@ export default function SignaturePadModal({
                   onTouchEnd={stopDrawing}
                 />
                 {!hasDrawn && (
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-medium text-slate-400">
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-medium text-ink-faint">
                     Sign inside this box with your finger or mouse
                   </div>
                 )}
-                <div className="pointer-events-none absolute bottom-5 left-6 right-6 border-b border-slate-300" />
+                <div className="pointer-events-none absolute bottom-5 left-6 right-6 border-b border-line" />
               </div>
               <div className="mt-1.5 flex justify-end">
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
+                  className="pointer-coarse:min-h-11 flex items-center gap-1 text-xs font-semibold text-ink-muted hover:text-ink-strong"
                 >
                   <ArrowClockwise size={12} />
                   Clear & Redo
@@ -354,9 +360,9 @@ export default function SignaturePadModal({
                       width={240}
                       height={96}
                       unoptimized
-                      className="max-h-24 w-auto rounded border border-slate-200 bg-white p-2 object-contain"
+                      className="max-h-24 w-auto rounded border border-line bg-white p-2 object-contain"
                     />
-                    <label className="cursor-pointer text-xs font-semibold text-sky-600 hover:underline">
+                    <label className="cursor-pointer text-xs font-semibold text-info hover:underline">
                       Choose another file
                       <input
                         type="file"
@@ -368,13 +374,13 @@ export default function SignaturePadModal({
                   </div>
                 ) : (
                   <label className="flex cursor-pointer flex-col items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-muted text-ink-muted">
                       <UploadSimple size={20} weight="bold" />
                     </div>
                     <span className="text-xs font-semibold text-[var(--ink-strong)]">
                       Upload photo or scan of signature
                     </span>
-                    <span className="text-[11px] text-[var(--ink-muted)]">
+                    <span className="text-xs text-[var(--ink-muted)]">
                       PNG or JPEG. Large photos are shrunk to {Math.round(SIGNATURE_IMAGE_MAX_BYTES / 1024)} KB.
                     </span>
                     <input
@@ -390,7 +396,7 @@ export default function SignaturePadModal({
           )}
 
           {uploadError ? (
-            <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-xs text-danger">
               {uploadError}
             </p>
           ) : null}
@@ -402,7 +408,7 @@ export default function SignaturePadModal({
               type="checkbox"
               checked={affirmed}
               onChange={(e) => setAffirmed(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+              className="mt-0.5 h-4 w-4 rounded border-line text-info focus:ring-info"
             />
             <label htmlFor={affirmationId}>
               <strong className="text-[var(--ink-strong)]">Legal Audit Affirmation:</strong> I certify under penalty of
@@ -417,7 +423,7 @@ export default function SignaturePadModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-base)] hover:text-[var(--ink-strong)]"
+            className="pointer-coarse:min-h-11 rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-base)] hover:text-[var(--ink-strong)]"
           >
             Cancel
           </button>
@@ -425,10 +431,10 @@ export default function SignaturePadModal({
             type="button"
             disabled={!canSubmit}
             onClick={handleSave}
-            className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-all ${
+            className={`pointer-coarse:min-h-11 flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
               canSubmit
-                ? "bg-sky-600 hover:bg-sky-700 shadow-sm"
-                : "cursor-not-allowed bg-slate-400 opacity-60"
+                ? "bg-info text-on-info hover:brightness-110 shadow-sm"
+                : "cursor-not-allowed bg-surface-muted text-ink-muted opacity-60"
             }`}
           >
             <CheckCircle size={14} weight="bold" />

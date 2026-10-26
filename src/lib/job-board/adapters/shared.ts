@@ -1,6 +1,54 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
+import type { NormalizedJob } from "../types";
 
 export const JOB_SCOUT_USER_AGENT = "VisionQuest Job Scout/0.1";
+
+/**
+ * What one adapter's requests did during a scrape. fetchJson and fetchText
+ * return null on failure so a multi-board adapter can skip one dead board,
+ * which also makes a total outage look like a source with no jobs. This tally
+ * lets fetchSourceJobs tell the two apart (PR #248 review).
+ */
+interface SourceRequestTally {
+  attempted: number;
+  failed: number;
+  lastFailure: string | null;
+}
+
+const requestTally = new AsyncLocalStorage<SourceRequestTally>();
+
+function recordRequest(failure: string | null): void {
+  const tally = requestTally.getStore();
+  if (!tally) return;
+  tally.attempted++;
+  if (failure) {
+    tally.failed++;
+    tally.lastFailure = failure;
+  }
+}
+
+// A fixed label, never the error message: some request URLs carry API keys
+// (see FetchLogOptions.logUrl) and this text is stored on the source result.
+function requestErrorLabel(error: unknown): string {
+  return error instanceof Error && error.name === "TimeoutError" ? "timed out" : "network error";
+}
+
+/**
+ * Runs one adapter's fetch and throws when every request it made failed, so
+ * the scrape engine records the source as failed instead of as an empty
+ * success. A source that made no requests (unconfigured) or got at least one
+ * answer passes its jobs through unchanged.
+ */
+export async function fetchSourceJobs(fetchJobs: () => Promise<NormalizedJob[]>): Promise<NormalizedJob[]> {
+  const tally: SourceRequestTally = { attempted: 0, failed: 0, lastFailure: null };
+  const jobs = await requestTally.run(tally, fetchJobs);
+  if (tally.attempted > 0 && tally.failed === tally.attempted) {
+    throw new Error(`every request failed (last: ${tally.lastFailure})`);
+  }
+  return jobs;
+}
 
 const QUERY_STOPWORDS = new Set([
   "a",
@@ -48,11 +96,15 @@ export async function fetchJson<T>(
     });
     if (!response.ok) {
       logger.warn("Job source request failed", { url: logUrl, status: response.status });
+      recordRequest(`HTTP ${response.status}`);
       return null;
     }
-    return (await response.json()) as T;
+    const body = (await response.json()) as T;
+    recordRequest(null);
+    return body;
   } catch (error) {
-    logger.warn("Job source request errored", { url: logUrl, error: String(error) });
+    logger.warn("Job source request errored", { url: logUrl, error: errorForLog(error) });
+    recordRequest(requestErrorLabel(error));
     return null;
   }
 }
@@ -70,11 +122,15 @@ export async function fetchText(url: string, init: RequestInit = {}): Promise<st
     });
     if (!response.ok) {
       logger.warn("Job source request failed", { url, status: response.status });
+      recordRequest(`HTTP ${response.status}`);
       return null;
     }
-    return response.text();
+    const text = await response.text();
+    recordRequest(null);
+    return text;
   } catch (error) {
-    logger.warn("Job source request errored", { url, error: String(error) });
+    logger.warn("Job source request errored", { url, error: errorForLog(error) });
+    recordRequest(requestErrorLabel(error));
     return null;
   }
 }
@@ -134,6 +190,40 @@ export function annualSalaryText(min: number | null | undefined, max: number | n
   if (low == null || high == null) return null;
   if (low !== high) return `$${Math.round(low)}-$${Math.round(high)}/year`;
   return `$${Math.round(low)}/year`;
+}
+
+/**
+ * Maps raw source items to NormalizedJob one at a time, isolating one
+ * malformed item's failure from the rest of the batch — this is strictly
+ * better than either extreme: the old bare-try/catch adapters swallowed
+ * EVERY item silently on any single failure (one bad row hid a whole
+ * successful response), and a plain `.map()` lets one thrown error fail the
+ * entire fetchJobs() call (a stalled/500 batch turns into a total outage
+ * instead of a partial one). Here, one bad item is skipped and logged; every
+ * well-formed item still comes back.
+ *
+ * `mapItem` returning `null` means "skip, nothing wrong" (e.g. a genuinely
+ * absent required field) and is never logged — only a THROWN error is
+ * logged, since that's the unexpected case. The log carries only
+ * `{ source, index }`, never the item payload (may hold job-posting free
+ * text) or the thrown error's message (could echo back malformed input,
+ * and in principle a URL with embedded secrets).
+ */
+export function mapEachJob<T>(
+  items: readonly T[],
+  source: string,
+  mapItem: (item: T, index: number) => NormalizedJob | null,
+): NormalizedJob[] {
+  const out: NormalizedJob[] = [];
+  items.forEach((item, index) => {
+    try {
+      const mapped = mapItem(item, index);
+      if (mapped) out.push(mapped);
+    } catch {
+      logger.warn("Job source item failed to normalize", { source, index });
+    }
+  });
+  return out;
 }
 
 export function xmlTag(item: string, tag: string): string {

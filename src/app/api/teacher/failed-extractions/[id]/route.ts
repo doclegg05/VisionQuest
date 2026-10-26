@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withTeacherAuth, badRequest, conflict, notFound, type Session } from "@/lib/api-error";
-import { resolveAiProvider } from "@/lib/ai";
+import { resolveAiProvider, type AIProvider } from "@/lib/ai";
+import { AiCloudRefusedError } from "@/lib/ai/lanes";
+import {
+  getProviderClass,
+  logAiAuditEvent,
+  policyDecisionForProvider,
+} from "@/lib/ai/audit";
 import { logAuditEvent } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
@@ -47,18 +53,74 @@ async function replayGoalExtraction(session: Session, row: FailedExtractionRow) 
     throw badRequest("Original message reference is missing; cannot replay.");
   }
 
-  // Same task/sensitivity as the original post-response extraction run.
-  const provider = await resolveAiProvider({
-    studentId: row.studentId,
-    task: "sage_post_response",
-    sensitivity: "student_record",
+  // Same task/sensitivity as the original post-response extraction run. The
+  // teacher who pressed replay is the actor; the student is the target.
+  const aiAudit = {
+    actorId: session.id,
+    actorRole: session.role,
+    targetId: row.studentId,
+    route: "/api/teacher/failed-extractions/[id]#replay",
+    task: "sage_post_response" as const,
+    sensitivity: "student_record" as const,
+  };
+  let provider: AIProvider;
+  try {
+    provider = await resolveAiProvider({
+      studentId: row.studentId,
+      task: aiAudit.task,
+      sensitivity: aiAudit.sensitivity,
+    });
+  } catch (error) {
+    // A policy refusal is audited by the resolver; a misconfigured local
+    // server is recorded here.
+    if (!(error instanceof AiCloudRefusedError)) {
+      await logAiAuditEvent({
+        ...aiAudit,
+        policyDecision: "blocked",
+        status: "blocked",
+        providerName: null,
+        providerClass: "none",
+        allowCloud: false,
+        reason: error instanceof Error ? error.message : String(error),
+        errorCode: "LOCAL_AI_UNAVAILABLE",
+      });
+    }
+    throw error;
+  }
+  const providerClass = getProviderClass(provider.name);
+  const providerAudit = {
+    ...aiAudit,
+    policyDecision: policyDecisionForProvider(provider.name),
+    providerName: provider.name,
+    providerClass,
+    allowCloud: providerClass === "cloud",
+  };
+  const inputChars = snapshot.messages.reduce((sum, m) => sum + m.content.length, 0);
+  await logAiAuditEvent({ ...providerAudit, status: "routed", inputChars });
+
+  let extracted: Awaited<ReturnType<typeof extractGoals>>;
+  try {
+    extracted = await extractGoals(
+      provider,
+      snapshot.messages,
+      snapshot.stage,
+      snapshot.programType,
+    );
+  } catch (error) {
+    await logAiAuditEvent({
+      ...providerAudit,
+      status: "failed",
+      errorCode: "provider_error",
+      reason: String(error).slice(0, 200),
+    });
+    throw error;
+  }
+  await logAiAuditEvent({
+    ...providerAudit,
+    status: "completed",
+    inputChars,
+    metadata: { goalsFound: extracted.goals_found.length },
   });
-  const extracted = await extractGoals(
-    provider,
-    snapshot.messages,
-    snapshot.stage,
-    snapshot.programType,
-  );
 
   const outcomes = { created: 0, duplicate: 0, rejected: 0 };
   for (const goal of extracted.goals_found) {

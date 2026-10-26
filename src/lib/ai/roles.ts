@@ -2,16 +2,9 @@
 //
 // AI ROLES — the distinct jobs VisionQuest asks a *generative* model to do.
 //
-// Until this module existed, every generative call — a student's coaching
-// turn, a background goal extraction, a resume parse, a nightly briefing —
-// went to the single model named by SystemConfig `ai_provider_model`. That is
-// fine for a cloud provider (Gemini is one model that does everything well)
-// but wrong for a local one: the jobs below have genuinely different
-// capability profiles, and the local model that is best at one is measurably
-// not best at another. See `docs/plans/2026-08-21-local-ai-role-models.md`.
-//
-// A role is a *capability profile*, not a call site. Two call sites share a
-// role when the same model property decides whether they succeed.
+// VisionQuest currently pins all local generative roles to Gemma 4 12B.
+// Roles retain their output budgets and capability profiles. Historical model
+// override keys remain for compatibility but do not select other local models.
 
 import type { AiTask } from "./types";
 
@@ -24,8 +17,8 @@ export function isAiRole(value: string): value is AiRole {
 }
 
 /**
- * SystemConfig key holding the model override for each role. Unset (the
- * default) means "use `ai_provider_model`" — i.e. exactly today's behavior.
+ * Historical SystemConfig model keys. The current 12B policy ignores these
+ * values; retaining the keys permits explicit clearing without deleting host models.
  */
 export const AI_ROLE_MODEL_CONFIG_KEYS = {
   chat: "ai_provider_model_chat",
@@ -130,6 +123,10 @@ const TASK_ROLES: Record<AiTask, AiRole | null> = {
   // provider (policyDecision "direct_no_model" in /api/chat/send). Listed
   // for totality; the value is unreachable.
   public_form_lookup: null,
+  // Vector embeddings are served by the embedding resolver, which has its own
+  // model config (`ai_provider_embedding_model`) and never consults a role.
+  // Listed for totality; the value is unreachable.
+  embedding: null,
 
   sage_student_chat: "chat",
   sage_staff_chat: "chat",
@@ -141,6 +138,16 @@ const TASK_ROLES: Record<AiTask, AiRole | null> = {
 
   resume_extract: "document",
   chat_file_gist: "document",
+
+  // Plain-language rewrite of one job posting for one student (explain_job).
+  // Prose, not JSON — the same shape of work as the other draft tasks.
+  explain_job: "draft",
+
+  // The instructor endorsement in a Connection packet: three sentences of
+  // prose about one student, written from verified facts and then refused if
+  // it asserts anything else. Prose with output-length headroom — the same
+  // shape of work as the other draft tasks.
+  draft_endorsement: "draft",
 
   sage_briefing: "draft",
   conversation_summary: "draft",

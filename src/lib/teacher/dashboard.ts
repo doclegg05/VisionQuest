@@ -11,59 +11,20 @@ import { getCertificationProgress } from "@/lib/certifications";
 import { prisma, prismaAdmin } from "@/lib/db";
 import { forbidden, type Session } from "@/lib/api-error";
 import { goalCountsTowardPlan } from "@/lib/goals";
-import {
-  ALL_INACTIVITY_ALERT_TYPES,
-  getInactivityStageByType,
-  getInactivityStageRank,
-  normalizeInactivityAlertType,
-} from "@/lib/inactivity";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
-import { computeReadinessScore } from "@/lib/progression/readiness-score";
+import { fetchReadinessDataForStudents } from "@/lib/progression/fetch-readiness-data";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import {
   buildInterventionQueueEntry,
+  compareQueueEntries,
+  type InterventionQueueEntry,
   type InterventionQueueStudentRecord,
 } from "@/lib/teacher/intervention-queue";
-import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
+import { interventionQueueStudentSelect } from "@/lib/teacher/intervention-queue-select";
 
-export interface QueueStudent {
-  studentId: string;
-  publicStudentId: string;
-  name: string;
-  email: string | null;
-  programType: ProgramType;
-  urgencyScore: number;
-  /** Plain-language chips explaining the score (Phase 6). */
-  urgencyReasons: string[];
-  primaryAlert: {
-    id: string;
-    type: string;
-    severity: string;
-    title: string;
-    summary: string;
-    sourceType: string | null;
-    sourceId: string | null;
-    detectedAt: string;
-  } | null;
-  recommendedAction: {
-    kind: DashboardQuickActionKind | null;
-    label: string;
-    href: string;
-  };
-  signals: {
-    stalledGoalCount: number;
-    highSeverityAlertCount: number;
-    evidenceGapCount: number;
-    overdueTaskCount: number;
-    daysSinceLastLogin: number;
-    orientationComplete: boolean;
-    orientationProgress: number;
-    readinessScore: number;
-    openAlertCount: number;
-    daysSinceLastGoalReview: number;
-    unmatchedGoalCount: number;
-  };
-}
+export { interventionQueueStudentSelect };
+
+export type QueueStudent = InterventionQueueEntry;
 
 export interface InterventionQueueResponse {
   queue: QueueStudent[];
@@ -108,24 +69,6 @@ export interface ManagedClassOption {
   programType: ProgramType;
 }
 
-export interface DashboardAlert {
-  id: string;
-  type: string;
-  severity: string;
-  title: string;
-  summary: string;
-  sourceType: string | null;
-  sourceId: string | null;
-  detectedAt: string;
-  student: {
-    id: string;
-    studentId: string;
-    displayName: string;
-  };
-}
-
-export type ReviewQueueItem = DashboardAlert;
-
 export interface UpcomingAppointment {
   id: string;
   title: string;
@@ -140,49 +83,15 @@ export interface UpcomingAppointment {
   };
 }
 
-export interface InactivityQueueItem extends DashboardAlert {
-  stageLabel: string;
-  nextStep: string;
-}
-
-function serializeDashboardAlert<T extends {
-  detectedAt: Date;
-  student: { id: string; studentId: string; displayName: string };
-}>(alert: T): Omit<T, "detectedAt"> & { detectedAt: string } {
-  return {
-    ...alert,
-    detectedAt: alert.detectedAt.toISOString(),
-  };
-}
-
-export interface InactivitySummary {
-  followUp14: number;
-  inactive30: number;
-  reengage60: number;
-  archiveReview90: number;
-}
-
 export interface TeacherDashboardPageData {
   classes: ManagedClassOption[];
   currentClassId: string | null;
   students: StudentOverview[];
-  alerts: DashboardAlert[];
-  inactivityQueue: InactivityQueueItem[];
-  inactivitySummary: InactivitySummary;
-  reviewQueue: ReviewQueueItem[];
   upcomingAppointments: UpcomingAppointment[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
-}
-
-function sortInactivityAlerts<T extends { type: string; detectedAt: Date }>(alerts: T[]) {
-  return alerts.sort((left, right) => {
-    const stageGap = getInactivityStageRank(right.type) - getInactivityStageRank(left.type);
-    if (stageGap !== 0) return stageGap;
-    return right.detectedAt.getTime() - left.detectedAt.getTime();
-  });
 }
 
 function latestDate(...values: Array<Date | null | undefined>) {
@@ -193,89 +102,15 @@ function latestDate(...values: Array<Date | null | undefined>) {
   }, null);
 }
 
-/**
- * Select for the intervention-queue student query. A builder rather than a
- * constant because `now` is embedded in the overdue-task filter. `as const`
- * keeps the literal types Prisma needs for payload inference.
- */
-function interventionQueueStudentSelect(now: Date) {
-  return {
-    id: true,
-    studentId: true,
-    displayName: true,
-    email: true,
-    createdAt: true,
-    updatedAt: true,
-    progression: { select: { state: true } },
-    goals: {
-      select: { level: true, status: true, updatedAt: true, lastReviewedAt: true, pathwayId: true },
-    },
-    orientationProgress: {
-      select: { completed: true, completedAt: true },
-    },
-    alerts: {
-      where: { status: "open" },
-      select: {
-        id: true,
-        type: true,
-        severity: true,
-        title: true,
-        summary: true,
-        sourceType: true,
-        sourceId: true,
-        detectedAt: true,
-      },
-    },
-    assignedTasks: {
-      where: {
-        status: { not: "completed" },
-        dueAt: { lt: now },
-      },
-      select: { id: true },
-    },
-    conversations: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    portfolioItems: { select: { updatedAt: true } },
-    files: { select: { uploadedAt: true } },
-    formSubmissions: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    applications: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    eventRegistrations: {
-      select: { updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-    certifications: {
-      select: {
-        status: true,
-      },
-    },
-    resumeData: { select: { id: true } },
-    publicCredentialPage: { select: { isPublic: true } },
-    classEnrollments: {
-      select: {
-        enrolledAt: true,
-        status: true,
-        class: { select: { programType: true } },
-      },
-      orderBy: { enrolledAt: "desc" },
-    },
-  } as const;
-}
+// interventionQueueStudentSelect moved to ./intervention-queue-select.ts
+// (2026-09-05, benchmark suite B5, imported above) — this file's
+// `import "server-only"` at the top throws for any importer outside a
+// Next.js server-component context, which made the select unreachable from
+// a plain script (scripts/bench/suites/query-plans.mjs).
 
 /**
  * Shared tail of both queue variants: score each student, drop
- * zero-urgency entries, sort most-urgent first.
+ * zero-urgency entries, crisis first, then most urgent.
  */
 function buildQueueResponse(
   students: InterventionQueueStudentRecord[],
@@ -293,7 +128,7 @@ function buildQueueResponse(
   return {
     queue: queueEntries
       .filter((entry) => entry.urgencyScore > 0)
-      .sort((a, b) => b.urgencyScore - a.urgencyScore),
+      .sort(compareQueueEntries),
   };
 }
 
@@ -499,20 +334,24 @@ export async function getTeacherDashboardPage(
       : Promise.resolve(new Map()),
   ]);
 
+  // Ticket D1 (2026-09-07): the roster's readiness score is the SAME
+  // reconciled mapping every other surface uses (readiness-consumers.ts),
+  // reached through the batched loader so one page of students costs a
+  // constant number of queries, not one query per student.
+  const readinessByStudent = await fetchReadinessDataForStudents(
+    students.map((student) => student.id),
+  );
+
   const overview = students.map((student) => {
     let xp = 0;
     let level = 1;
     let streak = 0;
-    let longestStreak = 0;
-    let portfolioShared = false;
     if (student.progression?.state) {
       try {
         const state = JSON.parse(student.progression.state);
         xp = state.xp || 0;
         level = state.level || 1;
         streak = state.currentStreak || state.streaks?.daily?.current || 0;
-        longestStreak = state.longestStreak || state.streaks?.daily?.longest || 0;
-        portfolioShared = !!state.portfolioShared;
       } catch {
         // Ignore malformed progression state and fall back to defaults.
       }
@@ -537,23 +376,11 @@ export async function getTeacherDashboardPage(
       ? certification.requirements.filter((requirement) => requirement.completed && !requirement.verifiedBy).length
       : 0;
 
-    const bhagCompleted = student.goals.some(
-      (goal) => goal.level === "bhag" && goal.status === "completed",
-    );
-    const readiness = computeReadinessScore(
-      {
-        orientationComplete:
-          student.orientationProgress.length >= orientationTotal && orientationTotal > 0,
-        completedGoalLevels,
-        bhagCompleted,
-        certificationsEarned: certDone,
-        portfolioItemCount: student._count.portfolioItems,
-        resumeCreated: !!student.resumeData,
-        portfolioShared,
-        longestStreak,
-      },
-      certTemplates.filter((template) => template.required).length,
-    );
+    // Ticket D1 (2026-09-07): the roster no longer builds its own readiness
+    // input — it reads the SAME reconciled score every other surface uses,
+    // from the batch fetched above. `readinessByStudent` always has an entry
+    // for every id in `students`, since that is exactly what it was asked for.
+    const readiness = readinessByStudent.get(student.id)!.readiness;
     const lastActiveAt =
       latestDate(
         student.createdAt,
@@ -613,153 +440,33 @@ export async function getTeacherDashboardPage(
     };
   });
 
-  const [alerts, reviewQueue, upcomingAppointments, inactivityAlerts] =
-    await Promise.all([
-      prisma.studentAlert.findMany({
-        where: {
-          status: "open",
-          studentId: { in: managedStudentIds },
-          type: { notIn: [...ALL_INACTIVITY_ALERT_TYPES] },
-        },
+  const upcomingAppointments = await prisma.appointment.findMany({
+    where: {
+      studentId: { in: managedStudentIds },
+      status: "scheduled",
+      startsAt: {
+        gte: now,
+        lte: upcomingWindow,
+      },
+    },
+    select: {
+      id: true,
+      title: true,
+      startsAt: true,
+      endsAt: true,
+      locationType: true,
+      locationLabel: true,
+      student: {
         select: {
           id: true,
-          type: true,
-          severity: true,
-          title: true,
-          summary: true,
-          sourceType: true,
-          sourceId: true,
-          detectedAt: true,
-          student: {
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-            },
-          },
+          studentId: true,
+          displayName: true,
         },
-        orderBy: { detectedAt: "desc" },
-        take: 8,
-      }),
-      prisma.studentAlert.findMany({
-        where: {
-          status: "open",
-          studentId: { in: managedStudentIds },
-          type: {
-            in: [
-              "goal_needs_resource",
-              "goal_resource_stale",
-              "goal_review_pending",
-              "goal_platform_stale",
-              "goal_missing_confirmed",
-              "goal_missing_monthly",
-              "goal_review_stale",
-              "goal_unconfirmed",
-            ],
-          },
-        },
-        select: {
-          id: true,
-          type: true,
-          severity: true,
-          title: true,
-          summary: true,
-          sourceType: true,
-          sourceId: true,
-          detectedAt: true,
-          student: {
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-            },
-          },
-        },
-        orderBy: [{ severity: "asc" }, { detectedAt: "desc" }],
-        take: 8,
-      }),
-      prisma.appointment.findMany({
-        where: {
-          studentId: { in: managedStudentIds },
-          status: "scheduled",
-          startsAt: {
-            gte: now,
-            lte: upcomingWindow,
-          },
-        },
-        select: {
-          id: true,
-          title: true,
-          startsAt: true,
-          endsAt: true,
-          locationType: true,
-          locationLabel: true,
-          student: {
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-            },
-          },
-        },
-        orderBy: { startsAt: "asc" },
-        take: 6,
-      }),
-      prisma.studentAlert.findMany({
-        where: {
-          status: "open",
-          studentId: { in: managedStudentIds },
-          type: { in: [...ALL_INACTIVITY_ALERT_TYPES] },
-        },
-        select: {
-          id: true,
-          type: true,
-          severity: true,
-          title: true,
-          summary: true,
-          sourceType: true,
-          sourceId: true,
-          detectedAt: true,
-          student: {
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-            },
-          },
-        },
-        take: 12,
-      }),
-    ]);
-
-  const inactivityQueue = sortInactivityAlerts(inactivityAlerts).map((alert) => {
-    const stage = getInactivityStageByType(alert.type);
-    const normalizedType = normalizeInactivityAlertType(alert.type) || alert.type;
-
-    return {
-      ...serializeDashboardAlert(alert),
-      type: normalizedType,
-      stageLabel: stage?.label || "Follow-up",
-      nextStep: stage?.nextStep || alert.summary,
-    };
+      },
+    },
+    orderBy: { startsAt: "asc" },
+    take: 6,
   });
-
-  const inactivitySummary = inactivityQueue.reduce<InactivitySummary>(
-    (summary, item) => {
-      const normalizedType = normalizeInactivityAlertType(item.type);
-      if (normalizedType === "inactive_student_14") summary.followUp14 += 1;
-      if (normalizedType === "inactive_student_30") summary.inactive30 += 1;
-      if (normalizedType === "inactive_student_60") summary.reengage60 += 1;
-      if (normalizedType === "inactive_student_90") summary.archiveReview90 += 1;
-      return summary;
-    },
-    {
-      followUp14: 0,
-      inactive30: 0,
-      reengage60: 0,
-      archiveReview90: 0,
-    },
-  );
 
   const classOptions: ManagedClassOption[] = classes.map((item) => ({
     id: item.id,
@@ -773,10 +480,6 @@ export async function getTeacherDashboardPage(
     classes: classOptions,
     currentClassId: requestedClassId || null,
     students: overview,
-    alerts: alerts.map(serializeDashboardAlert),
-    inactivityQueue,
-    inactivitySummary,
-    reviewQueue: reviewQueue.map(serializeDashboardAlert),
     upcomingAppointments: upcomingAppointments.map((appointment) => ({
       ...appointment,
       startsAt: appointment.startsAt.toISOString(),

@@ -128,4 +128,28 @@ describe("parseSalaryToHourly", () => {
       assert.equal(parseSalaryToHourly("DOE"), null);
     });
   });
+
+  // detectPeriod used to resolve by pattern-array priority rather than
+  // proximity to the matched amount, so a posting that states BOTH an
+  // annual figure and a parenthetical hourly equivalent picked "hourly"
+  // (the higher-priority pattern) no matter which one sat next to the
+  // amount actually used — 85000 / 1 hour blew the plausibility bounds and
+  // silently returned null instead of the true annual rate.
+  describe("period resolution picks the period nearest the amount", () => {
+    it("resolves a mixed-period posting by the marker nearest the first amount", () => {
+      assert.equal(parseSalaryToHourly("$85,000 a year (about $41 per hour)"), 40.87);
+    });
+
+    it("recognizes 'per diem' as a daily rate", () => {
+      assert.equal(parseSalaryToHourly("$50 per diem"), 6.25); // 50 / 8
+    });
+
+    it("does not guess annual hours for a school-year figure", () => {
+      // A school year is ~9-10 months, not the 2080-hour full-year
+      // convention PERIOD_HOURS.yearly assumes — treating it as annual
+      // silently invents a rate. Unknown, not wrong-but-plausible.
+      assert.equal(parseSalaryToHourly("$45,000 per school year"), null);
+      assert.equal(parseSalaryToHourly("$45,000 for the school year"), null);
+    });
+  });
 });

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { syncStudentAlerts } from "@/lib/advising";
+import { afterWrite } from "@/lib/after-write";
+import { deferAfterResponse } from "@/lib/after-response";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { applyStudentOrientationCompletion } from "@/lib/orientation-completion";
@@ -163,7 +165,18 @@ export const POST = withAuth(async (session, req: Request) => {
     if (result.outcome === "signature_required") {
       throw badRequest(result.message);
     }
-    await syncStudentAlerts(targetStudentId);
+    // Progress is saved. The alert sync is teacher-queue bookkeeping and
+    // runs after the response — the wizard's "Sign & Submit" waited on it
+    // for tens of seconds in prod (2026-09-07, src/lib/after-response.ts).
+    // Staff paths below still await it: the instructor's queue refreshes
+    // right after and should not show a stale alert.
+    deferAfterResponse(() =>
+      afterWrite(() => syncStudentAlerts(targetStudentId), {
+        surface: "orientation",
+        effect: "syncStudentAlerts",
+        studentId: targetStudentId,
+      }),
+    );
     if (result.outcome === "pending_verification") {
       return NextResponse.json({ success: true, data: { pendingVerification: true } });
     }

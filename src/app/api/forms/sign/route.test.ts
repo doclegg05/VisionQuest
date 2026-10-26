@@ -20,7 +20,9 @@ const student = mockStudentSession();
 let currentSession: Session | null = student;
 
 const mockUploadFile = mock.fn<(key: string, buffer: Buffer, mimeType: string) => Promise<void>>();
-const mockFileUploadFindFirst = mock.fn(async (_args: unknown): Promise<{ id: string } | null> => null);
+const mockFileUploadFindFirst = mock.fn(
+  async (_args: { where: Record<string, unknown>; select?: unknown }): Promise<{ id: string } | null> => null,
+);
 const mockFileUploadCreate = mock.fn<
   (args: { data: Record<string, unknown> }) => Promise<{ id: string }>
 >();
@@ -101,6 +103,7 @@ describe("POST /api/forms/sign", () => {
     currentSession = student;
     mockUploadFile.mock.resetCalls();
     mockFileUploadCreate.mock.resetCalls();
+    mockFileUploadFindFirst.mock.resetCalls();
     mockFormSubmissionUpsert.mock.resetCalls();
     mockSyncStudentAlerts.mock.resetCalls();
     mockWarn.mock.resetCalls();
@@ -108,6 +111,7 @@ describe("POST /api/forms/sign", () => {
 
     mockUploadFile.mock.mockImplementation(async () => undefined);
     mockFileUploadCreate.mock.mockImplementation(async () => ({ id: "sig-file-1" }));
+    mockFileUploadFindFirst.mock.mockImplementation(async () => ({ id: "own-file-1" }));
     mockFormSubmissionUpsert.mock.mockImplementation(async () => ({
       id: "submission-1",
       studentId: student.id,
@@ -141,12 +145,68 @@ describe("POST /api/forms/sign", () => {
   });
 
   it("rejects a foreign file before uploading a signature", async () => {
+    mockFileUploadFindFirst.mock.mockImplementation(async () => null);
     const res = await post({ formId: FORM_ID, signature: SIGNATURE, fileId: "cabcdefghijklmnopqrstuvwx" });
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 400);
     assert.equal(mockUploadFile.mock.callCount(), 0);
     assert.deepEqual(mockFileUploadFindFirst.mock.calls.at(-1)?.arguments[0], {
       where: { id: "cabcdefghijklmnopqrstuvwx", studentId: student.id }, select: { id: true },
     });
+  });
+
+  // `fileId` names the FILE a signed submission points at, and the teacher's
+  // forms view and student-detail page render it without re-scoping. Every
+  // sibling route scopes its file lookup to the student (portfolio,
+  // certifications, vision-board, applications); this one validated the id as
+  // a cuid and nothing more, so a student could attach another student's
+  // upload as their own signed form and staff would download the victim's file
+  // labelled as this student's signature.
+  it("refuses a fileId that does not belong to the target student", async () => {
+    mockFileUploadFindFirst.mock.mockImplementation(async () => null);
+
+    const res = await post({
+      formId: FORM_ID,
+      signature: SIGNATURE,
+      fileId: "cm00000000000000000000000",
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error, "Attached file was not found.");
+    assert.equal(
+      mockFormSubmissionUpsert.mock.callCount(),
+      0,
+      "a foreign fileId must never reach the submission write",
+    );
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
+
+    // Scoped by owner, not merely by id.
+    const where = mockFileUploadFindFirst.mock.calls[0].arguments[0].where;
+    assert.deepEqual(where, { id: "cm00000000000000000000000", studentId: student.id });
+  });
+
+  it("accepts a fileId the target student owns and writes it to the submission", async () => {
+    mockFileUploadFindFirst.mock.mockImplementation(async () => ({ id: "own-file-1" }));
+
+    const res = await post({
+      formId: FORM_ID,
+      signature: SIGNATURE,
+      fileId: "cm11111111111111111111111",
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 1);
+    const args = mockFormSubmissionUpsert.mock.calls[0].arguments[0];
+    assert.equal(args.create.fileId, "cm11111111111111111111111");
+    assert.equal(args.update.fileId, "cm11111111111111111111111");
+  });
+
+  it("does not look up a file when no fileId was supplied", async () => {
+    const res = await post({ formId: FORM_ID, signature: SIGNATURE });
+
+    assert.equal(res.status, 200);
+    assert.equal(mockFileUploadFindFirst.mock.callCount(), 0);
+    // The signature file stands in as the submission's file, as before.
+    assert.equal(mockFormSubmissionUpsert.mock.calls[0].arguments[0].create.fileId, "sig-file-1");
   });
 
   it("rejects a body with no signature before touching storage or the database", async () => {
@@ -190,6 +250,33 @@ describe("POST /api/forms/sign", () => {
     assert.equal(mockUploadFile.mock.callCount(), 0);
     assert.equal(mockFileUploadCreate.mock.callCount(), 0);
     assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
+  });
+
+  it("rejects non-PNG bytes disguised as a PNG data URL", async () => {
+    const res = await post({ formId: FORM_ID, signature: `data:image/png;base64,${Buffer.from("<script>alert(1)</script>").toString("base64")}` });
+    assert.equal(res.status, 400);
+    assert.equal(mockUploadFile.mock.callCount(), 0);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
+  });
+
+  it("rejects a file belonging to another student before any writes", async () => {
+    mockFileUploadFindFirst.mock.mockImplementation(async () => null);
+    const fileId = "cm12345678901234567890123";
+    const res = await post({ formId: FORM_ID, signature: SIGNATURE, fileId });
+    assert.equal(res.status, 400);
+    assert.deepEqual(mockFileUploadFindFirst.mock.calls[0].arguments[0], {
+      where: { id: fileId, studentId: student.id }, select: { id: true },
+    });
+    assert.equal(mockUploadFile.mock.callCount(), 0);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 0);
+  });
+
+  it("accepts an existing file owned by the target student", async () => {
+    const fileId = "cm12345678901234567890123";
+    mockFileUploadFindFirst.mock.mockImplementation(async () => ({ id: fileId }));
+    const res = await post({ formId: FORM_ID, signature: SIGNATURE, fileId });
+    assert.equal(res.status, 200);
+    assert.equal(mockFormSubmissionUpsert.mock.calls[0].arguments[0].create.fileId, fileId);
   });
 
   it("returns 401 with no session and writes nothing", async () => {
@@ -247,6 +334,8 @@ describe("POST /api/forms/sign", () => {
     assert.equal(body.submission.id, "submission-1");
     assert.equal(body.signatureFileId, "sig-file-1");
 
+    // The sync now runs off the response path; let its rejection settle.
+    await new Promise((resolve) => setImmediate(resolve));
     assert.equal(mockWarn.mock.callCount(), 1, "the sync failure is logged, not surfaced");
     assert.equal(mockError.mock.callCount(), 0);
     const payload = mockWarn.mock.calls[0].arguments[1] ?? {};
@@ -254,5 +343,30 @@ describe("POST /api/forms/sign", () => {
     assert.equal(payload.student, studentLogKey(student.id));
     const serialized = JSON.stringify(mockWarn.mock.calls[0].arguments);
     assert.ok(!serialized.includes(student.id), `log line leaked the student id: ${serialized}`);
+  });
+
+  // Prod, 2026-09-07: the route awaited syncStudentAlerts before answering,
+  // so one student's "Submitting..." sat for ~45 s while the alert sync ran
+  // (and re-ran, once per extra tap). The signature had saved in under a
+  // second. A sync that never resolves must not hold the response.
+  it("answers as soon as the submission is saved, without waiting for the alert sync", async () => {
+    let releaseSync: () => void = () => undefined;
+    mockSyncStudentAlerts.mock.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        releaseSync = resolve;
+      }),
+    );
+
+    const timeout = new Promise<"timed out">((resolve) => setTimeout(() => resolve("timed out"), 2000));
+    const outcome = await Promise.race([post({ formId: FORM_ID, signature: SIGNATURE }), timeout]);
+
+    assert.notEqual(outcome, "timed out", "the response waited on the alert sync");
+    const res = outcome as Response;
+    assert.equal(res.status, 200);
+    assert.equal(mockFormSubmissionUpsert.mock.callCount(), 1, "the submission was saved first");
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 1, "the sync is still started");
+    assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [student.id]);
+
+    releaseSync();
   });
 });

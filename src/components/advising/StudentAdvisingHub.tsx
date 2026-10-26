@@ -2,11 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import AskSageLink from "@/components/sage/AskSageLink";
+import { NUDGE_ALERT_TYPES } from "@/lib/nudges/schedule-shared";
+
+/**
+ * Student-visible alerts that are GOOD NEWS, and where they lead.
+ *
+ * These render as an answer with a button rather than as a triage card. The
+ * queue's chrome — a severity chip and a "Detected <date>" line — is staff
+ * vocabulary for work somebody else picks up; applied to "your jobs are
+ * ready" it reads as a problem report about the thing the student asked for.
+ */
+const GOOD_NEWS_ALERT_TYPES: Record<string, { href: string; label: string }> = {
+  [NUDGE_ALERT_TYPES.weeklyJobsReady]: { href: "/career", label: "See My Jobs" },
+};
 
 interface StudentAdvisingHubProps {
   alerts: Array<{
     id: string;
+    type: string;
     severity: string;
     title: string;
     summary: string;
@@ -146,10 +161,10 @@ export default function StudentAdvisingHub({
           <div>
             <h2 className="font-display text-2xl text-[var(--ink-strong)]">Book Advising Time</h2>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">
-              Reserve an open slot with a teacher without waiting for someone else to schedule it.
+              Pick an open time with a teacher. You do not have to wait for someone to set it up.
             </p>
           </div>
-          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-info">
             {bookableAdvisors.reduce((sum, advisor) => sum + advisor.slots.length, 0)} open slots
           </span>
         </div>
@@ -169,7 +184,7 @@ export default function StudentAdvisingHub({
         ) : (
           <div className="mt-4 grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
             <div className="space-y-3 rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-              <label className="text-sm text-[var(--ink-muted)]">
+              <label className="block text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Advisor
                 </span>
@@ -183,7 +198,7 @@ export default function StudentAdvisingHub({
                       startsAt: nextAdvisor?.slots[0]?.startsAt || "",
                     }));
                   }}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                  className="min-h-11 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   {bookableAdvisors.map((advisor) => (
                     <option key={advisor.advisorId} value={advisor.advisorId}>
@@ -193,14 +208,14 @@ export default function StudentAdvisingHub({
                 </select>
               </label>
 
-              <label className="text-sm text-[var(--ink-muted)]">
+              <label className="block text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Time slot
                 </span>
                 <select
                   value={selectedSlot?.startsAt || ""}
                   onChange={(event) => setBookingForm((current) => ({ ...current, startsAt: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                  className="min-h-11 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   {(selectedAdvisor?.slots || []).map((slot) => (
                     <option key={slot.key} value={slot.startsAt}>
@@ -210,21 +225,29 @@ export default function StudentAdvisingHub({
                 </select>
               </label>
 
-              <input
-                type="text"
-                value={bookingForm.title}
-                onChange={(event) => setBookingForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Appointment title (optional)"
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-              />
+              <label className="block text-sm text-[var(--ink-muted)]">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                  Appointment title (optional)
+                </span>
+                <input
+                  type="text"
+                  value={bookingForm.title}
+                  onChange={(event) => setBookingForm((current) => ({ ...current, title: event.target.value }))}
+                  className="min-h-11 w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                />
+              </label>
 
-              <textarea
-                value={bookingForm.description}
-                onChange={(event) => setBookingForm((current) => ({ ...current, description: event.target.value }))}
-                placeholder="What would you like help with?"
-                rows={4}
-                className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
-              />
+              <label className="block text-sm text-[var(--ink-muted)]">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                  What would you like help with? (optional)
+                </span>
+                <textarea
+                  value={bookingForm.description}
+                  onChange={(event) => setBookingForm((current) => ({ ...current, description: event.target.value }))}
+                  rows={4}
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                />
+              </label>
 
               <button
                 type="button"
@@ -241,7 +264,7 @@ export default function StudentAdvisingHub({
             </div>
 
             <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-secondary)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-info">
                 Selected slot
               </p>
               {selectedSlot && selectedAdvisor ? (
@@ -256,7 +279,7 @@ export default function StudentAdvisingHub({
                     {selectedSlot.locationLabel || selectedSlot.locationType.replace("_", " ")}
                   </p>
                   {selectedSlot.meetingUrl ? (
-                    <p className="mt-3 text-sm text-[var(--accent-strong)]">Link will be included in your confirmation.</p>
+                    <p className="mt-3 text-sm text-success">Link will be included in your confirmation.</p>
                   ) : null}
                 </>
               ) : (
@@ -284,7 +307,7 @@ export default function StudentAdvisingHub({
                 Meetings your advisors have scheduled with you.
               </p>
             </div>
-            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs font-semibold text-[var(--accent-secondary)]">
+            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs font-semibold text-info">
               {upcomingAppointments.length} upcoming
             </span>
           </div>
@@ -323,7 +346,7 @@ export default function StudentAdvisingHub({
                         href={appointment.meetingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-semibold text-[var(--accent-strong)]"
+                        className="inline-flex min-h-11 items-center font-semibold text-success"
                       >
                         Join meeting
                       </a>
@@ -346,7 +369,7 @@ export default function StudentAdvisingHub({
                 Items that need a response so nothing slips.
               </p>
             </div>
-            <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+            <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-success">
               {alerts.length} open
             </span>
           </div>
@@ -357,20 +380,43 @@ export default function StudentAdvisingHub({
             </div>
           ) : (
             <div className="space-y-3">
-              {alerts.map((alert) => (
-                <div key={alert.id} className="rounded-[1.2rem] border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
-                    <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--badge-warning-text)]">
-                      {alert.severity}
-                    </span>
+              {alerts.map((alert) =>
+                GOOD_NEWS_ALERT_TYPES[alert.type] ? (
+                  // A student who texted "Y, show me the jobs" gets an answer,
+                  // not a triage card. The staff chrome — a "LOW" severity chip
+                  // and a "Detected <date>" line — is the vocabulary of a queue
+                  // someone else works, and reading it about good news teaches
+                  // this page is not for them.
+                  <div
+                    key={alert.id}
+                    className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4"
+                  >
+                    <p className="break-words font-semibold text-[var(--ink-strong)]">
+                      {alert.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
+                    <Link
+                      href={GOOD_NEWS_ALERT_TYPES[alert.type].href}
+                      className="primary-button mt-3 inline-flex min-h-11 items-center px-4 py-2 text-sm"
+                    >
+                      {GOOD_NEWS_ALERT_TYPES[alert.type].label}
+                    </Link>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
-                  <p className="mt-2 text-xs text-[var(--ink-muted)]">
-                    Detected {dateFormatter.format(new Date(alert.detectedAt))}
-                  </p>
-                </div>
-              ))}
+                ) : (
+                  <div key={alert.id} className="rounded-[1.2rem] border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
+                      <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--badge-warning-text)]">
+                        {alert.severity}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">{alert.summary}</p>
+                    <p className="mt-2 text-xs text-[var(--ink-muted)]">
+                      Detected {dateFormatter.format(new Date(alert.detectedAt))}
+                    </p>
+                  </div>
+                ),
+              )}
             </div>
           )}
         </section>
@@ -397,7 +443,7 @@ export default function StudentAdvisingHub({
               </p>
               <div className="mt-3">
                 <AskSageLink
-                  prompt="Help me choose one productive advising follow-up task I can do today based on my VisionQuest progress."
+                  prompt="Help me pick one advising task I can do today. Use my progress to choose it."
                   label="Ask Sage for a next task"
                 />
               </div>
@@ -447,10 +493,10 @@ export default function StudentAdvisingHub({
                         type="button"
                         disabled={isPending && updatingTaskId === task.id}
                         onClick={() => updateTaskStatus(task.id, isCompleted ? "open" : "completed")}
-                        className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                        className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                           isCompleted
                             ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
-                            : "bg-[var(--accent-strong)] text-white hover:bg-[var(--accent-green)]/90"
+                            : "bg-[var(--accent-strong)] text-[var(--on-accent)] hover:bg-[var(--accent-green)]/90"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         {isPending && updatingTaskId === task.id

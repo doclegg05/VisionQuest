@@ -33,10 +33,10 @@ export function getRlsContext(): RlsContext | undefined {
  * (`"studentId" = current_setting('app.current_user_id')`).
  *
  * For code that has no request session: cron bodies under
- * `src/app/api/internal` and `src/app/api/cron`, and job handlers in
- * `src/lib/jobs-registry.ts`. Under `vq_app` an app-client query with no
- * context fails closed (reads return no rows, writes are rejected), and a
- * per-student catch turns that into a silent "0 of N". Precedent:
+ * `src/app/api/internal`, and job handlers in `src/lib/jobs-registry.ts`.
+ * Under `vq_app` an app-client query with no context fails closed (reads
+ * return no rows, writes are rejected), and a per-student catch turns that
+ * into a silent "0 of N". Precedent:
  * `runDailyBriefing` in `src/lib/sage/briefing.ts` and
  * `src/lib/sage/wager-diagnosis.ts`. Cross-student reads (a roster, all
  * active students) have no student branch and belong on `prismaAdmin`.

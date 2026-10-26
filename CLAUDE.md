@@ -9,7 +9,7 @@ Agents should read docs based on what they are doing. Do not read everything —
 
 ### Level 0: Always Read First
 - **This file (CLAUDE.md)** — project overview, operating rules, production environment, design context
-- **[.claude/MEMORY.md](./.claude/MEMORY.md)** — project state and handoff: current status, last session, open items, engineering decisions log, architecture notes, known issues (imported below, so it loads with this file)
+- **[.claude/MEMORY.md](./.claude/MEMORY.md)** — project state and handoff: current status, last session pointer, open items, architecture notes, known issues (imported below, so it loads with this file). Session history lives in `.claude/handoffs/`; decisions in `docs/decisions/engineering-log.md`
 
 ### Level 1: Product-Shaping Work
 Read before any change that affects what users see or how workflows behave.
@@ -28,9 +28,11 @@ Read when deciding what to build, cut, simplify, or automate.
 | Local AI hosting & tunnel recommendation | [docs/plans/2026-04-15-local-ai-tunnel-recommendation.md](./docs/plans/2026-04-15-local-ai-tunnel-recommendation.md) |
 | Frontend redesign implementation | [docs/superpowers/plans/2026-03-30-frontend-redesign.md](./docs/superpowers/plans/2026-03-30-frontend-redesign.md) |
 | Job board implementation | [docs/superpowers/plans/2026-03-31-job-board.md](./docs/superpowers/plans/2026-03-31-job-board.md) |
+| Match & Connect (student↔employer brokering) — **PROPOSED** | [docs/superpowers/specs/2026-09-05-match-and-connect-design.md](./docs/superpowers/specs/2026-09-05-match-and-connect-design.md) · plan: [docs/superpowers/plans/2026-09-05-match-and-connect.md](./docs/superpowers/plans/2026-09-05-match-and-connect.md) |
+| Benchmark suite (numeric quality, safety, performance floors) — **PROPOSED** | [docs/superpowers/specs/2026-09-05-benchmark-suite-design.md](./docs/superpowers/specs/2026-09-05-benchmark-suite-design.md) |
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
 | Developer setup & scripts | [README.md](./README.md) |
-| SPOKES content reference | [content/_INDEX.md](./content/_INDEX.md) |
+| SPOKES content reference | [catalog/index.md](./catalog/index.md) |
 | Recursive self-improving loop (Ouroboros) — **DRAFT** | [docs/plans/self-improving-loop-architecture.md](./docs/plans/self-improving-loop-architecture.md) |
 | Org-knowledge catalog (OKF) + the two agent memory systems | [docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md](./docs/superpowers/specs/2026-06-30-okf-catalog-codex-review.md) |
 | `<gate>-pipeline` command contracts (CI-enforced) | [docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md](./docs/superpowers/specs/2026-07-22-ci-pipeline-command-design.md) |
@@ -55,7 +57,7 @@ and an agent that doesn't know they exist will draw confident, incomplete conclu
 - `docs/archive/SETUP_WIZARD_PLAN.md` — frozen planning artifact
 
 ## Project Memory (state, handoff, engineering decisions)
-The live handoff — current status, last session, open items, engineering decisions log, architecture notes, and known issues — is maintained in `.claude/MEMORY.md` and imported here so it loads with this file. Update it at the end of every session.
+The live handoff (current status, last session pointer, open items, architecture notes, and known issues) is maintained in `.claude/MEMORY.md` and imported here so it loads with this file. At session end, write a new `.claude/handoffs/YYYY-MM-DD-<slug>.md` and repoint the `## Last Session` lines at it. Edit other `.claude/MEMORY.md` sections only when their facts change. Append decisions to `docs/decisions/engineering-log.md`. `npm run memory:validate` enforces the shape.
 
 @.claude/MEMORY.md
 
@@ -69,6 +71,7 @@ The live handoff — current status, last session, open items, engineering decis
 
 ## Design Context
 - **Full design context**: See [.impeccable.md](./.impeccable.md) for complete design principles, color system, typography, and accessibility requirements
+- **Brand source of truth**: the SPOKES Design System (https://claude.ai/artifact/5cF3cJB5x5K4qj4wb9G2dh). VisionQuest follows it strictly with three approved exceptions, listed in `.impeccable.md`
 - **Brand personality**: Bold, Supportive, Practical — direct, action-oriented ally
 - **Emotional goals**: Confidence, Momentum, Safety, Pride
 - **Reference**: Khan Academy — warm, educational, progress-focused, not childish

@@ -6,13 +6,14 @@ export interface DocUpdate {
   newNote: string;
 }
 
-// whenToUse-only: this note feeds BOTH the doc embedding (DB-side semantic
-// index) and the prompt summary Sage sees for a retrieved doc. Negation
-// (whenNotToUse) must never enter an embedding — a keyword/vector matcher
-// reads "NOT the sign-in sheet" as the literal tokens "sign-in sheet", which
-// pollutes this doc with its sibling's queries (measured regression).
+// Title + whenToUse: this note feeds BOTH the doc embedding (DB-side semantic
+// index) and the prompt summary Sage sees for a retrieved doc. The title keeps
+// distinctive name tokens (e.g. "responsibilities") in the seeded note.
+// Negation (whenNotToUse) must never enter an embedding — a keyword/vector
+// matcher reads "NOT the sign-in sheet" as the literal tokens "sign-in sheet",
+// which pollutes this doc with its sibling's queries (measured regression).
 export function buildDocNote(node: CatalogNode): string {
-  const parts = [node.frontmatter.description, node.sections.whenToUse]
+  const parts = [node.frontmatter.title, node.frontmatter.description, node.sections.whenToUse]
     .map((s) => (s ?? "").trim())
     .filter(Boolean);
   return parts.join(" ");

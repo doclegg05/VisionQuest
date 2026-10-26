@@ -3,6 +3,7 @@ import { badRequest, conflict, notFound, withTeacherAuth } from "@/lib/api-error
 import { syncStudentAlerts } from "@/lib/advising";
 import { afterWrite } from "@/lib/after-write";
 import { logAuditEvent } from "@/lib/audit";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import {
   isGoalResourceLinkStatus,
@@ -11,6 +12,7 @@ import {
   toGoalResourceLinkView,
 } from "@/lib/goal-resource-links";
 import { goalCountsTowardPlan } from "@/lib/goals";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { sendNotification } from "@/lib/notifications";
 
@@ -68,6 +70,10 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
   if (!goal) {
     throw notFound("Goal not found.");
   }
+
+  // Same check as PATCH /api/goal-resource-links/[id]. A regular teacher may
+  // manage any student; the cohort demo instructor only its own class's.
+  await assertStaffCanManageStudent(session, goal.studentId);
 
   if (!goalCountsTowardPlan(goal.status)) {
     throw badRequest("Resources can only be linked to goals that are still part of the student's plan.");
@@ -134,7 +140,7 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
       body: dueAt
         ? `"${title}" was added to your plan and is due ${dueAt.toLocaleDateString()}.`
         : `"${title}" was added to your current goal plan.`,
-    }).catch((error) => logger.error("Failed to send goal plan notification", { error: String(error) }));
+    }).catch((error) => logger.error("Failed to send goal plan notification", { error: errorForLog(error) }));
   }
 
   await afterWrite(() => syncStudentAlerts(goal.studentId), {

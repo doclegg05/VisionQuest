@@ -119,13 +119,44 @@ async function main() {
 
   try {
     if (clean) {
+      // Connections FIRST, and not because of the student's own row.
+      //
+      // `Connection.studentId` cascades, so a student's own connections would
+      // go with them. `Connection.proposedById` does NOT — it is RESTRICT,
+      // because a disclosure record has to outlive every party to it. A
+      // self-proposed connection (the Sage path writes proposedById =
+      // studentId) therefore points at the same Student row through both, and
+      // Postgres enforces the RESTRICT regardless of the CASCADE: the delete
+      // below fails outright rather than cascading.
+      //
+      // Deleting them here is safe in a way it would not be in production —
+      // these are marker fixtures on a hermetic or explicitly local database,
+      // which this script refuses to run against anything else.
+      const fixtureLogins = [
+        E2E_TEACHER.login,
+        E2E_STUDENT.login,
+        E2E_JOURNEY_STUDENT.login,
+      ];
+      const fixtureStudents = await prisma.student.findMany({
+        where: { studentId: { in: fixtureLogins } },
+        select: { id: true },
+      });
+      const fixtureIds = fixtureStudents.map((row) => row.id);
+      if (fixtureIds.length > 0) {
+        await prisma.connection.deleteMany({
+          where: {
+            OR: [
+              { studentId: { in: fixtureIds } },
+              { proposedById: { in: fixtureIds } },
+              { sentById: { in: fixtureIds } },
+            ],
+          },
+        });
+      }
+
       // Student cascades wipe goals/progress/enrollments/alerts.
       const students = await prisma.student.deleteMany({
-        where: {
-          studentId: {
-            in: [E2E_TEACHER.login, E2E_STUDENT.login, E2E_JOURNEY_STUDENT.login],
-          },
-        },
+        where: { studentId: { in: fixtureLogins } },
       });
       const classes = await prisma.spokesClass.deleteMany({
         where: { code: E2E_CLASS.code },
@@ -359,6 +390,13 @@ async function main() {
     // /api/auth/login allows 10 attempts per IP per 15 min; repeated local
     // suite runs from one machine would trip it. This seed only ever targets
     // e2e databases (hermetic CI Postgres / dev), so reset login buckets.
+    //
+    // `RateLimitEntry.key` holds a DERIVED key since 2026-09-06 —
+    // `<family>:<digest>`, see src/lib/rate-limit-key.ts — but the family is
+    // kept verbatim in front precisely so this prefix delete keeps working.
+    // It still clears both login families: `login:<ip>` and
+    // `login:user:<id>` (the per-account bucket, which is the binding one for
+    // the e2e collectors) both live under `login:`.
     const rl = await prisma.rateLimitEntry.deleteMany({
       where: { key: { startsWith: "login:" } },
     });

@@ -5,6 +5,7 @@ import { isStaffRole, withAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { detectedFileType, safeDownloadType } from "@/lib/file-security";
 
 export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
@@ -35,6 +36,7 @@ export const GET = withAuth(async (session, req: Request) => {
 
   const presigned = await getPresignedDownloadUrl(file.storageKey, {
     contentDisposition: disposition,
+    contentType: safeDownloadType(file.mimeType),
   });
   if (presigned) return NextResponse.redirect(presigned, 302);
 
@@ -66,7 +68,9 @@ export const GET = withAuth(async (session, req: Request) => {
 
   return new NextResponse(new Uint8Array(result.buffer), {
     headers: {
-      "Content-Type": result.mimeType,
+      "Content-Type": detectedFileType(result.buffer) || "application/octet-stream",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, no-store",
       "Content-Disposition": disposition,
     },
   });

@@ -31,7 +31,7 @@
  */
 
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
+import { resolveEvalProvider, reportEvalFailure, trackEvalAborts } from "./lib/sage-eval-provider.mjs";
 
 loadEnvFile();
 
@@ -207,7 +207,26 @@ async function probeHit(retrieveMemories, subjectType, subjectId, scenario) {
 }
 
 async function main() {
+  // Resolve the provider before importing or touching the database: provider
+  // checks (e.g. OpenRouter refusing a non-local DATABASE_URL) must run before
+  // the sentinel deleteMany below can reach a real database.
+  const resolved = await resolveEvalProvider();
+  const providerLabel = resolved.label;
+  // Extraction never throws to its caller, so a drained wallet or a refused
+  // model would read as a 0% hit rate. The tracker remembers the abort and
+  // each loop rethrows it, so the run exits 3 or 4 ("not run") instead.
+  const { provider, throwIfAborted } = trackEvalAborts(resolved.provider);
+  console.log(`Provider: ${providerLabel}`);
   const { prisma } = await import("../src/lib/db.ts");
+  // Disconnect before stopping on an abort, so an open pool cannot hold the job open.
+  const stopIfAborted = async () => {
+    try {
+      throwIfAborted();
+    } catch (error) {
+      await prisma.$disconnect();
+      throw error;
+    }
+  };
   const { extractAndStoreMemories } = await import("../src/lib/sage/memory/extract.ts");
   const { extractAndStoreStaffMemories } = await import("../src/lib/sage/memory/staff-extract.ts");
   const { retrieveMemories } = await import("../src/lib/sage/memory/retrieve.ts");
@@ -224,8 +243,6 @@ async function main() {
     },
   });
 
-  const { provider, label: providerLabel } = await resolveEvalProvider();
-  console.log(`Provider: ${providerLabel}`);
   const totals = { stored: 0, deduped: 0, rejected: 0 };
 
   console.log(`\nSuite 1/3 — replaying ${CONVERSATIONS.length} student conversations…`);
@@ -241,6 +258,7 @@ async function main() {
     });
     totals.stored += result.stored;
     totals.deduped += result.deduped;
+    await stopIfAborted();
     totals.rejected += result.rejected;
     console.log(
       `[${index + 1}/${CONVERSATIONS.length}] stored=${result.stored} deduped=${result.deduped} rejected=${result.rejected}${"duplicateOf" in conversation ? " (restatement)" : ""}`,
@@ -262,6 +280,7 @@ async function main() {
     });
     staffTotals.stored += result.stored;
     staffTotals.deduped += result.deduped;
+    await stopIfAborted();
     staffTotals.rejected += result.rejected;
     console.log(
       `[${index + 1}/${STAFF_CONVERSATIONS.length}] stored=${result.stored} deduped=${result.deduped} rejected=${result.rejected}`,
@@ -366,8 +385,5 @@ async function main() {
 // must not trigger the live DB/model pipeline.
 const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  main().catch(reportEvalFailure);
 }

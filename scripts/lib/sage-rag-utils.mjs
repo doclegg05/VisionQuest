@@ -115,3 +115,8 @@ export function summarizeCounts(rows, keyFn) {
   }
   return Object.fromEntries([...counts.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
+
+/** A forbidden source always fails, including on a no-answer case. */
+export function passesRetrievalCase({ audienceLeak, expectNoContext, noAnswerOk, legacyPassed, relevancePassed }) {
+  return audienceLeak === 0 && (expectNoContext ? noAnswerOk === true : legacyPassed && relevancePassed !== false);
+}

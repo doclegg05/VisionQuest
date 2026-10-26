@@ -9,7 +9,17 @@ import {
 import { enqueueJobWithCooldown } from "./jobs";
 import { sendNotificationWithCooldown } from "./notifications";
 import { isEmailDeliveryConfigured } from "./email";
-import { prismaAdmin } from "./db";
+import { isDemoStudentIdOrFalse } from "./demo/accounts";
+import { errorForLog } from "./log-error";
+import { logger } from "./logger";
+import { studentLogKey } from "./log-keys";
+import {
+  findAssignedInstructors,
+  listActiveTeachers,
+  type StaffRecipient,
+} from "./staff-recipients";
+
+type TeacherNudgeSpec = ReturnType<typeof buildTeacherInterventionNotifications>[number];
 import type { AlertDescriptor } from "./advising-alerts";
 
 export async function syncInterventionNotifications({
@@ -97,48 +107,10 @@ export async function syncInterventionNotifications({
     return;
   }
 
-  // Teacher resolution and the teacher nudge rows below use prismaAdmin: via
-  // syncStudentAlerts this runs inside a STUDENT's RLS context on student
-  // routes, where the app client returns zero teacher rows and
-  // `notification_access` WITH CHECK rejects a Notification addressed to a
-  // teacher. Only staff identities are read here; the student's own nudge
-  // above stays on the app client.
-  //
-  // Audience: ALL active teachers is main's pre-RLS intent for nudges. It is
-  // broader than the crisis path's assigned-instructor-first scoping in
-  // src/lib/sage/crisis-detection.ts. Narrowing it is an open product
-  // decision (D8, 2026-09-01 review) and is deliberately not changed here.
-  const teachers = await prismaAdmin.student.findMany({
-    where: {
-      role: "teacher",
-      isActive: true,
-    },
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-    },
-  });
+  const delivered = await deliverTeacherNudges(studentId, teacherSpecs);
 
   await Promise.allSettled(
-    teachers.flatMap((teacher) =>
-      teacherSpecs.map((spec) =>
-        sendNotificationWithCooldown(
-          teacher.id,
-          {
-            type: spec.type,
-            title: spec.title,
-            body: spec.body,
-          },
-          spec.cooldownHours,
-          { client: "admin" },
-        ),
-      ),
-    ),
-  );
-
-  await Promise.allSettled(
-    teachers.flatMap((teacher) => {
+    delivered.flatMap((teacher) => {
       if (!emailEnabled || !teacher.email) return [];
 
       return teacherSpecs.map((spec) => {
@@ -164,4 +136,167 @@ export async function syncInterventionNotifications({
       });
     }),
   );
+}
+
+/**
+ * Who is told that THIS student has an overdue task or a goal needing review,
+ * and whether anybody actually received it.
+ *
+ * D8 (2026-09-01 review, decided 2026-09-07): assigned instructors first.
+ * A teacher nudge names the student in its title and body, so delivering it
+ * to every active teacher discloses one class's students to every other
+ * class's instructor — a FERPA-relevant over-disclosure with no operational
+ * benefit, since an unassigned teacher cannot act on the nudge anyway. The
+ * program-wide audience survives only as the fallback: a student nobody is
+ * assigned to, or a resolution that fails outright, still produces a nudge
+ * somebody sees. Over-notifying beats a nudge nobody receives, the same
+ * failure direction resolveWellbeingRecipients chose for the crisis path.
+ *
+ * W2 (2026-09-07 audit): the fallback keys on what was DELIVERED, not on what
+ * resolved. `sendNotificationWithCooldown({ client: "admin" })` refuses a
+ * non-staff recipient by throwing, and `Promise.allSettled` swallows it — so
+ * a resolved-but-undeliverable audience used to end the whole path silently,
+ * with the student's nudge reaching nobody. A recipient counts as delivered
+ * when their write did not throw; a cooldown-suppressed write (`false`) is a
+ * delivery, because that recipient already holds this nudge and re-widening
+ * to the program on their account would spam every teacher.
+ *
+ * The delivered set is also what the email loop iterates. That loop has no
+ * staff check of its own, so following delivery rather than resolution is
+ * what keeps a student-naming email off an address the in-app write already
+ * refused.
+ *
+ * Both reads go through prismaAdmin (see staff-recipients.ts): via
+ * syncStudentAlerts this runs inside a STUDENT's RLS context on student
+ * routes, where the app client returns zero teacher rows and
+ * `notification_access` WITH CHECK rejects a Notification addressed to a
+ * teacher. Only staff identities are read; the student's own nudge stays on
+ * the app client.
+ *
+ * Cohort demo mode is the one exception to the widening. A demo student's
+ * nudge names a made-up student, and the program-wide fallback would put it in
+ * real teachers' inboxes, so a demo student is never widened: the nudge stays
+ * with whoever is assigned (the demo instructor, who has no email address). A
+ * real student is never narrowed by this, including when the demo lookup
+ * fails.
+ *
+ * The structured log names the branch that fired and carries counts. The
+ * failure line carries `studentLogKey(studentId)` — a one-way correlation
+ * key, never the raw id — because a broken lookup is worth tracing back to
+ * one student; the audience-size lines carry no student field at all
+ * (.claude/rules/security.md, Data Privacy).
+ */
+async function deliverTeacherNudges(
+  studentId: string,
+  teacherSpecs: TeacherNudgeSpec[],
+): Promise<StaffRecipient[]> {
+  const assigned = await resolveAssignedInstructors(studentId);
+
+  const assignedDelivered = await sendToAll(assigned, teacherSpecs);
+
+  if (assignedDelivered.length > 0) {
+    logger.debug("Nudge: delivered to assigned instructors", {
+      alert: "intervention_nudge_assigned_instructors",
+      recipientCount: assignedDelivered.length,
+    });
+    return assignedDelivered;
+  }
+
+  // Nobody assigned, or nobody assigned could be written to. Widen, unless
+  // this is a demo student, whose nudge must not leave the demo.
+  if (await isDemoStudent(studentId)) {
+    alarmIfUndelivered(assignedDelivered, assigned.length);
+    return assignedDelivered;
+  }
+
+  const everyone = await listActiveTeachers();
+  logger.warn("Nudge: no assigned instructor received it; delivering program-wide", {
+    alert: "intervention_nudge_fallback_program_wide",
+    recipientCount: everyone.length,
+  });
+  const delivered = await sendToAll(everyone, teacherSpecs);
+  alarmIfUndelivered(delivered, everyone.length);
+
+  return delivered;
+}
+
+/**
+ * The nudge reached nobody. Same shape and same reason as
+ * `wellbeing_no_recipients`: this is the line that fires when
+ * ADMIN_DATABASE_URL is unset and prismaAdmin has silently degraded to
+ * vq_app, and it must never be quiet.
+ */
+function alarmIfUndelivered(delivered: StaffRecipient[], attemptedCount: number): void {
+  if (delivered.length > 0) return;
+  logger.error("Nudge: no staff recipients received it; nobody was notified", {
+    alert: "intervention_nudge_no_recipients",
+    attemptedCount,
+  });
+}
+
+/**
+ * Whether the student is a cohort demo account. A failed lookup counts as "no"
+ * (the shared policy in src/lib/demo/accounts.ts) and is logged here.
+ */
+function isDemoStudent(studentId: string): Promise<boolean> {
+  return isDemoStudentIdOrFalse(studentId, (err) => {
+    logger.error("Nudge: demo-account check failed; treating the student as a real account", {
+      student: studentLogKey(studentId),
+      alert: "intervention_nudge_demo_check_failed",
+      error: errorForLog(err),
+    });
+  });
+}
+
+/** The assigned instructors, or [] if resolution returned nothing or threw. */
+async function resolveAssignedInstructors(studentId: string): Promise<StaffRecipient[]> {
+  try {
+    return await findAssignedInstructors(studentId);
+  } catch (err) {
+    // Under the student's RLS context the enrollment→instructor join raises
+    // Prisma's inconsistency error rather than returning zero rows. Caught
+    // here for the same reason the crisis path catches it: a broken lookup
+    // must widen the audience, never silence the nudge.
+    logger.error("Nudge: instructor resolution failed; falling back to all active teachers", {
+      student: studentLogKey(studentId),
+      alert: "intervention_nudge_instructor_resolution_failed",
+      error: errorForLog(err),
+    });
+    return [];
+  }
+}
+
+/**
+ * Attempt every (recipient × spec) nudge and return the recipients whose
+ * writes all completed. A rejected write means the admin client refused that
+ * recipient — they were not notified, and must not be emailed either.
+ */
+async function sendToAll(
+  recipients: StaffRecipient[],
+  teacherSpecs: TeacherNudgeSpec[],
+): Promise<StaffRecipient[]> {
+  const outcomes = await Promise.all(
+    recipients.map(async (recipient) => {
+      const results = await Promise.allSettled(
+        teacherSpecs.map((spec) =>
+          sendNotificationWithCooldown(
+            recipient.id,
+            {
+              type: spec.type,
+              title: spec.title,
+              body: spec.body,
+            },
+            spec.cooldownHours,
+            { client: "admin" },
+          ),
+        ),
+      );
+      // "Delivered" is "not refused". A `false` return is the cooldown
+      // saying this recipient already has the nudge.
+      const reached = results.some((result) => result.status === "fulfilled");
+      return reached ? recipient : null;
+    }),
+  );
+
+  return outcomes.filter((recipient): recipient is StaffRecipient => recipient !== null);
 }

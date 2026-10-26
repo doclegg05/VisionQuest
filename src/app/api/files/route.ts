@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, deleteFile, validateFile } from "@/lib/storage";
+import { validateUploadContent } from "@/lib/file-security";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { ApiError, withAuth, badRequest, notFound } from "@/lib/api-error";
 import { parseBody, deleteFileSchema } from "@/lib/schemas";
+import { safeUploadName } from "@/lib/upload-name";
 
 // GET — list student's files
 export const GET = withAuth(async (session) => {
@@ -21,25 +24,31 @@ export const POST = withAuth(async (session, req: Request) => {
   const file = formData.get("file") as File | null;
   const category = (formData.get("category") as string) || "general";
 
-  if (!file) throw badRequest("No file provided");
+  if (!(file instanceof File)) throw badRequest("No file provided");
 
   const validationError = validateFile({ size: file.size, type: file.type });
   if (validationError) throw badRequest(validationError);
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const storageKey = generateStorageKey(session.id, file.name);
+  const contentError = validateUploadContent(buffer, file.type);
+  if (contentError) throw badRequest(contentError);
+  // `File.name` is student-controlled and undici preserves it verbatim, so the
+  // stored name must be a name and not a path — the retention archive turns
+  // this column into a ZIP entry path.
+  const filename = safeUploadName(file.name);
+  const storageKey = generateStorageKey(session.id, filename);
 
   try {
     await uploadFile(storageKey, buffer, file.type);
   } catch (err) {
-    logger.error("File upload failed", { error: String(err) });
+    logger.error("File upload failed", { error: errorForLog(err) });
     throw new ApiError(500, "Failed to upload file to storage");
   }
 
   const record = await prisma.fileUpload.create({
     data: {
       studentId: session.id,
-      filename: file.name,
+      filename,
       mimeType: file.type,
       sizeBytes: file.size,
       storageKey,
@@ -70,7 +79,7 @@ export const DELETE = withAuth(async (session, req: Request) => {
   } catch (err) {
     logger.error("Failed to delete file from storage; aborting DB delete", {
       storageKey: file.storageKey,
-      error: String(err),
+      error: errorForLog(err),
     });
     throw new ApiError(500, "Failed to delete file. Please try again.");
   }

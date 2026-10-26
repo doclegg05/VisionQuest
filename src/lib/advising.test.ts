@@ -1,10 +1,93 @@
-import test from "node:test";
+import test, { before, mock } from "node:test";
 import assert from "node:assert/strict";
-import {
-  buildBookableAdvisorSlots,
-  buildStudentAlertDescriptors,
-} from "./advising";
 import { buildStudentStatusSignals } from "./student-status";
+
+// ---------------------------------------------------------------------------
+// listBookableAdvisors reads through ./db. The prisma stand-in below applies
+// the `advisor` relation filter the way Postgres would (null means IS NULL),
+// so an audience that forgets its demoAccount condition returns the wrong
+// advisors and the test sees them.
+//
+// ./advising is imported only after the mock is registered.
+// ---------------------------------------------------------------------------
+
+type AdvisorPerson = {
+  displayName: string;
+  email: string | null;
+  role: string;
+  demoAccount: string | null;
+};
+
+const REAL_ADVISOR: AdvisorPerson = {
+  displayName: "Ms. Legg",
+  email: "legg@example.test",
+  role: "teacher",
+  demoAccount: null,
+};
+const DEMO_INSTRUCTOR: AdvisorPerson = {
+  displayName: "Demo Instructor",
+  email: null,
+  role: "teacher",
+  demoAccount: "instructor",
+};
+
+function availabilityBlock(id: string, advisorId: string, advisor: AdvisorPerson) {
+  return {
+    id,
+    advisorId,
+    weekday: 2,
+    startMinutes: 10 * 60,
+    endMinutes: 11 * 60,
+    slotMinutes: 30,
+    locationType: "virtual",
+    locationLabel: "Zoom",
+    meetingUrl: null,
+    active: true,
+    advisor,
+  };
+}
+
+const AVAILABILITY_BLOCKS = [
+  availabilityBlock("block-real", "adv-real", REAL_ADVISOR),
+  availabilityBlock("block-demo", "adv-demo", DEMO_INSTRUCTOR),
+];
+
+type RelationFilter = Partial<Record<keyof AdvisorPerson, unknown>>;
+
+function matchesRelation(person: AdvisorPerson, filter: RelationFilter | undefined): boolean {
+  if (!filter) return true;
+  return (Object.keys(filter) as Array<keyof AdvisorPerson>).every(
+    (key) => person[key] === filter[key],
+  );
+}
+
+type BlockQuery = { where: { active: boolean; advisor?: RelationFilter } };
+
+const mockAvailabilityFindMany = mock.fn(async (args: BlockQuery) =>
+  AVAILABILITY_BLOCKS.filter(
+    (block) => block.active === args.where.active && matchesRelation(block.advisor, args.where.advisor),
+  ),
+);
+
+mock.module("./db", {
+  exports: {
+    prisma: {
+      advisorAvailability: { findMany: mockAvailabilityFindMany },
+      appointment: { findMany: async () => [] },
+    },
+    prismaAdmin: {},
+  },
+});
+
+type AdvisingModule = typeof import("./advising");
+let buildBookableAdvisorSlots: AdvisingModule["buildBookableAdvisorSlots"];
+let buildStudentAlertDescriptors: AdvisingModule["buildStudentAlertDescriptors"];
+let listBookableAdvisors: AdvisingModule["listBookableAdvisors"];
+
+before(async () => {
+  ({ buildBookableAdvisorSlots, buildStudentAlertDescriptors, listBookableAdvisors } =
+    await import("./advising"));
+});
 
 test("buildStudentAlertDescriptors creates overdue task alerts with escalating severity", () => {
   const now = new Date("2026-03-13T17:00:00.000Z");
@@ -422,5 +505,38 @@ test("buildBookableAdvisorSlots respects minimum lead time", () => {
       "2026-03-16T10:00:00.000Z",
       "2026-03-16T10:30:00.000Z",
     ]
+  );
+});
+
+// 2026-10-20 is a Tuesday (weekday 2), the day both fixture blocks open.
+const BOOKING_NOW = new Date("2026-10-19T12:00:00.000Z");
+const BOOKING_WINDOW = { now: BOOKING_NOW, days: 7, maxSlotsPerAdvisor: 10, minimumLeadMinutes: 0 };
+
+test("listBookableAdvisors lists only the demo instructor for the demo audience", async () => {
+  const advisors = await listBookableAdvisors({ ...BOOKING_WINDOW, audience: "demo" });
+
+  assert.deepEqual(
+    advisors.map((advisor) => advisor.advisorId),
+    ["adv-demo"],
+  );
+  assert.equal(advisors[0]?.advisorName, "Demo Instructor");
+  assert.ok((advisors[0]?.slots.length ?? 0) > 0, "the demo instructor has open slots");
+});
+
+test("listBookableAdvisors hides the demo instructor from the standard audience", async () => {
+  const advisors = await listBookableAdvisors({ ...BOOKING_WINDOW, audience: "standard" });
+
+  assert.deepEqual(
+    advisors.map((advisor) => advisor.advisorId),
+    ["adv-real"],
+  );
+});
+
+test("listBookableAdvisors defaults to the standard audience", async () => {
+  const advisors = await listBookableAdvisors(BOOKING_WINDOW);
+
+  assert.deepEqual(
+    advisors.map((advisor) => advisor.advisorId),
+    ["adv-real"],
   );
 });

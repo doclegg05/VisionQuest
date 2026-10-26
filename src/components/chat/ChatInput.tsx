@@ -4,6 +4,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Command, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
 import { CommandPalette } from "./CommandPalette";
+import { useDemoAccount } from "@/components/demo/DemoAccountContext";
+import { DemoPrivacyNotice } from "@/components/demo/DemoPrivacyNotice";
 import { type ChatRole, type SlashCommand } from "@/lib/chat/commands";
 
 interface ChatInputProps {
@@ -11,10 +13,12 @@ interface ChatInputProps {
   disabled?: boolean;
   compact?: boolean;
   role?: ChatRole;
+  /** Text placed in the box on mount. It is only sent when the user presses Send. */
+  initialMessage?: string;
 }
 
-export default function ChatInput({ onSend, disabled, compact, role = "student" }: ChatInputProps) {
-  const [message, setMessage] = useState("");
+export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage }: ChatInputProps) {
+  const [message, setMessage] = useState(initialMessage ?? "");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [serverCommands, setServerCommands] = useState<SlashCommand[] | undefined>();
   const [focused, setFocused] = useState(false);
@@ -26,6 +30,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
   const prevDisabledRef = useRef(disabled);
   const commandListboxId = useId();
   const reduce = useReducedMotion();
+  const demoAccount = useDemoAccount();
 
   useEffect(() => {
     if (prevDisabledRef.current && !disabled) {
@@ -33,6 +38,13 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
     }
     prevDisabledRef.current = disabled;
   }, [disabled]);
+
+  useEffect(() => {
+    // Grow the box to fit prefilled text so the user can read all of it before Send.
+    const el = textareaRef.current;
+    if (!el || !initialMessage) return;
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, [initialMessage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,7 +230,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
                   type="button"
                   onClick={() => removeAttachment(attachment.id)}
                   aria-label={`Remove attachment ${attachment.filename}`}
-                  className="text-[var(--ink-faint)] hover:text-[var(--badge-error-text)]"
+                  className="-my-3.5 -mr-3 inline-flex size-11 items-center justify-center text-[var(--ink-faint)] hover:text-[var(--badge-error-text)]"
                 >
                   ×
                 </button>
@@ -231,6 +243,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
           type="file"
           className="hidden"
           onChange={handleFileChange}
+          aria-label="Upload file"
           aria-hidden="true"
           tabIndex={-1}
         />
@@ -329,7 +342,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
               className={[
                 "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors",
                 canSend && !disabled
-                  ? "bg-[var(--accent-strong)] text-white shadow-[0_8px_18px_rgba(42,138,60,0.28)] hover:opacity-95"
+                  ? "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-[0_8px_18px_rgba(42,138,60,0.28)] hover:opacity-95"
                   : "cursor-not-allowed bg-[var(--surface-interactive)] text-[var(--ink-muted)] shadow-none",
               ].join(" ")}
             >
@@ -337,6 +350,11 @@ export default function ChatInput({ onSend, disabled, compact, role = "student" 
             </motion.button>
           </div>
         </div>
+        {demoAccount === "student" && (
+          <div className="mt-2 px-1">
+            <DemoPrivacyNotice />
+          </div>
+        )}
       </div>
     </div>
   );

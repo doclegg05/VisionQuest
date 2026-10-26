@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut } from "@phosphor-icons/react";
+import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut, X } from "@phosphor-icons/react";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
+import {
+  MACC_APPLY_HINT,
+  WORKFORCE_WV_BADGE,
+  isWorkForceWvPosting,
+} from "@/lib/job-board/wv-employer";
+import { ReadAloudButton } from "@/components/ui/ReadAloudButton";
+import { describeSaveError, SaveJobError } from "@/lib/job-board/save-error";
 
 export interface JobTrackingUpdate {
   status?: SavedJobStatus;
@@ -34,15 +41,10 @@ interface JobCardProps {
   onSave?: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
 }
 
-const CLUSTER_COLORS: Record<string, string> = {
-  "office-admin": "bg-blue-500/20 text-blue-300",
-  "finance-bookkeeping": "bg-green-500/20 text-green-300",
-  "tech-digital": "bg-purple-500/20 text-purple-300",
-  "creative-design": "bg-pink-500/20 text-pink-300",
-  "customer-service": "bg-orange-500/20 text-orange-300",
-  "career-readiness": "bg-teal-500/20 text-teal-300",
-  "language-esl": "bg-amber-500/20 text-amber-300",
-};
+// Theme-aware badge pairs (light and dark values, 4.5:1 or better together).
+const SUCCESS_PILL = "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]";
+const INFO_PILL = "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]";
+const WARNING_PILL = "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]";
 
 const CLUSTER_LABELS: Record<string, string> = {
   "office-admin": "Office & Admin",
@@ -62,10 +64,55 @@ const TRACKING_STATUSES: Array<{ value: SavedJobStatus; label: string }> = [
   { value: "withdrawn", label: "Withdrawn" },
 ];
 
+/**
+ * VQ-R-016: the pure decision behind the Save/Update error banner, exported
+ * so the mapping from "what onSave did" to "what the student sees" is
+ * testable without a DOM (see JobCard.save-error.test.ts). Returns the
+ * plain-language message to show, or null when there is nothing to show.
+ */
+export async function runSaveAndDescribeError(
+  onSave: JobCardProps["onSave"],
+  id: string,
+  update: JobTrackingUpdate,
+): Promise<string | null> {
+  if (!onSave) return null;
+  try {
+    await onSave(id, update);
+    return null;
+  } catch (err) {
+    // Only a SaveJobError's message is student-facing copy we authored
+    // ourselves (see save-error.ts); anything else (a network failure, a
+    // thrown non-Error) falls back to the generic message rather than
+    // leaking a raw error string onto the page.
+    return err instanceof SaveJobError ? err.message : describeSaveError();
+  }
+}
+
+/**
+ * UX review WARNING (2026-09-07): the save-error message had no dismiss
+ * control. Icon-only 44px button (p-2.5 padding around a 24px X) clears the
+ * error; the message itself reads at text-sm rather than text-xs.
+ */
+export function SaveErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div role="alert" className="flex items-start justify-between gap-2">
+      <p className="text-sm leading-5 text-danger">{message}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss error"
+        className="min-h-11 min-w-11 shrink-0 rounded-lg p-2.5 text-danger transition-colors hover:bg-[var(--surface-raised)]"
+      >
+        <X size={24} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 const WORK_MODE_STYLES: Record<JobWorkMode, string> = {
-  onsite: "bg-emerald-500/15 text-emerald-700",
-  remote: "bg-sky-500/15 text-sky-700",
-  hybrid: "bg-amber-500/15 text-amber-700",
+  onsite: SUCCESS_PILL,
+  remote: INFO_PILL,
+  hybrid: WARNING_PILL,
 };
 
 function formatStatusLabel(status: string): string {
@@ -118,9 +165,11 @@ export function JobCard({
 }: JobCardProps) {
   const primaryCluster = clusters[0];
   const visibleReasons = matchReasons.slice(0, 3);
+  const workForceWv = isWorkForceWvPosting({ company, source });
   const [draftStatus, setDraftStatus] = useState<SavedJobStatus>(savedStatus ?? "saved");
   const [draftNotes, setDraftNotes] = useState(savedNotes ?? "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Adjust-during-render: keep the drafts in sync with the saved* props
   // without an effect (React's documented pattern for resetting state when
@@ -137,11 +186,10 @@ export function JobCard({
   async function persistTracking(update: JobTrackingUpdate) {
     if (!onSave) return;
     setSaving(true);
-    try {
-      await onSave(id, update);
-    } finally {
-      setSaving(false);
-    }
+    setSaveError(null);
+    const message = await runSaveAndDescribeError(onSave, id, update);
+    setSaveError(message);
+    setSaving(false);
   }
 
   return (
@@ -149,9 +197,7 @@ export function JobCard({
       {/* Match label */}
       {matchLabel && (
         <span className={`absolute top-2 right-2 text-xs font-medium px-2 py-0.5 rounded-full ${
-          matchLabel === "Strong match"
-            ? "bg-green-500/20 text-green-300"
-            : "bg-blue-500/20 text-blue-300"
+          matchLabel === "Strong match" ? SUCCESS_PILL : INFO_PILL
         }`}>
           {matchLabel}
         </span>
@@ -164,30 +210,28 @@ export function JobCard({
           {formatJobWorkMode(workMode)}
         </span>
         {primaryCluster && (
-          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-            CLUSTER_COLORS[primaryCluster] ?? "bg-[var(--surface-interactive)] text-[var(--ink-faint)]"
-          }`}>
+          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${INFO_PILL}`}>
             {CLUSTER_LABELS[primaryCluster] ?? primaryCluster}
           </span>
         )}
       </div>
 
       {/* Job info */}
-      <h3 className={["font-semibold text-[var(--text-primary)]", compact ? "text-sm" : "text-base", "leading-tight"].join(" ")}>
+      <h3 className={["font-semibold text-[var(--ink-strong)]", compact ? "text-sm" : "text-base", "leading-tight"].join(" ")}>
         {title}
       </h3>
-      <div className="flex items-center gap-1 text-sm text-[var(--text-secondary)] mt-1">
+      <div className="flex items-center gap-1 text-sm text-[var(--ink-muted)] mt-1">
         <Briefcase size={14} />
         <span>{company}</span>
       </div>
-      <div className="flex items-center gap-1 text-sm text-[var(--text-secondary)] mt-0.5">
+      <div className="flex items-center gap-1 text-sm text-[var(--ink-muted)] mt-0.5">
         <MapPin size={14} />
         <span>{location}</span>
       </div>
 
       {/* Salary */}
       {salary && (
-        <div className="flex items-center gap-1 mt-2 text-[var(--accent)] font-semibold text-sm">
+        <div className="flex items-center gap-1 mt-2 text-[var(--badge-success-text)] font-semibold text-sm">
           <CurrencyDollar size={16} weight="bold" />
           <span>{salary}</span>
         </div>
@@ -195,22 +239,43 @@ export function JobCard({
 
       {/* Posted date + source badge */}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className="text-xs text-[var(--text-secondary)]">
+        <span className="text-xs text-[var(--ink-muted)]">
           {formatPostedAt(postedAt, createdAt)}
         </span>
         {formatSourceLabel(source) && (
-          <span className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+          <span className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink-muted)]">
             {formatSourceLabel(source)}
           </span>
         )}
+        {workForceWv && (
+          <span className="rounded-full bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] px-2 py-0.5 text-xs font-semibold">
+            {WORKFORCE_WV_BADGE}
+          </span>
+        )}
       </div>
+
+      {workForceWv && (
+        <p className="mt-2 text-xs leading-snug text-[var(--ink-muted)]">
+          {MACC_APPLY_HINT}
+        </p>
+      )}
+
+      {/* Read the posting's own facts out loud — title, employer, place, pay.
+          Hidden where the browser has no speech synthesis. */}
+      {!compact && (
+        <div className="mt-2">
+          <ReadAloudButton
+            text={`${title} at ${company}. ${location}.${salary ? ` Pay: ${salary}.` : ""}`}
+          />
+        </div>
+      )}
 
       {!compact && visibleReasons.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
           {visibleReasons.map((reason) => (
             <span
               key={`${reason.type}:${reason.value ?? reason.label}`}
-              className="rounded-full bg-[var(--surface-elevated)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+              className="rounded-full bg-[var(--surface-raised)] px-2 py-0.5 text-xs text-[var(--ink-muted)]"
             >
               {reason.label}
             </span>
@@ -221,12 +286,14 @@ export function JobCard({
       {/* Actions */}
       {!compact && (
         <div className="mt-3 space-y-3">
+          {saveError && <SaveErrorBanner message={saveError} onDismiss={() => setSaveError(null)} />}
           {savedStatus ? (
             <div className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
               <select
                 value={draftStatus}
                 onChange={(event) => setDraftStatus(event.target.value as SavedJobStatus)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                aria-label="Application status"
+                className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--ink-strong)]"
               >
                 {TRACKING_STATUSES.map((status) => (
                   <option key={status.value} value={status.value}>
@@ -239,14 +306,15 @@ export function JobCard({
                 onChange={(event) => setDraftNotes(event.target.value)}
                 rows={2}
                 maxLength={10000}
+                aria-label="Application notes"
                 placeholder="Notes, next step, or follow-up date"
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs text-[var(--text-primary)]"
+                className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--ink-strong)]"
               />
               <button
                 type="button"
                 onClick={() => void persistTracking({ status: draftStatus, notes: draftNotes })}
                 disabled={saving}
-                className="rounded-lg bg-[var(--primary)] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:self-start"
+                className="primary-button min-h-11 px-3 py-2 text-xs disabled:opacity-50 sm:self-start"
               >
                 {saving ? "Saving..." : "Update"}
               </button>
@@ -257,10 +325,10 @@ export function JobCard({
             <button
               onClick={() => void persistTracking({ status: "saved" })}
               disabled={saving}
-              className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+              className={`flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
                 savedStatus
-                  ? "bg-[var(--accent)]/20 text-[var(--accent)]"
-                  : "bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                  ? SUCCESS_PILL
+                  : "bg-[var(--surface-raised)] text-[var(--ink-muted)] hover:text-[var(--badge-success-text)]"
               }`}
             >
               <BookmarkSimple size={14} weight={savedStatus ? "fill" : "regular"} />
@@ -270,13 +338,13 @@ export function JobCard({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
+              className="flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-muted)] hover:text-[var(--badge-info-text)] transition-colors"
             >
               <ArrowSquareOut size={14} />
               View
             </a>
             {savedAppliedAt ? (
-              <span className="text-xs text-[var(--text-secondary)]">
+              <span className="text-xs text-[var(--ink-muted)]">
                 Applied {new Date(savedAppliedAt).toLocaleDateString()}
               </span>
             ) : null}

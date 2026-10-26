@@ -27,6 +27,10 @@ mock.module("@/lib/db", {
       studentAlert: createStudentAlertStore(),
       orientationItem: { findMany: async () => [] },
       formSubmission: { count: async () => intakeSubmissionCount },
+      // The SMS re-consent notice reads the student's own preference row.
+      // Null = never set one up, which is the case for this fixture and for
+      // most students; the notice renders for nobody here.
+      notificationPreference: { findUnique: async () => null },
     },
   },
 });

@@ -73,12 +73,12 @@ export default function ClassIntakeFlyerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       {/* Printable Flyer (Visible on screen and during print) */}
-      <div className="relative w-full max-w-lg rounded-3xl border border-[var(--border)] bg-[var(--surface-card)] p-6 shadow-2xl sm:p-8">
+      <div className="relative w-full max-w-lg rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-2xl sm:p-8">
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-2 text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] print:hidden"
+          className="pointer-coarse:min-h-11 absolute right-5 top-5 rounded-full p-2 text-[var(--ink-muted)] hover:bg-[var(--surface-muted)] print:hidden"
         >
           <X size={20} />
         </button>
@@ -122,17 +122,18 @@ export default function ClassIntakeFlyerModal({
             <input
               type="text"
               readOnly
+              aria-label="Direct web link to the class intake form"
               value={intakeUrl}
               className="field w-full truncate px-3 py-2 text-xs font-mono text-[var(--ink-muted)]"
             />
             <button
               type="button"
               onClick={handleCopy}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-soft)]"
+              className="pointer-coarse:min-h-11 flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-soft)]"
             >
               {copied ? (
                 <>
-                  <CheckCircle size={14} className="text-emerald-600" weight="fill" /> Copied
+                  <CheckCircle size={14} className="text-success" weight="fill" /> Copied
                 </>
               ) : (
                 <>

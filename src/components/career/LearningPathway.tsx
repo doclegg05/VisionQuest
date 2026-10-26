@@ -23,11 +23,11 @@ const STATUS_CONFIG = {
   },
   in_progress: {
     circleCls:
-      "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.12)] text-[var(--accent-strong)]",
+      "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.12)] text-success",
     icon: (
       <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent-strong)]" />
     ),
-    badgeCls: "bg-[rgba(15,154,146,0.12)] text-[var(--accent-strong)]",
+    badgeCls: "bg-[rgba(15,154,146,0.12)] text-success",
     badgeLabel: "In Progress",
     textCls: "text-[var(--ink-strong)] font-semibold",
     cardCls: "",
@@ -62,7 +62,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
       {/* Header */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-success">
             Your Learning Roadmap
           </p>
           <h2 className="mt-1 font-display text-xl text-[var(--ink-strong)]">
@@ -132,7 +132,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
                       </span>
                       {step.name}
                       {step.isCurrent && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-[var(--accent-strong)] px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white">
+                        <span className="ml-2 inline-flex items-center rounded-full bg-[var(--accent-strong)] px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-[var(--on-accent)]">
                           You are here
                         </span>
                       )}
@@ -178,7 +178,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
 export function LearningPathwayEmpty() {
   return (
     <div className="surface-section p-6 text-center">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-success">
         Your Learning Roadmap
       </p>
       <p className="mt-3 text-sm text-[var(--ink-muted)]">
@@ -204,7 +204,7 @@ export function LearningPathwayEmpty() {
 export function LearningPathwayAwaitingCluster() {
   return (
     <div className="surface-section p-6 text-center">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-success">
         Your Learning Roadmap
       </p>
       <p className="mt-3 text-sm text-[var(--ink-muted)]">

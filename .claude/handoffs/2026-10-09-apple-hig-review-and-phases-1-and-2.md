@@ -1,0 +1,18 @@
+# Prior Session (2026-10-09, Apple HIG review and Phases 1 and 2)
+- **Date**: 2026-10-09
+- **What we worked on**:
+  - The Apple HIG review (205 findings, report artifact above).
+  - Phase 1 (PR #222).
+  - Phase 2 (`fix/hig-phase-2`), built from shared primitives and failing-first guards, then fanned out with agents.
+    - Round 1 covered dialogs, labels, palette and touch targets in 98 files.
+    - Round 2 grew 173 controls after the touch check started estimating rendered height.
+  - Reviewers' blockers were fixed and measured in real browsers:
+    - FormDialog Escape lock-up
+    - goals Edit/Remove covered on phones
+    - dark error/info badges failing at card tops
+    - two e2e specs stranded by placeholder-to-label changes
+- **What we decided**: see the 2026-10-09 rows in the Key Decisions Log.
+- **Where we left off**:
+  - `fix/hig-phase-2` is pushed with a draft PR stacked on #222.
+  - Worktree: `.claude/worktrees/hig-phases`. The old sibling folder broke the cluster rule and was moved.
+  - Waiting on Britt: the two phone/manual checks on #222, review of both PRs, and the design calls in Open Items.

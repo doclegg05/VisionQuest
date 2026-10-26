@@ -112,4 +112,34 @@ describe("validatePlatformMap — rule violations", () => {
     const errors = validatePlatformMap(entries, baseRefs());
     assert.ok(errors.some((e) => e.rule === "compact-budget" && e.id === "student"));
   });
+
+  // Student full grew 3,840 -> 6,269 -> 7,550+ chars with nothing catching
+  // it (compact-budget only guards the compact tier). This mirrors that
+  // rule's shape for the full tier.
+  it("flags full-budget when a role's full render exceeds the character limit", () => {
+    const hugeSummary = "x".repeat(8000);
+    const entries = [baseEntry({ summary: hugeSummary })];
+    const errors = validatePlatformMap(entries, baseRefs());
+    assert.ok(errors.some((e) => e.rule === "full-budget" && e.id === "student"));
+  });
+
+  it("full-budget does not flag a role whose full render stays under the limit", () => {
+    const entries = [baseEntry({ summary: "A short, ordinary summary." })];
+    const errors = validatePlatformMap(entries, baseRefs());
+    assert.ok(!errors.some((e) => e.rule === "full-budget"));
+  });
+
+  it("flags seeAlso-exists when a seeAlso id does not resolve to any entry in the map", () => {
+    const entries = [baseEntry({ seeAlso: ["some-id-nobody-defined"] })];
+    const errors = validatePlatformMap(entries, baseRefs());
+    assert.ok(
+      errors.some((e) => e.rule === "seeAlso-exists" && e.id === "test-entry" && e.message.includes("some-id-nobody-defined")),
+    );
+  });
+
+  it("seeAlso-exists does not flag a seeAlso id that resolves to a real entry in the same map", () => {
+    const entries = [baseEntry({ id: "a", seeAlso: ["b"] }), baseEntry({ id: "b" })];
+    const errors = validatePlatformMap(entries, baseRefs());
+    assert.ok(!errors.some((e) => e.rule === "seeAlso-exists"));
+  });
 });

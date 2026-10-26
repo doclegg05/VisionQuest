@@ -21,6 +21,7 @@ import { resolveSendError, resolveStreamOutcome } from "@/lib/chat/send-outcome"
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
 import { determineStage } from "@/lib/sage/stage";
+import { startGoalPolling } from "./goal-polling";
 
 interface Message {
   id: string;
@@ -60,6 +61,30 @@ const REQUESTED_STAGE_OPENERS = {
   discovery: STAGE_OPENERS.discovery,
   career_profile_review: STAGE_OPENERS.career_profile_review,
 } as const;
+
+/**
+ * Message text from an "Ask Sage" deep link (?prompt=, or ?topic= with ?name=).
+ * Anyone can write these URLs, so the text only prefills the input box: the
+ * user reads it and presses Send themselves. It is never sent on load (F19).
+ */
+function buildDeepLinkPrefill(searchParams: Pick<URLSearchParams, "get">): string {
+  const prompt = searchParams.get("prompt")?.trim();
+  const topic = searchParams.get("topic");
+  const name = searchParams.get("name");
+
+  if (prompt) return prompt.slice(0, 1000);
+  if (topic === "form" && name) {
+    return `Can you tell me about the "${name}" form? What is it for and what do I need to know about it?`;
+  }
+  if (topic === "cert" && name) {
+    return `I'd like to learn about the ${name} certification. What does it involve and how do I get started?`;
+  }
+  if (topic === "platform" && name) {
+    return `Can you help me understand how to use ${name}? How do I get started with it?`;
+  }
+  if (name) return `I have a question about ${name}.`;
+  return "";
+}
 
 function formatToolName(tool: string | undefined): string {
   if (!tool) return "Sage tool";
@@ -142,7 +167,7 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
               href={event.target}
               target={newTab ? "_blank" : undefined}
               rel={newTab ? "noopener noreferrer" : undefined}
-              className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-3 py-2 text-sm font-semibold text-[var(--chat-sage-action)] shadow-sm transition-colors hover:bg-[var(--chat-sage-mark-bg)]"
+              className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-3 py-2 text-sm font-semibold text-[var(--chat-sage-action)] shadow-sm transition-colors hover:bg-[var(--chat-sage-mark-bg)]"
             >
               <ArrowSquareOut size={17} weight="bold" className="shrink-0" />
               <span className="truncate">{event.label || "Open"}</span>
@@ -197,6 +222,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       ? REQUESTED_STAGE_OPENERS[requestedStage as keyof typeof REQUESTED_STAGE_OPENERS]
       : null;
   const { checkProgression } = useProgression();
+  // Read once on mount, like the deep-link effect this replaces.
+  const [deepLinkPrefill] = useState(() => buildDeepLinkPrefill(searchParams));
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -214,11 +241,26 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
    */
   const [optimisticGreeting, setOptimisticGreeting] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const latestPollIdRef = useRef(0);
+  const cancelGoalPollRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(false);
   const greetingGenerationRef = useRef(0);
   const sidebarRef = useRef<HTMLDivElement>(null);
   /** Tracks whether the warmup fetch has fired this session. */
   const warmupFiredRef = useRef(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cancelGoalPollRef.current?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!goalToast) return;
+    const timer = setTimeout(() => setGoalToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [goalToast]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -325,47 +367,19 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   };
 
   const pollForGoals = useCallback((prevGoalCount: number) => {
-    const pollId = ++latestPollIdRef.current;
-    let attempts = 0;
-    const interval = setInterval(async () => {
-      if (latestPollIdRef.current !== pollId) {
-        clearInterval(interval);
-        return;
-      }
-
-      attempts++;
-      if (attempts > 5) {
-        clearInterval(interval);
-        return;
-      }
-
-      try {
-        const res = await apiFetch("/api/goals");
-        if (!res.ok) return;
-
-        if (latestPollIdRef.current !== pollId) {
-          clearInterval(interval);
-          return;
-        }
-
-        const data = await res.json();
-        if (data.goals.length > prevGoalCount) {
-          const newGoal = data.goals[data.goals.length - 1];
-          const levelLabels: Record<string, string> = {
-            bhag: "Big Hairy Audacious Goal",
-            monthly: "Monthly Goal",
-            weekly: "Weekly Goal",
-            daily: "Daily Goal",
-            task: "Action Task",
-          };
-          setGoalToast(`${levelLabels[newGoal.level] || newGoal.level} captured!`);
-          setTimeout(() => setGoalToast(null), 4000);
-          clearInterval(interval);
-        }
-      } catch {
-        // Ignore polling errors.
-      }
-    }, 3000);
+    cancelGoalPollRef.current?.();
+    // A chat response may finish after navigation has already unmounted us.
+    if (!mountedRef.current) return;
+    cancelGoalPollRef.current = startGoalPolling(prevGoalCount, (level) => {
+      const levelLabels: Record<string, string> = {
+        bhag: "Big Hairy Audacious Goal",
+        monthly: "Monthly Goal",
+        weekly: "Weekly Goal",
+        daily: "Daily Goal",
+        task: "Action Task",
+      };
+      setGoalToast(`${levelLabels[level] || level} captured!`);
+    });
   }, []);
 
   const handleSend = useCallback(
@@ -390,7 +404,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       // is in flight. Discard it if the user sends a second message before SSE
       // arrives (handled by checking messages.length in the SSE reader below).
       const isFirstMessage = !conversationId && messages.length === 0;
-      if (isFirstMessage) {
+      if (isFirstMessage && role === "student") {
         if (requestedStageOpener) {
           setOptimisticGreeting(requestedStageOpener);
         } else {
@@ -581,34 +595,6 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener]
   );
 
-  // Deep link: auto-send a contextual first message when arriving from "Ask Sage" links
-  useEffect(() => {
-    const prompt = searchParams.get("prompt")?.trim();
-    const topic = searchParams.get("topic");
-    const name = searchParams.get("name");
-
-    if (messages.length === 0 && !conversationId) {
-      let autoMessage = "";
-      if (prompt) {
-        autoMessage = prompt.slice(0, 1000);
-      } else if (topic === "form" && name) {
-        autoMessage = `Can you tell me about the "${name}" form? What is it for and what do I need to know about it?`;
-      } else if (topic === "cert" && name) {
-        autoMessage = `I'd like to learn about the ${name} certification. What does it involve and how do I get started?`;
-      } else if (topic === "platform" && name) {
-        autoMessage = `Can you help me understand how to use ${name}? How do I get started with it?`;
-      } else if (name) {
-        autoMessage = `I have a question about ${name}.`;
-      }
-
-      // Auto-send after a brief delay to let the UI render
-      if (autoMessage) {
-        setTimeout(() => handleSend(autoMessage), 500);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => {
     if (!showSidebar) return;
 
@@ -655,7 +641,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             aria-label={showSidebar ? "Hide conversations" : "Show conversations"}
             aria-controls="sage-conversations"
             aria-expanded={showSidebar}
-            className="rounded-xl border border-[var(--chat-panel-border)] px-2.5 py-2 text-[var(--ink-muted)] hover:bg-[var(--chat-sidebar-hover)] hover:text-[var(--ink-strong)] md:hidden"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[var(--chat-panel-border)] text-[var(--ink-muted)] hover:bg-[var(--chat-sidebar-hover)] hover:text-[var(--ink-strong)] md:hidden"
           >
             <List aria-hidden="true" size={20} weight="bold" />
           </button>
@@ -750,7 +736,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           <ChatErrorBanner message={chatError} settingsHref={getRoleSettingsPath(role)} />
         )}
 
-        <ChatInput onSend={handleSend} disabled={isLoading} role={role} />
+        <ChatInput onSend={handleSend} disabled={isLoading} role={role} initialMessage={deepLinkPrefill} />
       </div>
 
       {showSidebar && (

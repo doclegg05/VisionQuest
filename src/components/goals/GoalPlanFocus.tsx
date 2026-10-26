@@ -124,7 +124,7 @@ export default function GoalPlanFocus({
                                 <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">{link.notes}</p>
                               ) : null}
                               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                                <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-1 font-semibold text-[var(--accent-secondary)]">
+                                <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-1 font-semibold text-info">
                                   {GOAL_RESOURCE_LINK_STATUS_LABELS[link.status]}
                                 </span>
                                 {dueLabel ? (
@@ -139,7 +139,7 @@ export default function GoalPlanFocus({
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
+                                className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
                               >
                                 Open
                               </a>
@@ -179,7 +179,7 @@ export default function GoalPlanFocus({
                               href={entry.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
+                              className="inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)]"
                             >
                               View
                             </a>

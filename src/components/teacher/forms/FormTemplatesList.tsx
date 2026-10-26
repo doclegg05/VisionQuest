@@ -99,14 +99,14 @@ export default function FormTemplatesList() {
         <button
           type="button"
           onClick={() => setBuilder({ mode: "new" })}
-          className="primary-button px-4 py-2 text-sm"
+          className="primary-button px-4 py-2 text-sm pointer-coarse:min-h-11"
         >
           New form
         </button>
       </div>
 
       {error && (
-        <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--error)]" role="alert">
+        <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
@@ -155,7 +155,7 @@ export default function FormTemplatesList() {
                 <button
                   type="button"
                   onClick={() => setBuilder({ mode: "edit", templateId: template.id })}
-                  className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)]"
+                  className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] pointer-coarse:min-h-11"
                 >
                   Edit
                 </button>
@@ -163,7 +163,7 @@ export default function FormTemplatesList() {
                   <button
                     type="button"
                     onClick={() => void handleArchive(template.id)}
-                    className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)]"
+                    className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] pointer-coarse:min-h-11"
                   >
                     Archive
                   </button>
@@ -171,7 +171,7 @@ export default function FormTemplatesList() {
                   <button
                     type="button"
                     onClick={() => void handleReactivate(template.id)}
-                    className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)]"
+                    className="inline-flex items-center rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] pointer-coarse:min-h-11"
                   >
                     Reactivate
                   </button>

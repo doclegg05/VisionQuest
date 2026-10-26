@@ -1,0 +1,4 @@
+{
+  "_read_me": "pii-log-grep suite (config/benchmarks/pii-log-grep.json). This suite has no static corpus to score — its real input is whatever the unit-test run's log output looks like on a given commit, captured live via $BENCH_TEST_LOG or a fresh `npm test`. This file exists only because the suite-config contract requires a `fixture` field; it carries no data the scorer reads. The synthetic proof that the detection logic itself works (a planted fake cuid/phone/email) lives entirely inside scripts/bench/suites/pii-log-grep.mjs's own `--self-test` block as hardcoded sample data — NOT here — because an earlier version put that sample data in this file and the real runner, which always loads a suite's declared fixture for every invocation including production runs, silently scored the sample instead of the real log on every single CI run. Do not add sample-log keys back to this file.",
+  "_measured_at": "2026-09-05"
+}

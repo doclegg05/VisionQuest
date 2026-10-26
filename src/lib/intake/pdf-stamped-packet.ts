@@ -24,6 +24,7 @@ import { signDocumentVerificationToken } from "./document-token";
 // Re-exported: callers were given this name on this module, and the token is now
 // defined once in ./document-token so signer and verifier cannot drift apart.
 export { signDocumentVerificationToken } from "./document-token";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import QRCode from "qrcode";
 
@@ -256,7 +257,7 @@ function trySignVerificationToken(fileUploadId: string): string | null {
   try {
     return signDocumentVerificationToken(fileUploadId);
   } catch (err) {
-    logger.warn("Intake packet issued without a verification token", { error: String(err) });
+    logger.warn("Intake packet issued without a verification token", { error: errorForLog(err) });
     return null;
   }
 }
@@ -789,7 +790,7 @@ async function renderProceduralPacket(
     const qrPngBuffer = await QRCode.toBuffer(verifyUrlFor(plan.verificationToken), {
       width: 140,
       margin: 1,
-      color: { dark: "#004777", light: "#ffffff" },
+      color: { dark: "#004071", light: "#ffffff" }, // SPOKES dark on paper
     });
     const qrImg = await doc.embedPng(qrPngBuffer);
     ctx.page.drawImage(qrImg, {
@@ -1012,7 +1013,7 @@ async function recordContentDigest(fileUploadId: string, digest: string): Promis
   } catch (err) {
     logger.warn("Intake packet content digest not persisted", {
       alert: "packet_digest_not_recorded",
-      error: String(err),
+      error: errorForLog(err),
     });
   }
 }

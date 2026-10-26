@@ -177,9 +177,9 @@ export default function DocumentBrowser({
           <button
             type="button"
             onClick={() => setSelectedCategory("all")}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === "all"
-                ? "bg-[var(--accent-strong)] text-white"
+                ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                 : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
             }`}
           >
@@ -194,9 +194,9 @@ export default function DocumentBrowser({
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   selectedCategory === cat
-                    ? "bg-[var(--accent-strong)] text-white"
+                    ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                     : "border border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
                 }`}
               >
@@ -222,7 +222,7 @@ export default function DocumentBrowser({
           <button
             type="button"
             onClick={() => setFetchKey((k) => k + 1)}
-            className="mt-2 text-xs font-medium text-red-600 underline"
+            className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-700 underline"
           >
             Retry
           </button>
@@ -286,13 +286,13 @@ function CategorySection({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 text-left"
+        className="flex min-h-11 w-full items-center gap-3 text-left"
       >
         <span aria-hidden="true" className="text-2xl">{icon}</span>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-lg text-[var(--ink-strong)]">{label}</h2>
-            <span className="rounded-full bg-[var(--accent-strong)] px-2.5 py-0.5 text-xs font-semibold text-white">
+            <span className="rounded-full bg-[var(--accent-strong)] px-2.5 py-0.5 text-xs font-semibold text-[var(--on-accent)]">
               {count}
             </span>
           </div>

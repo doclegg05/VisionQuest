@@ -137,7 +137,7 @@ export function ActionCard({
                   }, 1200);
                 }
               }}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--accent-strong)] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-95"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--accent-strong)] px-4 text-sm font-semibold text-[var(--on-accent)] transition-opacity hover:opacity-95"
             >
               {working ? (
                 <SpinnerGap size={16} weight="bold" className="animate-spin" aria-hidden="true" />

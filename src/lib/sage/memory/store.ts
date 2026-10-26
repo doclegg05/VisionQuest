@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+import { isDemoLocalOnlyRequired } from "@/lib/ai/demo-local-only";
 /**
  * Shared write path for every Sage memory producer.
  *
@@ -23,8 +25,10 @@
  */
 
 import { prisma } from "@/lib/db";
-import { embedTexts, toVectorLiteral } from "@/lib/ai/embeddings";
-import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
+import { embedTextsWithModel, toVectorLiteral } from "@/lib/ai/embeddings";
+import { TokenVault, type IdentityInput } from "@/lib/ai/deidentify";
+import { DEIDENTIFY_ALLOWLIST } from "@/lib/ai/deidentify-allowlist";
+import { loadIdentityInput } from "@/lib/ai/identity";
 import { sourceHashFor, type MemoryCandidate } from "./schema";
 
 /**
@@ -104,6 +108,8 @@ export interface StoreMemoriesResult {
 }
 
 export interface StoreMemoriesOptions {
+  /** Durable job writes share the transaction that locks their lease. */
+  transaction?: Prisma.TransactionClient;
   /** Attribution for the embedding call's token accounting. */
   usage: { studentId: string; callSite: string };
   /**
@@ -111,6 +117,50 @@ export interface StoreMemoriesOptions {
    * candidates want this; deterministic templates do not — see module header.
    */
   semanticDedupe: boolean;
+}
+
+/**
+ * Substitute identifiers out of a candidate's content BEFORE it is stored.
+ *
+ * This is not the provider decorator and it is not reversible. A memory row is
+ * replayed into every future prompt for that subject, on whichever provider is
+ * configured that day, so the only way its contents can be governed is to
+ * govern what goes IN. There is deliberately no vault at read time: the row
+ * keeps `[STUDENT_NAME]` / `[EMAIL_1]` / `[PHONE_1]` / `[DOB_1]` /
+ * `[ADDRESS_1]` for good (FERPA review memo B §2.c.4).
+ *
+ * What it does NOT catch, and cannot: a third party the student names in
+ * passing ("my son Jayden", "my caseworker Brenda"). The app knows every name
+ * in the cohort and nothing else; memo B §2.b records this as the residual,
+ * and `store.deidentify.test.ts` pins the leak so closing it later is a
+ * deliberate change rather than an accident.
+ *
+ * Fail-open: memory is best-effort everywhere in this module, and a failed
+ * identity lookup must not cost a student their memory. It degrades to the
+ * free-text families alone, which are what a student typed and the reason
+ * this pass exists.
+ */
+async function pseudonymizeCandidates(
+  candidates: MemoryCandidate[],
+  actingStudentId: string,
+): Promise<MemoryCandidate[]> {
+  let identity: IdentityInput = {};
+  try {
+    identity = await loadIdentityInput({ studentId: actingStudentId });
+  } catch {
+    // Deliberately silent: a useful log payload here would have to carry a
+    // student identifier, which the no-PII-in-logs rule forbids.
+  }
+  // freeText is on even for an empty identity — a phone number a student
+  // typed is exactly what this pass is for, and needs no identity to find.
+  const vault = TokenVault.fromIdentity(identity, {
+    freeText: true,
+    allowlist: DEIDENTIFY_ALLOWLIST,
+  });
+  return candidates.map((candidate) => ({
+    ...candidate,
+    content: vault.pseudonymize(candidate.content),
+  }));
 }
 
 /**
@@ -122,19 +172,26 @@ export interface StoreMemoriesOptions {
  * (it never is, in practice — memory is best-effort everywhere).
  */
 export async function storeMemoryCandidates(
-  candidates: MemoryCandidate[],
-  { usage, semanticDedupe }: StoreMemoriesOptions,
+  rawCandidates: MemoryCandidate[],
+  { usage, semanticDedupe, transaction }: StoreMemoriesOptions,
 ): Promise<StoreMemoriesResult> {
-  if (candidates.length === 0) return { stored: 0, deduped: 0 };
+  if (rawCandidates.length === 0) return { stored: 0, deduped: 0 };
 
-  const { subjectType, subjectId } = candidates[0];
-  if (candidates.some((c) => c.subjectType !== subjectType || c.subjectId !== subjectId)) {
+  const { subjectType, subjectId } = rawCandidates[0];
+  if (rawCandidates.some((c) => c.subjectType !== subjectType || c.subjectId !== subjectId)) {
     throw new Error("storeMemoryCandidates requires every candidate to share one subject");
   }
 
-  return withSubjectLock(subjectId, async () => {
+  // De-identify BEFORE the lock, the hash, the embedding and the insert, so
+  // the stored row, its source hash and its vector all describe the same
+  // text — and so a network hiccup on the identity lookup does not happen
+  // while a subject lock is held.
+  const candidates = await pseudonymizeCandidates(rawCandidates, usage.studentId);
+
+  const writer = transaction ?? prisma;
+  const write = async () => {
     const hashes = candidates.map((candidate) => sourceHashFor(candidate));
-    const existing = await prisma.sageMemory.findMany({
+    const existing = await writer.sageMemory.findMany({
       where: {
         subjectType,
         subjectId,
@@ -145,28 +202,39 @@ export async function storeMemoryCandidates(
     });
     const existingHashes = new Set(existing.map((row) => row.sourceHash));
 
-    const fresh = candidates.filter((_, i) => !existingHashes.has(hashes[i]));
+    const fresh = candidates.filter((_, i) => {
+      if (existingHashes.has(hashes[i])) return false;
+      existingHashes.add(hashes[i]);
+      return true;
+    });
     let deduped = candidates.length - fresh.length;
     if (fresh.length === 0) return { stored: 0, deduped };
 
-    const vectors = await embedTexts(
+    // What the embedding carries: a teacher's own memory is staff-entered;
+    // every other subject (student, class, program) is written from a
+    // student's chat and is a student record. Both are local-only
+    // sensitivities, so under ai_cloud_policy=local_only neither reaches a
+    // cloud embeddings API — declared here rather than inferred by the
+    // facade, so the write path cannot drift to "system" unnoticed.
+    const sensitivity = subjectType === "teacher" ? "staff_entered" : "student_record";
+    const lexicalOnly = isDemoLocalOnlyRequired();
+    const { vectors, model: activeModel } = lexicalOnly ? { vectors: [] as number[][], model: null } : await embedTextsWithModel(
       fresh.map((candidate) => candidate.content),
-      { taskType: "RETRIEVAL_DOCUMENT", usage },
+      { taskType: "RETRIEVAL_DOCUMENT", usage: { ...usage, sensitivity } },
     );
-    // Provenance for the memory guard: same-model invariant as embedTexts above.
-    const activeModel = await getActiveEmbeddingModel();
+    // Preserve the producing model even if configuration changes in flight.
     const dupDistance = getDupDistance();
 
     let stored = 0;
     const insertedVectors: number[][] = [];
     for (let i = 0; i < fresh.length; i++) {
       const candidate = fresh[i];
-      const vectorLiteral = toVectorLiteral(vectors[i]);
+      const vectorLiteral = lexicalOnly ? null : toVectorLiteral(vectors[i]);
 
-      if (semanticDedupe) {
+      if (semanticDedupe && !lexicalOnly) {
         // Layer 2: rephrased versions of facts already in the DB (the hash
         // layer only catches near-verbatim restatements).
-        const semanticDup = await prisma.$queryRaw<{ id: string }[]>`
+        const semanticDup = await writer.$queryRaw<{ id: string }[]>`
           SELECT id FROM "visionquest"."SageMemory"
           WHERE "subjectType" = ${candidate.subjectType}
             AND "subjectId" = ${candidate.subjectId}
@@ -189,8 +257,9 @@ export async function storeMemoryCandidates(
         }
       }
 
+      if (transaction) await transaction.$executeRaw`SAVEPOINT memory_candidate`;
       try {
-        const row = await prisma.sageMemory.create({
+        const row = await writer.sageMemory.create({
           data: {
             subjectType: candidate.subjectType,
             subjectId: candidate.subjectId,
@@ -204,16 +273,21 @@ export async function storeMemoryCandidates(
           },
           select: { id: true },
         });
-        await prisma.$executeRaw`
+        if (!lexicalOnly) await writer.$executeRaw`
           UPDATE "visionquest"."SageMemory"
           SET embedding = ${vectorLiteral}::vector(768),
               "embeddingModel" = ${activeModel}
           WHERE id = ${row.id}
         `;
-        insertedVectors.push(vectors[i]);
+        if (!lexicalOnly) insertedVectors.push(vectors[i]);
         stored++;
+        if (transaction) await transaction.$executeRaw`RELEASE SAVEPOINT memory_candidate`;
       } catch (error) {
         if (isUniqueViolation(error)) {
+          if (transaction) {
+            await transaction.$executeRaw`ROLLBACK TO SAVEPOINT memory_candidate`;
+            await transaction.$executeRaw`RELEASE SAVEPOINT memory_candidate`;
+          }
           deduped++; // raced with a concurrent write — index did its job
         } else {
           throw error;
@@ -222,5 +296,10 @@ export async function storeMemoryCandidates(
     }
 
     return { stored, deduped };
-  });
+  };
+  if (transaction) {
+    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${subjectId})::bigint)`;
+    return write();
+  }
+  return withSubjectLock(subjectId, write);
 }

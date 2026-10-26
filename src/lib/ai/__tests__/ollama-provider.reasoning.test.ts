@@ -14,9 +14,11 @@
  *      what let this ship unnoticed.
  *
  * Endpoint-specific detail these tests lock in: the disable knob differs per
- * API surface, and each surface silently ignores the other's. Verified
- * against Ollama 0.32.4 — `/v1/chat/completions` honors only
- * `reasoning_effort: "none"`, `/api/chat` honors only `think: false`.
+ * API surface, and each surface silently ignores the other's (Ollama 0.32.4:
+ * `/v1/chat/completions` honors only `reasoning_effort`, `/api/chat` only
+ * `think`). Ollama endpoints use native /api/chat only, so their knob is
+ * `think: false`. The /v1 cases below use an `apiStyle: "openai"` server,
+ * the only kind that still talks to /v1.
  */
 import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -42,18 +44,18 @@ function bodyOf(callIndex: number): Record<string, unknown> {
   );
 }
 
-/** First call 404s the OpenAI path so the provider falls through to native. */
-function nativeAfter404(nativeResponse: () => Response): void {
-  let calls = 0;
-  mockFetch.mock.mockImplementation(async () => {
-    calls += 1;
-    if (calls === 1) return new Response("Not Found", { status: 404 });
-    return nativeResponse();
-  });
+function respondWith(response: () => Response): void {
+  mockFetch.mock.mockImplementation(async () => response());
+}
+
+function nativeStreamOf(lines: string[]): Response {
+  return new Response(streamOf(lines.map((line) => `${line}\n`)), { status: 200 });
 }
 
 describe("OllamaProvider thinking models", { concurrency: false }, () => {
   let provider: OllamaProvider;
+  /** A generic OpenAI-compatible server: the only kind still sent to /v1. */
+  let openAiProvider: OllamaProvider;
 
   beforeEach(() => {
     mockFetch.mock.resetCalls();
@@ -61,66 +63,50 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
       throw new Error("Unexpected fetch call in OllamaProvider test");
     });
     provider = new OllamaProvider("http://localhost:11434", "gemma4:26b-a4b-it-qat");
+    openAiProvider = new OllamaProvider("http://localhost:1234", "some-model", {
+      authMode: "none",
+      apiStyle: "openai",
+    });
   });
 
   describe("reasoning disabled by default", () => {
-    it("sends reasoning_effort:none on the OpenAI-compat path", async () => {
-      mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ choices: [{ message: { content: "ok" } }] }),
-      );
-
-      await provider.generateResponse("sys", [{ role: "user", content: "Hi" }]);
-
-      assert.equal(bodyOf(0).reasoning_effort, "none");
-    });
-
     it("sends think:false on the native path", async () => {
-      nativeAfter404(() => Response.json({ message: { content: "ok" } }));
+      respondWith(() => Response.json({ message: { content: "ok" } }));
 
       await provider.generateResponse("sys", [{ role: "user", content: "Hi" }]);
 
-      assert.equal(bodyOf(1).think, false);
+      assert.equal(bodyOf(0).think, false);
     });
 
     it("disables reasoning for structured JSON generation", async () => {
-      mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ choices: [{ message: { content: "{}" } }] }),
-      );
+      respondWith(() => Response.json({ message: { content: "{}" } }));
 
       await provider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]);
 
-      assert.equal(bodyOf(0).reasoning_effort, "none");
+      assert.equal(bodyOf(0).think, false);
     });
 
     it("disables reasoning for streaming", async () => {
-      mockFetch.mock.mockImplementationOnce(
-        async () =>
-          new Response(
-            streamOf([
-              `data: ${JSON.stringify({ choices: [{ delta: { content: "hi" } }] })}\n\n`,
-              "data: [DONE]\n\n",
-            ]),
-            { status: 200 },
-          ),
+      respondWith(() =>
+        nativeStreamOf([
+          JSON.stringify({ message: { content: "hi" }, done: false }),
+          JSON.stringify({ message: { content: "" }, done: true, done_reason: "stop" }),
+        ]),
       );
 
       for await (const _ of provider.streamResponse("sys", [{ role: "user", content: "Hi" }])) {
         // drain
       }
 
-      assert.equal(bodyOf(0).reasoning_effort, "none");
+      assert.equal(bodyOf(0).think, false);
     });
 
     it("disables reasoning for tool streaming", async () => {
-      mockFetch.mock.mockImplementationOnce(
-        async () =>
-          new Response(
-            streamOf([
-              `data: ${JSON.stringify({ choices: [{ delta: { content: "hi" } }] })}\n\n`,
-              "data: [DONE]\n\n",
-            ]),
-            { status: 200 },
-          ),
+      respondWith(() =>
+        nativeStreamOf([
+          JSON.stringify({ message: { content: "hi" }, done: false }),
+          JSON.stringify({ message: { content: "" }, done: true, done_reason: "stop" }),
+        ]),
       );
 
       const tools = [
@@ -139,37 +125,22 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
         // drain
       }
 
-      assert.equal(bodyOf(0).reasoning_effort, "none");
+      assert.equal(bodyOf(0).think, false);
     });
   });
 
   describe("reasoning opt-in", () => {
-    it("omits reasoning_effort on the OpenAI path when reasoning is enabled", async () => {
-      const reasoningProvider = new OllamaProvider(
-        "http://localhost:11434",
-        "gemma4:26b-a4b-it-qat",
-        { authMode: "none", reasoning: true },
-      );
-      mockFetch.mock.mockImplementationOnce(async () =>
-        Response.json({ choices: [{ message: { content: "ok" } }] }),
-      );
-
-      await reasoningProvider.generateResponse("sys", [{ role: "user", content: "Hi" }]);
-
-      assert.equal("reasoning_effort" in bodyOf(0), false);
-    });
-
     it("sends think:true on the native path when reasoning is enabled", async () => {
       const reasoningProvider = new OllamaProvider(
         "http://localhost:11434",
         "gemma4:26b-a4b-it-qat",
         { authMode: "none", reasoning: true },
       );
-      nativeAfter404(() => Response.json({ message: { content: "ok" } }));
+      respondWith(() => Response.json({ message: { content: "ok" } }));
 
       await reasoningProvider.generateResponse("sys", [{ role: "user", content: "Hi" }]);
 
-      assert.equal(bodyOf(1).think, true);
+      assert.equal(bodyOf(0).think, true);
     });
 
     /**
@@ -210,13 +181,13 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
       );
 
       await assert.rejects(
-        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        openAiProvider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
         /reasoning/i,
       );
     });
 
     it("generateResponse throws on the native path", async () => {
-      nativeAfter404(() =>
+      respondWith(() =>
         Response.json({
           message: { content: "", thinking: "thinking about it".repeat(80) },
           done: true,
@@ -242,7 +213,7 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
       );
 
       await assert.rejects(
-        provider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]),
+        openAiProvider.generateStructuredResponse("sys", [{ role: "user", content: "Hi" }]),
         /reasoning/i,
       );
     });
@@ -260,7 +231,7 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
         }),
       );
 
-      const result = await provider.generateResponse("sys", [
+      const result = await openAiProvider.generateResponse("sys", [
         { role: "user", content: "Hi" },
       ]);
 
@@ -282,7 +253,7 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
       );
 
       await assert.rejects(
-        provider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
+        openAiProvider.generateResponse("sys", [{ role: "user", content: "Hi" }]),
         (error: Error) => {
           assert.doesNotMatch(error.message, /reasoning/i);
           return true;
@@ -293,7 +264,7 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
 
   describe("streaming a reasoning-only turn", () => {
     it("reports the reasoning budget, not a generic empty stream", async () => {
-      nativeAfter404(
+      respondWith(
         () =>
           new Response(
             streamOf([
@@ -320,7 +291,7 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
     });
 
     it("still yields visible content when reasoning precedes it", async () => {
-      nativeAfter404(
+      respondWith(
         () =>
           new Response(
             streamOf([
@@ -349,7 +320,7 @@ describe("OllamaProvider thinking models", { concurrency: false }, () => {
      * exactly what the eval `neverContain` canaries exist to keep out.
      */
     it("never yields reasoning text as reply content", async () => {
-      nativeAfter404(
+      respondWith(
         () =>
           new Response(
             streamOf([

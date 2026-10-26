@@ -85,23 +85,23 @@ function VerifyContent() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-600 border-t-transparent" />
-        <p className="mt-4 text-sm font-semibold text-slate-700">Checking this document...</p>
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-info border-t-transparent" />
+        <p className="mt-4 text-sm font-semibold text-ink-strong">Checking this document...</p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-lg rounded-2xl border-2 border-red-200 bg-red-50/60 p-8 text-center shadow-lg">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+      <div className="mx-auto max-w-lg rounded-2xl border-2 border-danger bg-danger-soft p-8 text-center shadow-lg">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft text-danger">
           <Warning size={32} weight="bold" />
         </div>
-        <h2 className="mt-4 text-xl font-bold text-slate-900">We could not verify this document</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-4 text-xl font-bold text-ink-strong">We could not verify this document</h2>
+        <p className="mt-2 text-sm text-ink-muted">
           {error || "This document could not be matched to a SPOKES record."}
         </p>
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-4 text-xs text-ink-muted">
           To confirm a document by hand, contact the SPOKES program office.
         </p>
       </div>
@@ -109,47 +109,47 @@ function VerifyContent() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl border-2 border-emerald-300 bg-white shadow-2xl">
+    <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl border-2 border-success bg-white shadow-2xl">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-teal-800 via-sky-800 to-indigo-900 px-8 py-8 text-white">
+      <div className="bg-brand-deep px-8 py-8 text-on-brand-deep">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-md">
-            <ShieldCheck size={32} weight="fill" className="text-emerald-300" />
+            <ShieldCheck size={32} weight="fill" className="text-success" />
           </div>
           <div>
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/30 bg-emerald-400/20 px-3 py-0.5 text-xs font-bold uppercase tracking-wider text-emerald-300 backdrop-blur-sm">
+            <span className="inline-flex items-center gap-1 rounded-full border border-success bg-success px-3 py-0.5 text-xs font-bold uppercase tracking-wider text-success backdrop-blur-sm">
               <CheckCircle size={14} weight="fill" /> Issued by this program
             </span>
             <h1 className="mt-1 text-2xl font-extrabold tracking-tight">Document Verification</h1>
           </div>
         </div>
-        <p className="mt-2 text-xs text-sky-200">{data.issuingAgency}</p>
+        <p className="mt-2 text-xs text-info">{data.issuingAgency}</p>
       </div>
 
       {/* Main Details */}
       <div className="space-y-6 p-8">
-        <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-5">
+        <div className="rounded-2xl border-2 border-success bg-success-soft p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+              <span className="text-xs font-bold uppercase tracking-wider text-success">
                 What we checked
               </span>
-              <h2 className="text-lg font-extrabold text-slate-900">{data.documentType}</h2>
-              <p className="mt-1 text-sm text-slate-700">
+              <h2 className="text-lg font-extrabold text-ink-strong">{data.documentType}</h2>
+              <p className="mt-1 text-sm text-ink-strong">
                 This program issued this document and still holds the record for it.
               </p>
             </div>
-            <span className="rounded-xl border border-emerald-300 bg-emerald-600 px-3.5 py-1 text-xs font-bold uppercase text-white shadow-sm">
+            <span className="rounded-xl border border-success bg-success px-3.5 py-1 text-xs font-bold uppercase text-on-success shadow-sm">
               Verified
             </span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+        <div className="rounded-xl border border-line bg-surface-muted p-4 text-sm">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ink-muted">
             <FileText size={16} weight="bold" /> Date issued
           </div>
-          <p className="mt-1.5 text-base font-bold text-slate-900">
+          <p className="mt-1.5 text-base font-bold text-ink-strong">
             {new Date(data.issuedAt).toLocaleDateString("en-US", {
               month: "long",
               day: "numeric",
@@ -161,14 +161,14 @@ function VerifyContent() {
         {/* Document fingerprint. Rendered only when we actually hold one — an
             empty seal is the failure mode this page was rewritten to remove. */}
         {data.documentDigest && (
-          <div className="rounded-xl border border-slate-200 bg-slate-900 p-4 text-white">
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+          <div className="rounded-xl border border-line bg-surface-muted p-4 text-ink-strong">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-success">
               <Fingerprint size={16} weight="bold" /> Document fingerprint (SHA-256)
             </p>
-            <p className="mt-1.5 select-all break-all font-mono text-xs text-slate-300">
+            <p className="mt-1.5 select-all break-all font-mono text-xs text-ink-faint">
               {data.documentDigest}
             </p>
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+            <p className="mt-2 text-xs leading-relaxed text-ink-faint">
               This is the SHA-256 fingerprint of the PDF file this program issued. It matches the
               fingerprint printed on the document. If the two differ, the file you have is not the
               one we issued.
@@ -177,8 +177,8 @@ function VerifyContent() {
         )}
 
         {/* What this page does not tell you */}
-        <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-xs leading-relaxed text-slate-600">
-          <p className="font-bold uppercase tracking-wider text-sky-800">Scope of this check</p>
+        <div className="rounded-xl border border-info bg-info-soft p-4 text-xs leading-relaxed text-ink-muted">
+          <p className="font-bold uppercase tracking-wider text-info">Scope of this check</p>
           <p className="mt-1.5">
             This page confirms the document, not the person. It does not report anyone&rsquo;s name,
             enrollment or program status. Staff who need those details sign in to the SPOKES portal,
@@ -186,7 +186,7 @@ function VerifyContent() {
           </p>
         </div>
 
-        <div className="border-t border-slate-200 pt-4 text-center text-[11px] leading-relaxed text-slate-500">
+        <div className="border-t border-line pt-4 text-center text-xs leading-relaxed text-ink-muted">
           <p>Electronic signature record maintained pursuant to the {data.legalStandard}.</p>
         </div>
       </div>
@@ -196,7 +196,7 @@ function VerifyContent() {
 
 export default function DocumentVerificationPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200 px-4 py-12 sm:px-6">
+    <div className="min-h-screen bg-gradient-to-b from-surface-muted to-surface-muted px-4 py-12 sm:px-6">
       <Suspense fallback={<div className="py-20 text-center">Loading verification details...</div>}>
         <VerifyContent />
       </Suspense>

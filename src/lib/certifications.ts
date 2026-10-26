@@ -1,3 +1,53 @@
+/**
+ * The certType every Certification row was hardcoded to before D7
+ * (2026-09-07, src/app/api/certifications/route.ts) — still the default
+ * when the create path is given no catalog certId.
+ */
+export const READY_TO_WORK_CERT_TYPE = "ready-to-work";
+
+/**
+ * The Ready-to-Work credential family: the legacy default certType plus
+ * every catalog id (src/lib/spokes/certifications.ts) that goal links use
+ * to reference the same underlying "Ready to Work" certification, so a
+ * Certification row created under ANY of these ids is still found by a
+ * reader looking for "the student's Ready-to-Work certification."
+ *
+ * "workkeys-ncrc" (ACT WorkKeys NCRC) is the only catalog entry that has
+ * denoted this certificate track — see the soft-match fallback comment in
+ * src/lib/goal-evidence.ts, which this constant now backs, for the legacy
+ * (pre-D7) rows it still needs to cover.
+ */
+export const READY_TO_WORK_FAMILY_CERT_TYPES: readonly string[] = [
+  READY_TO_WORK_CERT_TYPE,
+  "workkeys-ncrc",
+];
+
+/**
+ * Whether a class requirement for certification `itemId` is satisfied by
+ * the certTypes of a student's completed Certification rows. An exact
+ * certType match counts first. A Ready to Work requirement
+ * (READY_TO_WORK_CERT_TYPE) is also met by a completed row under any
+ * family certType, because every family row holds the Ready to Work
+ * checklist whatever its label.
+ *
+ * Every other requirement, "workkeys-ncrc" included, is exact-match only.
+ * Owner decision 2026-10-15: finishing the Ready to Work checklist is not
+ * evidence of passing the WorkKeys NCRC exam, which the program treats as a
+ * separate prerequisite. This deliberately differs from the goal-evidence
+ * soft match (src/lib/goal-evidence.ts), where a "workkeys-ncrc" goal link
+ * falls back to the "ready-to-work" row.
+ */
+export function isCertificationRequirementMet(
+  itemId: string,
+  completedCertTypes: ReadonlySet<string>,
+): boolean {
+  if (completedCertTypes.has(itemId)) return true;
+  return (
+    itemId === READY_TO_WORK_CERT_TYPE &&
+    READY_TO_WORK_FAMILY_CERT_TYPES.some((certType) => completedCertTypes.has(certType))
+  );
+}
+
 export interface CertificationTemplateRule {
   id: string;
   required: boolean;

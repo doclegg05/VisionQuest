@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateStorageKey, uploadFile, validateFile } from "@/lib/storage";
+import { validateUploadContent } from "@/lib/file-security";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { ApiError, withAuth, badRequest, rateLimited } from "@/lib/api-error";
 import { hasActiveConsent } from "@/lib/consent";
@@ -8,6 +10,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { buildFileGist } from "@/lib/sage/file-gist";
 import { ensureClassification } from "@/lib/sage/attachment-classify";
 import { logAiAuditEvent } from "@/lib/ai/audit";
+import { safeUploadName } from "@/lib/upload-name";
 
 /**
  * POST /api/chat/upload — hand Sage a file in chat (Phase 3).
@@ -26,18 +29,26 @@ export const POST = withAuth(async (session, req: Request) => {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
 
-  if (!file) throw badRequest("No file provided");
+  if (!(file instanceof File)) throw badRequest("No file provided");
 
   const validationError = validateFile({ size: file.size, type: file.type });
   if (validationError) throw badRequest(validationError);
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const storageKey = generateStorageKey(session.id, file.name);
+  const contentError = validateUploadContent(buffer, file.type);
+  if (contentError) throw badRequest(contentError);
+  // `File.name` is student-controlled and undici preserves it verbatim, so the
+  // stored name must be a name and not a path — the retention archive turns
+  // this column into a ZIP entry path. The gist sees the same sanitized name,
+  // so the prompt and the stored row never disagree about what the file is
+  // called.
+  const filename = safeUploadName(file.name);
+  const storageKey = generateStorageKey(session.id, filename);
 
   try {
     await uploadFile(storageKey, buffer, file.type);
   } catch (err) {
-    logger.error("Chat file upload failed", { error: String(err) });
+    logger.error("Chat file upload failed", { error: errorForLog(err) });
     throw new ApiError(500, "Failed to upload file to storage");
   }
 
@@ -46,7 +57,7 @@ export const POST = withAuth(async (session, req: Request) => {
 
   const { gist, method } = await buildFileGist({
     buffer,
-    filename: file.name,
+    filename,
     mimeType: file.type,
     studentId: session.id,
     cloudAllowed,
@@ -55,7 +66,7 @@ export const POST = withAuth(async (session, req: Request) => {
   const record = await prisma.fileUpload.create({
     data: {
       studentId: session.id,
-      filename: file.name,
+      filename,
       mimeType: file.type,
       sizeBytes: file.size,
       storageKey,
@@ -75,7 +86,7 @@ export const POST = withAuth(async (session, req: Request) => {
     cloudAllowed: false,
     buffer,
   }).catch((err) => {
-    logger.warn("Upload baseline classification failed", { error: String(err) });
+    logger.warn("Upload baseline classification failed", { error: errorForLog(err) });
   });
 
   await logAiAuditEvent({
@@ -100,6 +111,6 @@ export const POST = withAuth(async (session, req: Request) => {
 
   return NextResponse.json({
     success: true,
-    data: { fileUploadId: record.id, filename: file.name, gist, gistMethod: method },
+    data: { fileUploadId: record.id, filename, gist, gistMethod: method },
   });
 });

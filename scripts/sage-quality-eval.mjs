@@ -27,7 +27,7 @@
 
 import { readFileSync } from "node:fs";
 import { loadEnvFile } from "./lib/sage-rag-utils.mjs";
-import { resolveEvalProvider } from "./lib/sage-eval-provider.mjs";
+import { isEvalAbort, resolveEvalProvider, reportEvalFailure } from "./lib/sage-eval-provider.mjs";
 import { buildQualityEvalPrompt } from "./lib/sage-quality-eval-prompt.mjs";
 
 loadEnvFile();
@@ -118,6 +118,9 @@ async function main() {
       );
       reply = await provider.generateResponse(systemPrompt, [{ role: "user", content: scenario.message }]);
     } catch (err) {
+      // Nothing can be evaluated (credits, key, or model unavailable): stop the
+      // whole run with its not-run exit code instead of grading this case.
+      if (isEvalAbort(err)) throw err;
       console.log(`  ?? ${scenario.id}: Sage call failed — ${err.message}`);
       continue;
     }
@@ -183,6 +186,12 @@ async function main() {
 
   console.log(`\n=== Sage Quality Eval ===`);
   console.log(`Replies generated: ${replied}/${SCENARIOS.length}`);
+  // With no reply there is nothing to report, and exit 0 would read as one.
+  if (replied === 0) {
+    console.error("::error::No scenario produced a reply — quality eval has nothing to report.");
+    process.exitCode = 1;
+    return;
+  }
   if (gradeCount > 0) {
     console.log(
       `Reading level (Flesch-Kincaid): avg ${(gradeSum / gradeCount).toFixed(1)}; ` +
@@ -206,7 +215,4 @@ async function main() {
   console.log(passRate >= 0.7 ? `\nPASS-level quality (informational).` : `\nREVIEW: pass rate below 70% — inspect the low scorers above.`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main().catch(reportEvalFailure);

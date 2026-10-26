@@ -410,3 +410,40 @@ changes in [MATURITY_REVIEW.md](./MATURITY_REVIEW.md)):
   DSAR self-serve export deliberately deferred until their manual loops are proven
   (Step 5 Automation Readiness Test). Retention durations await OWNER-CONFIRM in
   [DATA_RETENTION_POLICY.md](./DATA_RETENTION_POLICY.md).
+
+
+## 2026-10-08 — Local model simplification (implementation prepared locally)
+
+Owner requested EmbeddingGemma 2 inside VisionQuest and Gemma 4 12B as the only
+local conversational model choice, limited to VisionQuest. All local generative
+roles are pinned to `gemma4:12b`; existing downloaded host models remain intact.
+EmbeddingGemma 2 serves the separate search/embedding role through a local bridge.
+Cloud policy and selection remain unchanged. Local synthetic integration is verified;
+production deployment, secured connectivity, and index migration are separate steps.
+See [installation and activation runbook](./runbooks/embeddinggemma-2-local.md).
+
+## 2026-10-19: Cohort demo mode suspends "accounts are created by staff"
+
+Owner-approved (Britt, 2026-10-19). From the day the switch is set until Dec 18, 2026,
+the end of the AI Leadership Academy course, `COHORT_DEMO_MODE=true` lets anyone with the
+link into VisionQuest without an account made by staff. This suspends the rule that staff
+create every account (see the Google callback in `src/app/api/auth/google/callback/route.ts`).
+It does not repeal it.
+
+- **Mock data only.** Every record on the live site is mock. The six real student accounts
+  were deleted on 2026-10-15. If real student records are ever added while the switch is
+  on, turn it off first.
+- **Two entries.** A visitor can start a new mock student (a made-up name, in the "Cohort Demo
+  Class", on day one) or sign in to one shared demo instructor. Demo accounts have no password,
+  email or phone, and cannot set any.
+- **Demo instructor.** It sees only the demo class and its students, can read program-wide
+  content, and cannot change it. It can add notes and do the other routine work on demo
+  students.
+- **Nothing leaves the app.** No email or text message is sent by, for or about a demo account.
+- **Limits.** New demo students are capped per network, per hour and per day, and Sage use is
+  capped across all demo accounts. The numbers are in [DEPLOY.md](../DEPLOY.md#cohort-demo-mode).
+- **Ending it.** Delete `COHORT_DEMO_MODE` in Render after Dec 18, 2026. The sign-in page goes
+  back to the normal form, and the rule that staff create accounts applies again with no
+  code change. Demo rows stay in the database until a separate cleanup.
+
+Design: [2026-10-19-cohort-demo-access-design.md](./superpowers/specs/2026-10-19-cohort-demo-access-design.md).

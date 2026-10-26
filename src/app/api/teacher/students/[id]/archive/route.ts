@@ -4,14 +4,16 @@ import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { tryLogAuditEvent } from "@/lib/audit";
 import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { generateStudentArchive } from "@/lib/student-archive";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unknown) => {
-  const { id: studentId } = await (ctx as RouteContext).params;
-  const student = await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier } = await (ctx as RouteContext).params;
+  const student = await assertStaffCanManageStudent(session, identifier);
+  const studentId = student.id;
 
   try {
     const { storageKey, fileCount } = await generateStudentArchive(
@@ -36,7 +38,7 @@ export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unkn
   } catch (error) {
     logger.error("Archive generation failed", {
       student: studentLogKey(studentId),
-      error: String(error),
+      error: errorForLog(error),
     });
     return NextResponse.json(
       { error: "Failed to generate archive. Please try again." },
@@ -46,8 +48,8 @@ export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unkn
 });
 
 export const GET = withTeacherAuth(async (session, req: NextRequest, ctx: unknown) => {
-  const { id: studentId } = await (ctx as RouteContext).params;
-  await assertStaffCanManageStudent(session, studentId);
+  const { id: identifier } = await (ctx as RouteContext).params;
+  const { id: studentId } = await assertStaffCanManageStudent(session, identifier);
 
   const url = new URL(req.url);
   const storageKey = url.searchParams.get("key");

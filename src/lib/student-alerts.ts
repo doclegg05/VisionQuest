@@ -15,16 +15,33 @@ import { prisma } from "@/lib/db";
 
 /**
  * Alert types a student may see. An allowlist, not a denylist: a new alert
- * type is staff-only until it is added here. These two are the follow-ups the
+ * type is staff-only until it is added here. These are the follow-ups the
  * Advising page shows next to the student's own tasks and appointments, and
  * the only types whose title and summary are written for the student to read.
+ *
+ * `connect_weekly_jobs_ready` (Match & Connect Phase 5) is the third and is
+ * the only one a student ever asks for: it is written when they text Y back to
+ * the Monday jobs nudge, so hiding it would answer a question they asked with
+ * silence. Its wording is grade-6 and points at /career. The other four types
+ * that phase raises — the two employer-side ones, the interview-unconfirmed
+ * one and the retention-lost one — are instructor triage and stay out.
  */
-export const STUDENT_VISIBLE_ALERT_TYPES = ["overdue_task", "missed_appointment"] as const;
+export const STUDENT_VISIBLE_ALERT_TYPES = [
+  "overdue_task",
+  "missed_appointment",
+  "connect_weekly_jobs_ready",
+] as const;
 
 export type StudentVisibleAlertType = (typeof STUDENT_VISIBLE_ALERT_TYPES)[number];
 
 export interface StudentVisibleAlert {
   id: string;
+  /**
+   * The alert type, so a surface can render a POSITIVE one differently. The
+   * Advising page shows `connect_weekly_jobs_ready` as an answer with a link
+   * rather than as a triage card with a severity chip.
+   */
+  type: string;
   severity: string;
   title: string;
   summary: string;
@@ -45,6 +62,7 @@ export async function listStudentVisibleAlerts(studentId: string): Promise<Stude
     where: studentVisibleAlertWhere(studentId),
     select: {
       id: true,
+      type: true,
       severity: true,
       title: true,
       summary: true,
@@ -57,4 +75,22 @@ export async function listStudentVisibleAlerts(studentId: string): Promise<Stude
 /** How many of those alerts are open, for the Home rail and the next-step engine. */
 export async function countStudentVisibleAlerts(studentId: string): Promise<number> {
   return prisma.studentAlert.count({ where: studentVisibleAlertWhere(studentId) });
+}
+
+/**
+ * How many of ONE allowlisted type are open.
+ *
+ * The parameter is typed to `StudentVisibleAlertType`, so this cannot become a
+ * back door for counting a staff type: asking for `wellbeing_concern` here is
+ * a compile error, not a runtime surprise. The `type.in` shape matches the
+ * queries above so every read of this table from a student surface looks the
+ * same to a reviewer.
+ */
+export async function countStudentVisibleAlertsOfType(
+  studentId: string,
+  type: StudentVisibleAlertType,
+): Promise<number> {
+  return prisma.studentAlert.count({
+    where: { studentId, status: "open", type: { in: [type] } },
+  });
 }

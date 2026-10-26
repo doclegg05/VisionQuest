@@ -15,6 +15,7 @@ import { taskQuerySchema } from "@/lib/dashboard/task-schemas";
 import { SagePanels } from "@/components/dashboard/sage/SagePanels";
 import { getLatestPanelSpec } from "@/lib/sage/panel-data";
 import styles from "@/components/dashboard/dashboard.module.css";
+import { SmsReconsentNotice } from "@/components/student/SmsReconsentNotice";
 
 /** Dashboard-first home; exactly one next-action engine, in readSupport.
  * /dashboard/classic still redirects here. Sage streaming stays in /chat.
@@ -22,11 +23,24 @@ import styles from "@/components/dashboard/dashboard.module.css";
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
-  const [goalCount, readinessData] = await Promise.all([
+  const [goalCount, readinessData, smsPreference] = await Promise.all([
     prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
     fetchStudentReadinessData(session.id),
+    // Read here, on the student's own page: DashboardClient is also mounted by
+    // the teacher's student-detail dashboard, where "your" preferences would
+    // mean the teacher's (upstream f801ed69, W4).
+    prisma.notificationPreference.findUnique({
+      where: { studentId_channel: { studentId: session.id, channel: "sms" } },
+      select: { enabled: true, smsConsentAt: true, smsRevokedAt: true },
+    }),
   ]);
   const { orientationProgress } = readinessData;
+  // Enabled but unconfirmed: the channel is on and nothing is being delivered.
+  // A revoked row is not this case; that student chose to stop.
+  const smsAwaitingConfirmation =
+    smsPreference?.enabled === true &&
+    smsPreference.smsConsentAt === null &&
+    smsPreference.smsRevokedAt === null;
   // A Progression row is created by the app's check-in; it is not evidence
   // the student has completed welcome. Preserve the recorded-fact predicate.
   if (goalCount === 0 && orientationProgress.completed === 0) {
@@ -55,11 +69,12 @@ export default async function DashboardPage() {
     readSupport(session.id, readinessData), getLatestPanelSpec(session.id),
   ]);
   return <div className={`${styles.workspace} page-shell page-shell-wide min-w-0 space-y-6`}>
+    <SmsReconsentNotice show={smsAwaitingConfirmation} />
     <header className="flex flex-wrap items-center justify-between gap-4">
       <div><h1 className="font-display text-2xl font-semibold text-[var(--ink-strong)]">Your dashboard</h1><p className="mt-1 text-[var(--ink-muted)]">Your next action, plans, and recorded progress in one place.</p></div>
       <Link href="/chat" className="secondary-button px-4 py-3">Talk to Sage</Link>
     </header>
-    {needsIntakeSignature && <section aria-label="Student profile signature" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] p-5">
+    {needsIntakeSignature && <section aria-label="Student profile signature" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-5">
       <div><h2 className="font-semibold text-[var(--ink-strong)]">Sign your student profile form</h2><p className="mt-1 text-sm text-[var(--ink-muted)]">Your class hours only count once your signed form is on file.</p></div>
       <Link href="/orientation" className="primary-button px-5 py-3">Sign my form</Link>
     </section>}
@@ -70,6 +85,6 @@ export default async function DashboardPage() {
       initialSupport={support.status === "fulfilled" ? support.value : undefined}
     />
     {sagePanel.status === "fulfilled" && sagePanel.value && <SagePanels panel={sagePanel.value} showActions />}
-    {sagePanel.status === "rejected" && <p className="text-sm text-[var(--ink-muted)]">Sage’s saved suggestions could not load. <Link className="underline" href="/chat">Open Sage</Link> or refresh this dashboard to try again.</p>}
+    {sagePanel.status === "rejected" && <p className="text-sm text-[var(--ink-muted)]">Sage’s saved suggestions could not load. <Link className="inline-flex items-center pointer-coarse:min-h-11 underline" href="/chat">Open Sage</Link> or refresh this dashboard to try again.</p>}
   </div>;
 }

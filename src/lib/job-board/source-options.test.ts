@@ -44,10 +44,20 @@ describe("job source options", () => {
     assert.equal(isValidJobSource(""), false);
   });
 
-  it("defaults to local-first sources including the WV feed", () => {
-    assert.deepEqual(DEFAULT_JOB_SOURCES, ["careeronestop", "usajobs", "adzuna"]);
+  it("defaults to local-first sources including the WV feed and Talroo, but not Adzuna", () => {
+    assert.deepEqual(DEFAULT_JOB_SOURCES, ["careeronestop", "talroo", "usajobs"]);
     for (const source of DEFAULT_JOB_SOURCES) {
       assert.equal(JOB_SOURCE_OPTIONS.find((o) => o.value === source)?.sourceMode, "local");
     }
+    // Adzuna stays selectable but off by default until the licence question
+    // in docs/plans/2026-09-04-nlx-macc-job-search-research.md is answered.
+    assert.ok(VALID_JOB_SOURCES.includes("adzuna"));
+    assert.ok(!(DEFAULT_JOB_SOURCES as readonly string[]).includes("adzuna"));
+  });
+
+  it("includes Talroo as a local, no-friction hourly-jobs source", () => {
+    const talroo = JOB_SOURCE_OPTIONS.find((source) => source.value === "talroo");
+    assert.equal(talroo?.sourceMode, "local");
+    assert.equal(talroo?.label, "Hourly jobs near you");
   });
 });

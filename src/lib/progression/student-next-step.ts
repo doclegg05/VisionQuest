@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
-import { countStudentVisibleAlerts } from "@/lib/student-alerts";
+import {
+  countStudentVisibleAlerts,
+  countStudentVisibleAlertsOfType,
+} from "@/lib/student-alerts";
 import type { ProgressionState } from "./engine";
 import {
   fetchStudentReadinessData,
@@ -57,6 +60,14 @@ export interface StudentNextStepSignals {
   savedJobCount: number;
   applicationCount: number;
   openAlertCount: number;
+  /**
+   * The subset of `openAlertCount` that is a `connect_weekly_jobs_ready` card
+   * — written when the student texts Y back to the Monday jobs nudge (Match &
+   * Connect Phase 5). It changes only WHERE the follow-up step points, never
+   * whether the step is reached: the phase ladder above still decides that, so
+   * a student who is still in orientation is not diverted to the job board.
+   */
+  jobsReadyAlertCount: number;
   openTaskCount: number;
   /**
    * Planning-status goals that are Sage proposals still awaiting instructor
@@ -236,7 +247,15 @@ export function resolveStudentNextStep(signals: StudentNextStepSignals): Student
     actionLink = "/career";
   } else {
     currentStepKey = "followUp";
-    if (hasOpenTasksOrAlerts) {
+    if (signals.jobsReadyAlertCount > 0) {
+      // The student asked for these by text. Sending them to the advising page
+      // instead would answer "show me the jobs" with a list of appointments.
+      title = "See the new jobs near you";
+      description = "You asked to see this week's new jobs. They are in the Career Hub.";
+      whyItMatters = "New jobs come and go fast. Looking early gives you a better shot.";
+      actionLabel = "See My Jobs";
+      actionLink = "/career";
+    } else if (hasOpenTasksOrAlerts) {
       title = "Resolve advising items and follow-up tasks";
       description = "Check your appointments, open alerts, and tasks from your instructor.";
       whyItMatters =
@@ -313,6 +332,7 @@ export async function getStudentNextStep(
     savedJobsCount,
     applicationsCount,
     openAlertsCount,
+    jobsReadyAlertsCount,
     openTasksCount,
   ] = await Promise.all([
     preloadedReadinessData ?? fetchStudentReadinessData(studentId),
@@ -355,6 +375,7 @@ export async function getStudentNextStep(
       where: { studentId },
     }),
     countStudentVisibleAlerts(studentId),
+    countStudentVisibleAlertsOfType(studentId, "connect_weekly_jobs_ready"),
     prisma.studentTask.count({
       where: { studentId, status: { in: ["open", "in_progress"] } },
     }),
@@ -381,6 +402,7 @@ export async function getStudentNextStep(
     savedJobCount: savedJobsCount,
     applicationCount: applicationsCount,
     openAlertCount: openAlertsCount,
+    jobsReadyAlertCount: jobsReadyAlertsCount,
     openTaskCount: openTasksCount,
   });
 }

@@ -65,7 +65,7 @@ function SignAndSubmitButton({
         <button
           onClick={() => setShowPad(true)}
           type="button"
-          className="text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
+          className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
         >
           Re-sign
         </button>
@@ -76,12 +76,13 @@ function SignAndSubmitButton({
   if (showPad) {
     return (
       <div className="mt-2">
-        {submitting && (
-          <p className="mb-2 text-xs text-[var(--ink-muted)]">Submitting signature...</p>
-        )}
+        <p role="status" aria-live="polite" className="mb-2 text-sm text-[var(--ink-muted)]">
+          {submitting ? "Saving your signature. This can take a few seconds." : ""}
+        </p>
         <SignaturePad
           onSign={handleSign}
           onCancel={() => setShowPad(false)}
+          submitting={submitting}
         />
         {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
       </div>
@@ -93,7 +94,7 @@ function SignAndSubmitButton({
       <button
         onClick={() => setShowPad(true)}
         type="button"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:bg-[rgba(15,154,146,0.12)]"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[rgba(15,154,146,0.12)]"
       >
         {currentStatus === "rejected" ? "Re-sign" : "Sign & Submit"}
       </button>
@@ -119,6 +120,10 @@ function OrientationFormCard({
   targetStudentId?: string;
 }) {
   const hasDocument = hasDownloadableFormDocument(form);
+  // The Student Profile is flagged requiresSignature but is completed in the
+  // browser (see classifyStep and formRequiresSignatureStep), so it keeps the
+  // upload action. A signature pad here would post a signature-only submission.
+  const usesSignaturePad = form.requiresSignature && form.id !== "student-profile";
 
   return (
     <div className="rounded-xl border border-[rgba(15,154,146,0.12)] bg-[rgba(15,154,146,0.06)] p-3">
@@ -129,7 +134,7 @@ function OrientationFormCard({
         </div>
         <div className="flex shrink-0 gap-1.5">
           {form.fillable && (
-            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
+            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
               Fillable
             </span>
           )}
@@ -139,7 +144,7 @@ function OrientationFormCard({
             </span>
           )}
           {form.required && (
-            <span className="rounded-full bg-[rgba(249,115,22,0.1)] px-2 py-0.5 text-xs font-semibold text-[var(--accent-strong)]">
+            <span className="rounded-full bg-[rgba(249,115,22,0.1)] px-2 py-0.5 text-xs font-semibold text-success">
               Required
             </span>
           )}
@@ -153,19 +158,19 @@ function OrientationFormCard({
               href={buildFormDownloadUrl(form, "view")}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-semibold text-[var(--accent-secondary)] transition-colors hover:opacity-80"
+              className="inline-flex min-h-11 items-center text-xs font-semibold text-info transition-colors hover:opacity-80"
             >
               Open PDF
             </a>
             <a
               href={buildFormDownloadUrl(form, "download")}
-              className="text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
+              className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)]"
             >
               Download
             </a>
           </>
         ) : (
-          <p className="text-xs text-[var(--accent-strong)]">
+          <p className="text-xs text-success">
             PDF not connected yet. You can still upload a completed copy if your class uses paper forms.
           </p>
         )}
@@ -173,7 +178,7 @@ function OrientationFormCard({
 
       {/* Submission actions */}
       <div className="mt-2">
-        {form.requiresSignature ? (
+        {usesSignaturePad ? (
           <SignAndSubmitButton
             formId={form.id}
             currentStatus={currentStatus}

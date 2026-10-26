@@ -31,18 +31,22 @@ import { loadEnvFile, parseArgs } from "./lib/sage-rag-utils.mjs";
 loadEnvFile();
 
 const args = parseArgs();
-const prisma = new PrismaClient();
 
 // Evidence-bearing tables from the task brief. Kept as an explicit list
 // (not "every model") so a schema change can't silently narrow what this
-// script watches without a reviewer noticing the diff.
-const EVIDENCE_TABLES = [
-  { label: "Student", count: () => prisma.student.count() },
-  { label: "FormSubmission", count: () => prisma.formSubmission.count() },
-  { label: "FileUpload", count: () => prisma.fileUpload.count() },
-  { label: "Certification", count: () => prisma.certification.count() },
-  { label: "SpokesRecord", count: () => prisma.spokesRecord.count() },
-];
+// script watches without a reviewer noticing the diff. Parametrized on the
+// Prisma client so runBackupVerify() below can point it at a different
+// connection (the benchmark suite's prod-readonly URL) than the CLI's
+// module-level client.
+function evidenceTables(prisma) {
+  return [
+    { label: "Student", count: () => prisma.student.count() },
+    { label: "FormSubmission", count: () => prisma.formSubmission.count() },
+    { label: "FileUpload", count: () => prisma.fileUpload.count() },
+    { label: "Certification", count: () => prisma.certification.count() },
+    { label: "SpokesRecord", count: () => prisma.spokesRecord.count() },
+  ];
+}
 
 // Mirrors the backend-selection logic in src/lib/storage.ts (STORAGE_* /
 // Supabase Storage preferred, R2_* as the live secondary — see the "Do not
@@ -138,34 +142,57 @@ async function probeArchives(probe) {
   return { objectCount, studentDirCount: studentDirs.size, truncated };
 }
 
-async function main() {
-  const generatedAt = new Date().toISOString();
+/**
+ * Importable core: runs the same table-count + storage-probe checks as the
+ * CLI, against a given database connection (undefined = Prisma's default
+ * env resolution, exactly like the module-level client this replaces), and
+ * returns the report object with no printing. Used by the CLI below and by
+ * scripts/bench/suites/backup-drill.mjs.
+ *
+ * @param {string} [databaseUrl] optional connection string override
+ * @returns {Promise<{ generatedAt: string, tables: Record<string, number>, storage: object }>}
+ */
+export async function runBackupVerify(databaseUrl) {
+  const prisma = databaseUrl
+    ? new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+    : new PrismaClient();
 
-  const counts = {};
-  for (const table of EVIDENCE_TABLES) {
-    counts[table.label] = await table.count();
-  }
+  try {
+    const generatedAt = new Date().toISOString();
 
-  const probe = buildStorageProbe();
-  let storage = { configured: false, backend: null, bucket: null, archives: null, error: null };
-
-  if (probe) {
-    storage = { configured: true, backend: probe.backend, bucket: probe.bucket, archives: null, error: null };
-    try {
-      storage.archives = await probeArchives(probe);
-    } catch (error) {
-      storage.error = error instanceof Error ? error.message : String(error);
+    const counts = {};
+    for (const table of evidenceTables(prisma)) {
+      counts[table.label] = await table.count();
     }
-  }
 
-  const report = { generatedAt, tables: counts, storage };
+    const probe = buildStorageProbe();
+    let storage = { configured: false, backend: null, bucket: null, archives: null, error: null };
+
+    if (probe) {
+      storage = { configured: true, backend: probe.backend, bucket: probe.bucket, archives: null, error: null };
+      try {
+        storage.archives = await probeArchives(probe);
+      } catch (error) {
+        storage.error = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    return { generatedAt, tables: counts, storage };
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function main() {
+  const report = await runBackupVerify();
 
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
 
-  const tableSummary = EVIDENCE_TABLES.map((t) => `${t.label}=${counts[t.label]}`).join(" ");
+  const tableSummary = Object.entries(report.tables).map(([label, count]) => `${label}=${count}`).join(" ");
+  const storage = report.storage;
   const storageSummary = !storage.configured
     ? "storage=unconfigured"
     : storage.error
@@ -173,12 +200,15 @@ async function main() {
       : `storage=${storage.backend} archives_objects=${storage.archives.objectCount} archives_students=${storage.archives.studentDirCount}${storage.archives.truncated ? "(truncated)" : ""}`;
 
   // Single dated line — this is the line a cron log should keep.
-  console.log(`${generatedAt} backup-verify: ${tableSummary} ${storageSummary}`);
+  console.log(`${report.generatedAt} backup-verify: ${tableSummary} ${storageSummary}`);
 }
 
-main()
-  .catch((error) => {
+// Only auto-run when executed directly — importing this module for
+// runBackupVerify() (the benchmark suite) must never start a live CLI run.
+const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  main().catch((error) => {
     console.error(`${new Date().toISOString()} backup-verify FAILED:`, error);
     process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+  });
+}

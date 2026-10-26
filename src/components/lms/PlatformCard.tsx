@@ -48,7 +48,7 @@ export default function PlatformCard({
         {/* Goal match badge */}
         {goalMatch && (
           <div className="mb-3">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[var(--accent-strong)] text-white">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[var(--accent-strong)] text-[var(--on-accent)]">
               Matches your goals
             </span>
           </div>
@@ -75,7 +75,7 @@ export default function PlatformCard({
             {platform.certifications.map((cert) => (
               <span
                 key={cert}
-                className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-secondary)]/15 text-[var(--accent-secondary)] font-medium"
+                className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent-secondary)]/15 text-info font-medium"
               >
                 {cert.replace(/-/g, " ")}
               </span>
@@ -86,7 +86,7 @@ export default function PlatformCard({
         {/* Actions */}
         <div className="mt-4 flex items-center gap-3">
           {platform.loginUrl ? (
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-white shadow-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] shadow-sm">
               Open Platform &rarr;
             </span>
           ) : (
@@ -102,7 +102,7 @@ export default function PlatformCard({
                 e.preventDefault();
                 setLinksOpen(!linksOpen);
               }}
-              className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] transition-colors cursor-pointer"
+              className="inline-flex min-h-11 items-center text-xs text-[var(--ink-muted)] hover:text-[var(--ink-strong)] transition-colors cursor-pointer"
             >
               {linksOpen ? "Less resources \u25B4" : "More resources \u25BE"}
             </button>
@@ -121,7 +121,7 @@ export default function PlatformCard({
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-xs text-[var(--accent-secondary)] hover:underline"
+                className="flex min-h-11 items-center text-xs text-info hover:underline"
               >
                 {link.label} &nearr;
               </a>
@@ -143,7 +143,7 @@ export default function PlatformCard({
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => onVisit?.(platform.id)}
-        className={`${sharedClasses} no-underline cursor-pointer`}
+        className={`${sharedClasses} min-h-11 no-underline cursor-pointer`}
       >
         {cardContent}
       </a>

@@ -116,6 +116,14 @@ describe("getSignatureRequiredForms", () => {
     assert.deepEqual(formIds, ["auth-release", "dohs-release"]);
   });
 
+  it("returns the Rights form and the Non-Discrimination Notice for the Rights item", () => {
+    const formIds = getSignatureRequiredForms("Review Rights and Responsibilities").map(
+      (form) => form.id,
+    );
+
+    assert.deepEqual(formIds, ["rights-responsibilities", "non-discrimination"]);
+  });
+
   it("keeps the in-browser Student Profile out of the signature set", () => {
     assert.deepEqual(getSignatureRequiredForms("Complete SPOKES Student Profile"), []);
   });

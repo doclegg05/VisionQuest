@@ -6,6 +6,8 @@
  * Splits prefer paragraph breaks, then sentence ends, then hard cuts.
  */
 
+import { cleanPassageText } from "./passage-text";
+
 export interface ChunkOptions {
   /** Maximum characters per chunk. Default 2048 (≈512 tokens). */
   maxChars?: number;
@@ -52,6 +54,7 @@ export interface ChunkWithProvenance {
   tokenCount: number;
   pageNumber: number | null;
   sectionTitle: string | null;
+  extractionMethod?: "text" | "ocr" | "unknown";
 }
 
 const HEADING_RE =
@@ -69,7 +72,7 @@ function detectHeading(line: string): string | null {
  * flush) so the page citation is exact.
  */
 export function chunkPages(
-  pages: { pageNumber: number; text: string }[],
+  pages: { pageNumber: number | null; text: string; extractionMethod?: "text" | "ocr" }[],
   options: ChunkOptions = {},
 ): ChunkWithProvenance[] {
   const out: ChunkWithProvenance[] = [];
@@ -86,6 +89,7 @@ export function chunkPages(
           tokenCount: Math.ceil(content.length / 4),
           pageNumber: page.pageNumber,
           sectionTitle: currentSection,
+          extractionMethod: page.extractionMethod ?? "text",
         });
       }
       sectionLines = [];
@@ -115,7 +119,7 @@ export function chunkText(text: string, options: ChunkOptions = {}): string[] {
     Math.floor(maxChars / 2),
   );
 
-  const normalized = text.trim();
+  const normalized = cleanPassageText(text);
   if (normalized.length === 0) return [];
   if (normalized.length <= maxChars) return [normalized];
 

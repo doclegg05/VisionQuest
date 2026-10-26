@@ -93,7 +93,7 @@ export function PathToEmployment({
             </span>
           )}
         </span>
-        <span className="flex shrink-0 items-center text-[var(--accent-strong)]">
+        <span className="flex shrink-0 items-center text-success">
           <span className="sr-only">{actionLabel}</span>
           <ArrowRight size={20} weight="bold" aria-hidden="true" />
         </span>
@@ -158,7 +158,7 @@ export function PathToEmployment({
                 <div
                   className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${
                     isActive
-                      ? "animate-glow-pulse scale-105 bg-[var(--accent-strong)] text-white shadow-md"
+                      ? "animate-glow-pulse scale-105 bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-md"
                       : isComplete
                         ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]"
                         : isBlocked

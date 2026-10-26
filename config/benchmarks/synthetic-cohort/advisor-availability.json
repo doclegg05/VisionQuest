@@ -1,0 +1,167 @@
+[
+  {
+    "id": "cbenchavail11",
+    "advisorId": "cbenchinstr1",
+    "weekday": 1,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail12",
+    "advisorId": "cbenchinstr1",
+    "weekday": 2,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail13",
+    "advisorId": "cbenchinstr1",
+    "weekday": 3,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail14",
+    "advisorId": "cbenchinstr1",
+    "weekday": 4,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail15",
+    "advisorId": "cbenchinstr1",
+    "weekday": 5,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail21",
+    "advisorId": "cbenchinstr2",
+    "weekday": 1,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail22",
+    "advisorId": "cbenchinstr2",
+    "weekday": 2,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail23",
+    "advisorId": "cbenchinstr2",
+    "weekday": 3,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail24",
+    "advisorId": "cbenchinstr2",
+    "weekday": 4,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail25",
+    "advisorId": "cbenchinstr2",
+    "weekday": 5,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail31",
+    "advisorId": "cbenchinstr3",
+    "weekday": 1,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail32",
+    "advisorId": "cbenchinstr3",
+    "weekday": 2,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail33",
+    "advisorId": "cbenchinstr3",
+    "weekday": 3,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail34",
+    "advisorId": "cbenchinstr3",
+    "weekday": 4,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  },
+  {
+    "id": "cbenchavail35",
+    "advisorId": "cbenchinstr3",
+    "weekday": 5,
+    "startMinutes": 540,
+    "endMinutes": 720,
+    "slotMinutes": 30,
+    "locationType": "in_person",
+    "locationLabel": "Room 2",
+    "active": true
+  }
+]

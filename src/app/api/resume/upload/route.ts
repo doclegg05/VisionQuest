@@ -4,7 +4,14 @@ import { rateLimit } from "@/lib/rate-limit";
 import { resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
 import { extractTextFromFile, extractResumeFromText } from "@/lib/resume-extract";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
+
+// FERPA review §2.c.3 (2026-09-06): the raw résumé text is the payload and
+// cannot be de-identified, so resume_extract is lane `batch`. Recorded on every
+// audit event this route writes; Ticket 1A's policy switch is what refuses it
+// on a cloud provider under `lanes`.
+const RESUME_EXTRACT_LANE = "batch";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = [
@@ -62,6 +69,7 @@ export const POST = withAuth(async (session, req: Request) => {
       errorCode: "LOCAL_AI_UNAVAILABLE",
       metadata: {
         fileType: file.type,
+        lane: RESUME_EXTRACT_LANE,
       },
     });
     return NextResponse.json(
@@ -91,6 +99,7 @@ export const POST = withAuth(async (session, req: Request) => {
         : "Operator configured cloud AI; resume parsing routed to the configured provider.",
     metadata: {
       fileType: file.type,
+      lane: RESUME_EXTRACT_LANE,
     },
   });
 
@@ -100,7 +109,7 @@ export const POST = withAuth(async (session, req: Request) => {
   try {
     rawText = await extractTextFromFile(buffer, file.type);
   } catch (err) {
-    logger.error("Resume text extraction failed", { error: String(err) });
+    logger.error("Resume text extraction failed", { error: errorForLog(err) });
     throw badRequest("Could not read the document. Make sure it is a valid PDF or Word file.");
   }
 
@@ -111,7 +120,7 @@ export const POST = withAuth(async (session, req: Request) => {
   }
 
   try {
-    const result = await extractResumeFromText(provider, rawText, session.displayName);
+    const result = await extractResumeFromText(provider, rawText);
     await logAiAuditEvent({
       actorId: session.id,
       actorRole: session.role,
@@ -128,11 +137,12 @@ export const POST = withAuth(async (session, req: Request) => {
       outputChars: JSON.stringify(result).length,
       metadata: {
         fileType: file.type,
+        lane: RESUME_EXTRACT_LANE,
       },
     });
     return NextResponse.json(result);
   } catch (err) {
-    logger.error("Resume AI extraction failed", { error: String(err) });
+    logger.error("Resume AI extraction failed", { error: errorForLog(err) });
     await logAiAuditEvent({
       actorId: session.id,
       actorRole: session.role,
@@ -150,6 +160,7 @@ export const POST = withAuth(async (session, req: Request) => {
       errorCode: "RESUME_EXTRACT_FAILED",
       metadata: {
         fileType: file.type,
+        lane: RESUME_EXTRACT_LANE,
       },
     });
     return NextResponse.json(

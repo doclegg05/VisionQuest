@@ -105,7 +105,7 @@ export default function CredlyBadges() {
           ].map((item) => (
             <div key={item.step} className="theme-card rounded-xl/60 p-4">
               <div className="mb-2 flex items-center gap-2">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent-strong)] text-xs font-bold text-white">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--accent-strong)] text-xs font-bold text-[var(--on-accent)]">
                   {item.step}
                 </span>
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">{item.title}</p>
@@ -156,7 +156,7 @@ export default function CredlyBadges() {
             href="https://www.credly.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-medium text-[var(--accent-secondary)] hover:underline"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-info hover:underline"
           >
             Visit credly.com to find your profile
           </a>
@@ -177,7 +177,7 @@ export default function CredlyBadges() {
             href={`https://www.credly.com/users/${username}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-medium text-[var(--accent-secondary)] hover:underline"
+            className="inline-flex min-h-11 items-center text-xs font-medium text-info hover:underline"
           >
             View on Credly
           </a>
@@ -202,7 +202,7 @@ export default function CredlyBadges() {
           href={`https://www.credly.com/users/${username}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs font-medium text-[var(--accent-secondary)] hover:underline"
+          className="inline-flex min-h-11 items-center text-xs font-medium text-info hover:underline"
         >
           View on Credly
         </a>
@@ -231,7 +231,7 @@ export default function CredlyBadges() {
                 🏅
               </div>
             )}
-            <p className="text-xs font-semibold leading-4 text-[var(--ink-strong)] group-hover:text-[var(--accent-secondary)]">
+            <p className="text-xs font-semibold leading-4 text-[var(--ink-strong)] group-hover:underline">
               {badge.name}
             </p>
             {badge.issuerName && (

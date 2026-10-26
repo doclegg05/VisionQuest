@@ -5,8 +5,8 @@ import { prisma } from "@/lib/db";
 
 export const GET = withTeacherAuth(
   async (session, _req: Request, { params }: { params: Promise<{ id: string }> }) => {
-    const { id: studentId } = await params;
-    await assertStaffCanManageStudent(session, studentId);
+    const { id: identifier } = await params;
+    const { id: studentId } = await assertStaffCanManageStudent(session, identifier);
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

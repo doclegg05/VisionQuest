@@ -1,6 +1,7 @@
 import "server-only";
 
 import { buildStudentAlertDescriptors, type AlertDescriptor } from "./advising-alerts";
+import { isHeldByTeacher } from "./alert-hold";
 import { prisma } from "./db";
 import { buildGoalEvidenceEntries, buildGoalReviewQueue } from "./goal-evidence";
 import { parseState } from "./progression/engine";
@@ -253,11 +254,7 @@ export async function applyStudentAlertSyncPlan({
 
   await prisma.$transaction(async (tx) => {
     for (const alert of desiredAlerts) {
-      const prev = existingByKey.get(alert.alertKey);
-      const isSnoozed = prev?.status === "snoozed" && prev.snoozedUntil && prev.snoozedUntil > now;
-      const isDismissed = prev?.status === "dismissed";
-
-      if (isSnoozed || isDismissed) {
+      if (isHeldByTeacher(existingByKey.get(alert.alertKey), now)) {
         await tx.studentAlert.update({
           where: { alertKey: alert.alertKey },
           data: {

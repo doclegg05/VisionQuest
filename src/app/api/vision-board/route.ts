@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { recordVisionBoardItem } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { withAuth } from "@/lib/api-error";
 
@@ -87,7 +88,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
       mutate: (state) => recordVisionBoardItem(state, type === "goal" ? "goal_link" : "pin"),
     });
   } catch (err) {
-    logger.error("Failed to record vision board progression", { error: String(err) });
+    logger.error("Failed to record vision board progression", { error: errorForLog(err) });
   }
 
   return NextResponse.json({ item });

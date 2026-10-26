@@ -1,9 +1,19 @@
 import { prisma } from "./db";
-import { getCertificationProgress } from "./certifications";
+import {
+  getCertificationProgress,
+  READY_TO_WORK_CERT_TYPE,
+  READY_TO_WORK_FAMILY_CERT_TYPES,
+} from "./certifications";
 
 async function getTemplates(certType: string) {
+  // Every Ready-to-Work family row (e.g. "workkeys-ncrc", created by the D7
+  // certId path) shares the one checklist stored under "ready-to-work";
+  // no templates exist under the other family labels.
+  const templateCertType = READY_TO_WORK_FAMILY_CERT_TYPES.includes(certType)
+    ? READY_TO_WORK_CERT_TYPE
+    : certType;
   return prisma.certTemplate.findMany({
-    where: { certType },
+    where: { certType: templateCertType },
     select: {
       id: true,
       required: true,
@@ -87,8 +97,14 @@ export async function recomputeCertificationStatus(certificationId: string, cert
 }
 
 export async function recomputeCertificationStatusesForType(certType: string) {
+  // The teacher template routes pass "ready-to-work", the only certType that
+  // holds templates. Every family row holds that checklist, so a change to it
+  // recomputes the whole family.
   const certifications = await prisma.certification.findMany({
-    where: { certType },
+    where: {
+      certType:
+        certType === READY_TO_WORK_CERT_TYPE ? { in: [...READY_TO_WORK_FAMILY_CERT_TYPES] } : certType,
+    },
     select: { id: true },
   });
 

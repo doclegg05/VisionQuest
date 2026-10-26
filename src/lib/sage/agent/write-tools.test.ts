@@ -19,6 +19,16 @@ const mockRecordOperation = mock.fn(async () => undefined) as any;
 // default fixture has its signed submission on file).
 const mockProgressUpsert = mock.fn(async () => ({})) as any;
 const mockSubmissionFindMany = mock.fn(async () => [{ formId: "dress-code" }]) as any;
+// book_appointment re-reads open slots through listBookableAdvisors and writes
+// the appointment itself. The audience filter lives in src/lib/advising.ts and
+// is covered by src/lib/advising.test.ts; here the stand-in only records which
+// audience the tool asked for.
+const mockListBookableAdvisors = mock.fn(async (_options?: unknown) => []) as any;
+const mockAppointmentCreate = mock.fn(async () => ({ id: "appt-1" })) as any;
+
+mock.module("@/lib/classroom", {
+  namedExports: { assertStaffCanManageStudent: async (_session: unknown, id: string) => ({ id }) },
+});
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -67,12 +77,25 @@ mock.module("@/lib/db", {
           return mockSavedJobUpsert;
         },
       },
+      appointment: {
+        get create() {
+          return mockAppointmentCreate;
+        },
+      },
       certification: { findFirst: mock.fn(async () => null) },
       certRequirement: { updateMany: mock.fn(async () => ({ count: 0 })) },
       get $transaction() {
         return mockTransaction;
       },
     },
+  },
+});
+
+mock.module("@/lib/advising", {
+  exports: {
+    listBookableAdvisors: mockListBookableAdvisors,
+    sendAppointmentConfirmation: async () => undefined,
+    syncStudentAlerts: async () => undefined,
   },
 });
 
@@ -526,8 +549,11 @@ describe("save_job — class scoping", () => {
     assert.deepEqual(where.classConfig, { classId: "class-1" });
   });
 
-  it("refuses to save another cohort's job listing", async () => {
-    // The id is real, but it lives on a different class's board.
+  it("refuses to save another cohort's job listing with the same not_your_class_board code as the HTTP route (S4)", async () => {
+    // The id is real, but it lives on a different class's board (or the
+    // program-wide browse pool) — same ambiguity POST /api/jobs/save has,
+    // so this tool now gives the same plain-language message rather than
+    // the bare "not found" a student can't act on.
     mockListingFindFirst.mock.mockImplementation(async () => null);
 
     const record = await executeAgentTool({
@@ -538,7 +564,7 @@ describe("save_job — class scoping", () => {
     });
 
     assert.equal(record.result.status, "error");
-    assert.match(record.result.summary, /not found/i);
+    assert.match(record.result.summary, /class's board/i);
     assert.equal(mockSavedJobUpsert.mock.callCount(), 0);
   });
 
@@ -773,5 +799,90 @@ describe("update_goal_status — proposed-goal guard (F23 / VQ-R-005)", () => {
     assert.equal(record.result.status, "success");
     assert.equal(mockGoalUpdate.mock.calls[0].arguments[0].data.status, "completed");
     assert.deepEqual(mockInvalidatePrefix.mock.calls.map((c: any) => c.arguments[0]), ["goals:stu-2"]);
+  });
+});
+
+describe("book_appointment, by booking audience (cohort demo)", () => {
+  const SLOT = {
+    startsAt: "2026-10-20T14:00:00.000Z",
+    endsAt: "2026-10-20T14:30:00.000Z",
+    locationType: "virtual",
+    locationLabel: "Zoom",
+    meetingUrl: null,
+  };
+  const REAL_ADVISOR = { advisorId: "adv-real", advisorName: "Ms. Legg", slots: [SLOT] };
+  const DEMO_ADVISOR = { advisorId: "adv-demo", advisorName: "Demo Instructor", slots: [SLOT] };
+
+  function demoStudentSession() {
+    return { id: "stu-demo", role: "student", demoAccount: "student" } as any;
+  }
+
+  function audienceOf(options: unknown): string | undefined {
+    return (options as { audience?: string } | undefined)?.audience;
+  }
+
+  async function bookAs(session: any, advisorId: string, confirmedToken?: string) {
+    return executeAgentTool({
+      session,
+      conversationId: "conv-1",
+      toolName: "book_appointment",
+      args: { advisorId, startsAt: SLOT.startsAt },
+      confirmedToken,
+    });
+  }
+
+  beforeEach(() => {
+    mockListBookableAdvisors.mock.resetCalls();
+    mockAppointmentCreate.mock.resetCalls();
+    mockRecordOperation.mock.resetCalls();
+    // The demo audience is offered the demo instructor; everyone else the
+    // real advisor.
+    mockListBookableAdvisors.mock.mockImplementation(async (options: unknown) =>
+      audienceOf(options) === "demo" ? [DEMO_ADVISOR] : [REAL_ADVISOR],
+    );
+  });
+
+  it("proposes the demo instructor's slot to a demo student, reading the demo audience", async () => {
+    const record = await bookAs(demoStudentSession(), DEMO_ADVISOR.advisorId);
+
+    assert.equal(record.result.status, "success");
+    assert.equal(record.result.action?.action, "confirm_tool");
+    assert.match(record.result.summary, /Demo Instructor/);
+    assert.equal(audienceOf(mockListBookableAdvisors.mock.calls[0].arguments[0]), "demo");
+    assert.equal(mockAppointmentCreate.mock.callCount(), 0);
+  });
+
+  it("refuses a demo student booking a real advisor's slot as no longer available", async () => {
+    const record = await bookAs(demoStudentSession(), REAL_ADVISOR.advisorId);
+
+    assert.equal(record.result.status, "error");
+    assert.equal(record.result.summary, "That time slot is no longer available.");
+    assert.equal(record.result.action, undefined, "no confirmation card for a slot the server refuses");
+    assert.equal(mockAppointmentCreate.mock.callCount(), 0);
+  });
+
+  it("refuses a real student booking the demo instructor's slot as no longer available", async () => {
+    const record = await bookAs(studentSession(), DEMO_ADVISOR.advisorId);
+
+    assert.equal(record.result.status, "error");
+    assert.equal(record.result.summary, "That time slot is no longer available.");
+    assert.equal(audienceOf(mockListBookableAdvisors.mock.calls[0].arguments[0]), "standard");
+    assert.equal(mockAppointmentCreate.mock.callCount(), 0);
+  });
+
+  it("books the demo instructor for a demo student once confirmed", async () => {
+    const args = { advisorId: DEMO_ADVISOR.advisorId, startsAt: SLOT.startsAt };
+    const token = createConfirmationToken(
+      { toolName: "book_appointment", args, sessionId: "stu-demo", conversationId: "conv-1" },
+      new Date(),
+    );
+
+    const record = await bookAs(demoStudentSession(), DEMO_ADVISOR.advisorId, token);
+
+    assert.equal(record.result.status, "success");
+    assert.equal(mockAppointmentCreate.mock.callCount(), 1);
+    const { data } = mockAppointmentCreate.mock.calls[0].arguments[0];
+    assert.equal(data.studentId, "stu-demo");
+    assert.equal(data.advisorId, DEMO_ADVISOR.advisorId);
   });
 });

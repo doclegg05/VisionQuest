@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey, validateFile } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
+import { validateUploadContent } from "@/lib/file-security";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { withAuth, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
+import { safeUploadName } from "@/lib/upload-name";
 
 async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
   const targetStudentId = requestedStudentId?.trim() || session.id;
@@ -28,7 +31,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     const formId = formData.get("formId") as string | null;
     const requestedStudentId = formData.get("studentId") as string | null;
 
-    if (!file || !formId) {
+    if (!(file instanceof File) || typeof formId !== "string" || !formId
+      || (requestedStudentId !== null && typeof requestedStudentId !== "string")) {
       return NextResponse.json({ error: "File and formId are required." }, { status: 400 });
     }
 
@@ -53,7 +57,13 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const storageKey = generateStorageKey(targetStudentId, file.name);
+    const contentError = validateUploadContent(buffer, file.type);
+    if (contentError) return NextResponse.json({ error: contentError }, { status: 400 });
+    // `File.name` is student-controlled and undici preserves it verbatim, so
+    // the stored name must be a name and not a path — the retention archive
+    // turns this column into a ZIP entry path.
+    const filename = safeUploadName(file.name);
+    const storageKey = generateStorageKey(targetStudentId, filename);
 
     // Upload to storage
     await uploadFile(storageKey, buffer, file.type);
@@ -62,7 +72,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     const fileRecord = await prisma.fileUpload.create({
       data: {
         studentId: targetStudentId,
-        filename: file.name,
+        filename,
         mimeType: file.type,
         sizeBytes: file.size,
         storageKey,
@@ -94,7 +104,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
     return NextResponse.json({ submission, fileId: fileRecord.id });
   } catch (error) {
-    logger.error("Form upload error", { error: String(error) });
+    if (error instanceof Error && error.name === "ApiError") throw error;
+    logger.error("Form upload error", { error: errorForLog(error) });
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
 });

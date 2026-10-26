@@ -112,9 +112,13 @@ export async function saveMessage(
   studentId: string,
   role: "user" | "assistant",
   content: string,
+  options: { memoryIntent?: boolean } = {},
 ) {
   return prisma.message.create({
-    data: { conversationId, studentId, role, content },
+    data: { conversationId, studentId, role, content,
+      ...(role === "assistant" && options.memoryIntent && process.env.VQ_MAC_RELAY_ENABLED === "true" && process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false"
+        ? { metadata: JSON.stringify({ memoryJob: true }) } : {}),
+    },
   });
 }
 

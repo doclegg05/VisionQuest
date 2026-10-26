@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { CERTIFICATIONS } from "@/lib/spokes/certifications";
+import { CLASS_REQUIREMENT_CATALOG } from "@/lib/class-requirement-catalog";
 
 interface Requirement {
   id: string;
@@ -25,21 +25,10 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_OPTIONS = [
-  { value: "required", label: "Required", color: "bg-red-50 text-red-700 border-red-200" },
-  { value: "optional", label: "Optional", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { value: "required", label: "Required", color: "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] border-[var(--badge-error-bg)]" },
+  { value: "optional", label: "Optional", color: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] border-[var(--badge-info-bg)]" },
   { value: "not_applicable", label: "N/A", color: "bg-[var(--surface-soft)] text-[var(--ink-muted)] border-[var(--border)]" },
 ];
-
-// Build catalog of items that can be added as requirements.
-// Platforms (LMS systems) are intentionally excluded — they're how students
-// access courses, not courses themselves. Several platforms also duplicated
-// certifications (e.g. "Bring Your A Game" platform vs BYAG certification).
-const CATALOG = CERTIFICATIONS.map((c) => ({
-  itemType: "certification" as const,
-  itemId: c.id,
-  title: c.shortName,
-  description: c.description,
-}));
 
 export default function ClassRequirementEditor({ classId }: ClassRequirementEditorProps) {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
@@ -147,12 +136,12 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
   if (loading) return <p className="text-sm text-[var(--ink-muted)]">Loading requirements...</p>;
 
   const existingIds = new Set(requirements.map((r) => `${r.itemType}:${r.itemId}`));
-  const availableCatalog = CATALOG.filter((c) => !existingIds.has(`${c.itemType}:${c.itemId}`));
+  const availableCatalog = CLASS_REQUIREMENT_CATALOG.filter((c) => !existingIds.has(`${c.itemType}:${c.itemId}`));
 
   return (
     <div className="space-y-3">
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+        <p className="text-sm text-[var(--badge-error-text)] bg-[var(--badge-error-bg)] rounded-lg px-3 py-2">{error}</p>
       )}
 
       {requirements.length === 0 ? (
@@ -173,13 +162,13 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
                 <p className="text-sm font-medium text-[var(--ink-strong)] truncate">{r.title}</p>
                 <p className="text-xs text-[var(--ink-faint)]">{ITEM_TYPE_LABELS[r.itemType] ?? r.itemType}</p>
               </div>
-              <div className="flex gap-1 shrink-0">
+              <div className="flex gap-2 shrink-0">
                 {STATUS_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => updateStatus(idx, opt.value)}
-                    className={`text-xs px-2 py-1 rounded border transition-colors ${
+                    className={`inline-flex items-center pointer-coarse:min-h-11 text-xs px-2 py-1 rounded border transition-colors ${
                       r.status === opt.value
                         ? opt.color + " font-semibold"
                         : "bg-[var(--surface-raised)] border-[var(--border)] text-[var(--ink-faint)] hover:border-[var(--border-strong)]"
@@ -192,7 +181,8 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
               <button
                 type="button"
                 onClick={() => removeRequirement(idx)}
-                className="text-xs text-[var(--ink-faint)] hover:text-red-500 px-1 shrink-0"
+                className="inline-flex size-8 shrink-0 items-center justify-center pointer-coarse:size-11 text-xs text-[var(--ink-faint)] hover:text-[var(--badge-error-text)]"
+                aria-label={`Remove ${r.title}`}
                 title="Remove"
               >
                 x
@@ -207,7 +197,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
           <div className="w-full theme-card rounded-xl p-3 space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-xs font-medium text-[var(--ink-muted)]">Add from catalog</p>
-              <button onClick={() => setShowCatalog(false)} className="text-xs text-[var(--ink-faint)] hover:text-[var(--ink-muted)]">
+              <button onClick={() => setShowCatalog(false)} className="inline-flex items-center pointer-coarse:min-h-11 text-xs text-[var(--ink-faint)] hover:text-[var(--ink-muted)]">
                 Close
               </button>
             </div>
@@ -220,7 +210,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
                     key={`${item.itemType}:${item.itemId}`}
                     type="button"
                     onClick={() => addFromCatalog(item)}
-                    className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-[var(--surface-soft)] transition-colors"
+                    className="flex w-full items-center pointer-coarse:min-h-11 text-left text-sm px-3 py-2 rounded-lg hover:bg-[var(--surface-soft)] transition-colors"
                   >
                     <span className="font-medium text-[var(--ink-strong)]">{item.title}</span>
                     <span className="ml-2 text-xs text-[var(--ink-faint)]">
@@ -235,7 +225,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
           <button
             type="button"
             onClick={() => setShowCatalog(true)}
-            className="border-2 border-dashed border-[var(--border-strong)] rounded-xl px-4 py-2 text-sm text-[var(--ink-muted)] hover:border-blue-400 hover:text-blue-600 transition-colors"
+            className="inline-flex items-center pointer-coarse:min-h-11 border-2 border-dashed border-[var(--border-strong)] rounded-xl px-4 py-2 text-sm text-[var(--ink-muted)] hover:border-[var(--accent-blue)] hover:text-[var(--badge-info-text)] transition-colors"
           >
             + Add Requirement
           </button>
@@ -246,7 +236,7 @@ export default function ClassRequirementEditor({ classId }: ClassRequirementEdit
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 ml-auto"
+            className="primary-button pointer-coarse:min-h-11 text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ml-auto"
           >
             {saving ? "Saving..." : "Save Changes"}
           </button>

@@ -41,7 +41,7 @@ export function MoodCheckInCard() {
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--accent-secondary)]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-info">
         Daily check-in
       </p>
       {status === "saved" ? (

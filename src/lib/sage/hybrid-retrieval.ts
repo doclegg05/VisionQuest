@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { embedTextsWithModel, toVectorLiteral } from "@/lib/ai/embeddings";
 import { getActiveEmbeddingModel } from "@/lib/ai/embedding-provider";
@@ -24,6 +25,7 @@ export interface HybridDocResult {
   title: string;
   storageKey: string;
   sageContextNote: string | null;
+  /** Best edition's RRF score plus a bounded exact-title selection bonus. */
   score: number;
   semanticRank: number | null;
   ftsRank: number | null;
@@ -125,7 +127,19 @@ const SCORE_TIE_EPSILON = 1e-9;
  * on this normalized title key so a duplicate can't occupy a second slot.
  */
 function normalizeTitleKey(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return title.toLowerCase().replace(/\bfillable\b/g, "").replace(/[^a-z0-9]+/g, "");
+}
+
+const TITLE_QUERY_FILLERS = new Set([
+  "what", "which", "where", "when", "how", "can", "could", "would", "should",
+  "will", "does", "did", "the", "and", "are", "for", "our", "your", "with",
+  "from", "tell", "find", "get", "help", "spokes", "dfa", "use", "learn",
+]);
+
+function titleCoverage(title: string, queryTokens: string[]): number {
+  const titleTokens = new Set(tokenizeForRetrieval(title, 3));
+  const total = queryTokens.reduce((sum, token) => sum + token.length, 0);
+  return total ? queryTokens.reduce((sum, token) => sum + (titleTokens.has(token) ? token.length : 0), 0) / total : 0;
 }
 
 /**
@@ -138,15 +152,20 @@ export function buildWebsearchQuery(userMessage: string): string {
   return tokens.join(" OR ");
 }
 
+/** Subject attribution stays attached to every embedding request and cache entry. */
+export interface QueryEmbeddingSubject {
+  studentId?: string | null;
+}
+
 interface QueryVector { vector: number[]; model: string }
 const pendingQueryEmbeddings = new Map<string, Promise<QueryVector>>();
 
-async function getQueryVector(userMessage: string) {
+async function getQueryVector(userMessage: string, subject?: QueryEmbeddingSubject) {
   // Reading the configured model is cheap; resolving credentials/provider is
   // deferred until a cache miss so warm queries do not add database round trips.
   const model = await getActiveEmbeddingModel();
   const digest = createHash("sha256")
-    .update(JSON.stringify([model, userMessage])).digest("hex");
+    .update(JSON.stringify([model, subject?.studentId ?? null, userMessage])).digest("hex");
   const key = `sage:qe:${digest}`;
   // Documents and passages can ask concurrently. Share the in-flight request,
   // but never reuse an embedding across model changes or cache rejected work.
@@ -154,7 +173,12 @@ async function getQueryVector(userMessage: string) {
   if (!pending) {
     pending = cached(key, QUERY_EMBED_CACHE_TTL_SECONDS, async () => {
       const result = await embedTextsWithModel([userMessage], {
-        taskType: "RETRIEVAL_QUERY", usage: { callSite: "sage_embedding_query", studentId: null },
+        taskType: "RETRIEVAL_QUERY",
+        usage: {
+          callSite: "sage_embedding_query",
+          studentId: subject?.studentId ?? null,
+          sensitivity: "student_record",
+        },
       });
       if (result.model !== model) throw new Error("Embedding model changed before query embedding; retry retrieval");
       const [vector] = result.vectors;
@@ -170,8 +194,8 @@ async function getQueryVector(userMessage: string) {
   }
 }
 
-export async function getQueryEmbedding(userMessage: string): Promise<number[]> {
-  return (await getQueryVector(userMessage)).vector;
+export async function getQueryEmbedding(userMessage: string, subject?: QueryEmbeddingSubject): Promise<number[]> {
+  return (await getQueryVector(userMessage, subject)).vector;
 }
 
 /**
@@ -183,16 +207,17 @@ export async function hybridSearchDocuments(
   userMessage: string,
   callerRole: "student" | "staff",
   limit: number,
+  subject?: QueryEmbeddingSubject,
 ): Promise<HybridDocResult[] | null> {
   let vectorLiteral: string;
   let queryModel: string;
   try {
-    const query = await getQueryVector(userMessage);
+    const query = await getQueryVector(userMessage, subject);
     vectorLiteral = toVectorLiteral(query.vector);
     queryModel = query.model;
   } catch (error) {
     logger.warn("Hybrid retrieval: query embedding failed, falling back to keyword scoring", {
-      error: String(error),
+      error: errorForLog(error),
     });
     return null;
   }
@@ -201,7 +226,7 @@ export async function hybridSearchDocuments(
 
   // Fetch beyond the caller's limit so rows removed by dedupe and the relative
   // cutoffs below can backfill from cut-survivors instead of shrinking the set.
-  const fetchLimit = limit * 2 + 2;
+  const fetchLimit = Math.max(24, limit * 2 + 2);
 
   try {
     const rows = await prisma.$queryRaw<HybridSearchRow[]>`
@@ -227,13 +252,26 @@ export async function hybridSearchDocuments(
       return (a.best_distance ?? Infinity) - (b.best_distance ?? Infinity);
     });
 
-    const seenTitles = new Set<string>();
-    const deduped = ordered.filter((row) => {
+    const families = new Map<string, HybridSearchRow>();
+    for (const row of ordered) {
       const key = normalizeTitleKey(row.title);
-      if (seenTitles.has(key)) return false;
-      seenTitles.add(key);
-      return true;
-    });
+      const previous = families.get(key);
+      if (!previous) { families.set(key, row); continue; }
+      // Same title/revision: keep an equally competitive fillable edition,
+      // otherwise use the semantically closer duplicate. Never collapse
+      // differently dated/revised titles or activate another source.
+      if (row.score < previous.score * getMinScoreRatio()) continue;
+      const fillable = /\bfillable\b/i.test(row.title);
+      const previousFillable = /\bfillable\b/i.test(previous.title);
+      if ((fillable && !previousFillable && (row.best_distance ?? 0) <= getMaxCosineDistance())
+          || (fillable === previousFillable && (row.best_distance ?? Infinity) < (previous.best_distance ?? Infinity))) {
+        // Family relevance comes from its strongest edition. Carry that
+        // score onto the canonical edition so deduplication cannot push an
+        // otherwise relevant family below the relative-score threshold.
+        families.set(key, { ...row, score: Math.max(row.score, previous.score) });
+      }
+    }
+    const deduped = [...families.values()].sort((a, b) => b.score - a.score);
 
     const distances = deduped
       .map((row) => row.best_distance)
@@ -262,28 +300,42 @@ export async function hybridSearchDocuments(
     const maxAllowedDistance =
       margin > 0 && closestDistance !== null ? closestDistance + margin : Infinity;
 
+    const titleTokens = [...new Set(tokenizeForRetrieval(userMessage, 3))].filter((token) => !TITLE_QUERY_FILLERS.has(token));
+    const coverage = new Map(deduped.map((row) => [row.id, titleCoverage(row.title, titleTokens)]));
+    const bestCoverage = Math.max(0, ...coverage.values());
+    const titleAnchor = (row: HybridSearchRow) =>
+      (coverage.get(row.id) ?? 0) >= Math.max(0.6, bestCoverage)
+      && row.fts_rank !== null
+      && (row.best_distance === null || row.best_distance <= getMaxCosineDistance());
+
     const trimmed = deduped.filter(
       (row) =>
         row.score >= minScore &&
-        (row.best_distance === null || row.best_distance <= maxAllowedDistance),
+        (row.best_distance === null || row.best_distance <= maxAllowedDistance || titleAnchor(row)),
     );
     const surviving = trimmed.length > 0 ? trimmed : deduped.slice(0, 1);
 
+    // An exact named topic should not lose to a generic form that happens to
+    // share more boilerplate. Keep the raw RRF comparisons for the noise gate;
+    // a bounded title bonus determines final context order.
+    const selectionScore = (row: HybridSearchRow) => row.score + (titleAnchor(row) ? 0.01 : 0);
+
     return surviving
+      .sort((a, b) => selectionScore(b) - selectionScore(a))
       .slice(0, limit)
       .map((row) => ({
         id: row.id,
         title: row.title,
         storageKey: row.storage_key,
         sageContextNote: row.sageContextNote,
-        score: row.score,
+        score: selectionScore(row),
         semanticRank: row.semantic_rank,
         ftsRank: row.fts_rank,
         bestDistance: row.best_distance,
       }));
   } catch (error) {
     logger.warn("Hybrid retrieval: SQL search failed, falling back to keyword scoring", {
-      error: String(error),
+      error: errorForLog(error),
     });
     return null;
   }
@@ -294,6 +346,7 @@ export interface ChunkPassage {
   content: string;
   pageNumber: number | null;
   sectionTitle: string | null;
+  extractionMethod?: string;
   distance: number;
 }
 
@@ -302,6 +355,7 @@ interface BestChunkRow {
   content: string;
   pageNumber: number | null;
   sectionTitle: string | null;
+  extractionMethod?: string;
   distance: number;
 }
 
@@ -315,20 +369,22 @@ export async function getBestChunks(
   documentIds: string[],
   userMessage: string,
   perDoc: number,
+  subject?: QueryEmbeddingSubject,
 ): Promise<Map<string, ChunkPassage[]>> {
   if (documentIds.length === 0) return new Map();
   try {
-    const query = await getQueryVector(userMessage);
+    const query = await getQueryVector(userMessage, subject);
     const vectorLiteral = toVectorLiteral(query.vector);
     const queryModel = query.model;
     const queryText = buildWebsearchQuery(userMessage);
     const rows = await prisma.$queryRaw<BestChunkRow[]>`
-      SELECT "documentId", "content", "pageNumber", "sectionTitle", distance
+      SELECT "documentId", "content", "pageNumber", "sectionTitle", "extractionMethod", distance
       FROM (
         SELECT c."documentId",
                c."content",
                c."pageNumber",
                c."sectionTitle",
+               c."extractionMethod",
                (c."embedding" <=> ${vectorLiteral}::vector(768)) AS distance,
                row_number() OVER (
                  PARTITION BY c."documentId"
@@ -355,7 +411,7 @@ export async function getBestChunks(
     return map;
   } catch (error) {
     logger.warn("getBestChunks failed; falling back to summary injection", {
-      error: String(error),
+      error: errorForLog(error),
     });
     return new Map();
   }

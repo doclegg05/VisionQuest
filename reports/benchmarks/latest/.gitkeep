@@ -1,0 +1,3 @@
+# Benchmark results land here, one <suite>.json per run of scripts/bench/run.mjs.
+# The nightly benchmarks.yml workflow commits these files on main runs, so the
+# directory is tracked even when it is empty.

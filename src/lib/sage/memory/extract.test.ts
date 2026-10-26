@@ -44,13 +44,28 @@ mock.module("@/lib/db", {
 
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
-    embedTexts: mockEmbedTexts,
+    embedTextsWithModel: async (...args: unknown[]) => ({ vectors: await mockEmbedTexts(...args), model: "gemini-embedding-001" }),
     toVectorLiteral: (vector: number[]) => `[${vector.join(",")}]`,
   },
 });
 
 mock.module("@/lib/llm-usage", {
   namedExports: { logLlmCall: mockLogLlmCall },
+});
+
+// The extraction's model call is now AI-audited; recorded so the attribution
+// can be asserted, and so no test here reaches a real AuditLog write.
+const aiAuditEvents: Record<string, unknown>[] = [];
+mock.module("@/lib/ai/audit", {
+  namedExports: {
+    logAiAuditEvent: async (event: Record<string, unknown>) => {
+      aiAuditEvents.push(event);
+    },
+    getProviderClass: (name?: string | null) =>
+      name === "ollama" ? "local" : name === "gemini" ? "cloud" : name ? "unknown" : "none",
+    policyDecisionForProvider: (name?: string | null) =>
+      name === "ollama" ? "local_only" : "configured_provider",
+  },
 });
 
 mock.module("@/lib/ai/embedding-provider", {
@@ -106,6 +121,24 @@ describe("extractAndStoreMemories", () => {
         return vector;
       }),
     );
+  });
+
+  it("writes routed then completed AI audit events for the extraction call", async () => {
+    aiAuditEvents.length = 0;
+    await extractAndStoreMemories({
+      provider: providerReturning(VALID_JSON),
+      studentId: "stu-1",
+      conversationId: "conv-1",
+      messages: MESSAGES,
+    });
+    assert.deepEqual(aiAuditEvents.map((event) => event.status), ["routed", "completed"]);
+    for (const event of aiAuditEvents) {
+      assert.equal(event.task, "sage_post_response");
+      assert.equal(event.sensitivity, "student_record");
+      assert.equal(event.actorId, "stu-1");
+      assert.equal(event.actorRole, "student");
+      assert.equal(event.route, "sage.memory_extract");
+    }
   });
 
   it("stores validated candidates with server-pinned subject and provenance", async () => {
@@ -230,6 +263,36 @@ describe("extractAndStoreMemories", () => {
     assert.deepEqual(result, { stored: 0, deduped: 2, rejected: 0 });
   });
 
+  it("stores memories without contacting an embedding provider in local-only demos", async () => {
+    process.env.COHORT_DEMO_LOCAL_ONLY = "true";
+    try {
+      mockEmbedTexts.mock.mockImplementation(async () => { throw new Error("cloud embeddings forbidden"); });
+      const result = await extractAndStoreMemories({ provider: providerReturning(VALID_JSON),
+        studentId: "stu-1", conversationId: "conv-1", messages: MESSAGES, throwOnError: true });
+      assert.equal(result.stored, 2);
+      assert.equal(mockEmbedTexts.mock.callCount(), 0);
+      assert.equal(mockCreate.mock.callCount(), 2);
+      assert.equal(mockExecuteRaw.mock.callCount(), 1); // lock only; no vector write
+    } finally { delete process.env.COHORT_DEMO_LOCAL_ONLY; }
+  });
+
+  it("retries invalid JSON shapes but accepts a valid empty extraction", async () => {
+    for (const raw of ["{}", "42", "true", '{"status":"busy"}']) {
+      await assert.rejects(extractAndStoreMemories({ provider: providerReturning(raw), studentId: "stu-1",
+        conversationId: "conv-1", messages: MESSAGES, throwOnError: true }), /Memory extraction failed/);
+    }
+    assert.deepEqual(await extractAndStoreMemories({ provider: providerReturning("[]"), studentId: "stu-1",
+      conversationId: "conv-1", messages: MESSAGES, throwOnError: true }), { stored: 0, deduped: 0, rejected: 0 });
+  });
+
+  it("rejects failed inference for durable jobs instead of reporting empty success", async () => {
+    await assert.rejects(extractAndStoreMemories({
+      provider: { name: "ollama", generateStructuredResponse: async () => { throw new Error("busy"); } } as any,
+      studentId: "stu-1", conversationId: "conv-1", messages: MESSAGES,
+      throwOnError: true,
+    }), /Memory extraction failed/);
+  });
+
   it("returns zeros and never throws when the provider fails", async () => {
     const provider = {
       name: "mock",
@@ -335,3 +398,13 @@ describe("extractAndStoreMemories", () => {
     assert.equal(lockCalls.length, 2, "both concurrent calls for the same student must acquire the advisory lock");
   });
 });
+
+ it("preserves model-first transcript roles and ends with an extraction request", async () => {
+  const provider = providerReturning("[]");
+  const transcript = [{ role: "model" as const, content: "How do you travel?" }, { role: "user" as const, content: "By bus." }, { role: "model" as const, content: "Let's plan around that." }];
+  await extractAndStoreMemories({provider, studentId: "student-1", conversationId: "conv-1", messages: transcript});
+  const sent = provider.generateStructuredResponse.mock.calls[0].arguments[1];
+  assert.equal(sent[0].role, "user");
+  assert.equal(sent.at(-1).role, "user");
+  assert.deepEqual(sent.slice(1, -1), transcript);
+ });

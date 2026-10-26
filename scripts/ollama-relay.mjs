@@ -7,10 +7,17 @@
  * and sends heartbeat pings every 25s while Ollama evaluates the prompt,
  * then pipes Ollama's actual tokens through transparently.
  *
+ * Because the 200 is already sent, an upstream failure is reported as one
+ * SSE line, `data: {"error":"Ollama returned NNN: <cause>"}`. The cause is
+ * read from Ollama's error body. Keep the `Ollama returned NNN` prefix:
+ * `isRetryableStartupError` in src/lib/ai/ollama-provider.ts matches it.
+ *
  * Usage:
  *   node scripts/ollama-relay.mjs
  *
  * Then point cloudflared config at http://localhost:11435
+ *
+ * Tests: npm run test:relay
  */
 
 import http from "node:http";
@@ -19,7 +26,78 @@ const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
 const RELAY_PORT = parseInt(process.env.RELAY_PORT || "11435", 10);
 const HEARTBEAT_INTERVAL_MS = 25_000;
 
+// An error body is read only far enough to name the cause. Ollama's own
+// errors are a few hundred bytes; a proxy's HTML page needs no more.
+const ERROR_BODY_MAX_BYTES = 2048;
+const ERROR_BODY_TIMEOUT_MS = 1_500;
+const ERROR_MESSAGE_MAX_CHARS = 300;
+const ERROR_UNWRAP_MAX_DEPTH = 4;
+
 const ollamaUrl = new URL(OLLAMA_HOST);
+
+/** Reads at most ERROR_BODY_MAX_BYTES of a response, never waiting past the timeout. Never rejects. */
+function readCappedBody(res) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (!res.complete) res.destroy();
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    };
+    const timer = setTimeout(finish, ERROR_BODY_TIMEOUT_MS);
+    res.on("data", (chunk) => {
+      if (done) return;
+      const kept = chunk.subarray(0, ERROR_BODY_MAX_BYTES - size);
+      chunks.push(kept);
+      size += kept.length;
+      if (size >= ERROR_BODY_MAX_BYTES) finish();
+    });
+    res.once("end", finish);
+    res.once("error", finish);
+    res.once("close", finish);
+  });
+}
+
+function oneLine(text) {
+  return text.replace(/\s+/g, " ").trim().slice(0, ERROR_MESSAGE_MAX_CHARS);
+}
+
+/**
+ * Ollama 0.40.3 nests llama.cpp's error object as a JSON string inside its
+ * own envelope: {"error":"{\"error\":{\"message\":\"request (4246 tokens)
+ * exceeds ...\"}}"}. Unwrap to the innermost message, or keep the outer
+ * string when it is not JSON.
+ */
+function messageFromValue(value, depth) {
+  if (depth > ERROR_UNWRAP_MAX_DEPTH) return null;
+  if (typeof value === "string") {
+    return messageFromJson(value, depth + 1) ?? (oneLine(value) || null);
+  }
+  if (value && typeof value === "object") {
+    return messageFromValue(value.message ?? value.error, depth + 1);
+  }
+  return null;
+}
+
+function messageFromJson(text, depth) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  return messageFromValue(parsed.error ?? parsed.message, depth);
+}
+
+function upstreamErrorText(status, body) {
+  const message = messageFromJson(body, 0) ?? (oneLine(body) || null);
+  return message ? `Ollama returned ${status}: ${message}` : `Ollama returned ${status}`;
+}
 
 function isStreamingRequest(body) {
   try {
@@ -126,9 +204,14 @@ function handleStreaming(clientReq, clientRes, requestBody) {
     (upstreamRes) => {
       if (upstreamRes.statusCode !== 200) {
         cleanup();
-        const errMsg = `data: ${JSON.stringify({ error: `Ollama returned ${upstreamRes.statusCode}` })}\n\n`;
-        clientRes.write(errMsg);
-        clientRes.end();
+        const status = upstreamRes.statusCode;
+        readCappedBody(upstreamRes).then((body) => {
+          const error = upstreamErrorText(status, body);
+          console.error(`[relay] ${error}`);
+          if (clientRes.writableEnded || clientRes.destroyed) return;
+          clientRes.write(`data: ${JSON.stringify({ error })}\n\n`);
+          clientRes.end();
+        });
         return;
       }
 

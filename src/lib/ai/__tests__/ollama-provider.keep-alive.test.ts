@@ -11,12 +11,11 @@
  * once with reasoning knobs: **the two Ollama surfaces do not accept the same
  * parameters, and each silently ignores the other's.** `keep_alive` is a
  * native `/api/chat` parameter; `/v1/chat/completions` drops it
- * (ollama/ollama#11458). Since `postChat` tries /v1 FIRST and a stock Ollama
- * answers it 200, a keep-alive sent only in the native body never reaches the
- * server on the live path — it looks correct in review and does nothing.
+ * (ollama/ollama#11458). While the provider tried /v1 first, a keep-alive
+ * sent only in the native body never reached the server.
  *
- * So: an instance given an explicit keep-alive talks to the native surface,
- * and these tests assert both halves — the surface AND the value on the wire.
+ * Ollama endpoints now use native /api/chat only, so these tests assert both
+ * halves on every Ollama call: the surface AND the value on the wire.
  */
 import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -96,19 +95,6 @@ describe("OllamaProvider keep-alive residency", { concurrency: false }, () => {
     assert.equal(bodyOf(0).format, "json");
   });
 
-  it("leaves surface selection alone when no keep-alive is requested", async () => {
-    // The single-model deployment must be untouched: /v1 first, as always.
-    mockFetch.mock.mockImplementation(async (input) =>
-      String(input).includes("/v1/") ? openAiOk() : nativeOk(),
-    );
-
-    const provider = new OllamaProvider("http://localhost:11434", "gemma4:26b", {
-      authMode: "none",
-    });
-    await provider.generateResponse("system", [{ role: "user", content: "hi" }]);
-
-    assert.match(urlOf(0), /\/v1\/chat\/completions$/);
-  });
 
   it("never forces native on a generic OpenAI-only endpoint", async () => {
     // LM Studio / vLLM expose no /api/chat at all, and have no residency
@@ -125,23 +111,20 @@ describe("OllamaProvider keep-alive residency", { concurrency: false }, () => {
     assert.match(urlOf(0), /\/v1\/chat\/completions$/);
   });
 
-  it("defaults to the workday keep-alive when the native surface is reached anyway", async () => {
-    // No explicit keep-alive, so no pinning — but if /v1 is unavailable the
-    // native fallback still carries the workday default.
-    let calls = 0;
-    mockFetch.mock.mockImplementation(async () => {
-      calls += 1;
-      if (calls === 1) return new Response("Not Found", { status: 404 });
-      return nativeOk();
-    });
+  it("sends the workday keep-alive on native when none is requested", async () => {
+    // Both surfaces would answer 200 here; the chat model still goes native.
+    mockFetch.mock.mockImplementation(async (input) =>
+      String(input).includes("/v1/") ? openAiOk() : nativeOk(),
+    );
 
     const provider = new OllamaProvider("http://localhost:11434", "gemma4:26b", {
       authMode: "none",
     });
     await provider.generateResponse("system", [{ role: "user", content: "hi" }]);
 
-    assert.match(urlOf(1), /\/api\/chat$/);
-    assert.equal(bodyOf(1).keep_alive, "8h");
+    assert.equal(mockFetch.mock.calls.length, 1);
+    assert.match(urlOf(0), /\/api\/chat$/);
+    assert.equal(bodyOf(0).keep_alive, "8h");
   });
 
   it("exposes a secondary keep-alive that is meaningfully shorter than the default", () => {
@@ -155,13 +138,13 @@ describe("OllamaProvider keep-alive residency", { concurrency: false }, () => {
  *
  * The keep-alive bug above was not a one-off: it is a bug CLASS. Ollama's
  * OpenAI-compatible /v1 and its native /api/chat take different parameter
- * names for the same knob and each silently ignores the other's, and postChat
- * prefers /v1 — so an option added to only one body is inert on the live path
- * and looks correct in review. It has now happened twice in this repo
- * (reasoning knobs, then keep-alive).
+ * names for the same knob and each silently ignores the other's, so an option
+ * added to only one body is inert on the surface that uses the other. It has
+ * happened twice in this repo (reasoning knobs, then keep-alive).
  *
- * These assert the option reaches the wire on whichever surface is used, so
- * the next tunable cannot be severed from the request with the suite green.
+ * Ollama endpoints use native; `apiStyle: "openai"` servers use /v1. These
+ * assert the option reaches the wire on both, so the next tunable cannot be
+ * severed from the request with the suite green.
  */
 describe("per-role options reach the wire on both surfaces", { concurrency: false }, () => {
   beforeEach(() => {
@@ -171,8 +154,9 @@ describe("per-role options reach the wire on both surfaces", { concurrency: fals
   it("sends the role output cap to JSON mode on the OpenAI surface", async () => {
     mockFetch.mock.mockImplementation(async () => openAiOk("{}"));
 
-    const provider = new OllamaProvider("http://localhost:11434", "gemma4:12b", {
+    const provider = new OllamaProvider("http://localhost:1234", "gemma4:12b", {
       authMode: "none",
+      apiStyle: "openai",
       structuredMaxOutputTokens: 2048,
     });
     await provider.generateStructuredResponse("system", [{ role: "user", content: "hi" }]);
@@ -183,12 +167,7 @@ describe("per-role options reach the wire on both surfaces", { concurrency: fals
   });
 
   it("sends the role output cap to JSON mode on the native surface", async () => {
-    let calls = 0;
-    mockFetch.mock.mockImplementation(async () => {
-      calls += 1;
-      if (calls === 1) return new Response("Not Found", { status: 404 });
-      return nativeOk('{"ok":true}');
-    });
+    mockFetch.mock.mockImplementation(async () => nativeOk('{"ok":true}'));
 
     const provider = new OllamaProvider("http://localhost:11434", "gemma4:12b", {
       authMode: "none",
@@ -196,13 +175,13 @@ describe("per-role options reach the wire on both surfaces", { concurrency: fals
     });
     await provider.generateStructuredResponse("system", [{ role: "user", content: "hi" }]);
 
-    assert.match(urlOf(1), /\/api\/chat$/);
-    assert.equal((bodyOf(1).options as Record<string, unknown>).num_predict, 2048);
-    assert.equal(bodyOf(1).format, "json");
+    assert.match(urlOf(0), /\/api\/chat$/);
+    assert.equal((bodyOf(0).options as Record<string, unknown>).num_predict, 2048);
+    assert.equal(bodyOf(0).format, "json");
   });
 
   it("keeps JSON mode on its own default when no role cap is given", async () => {
-    mockFetch.mock.mockImplementation(async () => openAiOk("{}"));
+    mockFetch.mock.mockImplementation(async () => nativeOk('{"ok":true}'));
 
     const provider = new OllamaProvider("http://localhost:11434", "gemma4:12b", {
       authMode: "none",
@@ -213,11 +192,24 @@ describe("per-role options reach the wire on both surfaces", { concurrency: fals
     });
     await provider.generateStructuredResponse("system", [{ role: "user", content: "hi" }]);
 
-    assert.equal(bodyOf(0).max_tokens, 512);
+    assert.equal((bodyOf(0).options as Record<string, unknown>).num_predict, 512);
   });
 
   it("sends the role output cap to free-text generation on the OpenAI surface", async () => {
     mockFetch.mock.mockImplementation(async () => openAiOk());
+
+    const provider = new OllamaProvider("http://localhost:1234", "gemma4:12b", {
+      authMode: "none",
+      apiStyle: "openai",
+      maxOutputTokens: 1536,
+    });
+    await provider.generateResponse("system", [{ role: "user", content: "hi" }]);
+
+    assert.equal(bodyOf(0).max_tokens, 1536);
+  });
+
+  it("sends the role output cap to free-text generation on the native surface", async () => {
+    mockFetch.mock.mockImplementation(async () => nativeOk());
 
     const provider = new OllamaProvider("http://localhost:11434", "gemma4:12b", {
       authMode: "none",
@@ -225,6 +217,6 @@ describe("per-role options reach the wire on both surfaces", { concurrency: fals
     });
     await provider.generateResponse("system", [{ role: "user", content: "hi" }]);
 
-    assert.equal(bodyOf(0).max_tokens, 1536);
+    assert.equal((bodyOf(0).options as Record<string, unknown>).num_predict, 1536);
   });
 });

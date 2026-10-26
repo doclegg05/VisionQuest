@@ -29,7 +29,7 @@ Read when deciding what to build, cut, simplify, or automate.
 | Job board implementation | [docs/superpowers/plans/2026-03-31-job-board.md](./docs/superpowers/plans/2026-03-31-job-board.md) |
 | Deployment & hosting | [DEPLOY.md](./DEPLOY.md) |
 | Developer setup & scripts | [README.md](./README.md) |
-| SPOKES content reference | [content/_INDEX.md](./content/_INDEX.md) |
+| SPOKES content reference | [catalog/index.md](./catalog/index.md) |
 
 ### Archived (do not read unless explicitly asked)
 - `docs/archive/GAMIFICATION_BACKLOG.md` — frozen planning artifact
@@ -63,22 +63,7 @@ Read when deciding what to build, cut, simplify, or automate.
 - **Key decision (April 1, 2026, superseded June 10, 2026)**: Vision Board, Files, and Resources features are retained; the chat-first redesign moved Resources out of nav (reachable via Learning) and renamed Files to "Documents". See the 2026-06-10 and 2026-07-20 entries in `docs/PRODUCT_DECISIONS.md`.
 
 ## Key Decisions Log
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-03-11 | Next.js + Prisma + Gemini stack | Full framework, free AI tier, conversation-first UX |
-| 2026-03-11 | Named AI coach "Sage" | Wise, calm, non-judgmental mentor personality |
-| 2026-03-13 | Supabase Storage over Cloudflare R2 | Single service for DB + files, simpler architecture |
-| 2026-03-13 | Sentry for error tracking | Client + server + edge, free tier sufficient |
-| 2026-03-13 | Standalone output mode via render.yaml | Uses `node .next/standalone/server.js` for smaller container |
-| 2026-03-13 | All deps in dependencies (no devDeps) | Render sets NODE_ENV=production before build, skips devDeps |
-| 2026-03-13 | Gemini 2.5-flash with model-level systemInstruction | 2.0-flash retired; chat-level systemInstruction breaks streaming |
-| 2026-03-13 | Separate /teacher-register page | Clear UX separation, requires TEACHER_KEY for authorization |
-| 2026-04-01 | Product docs consolidated into PRODUCT_GUIDE + PRODUCT_DECISIONS | Resolves conflicts — Vision Board, Files, Resources retained |
-| 2026-04-01 | StudentDetail split into 4-tab layout | 2043→472 line parent; tabs: Overview, Goals & Plan, Progress, Operations |
-| 2026-04-01 | Intervention queue as primary teacher dashboard | Urgency-scored student list above ClassOverview |
-| 2026-04-01 | Goal confirmation model added | `confirmed` status, `confirmedAt`, `confirmedBy`, `lastReviewedAt` fields on Goal |
-| 2026-04-01 | Unified readiness computation | Single `fetchStudentReadinessData()` used by all 6 consumers |
-| 2026-04-01 | CSP headers with nonce-based scripts/styles | Hardened via `src/proxy.ts`; Gemini, Credly, Sentry, Google Fonts whitelisted |
+Decisions are recorded in `docs/decisions/engineering-log.md`. Append new rows there.
 
 ## Known Issues
 - ~~Free tier Render instances sleep after inactivity~~ — Resolved: project is on Render Starter plan (verified 2026-04-29 in `render.yaml`)

@@ -1,0 +1,34 @@
+{
+  "suite": "sms-readability",
+  "title": "SMS template reading grade and segment fit",
+  "area": "a11y",
+  "tier": "gate",
+  "scorer": "scripts/bench/suites/sms-readability.mjs",
+  "fixture": "config/benchmarks/fixtures/sms-readability.json",
+  "requires": [],
+  "metrics": [
+    {
+      "id": "fixed_text_max_grade",
+      "unit": "grade",
+      "direction": "lower",
+      "floor": 6,
+      "tolerance": 0.5
+    },
+    {
+      "id": "rendered_max_grade",
+      "unit": "grade",
+      "direction": "lower",
+      "floor": null,
+      "reason": "job titles and employer names are third-party text; tracked, not gated",
+      "tolerance": 0.5
+    },
+    {
+      "id": "over_160_gsm7",
+      "unit": "count",
+      "direction": "lower",
+      "floor": 0,
+      "tolerance": 0
+    }
+  ],
+  "notes": "Owner call, 2026-09-05: the suite's first measurement (a single pooled max_grade over realistic values) breached floor=6 at 8.3, driven entirely by verbatim third-party job titles the message must carry (e.g. buildHeardBackSms with 'Customer Service Representative - Bilingual Preferred'). Rather than loosen the floor or leave the whole suite at watch, the metric is split: fixed_text_max_grade renders every template with every caller-supplied slot replaced by the one-syllable placeholder 'X' (numeric slots get their minimal value, 1) — this measures the English sentences VisionQuest authored and controls, floor 6, gate. rendered_max_grade is the same measurement this suite always had, with realistic values from the fixture — floor null, tracked but not gated, because a real job title is not something copy-editing can fix. Red-first: scripts/bench/suites/sms-readability.test.mjs proves the fixed_text_max_grade check can actually fail (a synthetic grade-7.4 fixed template) before asserting every real template passes it (they do, max observed 3.5 — buildInterviewConfirmSms's 'place given' branch — see scripts/bench/suites/sms-readability.mjs's --self-test output for the current per-template breakdown). rendered_max_grade's first (and still current) measurement is 8.3. over_160_gsm7 stays floor 0, gate, computed from the realistic renders only (placeholder text is always short and would never stress the segment limit) — clean at 0/75."
+}

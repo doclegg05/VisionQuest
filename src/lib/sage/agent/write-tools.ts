@@ -15,8 +15,16 @@
  */
 
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
+import { describeSaveError } from "@/lib/job-board/save-error";
+import {
+  sageWorkProfileInputSchema,
+  TRANSPORT_MODES,
+  upsertWorkProfile,
+} from "@/lib/connect/work-profile";
 import { listBookableAdvisors, sendAppointmentConfirmation, syncStudentAlerts } from "@/lib/advising";
+import { bookingAudienceFor } from "@/lib/demo/guards";
 import { formatCohortDateTime } from "@/lib/timezone";
 import { isValidUrl } from "@/lib/validation";
 import { normalizePortfolioItemType, PORTFOLIO_ITEM_TYPES } from "@/lib/portfolio";
@@ -155,9 +163,11 @@ export async function executeAndLedger(
       resultSummary: summary,
     });
     return { status: "success", summary, data };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Write tool ${toolName} failed`, { error: message });
+  } catch {
+    const message = "That didn't work — the action was not completed.";
+    // Database/provider errors may echo the private payload. Keep the failure
+    // record useful without copying those details into logs or audit summaries.
+    logger.error(`Write tool ${toolName} failed`);
     await recordOperation({
       id: operationId,
       actorType: actorTypeFor(ctx.session.role),
@@ -169,7 +179,7 @@ export async function executeAndLedger(
       payload: args as never,
       resultSummary: message,
     }).catch(() => undefined);
-    return { status: "error", summary: "That didn't work — the action was not completed." };
+    return { status: "error", summary: message };
   }
 }
 
@@ -192,6 +202,7 @@ const submitForm: AgentTool = {
     },
     required: ["fileUploadId", "orientationItemId"],
   },
+  requiresAttachment: true,
   requiredRoles: ["student", "teacher", "admin"],
   riskTier: "mutate_consequential",
   enabled: true,
@@ -260,8 +271,19 @@ const FILE_CATEGORIES = ["general", "resume", "portfolio", "cert_evidence", "ori
 
 const fileDocument: AgentTool = {
   name: "file_document",
+  // Measured wording, keep it. On 2026-10-14 two narrower descriptions ("into
+  // one of their document categories") scored the same on every eval case,
+  // but sent "put my WorkKeys certificate with my certification records" to
+  // file_document (a label) instead of lookup_cert_progress, which leads to
+  // mark_certification_complete and actually counts the file. Re-measure
+  // before changing it.
   description:
     "File an uploaded chat document into the right place: a document category, or as evidence for a certification requirement. Requires user confirmation.",
+  // No requirement id here, deliberately. A requirement parameter on this
+  // tool (first a template id no tool returned, then the requirementId) drew
+  // unrelated portfolio requests to file_document in the 2026-10-14 A/B probe,
+  // and the model attaches a file to a requirement with
+  // mark_certification_complete anyway. See file-document.test.ts.
   parameters: {
     type: "object",
     properties: {
@@ -271,22 +293,16 @@ const fileDocument: AgentTool = {
         enum: FILE_CATEGORIES,
         description: "Where the document belongs.",
       },
-      certRequirementTemplateId: {
-        type: "string",
-        description: "Only with category cert_evidence: the certification requirement template this file evidences.",
-      },
     },
     required: ["fileUploadId", "category"],
   },
+  requiresAttachment: true,
   requiredRoles: ["student", "teacher", "admin"],
   riskTier: "mutate_consequential",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
     const fileUploadId = String(args.fileUploadId ?? "");
     const category = String(args.category ?? "");
-    const templateId = args.certRequirementTemplateId
-      ? String(args.certRequirementTemplateId)
-      : undefined;
     const studentId = ctx.targetStudentId ?? ctx.session.id;
 
     if (!(FILE_CATEGORIES as ReadonlyArray<string>).includes(category)) {
@@ -298,37 +314,30 @@ const fileDocument: AgentTool = {
     });
     if (!file) return { status: "error", summary: "That uploaded file was not found on this account." };
 
-    const gateArgs: Record<string, unknown> = templateId
-      ? { fileUploadId, category, certRequirementTemplateId: templateId }
-      : { fileUploadId, category };
+    const gateArgs: Record<string, unknown> = { fileUploadId, category };
     const gate = await confirmationGate(
       "file_document",
       gateArgs,
       ctx,
-      category === "cert_evidence"
-        ? `Attach "${file.filename}" as certification evidence?`
-        : `File "${file.filename}" under ${category.replace("_", " ")}?`,
+      `File "${file.filename}" under ${category.replace("_", " ")}?`,
       `File "${file.filename}"`,
     );
     if (gate) return gate;
 
     return executeAndLedger("file_document", gateArgs, ctx, async () => {
       await prisma.fileUpload.update({ where: { id: fileUploadId }, data: { category } });
-
-      if (category === "cert_evidence" && templateId) {
-        const cert = await prisma.certification.findFirst({
-          where: { studentId },
-          select: { id: true },
-        });
-        if (cert) {
-          // Attach evidence only — completion/verification stays with the teacher.
-          await prisma.certRequirement.updateMany({
-            where: { certificationId: cert.id, templateId },
-            data: { fileId: fileUploadId },
-          });
-        }
-      }
-      return { summary: `Filed "${file.filename}" under ${category.replace("_", " ")}.` };
+      const filed = `Filed "${file.filename}" under ${category.replace("_", " ")}.`;
+      // A category label does not touch the Ready-to-Work checklist; say so,
+      // or the student hears "filed" and assumes the requirement is covered.
+      // The student reads this (ConfirmToolCard shows it after a confirm), so
+      // it names no tools. Sage sees a file's id only on the turn that carries
+      // it, so the next step works only if the student attaches it again.
+      return {
+        summary:
+          category === "cert_evidence"
+            ? `${filed} It does not count toward your Ready-to-Work checklist yet. To count it, attach the file again and ask Sage to mark that checklist item done.`
+            : filed,
+      };
     });
   },
 };
@@ -423,7 +432,12 @@ const saveJob: AgentTool = {
       where: { id: jobListingId, classConfig: { classId: enrollment.classId } },
       select: { id: true, title: true, company: true },
     });
-    if (!listing) return { status: "error", summary: "That job listing was not found." };
+    // S4: same code POST /api/jobs/save uses for the same ambiguity (the id
+    // may be a JobBrowseListing row, or a different class's board) — a
+    // student asking Sage to save a job gets the same plain-language
+    // explanation the Career tab's Save button now gives, instead of a
+    // bare "not found" that doesn't say what to do about it.
+    if (!listing) return { status: "error", summary: describeSaveError("not_your_class_board") };
 
     return executeAndLedger("save_job", { jobListingId }, ctx, async () => {
       await prisma.studentSavedJob.upsert({
@@ -435,6 +449,114 @@ const saveJob: AgentTool = {
     });
   },
 };
+
+// ─── update_work_profile (no confirmation — the student can change it any time) ─
+
+/**
+ * The five-question intake (Match & Connect Task 2.2). Sage asks these in the
+ * student's own words, one at a time, and saves whatever they answer.
+ *
+ * The tool writes ONLY these five fields. StudentWorkProfile also carries
+ * homeZip, county, maxCommuteMinutes and shiftLimits, which the student sets
+ * on the Settings form — a chat turn must not overwrite or clear those. The
+ * picked, strict Zod schema is what enforces that, so a sixth field cannot be
+ * added here by accident: it would have to be added to the schema too.
+ */
+const updateWorkProfile: AgentTool = {
+  name: "update_work_profile",
+  description:
+    "Save what the student tells you about working: the days and times they can work, how they " +
+    "get there, the pay they need, the soonest they can start, and anything about their kids' " +
+    "hours. Ask one question at a time in plain words, then save the answers. Save only what " +
+    "they actually said — never guess a day, a wage, or a date for them.",
+  parameters: {
+    type: "object",
+    properties: {
+      availability: {
+        type: "object",
+        description:
+          "The days and times they can work, as an object with all seven days " +
+          "(monday..sunday), each holding {morning, afternoon, evening, overnight} booleans. " +
+          "Send the whole grid, with false for every time they cannot work.",
+      },
+      transport: {
+        type: "string",
+        enum: TRANSPORT_MODES,
+        description:
+          'How they get to work: "car" (their own), "ride" (someone drives them), "bus", ' +
+          '"walk", or "none" if they have no way to get there yet.',
+      },
+      payFloorHourly: {
+        type: "number",
+        description: "The lowest hourly pay that works for them, in dollars per hour.",
+      },
+      earliestStart: {
+        type: "string",
+        description: "The soonest date they could start, as YYYY-MM-DD.",
+      },
+      childcareHours: {
+        type: "object",
+        description:
+          'What they said about their kids\' hours, as {"note": "their words"}. Leave it out ' +
+          "if they did not bring it up.",
+      },
+    },
+  },
+  requiredRoles: ["student"],
+  riskTier: "mutate_reversible",
+  enabled: true,
+  async execute(args, ctx): Promise<AgentToolResult> {
+    const parsed = sageWorkProfileInputSchema.safeParse(args);
+    if (!parsed.success) {
+      return {
+        status: "error",
+        summary: "I couldn't save that. Let's go through the questions one at a time.",
+        modelHint:
+          `update_work_profile rejected the arguments: ${parsed.error.issues
+            .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+            .join("; ")}. Ask the student again in plain words and send only the five ` +
+          "documented fields.",
+      };
+    }
+
+    const answered = Object.keys(parsed.data);
+    if (answered.length === 0) {
+      return {
+        status: "error",
+        summary: "I didn't catch an answer to save yet.",
+        modelHint:
+          "update_work_profile was called with no fields. Ask one of the five questions first, " +
+          "then call it with the student's answer.",
+      };
+    }
+
+    return executeAndLedger("update_work_profile", parsed.data, ctx, async () => {
+      await upsertWorkProfile(ctx.session.id, parsed.data, "sage");
+      return {
+        summary: `Saved your work answers: ${answered.map(workProfileFieldLabel).join(", ")}.`,
+        data: { saved: answered },
+      };
+    });
+  },
+};
+
+/** Grade-6 labels for the five questions, used in the chat confirmation line. */
+function workProfileFieldLabel(field: string): string {
+  switch (field) {
+    case "availability":
+      return "the days and times you can work";
+    case "transport":
+      return "how you get there";
+    case "payFloorHourly":
+      return "the pay you need";
+    case "earliestStart":
+      return "when you can start";
+    case "childcareHours":
+      return "your kids' hours";
+    default:
+      return field;
+  }
+}
 
 // ─── add_portfolio_item (no confirmation — trivially reversible) ────────────
 
@@ -637,6 +759,7 @@ const bookAppointment: AgentTool = {
       days: 21,
       maxSlotsPerAdvisor: 100,
       minimumLeadMinutes: 60,
+      audience: bookingAudienceFor(ctx.session),
     });
     const advisor = advisors.find((entry) => entry.advisorId === advisorId);
     const slot = advisor?.slots.find((entry) => entry.startsAt === startsAt);
@@ -680,7 +803,7 @@ const bookAppointment: AgentTool = {
       try {
         await sendAppointmentConfirmation(appointment.id);
       } catch (error) {
-        logger.error("book_appointment: confirmation send failed", { error: String(error) });
+        logger.error("book_appointment: confirmation send failed", { error: errorForLog(error) });
       }
 
       return {
@@ -858,6 +981,7 @@ export const WRITE_TOOLS: AgentTool[] = [
   fileDocument,
   updateGoalStatus,
   saveJob,
+  updateWorkProfile,
   addPortfolioItem,
   editPortfolioItem,
   deletePortfolioItem,

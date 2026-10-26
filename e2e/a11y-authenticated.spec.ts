@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 import { E2E_STUDENT, E2E_TEACHER } from "./fixtures";
 import { loginContext } from "./helpers/auth";
 
@@ -12,12 +12,14 @@ import { loginContext } from "./helpers/auth";
  *   npx tsx scripts/seed-e2e-users.ts
  *
  * The bar is the same as the public suite — zero violations against the
- * WCAG 2.0/2.1 A+AA rulesets, fix the page, never filter the rule. Until
- * today's authenticated pages actually meet that bar, this spec lives in the
- * CI soak lane (`continue-on-error` step in .github/workflows/ci.yml, and
- * it is NOT part of `npm run test:a11y`): it runs on every push and fails
- * honestly, producing the red baseline for the page-fixing phase, without
- * blocking merges. Promote it to the gating step once the scans pass.
+ * WCAG 2.0/2.1 A+AA rulesets, fix the page, never filter the rule.
+ *
+ * D4 (2026-09-07): promoted into the gating "E2E gate" step in
+ * .github/workflows/ci.yml and into `npm run test:a11y` — the companion
+ * `axe-authenticated` benchmark (gate tier, config/benchmarks/
+ * axe-authenticated.json) already measures 0 violations here, which made
+ * the standalone continue-on-error soak step this spec used to run in
+ * redundant. A regression on any authenticated route now fails CI.
  *
  * Soft assertions: every route is scanned and reported even after the first
  * failure, so one CI run yields the full violation inventory.
@@ -32,6 +34,17 @@ const STUDENT_ROUTES = [
 ] as const;
 
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+
+/**
+ * Both themes, set explicitly. Before 2026-10-09 the app defaulted to dark, so
+ * this gate scanned dark only; the default now follows the device.
+ */
+const THEMES = ["light", "dark"] as const;
+
+async function setThemeCookie(context: BrowserContext, theme: (typeof THEMES)[number]): Promise<void> {
+  const { origin } = new URL(test.info().project.use.baseURL ?? "http://localhost:3000");
+  await context.addCookies([{ name: "vq-theme", value: theme, url: origin }]);
+}
 
 interface RouteViolation {
   id: string;
@@ -68,12 +81,15 @@ test.describe("Accessibility — authenticated routes (WCAG 2.x A/AA)", () => {
     const context = await loginContext(browser, E2E_STUDENT);
     try {
       const page = await context.newPage();
-      for (const route of STUDENT_ROUTES) {
-        await settle(page, route);
-        const violations = await scan(page);
-        expect
-          .soft(violations, `axe violations on ${route} (student)`)
-          .toEqual([]);
+      for (const theme of THEMES) {
+        await setThemeCookie(context, theme);
+        for (const route of STUDENT_ROUTES) {
+          await settle(page, route);
+          const violations = await scan(page);
+          expect
+            .soft(violations, `axe violations on ${route} (student, ${theme})`)
+            .toEqual([]);
+        }
       }
     } finally {
       await context.close();
@@ -103,21 +119,23 @@ test.describe("Accessibility — authenticated routes (WCAG 2.x A/AA)", () => {
         );
       }
 
-      const page1 = page;
-      await settle(page1, "/teacher");
-      expect.soft(await scan(page1), "axe violations on /teacher").toEqual([]);
-
       const detailPath = `/teacher/students/${seeded.studentId}`;
-      await page.goto(detailPath);
-      // Student detail loads client-side — wait for real content, not the
-      // "Loading student data..." placeholder, before scanning.
-      await expect(page.getByRole("button", { name: "Coach" })).toBeVisible({
-        timeout: 20_000,
-      });
-      await page.waitForTimeout(500);
-      expect
-        .soft(await scan(page), `axe violations on ${detailPath} (student detail)`)
-        .toEqual([]);
+      for (const theme of THEMES) {
+        await setThemeCookie(context, theme);
+        await settle(page, "/teacher");
+        expect.soft(await scan(page), `axe violations on /teacher (${theme})`).toEqual([]);
+
+        await page.goto(detailPath);
+        // Student detail loads client-side — wait for real content, not the
+        // "Loading student data..." placeholder, before scanning.
+        await expect(page.getByRole("tab", { name: "Coach" })).toBeVisible({
+          timeout: 20_000,
+        });
+        await page.waitForTimeout(500);
+        expect
+          .soft(await scan(page), `axe violations on ${detailPath} (student detail, ${theme})`)
+          .toEqual([]);
+      }
     } finally {
       await context.close();
     }

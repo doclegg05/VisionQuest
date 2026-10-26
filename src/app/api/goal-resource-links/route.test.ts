@@ -41,6 +41,7 @@ const mockSendNotification = mock.fn<
   (userId: string, payload: { type: string; title: string; body?: string }) => Promise<void>
 >();
 const mockSyncStudentAlerts = mock.fn<(studentId: string) => Promise<void>>();
+const mockAssertStaffCanManageStudent = mock.fn<(session: Session, studentId: string) => Promise<void>>();
 const mockWarn = mock.fn<(message: string, context?: Record<string, unknown>) => void>();
 const mockError = mock.fn<(message: string, context?: Record<string, unknown>) => void>();
 
@@ -77,6 +78,12 @@ mock.module("@/lib/advising", {
   },
 });
 
+mock.module("@/lib/classroom", {
+  namedExports: {
+    assertStaffCanManageStudent: mockAssertStaffCanManageStudent,
+  },
+});
+
 mock.module("@/lib/logger", {
   namedExports: {
     logger: {
@@ -107,9 +114,11 @@ describe("POST /api/goal-resource-links", () => {
     mockLogAuditEvent.mock.resetCalls();
     mockSendNotification.mock.resetCalls();
     mockSyncStudentAlerts.mock.resetCalls();
+    mockAssertStaffCanManageStudent.mock.resetCalls();
     mockWarn.mock.resetCalls();
     mockError.mock.resetCalls();
 
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => undefined);
     mockGoalFindFirst.mock.mockImplementation(async () => goal);
     mockLinkFindFirst.mock.mockImplementation(async () => null);
     mockLinkCreate.mock.mockImplementation(async (args) => ({
@@ -169,6 +178,25 @@ describe("POST /api/goal-resource-links", () => {
 
     assert.equal(res.status, 403);
     assert.equal(mockLinkCreate.mock.callCount(), 0);
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
+  });
+
+  it("refuses a goal whose student the teacher cannot manage, and writes nothing", async () => {
+    // The cohort demo instructor is a real teacher row held to its own class,
+    // so a goal id from any other class must stop here, not just under RLS.
+    // Imported here, not at the top: a static import would load the real
+    // @/lib/auth into api-error before the mock above replaces it.
+    const { forbidden } = await import("@/lib/api-error");
+    mockAssertStaffCanManageStudent.mock.mockImplementation(async () => {
+      throw forbidden("You do not have access to this student.");
+    });
+
+    const res = await post(validBody);
+
+    assert.equal(res.status, 403);
+    assert.deepEqual(mockAssertStaffCanManageStudent.mock.calls[0]?.arguments, [teacher, goal.studentId]);
+    assert.equal(mockLinkCreate.mock.callCount(), 0);
+    assert.equal(mockSendNotification.mock.callCount(), 0);
     assert.equal(mockSyncStudentAlerts.mock.callCount(), 0);
   });
 

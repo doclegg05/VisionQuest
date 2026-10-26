@@ -17,8 +17,19 @@ const mockAdminNotificationFindFirst = mock.fn() as any;
 const mockAdminStudentFindUnique = mock.fn() as any;
 const mockStudentFindUnique = mock.fn() as any;
 const mockPreferenceFindMany = mock.fn() as any;
+const mockAdminPreferenceFindFirst = mock.fn() as any;
+const mockOutboundCount = mock.fn() as any;
+const mockOutboundCreate = mock.fn() as any;
+const mockOutboundUpdate = mock.fn() as any;
+// sendPolicySms reserves the cap slot inside a transaction holding
+// pg_advisory_xact_lock, then updates the row after Twilio answers. The
+// interactive-transaction callback gets the same delegates as the client.
+const mockAdvisoryLock = mock.fn() as any;
 const mockSendEmail = mock.fn() as any;
 const mockSendSms = mock.fn() as any;
+const mockBuildNotificationEmail = mock.fn() as any;
+const mockEnqueueJob = mock.fn(async (_options: unknown): Promise<string | null> => "queued-job");
+mock.module("@/lib/jobs", { namedExports: { enqueueJob: mockEnqueueJob } });
 
 const mockDebug = mock.fn() as any;
 const mockInfo = mock.fn() as any;
@@ -61,6 +72,42 @@ mock.module("@/lib/db", {
           return mockAdminStudentFindUnique;
         },
       },
+      // The SMS branch now runs through src/lib/nudges/sms-policy.ts, which
+      // reads the consent record and writes the outbound log on the admin
+      // client (OutboundMessage is staff-only under RLS).
+      notificationPreference: {
+        get findFirst() {
+          return mockAdminPreferenceFindFirst;
+        },
+      },
+      outboundMessage: {
+        get count() {
+          return mockOutboundCount;
+        },
+        get create() {
+          return mockOutboundCreate;
+        },
+        get update() {
+          return mockOutboundUpdate;
+        },
+      },
+      $transaction: async (fn: any) =>
+        fn({
+          $executeRaw: (...args: unknown[]) => mockAdvisoryLock(...args),
+          notificationPreference: {
+            get findFirst() {
+              return mockAdminPreferenceFindFirst;
+            },
+          },
+          outboundMessage: {
+            get count() {
+              return mockOutboundCount;
+            },
+            get create() {
+              return mockOutboundCreate;
+            },
+          },
+        }),
     },
   },
 });
@@ -103,7 +150,9 @@ mock.module("@/lib/sms", {
 
 mock.module("@/lib/email-templates", {
   namedExports: {
-    buildNotificationEmail: () => "<p>notification</p>",
+    get buildNotificationEmail() {
+      return mockBuildNotificationEmail;
+    },
   },
 });
 
@@ -134,14 +183,24 @@ async function flushDelivery(): Promise<void> {
 const payload = { type: "goal_due", title: "Goal due soon", body: "Check your plan." };
 
 describe("sendMultiChannelNotification logging", () => {
-  beforeEach(() => {
+  beforeEach((t) => {
+    assert.ok("mock" in t);
+    t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-01T16:00:00Z").getTime() });
     for (const m of [
       mockNotificationCreate,
       mockNotificationFindFirst,
       mockStudentFindUnique,
       mockPreferenceFindMany,
+      mockAdminPreferenceFindFirst,
+      mockOutboundCount,
+      mockOutboundCreate,
+      mockOutboundUpdate,
+      mockAdvisoryLock,
       mockSendEmail,
       mockSendSms,
+      mockBuildNotificationEmail,
+      mockEnqueueJob,
+      mockAdminStudentFindUnique,
       mockDebug,
       mockInfo,
       mockWarn,
@@ -163,8 +222,23 @@ describe("sendMultiChannelNotification logging", () => {
       { channel: "email", destination: STUDENT_EMAIL, enabled: true },
       { channel: "sms", destination: STUDENT_PHONE, enabled: true },
     ]);
+    // A consenting recipient inside the send window, so the SMS branch is
+    // exercised end to end rather than short-circuiting on policy.
+    mockAdminPreferenceFindFirst.mock.mockImplementation(async ({ where }: any) => ({
+      enabled: true,
+      destination: where.channel === "email" ? STUDENT_EMAIL : STUDENT_PHONE,
+      smsConsentAt: new Date("2026-08-01T12:00:00.000Z"),
+      smsRevokedAt: null,
+    }));
+    mockOutboundCount.mock.mockImplementation(async () => 0);
+    mockOutboundCreate.mock.mockImplementation(async () => ({ id: "outbound-1" }));
+    mockOutboundUpdate.mock.mockImplementation(async () => ({ id: "outbound-1" }));
+    mockAdvisoryLock.mock.mockImplementation(async () => 1);
     mockSendEmail.mock.mockImplementation(async () => undefined);
     mockSendSms.mock.mockImplementation(async () => true);
+    mockBuildNotificationEmail.mock.mockImplementation(() => "<p>notification</p>");
+    mockEnqueueJob.mock.mockImplementation(async () => "queued-job");
+    mockAdminStudentFindUnique.mock.mockImplementation(async () => ({ isActive: true, email: STUDENT_EMAIL }));
   });
 
   it("logs no student id, email address, or phone number on the success path", async () => {
@@ -187,9 +261,10 @@ describe("sendMultiChannelNotification logging", () => {
     const logged = loggedText();
     assert.ok(logged.includes("email"), "dropped the channel");
     assert.ok(logged.includes(payload.type), "dropped the notification type");
+    assert.ok(!logged.includes(payload.title), "logged private notification title");
   });
 
-  it("redacts the recipient address out of a bounced-email error", async () => {
+  it("queues a bounced email without logging recipient or provider text", async () => {
     mockSendEmail.mock.mockImplementation(async () => {
       throw new Error(`550 5.1.1 <${STUDENT_EMAIL}>: recipient address rejected`);
     });
@@ -197,10 +272,114 @@ describe("sendMultiChannelNotification logging", () => {
     await notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24);
     await flushDelivery();
 
-    assert.equal(mockError.mock.callCount(), 1);
+    assert.equal(mockWarn.mock.callCount(), 1);
+    assert.equal(mockEnqueueJob.mock.callCount(), 1);
     const logged = loggedText();
     assert.ok(!logged.includes(STUDENT_EMAIL), `error log leaked the address: ${logged}`);
-    assert.ok(logged.includes("550 5.1.1"), "dropped the SMTP status needed to debug the bounce");
+    assert.ok(!logged.includes("550 5.1.1"), "logged provider exception text");
+  });
+
+  it("does not drop bulk or crisis channel deliveries when providers are busy", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    mockSendEmail.mock.mockImplementation(() => gate);
+    mockSendSms.mock.mockImplementation(async () => { await gate; return true; });
+    try {
+      const results = await Promise.all(Array.from({ length: 20 }, () =>
+        notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24)));
+      assert.ok(results.every((result) => result.email && result.sms));
+      await flushDelivery();
+      const started = mockSendEmail.mock.callCount() + mockSendSms.mock.callCount();
+      assert.equal(started, 16);
+      assert.equal(mockEnqueueJob.mock.callCount(), 24);
+      assert.equal(started + mockEnqueueJob.mock.callCount(), 40);
+      const crisis = await notifications.sendMultiChannelNotification(STUDENT_ID, {
+        type: "wellbeing.concern", title: "Urgent check-in", body: "Please check in.",
+      }, 0);
+      assert.equal(crisis.email, true);
+      assert.equal(crisis.sms, true);
+      assert.equal(mockSendEmail.mock.callCount() + mockSendSms.mock.callCount(), 16);
+      assert.equal(mockEnqueueJob.mock.callCount(), 26);
+      for (const call of mockEnqueueJob.mock.calls) {
+        const job = call.arguments[0] as { type: string; payload: { channel: string; to?: string; studentId: string } };
+        assert.equal(job.type, "notification_channel_delivery");
+        assert.equal(job.payload.studentId, STUDENT_ID);
+        assert.equal(job.payload.to, job.payload.channel === "email" ? STUDENT_EMAIL : undefined);
+      }
+    } finally { release(); }
+    await flushDelivery();
+    const result = await notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24);
+    assert.equal(result.email, true);
+    assert.equal(result.sms, true);
+    await flushDelivery();
+  });
+
+  it("surfaces overflow persistence failure after preserving the in-app notification", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    mockSendEmail.mock.mockImplementation(() => gate);
+    mockSendSms.mock.mockImplementation(async () => { await gate; return true; });
+    try {
+      await Promise.all(Array.from({ length: 8 }, () => notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24)));
+      await flushDelivery();
+      assert.equal(mockSendEmail.mock.callCount() + mockSendSms.mock.callCount(), 16);
+      const inAppBefore = mockNotificationCreate.mock.callCount();
+      mockEnqueueJob.mock.mockImplementation(async () => { throw new Error(`${STUDENT_EMAIL} private SQL payload`); });
+      await assert.rejects(notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24), /^Error: Notification delivery could not be queued\.$/);
+      assert.equal(mockNotificationCreate.mock.callCount(), inAppBefore + 1);
+      assert.equal(mockError.mock.callCount(), 1);
+      assert.ok(!loggedText().includes(STUDENT_EMAIL));
+      assert.doesNotMatch(loggedText(), /private SQL payload/);
+    } finally { release(); }
+    await flushDelivery();
+  });
+
+  it("reports immediate-failure retry persistence errors without private text", async () => {
+    mockSendEmail.mock.mockImplementation(async () => { throw new Error(`${STUDENT_EMAIL} private provider text`); });
+    mockEnqueueJob.mock.mockImplementation(async () => { throw new Error("private SQL payload"); });
+    await notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24);
+    await flushDelivery();
+    assert.equal(mockError.mock.callCount(), 1);
+    assert.ok(!loggedText().includes(STUDENT_EMAIL));
+    assert.doesNotMatch(loggedText(), /private SQL payload|private provider text/);
+  });
+
+  it("handles rejected SMS delivery without logging private error text", async () => {
+    mockSendSms.mock.mockImplementation(async () => false);
+    await notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24);
+    await flushDelivery();
+    assert.equal(mockWarn.mock.callCount(), 1);
+    assert.equal(mockEnqueueJob.mock.callCount(), 1);
+    assert.doesNotMatch(loggedText(), /private message body/);
+    assert.ok(!loggedText().includes(STUDENT_PHONE));
+  });
+
+  it("threads the recipient's role into the notification email so staff land on /teacher/settings", async () => {
+    mockStudentFindUnique.mock.mockImplementation(async () => ({
+      email: STUDENT_EMAIL,
+      role: "teacher",
+    }));
+
+    await notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24);
+    await flushDelivery();
+
+    assert.equal(mockBuildNotificationEmail.mock.callCount(), 1);
+    const args = mockBuildNotificationEmail.mock.calls[0].arguments;
+    assert.deepEqual(args[3], { role: "teacher" });
+  });
+
+  it("passes the student role through unchanged for an ordinary student recipient", async () => {
+    mockStudentFindUnique.mock.mockImplementation(async () => ({
+      email: STUDENT_EMAIL,
+      role: "student",
+    }));
+
+    await notifications.sendMultiChannelNotification(STUDENT_ID, payload, 24);
+    await flushDelivery();
+
+    assert.equal(mockBuildNotificationEmail.mock.callCount(), 1);
+    const args = mockBuildNotificationEmail.mock.calls[0].arguments;
+    assert.deepEqual(args[3], { role: "student" });
   });
 
   it("logs no student id when evicting a dead SSE connection", async () => {
@@ -208,7 +387,8 @@ describe("sendMultiChannelNotification logging", () => {
       write: async () => {
         throw new Error("stream closed");
       },
-      close: async () => undefined,
+      abort: async () => undefined,
+      closed: new Promise(() => {}),
     } as unknown as WritableStreamDefaultWriter<Uint8Array>;
 
     notifications.addConnection(STUDENT_ID, failingWriter);
@@ -227,6 +407,52 @@ describe("sendMultiChannelNotification logging", () => {
 // `notification_access` WITH CHECK rejects inserting one. The SSE push is
 // keyed on the recipient id and must fire exactly as before.
 // ---------------------------------------------------------------------------
+
+describe("bounded SSE lifecycle", () => {
+  it("evicts a stalled writer at eight outstanding writes without growing its queue", async () => {
+    const { readable, writable } = new TransformStream<Uint8Array>();
+    const writer = writable.getWriter();
+    let disconnected = 0;
+    const cleanup = notifications.addConnection("slow-user", writer, () => disconnected++);
+    const writes = Array.from({ length: 20 }, () => notifications.writeConnection(writer, new Uint8Array([1])));
+    const results = await Promise.all(writes);
+    assert.ok(results.every((value) => value === false));
+    assert.equal(disconnected, 1);
+    cleanup();
+    assert.equal(disconnected, 1);
+    await readable.cancel().catch(() => {});
+  });
+
+  it("times out a single stalled write and removes the connection", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const { writable } = new TransformStream<Uint8Array>();
+    const writer = writable.getWriter();
+    let disconnected = 0;
+    notifications.addConnection("timeout-user", writer, () => disconnected++);
+    const write = notifications.writeConnection(writer, new Uint8Array([1]));
+    t.mock.timers.tick(5_001);
+    assert.equal(await write, false);
+    assert.equal(disconnected, 1);
+    assert.equal(await notifications.writeConnection(writer, new Uint8Array([1])), false);
+  });
+
+  it("eviction and reader cancellation release resources exactly once", async () => {
+    const cleanups: Array<() => void> = [];
+    const readers: ReadableStream<Uint8Array>[] = [];
+    let disconnected = 0;
+    for (let i = 0; i < 6; i++) {
+      const { readable, writable } = new TransformStream<Uint8Array>();
+      readers.push(readable);
+      cleanups.push(notifications.addConnection("eviction-user", writable.getWriter(), () => disconnected++));
+    }
+    assert.equal(disconnected, 1);
+    await readers[5].cancel();
+    await flushDelivery();
+    assert.equal(disconnected, 2);
+    cleanups.forEach((cleanup) => cleanup());
+    assert.equal(disconnected, 6);
+  });
+});
 
 const TEACHER_ID = "clteacher0000abcdefghijkl";
 const staffPayload = {
@@ -309,7 +535,8 @@ describe("sendNotificationWithCooldown for staff recipients", () => {
       write: async (chunk: Uint8Array) => {
         chunks.push(new TextDecoder().decode(chunk));
       },
-      close: async () => undefined,
+      abort: async () => undefined,
+      closed: new Promise(() => {}),
     } as unknown as WritableStreamDefaultWriter<Uint8Array>;
 
     const remove = notifications.addConnection(TEACHER_ID, writer);

@@ -6,14 +6,18 @@
 // =============================================================================
 
 import { randomUUID } from "crypto";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { logAuditEvent } from "@/lib/audit";
-import type { Session } from "@/lib/api-error";
+import { isStaffRole, type Session } from "@/lib/api-error";
+import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
+import { isDemoInstructor } from "@/lib/demo/guards";
 import { getToolByName, findToolBySlashCommand } from "./tools";
 import { validateToolArgs } from "./validation";
 import { checkToolRateLimit, rateLimitMessage } from "./rate-limit";
 import { agentMode, isTierAllowedInMode } from "./flags";
-import type { AgentTool, AgentToolCallRecord, AgentToolResult } from "./types";
+import type { AgentTool, AgentToolCallRecord, AgentToolResult, RiskTier } from "./types";
 
 export interface ExecuteToolOptions {
   session: Session;
@@ -85,6 +89,30 @@ export async function executeAgentTool(
     );
   }
 
+  // The demo instructor may look, but a write that names no student is not tied
+  // to the demo class, so it could reach anything the tool can. A write that
+  // does name a student goes through the class check below, which is narrowed
+  // to the demo instructor's own class.
+  if (!targetStudentId && isDemoInstructor(session) && isWriteTier(tool.riskTier)) {
+    return errorRecord(callId, toolName, args, startedAt, DEMO_READ_ONLY_REFUSAL);
+  }
+
+  // Confirmation tokens bind a target, but do not grant lasting access to it.
+  // Re-check at execution (including delayed confirmations), not just when
+  // assembling the chat context. Never trust a student's supplied target.
+  if (targetStudentId) {
+    try {
+      if (!isStaffRole(session.role)) throw new Error("Invalid target");
+      const student = await assertStaffCanManageStudent(session, targetStudentId);
+      // This boundary accepts canonical IDs only. The shared UI guard also
+      // resolves usernames; accepting an alias here could authorize one student
+      // while a tool (or confirmation token) addresses another by primary key.
+      if (student.id !== targetStudentId) throw new Error("Invalid target");
+    } catch {
+      return errorRecord(callId, toolName, args, startedAt, "You don't have access to this student.");
+    }
+  }
+
   // Per-student per-tool rate limit — enforced BEFORE execute so a runaway
   // loop can't hammer a tool. Composes with (does not replace) the token/cost
   // quota checked upstream in the chat route. Blocked → friendly, audited
@@ -107,7 +135,7 @@ export async function executeAgentTool(
         targetStudentId: targetStudentId ?? null,
       },
     }).catch((err) => {
-      logger.warn("agent.executor: rate-limit audit log failed", { err: String(err), toolName });
+      logger.warn("agent.executor: rate-limit audit log failed", { err: errorForLog(err), toolName });
     });
     return errorRecord(
       callId,
@@ -141,30 +169,28 @@ export async function executeAgentTool(
       action: `sage.tool.${toolName}`,
       targetType: "sage_conversation",
       targetId: conversationId,
-      summary: `Sage tool "${toolName}" → ${result.status}: ${result.summary}`,
+      summary: `Sage tool "${toolName}" → ${result.status}.`,
       metadata: {
         callId,
-        args: validation.args,
         status: result.status,
         targetStudentId: targetStudentId ?? null,
         actionKind: result.action?.action ?? null,
       },
     }).catch((err) => {
-      logger.warn("agent.executor: audit log failed", { err: String(err), toolName });
+      logger.warn("agent.executor: audit log failed", { err: errorForLog(err), toolName });
     });
 
     return { callId, tool: toolName, args: validation.args, result, startedAt, finishedAt };
-  } catch (err) {
-    logger.error("agent.executor: tool threw", {
-      toolName,
-      err: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
+    // Provider/Prisma errors can contain student records or secrets. Neither
+    // the model-visible result nor ordinary logs should receive that payload.
+    logger.error("agent.executor: tool threw", { toolName });
     return errorRecord(
       callId,
       toolName,
       args,
       startedAt,
-      err instanceof Error ? err.message : "Tool failed unexpectedly.",
+      "Tool failed unexpectedly.",
     );
   }
 }
@@ -197,6 +223,18 @@ export async function executeSlashCommand(
   });
 
   return { tool, record };
+}
+
+/** Exhaustive over RiskTier: a new tier is a compile error here. */
+function isWriteTier(tier: RiskTier): boolean {
+  switch (tier) {
+    case "read":
+    case "read_ai":
+      return false;
+    case "mutate_reversible":
+    case "mutate_consequential":
+      return true;
+  }
 }
 
 function isAuthorized(session: Session, tool: AgentTool): boolean {

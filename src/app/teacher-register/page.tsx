@@ -90,7 +90,7 @@ export default function StaffRegisterPage() {
                       setError("");
                       setNotice("");
                     }}
-                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                    className={`inline-flex flex-1 items-center justify-center rounded-lg py-2 text-sm font-medium transition-colors pointer-coarse:min-h-11 ${
                       role === option
                         ? "bg-[var(--surface-strong)] text-[var(--ink-strong)] shadow-sm"
                         : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
@@ -109,6 +109,12 @@ export default function StaffRegisterPage() {
               <input
                 id="registrationKey"
                 type="password"
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={registrationKey}
                 onChange={(e) => setRegistrationKey(e.target.value)}
                 placeholder={`Enter the ${role} registration key`}
@@ -127,6 +133,7 @@ export default function StaffRegisterPage() {
               <input
                 id="displayName"
                 type="text"
+                autoComplete="name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Your full name"
@@ -211,7 +218,7 @@ export default function StaffRegisterPage() {
           <div className="mt-6 text-center">
             <Link
               href="/"
-              className="text-sm font-medium text-[var(--accent-strong)] transition-colors hover:text-[var(--ink-strong)]"
+              className="inline-flex items-center pointer-coarse:min-h-11 text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
             >
               Back to student sign-in
             </Link>

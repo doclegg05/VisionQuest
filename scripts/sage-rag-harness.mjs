@@ -24,6 +24,7 @@ import {
   ensureParentDir,
   loadEnvFile,
   parseArgs,
+  passesRetrievalCase,
 } from "./lib/sage-rag-utils.mjs";
 import { percentile } from "./lib/percentile.mjs";
 
@@ -46,7 +47,7 @@ function unique(values) {
 
 function parseDocumentRefs(context) {
   // formatEntry() emits a doc entry in one of two shapes (see knowledge-base-server.ts):
-  //   no passages:  "[Title]\nLink: /api/documents/download?id=ID&mode=view\nSummary: …"
+  //   notes-only:   "Link: /api/documents/download?id=ID&mode=view\n[Title]\nTitle. …"
   //   chunk path:   "Link: /api/documents/download?id=ID&mode=view\n[Title, p.N]\n…"
   // The chunk-citation path (live hybrid retrieval) puts Link FIRST with no leading
   // [Title], so the old `^\[Title\]\nLink:` anchor silently missed every chunk-retrieved
@@ -122,6 +123,16 @@ async function main() {
   const docsByStorageKey = await loadDocumentsByStorageKeys(expectationKeys);
   const missingExpectationKeys = expectationKeys.filter((key) => !docsByStorageKey.has(key));
   const { getDocumentContext } = await import("../src/lib/sage/knowledge-base-server.ts");
+  const { getAbstentionDistance, getMaxCosineDistance, getDistanceMargin, getMinScoreRatio } =
+    await import("../src/lib/sage/hybrid-retrieval.ts");
+  // Record effective values, including defaults, so a local run cannot be
+  // mistaken for one using the deployment's configured retrieval thresholds.
+  const retrievalSettings = {
+    abstentionDistance: getAbstentionDistance(),
+    maxCosineDistance: getMaxCosineDistance(),
+    distanceMargin: getDistanceMargin(),
+    minScoreRatio: getMinScoreRatio(),
+  };
 
   const results = [];
   for (const item of questions) {
@@ -179,7 +190,7 @@ async function main() {
     const matchedExpectedTerm = includesAny(contextLower, item.expectedTerms || []);
     const legacyPassed = hasContext && matchedExpectedTerm;
     const relevancePassed = hasExpectations ? top3Expected : null;
-    const strictPassed = legacyPassed && (relevancePassed !== false);
+    const strictPassed = passesRetrievalCase({ audienceLeak, expectNoContext: item.expectNoContext, noAnswerOk, legacyPassed, relevancePassed });
     const strictCleanPassed = strictPassed && (cleanTop3 !== false);
 
     results.push({
@@ -240,6 +251,7 @@ async function main() {
     role,
     maxResults,
     tokenBudgetChars,
+    retrievalSettings,
     legacyPassed,
     strictPassed,
     strictCleanPassed,
@@ -269,6 +281,7 @@ async function main() {
     console.log("\nVisionQuest Sage RAG Harness");
     console.log(`Fixture: ${fixturePath}`);
     console.log(`Role: ${role}`);
+    console.log(`Retrieval settings: ${JSON.stringify(retrievalSettings)}`);
     console.log(`Legacy term/context pass: ${legacyPassed}/${results.length}`);
     console.log(`Strict top-3 source pass: ${strictPassed}/${results.length}`);
     console.log(`Top-1 expected: ${top1Expected}/${expectedResults.length}`);

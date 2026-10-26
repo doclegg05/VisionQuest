@@ -18,6 +18,16 @@ interface ProgressTabProps {
   /** Certification outcome verification (P1-4) */
   certOutcomeVerifying: boolean;
   onCertOutcomeVerify: (certificationId: string) => void;
+  /**
+   * Application outcome verification (P1-4). The API has existed since P1-4
+   * shipped; this is its first UI. Grant reports split verified placements
+   * from student claims, so an unverified application is a placement nobody
+   * can count.
+   */
+  applicationVerifying: string | null;
+  /** Set when the last verify failed; shown next to the applications list. */
+  applicationVerifyError: string | null;
+  onApplicationVerify: (applicationId: string) => void;
   /** Orientation honor-system verification (P1-1) */
   orientationVerifying: string | null;
   onOrientationVerify: (itemId: string, decision: "confirm" | "decline") => void;
@@ -33,6 +43,9 @@ export default function ProgressTab({
   onVerify,
   certOutcomeVerifying,
   onCertOutcomeVerify,
+  applicationVerifying,
+  applicationVerifyError,
+  onApplicationVerify,
   orientationVerifying,
   onOrientationVerify,
   showAllConversations,
@@ -82,31 +95,33 @@ export default function ProgressTab({
               const busy = orientationVerifying === item.id;
               return (
                 <div key={item.id} className="flex items-center gap-2 text-sm flex-wrap">
-                  <span className={progressItem?.completed ? "text-green-500" : "text-[var(--ink-faint)]"}>
+                  <span className={progressItem?.completed ? "text-[var(--badge-success-text)]" : "text-[var(--ink-faint)]"}>
                     {progressItem?.completed ? "\u2713" : "\u25CB"}
                   </span>
                   <span className={progressItem?.completed ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}>
                     {item.label}
                   </span>
                   {item.required && !progressItem?.completed && (
-                    <span className="text-xs bg-red-50 text-red-700 px-1.5 py-0.5 rounded">Required</span>
+                    <span className="text-xs bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] px-1.5 py-0.5 rounded">Required</span>
                   )}
                   {pendingVerification && (
                     <>
-                      <span className="text-xs bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded">
+                      <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">
                         Student marked done \u2014 verify
                       </span>
                       <button
                         onClick={() => onOrientationVerify(item.id, "confirm")}
                         disabled={busy}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                        aria-label={`Confirm orientation step: ${item.label}`}
+                        className="inline-flex items-center text-xs px-2.5 py-1 rounded-lg bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] hover:ring-1 hover:ring-current transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
                       >
                         {busy ? "..." : "Confirm"}
                       </button>
                       <button
                         onClick={() => onOrientationVerify(item.id, "decline")}
                         disabled={busy}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+                        aria-label={`Decline orientation step: ${item.label}`}
+                        className="inline-flex items-center text-xs px-2.5 py-1 rounded-lg bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] hover:ring-1 hover:ring-current transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
                       >
                         {busy ? "..." : "Decline"}
                       </button>
@@ -134,7 +149,7 @@ export default function ProgressTab({
         <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
           Ready to Work Certification ({certDone}/{certification.templates.length})
           {certification.cert?.status === "completed" && (
-            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Completed</span>
+            <span className="ml-2 text-xs bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] px-2 py-0.5 rounded-full">Completed</span>
           )}
         </h3>
         {/* P1-4: cert-level outcome verification — self-reported progress
@@ -142,13 +157,14 @@ export default function ProgressTab({
             orientation honor-system verify above. */}
         {certification.cert?.verificationStatus === "self_reported" && (
           <div className="mb-3 flex items-center gap-2 flex-wrap">
-            <span className="text-xs bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded">
+            <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">
               Self-reported progress {"—"} verify
             </span>
             <button
               onClick={() => certification.cert && onCertOutcomeVerify(certification.cert.id)}
               disabled={certOutcomeVerifying}
-              className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+              aria-label="Verify Ready to Work certification progress"
+              className="inline-flex items-center text-xs px-2.5 py-1 rounded-lg bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] hover:ring-1 hover:ring-current transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
             >
               {certOutcomeVerifying ? "..." : "Verify"}
             </button>
@@ -169,12 +185,12 @@ export default function ProgressTab({
                 <div key={template.id} className="theme-input rounded-lg p-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
-                      <span className={requirement?.completed ? "text-green-500" : "text-[var(--ink-faint)]"}>
+                      <span className={requirement?.completed ? "text-[var(--badge-success-text)]" : "text-[var(--ink-faint)]"}>
                         {requirement?.completed ? "\u2713" : "\u25CB"}
                       </span>
                       <span className="text-sm text-[var(--ink-strong)]">{template.label}</span>
                       {template.required && (
-                        <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Required</span>
+                        <span className="text-xs bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-1.5 py-0.5 rounded">Required</span>
                       )}
                     </div>
 
@@ -184,7 +200,7 @@ export default function ProgressTab({
                           href={`/api/files/download?id=${requirement.fileId}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:text-blue-800"
+                          className="inline-flex items-center text-xs text-[var(--badge-info-text)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
                         >
                           {"\uD83D\uDCCE"} View file
                         </a>
@@ -194,10 +210,10 @@ export default function ProgressTab({
                         <button
                           onClick={() => onVerify(requirement.id, !requirement.verifiedBy)}
                           disabled={verifying === requirement.id}
-                          className={`text-xs px-3 py-1 rounded-lg transition-colors ${
+                          className={`inline-flex items-center text-xs px-3 py-1 rounded-lg transition-colors pointer-coarse:min-h-11 ${
                             requirement.verifiedBy
-                              ? "bg-green-100 text-green-700 hover:bg-red-50 hover:text-red-600"
-                              : "bg-orange-100 text-orange-700 hover:bg-green-100 hover:text-green-700"
+                              ? "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] hover:bg-[var(--badge-error-bg)] hover:text-[var(--badge-error-text)]"
+                              : "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] hover:bg-[var(--badge-success-bg)] hover:text-[var(--badge-success-text)]"
                           }`}
                         >
                           {verifying === requirement.id
@@ -233,6 +249,11 @@ export default function ProgressTab({
         <div className="grid gap-6 xl:grid-cols-2">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-faint)]">Applications</p>
+            {applicationVerifyError && (
+              <p role="alert" className="mt-2 text-sm text-[var(--badge-error-text)]">
+                {applicationVerifyError}
+              </p>
+            )}
             {applications.length === 0 ? (
               <p className="mt-3 text-sm text-[var(--ink-faint)]">No tracked applications yet.</p>
             ) : (
@@ -246,13 +267,33 @@ export default function ProgressTab({
                           {application.opportunity.company} {"\u2022"} {application.opportunity.type}
                         </p>
                       </div>
-                      <span className="rounded-full border border-sky-300 bg-sky-100 px-2.5 py-1 text-sm font-semibold text-sky-800">
+                      <span className="rounded-full border border-[var(--badge-info-bg)] bg-[var(--badge-info-bg)] px-2.5 py-1 text-sm font-semibold text-[var(--badge-info-text)]">
                         Status: {applicationStatusLabel(application.status)}
                       </span>
                     </div>
                     <p className="mt-2 text-xs text-[var(--ink-faint)]">
                       Updated {dateFormatter.format(new Date(application.updatedAt))}
                     </p>
+                    {application.verificationStatus === "verified" ? (
+                      <p className="mt-2 text-xs text-[var(--badge-success-text)]">Outcome verified</p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">
+                          {application.verificationStatus === "self_reported"
+                            ? "Student-reported \u2014 verify"
+                            : "Not verified"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onApplicationVerify(application.id)}
+                          disabled={applicationVerifying === application.id}
+                          aria-label={`Verify application for ${application.opportunity.title} at ${application.opportunity.company}`}
+                          className="min-h-[44px] text-xs px-2.5 py-1 rounded-lg bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] hover:ring-1 hover:ring-current transition-colors disabled:opacity-50"
+                        >
+                          {applicationVerifying === application.id ? "..." : "Verify"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -274,7 +315,7 @@ export default function ProgressTab({
                           {dateFormatter.format(new Date(registration.event.startsAt))}
                         </p>
                       </div>
-                      <span className="rounded-full border border-teal-300 bg-teal-100 px-2.5 py-1 text-sm font-semibold text-teal-800">
+                      <span className="rounded-full border border-[var(--badge-info-bg)] bg-[var(--badge-info-bg)] px-2.5 py-1 text-sm font-semibold text-[var(--badge-info-text)]">
                         Status: {eventRegistrationStatusLabel(registration.status)}
                       </span>
                     </div>
@@ -293,7 +334,7 @@ export default function ProgressTab({
       <div className="theme-card rounded-xl p-5">
         <h3 className="text-sm font-semibold text-[var(--ink-strong)] mb-3">
           Portfolio ({portfolio.length} items)
-          {hasResume && <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Resume built</span>}
+          {hasResume && <span className="ml-2 text-xs bg-[var(--badge-success-bg)] text-[var(--badge-success-text)] px-2 py-0.5 rounded-full">Resume built</span>}
         </h3>
         {portfolio.length === 0 ? (
           <p className="text-sm text-[var(--ink-faint)]">No portfolio items yet.</p>
@@ -328,7 +369,7 @@ export default function ProgressTab({
                     href={`/api/files/download?id=${file.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800"
+                    className="inline-flex items-center text-[var(--badge-info-text)] hover:text-[var(--ink-strong)] pointer-coarse:min-h-11"
                   >
                     {file.filename}
                   </a>
@@ -362,7 +403,7 @@ export default function ProgressTab({
                       </p>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
+                      <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
                         {conv.stage}
                       </span>
                       <span className="text-xs text-[var(--ink-muted)]">
@@ -382,7 +423,7 @@ export default function ProgressTab({
             {!showAllConversations && conversations.length > 20 && (
               <button
                 onClick={onShowAllConversations}
-                className="w-full text-xs text-[var(--accent-strong)] hover:text-[var(--ink-strong)] py-2"
+                className="flex w-full items-center justify-center text-xs text-success hover:text-[var(--ink-strong)] hover:underline py-2 pointer-coarse:min-h-11"
               >
                 Show all {conversations.length} conversations
               </button>
@@ -404,7 +445,7 @@ function PublicCredentialBanner({
 }) {
   return (
     <div className="mt-4 rounded-lg border border-[rgba(15,154,146,0.14)] bg-[rgba(15,154,146,0.07)] p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-secondary)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-info">
         Public credential
       </p>
       <p className="mt-2 text-sm text-[var(--ink-strong)]">
@@ -417,7 +458,7 @@ function PublicCredentialBanner({
           href={`/credentials/${publicCredentialPage.slug}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 inline-flex text-sm font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+          className="mt-3 inline-flex items-center text-sm font-semibold text-success hover:text-[var(--ink-strong)] hover:underline pointer-coarse:min-h-11"
         >
           Open public credential {"\u2192"}
         </a>

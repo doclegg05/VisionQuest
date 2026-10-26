@@ -40,7 +40,7 @@ mock.module("@/lib/db", {
 
 mock.module("@/lib/ai/embeddings", {
   namedExports: {
-    embedTexts: mockEmbedTexts,
+    embedTextsWithModel: async (...args: unknown[]) => ({ vectors: await mockEmbedTexts(...args), model: "gemini-embedding-001" }),
     toVectorLiteral: (vector: number[]) => `[${vector.join(",")}]`,
   },
 });
@@ -86,8 +86,8 @@ const STAFF_MESSAGES = [
 ];
 
 const STAFF_JSON = JSON.stringify([
-  { kind: "semantic", content: "Prefers three-bullet answers with the action first.", category: "preference", confidence: 0.9 },
-  { kind: "semantic", content: "Reviews flagged students every Monday morning before class.", category: "coaching", confidence: 0.8 },
+  { kind: "semantic", content: "This instructor prefers three-bullet answers with the action first.", category: "preference", confidence: 0.9 },
+  { kind: "semantic", content: "This instructor reviews flagged students every Monday morning before class.", category: "coaching", confidence: 0.8 },
 ]);
 
 function resetAll() {
@@ -138,10 +138,12 @@ describe("extractAndStoreStaffMemories", () => {
   });
 
   it("drops extracted items that carry student-identifying content", async () => {
+    // Every item carries the fixed subject, so the privacy guard, not the
+    // frame check, is what has to reject the two leaky ones.
     const leaky = JSON.stringify([
-      { kind: "semantic", content: "Prefers short answers with the action first.", category: "preference", confidence: 0.9 },
-      { kind: "episodic", content: "Worried about Maria missing class again.", category: "other", confidence: 0.9 },
-      { kind: "episodic", content: "A student disclosed a custody hearing on Thursday.", category: "circumstance", confidence: 0.9 },
+      { kind: "semantic", content: "This instructor prefers short answers with the action first.", category: "preference", confidence: 0.9 },
+      { kind: "episodic", content: "This instructor is worried about Maria missing class again.", category: "other", confidence: 0.9 },
+      { kind: "episodic", content: "This instructor heard a student disclosed a custody hearing on Thursday.", category: "circumstance", confidence: 0.9 },
     ]);
 
     const result = await extractAndStoreStaffMemories({
@@ -155,7 +157,7 @@ describe("extractAndStoreStaffMemories", () => {
     assert.equal(result.stored, 1);
     assert.equal(result.rejected, 2);
     const stored = mockCreate.mock.calls.map((call: any) => call.arguments[0].data.content);
-    assert.deepEqual(stored, ["Prefers short answers with the action first."]);
+    assert.deepEqual(stored, ["This instructor prefers short answers with the action first."]);
   });
 
   it("honors the SAGE_MEMORY_ENABLED kill switch", async () => {
@@ -206,6 +208,93 @@ describe("extractAndStoreStaffMemories", () => {
   });
 });
 
+describe("staff facts open with the fixed subject \"This instructor\"", () => {
+  beforeEach(resetAll);
+
+  function extractWith(json: string, conversationId: string) {
+    const provider = providerReturning(json);
+    const result = extractAndStoreStaffMemories({
+      provider,
+      staffId: "teacher-1",
+      staffRole: "teacher",
+      conversationId,
+      messages: STAFF_MESSAGES,
+    });
+    return { provider, result };
+  }
+
+  function item(content: string) {
+    return { kind: "semantic", content, category: "preference", confidence: 0.9 };
+  }
+
+  function storedContents(): string[] {
+    return mockCreate.mock.calls.map((call: any) => call.arguments[0].data.content);
+  }
+
+  it("asks the model to open every fact with \"This instructor\"", async () => {
+    const { provider, result } = extractWith("[]", "conv-frame-1");
+    await result;
+    const systemPrompt: string = provider.generateStructuredResponse.mock.calls[0].arguments[0];
+    assert.match(systemPrompt, /Start every fact with "This instructor"/);
+    assert.match(systemPrompt, /Refer to the instructor as "they" or "their", never "he" or "she"/);
+    assert.doesNotMatch(systemPrompt, /starting with an ordinary verb/);
+  });
+
+  it("rejects a fact that does not open with the fixed subject", async () => {
+    // The old shape. Its opening verb is a capitalized word the privacy guard
+    // has to judge, which is how "Lacks" and "Translates" got read as names.
+    const json = JSON.stringify([item("Prefers three-bullet answers with the action first.")]);
+    const { result } = extractWith(json, "conv-frame-2");
+    assert.deepEqual(await result, { stored: 0, deduped: 0, rejected: 1 });
+    assert.equal(mockCreate.mock.callCount(), 0);
+  });
+
+  it("stores framed facts whose verbs the privacy guard has no entry for", async () => {
+    // The three facts the 2026-10-16 memory eval diagnosis found dropped most
+    // often, written the way the new prompt asks.
+    const contents = [
+      "This instructor lacks the authority to approve placements and routes them to the coordinator.",
+      "This instructor translates program jargon into plain language at a sixth-grade reading level.",
+      "This instructor conducts caseload reviews every Monday morning before class.",
+    ];
+    const { result } = extractWith(JSON.stringify(contents.map(item)), "conv-frame-3");
+    assert.deepEqual(await result, { stored: 3, deduped: 0, rejected: 0 });
+    assert.deepEqual(storedContents(), contents);
+  });
+
+  it("accepts the possessive form of the fixed subject", async () => {
+    const content = "This instructor's caseload is capped at twenty learners per cohort.";
+    const { result } = extractWith(JSON.stringify([item(content)]), "conv-frame-4");
+    assert.deepEqual(await result, { stored: 1, deduped: 0, rejected: 0 });
+    assert.deepEqual(storedContents(), [content]);
+  });
+
+  it("does not accept a lowercase, partial or capitalized-verb frame", async () => {
+    // A capitalized verb after the subject puts the verb back in front of the
+    // proper-noun scan, where "Lacks" reads as a name and "Prefers" happens to
+    // pass. The frame check rejects both the same way.
+    const json = JSON.stringify([
+      item("this instructor prefers short answers."),
+      item("This instructors' room opens at eight."),
+      item("This prefers short answers."),
+      item("This instructor Prefers short answers."),
+      item("This instructor Lacks the authority to approve placements."),
+    ]);
+    const { result } = extractWith(json, "conv-frame-5");
+    assert.deepEqual(await result, { stored: 0, deduped: 0, rejected: 5 });
+  });
+
+  it("still drops a framed fact that names a student", async () => {
+    const json = JSON.stringify([
+      item("This instructor says Jasmine needs a bus pass this month."),
+      item("This instructor reports a student disclosed an eviction notice."),
+      item("This instructor says jasmine is behind on her forms."),
+    ]);
+    const { result } = extractWith(json, "conv-frame-6");
+    assert.deepEqual(await result, { stored: 0, deduped: 0, rejected: 3 });
+  });
+});
+
 describe("student chat extraction is unchanged by the staff path", () => {
   beforeEach(resetAll);
 
@@ -242,4 +331,28 @@ describe("student chat extraction is unchanged by the staff path", () => {
     });
     assert.equal(result.stored, 1);
   });
+});
+
+ it("preserves model-first staff transcript roles behind an extraction request", async () => {
+  resetAll();
+  const provider = providerReturning("[]");
+  const transcript = [{role: "model" as const, content: "How should I format replies?"}, {role: "user" as const, content: "Keep them brief."}, {role: "model" as const, content: "Understood."}];
+  await extractAndStoreStaffMemories({provider, staffId: "staff-1", staffRole: "teacher", conversationId: "conv-1", messages: transcript});
+  const sent = provider.generateStructuredResponse.mock.calls[0].arguments[1];
+  assert.equal(sent[0].role, "user");
+  assert.equal(sent.at(-1).role, "user");
+  assert.deepEqual(sent.slice(1, -1), transcript);
+ });
+
+it("durable staff extraction rejects invalid shapes instead of completing empty", async () => {
+  await assert.rejects(extractAndStoreStaffMemories({ provider: providerReturning("{}"), staffId: "teacher-1",
+    staffRole: "teacher", conversationId: "conv-1", messages: STAFF_MESSAGES, throwOnError: true }), /Staff memory extraction failed/);
+});
+
+it("a durable staff retry does not consume its daily allowance again", async () => {
+  resetAll();
+  mockRateLimitDaily.mock.mockImplementation(async () => ({ success: false }));
+  await extractAndStoreStaffMemories({ provider: providerReturning("[]"), staffId: "teacher-1", staffRole: "teacher",
+    conversationId: "conv-1", messages: STAFF_MESSAGES, throwOnError: true, dailyLimitReserved: true });
+  assert.equal(mockRateLimitDaily.mock.callCount(), 0);
 });

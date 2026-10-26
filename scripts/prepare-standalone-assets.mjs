@@ -32,6 +32,15 @@ const copies = [
     from: join(root, "config"),
     to: join(standaloneDir, "config"),
   },
+  // reports/benchmarks holds the committed benchmark results and baseline the
+  // admin dashboard (/teacher/admin/benchmarks) reads from disk at request
+  // time. Without this the deployed page would show every suite as "not run"
+  // while the files sit in the repository. Absent on a checkout that has
+  // never run a suite, so the existsSync guard below covers it.
+  {
+    from: join(root, "reports", "benchmarks"),
+    to: join(standaloneDir, "reports", "benchmarks"),
+  },
 ];
 
 for (const { from, to } of copies) {

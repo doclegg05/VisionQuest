@@ -285,6 +285,32 @@ export function teacherInterventionHref(type: string, studentRecordId: string) {
 
 export function teacherDashboardAlertAction(alertType: string, studentRecordId: string): InterventionAction {
   switch (alertType) {
+    // Match & Connect Phase 5. All four are about a CONNECTION — an employer
+    // who has gone quiet, an interview, a placement — and the console is where
+    // that work happens, so they deep-link there rather than to a student tab
+    // that shows none of it.
+    case "connect_employer_no_view":
+    case "connect_employer_no_response":
+      return {
+        href: "/teacher/connect",
+        label: "Open the lead",
+      };
+    case "connect_interview_unconfirmed":
+      return {
+        href: "/teacher/connect",
+        label: "Call the student",
+      };
+    case "connect_retention_confirm":
+      return {
+        href: `/teacher/students/${studentRecordId}/spokes`,
+        label: "Record follow-up",
+      };
+    case "connect_retention_unanswered":
+    case "connect_retention_lost":
+      return {
+        href: "/teacher/connect",
+        label: "Check the placement",
+      };
     case "orientation_form_missing":
       return {
         href: `/teacher/students/${studentRecordId}#submitted-forms`,
@@ -404,6 +430,14 @@ export function teacherDashboardAlertQuickAction(alertType: string): DashboardQu
     case "goal_stale":
     case "orientation_not_started":
     case "orientation_overdue":
+    // Every Connect alert resolves into a phone call or a record to update,
+    // and a task on the student is how an instructor parks that for later.
+    case "connect_employer_no_view":
+    case "connect_employer_no_response":
+    case "connect_interview_unconfirmed":
+    case "connect_retention_confirm":
+    case "connect_retention_unanswered":
+    case "connect_retention_lost":
       return {
         kind: "create_task",
         label: "Add task",

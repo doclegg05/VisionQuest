@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
+import { DEMO_ACCOUNT_KINDS, type DemoAccountKind } from "./demo/config";
 
 const TOKEN_TTL = "7d";
 const MFA_TOKEN_TTL = "5m";
@@ -7,6 +9,19 @@ export interface SessionClaims {
   sub: string;
   role: string;
   sv: number;
+  /**
+   * Set only on demo accounts. src/proxy.ts reads it to fence demo sessions
+   * without a database lookup. Real accounts never carry the key at all.
+   */
+  demo?: DemoAccountKind;
+  /**
+   * Random per-token id, so two tokens minted in the same second for one
+   * account (the shared demo instructor) differ and logout can revoke just
+   * one of them. Tokens issued before it was added have none.
+   */
+  jti?: string;
+  /** Expiry in seconds since the epoch, set by jsonwebtoken from TOKEN_TTL. */
+  exp?: number;
 }
 
 export interface MfaSessionClaims {
@@ -27,21 +42,73 @@ export function getJwtSecret(): string {
   return secret;
 }
 
-export function signToken(studentId: string, role: string, sessionVersion: number): string {
-  return jwt.sign({ sub: studentId, role, sv: sessionVersion }, getJwtSecret(), {
+export function signToken(
+  studentId: string,
+  role: string,
+  sessionVersion: number,
+  options: { demo?: DemoAccountKind } = {},
+): string {
+  // A real account's claims stay {sub, role, sv}, plus the jti below: no `demo` key.
+  const claims: SessionClaims = {
+    sub: studentId,
+    role,
+    sv: sessionVersion,
+    ...(options.demo === undefined ? {} : { demo: options.demo }),
+  };
+  return jwt.sign(claims, getJwtSecret(), {
     expiresIn: TOKEN_TTL,
     algorithm: "HS256",
+    jwtid: randomUUID(),
   });
 }
 
+function isDemoAccountKind(value: unknown): value is DemoAccountKind {
+  return DEMO_ACCOUNT_KINDS.some((kind) => kind === value);
+}
+
+/**
+ * Verify a full-session token (the `vq-session` cookie).
+ *
+ * Session tokens and MFA-challenge tokens are deliberately NOT
+ * interchangeable. Both are HS256 over the same JWT_SECRET and carry the same
+ * sub/role/sv claims, so a signature check alone cannot tell them apart — the
+ * `purpose` claim is the only separator, and it must be enforced HERE as well
+ * as in `verifyMfaSessionToken`.
+ *
+ * Why it matters: /api/auth/login mints an MFA challenge token the moment the
+ * PASSWORD verifies, before any TOTP code is presented, and returns it in a
+ * Set-Cookie header. A non-browser client can read that header and replay the
+ * token as `vq-session`. While this verifier ignored `purpose`, that replay
+ * produced a full teacher/admin session with the second factor never
+ * presented. The same shape applies to the emailed password-reset flow and the
+ * Google OAuth callback, both of which also hand out challenge tokens.
+ *
+ * The check is "carries a purpose claim at all", not "carries mfa_challenge",
+ * so any future purpose-scoped token is rejected by default rather than
+ * inheriting session authority the day it is added. Session tokens themselves
+ * are never given a purpose claim, so existing 7-day tokens keep working.
+ *
+ * A `demo` claim, when present, must be one of DEMO_ACCOUNT_KINDS. Anything
+ * else, a non-string included, fails the whole token: a claim this code does
+ * not recognize is not one it can safely ignore. Tokens with no `demo` key
+ * (every real account, and every token issued before demo mode) verify as
+ * before.
+ */
 export function verifyToken(token: string): SessionClaims | null {
   try {
     const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as Partial<SessionClaims>;
+    // Fail closed on any purpose-scoped token before looking at anything else.
+    if ("purpose" in (payload as Record<string, unknown>)) {
+      return null;
+    }
     if (
       typeof payload.sub !== "string" ||
       typeof payload.role !== "string" ||
       typeof payload.sv !== "number"
     ) {
+      return null;
+    }
+    if ("demo" in payload && !isDemoAccountKind(payload.demo)) {
       return null;
     }
     return payload as SessionClaims;
@@ -58,6 +125,14 @@ export function signMfaSessionToken(studentId: string, role: string, sessionVers
   );
 }
 
+/**
+ * Verify a short-lived MFA challenge token (the `vq-mfa-challenge` cookie).
+ *
+ * The counterpart to `verifyToken`, and non-interchangeable with it by design:
+ * this verifier requires `purpose === "mfa_challenge"`, so a full session
+ * token can never be presented as a completed-password-step challenge, just as
+ * a challenge token can never be presented as a session.
+ */
 export function verifyMfaSessionToken(token: string): MfaSessionClaims | null {
   try {
     const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as Partial<MfaSessionClaims>;

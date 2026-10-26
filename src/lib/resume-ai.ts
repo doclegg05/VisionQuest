@@ -14,14 +14,37 @@ export type ResumeAssistResponse = {
   notes: string;
 };
 
+/**
+ * What the model is given. No student name and no email: the résumé BODY is
+ * what gets rewritten, and neither is a fact the body needs (FERPA review
+ * §2.c.3 / W10, 2026-09-06). The stored `existingResume.contact` block is
+ * stripped before it is serialised and re-attached on the way out — the same
+ * split the Connect packet makes in `packetResumeContent` (SEC-W4).
+ */
 interface ResumeAssistContext {
-  studentName: string;
-  studentEmail: string;
   prompt: string;
   existingResume: ResumeContent;
   goals: string[];
   portfolioItems: Array<{ title: string; description: string | null; type: string }>;
   certifications: ResumeCertification[];
+}
+
+const EMPTY_CONTACT: ResumeContent["contact"] = {
+  email: "",
+  phone: "",
+  location: "",
+  website: "",
+  linkedin: "",
+};
+
+/**
+ * The résumé with its contact block blanked — what the model sees. Mirrors
+ * `packetResumeContent` in src/lib/connect/packet.ts; that module imports
+ * Prisma and storage, so this résumé path keeps its own four-line copy rather
+ * than pull the Connect server module into a unit-testable helper.
+ */
+function withoutContact(resume: ResumeContent): ResumeContent {
+  return { ...resume, contact: { ...EMPTY_CONTACT } };
 }
 
 const RESUME_ASSIST_PROMPT = `You are helping write a professional resume for a workforce development student.
@@ -35,19 +58,13 @@ Rules:
 - Keep the resume suitable for both online job applications and printed handouts.
 - Experience descriptions should use short bullet-style lines separated by newlines.
 - References should usually be "Available upon request" unless specific reference text already exists.
+- Do not write contact details (email, phone, address, links). The student's contact block is kept separately and attached after you finish.
 
 Return valid JSON in this exact shape:
 {
   "resume": {
     "headline": "",
     "objective": "",
-    "contact": {
-      "email": "",
-      "phone": "",
-      "location": "",
-      "website": "",
-      "linkedin": ""
-    },
     "skills": [],
     "experience": [
       {
@@ -98,12 +115,10 @@ function buildContextMessage(context: ResumeAssistContext): string {
     : "- None recorded";
 
   return [
-    `Student name: ${context.studentName}`,
-    `Student email on file: ${context.studentEmail || "(none)"}`,
     `Targeting notes from user: ${context.prompt || "(none provided)"}`,
     "",
-    "Existing resume JSON:",
-    JSON.stringify(context.existingResume, null, 2),
+    "Existing resume JSON (contact block withheld):",
+    JSON.stringify(withoutContact(context.existingResume), null, 2),
     "",
     "Recorded goals:",
     goals,
@@ -125,8 +140,12 @@ export async function generateResumeDraft(provider: AIProvider, context: ResumeA
 
   const parsed = resumeAssistResponseSchema.parse(JSON.parse(responseText));
 
+  // Re-attach the stored contact block locally. Anything the model put under
+  // `contact` is discarded: it never saw the real one, so it can only have
+  // invented it.
+  const draft = normalizeResumeContent(parsed.resume);
   return {
-    resume: normalizeResumeContent(parsed.resume),
+    resume: { ...draft, contact: { ...context.existingResume.contact } },
     missingInformation: parsed.missingInformation.filter(Boolean),
     notes: parsed.notes,
   };

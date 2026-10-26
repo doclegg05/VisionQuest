@@ -50,7 +50,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--accent-strong)]">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-success">
                       {pw.label}
                     </p>
                     <p className="mt-1 text-sm font-medium text-[var(--ink-strong)]">
@@ -129,7 +129,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
           <Link
             href="/chat"
             prefetch={false}
-            className="mt-3 inline-flex text-sm font-semibold text-[var(--accent-strong)] hover:text-[var(--ink-strong)]"
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-success hover:text-[var(--ink-strong)] hover:underline"
           >
             Talk to Sage about your goals →
           </Link>

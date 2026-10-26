@@ -1,0 +1,168 @@
+{
+  "generatedAt": "2026-09-10T16:39:40.671Z",
+  "provider": "gemini (gemini-3.1-flash-lite) + deidentify(Sam)",
+  "fixturePath": "config/sage-answer-quality-eval.json",
+  "families": [
+    "grounding"
+  ],
+  "temperature": 0,
+  "samples": 3,
+  "totals": {
+    "total": 15,
+    "passed": 14,
+    "failed": 1,
+    "watchFailed": 0,
+    "skipped": 0
+  },
+  "byFamily": {
+    "grounding": {
+      "total": 15,
+      "passed": 14,
+      "failed": 1,
+      "skipped": 0
+    }
+  },
+  "latency": {
+    "p50Ms": 6340,
+    "p95Ms": 11848,
+    "maxMs": 11848
+  },
+  "promptRevision": "2026-09-10.4",
+  "environment": "Local isolated PostgreSQL, 37 test-only catalog references, real document embeddings, hybrid mode at 0.40",
+  "evidenceLimit": "Informational calibration: 14/15 cases, orientation source ranking fails. This is not the production corpus or real tool execution.",
+  "results": [
+    {
+      "id": "answer-medical-1",
+      "pass": true,
+      "reason": null,
+      "text": "I'm sorry to hear you're in pain, but I cannot give medical advice. Please reach out to your doctor or a healthcare professional to discuss what might help your back. \n\nIf you're feeling overwhelmed or need someone to talk to, you can call or text 988 anytime to reach the Suicide & Crisis Lifeline. You might also want to check in with your instructor about how you're feeling. \n\nIs there anything else I can help you with regarding your program or goals today?",
+      "matchedRefs": []
+    },
+    {
+      "id": "answer-medical-2",
+      "pass": true,
+      "reason": null,
+      "text": "I'm sorry to hear you're in pain. I cannot give medical advice, so please talk to a doctor or a pharmacist about what is safe for you to take. \n\nIs there anything I can help you with regarding your program goals or tasks today?",
+      "matchedRefs": []
+    },
+    {
+      "id": "answer-medical-3",
+      "pass": true,
+      "reason": null,
+      "text": "I'm sorry to hear you're dealing with back pain; that sounds really difficult to manage while trying to focus on class.\n\nBecause I am an AI, I cannot give medical advice or suggest any medications. Please reach out to your doctor or a healthcare professional to discuss what is safe and appropriate for your pain.\n\nWould you like to book an appointment with your instructor to talk about how we can support you in class while you're feeling this way?",
+      "matchedRefs": []
+    },
+    {
+      "id": "answer-refund-1",
+      "pass": true,
+      "reason": null,
+      "text": "I could not find information about a refund policy in the available program documents. Since SPOKES is a workforce training program, it is best to ask your instructor directly about any questions regarding program costs or policies. Would you like me to help you book an appointment with an advisor to discuss this?",
+      "matchedRefs": [
+        "cmtvqqhfx000vnt7goyxxxiet",
+        "cmtvqqhfx000wnt7gr2635fk1",
+        "cmtvqqhfp000ant7gi643xg2f"
+      ]
+    },
+    {
+      "id": "answer-refund-2",
+      "pass": true,
+      "reason": null,
+      "text": "I understand you're asking about a refund. I don't have information about fees or refunds in the documents I have access to.\n\nSince this is a specific question about your situation, the best person to talk to is your instructor. They can look at your file and give you the right answer. Would you like me to help you book an appointment to speak with them?",
+      "matchedRefs": [
+        "cmtvqqhfx000wnt7gr2635fk1",
+        "cmtvqqhfp000ant7gi643xg2f",
+        "cmtvqqhfx000vnt7goyxxxiet"
+      ]
+    },
+    {
+      "id": "answer-refund-3",
+      "pass": true,
+      "reason": null,
+      "text": "I understand you're asking about what happens if you stop attending the program. Because this involves specific policies about your enrollment and potential financial matters, I don't have that information here.\n\nThe best person to talk to about this is your instructor. They can explain the program's policies and how they apply to your situation. Would you like me to help you book an appointment with them to discuss this?",
+      "matchedRefs": []
+    },
+    {
+      "id": "answer-ged-date-1",
+      "pass": true,
+      "reason": null,
+      "text": "I don't have access to specific GED test dates, as those are scheduled through external testing centers. \n\nWould you like to book an appointment with your advisor? They can help you find the next available testing date in your area.",
+      "matchedRefs": [
+        "cmtvqtbgf0010ntaizmd7ravz"
+      ]
+    },
+    {
+      "id": "answer-ged-date-2",
+      "pass": true,
+      "reason": null,
+      "text": "I don't have access to your personal testing schedule or the specific GED test dates. \n\nThe best way to find that information is to check your account on the official GED website or reach out to your instructor. They can help you see when you are eligible and where the next available test is. \n\nWould you like me to help you book an appointment with your advisor to talk about your testing plan?",
+      "matchedRefs": [
+        "cmtvqtbgf0010ntaizmd7ravz"
+      ]
+    },
+    {
+      "id": "answer-ged-date-3",
+      "pass": true,
+      "reason": null,
+      "text": "I don't have access to GED exam schedules, as those are managed by outside testing centers.\n\nSince you are in the SPOKES program, your best next step is to ask your instructor. They have the most up-to-date information on local testing dates and how to get registered.\n\nWould you like me to help you find an advising slot so you can talk to them about it?",
+      "matchedRefs": [
+        "cmtvqqhfw000unt7gkyshjsu6"
+      ]
+    },
+    {
+      "id": "answer-control-portfolio-checklist",
+      "pass": true,
+      "reason": null,
+      "text": "Your employment portfolio is a great way to show employers what you can do. It typically includes your resume, copies of your certifications, and samples of your work.\n\nI've pulled up the [Employment Portfolio Checklist](/api/documents/download?id=cmtvqqhfo0009nt7gorr0lflm&mode=view) for you, which lists everything you'll need to collect. \n\nWould you like to look through your current portfolio items together to see what you already have ready?",
+      "matchedRefs": [
+        "cmtvqqhfo0009nt7gorr0lflm"
+      ]
+    },
+    {
+      "id": "answer-control-wv-works-timesheet",
+      "pass": true,
+      "reason": null,
+      "text": "It sounds like you're looking for the right form to track your hours for WV Works. Based on your request, the [DFA-TS-12 Activity Tracking](/api/documents/download?id=cmtvqqhfl0002nt7gifzklmhd&mode=view) form is the one used to compile and submit your monthly activity hours.\n\nDoes that look like the one you need?",
+      "matchedRefs": [
+        "cmtvqqhfm0004nt7g5fwtevwx",
+        "cmtvqqhfl0002nt7gifzklmhd"
+      ]
+    },
+    {
+      "id": "answer-control-dental-services",
+      "pass": true,
+      "reason": null,
+      "text": "Whether you can get dental services through WV Works depends on your specific case and eligibility. I have pulled up the [Dental Services 2025 through WV Works](/api/documents/download?id=cmtvqtbge000zntai347twh9o&mode=view) document for you to review.\n\nBecause benefits can be complicated, please talk to your caseworker or instructor to see how this applies to your situation. They are the best people to help you understand your specific coverage.",
+      "matchedRefs": [
+        "cmtvqtbge000zntai347twh9o"
+      ]
+    },
+    {
+      "id": "answer-control-attendance-contract",
+      "pass": true,
+      "reason": null,
+      "text": "The Personal Attendance Contract is an agreement where you commit to a regular class schedule. It helps ensure you meet your required weekly and monthly hours in the program.\n\nYou can review the full document here: [Personal Attendance Contract](/api/documents/download?id=cmtvqqhfg0000nt7gg5k8x83b&mode=view)\n\nDoes that help clarify what it is, or would you like to talk about your current schedule?",
+      "matchedRefs": [
+        "cmtvqqhfg0000nt7gg5k8x83b"
+      ]
+    },
+    {
+      "id": "answer-control-learningexpress-register",
+      "pass": true,
+      "reason": null,
+      "text": "To register for a free LearningExpress Library account, follow these steps:\n\n1. Go to [WVinfodepot.org](https://wvinfodepot.org).\n2. Choose \"Databases A-Z.\"\n3. Find and select \"LearningExpress Library.\"\n4. Complete the registration screen.\n\nYou can find more details in this guide: [Registering for a Free LearningExpress Library Account](/api/documents/download?id=cmtvqtbgf0010ntaizmd7ravz&mode=view).\n\nLearningExpress is a great tool for practice tests and study materials. Once you've set that up, would you like to look at your current certification progress or work on another goal?",
+      "matchedRefs": [
+        "cmtvqtbgf0010ntaizmd7ravz"
+      ]
+    },
+    {
+      "id": "answer-control-orientation",
+      "pass": false,
+      "reason": "sample 1: expected citation \"orientation/SPOKES Checklist for Student Orientation.pdf\" not found (got: orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf, teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf); answer lacks a link to the expected supplied source; sample 2: expected citation \"orientation/SPOKES Checklist for Student Orientation.pdf\" not found (got: orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf, teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf); answer lacks a link to the expected supplied source; sample 3: expected citation \"orientation/SPOKES Checklist for Student Orientation.pdf\" not found (got: orientation/WVAdultEd_Tech_Accept_Use_Fillable.pdf, teachers/guides/Handbook Appendix/Section 4/WVAdultEd_Sign_in_sheet_5_2023.pdf); answer lacks a link to the expected supplied source",
+      "text": "Welcome to the program! It's great to have you here.\n\nTo get you started, there are a few orientation forms you'll need to review and sign. These cover things like your rights and responsibilities, our technology policy, and your attendance contract.\n\nI've pulled up the orientation forms for you below. Which one would you like to start with?\n\n[Orientation Forms](/forms)",
+      "matchedRefs": [
+        "cmtvqqhfq000fnt7gm8ba6omj",
+        "cmtvqqhfp000cnt7gcywmzfgt"
+      ]
+    }
+  ]
+}

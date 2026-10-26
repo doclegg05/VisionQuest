@@ -1,0 +1,5 @@
+{
+  "$comment": "No corpus needed — this suite reads scripts/lib/cron-health.mjs and prisma/migrations/*cron*/migration.sql directly. This file exists only so bench:validate's fixture-exists check has something to point at, and to record the migration glob for anyone auditing the suite without reading its source.",
+  "migrationGlob": "prisma/migrations/*cron*/migration.sql",
+  "registrationPattern": "cron.schedule('<name>'"
+}

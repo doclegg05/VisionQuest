@@ -51,12 +51,10 @@ test("teacher works the loop: queue → student detail → anchors → verificat
 
     // 1. Teacher dashboard renders the intervention queue with the student.
     await page.goto(`/teacher?classId=${fixtureClass.id}`);
-    // Two queue surfaces render an "Intervention Queue" heading (the
-    // dashboard panel and the class-overview variant) — either proves the
-    // queue rendered.
+    // The teacher home has exactly one intervention queue (issue #39).
     await expect(
-      page.getByRole("heading", { name: /intervention queue/i }).first(),
-    ).toBeVisible({ timeout: 20_000 });
+      page.getByRole("heading", { name: /intervention queue/i }),
+    ).toHaveCount(1, { timeout: 20_000 });
     // Scope to the queue panel (eyebrow "Needs attention") — other dashboard
     // surfaces (roster, class overview) also link the student, by public id.
     const queuePanel = page
@@ -74,11 +72,11 @@ test("teacher works the loop: queue → student detail → anchors → verificat
       timeout: 20_000,
     });
     // Detail loads client-side; the tab bar is the loaded-state marker.
-    await expect(page.getByRole("button", { name: "Coach" })).toBeVisible({
+    await expect(page.getByRole("tab", { name: "Coach" })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByRole("button", { name: "Progress" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Admin" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Progress" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Admin" })).toBeVisible();
 
     // 3. Deep-link anchors switch tabs (useAnchorTabSwitch): only the active
     // tab's content is in the DOM, so the target becoming visible proves the

@@ -4,6 +4,7 @@ import {
   type GoalPlanEntry,
 } from "@/lib/goal-resource-links";
 import { type ProgramType } from "@/lib/program-type";
+import { type WorkProfile } from "@/lib/connect/work-profile-shared";
 
 export interface StudentTabProps {
   studentId: string;
@@ -202,6 +203,13 @@ export interface ApplicationData {
   status: string;
   updatedAt: string;
   appliedAt: string | null;
+  /**
+   * null = legacy row, "self_reported" = the student claimed it, "verified" =
+   * an instructor confirmed it. Carried so the Progress tab can offer the
+   * per-application Verify action that `/api/teacher/outcomes/verify` has
+   * always supported but nothing ever called.
+   */
+  verificationStatus?: string | null;
   opportunity: {
     id: string;
     title: string;
@@ -285,4 +293,6 @@ export interface StudentData {
     circumstances: string[];
     completedAt: string | null;
   } | null;
+  /** Match & Connect Phase 2 — the student's own work constraints, or null. */
+  workProfile: WorkProfile | null;
 }

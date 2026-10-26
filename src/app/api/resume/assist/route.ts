@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
+import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import {
   parseStoredResumeData,
@@ -75,14 +76,11 @@ export const POST = withAuth(async (session, req: Request) => {
         : "Operator configured cloud AI; resume drafting routed to the configured provider.",
   });
 
-  const [student, goals, portfolioItems, certifications, storedResume] = await Promise.all([
-    prisma.student.findUnique({
-      where: { id: session.id },
-      select: {
-        displayName: true,
-        email: true,
-      },
-    }),
+  // No Student row is read here any more: the draft prompt carries neither
+  // the display name nor the email (FERPA review W10), and the résumé's own
+  // contact block is withheld from the model and re-attached locally in
+  // generateResumeDraft.
+  const [goals, portfolioItems, certifications, storedResume] = await Promise.all([
     prisma.goal.findMany({
       where: { studentId: session.id, status: { in: ["active", "completed"] } },
       orderBy: { updatedAt: "desc" },
@@ -125,8 +123,6 @@ export const POST = withAuth(async (session, req: Request) => {
 
   try {
     const result = await generateResumeDraft(provider, {
-      studentName: student?.displayName || session.displayName,
-      studentEmail: student?.email || "",
       prompt: body.prompt,
       existingResume: parseStoredResumeData(storedResume?.data),
       goals: goals.map((goal) => goal.content),
@@ -154,7 +150,7 @@ export const POST = withAuth(async (session, req: Request) => {
   } catch (error) {
     logger.error("Resume assist failed", {
       student: studentLogKey(session.id),
-      error: String(error),
+      error: errorForLog(error),
     });
     await logAiAuditEvent({
       actorId: session.id,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withRegistry } from "@/lib/registry/middleware";
 import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { getWorkProfile } from "@/lib/connect/work-profile";
 import { prisma } from "@/lib/db";
 import {
   buildGoalEvidenceEntries,
@@ -157,6 +158,8 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           status: true,
           updatedAt: true,
           appliedAt: true,
+          // Feeds the per-application Verify action on the Progress tab.
+          verificationStatus: true,
           opportunity: {
             select: {
               id: true,
@@ -316,7 +319,7 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
     ...student.formSubmissions.map((s) => s.fileId),
     ...student.formSubmissions.map((s) => s.signatureFileId).filter(Boolean),
   ].filter(Boolean) as string[];
-  const [orientationItems, certTemplates, formFiles] = await Promise.all([
+  const [orientationItems, certTemplates, formFiles, workProfile] = await Promise.all([
     prisma.orientationItem.findMany({
       orderBy: { sortOrder: "asc" },
     }),
@@ -324,9 +327,22 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
       where: { certType: "ready-to-work" },
       orderBy: { sortOrder: "asc" },
     }),
+    // Scoped by owner as well as by id, matching the sibling route
+    // (teacher/students/[id]/forms/route.ts:32). A `FormSubmission` row
+    // written before the ownership check existed can carry a `fileId`
+    // belonging to another student, and this page renders that file's name
+    // and a download link. Reading nothing is the right failure here: the
+    // entry is already nullable and the UI handles a missing one.
+    //
+    // The scope value is `studentId` (= managedStudent.id), NOT the raw path
+    // segment: `assertStaffCanManageStudent` accepts either the cuid or the
+    // human login id (buildStudentIdentifierWhere), so filtering on the path
+    // segment would silently return zero files whenever a teacher arrived by
+    // the login id. `studentId` is the same value this route's own
+    // `student.findUnique` is keyed by, so the two can never disagree.
     formFileIds.length > 0
       ? prisma.fileUpload.findMany({
-          where: { id: { in: formFileIds } },
+          where: { id: { in: formFileIds }, studentId },
           select: {
             id: true,
             filename: true,
@@ -335,6 +351,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           },
         })
       : Promise.resolve([]),
+    // Match & Connect Phase 2. Folded into the existing batch rather than
+    // awaited on its own: this route already exhausts the Supavisor session
+    // pool on /teacher/students/[id] (see the readiness comment below), and a
+    // serial round trip for one PK lookup is exactly the shape that does it.
+    getWorkProfile(studentId),
   ]);
   const formDefinitionById = new Map(FORMS.map((form) => [form.id, form]));
   const formFileById = new Map(formFiles.map((file) => [file.id, file]));
@@ -536,6 +557,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
           completedAt: student.careerDiscovery.completedAt,
         }
       : null,
+    // Match & Connect Phase 2: the student's own answers about when and how
+    // they can work. Read through the same helper the student surfaces use so
+    // stored JSON is parsed, not trusted. recordStudentView above covers this
+    // read — it is the same surface.
+    workProfile,
   });
 });
 

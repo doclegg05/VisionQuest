@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { StudentOverview } from "@/lib/teacher/dashboard";
+import { IntakeStatusBadge } from "./IntakeStatusBadge";
 
 interface StudentActionLinks {
   record: string;
@@ -49,7 +50,7 @@ export default function StudentCards({
                   <Link
                     href={links.record}
                     prefetch={false}
-                    className="break-words font-display text-base leading-5 text-[var(--ink-strong)] transition-colors hover:text-[var(--accent-secondary)]"
+                    className="inline-flex items-center break-words font-display text-base leading-5 text-[var(--ink-strong)] transition-colors hover:underline pointer-coarse:min-h-11"
                   >
                     {student.displayName}
                   </Link>
@@ -66,7 +67,7 @@ export default function StudentCards({
             </div>
 
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
-              <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-0.5 text-xs font-semibold text-[var(--accent-secondary)]">
+              <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-0.5 text-xs font-semibold text-info">
                 Lvl {student.level}
               </span>
               <span className="text-xs text-[var(--ink-muted)]">{student.xp} XP</span>
@@ -82,21 +83,7 @@ export default function StudentCards({
               >
                 {student.readinessScore}% Ready
               </span>
-              {student.intakeStatus === "certified" && (
-                <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/70 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 border border-emerald-300/40">
-                  ✓ Certified Intake
-                </span>
-              )}
-              {student.intakeStatus === "needs_review" && (
-                <span className="rounded-full bg-amber-100 dark:bg-amber-950/70 px-2.5 py-0.5 text-xs font-bold text-amber-800 dark:text-amber-300 border border-amber-300/40">
-                  ✍ Needs Sign-off
-                </span>
-              )}
-              {student.intakeStatus === "missing" && (
-                <span className="rounded-full bg-rose-100 dark:bg-rose-950/70 px-2.5 py-0.5 text-xs font-bold text-rose-800 dark:text-rose-300 border border-rose-300/40">
-                  ⚠ Missing Intake
-                </span>
-              )}
+              <IntakeStatusBadge status={student.intakeStatus} />
             </div>
 
             <div className="space-y-2">
@@ -155,32 +142,32 @@ export default function StudentCards({
               )}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-1.5 border-t border-[var(--border-strong)] pt-3">
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
               <Link
                 href={links.record}
                 prefetch={false}
-                className="inline-flex items-center rounded-lg border border-sky-600 bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-sky-700 hover:shadow active:scale-95"
+                className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Record
               </Link>
               <Link
-                href={links.forms}
-                prefetch={false}
-                className="inline-flex items-center rounded-lg border border-amber-600 bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-amber-700 hover:shadow active:scale-95"
-              >
-                Forms
-              </Link>
-              <Link
                 href={links.orientation}
                 prefetch={false}
-                className="inline-flex items-center rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow active:scale-95"
+                className="inline-flex items-center rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-info transition-colors hover:bg-[rgba(15,154,146,0.14)]"
               >
                 Orientation
               </Link>
               <Link
+                href={links.forms}
+                prefetch={false}
+                className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
+              >
+                Forms
+              </Link>
+              <Link
                 href={links.goals}
                 prefetch={false}
-                className="inline-flex items-center rounded-lg border border-indigo-600 bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow active:scale-95"
+                className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)]"
               >
                 Goals
               </Link>

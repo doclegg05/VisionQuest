@@ -1,3 +1,4 @@
+import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-only";
 /**
  * Local (Ollama-compatible) embedding provider (Phase 3: local embeddings
  * capability). Same EmbeddingProvider contract as GeminiEmbeddingProvider so
@@ -92,7 +93,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
       const startedAt = Date.now();
 
       const vectors = await retryWithBackoff(
-        () => this.embedBatch(batch),
+        () => this.embedBatch(this.formatInputs(batch, opts.taskType)),
         {
           label: "Local embedding",
           alertKey: "local_embedding_request_exhausted",
@@ -117,6 +118,16 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     return results;
   }
 
+  private formatInputs(texts: string[], task: EmbeddingTaskType): string[] {
+    // These task prefixes belong to EmbeddingGemma 2's vector space. Keep legacy
+    // models unchanged so existing indexes remain compatible until migrated.
+    if (!/^(google\/)?embeddinggemma-2(?::[^:]+)?$/.test(this.model)) return texts;
+    const prefix = task === "RETRIEVAL_QUERY"
+      ? "task: search result | query: "
+      : "title: none | text: ";
+    return texts.map((text) => prefix + text);
+  }
+
   private async embedBatch(texts: string[]): Promise<number[][]> {
     if (this.useNative) {
       const nativeResult = await this.callNativeEmbed(texts);
@@ -134,8 +145,10 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   private async callNativeEmbed(
     texts: string[],
   ): Promise<number[][] | "not-found"> {
+    assertLocalDemoTarget(this.baseUrl, this.model);
     const response = await fetch(`${this.baseUrl}/api/embed`, {
       method: "POST",
+      ...(isDemoLocalOnlyRequired() ? { redirect: "error" as const } : {}),
       headers: this.headers,
       body: JSON.stringify({ model: this.model, input: texts }),
     });
@@ -162,8 +175,10 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   }
 
   private async callOpenAiEmbed(texts: string[]): Promise<number[][]> {
+    assertLocalDemoTarget(this.baseUrl, this.model);
     const response = await fetch(`${this.baseUrl}/v1/embeddings`, {
       method: "POST",
+      ...(isDemoLocalOnlyRequired() ? { redirect: "error" as const } : {}),
       headers: this.headers,
       body: JSON.stringify({ model: this.model, input: texts }),
     });
@@ -194,6 +209,9 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   /** Hard-assert every vector is exactly EMBEDDING_DIMENSIONS long — never truncate. */
   private assertDimensions(vectors: number[][]): number[][] {
     vectors.forEach((vector, index) => {
+      if (!vector.every(Number.isFinite) || !vector.some((value) => value !== 0)) {
+        throw new Error(`Local embedding ${index} contains invalid numeric values`);
+      }
       if (vector.length !== EMBEDDING_DIMENSIONS) {
         throw new Error(
           `Local embedding model "${this.model}" returned ${vector.length} dims for item ${index}, expected ${EMBEDDING_DIMENSIONS}. ` +

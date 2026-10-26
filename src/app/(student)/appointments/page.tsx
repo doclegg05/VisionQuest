@@ -2,6 +2,7 @@ import PageIntro from "@/components/ui/PageIntro";
 import StudentAdvisingHub from "@/components/advising/StudentAdvisingHub";
 import { getSession } from "@/lib/auth";
 import { listBookableAdvisors } from "@/lib/advising";
+import { bookingAudienceFor } from "@/lib/demo/guards";
 import { prisma } from "@/lib/db";
 import { listStudentVisibleAlerts } from "@/lib/student-alerts";
 
@@ -51,7 +52,7 @@ export default async function AppointmentsPage() {
       orderBy: [{ status: "asc" }, { dueAt: "asc" }, { createdAt: "desc" }],
     }),
     listStudentVisibleAlerts(session.id),
-    listBookableAdvisors(),
+    listBookableAdvisors({ audience: bookingAudienceFor(session) }),
   ]);
 
   return (

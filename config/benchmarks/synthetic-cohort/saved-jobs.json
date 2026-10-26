@@ -1,0 +1,282 @@
+[
+  {
+    "id": "cbenchsaved01",
+    "studentId": "cbenchstu01",
+    "jobListingId": "cbenchlisting01",
+    "status": "saved",
+    "savedAt": "2026-08-03T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved02",
+    "studentId": "cbenchstu01",
+    "jobListingId": "cbenchlisting10",
+    "status": "saved",
+    "savedAt": "2026-08-10T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved03",
+    "studentId": "cbenchstu02",
+    "jobListingId": "cbenchlisting02",
+    "status": "applied",
+    "savedAt": "2026-07-14T12:00:00.000Z",
+    "appliedAt": "2026-08-30T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved04",
+    "studentId": "cbenchstu03",
+    "jobListingId": "cbenchlisting03",
+    "status": "saved",
+    "savedAt": "2026-07-25T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved05",
+    "studentId": "cbenchstu04",
+    "jobListingId": "cbenchlisting01",
+    "status": "applied",
+    "savedAt": "2026-07-21T12:00:00.000Z",
+    "appliedAt": "2026-08-29T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved06",
+    "studentId": "cbenchstu04",
+    "jobListingId": "cbenchlisting04",
+    "status": "saved",
+    "savedAt": "2026-08-12T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved07",
+    "studentId": "cbenchstu04",
+    "jobListingId": "cbenchlisting10",
+    "status": "applied",
+    "savedAt": "2026-07-28T12:00:00.000Z",
+    "appliedAt": "2026-08-30T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved08",
+    "studentId": "cbenchstu05",
+    "jobListingId": "cbenchlisting02",
+    "status": "saved",
+    "savedAt": "2026-08-17T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved09",
+    "studentId": "cbenchstu05",
+    "jobListingId": "cbenchlisting08",
+    "status": "applied",
+    "savedAt": "2026-08-28T12:00:00.000Z",
+    "appliedAt": "2026-08-29T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved10",
+    "studentId": "cbenchstu06",
+    "jobListingId": "cbenchlisting03",
+    "status": "saved",
+    "savedAt": "2026-08-18T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved11",
+    "studentId": "cbenchstu06",
+    "jobListingId": "cbenchlisting06",
+    "status": "saved",
+    "savedAt": "2026-07-12T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved12",
+    "studentId": "cbenchstu06",
+    "jobListingId": "cbenchlisting09",
+    "status": "saved",
+    "savedAt": "2026-08-09T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved13",
+    "studentId": "cbenchstu07",
+    "jobListingId": "cbenchlisting01",
+    "status": "saved",
+    "savedAt": "2026-08-29T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved14",
+    "studentId": "cbenchstu07",
+    "jobListingId": "cbenchlisting04",
+    "status": "applied",
+    "savedAt": "2026-08-11T12:00:00.000Z",
+    "appliedAt": "2026-08-29T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved15",
+    "studentId": "cbenchstu07",
+    "jobListingId": "cbenchlisting07",
+    "status": "applied",
+    "savedAt": "2026-08-27T12:00:00.000Z",
+    "appliedAt": "2026-08-30T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved16",
+    "studentId": "cbenchstu08",
+    "jobListingId": "cbenchlisting05",
+    "status": "applied",
+    "savedAt": "2026-07-08T12:00:00.000Z",
+    "appliedAt": "2026-08-31T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved17",
+    "studentId": "cbenchstu09",
+    "jobListingId": "cbenchlisting03",
+    "status": "saved",
+    "savedAt": "2026-07-25T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved18",
+    "studentId": "cbenchstu09",
+    "jobListingId": "cbenchlisting12",
+    "status": "saved",
+    "savedAt": "2026-08-12T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved19",
+    "studentId": "cbenchstu10",
+    "jobListingId": "cbenchlisting10",
+    "status": "applied",
+    "savedAt": "2026-07-09T12:00:00.000Z",
+    "appliedAt": "2026-08-29T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved20",
+    "studentId": "cbenchstu11",
+    "jobListingId": "cbenchlisting02",
+    "status": "saved",
+    "savedAt": "2026-08-14T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved21",
+    "studentId": "cbenchstu11",
+    "jobListingId": "cbenchlisting08",
+    "status": "saved",
+    "savedAt": "2026-07-07T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved22",
+    "studentId": "cbenchstu11",
+    "jobListingId": "cbenchlisting11",
+    "status": "saved",
+    "savedAt": "2026-08-29T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved23",
+    "studentId": "cbenchstu12",
+    "jobListingId": "cbenchlisting12",
+    "status": "saved",
+    "savedAt": "2026-07-26T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved24",
+    "studentId": "cbenchstu13",
+    "jobListingId": "cbenchlisting01",
+    "status": "saved",
+    "savedAt": "2026-07-08T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved25",
+    "studentId": "cbenchstu13",
+    "jobListingId": "cbenchlisting04",
+    "status": "saved",
+    "savedAt": "2026-07-16T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved26",
+    "studentId": "cbenchstu13",
+    "jobListingId": "cbenchlisting10",
+    "status": "saved",
+    "savedAt": "2026-07-26T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved27",
+    "studentId": "cbenchstu14",
+    "jobListingId": "cbenchlisting02",
+    "status": "applied",
+    "savedAt": "2026-08-23T12:00:00.000Z",
+    "appliedAt": "2026-08-30T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved28",
+    "studentId": "cbenchstu14",
+    "jobListingId": "cbenchlisting11",
+    "status": "applied",
+    "savedAt": "2026-07-30T12:00:00.000Z",
+    "appliedAt": "2026-08-31T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved29",
+    "studentId": "cbenchstu15",
+    "jobListingId": "cbenchlisting09",
+    "status": "saved",
+    "savedAt": "2026-07-30T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved30",
+    "studentId": "cbenchstu15",
+    "jobListingId": "cbenchlisting12",
+    "status": "applied",
+    "savedAt": "2026-07-25T12:00:00.000Z",
+    "appliedAt": "2026-08-29T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved31",
+    "studentId": "cbenchstu16",
+    "jobListingId": "cbenchlisting01",
+    "status": "applied",
+    "savedAt": "2026-07-15T12:00:00.000Z",
+    "appliedAt": "2026-08-30T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved32",
+    "studentId": "cbenchstu17",
+    "jobListingId": "cbenchlisting08",
+    "status": "applied",
+    "savedAt": "2026-08-19T12:00:00.000Z",
+    "appliedAt": "2026-08-31T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved33",
+    "studentId": "cbenchstu18",
+    "jobListingId": "cbenchlisting03",
+    "status": "saved",
+    "savedAt": "2026-07-15T12:00:00.000Z",
+    "appliedAt": null
+  },
+  {
+    "id": "cbenchsaved34",
+    "studentId": "cbenchstu18",
+    "jobListingId": "cbenchlisting06",
+    "status": "applied",
+    "savedAt": "2026-07-12T12:00:00.000Z",
+    "appliedAt": "2026-08-31T12:00:00.000Z"
+  },
+  {
+    "id": "cbenchsaved35",
+    "studentId": "cbenchstu18",
+    "jobListingId": "cbenchlisting12",
+    "status": "saved",
+    "savedAt": "2026-07-07T12:00:00.000Z",
+    "appliedAt": null
+  }
+]
