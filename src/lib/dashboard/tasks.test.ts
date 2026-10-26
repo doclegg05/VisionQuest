@@ -17,7 +17,7 @@ let conflictOnWrite = false;
 let failSync = false;
 let auditOk = true;
 let lastListArgs: unknown;
-const audit = mock.fn(async () => ({ audited: auditOk }));
+const audit = mock.fn(async (_input?: unknown) => ({ audited: auditOk }));
 const sync = mock.fn(async () => { if (failSync) throw new Error("sync unavailable"); });
 const tx = {
   student: { findFirst: mock.fn(async () => staffAllowed ? { id: session.id } : null) },
@@ -64,6 +64,36 @@ describe("task input boundaries", () => {
     assert.equal(taskQuerySchema.parse({ page: "2", pageSize: "10" }).page, 2);
     assert.equal(bulkTaskSchema.safeParse({ status: "completed", tasks: Array.from({ length: 26 }, () => ({ id: id1, updatedAt: version })) }).success, false);
     assert.equal(bulkTaskSchema.safeParse({ status: "open", tasks: [{ id: id1, updatedAt: version }, { id: id1, updatedAt: version }] }).success, false);
+  });
+});
+function auditCalls() { return audit.mock.calls.map((c) => c.arguments[0] as Record<string, unknown>); }
+describe("task audit rows", () => {
+  it("files every row under the student with a readable summary and the task id in metadata", async () => {
+    await service.createPersonalTask(session, createTaskSchema.parse({ title: "Call the shelter" }));
+    await service.updateTasks(session, [{ id: id1, patch: { status: "completed" } }]);
+    await service.deletePersonalTask(session, id2, version);
+    const [created, updated, deleted] = auditCalls();
+    for (const row of [created, updated, deleted]) {
+      assert.equal(row.targetType, "student"); assert.equal(row.targetId, session.id);
+      assert.notEqual(row.summary, row.action);
+    }
+    assert.equal(created.action, "task.created"); assert.equal(created.summary, 'Created task "Call the shelter".');
+    assert.equal(updated.action, "task.updated"); assert.equal(updated.summary, 'Updated task "Practice interview" to completed.');
+    assert.equal(deleted.action, "task.deleted"); assert.equal(deleted.summary, 'Deleted task "Practice interview".');
+    assert.equal((updated.metadata as { taskId: string }).taskId, id1);
+  });
+  it("writes one row per task on a bulk status change", async () => {
+    await service.updateTasks(session, rows.map(({ id }) => ({ id, patch: { status: "completed", updatedAt: version } })));
+    const bulk = auditCalls();
+    assert.equal(bulk.length, 2);
+    assert.deepEqual(bulk.map((r) => (r.metadata as { taskId: string }).taskId).sort(), [id1, id2]);
+    assert.ok(bulk.every((r) => r.targetType === "student" && /^Updated task ".+" to completed\.$/.test(String(r.summary))));
+  });
+  it("uses main's follow-up wording when staff assign a task", async () => {
+    await service.createAssignedTask({ ...session, id: "teacher-1", role: "teacher" }, session.id, createTaskSchema.parse({ title: "Bring ID" }));
+    const [row] = auditCalls();
+    assert.equal(row.targetType, "student"); assert.equal(row.targetId, session.id);
+    assert.equal(row.summary, 'Created follow-up task "Bring ID".');
   });
 });
 describe("owned task mutations", () => {

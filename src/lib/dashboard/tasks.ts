@@ -78,10 +78,17 @@ async function transaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>
     throw error;
   }
 }
-async function afterCommit(session: Session, tasks: StudentTask[], action: string) {
+// Audit rows are filed under the student (existing audit queries filter on
+// targetType=student) with a readable summary; the task id rides in metadata.
+function auditSummary(action: string, task: StudentTask, assigned: boolean) {
+  if (action === "task.created") return `Created ${assigned ? "follow-up " : ""}task "${task.title}".`;
+  if (action === "task.deleted") return `Deleted task "${task.title}".`;
+  return `Updated task "${task.title}" to ${task.status}.`;
+}
+async function afterCommit(session: Session, tasks: StudentTask[], action: string, assigned = false) {
   const audits = await Promise.all(tasks.map((task) => tryLogAuditEvent({
-    actorId: session.id, actorRole: session.role, action, targetType: "task", targetId: task.id,
-    summary: action, metadata: { studentId: task.studentId, status: task.status },
+    actorId: session.id, actorRole: session.role, action, targetType: "student", targetId: task.studentId,
+    summary: auditSummary(action, task, assigned), metadata: { taskId: task.id, status: task.status },
   })));
   let alertsSynced = true;
   for (const studentId of new Set(tasks.map((task) => task.studentId))) {
@@ -106,7 +113,7 @@ export async function createAssignedTask(session: Session, studentId: string, de
     if (appointmentId && !await tx.appointment.findFirst({ where: { id: appointmentId, studentId }, select: { id: true } })) throw badRequest("Appointment not found for this student.");
     return tx.studentTask.create({ data: { ...details, description: details.description || null, dueAt: parseDueDate(details.dueAt), studentId, createdById: session.id, appointmentId: appointmentId || null } });
   });
-  return { task: taskDto(task), ...await afterCommit(session, [task], "task.created") };
+  return { task: taskDto(task), ...await afterCommit(session, [task], "task.created", true) };
 }
 export async function updateTasks(session: Session, changes: { id: string; patch: TaskPatch }[]) {
   if (changes.length < 1 || changes.length > 25 || new Set(changes.map((c) => c.id)).size !== changes.length) throw badRequest("Select 1–25 distinct tasks.");
