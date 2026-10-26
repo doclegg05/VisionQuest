@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod-csp";
 import { RESUME_FONT_KEYS, DEFAULT_RESUME_FONT, getResumeFont } from "@/lib/resume-layout";
 
 const trimmedString = (max: number) =>

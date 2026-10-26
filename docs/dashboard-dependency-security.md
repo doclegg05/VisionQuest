@@ -21,7 +21,7 @@ No critical, moderate, or low findings remain in that registry scan. This is tim
 
 ## Verification
 
-- TypeScript passed after dependency changes.
+Historical (2026-09-10, superseded; see top of file): - TypeScript passed after dependency changes.
 - 57 focused dashboard, task/API, auth, security, and next-step tests passed after updates.
 - Updated the dashboard page unit test to mock its CSS-module import; real CSS is exercised separately in the browser harness.
 - Full production build and live deployment were not performed in this pass.

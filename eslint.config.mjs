@@ -114,6 +114,7 @@ const browserZodImports = {
     "src/components/**",
     "src/app/**/*Client.tsx",
     "src/lib/dashboard/**",
+    "src/lib/resume.ts",
   ],
   ignores: ["src/lib/zod-csp.ts"],
   rules: {
