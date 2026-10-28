@@ -6,7 +6,7 @@ import type { DashboardActivity } from "@/lib/dashboard/readers";
 
 export default function TaskCharts({ data }: { data: DashboardActivity }) {
   const total = data.statuses.reduce((sum, item) => sum + item.count, 0);
-  if (!total) return <p className="py-4">No tasks recorded yet. Add a task above or <Link className="inline-flex items-center pointer-coarse:min-h-11 underline" href="/goals">review your goals</Link>.</p>;
+  if (!total) return <p className="py-4">No tasks recorded yet. Add a task above or <Link className="inline-flex items-center min-h-11 underline" href="/goals">review your goals</Link>.</p>;
   return <>
     <p className="mt-2 text-sm text-[var(--ink-muted)]">These charts show your tasks today and the tasks you finished in the last 30 days (UTC). They do not show your full history. They do not prove you finished the program. A task you reopen or delete no longer counts as finished.</p>
     {data.unknownCompletionDates > 0 && <p className="mt-2 text-sm">{data.unknownCompletionDates} finished tasks have no finish date, so the line chart leaves them out.</p>}

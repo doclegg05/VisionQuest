@@ -88,6 +88,6 @@ export default async function DashboardPage() {
       initialSupport={support.status === "fulfilled" ? support.value : undefined}
     />
     {sagePanel.status === "fulfilled" && sagePanel.value && <SagePanels panel={sagePanel.value} showActions />}
-    {sagePanel.status === "rejected" && <p className="text-sm text-[var(--ink-muted)]">Sage’s saved suggestions could not load. <Link className="inline-flex items-center pointer-coarse:min-h-11 underline" href="/chat">Open Sage</Link> or refresh this dashboard to try again.</p>}
+    {sagePanel.status === "rejected" && <p className="text-sm text-[var(--ink-muted)]">Sage’s saved suggestions could not load. <Link className="inline-flex items-center min-h-11 underline" href="/chat">Open Sage</Link> or refresh this dashboard to try again.</p>}
   </div>;
 }
