@@ -24,6 +24,8 @@ export interface DashboardClientProps {
   initialTasks?: TaskPage;
   initialSupport?: DashboardSupport;
   moodContent?: ReactNode;
+  /** Page header and banners. Rendered after the next-step card so it stays in the first phone screen. */
+  intro?: ReactNode;
 }
 
 /** Private cache lives only inside this session's mounted dashboard. */
@@ -42,7 +44,7 @@ function RegionStatus({ loading, error, refreshing, hasData, fetchedAt, retry }:
     {loading ? "Loading your records…" : error ? <><span>{hasData ? "Showing last saved data. Refresh failed; these records may be out of date." : "This section could not load. Other sections are still available."}</span> <button className="min-h-11 underline" onClick={retry}>Try again</button></> : refreshing ? "Refreshing…" : fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })} UTC · checks every 30 seconds while visible` : null}
   </div>;
 }
-function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initialTasks, initialSupport, moodContent }: DashboardClientProps) {
+function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initialTasks, initialSupport, moodContent, intro }: DashboardClientProps) {
   const client = useQueryClient();
   const router = useRouter();
   const [query, setQuery] = useState<TaskQuery>(() => taskQuerySchema.parse({}));
@@ -84,6 +86,7 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
         <RegionStatus loading={support.isPending} error={support.isError} refreshing={support.isFetching && !support.isPending} hasData={!!support.data} fetchedAt={support.data?.fetchedAt} retry={() => { void support.refetch(); }} />
         {!support.data && support.isError && <Link className="inline-flex items-center pointer-coarse:min-h-11 underline" href="/goals">Review your plan while this section is unavailable</Link>}
       </section>
+      {intro}
       <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl font-semibold">Your recorded progress</h2><button disabled={pending || overview.isFetching || activity.isFetching || tasks.isFetching} className="pointer-coarse:min-h-11 secondary-button px-4 py-2 text-sm" onClick={() => { void client.invalidateQueries({ queryKey: root }); router.refresh(); }}>Refresh dashboard</button></div>
       <section aria-label="Outcome summaries">
         <RegionStatus loading={overview.isPending} error={overview.isError} refreshing={overview.isFetching && !overview.isPending} hasData={!!overview.data} fetchedAt={overview.data?.fetchedAt} retry={() => { void overview.refetch(); }} />

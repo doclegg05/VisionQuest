@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
+import type { ReactNode } from "react";
 import type { StudentNextStepResult } from "@/lib/progression/student-next-step";
 import {
   createStudentAlertStore,
@@ -71,9 +72,10 @@ mock.module("@/lib/progression/student-next-step", {
   },
 });
 
-mock.module("./DashboardClient", { defaultExport: (props: { initialSupport?: { alertCount: number } }) => {
+// Renders only the intro slot: the header and signature banner the page passes in.
+mock.module("./DashboardClient", { defaultExport: (props: { initialSupport?: { alertCount: number }; intro?: ReactNode }) => {
   if (props.initialSupport) ambientRenders.push(props.initialSupport);
-  return null;
+  return props.intro ?? null;
 } });
 mock.module("@/lib/dashboard/readers", { namedExports: {
   readOverview: async () => ({ outcomes: [], fetchedAt: new Date().toISOString() }),
