@@ -15,3 +15,12 @@ src/lib/ai/openrouter-provider.test.ts:generic-api-key:13
 docs/superpowers/plans/2026-10-13-openrouter-test-bench.md:generic-api-key:404
 docs/superpowers/plans/2026-10-13-openrouter-test-bench.md:generic-api-key:1439
 docs/superpowers/plans/2026-10-13-openrouter-test-bench.md:generic-api-key:1451
+
+# Intake provisioning (#288). CI runs `gitleaks git` over the PR's commits, which
+# reports commit:file:rule:line, so these entries carry the commit that added each
+# line. PASSWORD_ALPHABET is the character set for staff-issued passwords, and
+# K7QM-2XPT-9RHF is the made-up password a mocked provisioner returns in the
+# webhook route tests.
+4a31404fc02d2c168d370ba9246ec22fd7d80d5e:src/lib/intake/provision.ts:generic-api-key:91
+19a8ef35d1be168877780211c889da0e54bab98b:src/app/api/intake/webhook/route.test.ts:generic-api-key:71
+19a8ef35d1be168877780211c889da0e54bab98b:src/app/api/intake/webhook/route.test.ts:generic-api-key:101
