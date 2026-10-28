@@ -3,7 +3,6 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { uploadFile, generateStorageKey } from "@/lib/storage";
 import { FORMS } from "@/lib/spokes/forms";
-import { validateUploadContent } from "@/lib/file-security";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
@@ -12,6 +11,8 @@ import { syncStudentAlerts } from "@/lib/advising";
 import { afterWrite } from "@/lib/after-write";
 import { deferAfterResponse } from "@/lib/after-response";
 import { parseBody } from "@/lib/schemas";
+import { decodeSignaturePng, SIGNATURE_DATA_URL_PREFIX } from "@/lib/signature-png";
+import { fileBelongsToStudent } from "@/lib/forms/signature-files";
 
 // Signature is a base64 PNG data URL — body length capped to keep upstream
 // `Buffer.from(base64Data, "base64")` size bounded (existing 500_000 byte limit
@@ -57,40 +58,30 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     }
 
     // Validate signature is a base64 PNG data URL
-    if (!signature.startsWith("data:image/png;base64,")) {
+    if (!signature.startsWith(SIGNATURE_DATA_URL_PREFIX)) {
       throw badRequest("Signature must be a PNG data URL.");
     }
 
     const targetStudentId = await resolveTargetStudentId(session, studentId);
 
-    // `fileId` was validated only as a cuid, so any student could attach any
-    // other student's upload as their own signed form — and the teacher's
-    // forms view and student-detail page render `FormSubmission.fileId`
-    // without re-scoping, so staff would then see and download the victim's
-    // file labelled as this student's signature. Every sibling route
-    // (portfolio, certifications, vision-board, applications) scopes its file
-    // lookup to the student; this one is the outlier. Checked before the
-    // upsert so a foreign id never reaches the write.
-    if (fileId) {
-      const ownedFile = await prisma.fileUpload.findFirst({
-        where: { id: fileId, studentId: targetStudentId },
-        select: { id: true },
-      });
-      if (!ownedFile) {
-        throw badRequest("Attached file was not found.");
+    // A client-supplied fileId must be the target student's own upload: staff
+    // views render FormSubmission.fileId without re-scoping (6b106c8d). Checked
+    // before any write, and answered as not-found so it never confirms that
+    // another student's file exists.
+    if (fileId && !(await fileBelongsToStudent(fileId, targetStudentId))) {
+      throw badRequest("Attached file was not found.");
+    }
+
+    const decoded = await decodeSignaturePng(signature);
+    if (!decoded.ok) {
+      if (decoded.reason === "too_large") throw badRequest("Signature image too large.");
+      if (decoded.reason === "undecodable") {
+        logger.warn("Signature image rejected", { actorRole: session.role, surface: "forms/sign", detail: decoded.detail });
+        throw badRequest("Signature must contain a valid PNG image (maximum 4096 pixels per side and 4 megapixels).");
       }
+      throw badRequest("Signature must contain a valid PNG image.");
     }
-
-    // Decode and upload signature image
-    const base64Data = signature.replace(/^data:image\/png;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-
-    if (buffer.length > 500_000) {
-      throw badRequest("Signature image too large.");
-    }
-
-    const contentError = validateUploadContent(buffer, "image/png");
-    if (contentError) throw badRequest(contentError);
+    const { buffer } = decoded;
 
     const storageKey = generateStorageKey(targetStudentId, `signature-${formId}.png`);
     await uploadFile(storageKey, buffer, "image/png");

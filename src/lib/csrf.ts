@@ -45,17 +45,30 @@ export function isSignedWebhookPath(pathname: string): boolean {
 export function isAuthorizedInternalRequest(
   pathname: string,
   authorizationHeader: string | null,
-  cronSecret: string | undefined
+  cronSecret: string | undefined,
+  intakeSecret?: string | undefined,
 ): boolean {
-  if (!pathname.startsWith("/api/internal/")) {
-    return false;
+  if (pathname.startsWith("/api/internal/")) {
+    if (!cronSecret || !authorizationHeader) {
+      return false;
+    }
+    return constantTimeEqual(authorizationHeader, `Bearer ${cronSecret}`);
   }
 
-  if (!cronSecret || !authorizationHeader) {
-    return false;
+  // The intake webhook's caller is an external SaaS (Power Automate), so its
+  // secret is a separate, declared credential — never a fallback to
+  // CRON_SECRET. Sharing them would mean one vendor-side leak authenticates
+  // every /api/internal/* cron endpoint too. INTAKE_WEBHOOK_SECRET unset is a
+  // misconfiguration, and this fails closed on it rather than quietly widening
+  // the blast radius of a secret the vendor already holds.
+  if (pathname === "/api/intake/webhook") {
+    if (!intakeSecret || !authorizationHeader) {
+      return false;
+    }
+    return constantTimeEqual(authorizationHeader, `Bearer ${intakeSecret}`);
   }
 
-  return constantTimeEqual(authorizationHeader, `Bearer ${cronSecret}`);
+  return false;
 }
 
 /**

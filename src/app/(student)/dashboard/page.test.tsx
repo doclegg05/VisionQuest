@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
+import type { ReactNode } from "react";
 import type { StudentNextStepResult } from "@/lib/progression/student-next-step";
 import {
   createStudentAlertStore,
@@ -8,9 +9,16 @@ import {
   STUDENT_ID,
 } from "@/lib/student-alerts.test-support";
 
-// Module mocks, registered before the page is imported. Only the alert count
-// is under test; every other read returns the quietest value that keeps the
-// page off the welcome redirect (one goal, orientation complete).
+// Node does not process CSS modules; the browser harness verifies their real styles.
+mock.module("@/components/dashboard/dashboard.module.css", { defaultExport: { workspace: "workspace" } });
+
+// How many intake FormSubmission rows the student has. Mutable so a test can
+// drive the signature banner's branch; 0 = the banner shows.
+let intakeSubmissionCount = 0;
+
+// Module mocks, registered before the page is imported. Every read not under
+// test returns the quietest value that keeps the page off the welcome redirect
+// (one goal, orientation complete).
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
@@ -19,6 +27,7 @@ mock.module("@/lib/db", {
       studentTask: { findMany: async () => [] },
       studentAlert: createStudentAlertStore(),
       orientationItem: { findMany: async () => [] },
+      formSubmission: { count: async () => intakeSubmissionCount },
       // The SMS re-consent notice reads the student's own preference row.
       // Null = never set one up, which is the case for this fixture and for
       // most students; the notice renders for nobody here.
@@ -63,7 +72,18 @@ mock.module("@/lib/progression/student-next-step", {
   },
 });
 
-mock.module("@/components/chat/ChatWindow", { defaultExport: () => null });
+// Renders only the intro slot: the header and signature banner the page passes in.
+mock.module("./DashboardClient", { defaultExport: (props: { initialSupport?: { alertCount: number }; intro?: ReactNode }) => {
+  if (props.initialSupport) ambientRenders.push(props.initialSupport);
+  return props.intro ?? null;
+} });
+mock.module("@/lib/dashboard/readers", { namedExports: {
+  readOverview: async () => ({ outcomes: [], fetchedAt: new Date().toISOString() }),
+  readActivity: async () => ({ statuses: [], completions: [], unknownCompletionDates: 0, fetchedAt: new Date().toISOString() }),
+} });
+mock.module("@/lib/dashboard/tasks", { namedExports: {
+  readTasks: async () => ({ tasks: [], total: 0, page: 1, pageSize: 10, fetchedAt: new Date().toISOString() }),
+} });
 mock.module("@/components/dashboard/sage/SagePanels", {
   namedExports: { SagePanels: () => null },
 });
@@ -72,15 +92,6 @@ mock.module("@/components/progression/PathToEmployment", {
 });
 
 const ambientRenders: Array<{ alertCount: number }> = [];
-
-mock.module("@/components/dashboard/AmbientPanels", {
-  namedExports: {
-    AmbientPanels: (props: { alertCount: number }) => {
-      ambientRenders.push(props);
-      return null;
-    },
-  },
-});
 
 let DashboardPage: typeof import("./page").default;
 
@@ -93,7 +104,38 @@ describe("DashboardPage alert count", () => {
     renderToString(await DashboardPage());
 
     const ambient = ambientRenders.at(-1);
-    assert.ok(ambient, "AmbientPanels was not rendered");
+    assert.ok(ambient, "Dashboard support was not provided");
     assert.equal(ambient.alertCount, 1);
+  });
+});
+
+describe("DashboardPage intake signature banner", () => {
+  it("prompts the student when no intake submission exists yet", async () => {
+    intakeSubmissionCount = 0;
+    const html = renderToString(await DashboardPage());
+
+    assert.match(html, /Sign your student profile form/);
+    assert.match(html, /Your class hours only count once your signed form is on file\./);
+  });
+
+  it("sends a signed-in student to the authenticated orientation flow, never the anonymous intake form", async () => {
+    intakeSubmissionCount = 0;
+    const html = renderToString(await DashboardPage());
+
+    assert.match(html, /href="\/orientation"/);
+    // /intake is the public QR-code enrollment form. An authenticated student
+    // must never be routed to it: it collects the identity they already have,
+    // and it is the surface that used to hand out sessions.
+    assert.doesNotMatch(html, /href="\/intake"/);
+  });
+
+  it("hides the banner once an intake submission is on file", async () => {
+    intakeSubmissionCount = 1;
+    try {
+      const html = renderToString(await DashboardPage());
+      assert.doesNotMatch(html, /Sign your student profile form/);
+    } finally {
+      intakeSubmissionCount = 0;
+    }
   });
 });

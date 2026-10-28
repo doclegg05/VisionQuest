@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod-csp";
 
 import { DEMO_ACCOUNT_KINDS, type DemoAccountKind } from "@/lib/demo/config";
 import { DEMO_CONTINUE_AS_PREFIX, DEMO_ENTRY_FAILED, DEMO_ENTRY_OFFLINE, DEMO_ENTRY_PENDING } from "@/lib/demo/copy";

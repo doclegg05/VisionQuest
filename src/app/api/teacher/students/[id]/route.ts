@@ -481,7 +481,11 @@ export const GET = withRegistry("admin.student_detail", async (session, _req, ct
       return {
         id: submission.id,
         formId: submission.formId,
-        title: form?.title || submission.formId,
+        title:
+          form?.title ||
+          (submission.formId === "orientation-intake"
+            ? "Official SPOKES Intake & Student Profile"
+            : submission.formId),
         description: form?.description || null,
         status: submission.status,
         createdAt: submission.createdAt,

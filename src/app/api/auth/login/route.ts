@@ -169,6 +169,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       studentId: student.studentId,
       displayName: student.displayName,
       role: student.role,
+      // True while the account still holds a password somebody else chose —
+      // today, one issued by SPOKES intake. A prompt for the client, not a
+      // gate: the session above is already set, and nothing server-side
+      // refuses a request while this is true. Server-side enforcement needs a
+      // self-service change-password surface, which does not exist yet.
+      mustChangePassword: student.mustChangePassword,
     },
   });
 });

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { StudentOverview } from "@/lib/teacher/dashboard";
+import { IntakeStatusBadge } from "./IntakeStatusBadge";
 
 interface StudentActionLinks {
   record: string;
@@ -82,6 +83,7 @@ export default function StudentCards({
               >
                 {student.readinessScore}% Ready
               </span>
+              <IntakeStatusBadge status={student.intakeStatus} />
             </div>
 
             <div className="space-y-2">

@@ -447,3 +447,21 @@ It does not repeal it.
   code change. Demo rows stay in the database until a separate cleanup.
 
 Design: [2026-10-19-cohort-demo-access-design.md](./superpowers/specs/2026-10-19-cohort-demo-access-design.md).
+
+## 2026-10-26 — Pre-demo coordinator decision D2: frozen at `/coordinator` only
+
+Owner-approved: the coordinator role is **frozen at `/coordinator` only**. Reopen
+its scope when an actual coordinator needs something. This decision authorizes
+no additional coordinator links, regional workflows, or data-access changes.
+
+The retained route is not ready for real coordinator use: the known RLS context
+mapping and region-query limitations can deny rollups or show empty results.
+Freezing scope does not resolve that defect or establish that no coordinator
+accounts exist. The production active-account count remains unverified.
+
+Before treating the demo/pilot as ready for coordinator use, an authorized
+operator must check active coordinator accounts. If any exist, resolve the
+affected user's access before relying on the page; the approved fallback is an
+explicit unavailable screen with the coordinator navigation entry hidden.
+Hiding a link alone does not address direct visits. The account check does not
+block recording this approved scope decision or the independent decisions below.

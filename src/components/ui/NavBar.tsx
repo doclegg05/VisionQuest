@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import * as Dialog from "@radix-ui/react-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { getRoleHomePath, getRoleSettingsPath } from "@/lib/role-home";
 import { type NavPhase, type NavItem } from "@/lib/nav-progression";
@@ -26,11 +27,10 @@ import NotificationBell from "./NotificationBell";
 import { SageMiniChat } from "@/components/chat/SageMiniChat";
 
 export const STAFF_ITEMS: NavItem[] = [
-  { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
-  { href: "/teacher", label: "Students", icon: Users, phase: 1 },
+  { href: "/teacher", label: "Students & Classes", icon: Users, phase: 1 },
   { href: "/teacher/classes", label: "Classes", icon: Buildings, phase: 1 },
-  { href: "/teacher/connect", label: "Connect", icon: Handshake, phase: 1 },
   { href: "/teacher/library", label: "Library", icon: Books, phase: 1 },
+  { href: "/teacher/connect", label: "Connect", icon: Handshake, phase: 1 },
   { href: "/teacher/manage", label: "Program Setup", icon: Gear, phase: 1 },
   {
     href: "/teacher/failed-extractions",
@@ -38,9 +38,10 @@ export const STAFF_ITEMS: NavItem[] = [
     icon: WarningCircle,
     phase: 1,
   },
+  { href: "/teacher/chat", label: "Sage", icon: ChatCircle, phase: 1 },
 ];
 
-const COORDINATOR_ITEMS: NavItem[] = [
+export const COORDINATOR_ITEMS: NavItem[] = [
   { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 },
 ];
 
@@ -55,6 +56,22 @@ export const ADMIN_ITEMS: NavItem[] = [
   { href: "/admin/library", label: "Library", icon: Books, phase: 1 },
   { href: "/teacher/admin/benchmarks", label: "Benchmarks", icon: ChartBar, phase: 1 },
 ];
+
+/**
+ * Admin sidebar: admin-only entries first, then the roster, coordinator and
+ * staff entries the admin also uses. Admin has its own Sage (/admin/chat) and
+ * Library (/admin/library), so the teacher copies are dropped, and an href
+ * shared by two lists appears once. The roster entry is named explicitly
+ * because COORDINATOR_ITEMS no longer carries it (coordinators cannot open
+ * /teacher), and the admin's order must not change with that list.
+ */
+const ADMIN_ROSTER_ITEM: NavItem = STAFF_ITEMS[0];
+export const ADMIN_NAV_ITEMS: NavItem[] = [
+  ...ADMIN_ITEMS,
+  ADMIN_ROSTER_ITEM,
+  ...COORDINATOR_ITEMS,
+  ...STAFF_ITEMS.filter((item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library"),
+].filter((item, index, all) => all.findIndex((other) => other.href === item.href) === index);
 
 interface NavBarProps {
   studentName: string;
@@ -92,21 +109,18 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
   const homeHref = getRoleHomePath(role);
   const settingsHref = getRoleSettingsPath(role);
 
-  // Primary nav items for the sidebar
+  // Primary nav items for the sidebar. Each role's list is the exported
+  // constant for that role — not an inline copy. The 2026-09-03 reshuffle
+  // inlined four items per role and left STAFF_ITEMS rendering nothing, which
+  // silently dropped AI Review (/teacher/failed-extractions) and Classes out of
+  // teacher navigation altogether while NavBar.items.test.tsx went on asserting
+  // against the orphaned constant. Rendering from the constants keeps the tested
+  // list and the displayed list the same list.
   const primaryItems =
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
       : role === "admin"
-        // Admin has their own Sage (/admin/chat) and Library (/admin/library).
-        // Drop the teacher-facing duplicates from STAFF_ITEMS so the sidebar
-        // doesn't show "Sage" or "Library" twice.
-        ? [
-            ...ADMIN_ITEMS,
-            ...COORDINATOR_ITEMS,
-            ...STAFF_ITEMS.filter(
-              (item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library",
-            ),
-          ]
+        ? ADMIN_NAV_ITEMS
         : role === "coordinator"
           ? COORDINATOR_ITEMS
           : STAFF_ITEMS;
@@ -326,8 +340,15 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             );
           })()}
 
-          {/* Tab 5: More */}
-          <button
+          {/* Student sheet uses a focus-trapped dialog with automatic focus restoration. */}
+          {role === "student" ? <Dialog.Root>
+            <Dialog.Trigger asChild><button type="button" className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-label="More navigation options"><DotsThreeOutline size={22} /><span className="text-xs font-medium">More</span></button></Dialog.Trigger>
+            <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[80] bg-black/50 md:hidden" /><Dialog.Content className="fixed bottom-3 left-3 right-3 z-[81] max-h-[80dvh] overflow-y-auto rounded-2xl bg-[var(--surface-raised)] p-5 text-[var(--ink-strong)] md:hidden">
+              <Dialog.Title className="font-display text-lg font-semibold">Your workspace</Dialog.Title><Dialog.Description className="sr-only">Choose a page or update your settings.</Dialog.Description>
+              <div className="mt-4 grid grid-cols-2 gap-2">{mobileMore.map((item) => <Dialog.Close asChild key={item.href}><Link href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 hover:bg-[var(--surface-soft)]"><item.icon size={20} />{item.label}</Link></Dialog.Close>)}</div>
+              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-3">{settingsHref && <Dialog.Close asChild><Link className="inline-flex items-center pointer-coarse:min-h-11 min-h-11 py-2" href={settingsHref}>Settings</Link></Dialog.Close>}<button className="min-h-11 py-2" onClick={handleLogout}>Log out</button><Dialog.Close className="secondary-button px-4 py-2">Close menu</Dialog.Close></div>
+            </Dialog.Content></Dialog.Portal>
+          </Dialog.Root> : <button
             ref={moreButtonRef}
             onClick={() => setMoreOpen(!moreOpen)}
             type="button"
@@ -339,7 +360,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             <DotsThreeOutline size={22} weight={isMoreActive ? "fill" : "regular"} className={isMoreActive ? "text-success" : "text-[var(--ink-muted)]"} />
             <span className={`text-xs font-medium ${isMoreActive ? "text-success" : "text-[var(--ink-muted)]"}`}>More</span>
             {isMoreActive && <div className="mt-0.5 h-1 w-1 rounded-full bg-[var(--accent-green)]" />}
-          </button>
+          </button>}
         </div>
       </nav>
 
@@ -429,6 +450,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
         </nav>
 
         <div className="relative border-t border-white/10 p-4">
+          {role === "student" && <div className="mb-3 flex flex-wrap items-center gap-4">{settingsHref && <Link href={settingsHref} aria-current={isActive(settingsHref) ? "page" : undefined} className="flex min-h-11 items-center gap-2 text-sm"><Gear size={18} />Settings</Link>}<button onClick={handleLogout} className="flex min-h-11 items-center gap-2 text-sm"><SignOut size={18} />Log out</button></div>}
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <p className="break-words text-sm font-semibold leading-5">{studentName}</p>

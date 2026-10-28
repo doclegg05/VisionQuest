@@ -98,6 +98,57 @@ export const STUDENT_PROFILE_FIELDS: FormTemplateSchema = [
     maxLength: 200,
     helpText: "Where the program can reach you outside of class.",
   },
+  {
+    type: "text",
+    key: "phone",
+    label: "Phone number",
+    required: false,
+    maxLength: 30,
+    helpText: "Mobile or primary phone number for class notifications.",
+  },
+  {
+    type: "text",
+    key: "street_address",
+    label: "Street address",
+    required: false,
+    maxLength: 200,
+  },
+  {
+    type: "text",
+    key: "city",
+    label: "City / Town",
+    required: false,
+    maxLength: 100,
+  },
+  {
+    type: "text",
+    key: "zip_code",
+    label: "ZIP code",
+    required: false,
+    maxLength: 10,
+  },
+  {
+    type: "select",
+    key: "primary_language",
+    label: "Primary language",
+    required: false,
+    options: ["English", "Spanish", "Other", PREFER_NOT_TO_SAY],
+  },
+  {
+    type: "text",
+    key: "emergency_contact",
+    label: "Emergency contact (Name & Phone)",
+    required: false,
+    maxLength: 200,
+    helpText: "Who we should contact in case of an emergency.",
+  },
+  {
+    type: "text",
+    key: "case_number",
+    label: "TANF / DHHR Case # (if applicable)",
+    required: false,
+    maxLength: 50,
+  },
 ];
 
 /**

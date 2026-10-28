@@ -64,3 +64,14 @@ describe("SignaturePad submitting state", () => {
     assert.ok(/<canvas\b/.test(html), "the drawing stays on screen while saving; nothing is torn down");
   });
 });
+
+// Branch intent (codex/Supabasedesign, 0fcdb505): the signing area stays
+// paper-white in both themes so the dark exported ink is never recolored.
+// Upstream reaches the same result with data-theme="light"; this pins it.
+describe("SignaturePad paper", () => {
+  it("renders the drawing area as paper-white in either theme", () => {
+    const html = renderToString(<SignaturePad onSign={() => {}} onCancel={() => {}} />);
+    assert.match(html, /data-theme="light"[^>]*bg-white/);
+    assert.match(html, /choose Type above/);
+  });
+});

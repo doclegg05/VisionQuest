@@ -95,3 +95,61 @@ describe("signed third-party webhooks", () => {
     }
   });
 });
+
+describe("intake webhook authorization", () => {
+  it("accepts the intake webhook secret", () => {
+    assert.ok(
+      isAuthorizedInternalRequest(
+        "/api/intake/webhook",
+        "Bearer intake-secret",
+        "cron-secret",
+        "intake-secret",
+      ),
+    );
+  });
+
+  it("does not accept CRON_SECRET on the intake webhook", () => {
+    // The webhook secret lives with an external SaaS (Power Automate). If it
+    // could fall back to CRON_SECRET, one vendor-side leak would authenticate
+    // every /api/internal/* cron endpoint.
+    assert.ok(
+      !isAuthorizedInternalRequest(
+        "/api/intake/webhook",
+        "Bearer cron-secret",
+        "cron-secret",
+        "intake-secret",
+      ),
+    );
+  });
+
+  it("refuses the intake webhook when its own secret is unset", () => {
+    assert.ok(
+      !isAuthorizedInternalRequest("/api/intake/webhook", "Bearer cron-secret", "cron-secret"),
+    );
+    assert.ok(
+      !isAuthorizedInternalRequest("/api/intake/webhook", "Bearer cron-secret", "cron-secret", ""),
+    );
+  });
+
+  it("does not accept the intake secret on internal cron routes", () => {
+    assert.ok(
+      !isAuthorizedInternalRequest(
+        "/api/internal/appointments/reminders",
+        "Bearer intake-secret",
+        "cron-secret",
+        "intake-secret",
+      ),
+    );
+  });
+
+  it("matches the webhook path exactly", () => {
+    assert.ok(
+      !isAuthorizedInternalRequest(
+        "/api/intake/webhook/replay",
+        "Bearer intake-secret",
+        "cron-secret",
+        "intake-secret",
+      ),
+    );
+  });
+});

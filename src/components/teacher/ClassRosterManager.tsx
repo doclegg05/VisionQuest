@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { QrCode as QrIcon } from "@phosphor-icons/react";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
+import ClassIntakeFlyerModal from "./ClassIntakeFlyerModal";
 
 interface InstructorOption {
   id: string;
@@ -101,6 +103,7 @@ export default function ClassRosterManager() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [creatingClass, setCreatingClass] = useState(false);
+  const [showFlyerModal, setShowFlyerModal] = useState(false);
   const [newClassName, setNewClassName] = useState("");
   const [newClassCode, setNewClassCode] = useState("");
   const [newClassDescription, setNewClassDescription] = useState("");
@@ -661,7 +664,9 @@ export default function ClassRosterManager() {
 
               <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Add student</p>
-                <p className="mt-1 text-sm text-[var(--ink-muted)]">Create an account and enroll in this class.</p>
+                <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                  Create an account here, or share the class intake QR code so students enroll themselves.
+                </p>
                 <div className="mt-3 space-y-3">
                   <label className="block space-y-1.5">
                     <span className="block text-sm font-medium text-[var(--ink-strong)]">Name</span>
@@ -759,9 +764,18 @@ export default function ClassRosterManager() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Roster</p>
                   <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Students in this class</h3>
                 </div>
-                <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
-                  {classDetail.enrollments.length} total
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFlyerModal(true)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-strong)] bg-[var(--surface-raised)] px-3.5 py-1 text-xs font-semibold text-[var(--accent-text)] hover:bg-[var(--surface-soft)] pointer-coarse:min-h-11"
+                  >
+                    <QrIcon size={14} weight="bold" aria-hidden="true" /> Intake QR and link
+                  </button>
+                  <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
+                    {classDetail.enrollments.length} total
+                  </span>
+                </div>
               </div>
               <div className="mt-4 space-y-3">
                 {classDetail.enrollments.length === 0 ? (
@@ -781,6 +795,12 @@ export default function ClassRosterManager() {
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/teacher/students/${enrollment.student.id}`}
+                            className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-muted)] pointer-coarse:min-h-11"
+                          >
+                            View student
+                          </a>
                           <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-muted)]">
                             {enrollment.status}
                           </span>
@@ -831,6 +851,15 @@ export default function ClassRosterManager() {
           </p>
         )}
       </div>
+
+      {classDetail ? (
+        <ClassIntakeFlyerModal
+          isOpen={showFlyerModal}
+          onClose={() => setShowFlyerModal(false)}
+          classId={classDetail.id}
+          className={classDetail.name}
+        />
+      ) : null}
     </div>
   );
 }

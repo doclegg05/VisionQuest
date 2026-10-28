@@ -1,6 +1,9 @@
-import { type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { humanizeStatusValue } from "@/lib/status-labels";
 import StructuredFormsSection from "./StructuredFormsSection";
+import PdfPreviewModal from "./PdfPreviewModal";
+import SignaturePadModal from "@/components/intake/SignaturePadModal";
+import { counterSignApproval, type FormReviewHandler, type SignaturePadResult } from "./form-review";
 import type {
   StudentData,
   AppointmentData,
@@ -58,7 +61,7 @@ interface OperationsTabProps {
   dateFormatter: Intl.DateTimeFormat;
   /** Form review */
   reviewingFormId: string | null;
-  onReviewForm: (submissionId: string, status: "approved" | "rejected") => void;
+  onReviewForm: FormReviewHandler;
   /** Appointment form */
   appointmentForm: AppointmentFormValues;
   onAppointmentFormChange: (updater: (current: AppointmentFormValues) => AppointmentFormValues) => void;
@@ -122,9 +125,25 @@ export default function OperationsTab({
   const showSubmittedForms = scope === "all" || scope === "submittedForms";
   const showCoachingSections = scope === "all" || scope === "coaching";
 
+  const [previewSubmission, setPreviewSubmission] = useState<FormSubmissionData | null>(null);
+  const [counterSignSubmission, setCounterSignSubmission] = useState<FormSubmissionData | null>(null);
+  const [counterSigning, setCounterSigning] = useState(false);
+
+  const handleTeacherCounterSign = async (sig: SignaturePadResult) => {
+    if (!counterSignSubmission) return;
+    setCounterSigning(true);
+    try {
+      await counterSignApproval(counterSignSubmission.id, sig, onReviewForm);
+      setCounterSignSubmission(null);
+      setPreviewSubmission(null);
+    } finally {
+      setCounterSigning(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {showCoachingSections && (
+      {showSubmittedForms && (
         /* Structured Forms (Phase 4) — data-reportable forms, separate from PDF uploads below */
         <StructuredFormsSection studentId={student.id} />
       )}
@@ -177,13 +196,22 @@ export default function OperationsTab({
 
                   <div className="flex flex-wrap items-center gap-2">
                     {submission.file ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewSubmission(submission)}
+                        className="inline-flex items-center rounded-full bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)] hover:brightness-110 pointer-coarse:min-h-11"
+                      >
+                        Preview & Print
+                      </button>
+                    ) : null}
+                    {submission.file ? (
                       <a
                         href={`/api/files/download?id=${submission.file.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-raised)] pointer-coarse:min-h-11"
                       >
-                        Open file
+                        Download PDF
                       </a>
                     ) : null}
                     {submission.signatureFile ? (
@@ -196,22 +224,26 @@ export default function OperationsTab({
                         View signature
                       </a>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() => onReviewForm(submission.id, "approved")}
-                      disabled={reviewingFormId === submission.id}
-                      className="inline-flex items-center rounded-full bg-[var(--badge-success-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-success-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
-                    >
-                      {reviewingFormId === submission.id ? "Saving..." : "Approve"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onReviewForm(submission.id, "rejected")}
-                      disabled={reviewingFormId === submission.id}
-                      className="inline-flex items-center rounded-full bg-[var(--badge-error-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-error-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
-                    >
-                      Return
-                    </button>
+                    {submission.status !== "approved" && (
+                      <button
+                        type="button"
+                        onClick={() => setCounterSignSubmission(submission)}
+                        disabled={reviewingFormId === submission.id || counterSigning}
+                        className="inline-flex items-center rounded-full bg-[var(--badge-success-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-success-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
+                      >
+                        Counter-Sign & Approve
+                      </button>
+                    )}
+                    {submission.status !== "approved" && (
+                      <button
+                        type="button"
+                        onClick={() => onReviewForm(submission.id, "rejected")}
+                        disabled={reviewingFormId === submission.id}
+                        className="inline-flex items-center rounded-full bg-[var(--badge-error-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-error-text)] hover:ring-1 hover:ring-current disabled:opacity-60 pointer-coarse:min-h-11"
+                      >
+                        Return
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -661,6 +693,32 @@ export default function OperationsTab({
         </div>
       </div>
       </>
+      )}
+
+      {/* In-Browser PDF Preview & Print Modal */}
+      {previewSubmission && previewSubmission.file && (
+        <PdfPreviewModal
+          isOpen={Boolean(previewSubmission)}
+          onClose={() => setPreviewSubmission(null)}
+          fileId={previewSubmission.file.id}
+          title={previewSubmission.title}
+          studentName={student.displayName}
+          status={previewSubmission.status}
+          onCounterSign={() => {
+            const s = previewSubmission;
+            setPreviewSubmission(null);
+            setCounterSignSubmission(s);
+          }}
+        />
+      )}
+
+      {/* Teacher Counter-Signature Pad Modal */}
+      {counterSignSubmission && (
+        <SignaturePadModal
+          isOpen={Boolean(counterSignSubmission)}
+          onClose={() => setCounterSignSubmission(null)}
+          onSave={handleTeacherCounterSign}
+        />
       )}
     </div>
   );

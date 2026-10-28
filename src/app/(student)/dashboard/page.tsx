@@ -1,165 +1,93 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { fetchStudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { getWelcomeCompletedAt } from "@/lib/progression/welcome-completion";
 import { shouldEnterWelcome } from "@/lib/progression/welcome-routing";
-import { countStudentVisibleAlerts } from "@/lib/student-alerts";
-import ChatWindow from "@/components/chat/ChatWindow";
-import { AmbientPanels } from "@/components/dashboard/AmbientPanels";
+import DashboardClient from "./DashboardClient";
+import { MoodCheckIn } from "@/components/dashboard/MoodCheckIn";
+import { readOverview, readActivity } from "@/lib/dashboard/readers";
+import { readSupport } from "@/lib/dashboard/support";
+import { readTasks } from "@/lib/dashboard/tasks";
+import { taskQuerySchema } from "@/lib/dashboard/task-schemas";
 import { SagePanels } from "@/components/dashboard/sage/SagePanels";
 import { getLatestPanelSpec } from "@/lib/sage/panel-data";
-import {
-  getStudentNextStep,
-  nextStepShortLabel,
-} from "@/lib/progression/student-next-step";
-import { PathToEmployment } from "@/components/progression/PathToEmployment";
+import styles from "@/components/dashboard/dashboard.module.css";
 import { SmsReconsentNotice } from "@/components/student/SmsReconsentNotice";
 
-/**
- * Chat-first student home (Phase 4 redesign, user-approved 2026-06-09).
- *
- * The Sage conversation IS the home surface; the ambient rail carries the
- * old dashboard's vital signs and deep-links into full pages. The classic
- * dashboard was retired 2026-07-20; /dashboard/classic now redirects here.
- *
- * The "Next up" hint on the readiness card derives from the SAME
- * StudentNextStepResult as the Current Target strip (nextStepShortLabel) —
- * the journey has exactly one next-action engine.
+/** Dashboard-first home; exactly one next-action engine, in readSupport.
+ * /dashboard/classic still redirects here. Sage streaming stays in /chat.
  */
-
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
-
-  const now = new Date();
-  const [
-    goalCount,
-    nextAppointment,
-    tasks,
-    alertCount,
-    readinessData,
-    incompleteOrientationItems,
-    sagePanel,
-    smsPreference,
-  ] = await Promise.all([
-      prisma.goal.count({
-        where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } },
-      }),
-      prisma.appointment.findFirst({
-        where: { studentId: session.id, status: "scheduled", startsAt: { gte: now } },
-        select: { id: true, title: true, startsAt: true, locationLabel: true },
-        orderBy: { startsAt: "asc" },
-      }),
-      prisma.studentTask.findMany({
-        where: { studentId: session.id, status: { in: ["open", "in_progress"] } },
-        select: { id: true, title: true, dueAt: true },
-        orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
-        take: 3,
-      }),
-      countStudentVisibleAlerts(session.id),
-      fetchStudentReadinessData(session.id),
-      prisma.orientationItem.findMany({
-        where: {
-          required: true,
-          OR: [
-            { progress: { none: { studentId: session.id } } },
-            { progress: { some: { studentId: session.id, completed: false } } },
-          ],
-        },
-        select: { id: true, label: true },
-        orderBy: { sortOrder: "asc" },
-        take: 3,
-      }),
-      getLatestPanelSpec(session.id),
-      // Whether this student's texts are paused pending code verification.
-      // Read here, on the student's own page, rather than fetched by the
-      // component: DashboardClient is also mounted by the teacher's
-      // student-detail dashboard, where "your" preferences means the
-      // teacher's. Two booleans, no client round trip, no layout shift.
-      prisma.notificationPreference.findUnique({
-        where: { studentId_channel: { studentId: session.id, channel: "sms" } },
-        select: { enabled: true, smsConsentAt: true, smsRevokedAt: true },
-      }),
-    ]);
-
-  const { state, readiness, orientationProgress } = readinessData;
-
+  const [goalCount, readinessData, smsPreference] = await Promise.all([
+    prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
+    fetchStudentReadinessData(session.id),
+    // Read here, on the student's own page: DashboardClient is also mounted by
+    // the teacher's student-detail dashboard, where "your" preferences would
+    // mean the teacher's (upstream f801ed69, W4).
+    prisma.notificationPreference.findUnique({
+      where: { studentId_channel: { studentId: session.id, channel: "sms" } },
+      select: { enabled: true, smsConsentAt: true, smsRevokedAt: true },
+    }),
+  ]);
+  const { orientationProgress } = readinessData;
   // Enabled but unconfirmed: the channel is on and nothing is being delivered.
-  // A revoked row is not this case — that student chose to stop.
+  // A revoked row is not this case; that student chose to stop.
   const smsAwaitingConfirmation =
     smsPreference?.enabled === true &&
     smsPreference.smsConsentAt === null &&
     smsPreference.smsRevokedAt === null;
-
-  // Brand-new students still start at the welcome flow. "Brand new" is a
-  // recorded fact (shouldEnterWelcome), never an inference from a row the app
-  // creates on its own: this check used to read "no Progression row", which
-  // the layout's ProgressionProvider falsifies on the student's very first
-  // page mount. The cheap signals already in hand gate the extra reads.
+  // A Progression row is created by the app's check-in; it is not evidence
+  // the student has completed welcome. Preserve the recorded-fact predicate.
   if (goalCount === 0 && orientationProgress.completed === 0) {
     const [conversationCount, welcomeCompletedAt] = await Promise.all([
       prisma.conversation.count({ where: { studentId: session.id } }),
       getWelcomeCompletedAt(session.id),
     ]);
-    const shouldStartAtWelcome = shouldEnterWelcome({
-      welcomeCompletedAt,
-      goalCount,
-      conversationCount,
-      orientationCompletedCount: orientationProgress.completed,
-    });
-    if (shouldStartAtWelcome) {
-      redirect("/welcome");
-    }
+    if (shouldEnterWelcome({ welcomeCompletedAt, goalCount, conversationCount, orientationCompletedCount: orientationProgress.completed })) redirect("/welcome");
   }
 
-  // Reuse the readiness data fetched above — no duplicate readiness queries.
-  const nextStep = await getStudentNextStep(session.id, readinessData);
+  const intakeSubmissionCount = await prisma.formSubmission.count({
+    where: { studentId: session.id, formId: { in: ["orientation-intake", "student-intake"] } },
+  });
+  // KNOWN GAP (owner: the intake bundle, not this page). Neither "orientation-intake"
+  // nor "student-intake" is in the SPOKES catalog (src/lib/spokes/forms.ts), and
+  // /api/forms/sign refuses any formId that is not, so the ONLY writer of these two
+  // rows is the anonymous QR-code flow (src/lib/intake/pdf-stamped-packet.ts).
+  // A teacher-enrolled student cannot clear this banner in-app. Keep the existing
+  // predicate and copy pending the intake owner's decision; never redirect an
+  // authenticated student into anonymous enrollment. /orientation owns signing.
+  const needsIntakeSignature = intakeSubmissionCount === 0;
 
-  return (
-    <div className="page-shell page-shell-wide space-y-6">
-      <SmsReconsentNotice show={smsAwaitingConfirmation} />
-      <PathToEmployment
-        currentStepKey={nextStep.currentStepKey}
-        title={nextStep.title}
-        description={nextStep.description}
-        whyItMatters={nextStep.whyItMatters}
-        actionLabel={nextStep.actionLabel}
-        actionLink={nextStep.actionLink}
-        steps={nextStep.steps}
-      />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:order-2 lg:col-span-1">
-          {sagePanel && <SagePanels panel={sagePanel} showActions />}
-          <AmbientPanels
-            readinessScore={readiness.score}
-            nextGap={nextStepShortLabel(nextStep)}
-            tasks={tasks.map((task) => ({
-              ...task,
-              dueAt: task.dueAt ? task.dueAt.toISOString() : null,
-            }))}
-            alertCount={alertCount}
-            nextAppointment={
-              nextAppointment
-                ? {
-                    title: nextAppointment.title,
-                    startsAt: nextAppointment.startsAt.toISOString(),
-                    locationLabel: nextAppointment.locationLabel,
-                  }
-                : null
-            }
-            incompleteOrientationItems={incompleteOrientationItems}
-            orientationComplete={state.orientationComplete || false}
-            resumeCreated={state.resumeCreated || false}
-            level={state.level}
-            currentStreak={state.currentStreak}
-          />
-        </div>
-        <div className="surface-section overflow-hidden p-0 lg:order-1 lg:col-span-2">
-          <ChatWindow />
-        </div>
-      </div>
-    </div>
-  );
+  // Independent failures never erase other regions. API retries share these readers.
+  const [overview, activity, taskPage, support, sagePanel] = await Promise.allSettled([
+    readOverview(session.id), readActivity(session.id), readTasks(session.id, taskQuerySchema.parse({})),
+    readSupport(session.id, readinessData), getLatestPanelSpec(session.id),
+  ]);
+  return <div className={`${styles.workspace} page-shell page-shell-wide min-w-0 space-y-6`}>
+    <SmsReconsentNotice show={smsAwaitingConfirmation} />
+    {/* The intro renders below the next-step card: at 375px the next step must fit in the first screen. */}
+    <DashboardClient sessionId={session.id} moodContent={<MoodCheckIn />}
+      intro={<>
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div><h1 className="font-display text-2xl font-semibold text-[var(--ink-strong)]">Your dashboard</h1><p className="mt-1 text-[var(--ink-muted)]">Your next action, plans, and recorded progress in one place.</p></div>
+          <Link href="/chat" className="secondary-button px-4 py-3">Talk to Sage</Link>
+        </header>
+        {needsIntakeSignature && <section aria-label="Student profile signature" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-5">
+          <div><h2 className="font-semibold text-[var(--ink-strong)]">Sign your student profile form</h2><p className="mt-1 text-sm text-[var(--ink-muted)]">Your class hours only count once your signed form is on file.</p></div>
+          <Link href="/orientation" className="primary-button px-5 py-3">Sign my form</Link>
+        </section>}
+      </>}
+      initialOverview={overview.status === "fulfilled" ? overview.value : undefined}
+      initialActivity={activity.status === "fulfilled" ? activity.value : undefined}
+      initialTasks={taskPage.status === "fulfilled" ? taskPage.value : undefined}
+      initialSupport={support.status === "fulfilled" ? support.value : undefined}
+    />
+    {sagePanel.status === "fulfilled" && sagePanel.value && <SagePanels panel={sagePanel.value} showActions />}
+    {sagePanel.status === "rejected" && <p className="text-sm text-[var(--ink-muted)]">Sage’s saved suggestions could not load. <Link className="inline-flex items-center min-h-11 underline" href="/chat">Open Sage</Link> or refresh this dashboard to try again.</p>}
+  </div>;
 }

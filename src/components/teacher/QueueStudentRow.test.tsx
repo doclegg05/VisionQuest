@@ -118,3 +118,18 @@ describe("QueueStudentRow", () => {
     assert.doesNotMatch(html, /id="queue-issues-stu-1"/);
   });
 });
+
+// Ported from the branch's InterventionQueue.test.tsx (M10) when upstream
+// deleted that component (c487091a): the row's disclosure toggle must not
+// nest another control, or tapping a quick action also toggles the row and a
+// screen reader reads the actions as part of the toggle's label.
+describe("QueueStudentRow disclosure toggle (M10)", () => {
+  it("nests no interactive element inside the toggle button", () => {
+    const html = render();
+    const open = /<button\b[^>]*aria-expanded[^>]*>/.exec(html);
+    assert.ok(open, "expected a disclosure toggle carrying aria-expanded");
+    const rest = html.slice(open.index + open[0].length);
+    const inner = rest.slice(0, rest.indexOf("</button>"));
+    assert.doesNotMatch(inner, /<button\b|<a\b/);
+  });
+});

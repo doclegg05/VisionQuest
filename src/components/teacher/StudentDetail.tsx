@@ -13,6 +13,12 @@ import OverviewTab from "./student-detail/OverviewTab";
 import GoalsPlanTab from "./student-detail/GoalsPlanTab";
 import ProgressTab from "./student-detail/ProgressTab";
 import OperationsTab from "./student-detail/OperationsTab";
+import { toIsoDueAt } from "@/lib/dashboard/due-date";
+import {
+  buildFormReviewBody,
+  reviewResultMessage,
+  type FormReviewExtras,
+} from "./student-detail/form-review";
 import { useConfirm } from "@/components/ui/useConfirm";
 
 type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled";
@@ -361,7 +367,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       const response = await fetch(`/api/teacher/students/${studentId}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(taskForm),
+        body: JSON.stringify({ ...taskForm, dueAt: toIsoDueAt(taskForm.dueAt) }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
@@ -448,7 +454,11 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
   };
 
-  async function handleReviewForm(submissionId: string, status: "approved" | "rejected") {
+  async function handleReviewForm(
+    submissionId: string,
+    status: "approved" | "rejected",
+    extras?: FormReviewExtras,
+  ) {
     const notes = status === "rejected"
       ? await prompt({
           title: "Return this form to the student?",
@@ -467,18 +477,14 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       const response = await fetch(`/api/teacher/students/${studentId}/forms`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          submissionId,
-          status,
-          notes: notes || "",
-        }),
+        body: JSON.stringify(buildFormReviewBody(submissionId, status, notes || "", extras)),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
         throw new Error(getErrorMessage(payload, "Could not update the form review."));
       }
 
-      setPanelMessage(status === "approved" ? "Form approved." : "Form returned for revision.");
+      setPanelMessage(reviewResultMessage(status, extras, payload));
       await loadData();
     } catch (err) {
       setPanelMessage(err instanceof Error ? err.message : "Could not update the form review.");
@@ -594,27 +600,8 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
               onShowAllConversations={() => setShowAllConversations(true)}
             />
           ),
-          admin: (
-            <div id="account-actions" className="space-y-6">
-              <OverviewTab
-                data={data}
-                moodEntries={moodEntries}
-                dateFormatter={dateFormatter}
-                showResetPw={showResetPw}
-                onToggleResetPw={() => setShowResetPw((prev) => !prev)}
-                newPassword={newPassword}
-                onNewPasswordChange={setNewPassword}
-                resetStatus={resetStatus}
-                onResetPassword={handleResetPassword}
-                confirmDeactivate={confirmDeactivate}
-                onSetConfirmDeactivate={setConfirmDeactivate}
-                deactivating={deactivating}
-                onToggleStudentStatus={toggleStudentStatus}
-                archiving={archiving}
-                onArchive={handleArchive}
-                archiveResult={archiveResult}
-                archiveError={archiveError}
-              />
+          forms: (
+            <div id="forms-documents" className="space-y-6">
               <OperationsTab
                 data={data}
                 dateFormatter={dateFormatter}
@@ -637,6 +624,29 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 savingNote={savingNote}
                 onCreateNote={handleCreateNote}
                 scope="submittedForms"
+              />
+            </div>
+          ),
+          admin: (
+            <div id="account-actions" className="space-y-6">
+              <OverviewTab
+                data={data}
+                moodEntries={moodEntries}
+                dateFormatter={dateFormatter}
+                showResetPw={showResetPw}
+                onToggleResetPw={() => setShowResetPw((prev) => !prev)}
+                newPassword={newPassword}
+                onNewPasswordChange={setNewPassword}
+                resetStatus={resetStatus}
+                onResetPassword={handleResetPassword}
+                confirmDeactivate={confirmDeactivate}
+                onSetConfirmDeactivate={setConfirmDeactivate}
+                deactivating={deactivating}
+                onToggleStudentStatus={toggleStudentStatus}
+                archiving={archiving}
+                onArchive={handleArchive}
+                archiveResult={archiveResult}
+                archiveError={archiveError}
               />
             </div>
           ),

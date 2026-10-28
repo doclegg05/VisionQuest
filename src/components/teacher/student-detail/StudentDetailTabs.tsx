@@ -4,6 +4,7 @@ import { type KeyboardEvent, useState } from "react";
 import {
   ChatCircleText,
   ChartLineUp,
+  FileText,
   Gear,
 } from "@phosphor-icons/react";
 
@@ -12,7 +13,7 @@ import {
   useAnchorTabSwitch,
 } from "./useAnchorTabSwitch";
 
-export type StudentDetailTabKey = "coach" | "progress" | "admin";
+export type StudentDetailTabKey = "coach" | "progress" | "forms" | "admin";
 
 interface TabDef {
   key: StudentDetailTabKey;
@@ -23,6 +24,7 @@ interface TabDef {
 const TABS: TabDef[] = [
   { key: "coach", label: "Coach", icon: ChatCircleText },
   { key: "progress", label: "Progress", icon: ChartLineUp },
+  { key: "forms", label: "Forms", icon: FileText },
   { key: "admin", label: "Admin", icon: Gear },
 ];
 
@@ -84,7 +86,14 @@ export default function StudentDetailTabs({ children }: StudentDetailTabsProps) 
               aria-selected={selected}
               aria-controls={TABPANEL_ID}
               tabIndex={selected ? 0 : -1}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => {
+                setActiveTab(tab.key);
+                // A leftover #anchor would switch the tab back on the next
+                // hashchange, so a manual choice clears it.
+                if (window.location.hash) {
+                  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+                }
+              }}
               onKeyDown={(event) => selectAdjacentTab(event, tab.key)}
               type="button"
               className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${

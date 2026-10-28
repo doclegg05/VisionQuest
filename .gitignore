@@ -112,6 +112,7 @@ test-results/
 
 # Local runtime workspaces (audit logs, uploads, scratch dirs)
 local_*/
+/.developer-preview/
 
 # Analysis report artifacts (root-level)
 COMPETITIVE_ANALYSIS_2026.md
@@ -131,6 +132,8 @@ broken-documents-backup-*.json
 *.fcpbundle
 *.fcpxml
 
+# Local scratch — intake PDF samples, may contain student data
+/scratch/
 # Agent worktrees (isolated builder checkouts; never commit)
 .claude/worktrees/
 

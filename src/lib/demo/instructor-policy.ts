@@ -79,6 +79,8 @@ export const DEMO_INSTRUCTOR_WRITE_ALLOW: readonly string[] = [
   "POST /api/orientation",
   "POST /api/orientation/complete",
   "PATCH /api/tasks/[id]",
+  // Matched by the [id] pattern above anyway; listed so the record is explicit.
+  "PATCH /api/tasks/bulk-status",
   "POST /api/sage/insights",
   "PATCH /api/sage/insights/[id]",
   "DELETE /api/sage/insights/[id]",
@@ -119,6 +121,14 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
   "POST /api/applications",
 
   "POST /api/appointments/book",
+
+  // Branch intake and student task routes, classified at the 2026-10-26 merge:
+  // intake creates accounts; the rest are student-only (requireStudent /
+  // deletePersonalTask).
+  "POST /api/intake/submit",
+  "POST /api/intake/webhook",
+  "POST /api/tasks",
+  "DELETE /api/tasks/[id]",
 
   "POST /api/auth/forgot-password",
   "POST /api/auth/login",
@@ -284,6 +294,7 @@ export const DEMO_INSTRUCTOR_READ_DENY: readonly string[] = [
   "GET /api/teacher/failed-extractions",
   "GET /api/teacher/forms/responses",
   "GET /api/teacher/export/**",
+  "GET /api/teacher/classes/export-packets",
   "GET /api/teacher/audit/**",
 ];
 

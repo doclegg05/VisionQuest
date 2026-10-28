@@ -29,6 +29,7 @@ function renderTabs() {
       {{
         coach: <p>Coach panel content</p>,
         progress: <p>Progress panel content</p>,
+        forms: <p>Forms panel content</p>,
         admin: <p>Admin panel content</p>,
       }}
     </StudentDetailTabs>,
@@ -36,12 +37,12 @@ function renderTabs() {
 }
 
 describe("StudentDetailTabs ARIA tablist pattern", () => {
-  it("renders a tablist wrapping exactly three tabs", () => {
+  it("renders a tablist wrapping all four tabs (Forms added by the intake work)", () => {
     const html = renderTabs();
 
     assert.match(html, /role="tablist"/);
     const tabMatches = html.match(/role="tab"/g) ?? [];
-    assert.equal(tabMatches.length, 3, "expected exactly three role=\"tab\" elements");
+    assert.equal(tabMatches.length, 4, "expected exactly four role=\"tab\" elements");
   });
 
   it("marks only the default (coach) tab selected, with roving tabIndex", () => {
@@ -54,14 +55,14 @@ describe("StudentDetailTabs ARIA tablist pattern", () => {
     const selectedTrueCount = (html.match(/aria-selected="true"/g) ?? []).length;
     const selectedFalseCount = (html.match(/aria-selected="false"/g) ?? []).length;
     assert.equal(selectedTrueCount, 1, "exactly one tab should be aria-selected=true");
-    assert.equal(selectedFalseCount, 2, "the other two tabs should be aria-selected=false");
+    assert.equal(selectedFalseCount, 3, "the other three tabs should be aria-selected=false");
 
     const tabIndexZero = (html.match(/tabIndex/g) ?? []).length; // React strips tabIndex from SSR HTML attr name to tabindex
     void tabIndexZero;
     const tabindexZeroCount = (html.match(/tabindex="0"/g) ?? []).length;
     const tabindexNegOneCount = (html.match(/tabindex="-1"/g) ?? []).length;
     assert.equal(tabindexZeroCount, 1, "exactly one tab should be in the tab order (tabindex=0)");
-    assert.equal(tabindexNegOneCount, 2, "the other two tabs should be out of the tab order (tabindex=-1)");
+    assert.equal(tabindexNegOneCount, 3, "the other three tabs should be out of the tab order (tabindex=-1)");
   });
 
   it("wires aria-controls to a single tabpanel that carries role=tabpanel and aria-labelledby", () => {

@@ -123,6 +123,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       mfaSecret: true,
       mfaBackupCodes: true,
       mfaLastUsedCounter: true,
+      mustChangePassword: true,
     },
   });
 
@@ -201,6 +202,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       studentId: student.studentId,
       displayName: student.studentId, // Minimal — matches login response shape
       role: student.role,
+      // Same contract as the login response: a client-side prompt to rotate a
+      // password staff chose, never a gate on the session just issued.
+      mustChangePassword: student.mustChangePassword,
     },
   });
 });

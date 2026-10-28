@@ -18,6 +18,19 @@ const PUBLIC_ROUTES = [
   { path: "/", name: "landing page" },
   { path: "/teacher-register", name: "teacher registration" },
   { path: "/forgot-password", name: "forgot password" },
+  // The SPOKES intake pair. /intake is the highest-stakes public page in the
+  // product: it is reached by QR code off a printed flyer, so it is opened on
+  // a phone, once, by an adult who may be filling out the first form of their
+  // enrollment. A missing label or an unreachable control there is a student
+  // who does not enrol. /verify/document is the other half of that flow.
+  //
+  // Heads-up for whoever sees this go red first: /intake currently declares no
+  // id on any form control, and its <label>s are siblings carrying no htmlFor,
+  // so axe's `label` rule should fire on ~10 controls (the signature input has
+  // no label element at all). That is a real defect in the page, not in this
+  // list — fix the page, never filter the rule.
+  { path: "/intake", name: "SPOKES intake form" },
+  { path: "/verify/document", name: "document verification" },
 ] as const;
 
 /**

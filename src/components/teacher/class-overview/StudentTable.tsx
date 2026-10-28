@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { StudentOverview } from "@/lib/teacher/dashboard";
+import { IntakeStatusBadge } from "./IntakeStatusBadge";
 
 interface StudentActionLinks {
   record: string;
@@ -148,6 +149,9 @@ export default function StudentTable({
                           <p className="break-words font-medium text-[var(--ink-strong)]">{student.displayName}</p>
                         </div>
                         <p className="ml-4 text-xs break-words text-[var(--ink-faint)]">{student.studentId}</p>
+                        <div className="ml-4 mt-1">
+                          <IntakeStatusBadge status={student.intakeStatus} />
+                        </div>
                         {student.openAlertCount > 0 && (
                           <span className="mt-1 inline-flex rounded-full bg-[var(--badge-warning-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--badge-warning-text)]">
                             {student.openAlertCount} alert{student.openAlertCount === 1 ? "" : "s"}

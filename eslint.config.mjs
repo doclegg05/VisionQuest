@@ -204,19 +204,77 @@ const openRouterEvalOnly = {
 // (src/lib/rls-context.ts). This catches the direct import only; a lib
 // module that imports the app client is caught when a test exercises the
 // path under RLS_CONTEXT_STRICT=true (CI).
+//
+// The globs cover PUBLIC and PRE-AUTH surfaces too, not just the scheduled
+// ones. The rule was written for cron and job handlers, and the public intake
+// and verification routes then landed OUTSIDE all three globs and repeated the
+// same class silently — the second time a sessionless handler has walked
+// around this guard. A route reachable without a session is exactly the case
+// the rule exists for, so it is listed here when it is added, not after the
+// next review finds it.
+//
+// Deliberately NOT listed: src/app/api/auth/**. Login has no session by
+// definition and must read Student to create one; whether that read works
+// under vq_app is a live question (see F7, "give dev a vq_app login"), and
+// flipping it to an error before that is answered would break the gate
+// without telling anyone anything true. Settle it, then add the glob.
+const appPrismaPattern = {
+  regex: "(^|/)db$",
+  importNames: ["prisma"],
+  message:
+    "No request session here, so the app prisma client has no RLS context and fails closed under vq_app. Import prismaAdmin for cross-student rows, and run per-student lib helpers inside withStudentRlsContext from @/lib/rls-context.",
+};
+
+// Browser-reachable code must not value-import plain "zod": Zod 4's JIT
+// capability probe calls new Function, which logs CSP violations under the
+// strict nonce-based CSP. @/lib/zod-csp re-exports z after jitless config.
+// Flat config replaces a rule wholesale per file, so src/lib/intake/**, which
+// also carries the appPrisma restriction above, gets its own block that
+// merges both. Both blocks come after openRouterEvalOnly, so each repeats
+// openRouterEvalOnlyPatterns or it would switch that guard off.
+const zodCspPath = {
+  name: "zod",
+  message: "Import z from @/lib/zod-csp in browser-reachable code.",
+  allowTypeImports: true,
+};
+const browserZodImports = {
+  files: [
+    "src/components/**",
+    "src/app/**/*Client.tsx",
+    "src/lib/dashboard/**",
+    "src/lib/resume.ts",
+  ],
+  ignores: ["src/lib/zod-csp.ts"],
+  rules: {
+    "no-restricted-imports": ["error", { paths: [zodCspPath], patterns: openRouterEvalOnlyPatterns }],
+  },
+};
+const intakeZodImports = {
+  files: ["src/lib/intake/**"],
+  ignores: ["src/lib/zod-csp.ts"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      { paths: [zodCspPath], patterns: [appPrismaPattern, ...openRouterEvalOnlyPatterns] },
+    ],
+  },
+};
+
 const appPrismaImportWithoutSession = {
-  files: ["src/app/api/internal/**", "src/lib/jobs-registry.ts"],
+  files: [
+    "src/app/api/internal/**",
+    "src/app/api/cron/**",
+    "src/app/api/intake/**",
+    "src/app/api/verify/**",
+    "src/lib/intake/**",
+    "src/lib/jobs-registry.ts",
+  ],
   rules: {
     "no-restricted-imports": [
       "error",
       {
         patterns: [
-          {
-            regex: "(^|/)db$",
-            importNames: ["prisma"],
-            message:
-              "No request session here, so the app prisma client has no RLS context and fails closed under vq_app. Import prismaAdmin for cross-student rows, and run per-student lib helpers inside withStudentRlsContext from @/lib/rls-context.",
-          },
+          appPrismaPattern,
           ...openRouterEvalOnlyPatterns,
         ],
       },
@@ -387,6 +445,8 @@ const eslintConfig = defineConfig([
       ]
     : []),
   appPrismaImportWithoutSession,
+  browserZodImports,
+  intakeZodImports,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -397,6 +457,10 @@ const eslintConfig = defineConfig([
     // Agent worktrees (harness-managed checkouts) — repo-wide lint must not
     // walk them; they appear and vanish mid-run.
     ".claude/**",
+    // Generated developer-preview snapshot (contains a full .next build) and
+    // throwaway design prototypes — neither is shipped source.
+    ".developer-preview/**",
+    "prototypes/**",
     // Third-party prebuilt bundles are not application source. Parsing these
     // multi-megabyte files slows lint and reports unfixable upstream rules.
     "prototypes/**/vendor/**",

@@ -6,6 +6,7 @@ import StudentCards from "./class-overview/StudentCards";
 import StudentTable from "./class-overview/StudentTable";
 import { UpcomingAppointments } from "./class-overview/UpcomingAppointments";
 import { apiFetch } from "@/lib/api";
+import { FileArchive } from "@phosphor-icons/react";
 import type {
   ManagedClassOption,
   StudentOverview,
@@ -14,6 +15,16 @@ import type {
 } from "@/lib/teacher/dashboard";
 
 type SortKey = "displayName" | "lastActive" | "xp" | "certDone" | "orientationDone" | "readinessScore";
+type IntakeFilter = "all" | StudentOverview["intakeStatus"];
+
+// Intake compliance filter chips (branch intake work). Theme tokens only:
+// staff surfaces may not use raw palette colors.
+const INTAKE_FILTERS: { key: IntakeFilter; label: string; activeClass: string }[] = [
+  { key: "all", label: "All", activeClass: "bg-[var(--accent-strong)] text-[var(--on-accent)]" },
+  { key: "certified", label: "Certified", activeClass: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]" },
+  { key: "needs_review", label: "Needs sign-off", activeClass: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]" },
+  { key: "missing", label: "Missing", activeClass: "bg-[var(--badge-error-bg)] text-[var(--badge-error-text)]" },
+];
 
 export default function ClassOverview({
   initialData,
@@ -34,6 +45,7 @@ export default function ClassOverview({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(initialData?.totalPages ?? 1);
   const [showInactive, setShowInactive] = useState(false);
+  const [intakeFilter, setIntakeFilter] = useState<IntakeFilter>("all");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const skipInitialFetchRef = useRef(initialData !== undefined);
 
@@ -90,8 +102,9 @@ export default function ClassOverview({
   const filtered = students
     .filter(
       (s) =>
-        s.displayName.toLowerCase().includes(search.toLowerCase()) ||
-        s.studentId.toLowerCase().includes(search.toLowerCase())
+        (s.displayName.toLowerCase().includes(search.toLowerCase()) ||
+          s.studentId.toLowerCase().includes(search.toLowerCase())) &&
+        (intakeFilter === "all" || s.intakeStatus === intakeFilter)
     )
     .sort((a, b) => {
       let cmp = 0;
@@ -106,6 +119,12 @@ export default function ClassOverview({
 
   // Summary stats
   const totalStudents = students.length;
+  const intakeCounts: Record<IntakeFilter, number> = {
+    all: totalStudents,
+    certified: students.filter((s) => s.intakeStatus === "certified").length,
+    needs_review: students.filter((s) => s.intakeStatus === "needs_review").length,
+    missing: students.filter((s) => s.intakeStatus === "missing").length,
+  };
   const pendingVerifications = students.reduce((sum, s) => sum + s.certPendingVerify, 0);
   const avgXp = totalStudents > 0 ? Math.round(students.reduce((sum, s) => sum + s.xp, 0) / totalStudents) : 0;
 
@@ -212,12 +231,22 @@ export default function ClassOverview({
             />
           </label>
         </div>
-        <a
-          href={`/api/teacher/export${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
-          className="inline-flex items-center justify-center rounded-full border border-[var(--border)] px-4 py-3 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
-        >
-          Export CSV
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/api/teacher/classes/export-packets${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
+            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--accent-strong)] px-4 py-3 text-sm font-semibold text-[var(--on-accent)] transition-colors hover:brightness-110"
+            title="Download all stamped intake packets for this cohort as a ZIP"
+          >
+            <FileArchive size={18} weight="bold" aria-hidden="true" />
+            Download cohort packets (.zip)
+          </a>
+          <a
+            href={`/api/teacher/export${currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : ""}`}
+            className="inline-flex items-center justify-center rounded-full border border-[var(--border)] px-4 py-3 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]"
+          >
+            Export CSV
+          </a>
+        </div>
       </div>
 
       {/* View & Filter Controls */}
@@ -240,6 +269,22 @@ export default function ClassOverview({
             >
               Cards
             </button>
+          </div>
+
+          <div role="group" aria-label="Filter by intake status" className="flex flex-wrap items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-raised)]/70 p-1">
+            {INTAKE_FILTERS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={intakeFilter === option.key}
+                onClick={() => setIntakeFilter(option.key)}
+                className={`inline-flex items-center pointer-coarse:min-h-11 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
+                  intakeFilter === option.key ? option.activeClass : "text-[var(--ink-muted)] hover:bg-[var(--surface-muted)]"
+                }`}
+              >
+                {option.label} ({intakeCounts[option.key]})
+              </button>
+            ))}
           </div>
 
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--ink-muted)]">

@@ -85,6 +85,10 @@ const ALLOWED_WITHOUT_A_ROUTE_CHECK: Readonly<Record<string, string>> = {
   "POST /api/sage/panel/dismiss": "dismissPanel in src/lib/sage/panel-data.ts checks the student",
   "POST /api/demo/student": "demo entry, before any session exists",
   "POST /api/demo/instructor": "demo entry, before any session exists",
+  "PATCH /api/tasks/[id]":
+    "updateTasks -> scopedTask in src/lib/dashboard/tasks.ts checks the student with buildManagedStudentWhere",
+  "PATCH /api/tasks/bulk-status":
+    "updateTasks -> scopedTask in src/lib/dashboard/tasks.ts checks each task's student with buildManagedStudentWhere",
 };
 
 /** The helpers that hold a teacher to the students and classes they may manage. */
@@ -361,5 +365,14 @@ describe("matchesRoutePattern", () => {
   it("never matches a pattern with no method and path", () => {
     assert.equal(matchesRoutePattern("/api/orientation", "POST", "/api/orientation"), false);
     assert.equal(matchesRoutePattern("", "POST", "/api/orientation"), false);
+  });
+});
+
+describe("cohort intake packet export", () => {
+  it("is denied to the demo instructor (signed intake packets are real PII)", () => {
+    assert.equal(
+      isDemoInstructorRequestAllowed("GET", "/api/teacher/classes/export-packets"),
+      false,
+    );
   });
 });
