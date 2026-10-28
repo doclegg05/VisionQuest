@@ -46,7 +46,7 @@ export function TaskTable({ data, query, setQuery, pending, save, remove, setSta
   const pages = data ? Math.max(1, Math.ceil(data.total / query.pageSize)) : null;
   return <>
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 id="tasks-heading" className="font-display text-xl font-semibold">My tasks</h2><button className="primary-button min-h-11 px-4 py-2" disabled={pending} onClick={() => setAdding(true)}>Add personal task</button></div>
-    <p className="mt-2 text-sm text-[var(--ink-muted)]">Keep personal plans and staff assignments together. Only staff can edit assignment details.</p>
+    <p className="mt-2 text-sm text-[var(--ink-muted)]">Your own tasks and tasks from staff are in one list. Only staff can change the tasks they give you.</p>
     <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <label className="text-sm">Search tasks<input className="field mt-1 min-h-11 w-full px-3" type="search" maxLength={160} value={query.search} onChange={(e) => changeQuery({ search: e.target.value })} /></label>
       <label className="text-sm">Status<select className="field mt-1 min-h-11 w-full px-3" value={query.status} onChange={(e) => changeQuery({ status: e.target.value as TaskQuery["status"] })}><option value="all">All statuses</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="completed">Completed</option></select></label>
