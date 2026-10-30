@@ -86,7 +86,7 @@ export function CareerOneStopUnconfiguredNotice({
       className="rounded-lg border border-[var(--error)]/40 px-3 py-2 text-sm text-danger"
       role="alert"
     >
-      WV Local Jobs is not on yet. Ask your admin to add the CareerOneStop keys.
+      WV Local Jobs is not on. Select WVU Medicine below to get jobs without a key. Save your choice, then refresh.
     </p>
   );
 }
@@ -504,6 +504,11 @@ export function JobConfigSection() {
                   </option>
                 ))}
               </select>
+              {(sources.includes("wvumedicine") || sources.includes("localemployers")) && (
+                <p className="mt-2 text-xs text-[var(--ink-muted)]">
+                  Direct employer feeds search your city in West Virginia. They do not use the mile radius.
+                </p>
+              )}
             </div>
 
             <fieldset>

@@ -121,12 +121,14 @@ async function completeSourceResult(
   scrapeRunId: string,
   source: string,
   fetchedCount: number,
+  warning: string | null,
 ): Promise<void> {
   await prisma.jobScrapeSourceResult.update({
     where: { scrapeRunId_source: { scrapeRunId, source } },
     data: {
       status: "completed",
       fetchedCount,
+      error: warning,
       completedAt: new Date(),
     },
   });
@@ -233,8 +235,9 @@ async function scrapeConfig(configId: string, options: RunScrapeOptions): Promis
     const adapterResults = await Promise.allSettled(
       activeAdapters.map(async (adapter) => {
         try {
-          const jobs = await fetchSourceJobs(() => adapter.fetchJobs(config.region, config.radius));
-          await completeSourceResult(scrapeRunId, adapter.source, jobs.length);
+          let warning: string | null = null;
+          const jobs = await fetchSourceJobs(() => adapter.fetchJobs(config.region, config.radius), (message) => { warning = message; });
+          await completeSourceResult(scrapeRunId, adapter.source, jobs.length, warning);
           return { source: adapter.source, jobs };
         } catch (error) {
           const message = errorMessage(error);

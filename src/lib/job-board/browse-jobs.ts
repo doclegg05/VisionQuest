@@ -17,6 +17,7 @@ export async function loadBrowseJobs(params: {
   const now = new Date();
   const where: Record<string, unknown> = {
     status: "active",
+    workMode: "remote",
     expiresAt: { gt: now },
   };
   const cluster = params.searchParams.get("cluster");

@@ -417,6 +417,7 @@ jobs:
           e2e/student-login-chat.spec.ts
           e2e/teacher-dashboard.spec.ts
           e2e/student-journey.spec.ts
+          e2e/jobs-journey.spec.ts
           e2e/teacher-loop.spec.ts
           e2e/theme-variant.spec.ts
           e2e/cohort-demo-off.spec.ts

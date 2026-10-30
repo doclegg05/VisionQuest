@@ -184,6 +184,7 @@ Use [`DEPLOY.md`](/Users/brittlegg/visionquest/DEPLOY.md) for the full deploymen
 
 ## Product And Planning Docs
 
+- [Employer-direct job data](docs/runbooks/employer-direct-jobs.md) keyless WVU Medicine source, class setup, live check, and coverage limits
 - [`docs/PRODUCT_GUIDE.md`](/Users/brittlegg/visionquest/docs/PRODUCT_GUIDE.md) product intent, user model, and current gaps
 - [`docs/PRODUCT_DECISIONS.md`](/Users/brittlegg/visionquest/docs/PRODUCT_DECISIONS.md) scope authority and current decisions
 - [`docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md`](/Users/brittlegg/visionquest/docs/ACADEMIC_EFFECTIVENESS_ROADMAP.md) learning and evidence strategy

@@ -229,4 +229,38 @@ describe("GET /api/jobs band annotation", () => {
       assert.equal(job.band, null);
     }
   });
+
+  it("scores every candidate before the 100-job display limit", async () => {
+    mockJobListingFindMany.mock.mockImplementation(async () => [
+      ...Array.from({ length: 100 }, (_,index) => ({ ...classJobB, id: `unrelated-${index}`, company: `Employer ${index}`, sourceId: `other-${index}`, createdAt: new Date("2026-10-29") })),
+      { ...classJobA, id: "older-best-match", createdAt: new Date("2026-10-01") },
+    ]);
+    mockLoadBrowseJobs.mock.mockImplementation(async () => []);
+    const body = await (await route.GET(jobsRequest())).json();
+    assert.equal(body.jobs.length, 100);
+    assert.equal(body.jobs[0].id, "older-best-match");
+  });
+
+  it("enforces local_only for class jobs and excludes the remote browse pool", async () => {
+    mockConfigFindUnique.mock.mockImplementation(async () => ({ id: "config-1", region: "Charleston, WV", localJobPriority: "local_only" }));
+    mockJobListingFindMany.mock.mockImplementation(async () => [
+      classJobA,
+      { ...classJobB, id: "remote-local-source", source: "jsearch", workMode: "remote" },
+      { ...classJobB, id: "far-onsite", location: "Dallas, TX" },
+    ]);
+    const body = await (await route.GET(mockRequest("/api/jobs", { searchParams: { proximity: "all" } }))).json();
+    assert.deepEqual(body.jobs.map((job: { id: string }) => job.id), [classJobA.id]);
+    assert.equal(body.totalRemote, 0);
+    assert.equal(mockLoadBrowseJobs.mock.callCount(), 0);
+    const args = mockJobListingFindMany.mock.calls[0].arguments[0] as { where: { workMode: unknown } };
+    assert.deepEqual(args.where.workMode, { not: "remote" });
+  });
+
+  it("a legacy remote filter cannot bypass local_only policy", async () => {
+    mockConfigFindUnique.mock.mockImplementation(async () => ({ id: "config-1", region: "Charleston, WV", localJobPriority: "local_only" }));
+    mockJobListingFindMany.mock.mockImplementation(async () => [{ ...classJobA, workMode: "remote", source: "jsearch" }]);
+    const body = await (await route.GET(mockRequest("/api/jobs", { searchParams: { proximity: "all", workMode: "remote" } }))).json();
+    assert.deepEqual(body.jobs, []);
+    assert.equal(mockLoadBrowseJobs.mock.callCount(), 0);
+  });
 });

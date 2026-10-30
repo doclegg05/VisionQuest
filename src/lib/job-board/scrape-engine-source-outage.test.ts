@@ -136,5 +136,7 @@ test("a multi-board source with one dead board and one live board stays complete
 
   assert.ok(calls > 1, "expected the adapter to try more than one board");
   assert.equal(statusOf("smartrecruiters"), "completed");
+  const completed = sourceUpdates.find((update) => update.source === "smartrecruiters" && update.status === "completed");
+  assert.match(String(completed?.error), /Partial results: 1 of 4 requests failed/);
   assert.equal(runFinishes.at(-1)?.status, "completed");
 });

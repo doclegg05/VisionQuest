@@ -52,8 +52,8 @@ describe("CareerOneStopUnconfiguredNotice", () => {
     const html = renderToString(
       <CareerOneStopUnconfiguredNotice sources={["careeronestop"]} sourceHealth={[UNCONFIGURED_HEALTH]} />,
     );
-    assert.ok(html.includes("WV Local Jobs is not on yet."));
-    assert.ok(html.includes("Ask your admin to add the CareerOneStop keys."));
+    assert.ok(html.includes("WV Local Jobs is not on."));
+    assert.ok(html.includes("Select WVU Medicine below to get jobs without a key."));
   });
 
   it("marks the notice role=\"alert\" so screen readers announce it, per the house pattern (StructuredFormsSection, InterventionQueuePanel)", () => {
@@ -64,7 +64,7 @@ describe("CareerOneStopUnconfiguredNotice", () => {
   });
 
   it("scores at or under the grade-6/8 readability ceiling, so the 'grade-6' claim is enforced, not asserted", () => {
-    const text = "WV Local Jobs is not on yet. Ask your admin to add the CareerOneStop keys.";
+    const text = "WV Local Jobs is not on. Select WVU Medicine below to get jobs without a key. Save your choice, then refresh.";
     const assessment = assessReadability(text);
     assert.ok(assessment.scorable, "expected the notice text to be long enough to score");
     assert.ok(

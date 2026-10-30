@@ -95,6 +95,7 @@ export default function CareerHub({
 }) {
   const [jobsData, setJobsData] = useState<JobsResponse | null>(null);
   const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState<string | null>(null);
   const [cluster, setCluster] = useState("");
   const [proximity, setProximity] = useState<JobProximityFilter>("all");
   const [sort, setSort] = useState("recommended");
@@ -112,9 +113,12 @@ export default function CareerHub({
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
 
     (async () => {
       setJobsLoading(true);
+      setJobsError(null);
       const params = new URLSearchParams();
       if (cluster) params.set("cluster", cluster);
       params.set("proximity", proximity);
@@ -124,18 +128,26 @@ export default function CareerHub({
       if (minPay) params.set("minPay", minPay);
       if (jobType) params.set("jobType", jobType);
 
-      const res = await fetch(`/api/jobs?${params}`);
-      if (!cancelled && res.ok) {
+      try {
+        const res = await fetch(`/api/jobs?${params}`, { signal: controller.signal });
+        if (!res.ok) throw new Error("Job search could not be loaded.");
         const json = await res.json();
-        setJobsData(json);
-      }
-      if (!cancelled) {
-        setJobsLoading(false);
+        if (!cancelled) setJobsData(json);
+      } catch {
+        if (!cancelled) {
+          setJobsData(null);
+          setJobsError("We could not load jobs. Please try again.");
+        }
+      } finally {
+        clearTimeout(timeout);
+        if (!cancelled) setJobsLoading(false);
       }
     })();
 
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, [cluster, proximity, sort, debouncedKeyword, postedWithinDays, minPay, jobType, refreshKey]);
 
@@ -195,6 +207,15 @@ export default function CareerHub({
         {jobsLoading && (
           <div className="py-12 text-center text-[var(--ink-muted)]">
             Loading jobs...
+          </div>
+        )}
+
+        {jobsError && (
+          <div role="alert" className="surface-section mt-6 rounded-xl p-4">
+            <p className="text-sm text-danger">{jobsError}</p>
+            <button type="button" onClick={() => setRefreshKey((key) => key + 1)} className="primary-button mt-3 min-h-11 px-4 py-2 text-sm">
+              Retry job search
+            </button>
           </div>
         )}
 

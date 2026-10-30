@@ -21,8 +21,9 @@ before(async () => {
 
 test("loadBrowseJobs queries only active, non-expired listings", async () => {
   await loadBrowseJobs({ proximity: "all", sort: "recent", searchParams: new URLSearchParams() });
-  const arg = queries[0] as { where: { status: string; expiresAt: { gt: Date } } };
+  const arg = queries[0] as { where: { status: string; workMode: string; expiresAt: { gt: Date } } };
   assert.equal(arg.where.status, "active");
+  assert.equal(arg.where.workMode, "remote", "mixed ATS pools must not put onsite jobs in the Remote tab");
   assert.ok(arg.where.expiresAt.gt instanceof Date);
 });
 

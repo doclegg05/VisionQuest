@@ -75,6 +75,8 @@
     "employers:backfill": "tsx scripts/backfill-employers.ts",
     "cos:smoke": "tsx scripts/cos-smoke.mjs",
     "talroo:smoke": "tsx scripts/talroo-smoke.mjs",
+    "jobs:wvu:smoke": "node --import tsx scripts/wvu-jobs-smoke.mjs",
+    "jobs:local:smoke": "node --import tsx scripts/local-employers-smoke.mjs",
     "ui-copy:readability": "tsx scripts/ui-copy-readability.mjs",
     "seed:e2e": "tsx scripts/seed-e2e-users.ts",
     "test:e2e:journeys": "playwright test e2e/student-journey.spec.ts e2e/teacher-loop.spec.ts",

@@ -6,9 +6,15 @@ import {
   parseTransferableSkillNames,
   scoreJob,
   rankJobs,
+  classifyJobProximity,
 } from "./recommendation";
 
 describe("scoreJob", () => {
+  it("keeps explicit remote roles remote when a local-search API returns them", () => {
+    for (const source of ["jsearch", "careeronestop", "usajobs", "adzuna"]) {
+      assert.equal(classifyJobProximity({ source, workMode: "remote", location: "Charleston, WV" }, "Charleston, WV"), "remote");
+    }
+  });
   const baseJob = { id: "job-1", location: "Charleston, WV", clusters: ["office-admin"] };
 
   it("returns score 0 when no discovery data", () => {
