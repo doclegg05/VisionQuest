@@ -27,6 +27,9 @@ request returned 403 and was skipped without bypassing the denial. This is
 source-read evidence, not a production database import or student-browser test.
 Both search and detail requests explicitly request the `en-US` language;
 Workday returned HTTP 500 when Node supplied its default wildcard language.
+When a refresh keeps successful jobs but some requests or details fail, its
+completed source row retains a `Partial results` warning with failure counts.
+The teacher's existing source-status display shows that warning.
 
 ## Enable for an existing class
 
@@ -101,6 +104,8 @@ node --import tsx scripts/verify-local-job-refresh.mjs
 It requires the accounts from `scripts/seed-e2e-users.ts`, an explicit local
 `DATABASE_URL` and `APP_BASE_URL`, and a running app. It refuses remote targets.
 The browser regression test is `e2e/jobs-journey.spec.ts` and runs in CI.
+The live check requires its exact requested run to report a positive WVU
+upsert count before checking save/apply; old listings cannot establish success.
 These checks are local evidence. A hosted pilot still requires selecting one
 class, enabling its sources, and checking a real deployed student session.
 

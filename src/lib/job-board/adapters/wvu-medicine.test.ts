@@ -3,6 +3,7 @@ import { afterEach, describe, it } from "node:test";
 import { wvuMedicineAdapter } from "./wvu-medicine";
 import { filterQualityJobs } from "../job-quality";
 import { classifyJobProximity } from "../recommendation";
+import { fetchSourceJobs } from "./shared";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
@@ -108,7 +109,9 @@ describe("WVU Medicine employer-direct adapter", () => {
       if (String(input).endsWith("/other")) return new Response("unavailable", { status: 503 });
       return Response.json({ jobPostingInfo: info });
     };
-    assert.equal((await wvuMedicineAdapter.fetchJobs("Summersville, WV", 25)).length, 1);
+    const warnings: string[] = [];
+    assert.equal((await fetchSourceJobs(() => wvuMedicineAdapter.fetchJobs("Summersville, WV", 25), (warning) => warnings.push(warning))).length, 1);
+    assert.match(warnings[0], /Partial results: 1 WVU Medicine job details could not be read/);
   });
 
   it("rejects unsupported search areas before requesting the employer site", async () => {

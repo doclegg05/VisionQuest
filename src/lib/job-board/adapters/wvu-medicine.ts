@@ -1,7 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { inferEmploymentType } from "../employment-type";
 import { inferJobWorkMode } from "../work-mode";
-import { fetchJson, stripHtml, truncateDescription } from "./shared";
+import { fetchJson, recordSourceWarning, stripHtml, truncateDescription } from "./shared";
 
 // Public career-site responses verified 2026-10-30. This is the employer's
 // website service, not a versioned partner API; fail visibly on shape drift.
@@ -128,6 +128,7 @@ export const wvuMedicineAdapter: JobSourceAdapter = {
       for (const job of batch) if (job) jobs.push(job);
     }
     if (failures > 0 && jobs.length === 0) throw new Error("WVU Medicine job details could not be read. Try the refresh again.");
+    if (failures) recordSourceWarning(`${failures} WVU Medicine job details could not be read.`);
     return jobs;
   },
 };

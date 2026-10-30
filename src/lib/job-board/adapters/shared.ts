@@ -15,9 +15,15 @@ interface SourceRequestTally {
   attempted: number;
   failed: number;
   lastFailure: string | null;
+  warnings: string[];
 }
 
 const requestTally = new AsyncLocalStorage<SourceRequestTally>();
+
+/** Fixed, credential-free adapter diagnostics for partial response/row failures. */
+export function recordSourceWarning(warning: string): void {
+  requestTally.getStore()?.warnings.push(warning);
+}
 
 function recordRequest(failure: string | null): void {
   const tally = requestTally.getStore();
@@ -41,12 +47,17 @@ function requestErrorLabel(error: unknown): string {
  * success. A source that made no requests (unconfigured) or got at least one
  * answer passes its jobs through unchanged.
  */
-export async function fetchSourceJobs(fetchJobs: () => Promise<NormalizedJob[]>): Promise<NormalizedJob[]> {
-  const tally: SourceRequestTally = { attempted: 0, failed: 0, lastFailure: null };
+export async function fetchSourceJobs(
+  fetchJobs: () => Promise<NormalizedJob[]>,
+  onWarning?: (warning: string) => void,
+): Promise<NormalizedJob[]> {
+  const tally: SourceRequestTally = { attempted: 0, failed: 0, lastFailure: null, warnings: [] };
   const jobs = await requestTally.run(tally, fetchJobs);
   if (tally.attempted > 0 && tally.failed === tally.attempted) {
     throw new Error(`every request failed (last: ${tally.lastFailure})`);
   }
+  if (tally.failed) tally.warnings.push(`${tally.failed} of ${tally.attempted} requests failed.`);
+  if (tally.warnings.length) onWarning?.(`Partial results: ${[...new Set(tally.warnings)].join(" ")}`);
   return jobs;
 }
 

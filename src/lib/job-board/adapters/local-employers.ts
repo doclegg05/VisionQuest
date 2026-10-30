@@ -1,7 +1,7 @@
 import type { JobSourceAdapter, NormalizedJob } from "../types";
 import { inferEmploymentType } from "../employment-type";
 import { parseSalaryToHourly } from "../salary-parser";
-import { fetchJson, stripHtml, truncateDescription } from "./shared";
+import { fetchJson, recordSourceWarning, stripHtml, truncateDescription } from "./shared";
 
 // Employer-owned public Posting API boards. No applicant API or credentials.
 const EMPLOYERS = ["Dominos", "PilotCompany"] as const;
@@ -64,6 +64,7 @@ export const localEmployersAdapter: JobSourceAdapter = {
       }
     }
     if (failures && (!successfulSearches || !jobs.length)) throw new Error("Some local employer feeds could not be read. Try the refresh again.");
+    if (failures) recordSourceWarning(`${failures} employer searches or job details could not be read.`);
     return jobs;
   },
 };

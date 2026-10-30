@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { localEmployersAdapter } from "./local-employers";
 import { filterQualityJobs } from "../job-quality";
+import { fetchSourceJobs } from "./shared";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
@@ -47,7 +48,10 @@ describe("free local employer feeds", () => {
   it("retains one employer's jobs when another source fails, but exposes a total outage", async () => {
     globalThis.fetch = async (input) => String(input).includes("/Dominos/") ? new Response("outage", { status: 503 })
       : Response.json(String(input).includes("?") ? { content: [posting] } : detail);
-    assert.equal((await localEmployersAdapter.fetchJobs("Morgantown, WV", 25)).length, 1);
+    const warnings: string[] = [];
+    assert.equal((await fetchSourceJobs(() => localEmployersAdapter.fetchJobs("Morgantown, WV", 25), (warning) => warnings.push(warning))).length, 1);
+    assert.match(warnings[0], /Partial results:/);
+    assert.match(warnings[0], /1 employer searches or job details could not be read/);
     globalThis.fetch = async () => new Response("outage", { status: 503 });
     await assert.rejects(() => localEmployersAdapter.fetchJobs("Morgantown, WV", 25), /could not be read/);
   });

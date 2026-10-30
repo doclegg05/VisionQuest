@@ -20,6 +20,8 @@ try {
   if (!config.ok()) throw new Error(`Teacher configuration failed: HTTP ${config.status()}`);
   const refresh = await teacher.post("/api/teacher/jobs/refresh", { data: { classId: cohort.id } });
   if (!refresh.ok()) throw new Error(`Teacher refresh failed: HTTP ${refresh.status()}`);
+  const requestedRun = (await refresh.json()).run?.id;
+  if (!requestedRun) throw new Error("Refresh did not return a scrape run ID.");
   let result;
   for (let attempt = 0; attempt < 45; attempt++) {
     const status = await teacher.get(`/api/teacher/jobs/status?classId=${cohort.id}`);
@@ -29,6 +31,10 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
   if (result?.latestRun?.status !== "completed") throw new Error(`Refresh did not complete: ${result?.latestRun?.status}`);
+  const currentWvu = result.latestRun.sourceResults.find((source) => source.source === "wvumedicine");
+  if (result.latestRun.id !== requestedRun || currentWvu?.status !== "completed" || !(currentWvu.upsertedCount > 0)) {
+    throw new Error("This refresh did not import WVU Medicine jobs; older listings cannot establish refresh success.");
+  }
   const response = await student.get("/api/jobs?proximity=local&sort=recent");
   if (!response.ok()) throw new Error(`Student search failed: HTTP ${response.status()}`);
   const data = await response.json();
