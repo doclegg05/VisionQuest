@@ -134,12 +134,13 @@ function jobLocationMatchesRegion(jobLocation: string, classRegion: string): boo
  * Classifies a job's proximity relative to the class region.
  *
  * Priority order:
- *   1. The job's source adapter mode is authoritative when it is "local" or "remote".
+ *   1. Explicit remote work is remote even when returned by a local-search API.
+ *   2. The job's source adapter mode is authoritative when it is "local" or "remote".
  *      Local-mode adapters (jsearch, usajobs, adzuna) pass the configured region and
  *      radius to their upstream APIs, so anything they return is already inside the
  *      teacher's search area. Remote-mode adapters (remotive, remoteok, weworkremotely)
  *      only return remote roles by definition.
- *   2. For mixed-mode adapters (arbeitnow, greenhouse, lever, ashby, smartrecruiters)
+ *   3. For mixed-mode adapters (arbeitnow, greenhouse, lever, ashby, smartrecruiters)
  *      we fall back to the workMode + region text heuristic.
  *
  * Resulting categories:
@@ -152,12 +153,12 @@ export function classifyJobProximity(
   job: Pick<ScoredJob, "location" | "workMode" | "source">,
   classRegion: string,
 ): JobProximity {
+  if (isRemoteJob(job)) return "remote";
   const sourceMode = job.source ? getJobSourceMode(job.source) : "mixed";
   if (sourceMode === "local") return "local";
   if (sourceMode === "remote") return "remote";
 
   // Mixed-mode sources: fall back to workMode + region text match.
-  if (isRemoteJob(job)) return "remote";
   return jobLocationMatchesRegion(job.location ?? "", classRegion) ? "local" : "regional_onsite";
 }
 

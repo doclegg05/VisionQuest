@@ -10,8 +10,12 @@ import { weWorkRemotelyAdapter } from "./weworkremotely";
 import { arbeitnowAdapter } from "./arbeitnow";
 import { ashbyAdapter, greenhouseAdapter, leverAdapter } from "./ats";
 import { smartRecruitersAdapter } from "./smartrecruiters";
+import { wvuMedicineAdapter } from "./wvu-medicine";
+import { localEmployersAdapter } from "./local-employers";
 
 export const ALL_JOB_SOURCE_ADAPTERS: JobSourceAdapter[] = [
+  wvuMedicineAdapter,
+  localEmployersAdapter,
   careerOneStopAdapter,
   talrooAdapter,
   remotiveAdapter,

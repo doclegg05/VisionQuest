@@ -132,7 +132,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   const activeJobs = await prisma.jobListing.findMany({
     where,
     orderBy: sort === "salary"
-      ? { salaryMin: "desc" }
+      ? { salaryMin: { sort: "desc", nulls: "last" } }
       : { createdAt: "desc" },
     take: 500,
   });
@@ -143,7 +143,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   const jobsWithProximity = dedupedJobs.map((job) => ({
     job,
     proximity: classifyJobProximity(job, config.region),
-  }));
+  })).filter((item) => priority !== "local_only" || item.proximity === "local");
   const classLocalCount = jobsWithProximity.filter((item) => item.proximity === "local").length;
   const classRemoteCount = jobsWithProximity.filter((item) => item.proximity === "remote").length;
 
@@ -158,8 +158,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     .sort((a, b) => {
       if (sort === "salary") return (b.salaryMin ?? -1) - (a.salaryMin ?? -1);
       return b.createdAt.getTime() - a.createdAt.getTime();
-    })
-    .slice(0, 100);
+    });
 
   const [savedJobs, discovery, resumeRecord] = await Promise.all([
     prisma.studentSavedJob.findMany({
@@ -233,6 +232,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   if (sort === "recommended" && hasPersonalization) {
     classJobsWithMeta.sort((a, b) => b.matchScore - a.matchScore);
   }
+  const displayedClassJobs = classJobsWithMeta.slice(0, 100);
 
   // Merge browse-pool jobs into the Remote/All views.
   // Local tab always excludes browse jobs (browse pool is remote-only).
@@ -241,8 +241,9 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     dedupedJobs.map((j) => `${j.source}:${j.sourceId}`),
   );
 
-  const browseRows = await loadBrowseJobs({
-    proximity: proximityFilter,
+  const browseRows = priority === "local_only" ? [] : await loadBrowseJobs({
+    // Count the remote pool even while the Local tab is selected.
+    proximity: "remote",
     sort,
     searchParams: url.searchParams,
   });
@@ -250,15 +251,15 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   const uniqueBrowseRows = browseRows.filter(
     (row) => !classJobKeys.has(`${row.source}:${row.sourceId}`),
   );
-  const browseMapped = uniqueBrowseRows.map(mapBrowseRow);
+  const browseMapped = proximityFilter === "local" ? [] : uniqueBrowseRows.map(mapBrowseRow);
   const browseRemoteCount = uniqueBrowseRows.length;
 
   // Combine: class jobs first (already ranked/sorted), then browse jobs appended.
-  // The Local tab won't have browse jobs because loadBrowseJobs returns [] for proximity=local.
+  // The Local tab counts the browse pool but does not display it.
   // Band annotation is additive: class jobs (which have recommendations) get
   // core/stretch/wildcard from the same rankJobs() output; browse jobs get null.
   const jobs = annotateJobsWithBands(
-    [...classJobsWithMeta, ...browseMapped],
+    [...displayedClassJobs, ...browseMapped],
     recommendations,
     discovery,
   );

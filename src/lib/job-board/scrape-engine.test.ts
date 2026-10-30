@@ -12,8 +12,11 @@
 import assert from "node:assert/strict";
 import { mock, test, before, beforeEach } from "node:test";
 import type { JobSourceAdapter, NormalizedJob } from "./types";
+import { wvuMedicineAdapter } from "./adapters/wvu-medicine";
 
 const upserts: unknown[] = [];
+let configSources = ["usajobs"];
+let configRegion = "Charleston, WV";
 
 mock.module("@/lib/db", {
   namedExports: {
@@ -21,9 +24,9 @@ mock.module("@/lib/db", {
       jobClassConfig: {
         findUnique: async () => ({
           id: "config-alpha",
-          region: "Charleston, WV",
+          region: configRegion,
           radius: 25,
-          sources: ["usajobs"],
+          sources: configSources,
           localJobPriority: "prefer_local",
         }),
         update: async () => ({}),
@@ -80,7 +83,7 @@ function fakeAdapter(jobs: NormalizedJob[]): JobSourceAdapter {
 
 mock.module("./adapters/registry", {
   namedExports: {
-    ALL_JOB_SOURCE_ADAPTERS: [fakeAdapter([fakeJob()])],
+    ALL_JOB_SOURCE_ADAPTERS: [fakeAdapter([fakeJob()]), wvuMedicineAdapter],
   },
 });
 
@@ -93,6 +96,8 @@ before(async () => {
 
 beforeEach(() => {
   upserts.length = 0;
+  configSources = ["usajobs"];
+  configRegion = "Charleston, WV";
 });
 
 test("runScrapeForConfig upserts JobListing keyed on the class-scoped compound unique, not bare sourceId", async () => {
@@ -114,4 +119,25 @@ test("runScrapeForConfig upserts JobListing keyed on the class-scoped compound u
   assert.equal(compoundKey.classConfigId, "config-alpha");
   assert.equal(compoundKey.source, "usajobs");
   assert.equal(compoundKey.sourceId, "usajobs:shared-posting-1");
+});
+
+test("employer-direct data flows through the existing refresh into class-owned, trackable JobListing rows", async (t) => {
+  configSources = ["wvumedicine"];
+  configRegion = "Summersville, WV";
+  const path = "/job/Summersville-Regional-Medical-Center-SRMC/Housekeeping-Aide_JR26-48481";
+  t.mock.method(globalThis, "fetch", async (input: unknown) => Response.json(String(input).endsWith("/jobs")
+    ? { total: 1, jobPostings: [{ title: "Housekeeping Aide", locationsText: "Summersville Regional Medical Center (SRMC)", externalPath: path }] }
+    : { jobPostingInfo: {
+      title: "Housekeeping Aide", location: "Summersville Regional Medical Center (SRMC)",
+      jobReqId: "JR26-48481", jobDescription: "Clean patient rooms and common areas. Follow safety and cleaning procedures.",
+      timeType: "Full time", posted: true, canApply: true,
+    } }));
+
+  assert.equal(await runScrapeForConfig("config-alpha"), 1);
+  const arg = upserts[0] as { create: { classConfigId: string; source: string; sourceId: string; url: string; employmentType: string } };
+  assert.equal(arg.create.classConfigId, "config-alpha");
+  assert.equal(arg.create.source, "wvumedicine");
+  assert.equal(arg.create.sourceId, "wvumedicine:JR26-48481");
+  assert.equal(arg.create.url, `https://wvumedicine.wd1.myworkdayjobs.com/en-US/WVUH${path}`);
+  assert.equal(arg.create.employmentType, "full_time");
 });

@@ -44,10 +44,10 @@ describe("job source options", () => {
     assert.equal(isValidJobSource(""), false);
   });
 
-  it("defaults to local-first sources including the WV feed and Talroo, but not Adzuna", () => {
-    assert.deepEqual(DEFAULT_JOB_SOURCES, ["careeronestop", "talroo", "usajobs"]);
+  it("defaults to the verified keyless employer feed instead of unavailable credentialed sources", () => {
+    assert.deepEqual(DEFAULT_JOB_SOURCES, ["wvumedicine", "localemployers"]);
     for (const source of DEFAULT_JOB_SOURCES) {
-      assert.equal(JOB_SOURCE_OPTIONS.find((o) => o.value === source)?.sourceMode, "local");
+      assert.equal(JOB_SOURCE_OPTIONS.find((o) => o.value === source)?.sourceMode, "mixed");
     }
     // Adzuna stays selectable but off by default until the licence question
     // in docs/plans/2026-09-04-nlx-macc-job-search-research.md is answered.

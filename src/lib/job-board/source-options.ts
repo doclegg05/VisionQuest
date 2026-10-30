@@ -1,4 +1,7 @@
 /**
+ * New boards start with the keyless WVU Medicine employer feed. CareerOneStop
+ * access was not supplied; credentialed sources remain opt-in. Existing class
+ * configurations are preserved and can select the new source in Job Scout.
  * Adzuna deliberately stays out of the default set until the nonprofit-use
  * licence question is answered (docs/plans/2026-09-04-nlx-macc-job-search-
  * research.md Part 2, owner step P0.3 in docs/superpowers/plans/
@@ -8,12 +11,13 @@
  * for classes that opt in explicitly.
  */
 export const DEFAULT_JOB_SOURCES = [
-  "careeronestop",
-  "talroo",
-  "usajobs",
+  "wvumedicine",
+  "localemployers",
 ] as const;
 
 export const JOB_SOURCE_OPTIONS = [
+  { value: "wvumedicine", label: "WVU Medicine (no key, city search)", sourceMode: "mixed" },
+  { value: "localemployers", label: "Domino's & Pilot (no key, city search)", sourceMode: "mixed" },
   { value: "careeronestop", label: "WV Local Jobs — state job bank", sourceMode: "local" },
   { value: "talroo", label: "Hourly jobs near you", sourceMode: "local" },
   { value: "remotive", label: "Remotive (remote, no key)", sourceMode: "remote" },
