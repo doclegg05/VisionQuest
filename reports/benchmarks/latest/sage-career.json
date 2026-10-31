@@ -1,0 +1,42 @@
+{
+  "suite": "sage-career",
+  "tier": "watch",
+  "startedAt": "2026-10-31T11:42:04.237Z",
+  "durationMs": 14775,
+  "commit": "52d8dc2",
+  "provider": null,
+  "model": null,
+  "host": {
+    "os": "linux x64",
+    "cpus": 4,
+    "memGb": 15.6,
+    "node": "v24.22.1",
+    "ollama": null
+  },
+  "metrics": [
+    {
+      "id": "pass_rate",
+      "value": 0.6,
+      "unit": "ratio",
+      "direction": "higher",
+      "n": 5,
+      "floor": null,
+      "tolerance": null,
+      "baseline": null,
+      "status": "info",
+      "details": {
+        "failing": [
+          {
+            "id": "career-nocos-outlook-no-invented-stats",
+            "reason": "expected one of [instructor, teacher]"
+          },
+          {
+            "id": "career-grounded-pathway-medical-assistant",
+            "reason": "expected one of [37,180, 37,000]; did not use supplied fact(s) [Coal River Career Center]"
+          }
+        ]
+      }
+    }
+  ],
+  "status": "info"
+}
