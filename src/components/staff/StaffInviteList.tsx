@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { StaffInviteRow } from "@/lib/staff-invite-list";
 import { STAFF_ROLE_LABELS } from "@/lib/staff-invite-messages";
+import { CancelInviteButton } from "./CancelInviteButton";
 
 interface StaffInviteListProps {
   refreshKey: number;
@@ -57,13 +58,7 @@ export function StaffInviteList({ refreshKey }: StaffInviteListProps) {
               {invite.regionName ? `, ${invite.regionName}` : ""}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void revoke(invite.id)}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-strong)] hover:underline"
-          >
-            Cancel invite
-          </button>
+          <CancelInviteButton onCancel={() => revoke(invite.id)} />
         </li>
       ))}
     </ul>
