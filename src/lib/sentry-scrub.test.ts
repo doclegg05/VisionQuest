@@ -515,3 +515,56 @@ describe("scrubPii: student contact details and user.id (W11)", () => {
     assert.equal(out.contexts?.trace?.trace_id, "1".repeat(32));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Staff invite tokens in the path (org tree Phase 1, Task 8). `/invite/<token>`
+// is a 14-day account-creation capability, so it is redacted like `/connect/`.
+// ---------------------------------------------------------------------------
+
+/** 32 random bytes as base64url: 43 characters, built here so no real token is pinned. */
+const INVITE_TOKEN = "Zk3-_".repeat(9).slice(0, 43);
+
+function inviteEvent(url: string): Event {
+  return {
+    type: "transaction",
+    request: { url },
+    breadcrumbs: [{ category: "navigation", data: { to: new URL(url).pathname + new URL(url).search } }],
+    spans: [
+      {
+        span_id: "3".repeat(16),
+        trace_id: "1".repeat(32),
+        start_timestamp: 0,
+        data: { "http.url": url },
+      },
+    ],
+  };
+}
+
+describe("scrubPii: staff invite tokens in the path", () => {
+  for (const suffix of ["", "?x=1"]) {
+    it(`redacts /invite/<token>${suffix} in request url, span http.url and navigation breadcrumb`, () => {
+      const out = scrubPii(inviteEvent(`https://vq.example/invite/${INVITE_TOKEN}${suffix}`), HINT);
+      assert.equal(INVITE_TOKEN.length, 43);
+      assert.doesNotMatch(serialized(out), new RegExp(INVITE_TOKEN));
+      assert.equal(out.request?.url, `https://vq.example/invite/[REDACTED]${suffix}`);
+      assert.equal(
+        (out.spans?.[0]?.data as Record<string, string>)["http.url"],
+        `https://vq.example/invite/[REDACTED]${suffix}`,
+      );
+      assert.equal((out.breadcrumbs?.[0]?.data as { to: string }).to, `/invite/[REDACTED]${suffix}`);
+    });
+  }
+
+  it("leaves /invitee and a bare /invite alone", () => {
+    const out = scrubPii(
+      {
+        type: undefined,
+        request: { url: `https://vq.example/invitee/${INVITE_TOKEN}` },
+        breadcrumbs: [{ category: "navigation", data: { to: "/invite" } }],
+      },
+      HINT,
+    );
+    assert.equal(out.request?.url, `https://vq.example/invitee/${INVITE_TOKEN}`);
+    assert.equal((out.breadcrumbs?.[0]?.data as { to: string }).to, "/invite");
+  });
+});

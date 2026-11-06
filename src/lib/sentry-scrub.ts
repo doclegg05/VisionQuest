@@ -84,13 +84,16 @@ const EMAIL = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
  * Extend-only: this is a second `.replace` in `redactText`, and no existing
  * rule is touched.
  *
+ * `/invite/<token>` (staff invite accept page, org tree Phase 1) is the same
+ * shape: a 14-day account-creation token as the second path segment.
+ *
  * W1 (2026-09-06): case-insensitive, and `/+` at every separator. A URL is
  * not case-normalized on its way into an event, and a doubled slash survives
  * every layer between the browser and Sentry — `/CONNECT/<token>` and
  * `/connect//<token>` both reach the same route and both slipped the
  * original pattern. Widening here only ever redacts more.
  */
-const CAPABILITY_PATH_SEGMENT = /(\/+(?:api\/+connect\/+employer|connect)\/+)[A-Za-z0-9_-]{20,}/gi;
+const CAPABILITY_PATH_SEGMENT = /(\/+(?:api\/+connect\/+employer|connect|invite)\/+)[A-Za-z0-9_-]{20,}/gi;
 
 const REDACTED = "[REDACTED]";
 /** On an auth route the body is a credential by definition; drop it whole. */
