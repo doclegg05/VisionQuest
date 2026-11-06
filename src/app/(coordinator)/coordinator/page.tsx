@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import PageIntro from "@/components/ui/PageIntro";
 import CoordinatorDashboardClient from "@/components/coordinator/CoordinatorDashboardClient";
 import { getSession } from "@/lib/auth";
+import { OrgPlacementSection } from "@/components/staff/OrgPlacementSection";
 import { StaffInvitePanel } from "@/components/staff/StaffInvitePanel";
 import { listRegionsForSession } from "@/lib/region";
 
@@ -44,6 +45,7 @@ export default async function CoordinatorDashboard() {
         description="Regional rollups, grant progress, instructor metrics, and funder-ready exports."
       />
       <CoordinatorDashboardClient regions={regions} />
+      {session.role === "program_coordinator" && <OrgPlacementSection session={session} />}
       <StaffInvitePanel roles={inviteRolesFor(session.role)} regions={regions} />
     </div>
   );

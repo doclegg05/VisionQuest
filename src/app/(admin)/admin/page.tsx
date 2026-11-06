@@ -1,5 +1,6 @@
 import ClassRosterManager from "@/components/teacher/ClassRosterManager";
 import PageIntro from "@/components/ui/PageIntro";
+import { OrgPlacementSection } from "@/components/staff/OrgPlacementSection";
 import { StaffInvitePanel } from "@/components/staff/StaffInvitePanel";
 import { getSession } from "@/lib/auth";
 import { listRegionsForSession } from "@/lib/region";
@@ -72,6 +73,12 @@ export default async function AdminSettingsPage() {
       </div>
 
       <ClassRosterManager />
+
+      {session && (
+        <div className="mt-6">
+          <OrgPlacementSection session={session} />
+        </div>
+      )}
 
       <div className="mt-6">
         <StaffInvitePanel roles={ADMIN_INVITE_ROLES} regions={regions} />
