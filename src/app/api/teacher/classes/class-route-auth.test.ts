@@ -348,10 +348,8 @@ describe("POST /api/teacher/classes region rules", () => {
   it("opens no admin transaction until every check has passed", async () => {
     await post({ regionId: REGION_B });
     await post({ instructorIds: [OTHER_ID] });
-    mockAssertTeacherAssignmentLimit.mock.mockImplementation(async () => {
-      throw makeHttpError(409, "limit");
-    });
-    await post();
+    // The assignment limit is checked inside the transaction (see
+    // "still enforces the two-active-classes limit"), not before it.
     assert.equal(mockAdminTransaction.mock.callCount(), 0);
     assert.equal(mockRlsClassCreate.mock.callCount(), 0);
   });

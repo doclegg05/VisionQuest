@@ -6,7 +6,6 @@ import { assertRegionAllowed, createClassWithInstructors } from "@/lib/class-cre
 import { seesWholeState } from "@/lib/org-roles";
 import { withRegistry } from "@/lib/registry/middleware";
 import {
-  assertTeacherAssignmentLimit,
   listManagedClasses,
   normalizeClassCode,
   normalizeInstructorIds,
@@ -135,8 +134,6 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
     if (matchingTeachers !== instructorIds.length) {
       throw badRequest("One or more selected instructors are invalid.");
     }
-
-    await assertTeacherAssignmentLimit(instructorIds);
   }
 
   // Every check above has passed; the insert goes through prismaAdmin because

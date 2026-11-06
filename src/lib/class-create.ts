@@ -2,6 +2,7 @@ import { prisma, prismaAdmin } from "@/lib/db";
 import { badRequest, conflict, forbidden, type Session } from "@/lib/api-error";
 import { listInstructorRegionIds } from "@/lib/region";
 import { seesWholeState } from "@/lib/org-roles";
+import { assertTeacherAssignmentLimit } from "@/lib/classroom";
 
 /**
  * Whether a session may put a classroom in this region. Whole-state roles may
@@ -44,8 +45,8 @@ export interface NewClassInput {
 /**
  * Inserts a class and its instructor rows through `prismaAdmin`, in one
  * transaction (Ruling R19). Call it only after the route's own checks (region,
- * self included, co-teachers in region, assignment limit): those checks are the
- * only gate for this insert.
+ * self included, co-teachers in region); the assignment limit runs inside the
+ * transaction. Those checks are the only gate for this insert.
  *
  * Why not the RLS client: `spokes_class_access` WITH CHECK admits a teacher's
  * insert only for a class in `instructor_class_ids(me)`, which needs a
@@ -61,6 +62,12 @@ export async function createClassWithInstructors(input: NewClassInput) {
       select: { id: true },
     });
     if (existing) throw conflict("That class code is already in use.");
+
+    // Counted through the transaction client so co-teacher links the caller's
+    // RLS context cannot see are included, and checked in the same
+    // transaction as the insert. Read Committed does not serialise two
+    // concurrent creates, so this narrows the race rather than closing it.
+    await assertTeacherAssignmentLimit(input.instructorIds, { client: tx });
 
     const created = await tx.spokesClass.create({
       data: {

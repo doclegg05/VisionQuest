@@ -188,11 +188,23 @@ export async function assertStaffCanManageClass(session: Session, classId: strin
   return managedClass;
 }
 
+/** The one query the assignment limit needs, so a transaction client can stand in for `prisma`. */
+export interface InstructorLinkReader {
+  spokesClassInstructor: Pick<typeof prisma.spokesClassInstructor, "findMany">;
+}
+
+/**
+ * Throws when assigning these instructors would put one over
+ * `MAX_ACTIVE_CLASSES_PER_TEACHER`. Pass `options.client` (a transaction
+ * client from `prismaAdmin`) to count every link, including classes the
+ * caller's RLS context hides, inside the same transaction as the write.
+ */
 export async function assertTeacherAssignmentLimit(
   instructorIds: string[],
   options: {
     excludeClassId?: string;
     targetClassStatus?: string | null;
+    client?: InstructorLinkReader;
   } = {},
 ) {
   const normalizedInstructorIds = normalizeInstructorIds(instructorIds);
@@ -205,7 +217,8 @@ export async function assertTeacherAssignmentLimit(
     return;
   }
 
-  const activeAssignments = await prisma.spokesClassInstructor.findMany({
+  const reader = options.client ?? prisma;
+  const activeAssignments = await reader.spokesClassInstructor.findMany({
     where: {
       instructorId: { in: normalizedInstructorIds },
       ...(options.excludeClassId ? { classId: { not: options.excludeClassId } } : {}),
