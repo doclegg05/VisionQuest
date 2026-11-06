@@ -495,7 +495,7 @@ Decided during the build:
 - R11: Coordinators can view classes but cannot move students between classes.
 - R16: Only admins create unlinked referrals. Program coordinators read them.
 - R17: Admins get a "Place in a classroom" control on the applicants-waiting list.
-- R18: Staff invite links are single-use bearer links, valid for 14 days. Anyone holding the link can create the invited account, so the accept page no longer fills in the email; the person types it. Phase 2 Microsoft sign-in will tie each invite to a work account.
+- R18: Staff invite links are single-use links, valid for 14 days. The accept page does not fill in the email; the person types it. A link alone is not enough when the invite was emailed (R21): the person also needs a 6-digit code that VisionQuest emails to the invited address when they press "Send my code". The code works for 10 minutes and for 5 wrong tries, and only its hash is stored. Only an admin can send a link-only invite, used when email is not set up or the send fails, and that link still works on its own. Phase 2 Microsoft sign-in will tie each invite to a work account.
 
 Before deploying, run `node scripts/org-tree-preflight.mjs` from the Terminal panel.
 It prints counts only: teachers, coordinators and classes that would land unplaced.
