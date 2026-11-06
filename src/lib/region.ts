@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { type Session } from "@/lib/api-error";
+import { seesWholeState } from "@/lib/org-roles";
 
 export interface RegionSummary {
   id: string;
@@ -9,15 +10,15 @@ export interface RegionSummary {
 }
 
 /**
- * Returns the regions a coordinator oversees. Admins (and other
- * super-scoped roles) see every active region. Anyone else gets only the
+ * Returns the regions a coordinator oversees. Admins and program
+ * coordinators see every active region. Anyone else gets only the
  * regions they're explicitly assigned to via RegionCoordinator.
  *
  * Non-coordinator, non-admin sessions get an empty list — the calling route
  * should 403 on that rather than relying on this helper to throw.
  */
 export async function listRegionsForSession(session: Session): Promise<RegionSummary[]> {
-  if (session.role === "admin") {
+  if (seesWholeState(session.role)) {
     return prisma.region.findMany({
       where: { status: "active" },
       select: { id: true, name: true, code: true, status: true },
@@ -41,12 +42,12 @@ export async function listRegionsForSession(session: Session): Promise<RegionSum
 }
 
 /**
- * Authorizes the current session to access the given region. Admins pass
- * automatically. Coordinators must have an entry in RegionCoordinator.
+ * Authorizes the current session to access the given region. Admins and program
+ * coordinators pass automatically. Coordinators must have an entry in RegionCoordinator.
  * Throws nothing here — returns boolean so callers can craft their own 403.
  */
 export async function coordinatorHasRegion(session: Session, regionId: string): Promise<boolean> {
-  if (session.role === "admin") {
+  if (seesWholeState(session.role)) {
     const exists = await prisma.region.count({ where: { id: regionId } });
     return exists > 0;
   }

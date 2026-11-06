@@ -1,4 +1,5 @@
 import { forbidden, unauthorized, withAuth, type Session } from "@/lib/api-error";
+import { isCoordinatorRole } from "@/lib/org-roles";
 import { hasPermission } from "@/lib/rbac";
 
 /**
@@ -18,10 +19,10 @@ export function withCoordinatorAuth<Args extends unknown[]>(
   handler: (session: Session, ...args: Args) => Promise<Response>,
 ): (...args: Args) => Promise<Response> {
   return withAuth(async (session, ...args: Args) => {
-    if (session.role !== "admin" && session.role !== "coordinator") {
+    if (session.role !== "admin" && !isCoordinatorRole(session.role)) {
       throw forbidden();
     }
-    if (session.role === "coordinator") {
+    if (isCoordinatorRole(session.role)) {
       const allowed = await hasPermission(session.role, requiredPermission);
       if (!allowed) throw forbidden();
     }
@@ -36,7 +37,7 @@ export function withCoordinatorAuth<Args extends unknown[]>(
  */
 export function assertCoordinatorOrAdmin(session: Session | null | undefined): asserts session is Session {
   if (!session) throw unauthorized();
-  if (session.role !== "admin" && session.role !== "coordinator") {
+  if (session.role !== "admin" && !isCoordinatorRole(session.role)) {
     throw forbidden();
   }
 }
