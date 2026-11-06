@@ -2507,7 +2507,15 @@ model StaffInvite {
   acceptedAt   DateTime?
   acceptedById String?
   revokedAt    DateTime?
-  createdAt    DateTime  @default(now())
+  /// True when the invite email was sent. Accepting such an invite needs a
+  /// 6-digit code emailed to the same address (Ruling R21).
+  deliveredByEmail Boolean   @default(false)
+  /// SHA-256 of the current accept code. Never the code itself.
+  codeHash         String?
+  codeExpiresAt    DateTime?
+  codeAttempts     Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([email])
   @@schema("visionquest")

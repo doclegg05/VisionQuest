@@ -1,5 +1,7 @@
 -- StaffInvite: an invitation to join the organization tree as staff.
 -- Only the SHA-256 of the invite token is stored, never the token itself.
+-- An emailed invite also needs a 6-digit accept code (Ruling R21); only its
+-- SHA-256 is stored, with an expiry and a wrong-attempt count.
 -- src/lib/staff-invites.ts reads and writes it through prismaAdmin, so vq_app
 -- gets an admin-only policy and no policy for any other role.
 
@@ -14,7 +16,12 @@ CREATE TABLE "visionquest"."StaffInvite" (
     "acceptedAt" TIMESTAMP(3),
     "acceptedById" TEXT,
     "revokedAt" TIMESTAMP(3),
+    "deliveredByEmail" BOOLEAN NOT NULL DEFAULT false,
+    "codeHash" TEXT,
+    "codeExpiresAt" TIMESTAMP(3),
+    "codeAttempts" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "StaffInvite_pkey" PRIMARY KEY ("id")
 );
