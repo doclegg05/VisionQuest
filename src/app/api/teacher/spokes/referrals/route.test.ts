@@ -19,6 +19,7 @@ const session = { current: { id: "teacher-1", role: "teacher" } as { id: string;
 const mockTemplateFindMany = mock.fn(async () => [{ id: "county-1", label: "Kanawha" }]) as any;
 const mockRecordFindMany = mock.fn(async () => [APPLICANT]) as any;
 const mockRecordFindUnique = mock.fn(async () => ({ ...APPLICANT, studentId: null })) as any;
+const mockRecordCreate = mock.fn(async (args: any) => ({ id: "ref-new", ...args.data })) as any;
 const mockRecordDelete = mock.fn(async () => APPLICANT) as any;
 const mockLogAuditEvent = mock.fn(async () => undefined) as any;
 
@@ -30,6 +31,7 @@ mock.module("@/lib/db", {
         findMany: mockRecordFindMany,
         findUnique: mockRecordFindUnique,
         delete: mockRecordDelete,
+        create: mockRecordCreate,
       },
     },
   },
@@ -38,6 +40,7 @@ mock.module("@/lib/audit", { namedExports: { logAuditEvent: mockLogAuditEvent } 
 mock.module("@/lib/api-error", {
   namedExports: {
     badRequest: (message: string) => Object.assign(new Error(message), { statusCode: 400 }),
+    forbidden: (message = "Forbidden") => Object.assign(new Error(message), { statusCode: 403 }),
     withTeacherAuth: (handler: (...args: unknown[]) => unknown) => (...args: unknown[]) =>
       handler(session.current, ...args),
   },
@@ -45,9 +48,10 @@ mock.module("@/lib/api-error", {
 
 let GET: typeof import("./route").GET;
 let DELETE: typeof import("./route").DELETE;
+let POST: typeof import("./route").POST;
 
 before(async () => {
-  ({ GET, DELETE } = await import("./route"));
+  ({ GET, DELETE, POST } = await import("./route"));
 });
 
 function deleteRequest(id: string): Request {
@@ -65,6 +69,7 @@ beforeEach(() => {
     mockRecordFindMany,
     mockRecordFindUnique,
     mockRecordDelete,
+    mockRecordCreate,
     mockLogAuditEvent,
   ]) {
     fn.mock.resetCalls();
@@ -121,5 +126,59 @@ describe("DELETE /api/teacher/spokes/referrals", () => {
     assert.equal(res.status, 200);
     assert.equal(mockRecordDelete.mock.callCount(), 1);
     assert.deepEqual(mockRecordDelete.mock.calls[0].arguments[0], { where: { id: "ref-1" } });
+  });
+});
+
+function postRequest(body: unknown): Request {
+  return new Request("http://localhost/api/teacher/spokes/referrals", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+async function statusOf(run: () => Promise<unknown>): Promise<number> {
+  try {
+    return ((await run()) as Response).status;
+  } catch (error) {
+    return (error as { statusCode: number }).statusCode;
+  }
+}
+
+describe("POST /api/teacher/spokes/referrals", () => {
+  const valid = { firstName: "Ava", lastName: "Applicant", county: "Kanawha" };
+
+  it("refuses an instructor: an unlinked referral would be one they cannot see", async () => {
+    const status = await statusOf(() => POST(postRequest(valid)) as Promise<unknown>);
+
+    assert.equal(status, 403);
+    assert.equal(mockRecordCreate.mock.callCount(), 0);
+  });
+
+  it("lets an admin create one with no class", async () => {
+    session.current = { id: "admin-1", role: "admin" };
+
+    const res = (await POST(postRequest(valid))) as Response;
+
+    assert.equal(res.status, 201);
+    assert.equal(mockRecordCreate.mock.callCount(), 1);
+    assert.equal(mockRecordCreate.mock.calls[0].arguments[0].data.firstName, "Ava");
+  });
+
+  it("lets a program coordinator create one", async () => {
+    session.current = { id: "pc-1", role: "program_coordinator" };
+
+    const res = (await POST(postRequest(valid))) as Response;
+
+    assert.equal(res.status, 201);
+  });
+
+  it("rejects a body without a last name through the schema", async () => {
+    session.current = { id: "admin-1", role: "admin" };
+
+    const status = await statusOf(() => POST(postRequest({ firstName: "Ava" })) as Promise<unknown>);
+
+    assert.equal(status, 400);
+    assert.equal(mockRecordCreate.mock.callCount(), 0);
   });
 });
