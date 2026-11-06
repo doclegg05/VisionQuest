@@ -14,6 +14,7 @@ import {
 import { getRoleHomePath } from "./role-home";
 import { rlsContextFor, type Session } from "./api-error";
 import { matchesWhere, mockAdminSession, mockTeacherSession } from "./test-helpers";
+import { WHOLE_STATE_ROLES, isCoordinatorRole, seesWholeState } from "./org-roles";
 
 test("normalizeClassCode creates a stable class slug", () => {
   assert.equal(normalizeClassCode("  SPOKES Class 2026 / AM  "), "spokes-class-2026-am");
@@ -493,7 +494,7 @@ describe("buildManagedStudentWhere follows the organization tree", () => {
     assert.deepEqual(seesApplicant, [true, true, false, false, false]);
   });
 
-  it("a coordinator does not reach a region A student through a withdrawn enrollment", () => {
+  it("a coordinator does not reach a region A student through an archived enrollment", () => {
     const withdrawn = enrolledIn("SW", classA, "archived");
     const where = buildManagedStudentWhere(mockTeacherSession({ id: "CA", role: "coordinator" }));
     assert.equal(matchesWhere(withdrawn, where), false);
@@ -501,6 +502,23 @@ describe("buildManagedStudentWhere follows the organization tree", () => {
 });
 
 describe("tree role lists", () => {
+  it("STAFF_CAN_MANAGE_ANY is the org-roles whole-state list, not a copy", () => {
+    assert.equal(STAFF_CAN_MANAGE_ANY, WHOLE_STATE_ROLES);
+    for (const role of ["admin", "program_coordinator", "coordinator", "teacher", "cdc", "student", ""]) {
+      assert.equal(canManageAnyClass(role), seesWholeState(role), role);
+    }
+  });
+
+  it("gives the region clause to exactly the coordinators that do not see the whole state", () => {
+    for (const role of ["admin", "program_coordinator", "coordinator", "teacher", "cdc", "student"]) {
+      const where = buildManagedStudentWhere(mockTeacherSession({ id: "X", role })) as {
+        classEnrollments?: { some?: { class?: { region?: unknown } } };
+      };
+      const regional = where.classEnrollments?.some?.class?.region !== undefined;
+      assert.equal(regional, isCoordinatorRole(role) && !seesWholeState(role), role);
+    }
+  });
+
   it("STAFF_CAN_MANAGE_ANY and ELEVATED_STAFF still differ", () => {
     assert.notDeepEqual([...STAFF_CAN_MANAGE_ANY], [...ELEVATED_STAFF]);
   });

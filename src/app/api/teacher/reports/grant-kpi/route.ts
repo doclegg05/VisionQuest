@@ -26,10 +26,12 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
   const pyNum = parseInt(programYear.replace("PY", ""), 10);
   const { start: startDate, end: endDate } = programYearBoundsUtc(pyNum);
 
-  const records = await prisma.spokesRecord.findMany({
+  // No managed students (no class, or another instructor's classId) means
+  // zero records, never every record in the program year.
+  const records = studentIds.length === 0 ? [] : await prisma.spokesRecord.findMany({
     where: {
       referralDate: { gte: startDate, lt: endDate },
-      ...(studentIds.length > 0 ? { studentId: { in: studentIds } } : {}),
+      studentId: { in: studentIds },
     },
     select: {
       id: true,

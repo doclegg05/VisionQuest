@@ -1,7 +1,7 @@
 import { badRequest, forbidden, type Session } from "@/lib/api-error";
 import { prisma } from "@/lib/db";
 import { isDemoInstructor } from "@/lib/demo/guards";
-import { PROGRAM_COORDINATOR } from "@/lib/org-roles";
+import { PROGRAM_COORDINATOR, WHOLE_STATE_ROLES, isCoordinatorRole, seesWholeState } from "@/lib/org-roles";
 
 export const NON_ARCHIVED_ENROLLMENT_STATUSES = [
   "active",
@@ -29,12 +29,13 @@ export const MAX_ACTIVE_CLASSES_PER_TEACHER = 2;
  * `instructor_class_ids`, migration 20261107120000) is the backstop; this list
  * keeps app queries from asking for rows the database will refuse.
  *
- * Keep this list equal to `seesWholeState` in `src/lib/org-roles.ts`.
+ * This is `WHOLE_STATE_ROLES` from `src/lib/org-roles.ts`, re-exported so the
+ * two can never drift.
  */
-export const STAFF_CAN_MANAGE_ANY: readonly string[] = ["admin", PROGRAM_COORDINATOR];
+export const STAFF_CAN_MANAGE_ANY: readonly string[] = WHOLE_STATE_ROLES;
 
 export function canManageAnyClass(role: string): boolean {
-  return STAFF_CAN_MANAGE_ANY.includes(role);
+  return seesWholeState(role);
 }
 
 /**
@@ -103,7 +104,8 @@ export function normalizeInstructorIds(instructorIds: string[]): string[] {
  */
 export function buildManagedClassWhere(session: Session): Record<string, unknown> {
   if (canManageAnyClassFor(session)) return {};
-  if (session.role === "coordinator") {
+  // Whole-state roles returned above, so a coordinator here is a regional one.
+  if (isCoordinatorRole(session.role)) {
     return { region: { coordinators: { some: { coordinatorId: session.id } } } };
   }
   return { instructors: { some: { instructorId: session.id } } };

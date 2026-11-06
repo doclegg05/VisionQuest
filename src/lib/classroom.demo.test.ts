@@ -103,6 +103,11 @@ describe("listManagedClasses", () => {
     });
   });
 
+  it("lists every non-archived class for a program coordinator by default", async () => {
+    await classroom.listManagedClasses(programCoordinator);
+    assert.deepEqual(firstWhere(mockClassFindMany), { status: { not: "archived" } });
+  });
+
   it("lists every class for a program coordinator", async () => {
     await classroom.listManagedClasses(programCoordinator, { includeArchived: true });
     assert.deepEqual(firstWhere(mockClassFindMany), {});
