@@ -8,17 +8,16 @@
  *   node --import tsx scripts/bench/suites/rls-coverage.mjs --self-test
  */
 
-import { readFileSync } from "node:fs";
 import { maybeRunSelfTest } from "./lib/self-test.mjs";
+import { readRlsTestPaths, extractItBlocksFromFiles } from "./lib/rls-test-files.mjs";
 import { extractPolicyBearingTables, extractItBlocks, computeRlsCoverage } from "./lib/rls-parse.mjs";
 
-const RLS_TEST_PATH = "src/lib/rls.test.ts";
 const MIGRATIONS_DIR = "prisma/migrations";
 
 export async function run() {
   const policyBearingTables = extractPolicyBearingTables(MIGRATIONS_DIR);
-  const testSource = readFileSync(RLS_TEST_PATH, "utf8");
-  const itBlocks = extractItBlocks(testSource);
+  // Every file the `test:rls` npm script runs, so the benchmark and CI agree.
+  const itBlocks = extractItBlocksFromFiles(readRlsTestPaths(), extractItBlocks);
 
   const result = computeRlsCoverage(policyBearingTables, itBlocks);
 
