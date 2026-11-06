@@ -117,9 +117,24 @@ async function assertMayAssign(actor: Session, regionId: string): Promise<void> 
   if (!(await coordinatorHasRegion(actor, regionId))) throw forbidden("That region is not yours to assign.");
 }
 
-async function requireInstructor(instructorId: string): Promise<void> {
+/**
+ * A regional coordinator may place only an instructor who is unplaced or
+ * already in one of their own regions, so they cannot pull another region's
+ * instructor into theirs. Whole-state callers may place any instructor.
+ */
+function placeableBy(actor: Session) {
+  if (seesWholeState(actor.role)) return {};
+  return {
+    OR: [
+      { instructorRegions: { none: {} }, instructedClasses: { none: {} } },
+      { instructorRegions: { some: { region: { coordinators: { some: { coordinatorId: actor.id } } } } } },
+    ],
+  };
+}
+
+async function requireInstructor(actor: Session, instructorId: string): Promise<void> {
   const row = await prismaAdmin.student.findFirst({
-    where: { id: instructorId, role: "teacher" },
+    where: { id: instructorId, role: "teacher", ...placeableBy(actor) },
     select: { id: true },
   });
   if (!row) throw notFound("Instructor not found.");
@@ -130,7 +145,7 @@ export async function assignInstructorRegion(
   input: { instructorId: string; regionId: string },
 ): Promise<void> {
   await assertMayAssign(actor, input.regionId);
-  await requireInstructor(input.instructorId);
+  await requireInstructor(actor, input.instructorId);
 
   await prismaAdmin.regionInstructor.upsert({
     where: { regionId_instructorId: { regionId: input.regionId, instructorId: input.instructorId } },

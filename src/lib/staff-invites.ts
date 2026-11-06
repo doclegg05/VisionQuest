@@ -43,6 +43,7 @@ export type StaffInviteError =
   | "not_allowed"
   | "region_not_allowed"
   | "region_required"
+  | "region_inactive"
   | "inviter_no_longer_allowed"
   | "email_required"
   | "account_exists"
@@ -122,6 +123,16 @@ async function assertMayInvite(
   }
 }
 
+/**
+ * New invites go only to active regions. Not part of assertMayInvite, because
+ * revoking an invite must still work after its region is archived.
+ */
+async function assertRegionActive(regionId: string | null): Promise<void> {
+  if (!regionId) return;
+  const region = await prismaAdmin.region.findUnique({ where: { id: regionId }, select: { status: true } });
+  if (region?.status !== "active") throw new StaffInviteRefused("region_inactive");
+}
+
 function isInvitableRole(role: string): role is InvitableRole {
   return INVITABLE_ROLES.some((candidate) => candidate === role);
 }
@@ -158,6 +169,7 @@ export async function createStaffInvite(
   // A program coordinator belongs to no region, so a supplied region is dropped.
   const regionId = inviteNeedsRegion(parsed.role) ? (parsed.regionId ?? null) : null;
   await assertMayInvite(inviter, parsed.role, regionId);
+  await assertRegionActive(regionId);
   const mayLinkOnly = inviter.role === "admin";
   if (!deliver && !mayLinkOnly) throw new StaffInviteRefused("email_required");
 
@@ -370,6 +382,15 @@ function isForeignKeyFailure(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2003";
 }
 
+/** A unique-index clash on `field`; Prisma names the clashing fields in `meta.target`. */
+function isUniqueFailureOn(error: unknown, field: string): boolean {
+  if (typeof error !== "object" || error === null || !("code" in error) || error.code !== "P2002") return false;
+  const target = "meta" in error && typeof error.meta === "object" && error.meta !== null && "target" in error.meta
+    ? error.meta.target
+    : null;
+  return Array.isArray(target) ? target.includes(field) : typeof target === "string" && target.includes(field);
+}
+
 async function claimAndCreate(
   input: z.infer<typeof acceptStaffInviteSchema>,
   passwordHash: string,
@@ -393,6 +414,9 @@ async function claimAndCreate(
   } catch (error) {
     // The region went away between the check and the insert.
     if (isForeignKeyFailure(error)) throw new StaffInviteRefused("invalid");
+    // Another invite to the same email was accepted between the email check
+    // and the insert; the transaction rolled back, so this invite stays usable.
+    if (isUniqueFailureOn(error, "email")) throw new StaffInviteRefused("account_exists");
     throw error;
   }
 }

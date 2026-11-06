@@ -3,6 +3,7 @@ import { before, beforeEach, describe, it, mock } from "node:test";
 import { mockRequest } from "@/lib/test-helpers";
 
 let StaffInviteRefused: typeof import("@/lib/staff-invites").StaffInviteRefused;
+let hashToken: typeof import("@/lib/staff-invites").hashToken;
 const rateLimitCalls: Array<[string, number, number]> = [];
 /** Keys whose limiter refuses. Empty means every limiter allows. */
 let refusingKeys: RegExp | null = null;
@@ -44,7 +45,7 @@ before(async () => {
       },
     },
   });
-  ({ StaffInviteRefused } = await import("@/lib/staff-invites"));
+  ({ StaffInviteRefused, hashToken } = await import("@/lib/staff-invites"));
   const realInvites = await import("@/lib/staff-invites");
   mock.module("@/lib/staff-invites", {
     exports: {
@@ -79,12 +80,20 @@ beforeEach(() => {
 });
 
 describe("POST /api/staff-invites/accept", () => {
-  it("matches register-teacher: 5 per IP and a route-wide 20, each per 15 minutes", async () => {
+  it("limits 5 per IP and 20 per invite, each per 15 minutes, with no shared route-wide bucket", async () => {
     await post();
     assert.deepEqual(rateLimitCalls, [
       ["staff-invite-accept:9.9.9.9", 5, 15 * 60 * 1000],
-      ["staff-invite-accept:global", 20, 15 * 60 * 1000],
+      [`staff-invite-accept:invite:${hashToken("abc")}`, 20, 15 * 60 * 1000],
     ]);
+  });
+
+  it("does not let junk tokens spend another invite's bucket", async () => {
+    await post({ ...BODY, token: "junk-1" });
+    await post({ ...BODY, token: "junk-2" });
+    const inviteKeys = rateLimitCalls.map(([key]) => key).filter((key) => key.includes(":invite:"));
+    assert.equal(new Set(inviteKeys).size, 2);
+    assert.ok(!inviteKeys.includes(`staff-invite-accept:invite:${hashToken("abc")}`));
   });
 
   it("rate-limits by IP before it reads the body", async () => {
@@ -94,13 +103,13 @@ describe("POST /api/staff-invites/accept", () => {
     assert.equal(acceptCalls.length, 0);
   });
 
-  it("refuses at the route-wide ceiling with the same answer as the IP limiter", async () => {
+  it("refuses at the per-invite ceiling with the same answer as the IP limiter", async () => {
     refusingKeys = /^staff-invite-accept:9\.9\.9\.9$/;
     const byIp = await post();
-    refusingKeys = /^staff-invite-accept:global$/;
-    const byGlobal = await post();
-    assert.equal(byGlobal.status, 429);
-    assert.deepEqual(await byGlobal.json(), await byIp.json());
+    refusingKeys = /^staff-invite-accept:invite:/;
+    const byInvite = await post();
+    assert.equal(byInvite.status, 429);
+    assert.deepEqual(await byInvite.json(), await byIp.json());
     assert.equal(acceptCalls.length, 0);
   });
 

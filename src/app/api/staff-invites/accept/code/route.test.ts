@@ -34,10 +34,12 @@ mock.module("@/lib/rate-limit", {
 
 let POST: typeof import("./route").POST;
 let sendStaffInvite: typeof import("@/lib/staff-invite-email").sendStaffInvite;
+let hashToken: typeof import("@/lib/staff-invites").hashToken;
 
 before(async () => {
   ({ POST } = await import("./route"));
   ({ sendStaffInvite } = await import("@/lib/staff-invite-email"));
+  ({ hashToken } = await import("@/lib/staff-invites"));
 });
 
 const REGION_A = "cmregionaaaaaaaaaaaaaaaaa";
@@ -97,18 +99,18 @@ describe("POST /api/staff-invites/accept/code", () => {
     assert.equal(sent.length, before);
   });
 
-  it("matches register-teacher: 5 per IP and a route-wide 20, each per 15 minutes", async () => {
+  it("limits 5 per IP and 20 per invite, each per 15 minutes, with no shared route-wide bucket", async () => {
     await post({ token: "x" });
     assert.deepEqual(rateLimitCalls, [
       ["staff-invite-code:9.9.9.9", 5, 15 * 60 * 1000],
-      ["staff-invite-code:global", 20, 15 * 60 * 1000],
+      [`staff-invite-code:invite:${hashToken("x")}`, 20, 15 * 60 * 1000],
     ]);
   });
 
   it("refuses with 429 at either limiter and sends nothing", async () => {
     const token = await emailedToken();
     const before = sent.length;
-    for (const key of [/^staff-invite-code:9\.9\.9\.9$/, /^staff-invite-code:global$/]) {
+    for (const key of [/^staff-invite-code:9\.9\.9\.9$/, /^staff-invite-code:invite:/]) {
       refusingKeys = key;
       const res = await post({ token });
       assert.equal(res.status, 429);

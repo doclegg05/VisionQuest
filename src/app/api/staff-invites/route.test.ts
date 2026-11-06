@@ -55,6 +55,7 @@ const COORDINATOR: TestSession = { id: "c1", studentId: "coord", displayName: "C
 const ADMIN: TestSession = { id: "a1", studentId: "admin", displayName: "Admin", role: "admin" };
 
 beforeEach(() => {
+  process.env.APP_BASE_URL = "https://visionquest.example";
   fake.reset();
   fake.seed("region", { id: REGION_A, name: "North", status: "active" });
   fake.seed("region", { id: REGION_B, name: "South", status: "active" });
@@ -113,6 +114,22 @@ describe("POST /api/staff-invites", () => {
     sendThrows = true;
     const res = await post(BODY);
     assert.equal(res.status, 503);
+    assert.equal(fake.state.staffInvite.rows.length, 0);
+  });
+
+  it("builds the link from APP_BASE_URL, never from the request's host", async () => {
+    session = ADMIN;
+    emailConfigured = false;
+    const json = await (await post(BODY)).json();
+    assert.match(String(json.data.link), /^https:\/\/visionquest\.example\/invite\//);
+  });
+
+  it("refuses with 500 and creates nothing when APP_BASE_URL is not set", async () => {
+    delete process.env.APP_BASE_URL;
+    session = ADMIN;
+    emailConfigured = false;
+    const res = await post(BODY);
+    assert.equal(res.status, 500);
     assert.equal(fake.state.staffInvite.rows.length, 0);
   });
 
