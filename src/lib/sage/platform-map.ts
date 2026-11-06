@@ -424,6 +424,14 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     summary: "Export program data formatted for grant funders and compliance reporting.",
     compact: "funder-ready exports",
   },
+  {
+    id: "coordinator-chat",
+    name: "Coordinator Chat",
+    roles: ["coordinator", "program_coordinator"],
+    route: "/coordinator/chat",
+    summary: "The coordinator's own conversation with Sage: program knowledge, rollups, and which classes need attention.",
+    compact: "coordinator chat with Sage",
+  },
 
   // ─── Admin ──────────────────────────────────────────────────────────────
   {
