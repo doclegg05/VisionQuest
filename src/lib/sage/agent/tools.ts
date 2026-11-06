@@ -110,7 +110,7 @@ const presentForm: AgentTool = {
     argHint: "form name or id",
     parseArgs: (raw) => ({ query: raw.trim() }),
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
@@ -200,7 +200,7 @@ const searchFormsTool: AgentTool = {
     argHint: "describe the form",
     parseArgs: (raw) => ({ query: raw.trim() }),
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
@@ -311,7 +311,7 @@ const findCertification: AgentTool = {
     argHint: "cert name",
     parseArgs: (raw) => ({ query: raw.trim() }),
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
@@ -735,7 +735,7 @@ const openResource: AgentTool = {
     argHint: "dress-code | attendance-policy | handbook | vision-board | goals | portfolio",
     parseArgs: (raw) => ({ resourceId: raw.trim() }),
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
@@ -786,7 +786,7 @@ const lookupProgramInfo: AgentTool = {
     required: ["topic"],
   },
   // No slash command — this is model-driven, not user-invoked.
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
