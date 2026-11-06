@@ -139,9 +139,11 @@ describe("where production gets the grant", () => {
     const migration = read(
       "prisma/migrations/20261107140000_grant_sage_chat_to_coordinators/migration.sql",
     );
-    for (const roleId of ["sys_coordinator_role_v1", "sys_program_coordinator_role_v1"]) {
-      assert.match(migration, new RegExp(`'${roleId}'`));
-    }
+    // Roles are matched by name, the column rbac.ts reads, not by sentinel id.
+    assert.match(migration, /r\."name" IN \('coordinator', 'program_coordinator'\)/);
+    assert.doesNotMatch(migration, /sys_(program_)?coordinator_role_v1/);
+    // Deterministic row ids.
+    assert.match(migration, /'sys_rp_' \|\| r\."name" \|\| '_' \|\| replace\(p\."key", '\.', '_'\)/);
     for (const key of CHAT_TOOLS) {
       assert.match(migration, new RegExp(`'${key.replace(".", "\\.")}'`));
     }

@@ -12,7 +12,8 @@
 -- Chat and its two read routes only. tool-confirm and the chat upload stay
 -- closed to coordinators in the routes themselves.
 --
--- Sentinel ids in the baseline's sys_rp_<role>_ style. Idempotent.
+-- Roles are matched by name, the column rbac.ts reads. Row ids are
+-- deterministic, in the baseline's sys_rp_<role>_ style. Idempotent.
 
 INSERT INTO "visionquest"."RolePermission" ("id", "roleId", "permissionId", "granted")
 SELECT
@@ -23,5 +24,5 @@ SELECT
 FROM "visionquest"."Permission" p
 CROSS JOIN "visionquest"."Role" r
 WHERE p."key" IN ('sage.chat', 'sage.conversations', 'sage.history')
-  AND r."id" IN ('sys_coordinator_role_v1', 'sys_program_coordinator_role_v1')
+  AND r."name" IN ('coordinator', 'program_coordinator')
 ON CONFLICT DO NOTHING;

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ChatCircle } from "@phosphor-icons/react/dist/ssr";
+import type { ReactNode } from "react";
+import { isCoordinatorRole } from "@/lib/org-roles";
 
 /** The coordinator workspace's way into Sage chat. Same page as the nav's Sage entry. */
 export const COORDINATOR_CHAT_HREF = "/coordinator/chat";
@@ -14,4 +16,13 @@ export function AskSageLink() {
       Ask Sage
     </Link>
   );
+}
+
+/**
+ * The workspace header action for a session role. Admins can open
+ * /coordinator too, but they keep their own Sage at /admin/chat, so only the
+ * two coordinator roles get the link.
+ */
+export function askSageActionFor(role: string): ReactNode | null {
+  return isCoordinatorRole(role) ? <AskSageLink /> : null;
 }

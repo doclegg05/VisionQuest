@@ -34,7 +34,11 @@ import {
   type ExtractionItem,
   type MemoryCandidate,
 } from "./schema";
-import { looksLikeStudentReference, STAFF_FACT_SUBJECT } from "./staff-privacy";
+import {
+  looksLikeStudentReference,
+  staffFactSubjectFor,
+  type StaffFactSubject,
+} from "./staff-privacy";
 import { storeMemoryCandidates } from "./store";
 import {
   logEstimatedExtractionCost,
@@ -46,7 +50,8 @@ const MAX_STAFF_MEMORIES_PER_CONVERSATION = 3;
 const DEFAULT_STAFF_EXTRACT_DAILY_LIMIT = 100;
 
 /**
- * Every staff fact opens with STAFF_FACT_SUBJECT, then a lowercase word. The
+ * Every staff fact opens with the fixed subject for the speaker's role ("This
+ * instructor", "This regional coordinator", ...), then a lowercase word. The
  * privacy guard reads any capitalized word missing from its allowlist as a
  * name, so a fact that opens with a verb of the model's choosing ("Lacks",
  * "Translates", "Conducts") is dropped as if it named a student. Behind the
@@ -55,10 +60,13 @@ const DEFAULT_STAFF_EXTRACT_DAILY_LIMIT = 100;
  * without the frame, or with a capitalized word after it, is rejected, not
  * repaired, so a model that ignores the instruction fails closed. The frame
  * is stored as written: retrieve.ts runs the guard again at render time, and
- * a stripped "Lacks…" row would fail it. The pattern is built from a fixed
- * constant, never from input.
+ * a stripped "Lacks…" row would fail it. The pattern is built from the fixed
+ * subject table in staff-privacy.ts, never from input. A fact must open with
+ * the subject for the speaker's own role.
  */
-const STAFF_FACT_FRAME_RE = new RegExp(`^${STAFF_FACT_SUBJECT}(?:['’]s)?\\s+\\p{Ll}`, "u");
+function staffFactFrameRe(subject: string): RegExp {
+  return new RegExp(`^${subject}(?:['’]s)?\\s+\\p{Ll}`, "u");
+}
 
 /**
  * Layer 1 of the privacy design (the code guard is layer 2). The prompt is
@@ -67,7 +75,8 @@ const STAFF_FACT_FRAME_RE = new RegExp(`^${STAFF_FACT_SUBJECT}(?:['’]s)?\\s+\\
  * for the very common case of a conversation that was entirely about
  * individual students.
  */
-const STAFF_EXTRACTION_PROMPT = `You are a memory extractor for Sage, an AI assistant that supports instructors in the SPOKES workforce-development program.
+function staffExtractionPrompt({ subject, noun, plural }: StaffFactSubject): string {
+  return `You are a memory extractor for Sage, an AI assistant that supports ${plural} in the SPOKES workforce-development program.
 
 From the conversation, extract up to ${MAX_STAFF_MEMORIES_PER_CONVERSATION} NEW durable facts about THE STAFF MEMBER you are talking with — how they work, not what they are working on.
 
@@ -79,7 +88,7 @@ HARD PRIVACY RULE — this is not student-record storage:
 - Never include anything a student disclosed, or any personal circumstance of any student.
 - If the conversation was only about individual students, return {"memories": []}.
 
-Start every fact with "${STAFF_FACT_SUBJECT}" followed by a lowercase verb, as one self-contained sentence: "${STAFF_FACT_SUBJECT} prefers three-bullet answers with the action first.", "${STAFF_FACT_SUBJECT} reviews flagged students every Monday before class.", "${STAFF_FACT_SUBJECT} cannot approve placements and routes them to the coordinator." A fact that does not start with "${STAFF_FACT_SUBJECT}" is discarded. Refer to the instructor as "they" or "their", never "he" or "she". Never put a name anywhere in the sentence.
+Start every fact with "${subject}" followed by a lowercase verb, as one self-contained sentence: "${subject} prefers three-bullet answers with the action first.", "${subject} reviews flagged students every Monday before class.", "${subject} cannot approve placements and routes them to the coordinator." A fact that does not start with "${subject}" is discarded. Refer to the ${noun} as "they" or "their", never "he" or "she". Never put a name anywhere in the sentence.
 
 Respond with ONLY a JSON object with a memories array: {"memories": [...]}. Each array element:
 {
@@ -92,6 +101,7 @@ Respond with ONLY a JSON object with a memories array: {"memories": [...]}. Each
 Always include the memories key, even when its array is empty.
 
 If nothing durable about the staff member was shared, return exactly {"memories": []}. Never return {}.`;
+}
 
 export interface ExtractStaffMemoriesParams {
   provider: AIProvider;
@@ -101,7 +111,7 @@ export interface ExtractStaffMemoriesParams {
   storeGuard?: <T>(write: (transaction?: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
   /** The signed-in staff member. Becomes the memory subject. */
   staffId: string;
-  /** Session role, for the audit trail only. */
+  /** Session role: the audit trail, and which fixed fact subject the prompt uses. */
   staffRole: string;
   conversationId: string;
   messages: { role: "user" | "model"; content: string }[];
@@ -117,7 +127,7 @@ function staffExtractDailyLimit(): number {
 }
 
 /**
- * Keeps the items that open with STAFF_FACT_SUBJECT and pass the privacy
+ * Keeps the items that open with the role's fact subject and pass the privacy
  * guard (layer 2), which drops anything that reads as student data before it
  * can be written. Rejections are counted and logged, not thrown: the model
  * producing a student fact is an expected outcome of a conversation about
@@ -126,8 +136,10 @@ function staffExtractDailyLimit(): number {
 function keepFramedStaffSafeItems(
   items: ExtractionItem[],
   conversationId: string,
+  subject: string,
 ): { safe: ExtractionItem[]; rejected: number } {
-  const framed = items.filter((item) => STAFF_FACT_FRAME_RE.test(item.content));
+  const frame = staffFactFrameRe(subject);
+  const framed = items.filter((item) => frame.test(item.content));
   const frameRejected = items.length - framed.length;
   if (frameRejected > 0) {
     logger.info("sage.staff_memory.frame_rejected", { conversationId, rejected: frameRejected });
@@ -176,6 +188,8 @@ export async function extractAndStoreStaffMemories({
       return empty;
     }
 
+    const factSubject = staffFactSubjectFor(staffRole);
+    const prompt = staffExtractionPrompt(factSubject);
     const providerClass = getProviderClass(provider.name);
     await logAiAuditEvent({
       actorId: staffId,
@@ -189,17 +203,17 @@ export async function extractAndStoreStaffMemories({
       providerName: provider.name,
       providerClass,
       allowCloud: providerClass === "cloud",
-      inputChars: STAFF_EXTRACTION_PROMPT.length + inputMessages.reduce((sum, m) => sum + m.content.length, 0),
+      inputChars: prompt.length + inputMessages.reduce((sum, m) => sum + m.content.length, 0),
       reason: "Staff-chat memory extraction; teacher-subject facts only, no student content stored.",
     });
 
-    const raw = await provider.generateStructuredResponse(STAFF_EXTRACTION_PROMPT, inputMessages);
+    const raw = await provider.generateStructuredResponse(prompt, inputMessages);
 
     await logEstimatedExtractionCost({
       subjectId: staffId,
       callSite: "sage_staff_memory_extract",
       providerName: provider.name,
-      prompt: STAFF_EXTRACTION_PROMPT,
+      prompt,
       messages: inputMessages,
       raw,
     });
@@ -207,7 +221,7 @@ export async function extractAndStoreStaffMemories({
     const parsed = parseModelJson(raw);
     if (throwOnError && unwrapItemList(parsed) === null) throw new Error("Invalid staff memory extraction JSON");
     const { accepted, rejected: schemaRejected } = parseExtractionItems(parsed);
-    const { safe, rejected: filterRejected } = keepFramedStaffSafeItems(accepted, conversationId);
+    const { safe, rejected: filterRejected } = keepFramedStaffSafeItems(accepted, conversationId, factSubject.subject);
 
     const rejected = schemaRejected + filterRejected;
     if (safe.length === 0) return { ...empty, rejected };
