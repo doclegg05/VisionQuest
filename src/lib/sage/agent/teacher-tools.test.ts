@@ -193,6 +193,27 @@ describe("getCoordinatorInterventionQueue — role guard", () => {
     );
     assert.equal(state.regionCoordinatorCalls, 0);
   });
+
+  it("gives a program coordinator every region, including classes with no region", async () => {
+    const { getCoordinatorInterventionQueue } = await import("@/lib/teacher/dashboard");
+    state.adminStudentRows = [queueStudentRow({ id: "stu-9", displayName: "Nora Noregion" })];
+
+    const { queue } = await getCoordinatorInterventionQueue({
+      id: "pc-1",
+      studentId: "",
+      displayName: "Pat Program",
+      role: "program_coordinator",
+    });
+
+    assert.equal(queue.length, 1);
+    // No RegionCoordinator lookup: a program coordinator holds no regions.
+    assert.equal(state.regionCoordinatorCalls, 0);
+    assert.equal(state.adminStudentWhere?.role, "student");
+    assert.equal(state.adminStudentWhere?.isActive, true);
+    const enrollmentScope = state.adminStudentWhere?.classEnrollments?.some;
+    assert.equal(enrollmentScope?.class?.regionId, undefined);
+    assert.deepEqual(enrollmentScope?.class?.status, { not: "archived" });
+  });
 });
 
 describe("list_students_needing_attention — staff sessions", () => {

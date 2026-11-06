@@ -11,6 +11,7 @@ import { getCertificationProgress } from "@/lib/certifications";
 import { prisma, prismaAdmin } from "@/lib/db";
 import { forbidden, type Session } from "@/lib/api-error";
 import { goalCountsTowardPlan } from "@/lib/goals";
+import { seesWholeState } from "@/lib/org-roles";
 import { checkClassCompliance } from "@/lib/class-requirement-compliance";
 import { fetchReadinessDataForStudents } from "@/lib/progression/fetch-readiness-data";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
@@ -161,20 +162,15 @@ export async function getInterventionQueue(
  * (non-archived enrollment) in non-archived classes inside the
  * coordinator's active regions. Fails closed to an empty queue when the
  * coordinator has no region assignments.
+ *
+ * Program coordinators and admins hold no regions and read the whole state: every
+ * non-archived class, including classes with no region.
  */
 export async function getCoordinatorInterventionQueue(
   session: Session,
 ): Promise<InterventionQueueResponse> {
-  if (session.role !== "coordinator") {
-    throw forbidden("Coordinator session required.");
-  }
-
-  const assignments = await prismaAdmin.regionCoordinator.findMany({
-    where: { coordinatorId: session.id, region: { status: "active" } },
-    select: { regionId: true },
-  });
-  const regionIds = assignments.map((assignment) => assignment.regionId);
-  if (regionIds.length === 0) {
+  const classScope = await coordinatorQueueClassScope(session);
+  if (!classScope) {
     return { queue: [] };
   }
 
@@ -186,10 +182,7 @@ export async function getCoordinatorInterventionQueue(
       classEnrollments: {
         some: {
           status: { in: [...NON_ARCHIVED_ENROLLMENT_STATUSES] },
-          class: {
-            regionId: { in: regionIds },
-            status: { not: "archived" },
-          },
+          class: { ...classScope, status: { not: "archived" } },
         },
       },
     },
@@ -198,6 +191,29 @@ export async function getCoordinatorInterventionQueue(
 
   const orientationTotalCount = await prismaAdmin.orientationItem.count();
   return buildQueueResponse(students, orientationTotalCount, now);
+}
+
+/**
+ * The class filter a coordinator's queue reads: `{}` (every class) for a
+ * program coordinator or admin, the active assigned regions for a regional
+ * coordinator, and null (an empty queue) for one with no regions.
+ */
+async function coordinatorQueueClassScope(
+  session: Session,
+): Promise<{ regionId?: { in: string[] } } | null> {
+  if (seesWholeState(session.role)) {
+    return {};
+  }
+  if (session.role !== "coordinator") {
+    throw forbidden("Coordinator session required.");
+  }
+
+  const assignments = await prismaAdmin.regionCoordinator.findMany({
+    where: { coordinatorId: session.id, region: { status: "active" } },
+    select: { regionId: true },
+  });
+  const regionIds = assignments.map((assignment) => assignment.regionId);
+  return regionIds.length === 0 ? null : { regionId: { in: regionIds } };
 }
 
 export async function getTeacherDashboardPage(

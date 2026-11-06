@@ -1,9 +1,43 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { seesWholeState } from "@/lib/org-roles";
+import { parseBody } from "@/lib/schemas";
 
 const COUNTY_CATEGORY = "county";
+
+const deleteReferralSchema = z.object({
+  id: z.string().min(1, "id is required."),
+});
+
+// Unlinked referrals (studentId: null) are applicants with no class yet. Under
+// the organization tree they belong to admins and program coordinators only;
+// an instructor sees an empty list (SpokesManager loads this with its config,
+// so a 403 would blank the whole panel) and cannot delete one.
+async function listUnlinkedReferrals(county: string) {
+  return prisma.spokesRecord.findMany({
+    where: {
+      studentId: null,
+      ...(county ? { county } : {}),
+    },
+    orderBy: [{ referralDate: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      referralEmail: true,
+      county: true,
+      householdType: true,
+      requiredParticipationHours: true,
+      referralDate: true,
+      status: true,
+      notes: true,
+      createdAt: true,
+    },
+  });
+}
 
 function parseOptionalDate(value: unknown) {
   if (!value || typeof value !== "string") return null;
@@ -12,7 +46,7 @@ function parseOptionalDate(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-export const GET = withTeacherAuth(async (_session, req: Request) => {
+export const GET = withTeacherAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const county = searchParams.get("county")?.trim() || "";
 
@@ -30,26 +64,7 @@ export const GET = withTeacherAuth(async (_session, req: Request) => {
         sortOrder: true,
       },
     }),
-    prisma.spokesRecord.findMany({
-      where: {
-        studentId: null,
-        ...(county ? { county } : {}),
-      },
-      orderBy: [{ referralDate: "desc" }, { createdAt: "desc" }],
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        referralEmail: true,
-        county: true,
-        householdType: true,
-        requiredParticipationHours: true,
-        referralDate: true,
-        status: true,
-        notes: true,
-        createdAt: true,
-      },
-    }),
+    seesWholeState(session.role) ? listUnlinkedReferrals(county) : Promise.resolve([]),
   ]);
 
   return NextResponse.json({ countyOptions, referrals });
@@ -105,11 +120,14 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
 });
 
 export const DELETE = withTeacherAuth(async (session, req: Request) => {
-  const body = await req.json();
-
-  if (typeof body.id !== "string" || !body.id) {
-    return NextResponse.json({ error: "id is required." }, { status: 400 });
+  if (!seesWholeState(session.role)) {
+    return NextResponse.json(
+      { error: "Only admins and program coordinators manage unlinked referrals." },
+      { status: 403 },
+    );
   }
+
+  const body = await parseBody(req, deleteReferralSchema);
 
   const referral = await prisma.spokesRecord.findUnique({
     where: { id: body.id },
