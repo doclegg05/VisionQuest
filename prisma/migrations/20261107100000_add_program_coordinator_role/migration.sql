@@ -15,6 +15,7 @@ VALUES
   )
 ON CONFLICT DO NOTHING;
 
+-- Read-only: every coordinator permission except grant-goal writes.
 INSERT INTO "visionquest"."RolePermission" ("id", "roleId", "permissionId", "granted")
 SELECT
   'sys_rp_program_coordinator_' || substr(p."id", 10),
@@ -23,4 +24,5 @@ SELECT
   true
 FROM "visionquest"."Permission" p
 WHERE p."namespace" = 'coordinator'
+  AND p."key" <> 'coordinator.grant.edit'
 ON CONFLICT ("roleId", "permissionId") DO NOTHING;
