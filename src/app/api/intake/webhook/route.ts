@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { intakePayloadSchema } from "@/lib/intake/schema";
 import { provisionIntakeStudent } from "@/lib/intake/provision";
 import { getSession } from "@/lib/auth";
-import { isStaffRole, withErrorHandler } from "@/lib/api-error";
+import { badRequest, isStaffRole, withErrorHandler, type Session } from "@/lib/api-error";
+import { assertStaffCanManageClass } from "@/lib/classroom";
 import { parseBody } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 
@@ -75,10 +76,12 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   // Or check if invoked by a logged-in staff member from internal UI
   let hasStaffAuth = false;
+  let staffSession: Session | null = null;
   if (!hasWebhookAuth) {
     const session = await getSession();
     if (session && isStaffRole(session.role)) {
       hasStaffAuth = true;
+      staffSession = session;
     }
   }
 
@@ -93,6 +96,13 @@ export const POST = withErrorHandler(async (req: Request) => {
   // withErrorHandler renders. Zod messages are about the caller's own payload,
   // never about the database.
   const payload = await parseBody(req, intakePayloadSchema);
+
+  // A person at the keyboard places the student in a classroom they can
+  // manage. County matching is for the bearer-secret path only.
+  if (staffSession) {
+    if (!payload.classId) throw badRequest("Choose one of your classrooms.");
+    await assertStaffCanManageClass(staffSession, payload.classId);
+  }
 
   try {
     const result = await provisionIntakeStudent(payload, { source: "staff" });

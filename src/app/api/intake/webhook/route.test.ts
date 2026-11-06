@@ -8,7 +8,32 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
-mock.module("@/lib/auth", { namedExports: { getSession: async () => null } });
+let currentSession: Record<string, unknown> | null = null;
+mock.module("@/lib/auth", { namedExports: { getSession: async () => currentSession } });
+
+// A tiny stand-in for the class table: the real assertStaffCanManageClass runs
+// against it, so the instructor filter it builds is what decides the outcome.
+const CLASS_INSTRUCTORS: Record<string, string[]> = {
+  class_mine: ["teacher_1"],
+  class_other: ["teacher_2"],
+};
+mock.module("@/lib/db", {
+  exports: {
+    prisma: {
+      spokesClass: {
+        findFirst: async (args: {
+          where: { id: string; instructors?: { some: { instructorId: string } } };
+        }) => {
+          const { id, instructors } = args.where;
+          const roster = CLASS_INSTRUCTORS[id];
+          if (!roster) return null;
+          if (instructors && !roster.includes(instructors.some.instructorId)) return null;
+          return { id, name: id, code: id, status: "active" };
+        },
+      },
+    },
+  },
+});
 
 class FakeApiError extends Error {
   constructor(
@@ -26,6 +51,7 @@ mock.module("@/lib/api-error", {
     // would 500 on a bad payload and the 400 case would pass for the wrong
     // reason.
     badRequest: (message: string) => new FakeApiError(400, message),
+    forbidden: (message = "Forbidden") => new FakeApiError(403, message),
     // Faithful to the real wrapper's contract: ApiError renders as its own
     // status and message, anything else as a bare 500 with no detail.
     withErrorHandler:
@@ -109,6 +135,7 @@ function postWebhook(body: Record<string, unknown> = PAYLOAD): Request {
 describe("POST /api/intake/webhook", () => {
   beforeEach(() => {
     provisionError = null;
+    currentSession = null;
     provisionResult = {
       outcome: "provisioned",
       studentDbId: "stu_1",
@@ -224,5 +251,63 @@ describe("POST /api/intake/webhook", () => {
     assert.ok(!raw.includes("prisma"), `response leaked Prisma internals: ${raw}`);
     assert.ok(!raw.includes("Foreign key"), `response leaked the driver error: ${raw}`);
     assert.ok(!("message" in body), `response carried a raw message field: ${raw}`);
+  });
+
+  describe("a staff session caller", () => {
+    const teacher = { id: "teacher_1", role: "teacher", studentId: "t1", displayName: "T One" };
+
+    function postAsSession(extra: Record<string, unknown>): Request {
+      return new Request("http://localhost:3000/api/intake/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...PAYLOAD, ...extra }),
+      });
+    }
+
+    it("is refused a class they do not instruct, and no student is created", async () => {
+      currentSession = teacher;
+
+      const res = await route.POST(postAsSession({ classId: "class_other" }));
+
+      assert.equal(res.status, 403);
+      assert.equal(provisionMock.mock.callCount(), 0);
+    });
+
+    it("enrolls the student in a class they do instruct", async () => {
+      currentSession = teacher;
+
+      const res = await route.POST(postAsSession({ classId: "class_mine" }));
+
+      assert.equal(res.status, 201);
+      assert.equal(provisionMock.mock.callCount(), 1);
+      const payload = provisionMock.mock.calls[0]?.arguments[0] as { classId?: string };
+      assert.equal(payload.classId, "class_mine");
+    });
+
+    it("must name a classroom", async () => {
+      currentSession = teacher;
+
+      const res = await route.POST(postAsSession({}));
+      const body = await res.json();
+
+      assert.equal(res.status, 400);
+      assert.equal(body.error, "Choose one of your classrooms.");
+      assert.equal(provisionMock.mock.callCount(), 0);
+    });
+
+    it("lets an admin name any class", async () => {
+      currentSession = { id: "admin_1", role: "admin", studentId: "a1", displayName: "A" };
+
+      const res = await route.POST(postAsSession({ classId: "class_other" }));
+
+      assert.equal(res.status, 201);
+    });
+  });
+
+  it("leaves the bearer-secret path alone: no class needed, county matching intact", async () => {
+    const res = await route.POST(postWebhook());
+
+    assert.equal(res.status, 201);
+    assert.equal(provisionMock.mock.callCount(), 1);
   });
 });
