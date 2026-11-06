@@ -285,3 +285,15 @@ describe("acceptStaffInvite with a code", () => {
     assert.equal(accountRows().length, 1);
   });
 });
+
+describe("previewStaffInvite", () => {
+  it("tells the accept page whether the invite needs an email code", async () => {
+    const { previewStaffInvite } = await import("./staff-invite-list");
+    const { token } = await emailedInvite();
+    assert.equal((await previewStaffInvite(token))?.needsCode, true);
+
+    emailConfigured = false;
+    const linkOnly = await delivery.sendStaffInvite(admin, { email: "b@example.org", role: "teacher", regionId: REGION_A }, linkFor);
+    assert.equal((await previewStaffInvite(String(linkOnly.link).split("/").at(-1) ?? ""))?.needsCode, false);
+  });
+});

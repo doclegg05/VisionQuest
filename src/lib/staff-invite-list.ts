@@ -59,6 +59,8 @@ export async function listStaffInvites(actor: Session): Promise<StaffInviteRow[]
 export interface StaffInvitePreview {
   role: string;
   regionName: string | null;
+  /** The invite was emailed, so accepting needs the 6-digit email code (Ruling R21). */
+  needsCode: boolean;
 }
 
 /** What the accept page shows. Null for any invite that cannot be accepted now. */
@@ -69,7 +71,7 @@ export async function previewStaffInvite(token: string): Promise<StaffInvitePrev
   const region = invite.regionId
     ? await prismaAdmin.region.findUnique({ where: { id: invite.regionId }, select: { name: true } })
     : null;
-  return { role: invite.role, regionName: region?.name ?? null };
+  return { role: invite.role, regionName: region?.name ?? null, needsCode: invite.deliveredByEmail };
 }
 
 export async function regionNameFor(regionId: string | undefined): Promise<string | null> {

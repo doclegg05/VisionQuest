@@ -17,8 +17,21 @@ interface StaffInviteFormProps {
   onCreated: () => void;
 }
 
+type InviteDelivery = "sent" | "failed" | "not_configured";
+
 interface CreateResponse {
-  data: { emailed: boolean; link?: string };
+  data: { delivery: InviteDelivery; link?: string };
+}
+
+const NOTICES: Record<InviteDelivery, string> = {
+  sent: "Invite sent.",
+  failed: "We could not send the email. Try again, or ask an admin.",
+  not_configured: "Email is not set up. Copy this link and send it to the person yourself.",
+};
+
+/** What the inviter reads after a create. A failed send and email not set up read differently. */
+export function inviteNotice(delivery: InviteDelivery): string {
+  return NOTICES[delivery];
 }
 
 export function StaffInviteForm({ roles, regions, onCreated }: StaffInviteFormProps) {
@@ -45,12 +58,8 @@ export function StaffInviteForm({ roles, regions, onCreated }: StaffInviteFormPr
         role,
         ...(needsRegion && regionId ? { regionId } : {}),
       });
-      if (res.data.emailed) {
-        setNotice("Invite sent.");
-      } else {
-        setNotice("Email is not set up. Copy this link and send it to the person yourself.");
-        setLink(res.data.link ?? "");
-      }
+      setNotice(inviteNotice(res.data.delivery));
+      setLink(res.data.link ?? "");
       setEmail("");
       onCreated();
     } catch (err) {

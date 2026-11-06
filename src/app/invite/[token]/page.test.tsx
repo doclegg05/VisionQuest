@@ -7,12 +7,13 @@ import { renderToString } from "react-dom/server";
 // types it, and acceptance checks it against the invite.
 
 const INVITED_EMAIL = "pat.instructor@example.org";
+let needsCode = false;
 
 mock.module("@/lib/staff-invite-list", {
   exports: {
     // Shaped like the preview used to be, email included, so a page that
     // reads it again fails here.
-    previewStaffInvite: async () => ({ email: INVITED_EMAIL, role: "teacher", regionName: "North" }),
+    previewStaffInvite: async () => ({ email: INVITED_EMAIL, role: "teacher", regionName: "North", needsCode }),
   },
 });
 mock.module("next/navigation", {
@@ -32,5 +33,25 @@ describe("invite accept page", () => {
     assert.ok(html.includes("Create my account"), "the form must render for this to mean anything");
     assert.ok(!html.includes(INVITED_EMAIL), "the accept page printed or pre-filled the invited email");
     assert.match(html, /id="accept-email"[^>]*value=""/);
+  });
+
+  it("asks for the emailed code on an invite that was emailed (Ruling R21)", async () => {
+    needsCode = true;
+    try {
+      const html = renderToString(await Page({ params: Promise.resolve({ token: "tok" }) }));
+      assert.ok(html.includes("We will email a 6-digit code to the address on this invite."));
+      assert.match(html, />Send my code</);
+      assert.match(html, /id="accept-code"[^>]*autoComplete="one-time-code"|id="accept-code"[^>]*autocomplete="one-time-code"/);
+      assert.match(html, /id="accept-code"[^>]*inputMode="numeric"|id="accept-code"[^>]*inputmode="numeric"/);
+      assert.ok(!html.includes(INVITED_EMAIL), "the code step does not print the invited email either");
+    } finally {
+      needsCode = false;
+    }
+  });
+
+  it("shows no code step on a link-only invite", async () => {
+    const html = renderToString(await Page({ params: Promise.resolve({ token: "tok" }) }));
+    assert.ok(!html.includes("accept-code"));
+    assert.ok(!html.includes("Send my code"));
   });
 });
