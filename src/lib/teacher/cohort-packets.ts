@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma, prismaAdmin } from "@/lib/db";
 
 const PACKET_FORM_IDS = ["orientation-intake", "student-intake"];
 
@@ -16,6 +16,12 @@ export interface CohortPacketStudent {
  * Reads the newest archived intake packet reference for each student. Callers
  * must already have resolved `studentIds` through the staff scope check; this
  * helper does no authorization of its own.
+ *
+ * The file read uses `prismaAdmin`: coordinators read as tree readers, and RLS
+ * hides every FileUpload row from them (file_upload_tree_reader_block), so the
+ * RLS client found no packet and the export listed every student as missing
+ * one. The read stays inside the scoped students' own files and takes only
+ * the storage key.
  */
 export async function listCohortPacketStudents(
   studentIds: string[],
@@ -39,10 +45,13 @@ export async function listCohortPacketStudents(
   const fileIds = students
     .map((s) => s.formSubmissions[0]?.fileId)
     .filter((id): id is string => Boolean(id));
-  const files = await prisma.fileUpload.findMany({
-    where: { id: { in: fileIds } },
-    select: { id: true, storageKey: true },
-  });
+  const files =
+    fileIds.length === 0
+      ? []
+      : await prismaAdmin.fileUpload.findMany({
+          where: { id: { in: fileIds }, studentId: { in: studentIds } },
+          select: { id: true, storageKey: true },
+        });
   const keyById = new Map(files.map((f) => [f.id, f.storageKey]));
 
   return students.map((s) => {
