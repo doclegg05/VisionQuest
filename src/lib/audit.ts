@@ -57,7 +57,7 @@ export async function tryLogAuditEvent(
 }
 
 /** Where in the app the staff member viewed the student's data. */
-export type StudentViewSurface = "student_detail" | "conversations" | "export" | "sage_operations";
+export type StudentViewSurface = "student_detail" | "conversations" | "export" | "sage_operations" | "class_roster";
 
 interface StudentViewInput {
   actorId: string;

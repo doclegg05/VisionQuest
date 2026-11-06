@@ -8,6 +8,7 @@ import FormRollupList from "./FormRollupList";
 import GrantProgressPanel from "./GrantProgressPanel";
 import InstructorGrid from "./InstructorGrid";
 import MonthlyReportExporter from "./MonthlyReportExporter";
+import { RegionDrilldown } from "./RegionDrilldown";
 import RegionRollupCard from "./RegionRollupCard";
 
 interface RegionOption {
@@ -262,6 +263,7 @@ export default function CoordinatorDashboardClient({ regions }: { regions: Regio
           <WagerHitRateCard metrics={data.wagerHitRate} />
           <GrantProgressPanel goals={data.rollup.grantGoals} regionId={regionId} onChange={() => loadRollup(regionId)} />
           <InstructorGrid metrics={data.instructorMetrics} />
+          <RegionDrilldown regionId={regionId} />
           <FormRollupList regionId={regionId} />
         </div>
       ) : null}
