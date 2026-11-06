@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { badRequest } from "@/lib/api-error";
 import { hashPassword, normalizeEmail, normalizeStudentId } from "@/lib/auth";
 import { tryLogAuditEvent } from "@/lib/audit";
 import { invalidateChatContext } from "@/lib/cache";
@@ -42,6 +43,12 @@ export type IntakeSource = "public" | "staff";
 
 export interface ProvisionOptions {
   source: IntakeSource;
+  /**
+   * Set for a signed-in staff caller who must name the classroom. A named class
+   * that is not active is then refused instead of falling back to county
+   * matching, so the student never lands in a class the caller did not choose.
+   */
+  requireNamedClass?: boolean;
 }
 
 interface AccountSummary {
@@ -164,6 +171,7 @@ async function resolveActiveClass(
   county: string,
   explicitClassId: string | null | undefined,
   source: IntakeSource,
+  requireNamedClass = false,
 ): Promise<{ id: string; name: string } | null> {
   if (source === "staff" && explicitClassId) {
     const explicitClass = await prisma.spokesClass.findFirst({
@@ -171,6 +179,7 @@ async function resolveActiveClass(
       select: { id: true, name: true },
     });
     if (explicitClass) return explicitClass;
+    if (requireNamedClass) throw badRequest("That classroom is not active.");
   }
 
   return prisma.spokesClass.findFirst({
@@ -270,7 +279,7 @@ export async function provisionIntakeStudent(
   payload: IntakePayload,
   options: ProvisionOptions,
 ): Promise<ProvisionResult> {
-  const { source } = options;
+  const { source, requireNamedClass } = options;
   const normalizedEmail = payload.email ? normalizeEmail(payload.email) : null;
   const birthDateObj = new Date(payload.birthDate);
 
@@ -313,7 +322,7 @@ export async function provisionIntakeStudent(
     }
 
     const student = existingStudent;
-    const activeClass = await resolveActiveClass(payload.county, payload.classId, source);
+    const activeClass = await resolveActiveClass(payload.county, payload.classId, source, requireNamedClass);
 
     const spokesRecord = await prisma.spokesRecord.upsert({
       where: { studentId: student.id },
@@ -390,7 +399,7 @@ export async function provisionIntakeStudent(
   }
 
   // --- Path B: Brand New Student ---
-  const activeClass = await resolveActiveClass(payload.county, payload.classId, source);
+  const activeClass = await resolveActiveClass(payload.county, payload.classId, source, requireNamedClass);
   const newStudentId = await generateUniqueStudentId(payload.firstName, payload.lastName);
   const displayName = `${payload.firstName} ${payload.lastName}`;
 
