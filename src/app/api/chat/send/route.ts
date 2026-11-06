@@ -657,6 +657,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       studentName: session.displayName,
       userMessage,
       staffStudentContext,
+      staffRole: session.role,
     }, promptTier);
   } else {
     // Canonical context feed: the bundle is the single entry point for Sage

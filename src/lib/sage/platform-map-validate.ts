@@ -34,7 +34,7 @@ const COMPACT_CHAR_LIMIT = 650;
  * chars unguarded while compact-budget only ever watched the compact tier).
  */
 const FULL_CHAR_LIMIT = 7000;
-const ALL_ROLES: PlatformRole[] = ["student", "teacher", "coordinator", "admin"];
+const ALL_ROLES: PlatformRole[] = ["student", "teacher", "coordinator", "program_coordinator", "admin"];
 
 /**
  * Routes that intentionally have no PLATFORM_MAP entry — plain account

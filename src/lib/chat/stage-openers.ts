@@ -66,7 +66,7 @@ export const STAGE_OPENERS: Record<ConversationStage, string> = {
   admin_assistant:
     "Hi! I'm Sage. I can help with program usage, outcomes, reports, and policy lookups. What are you looking into?",
 
-  /** Coordinator assistant — addressed to regional coordinators, not students */
+  /** Coordinator assistant — addressed to regional and program coordinators, not students */
   coordinator_assistant:
     "Hi! I'm Sage. I can help with regional rollups, grant and benchmark progress, and funder-ready reporting. What are you looking into?",
 

@@ -829,6 +829,46 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
     assert.match(prompt, /Never claim you have access to a specific student/);
   });
 
+  for (const tier of ["full", "compact"] as const) {
+    it(`coordinator_assistant (${tier}) scopes a regional coordinator to their regions`, () => {
+      const prompt = buildSystemPrompt("coordinator_assistant", { staffRole: "coordinator" }, tier);
+      assert.match(prompt, /This coordinator is a regional coordinator\. Their scope is the classes in their assigned regions/);
+      assert.ok(!prompt.includes("This coordinator is a program coordinator"));
+    });
+
+    it(`coordinator_assistant (${tier}) gives a program coordinator the whole state`, () => {
+      const prompt = buildSystemPrompt("coordinator_assistant", { staffRole: "program_coordinator" }, tier);
+      assert.match(prompt, /This coordinator is a program coordinator\. Their scope is the whole state: every region and every class/);
+      assert.ok(!prompt.includes("This coordinator is a regional coordinator"));
+    });
+
+    it(`coordinator_assistant (${tier}) falls back to the regional scope when no role is given`, () => {
+      const prompt = buildSystemPrompt("coordinator_assistant", {}, tier);
+      assert.match(prompt, /This coordinator is a regional coordinator/);
+    });
+
+    it(`coordinator_assistant (${tier}) names both scopes and stays read-only`, () => {
+      const prompt = buildSystemPrompt("coordinator_assistant", { staffRole: "program_coordinator" }, tier);
+      assert.match(prompt, /regional coordinators and program coordinators/i);
+      assert.match(prompt, /never change, create, or delete a student record/i);
+    });
+  }
+
+  it("coordinator_assistant gives a program coordinator the program coordinator platform map", () => {
+    const pc = buildSystemPrompt("coordinator_assistant", { staffRole: "program_coordinator" });
+    assert.match(pc, /Program coordinators use it/);
+    assert.match(pc, /Regional Rollups/);
+    const regional = buildSystemPrompt("coordinator_assistant", { staffRole: "coordinator" });
+    assert.match(regional, /Regional coordinators use it/);
+    assert.ok(!regional.includes("Program coordinators use it"));
+  });
+
+  it("coordinator_assistant ignores a staffRole outside the coordinator roles", () => {
+    const prompt = buildSystemPrompt("coordinator_assistant", { staffRole: "admin" });
+    assert.match(prompt, /This coordinator is a regional coordinator/);
+    assert.ok(!prompt.includes("Program Setup"));
+  });
+
   it("checkin stage uses SPOKES_BRIEF instead of full knowledge block", () => {
     const prompt = buildSystemPrompt("checkin");
     assert.ok(!prompt.includes("SPOKES PROGRAM KNOWLEDGE BASE"));

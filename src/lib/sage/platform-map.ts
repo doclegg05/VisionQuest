@@ -13,7 +13,7 @@
 
 import type { PromptTier } from "@/lib/ai/types";
 
-export type PlatformRole = "student" | "teacher" | "coordinator" | "admin";
+export type PlatformRole = "student" | "teacher" | "coordinator" | "program_coordinator" | "admin";
 
 export interface PlatformFeature {
   /** Stable id, unique across the whole map. */
@@ -52,9 +52,14 @@ Visionquest is the digital hub for the SPOKES workforce training program under W
 YOUR ROLE HERE: You are the instructor's hands-on assistant INSIDE this platform — not a search engine and not a help article. When an instructor needs something here, help them actually get it done: pull up the intervention queue, open a student's record, review an orientation submission. Move with them through their workflow; don't just describe where a button is.`;
 
 const COORDINATOR_PREAMBLE = `ABOUT THE VISIONQUEST PLATFORM:
-Visionquest is the digital hub for the SPOKES workforce training program under West Virginia Adult Education. Regional coordinators use it to oversee program health across classrooms: grant/benchmark progress, instructor metrics, and funder-ready reporting.
+Visionquest is the digital hub for the SPOKES workforce training program under West Virginia Adult Education. Regional coordinators use it to oversee program health across the classrooms in their assigned regions: grant/benchmark progress, instructor metrics, and funder-ready reporting.
 
 YOUR ROLE HERE: You are the coordinator's hands-on assistant INSIDE this platform — not a search engine and not a help article. When a coordinator needs something here, help them actually get it done: pull up the regional rollup, check grant benchmark status, or prepare a funder export. Move with them through their workflow; don't just describe where a button is.`;
+
+const PROGRAM_COORDINATOR_PREAMBLE = `ABOUT THE VISIONQUEST PLATFORM:
+Visionquest is the digital hub for the SPOKES workforce training program under West Virginia Adult Education. Program coordinators use it to oversee program health across the whole state, every region and classroom: grant/benchmark progress, instructor metrics, and funder-ready reporting.
+
+YOUR ROLE HERE: You are the program coordinator's hands-on assistant INSIDE this platform — not a search engine and not a help article. When a program coordinator needs something here, help them actually get it done: pull up the statewide rollup, compare regions, check grant benchmark status, or prepare a funder export. Move with them through their workflow; don't just describe where a button is.`;
 
 const ADMIN_PREAMBLE = `ABOUT THE VISIONQUEST PLATFORM:
 Visionquest is the digital hub for the SPOKES workforce training program under West Virginia Adult Education. Administrators use it to configure the program, oversee usage, and analyze outcomes across the whole platform.
@@ -65,6 +70,7 @@ const ROLE_PREAMBLES: Record<PlatformRole, string> = {
   student: STUDENT_PREAMBLE,
   teacher: TEACHER_PREAMBLE,
   coordinator: COORDINATOR_PREAMBLE,
+  program_coordinator: PROGRAM_COORDINATOR_PREAMBLE,
   admin: ADMIN_PREAMBLE,
 };
 
@@ -388,31 +394,32 @@ export const PLATFORM_MAP: PlatformFeature[] = [
   {
     id: "coordinator-rollups",
     name: "Regional Rollups",
-    roles: ["coordinator"],
+    roles: ["coordinator", "program_coordinator"],
     route: "/coordinator",
-    summary: "Aggregate program health across every classroom in the coordinator's assigned regions.",
+    summary:
+      "Aggregate program health by region and classroom: a regional coordinator sees the regions assigned to them, a program coordinator sees every region in the state.",
     compact: "regional rollups (program health by region)",
   },
   {
     id: "coordinator-grant-progress",
     name: "Grant / Benchmark Progress",
-    roles: ["coordinator"],
+    roles: ["coordinator", "program_coordinator"],
     route: "/coordinator",
-    summary: "Tracks progress against grant goals and program benchmarks for the coordinator's regions.",
+    summary: "Tracks progress against grant goals and program benchmarks for the regions the coordinator oversees.",
     compact: "grant/benchmark progress tracking",
   },
   {
     id: "coordinator-instructor-metrics",
     name: "Instructor Metrics",
-    roles: ["coordinator"],
+    roles: ["coordinator", "program_coordinator"],
     route: "/coordinator",
-    summary: "Aggregate performance metrics for instructors across the coordinator's assigned regions.",
+    summary: "Aggregate performance metrics for instructors across the regions the coordinator oversees.",
     compact: "instructor metrics (aggregate, by region)",
   },
   {
     id: "coordinator-exports",
     name: "Funder-Ready Exports",
-    roles: ["coordinator"],
+    roles: ["coordinator", "program_coordinator"],
     route: "/coordinator",
     summary: "Export program data formatted for grant funders and compliance reporting.",
     compact: "funder-ready exports",
@@ -461,7 +468,7 @@ export const PLATFORM_MAP: PlatformFeature[] = [
     name: "Live Career Data (CareerOneStop)",
     // No `compact` phrase: the student compact render is already at its
     // 650-char ceiling (see the note in the student section above).
-    roles: ["student", "teacher", "coordinator", "admin"],
+    roles: ["student", "teacher", "coordinator", "program_coordinator", "admin"],
     summary:
       "Real occupation data Sage looks up during a conversation: what a job is like day to day, typical pay, the tools and equipment used on it, local training programs, and a skills matcher that turns self-rated skills into real job matches.",
     mechanics:

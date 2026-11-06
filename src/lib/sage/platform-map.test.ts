@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { buildPlatformKnowledge, PLATFORM_MAP, type PlatformRole } from "./platform-map";
 
-const ALL_ROLES: PlatformRole[] = ["student", "teacher", "coordinator", "admin"];
+const ALL_ROLES: PlatformRole[] = ["student", "teacher", "coordinator", "program_coordinator", "admin"];
 const COMPACT_CHAR_LIMIT = 650;
 
 describe("buildPlatformKnowledge — full tier", () => {
@@ -39,6 +39,33 @@ describe("buildPlatformKnowledge — full tier", () => {
     const prompt = buildPlatformKnowledge("coordinator", "full");
     assert.match(prompt, /Regional Rollups/);
     assert.match(prompt, /Grant \/ Benchmark Progress/);
+  });
+
+  it("regional coordinator full tier scopes the rollups to assigned regions", () => {
+    const prompt = buildPlatformKnowledge("coordinator", "full");
+    assert.match(prompt, /Regional coordinators use it/);
+    assert.match(prompt, /assigned regions/);
+    assert.ok(!prompt.includes("Program coordinators use it"));
+  });
+
+  it("program coordinator full tier covers every coordinator surface for the whole state", () => {
+    const prompt = buildPlatformKnowledge("program_coordinator", "full");
+    assert.match(prompt, /Program coordinators use it/);
+    assert.match(prompt, /whole state/);
+    assert.match(prompt, /Regional Rollups/);
+    assert.match(prompt, /Grant \/ Benchmark Progress/);
+    assert.match(prompt, /Instructor Metrics/);
+    assert.match(prompt, /Funder-Ready Exports/);
+    assert.match(prompt, /Live Career Data/);
+    assert.ok(!/your region|their region|assigned regions|coordinator's regions/i.test(prompt));
+    assert.ok(!prompt.includes("Intervention Queue"));
+    assert.ok(!prompt.includes("Program Setup"));
+  });
+
+  it("program coordinator compact tier lists the coordinator surfaces", () => {
+    const prompt = buildPlatformKnowledge("program_coordinator", "compact");
+    assert.match(prompt, /regional rollups/i);
+    assert.match(prompt, /funder-ready exports/);
   });
 
   it("admin full tier contains program setup", () => {
@@ -92,6 +119,24 @@ describe("PLATFORM_MAP", () => {
   it("has unique ids", () => {
     const ids = PLATFORM_MAP.map((e) => e.id);
     assert.equal(new Set(ids).size, ids.length);
+  });
+
+  it("gives program coordinators every entry regional coordinators have", () => {
+    for (const entry of PLATFORM_MAP) {
+      if (!entry.roles.includes("coordinator")) continue;
+      assert.ok(
+        entry.roles.includes("program_coordinator"),
+        `${entry.id} is available to coordinator but not program_coordinator`,
+      );
+    }
+  });
+
+  it("never tells a program coordinator about 'your region'", () => {
+    for (const entry of PLATFORM_MAP) {
+      if (!entry.roles.includes("program_coordinator")) continue;
+      const text = [entry.summary, entry.compact ?? "", entry.mechanics ?? ""].join(" ");
+      assert.ok(!/your region|coordinator's (assigned )?regions/i.test(text), `${entry.id}: ${text}`);
+    }
   });
 
   it("every entry has at least one role and a non-empty summary", () => {
