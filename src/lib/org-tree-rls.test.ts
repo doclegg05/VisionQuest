@@ -570,4 +570,70 @@ if (!SHOULD_RUN) {
       assert.equal(own.count, 1);
     });
   });
+
+  describe("org tree: StaffInvite (integration)", () => {
+    const db = new PrismaClient();
+    const asRole = asRoleOn(db);
+    const suffix = `orgtree-si-${Date.now()}`;
+    const ids = { admin: "", teacher: "", coordinator: "", student: "", invite: "" };
+
+    before(async () => {
+      ids.admin = (await createUser(db, `a-${suffix}`, "teacher")).id;
+      ids.teacher = (await createUser(db, `t-${suffix}`, "teacher")).id;
+      ids.coordinator = (await createUser(db, `c-${suffix}`, "coordinator")).id;
+      ids.student = (await createUser(db, `s-${suffix}`, "student")).id;
+      const invite = await db.staffInvite.create({
+        data: {
+          email: `invite-${suffix}@example.test`,
+          role: "teacher",
+          invitedById: ids.admin,
+          tokenHash: `hash-${suffix}`,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+      ids.invite = invite.id;
+    });
+
+    after(async () => {
+      await db.staffInvite.deleteMany({ where: { tokenHash: { startsWith: `hash-${suffix}` } } });
+      await db.student.deleteMany({
+        where: { id: { in: [ids.admin, ids.teacher, ids.coordinator, ids.student] } },
+      });
+      await db.$disconnect();
+    });
+
+    it("an admin reads a seeded StaffInvite row", async () => {
+      const rows = await asRole("admin", ids.admin, (tx) =>
+        tx.staffInvite.findMany({ where: { id: ids.invite } }),
+      );
+      assert.equal(rows.length, 1);
+    });
+
+    it("teacher, coordinator and student read zero StaffInvite rows", async () => {
+      const read = (tx: Tx) => tx.staffInvite.findMany({ where: { id: ids.invite } });
+      assert.equal((await asRole("teacher", ids.teacher, read)).length, 0);
+      // Coordinators map onto the teacher RLS role.
+      assert.equal((await asRole("teacher", ids.coordinator, read)).length, 0);
+      assert.equal((await asRole("student", ids.student, read)).length, 0);
+    });
+
+    it("a teacher cannot write a StaffInvite row", async () => {
+      await assert.rejects(
+        asRole("teacher", ids.teacher, (tx) =>
+          tx.staffInvite.createMany({
+            data: [
+              {
+                email: `blocked-${suffix}@example.test`,
+                role: "teacher",
+                invitedById: ids.teacher,
+                tokenHash: `hash-${suffix}-blocked`,
+                expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+              },
+            ],
+          }),
+        ),
+      );
+      assert.equal(await db.staffInvite.count({ where: { tokenHash: `hash-${suffix}-blocked` } }), 0);
+    });
+  });
 }
