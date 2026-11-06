@@ -108,6 +108,8 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
   "POST /api/admin/ai-config/test",
   "PUT /api/admin/ai-provider",
   "POST /api/admin/ai-provider/test",
+  "DELETE /api/admin/org-placement/region-instructors",
+  "POST /api/admin/org-placement/region-instructors",
   "PUT /api/admin/placement-bridge",
   "POST /api/admin/regions",
   "PATCH /api/admin/regions/[id]",
