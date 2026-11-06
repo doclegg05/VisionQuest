@@ -7,7 +7,14 @@
  * roles read as `teacher`, so every branch this prints is open to them at the
  * database layer, guarded only by the app layer. Review each one.
  *
- *   node scripts/rls-teacher-branches.mjs            # markdown table on stdout
+ *   node scripts/rls-teacher-branches.mjs                       # markdown table on stdout
+ *   node scripts/rls-teacher-branches.mjs --emit-write-blocks   # SQL for missing tree-reader write blocks
+ *
+ * The second form prints RESTRICTIVE INSERT/UPDATE/DELETE policies refusing
+ * tree readers on every table with a teacher write branch that has none yet,
+ * with an own-row carve-out where the table has an owner column. Paste its
+ * output into the migration that adds the branch;
+ * src/lib/rls-tree-reader-coverage.test.ts fails until you do.
  *
  * It replays every `CREATE POLICY` / `DROP POLICY` in
  * prisma/migrations/<folder>/migration.sql in folder order, keeps the latest
@@ -246,7 +253,87 @@ export function findUnscopedBranches(live) {
   return rows.sort((a, b) => `${a.table}${a.policy}${a.clause}`.localeCompare(`${b.table}${b.policy}${b.clause}`));
 }
 
-function loadMigrations(root) {
+const WRITE_COMMANDS = ["INSERT", "UPDATE", "DELETE"];
+
+/** True when a permissive policy can let the teacher RLS role write rows. */
+function admitsTeacherWrites(policy) {
+  if (policy.mode !== "permissive" || policy.command === "SELECT") return false;
+  const hasTeacher = (expr) => Boolean(expr) && new RegExp(TEACHER_CHECK.source, "i").test(expr);
+  return hasTeacher(policy.using) || hasTeacher(policy.withCheck);
+}
+
+/** Tables with any teacher write arm, scoped by managed_student_ids or not, sorted. */
+export function teacherWriteTables(live) {
+  const tables = new Set();
+  for (const policy of live.values()) {
+    if (admitsTeacherWrites(policy)) tables.add(policy.table);
+  }
+  return [...tables].sort();
+}
+
+/**
+ * Tables with a teacher write arm that lack a RESTRICTIVE tree-reader block
+ * for INSERT, UPDATE or DELETE. A block is a restrictive policy for that
+ * command whose expressions call is_tree_reader.
+ */
+export function missingTreeReaderWriteBlocks(live) {
+  const missing = [];
+  for (const table of teacherWriteTables(live)) {
+    for (const command of WRITE_COMMANDS) {
+      const blocked = [...live.values()].some(
+        (p) =>
+          p.table === table &&
+          p.mode === "restrictive" &&
+          (p.command === command || p.command === "ALL") &&
+          /is_tree_reader/.test(`${p.using ?? ""} ${p.withCheck ?? ""}`),
+      );
+      if (!blocked) missing.push(`${table}:${command}`);
+    }
+  }
+  return missing;
+}
+
+/** Columns that mark a row as the caller's own, where it is not `studentId`. */
+const OWNER_OVERRIDES = { Student: "id", SageMemory: "subjectId", SageOperation: "actorId" };
+
+/**
+ * The column whose value equals the caller's id on rows they own, read from
+ * the Prisma schema: an override, else `studentId` when the model has one,
+ * else null (no own-row carve-out).
+ */
+export function ownerColumnFor(table, schemaText) {
+  if (OWNER_OVERRIDES[table]) return OWNER_OVERRIDES[table];
+  const model = new RegExp(`^model ${table} \\{([\\s\\S]*?)^\\}`, "m").exec(schemaText);
+  return model && /^\s+studentId\s+String\b/m.test(model[1]) ? "studentId" : null;
+}
+
+const snake = (name) => name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
+/** SQL for the three RESTRICTIVE policies that stop tree readers writing `table`. */
+export function writeBlockSql(table, owner) {
+  const uid = "current_setting('app.current_user_id', true)";
+  const allowed = [
+    `NOT (SELECT visionquest.is_tree_reader(${uid}))`,
+    ...(owner ? [`"${owner}" = ${uid}`] : []),
+  ].join(" OR ");
+  const policy = (command, clauses) => {
+    const name = `${snake(table)}_tree_reader_no_${command.toLowerCase()}`;
+    return [
+      `DROP POLICY IF EXISTS "${name}" ON "visionquest"."${table}";`,
+      `CREATE POLICY "${name}" ON "visionquest"."${table}" AS RESTRICTIVE FOR ${command} TO vq_app`,
+      `  ${clauses};`,
+    ].join("\n");
+  };
+  return [
+    `-- ${table}${owner ? ` (own rows: "${owner}")` : " (no owner column)"}`,
+    policy("INSERT", `WITH CHECK (${allowed})`),
+    policy("UPDATE", `USING (${allowed})\n  WITH CHECK (${allowed})`),
+    policy("DELETE", `USING (${allowed})`),
+  ].join("\n");
+}
+
+/** Read every prisma/migrations/<folder>/migration.sql under `root`. */
+export function loadMigrations(root) {
   const dir = join(root, "prisma", "migrations");
   return readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && existsSync(join(dir, entry.name, "migration.sql")))
@@ -263,7 +350,18 @@ function toMarkdown(rows) {
   return `${lines.join("\n")}\n\n${rows.length} branches.\n`;
 }
 
+function emitWriteBlocks(root, live) {
+  const schema = readFileSync(join(root, "prisma", "schema.prisma"), "utf8");
+  const tables = [...new Set(missingTreeReaderWriteBlocks(live).map((entry) => entry.split(":")[0]))];
+  return `${tables.map((table) => writeBlockSql(table, ownerColumnFor(table, schema))).join("\n\n")}\n`;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
-  process.stdout.write(toMarkdown(findUnscopedBranches(replayMigrations(loadMigrations(root)))));
+  const live = replayMigrations(loadMigrations(root));
+  // --emit-write-blocks: print the RESTRICTIVE write-block SQL for every
+  // table that has a teacher write arm and no tree-reader block yet.
+  process.stdout.write(
+    process.argv.includes("--emit-write-blocks") ? emitWriteBlocks(root, live) : toMarkdown(findUnscopedBranches(live)),
+  );
 }

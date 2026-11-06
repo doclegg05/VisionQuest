@@ -3,12 +3,16 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   findUnscopedBranches,
+  missingTreeReaderWriteBlocks,
+  ownerColumnFor,
   parsePolicyStatement,
   replayMigrations,
   requiresManaged,
   splitStatements,
   stripComments,
   teacherArms,
+  teacherWriteTables,
+  writeBlockSql,
 } from "./rls-teacher-branches.mjs";
 
 const ROLE = "current_setting('app.current_role', true)";
@@ -97,5 +101,47 @@ describe("replayMigrations and findUnscopedBranches", () => {
     ]);
     const rows = findUnscopedBranches(live).map((r) => `${r.policy}:${r.clause}:${r.access}`);
     assert.deepEqual(rows, ["r:USING:read", "rw:USING:read/write", "rw:WITH CHECK:write"]);
+  });
+});
+
+describe("tree-reader write blocks", () => {
+  const teacherWrite = `CREATE POLICY "w" ON "visionquest"."T" FOR ALL TO vq_app USING (${ROLE} = 'teacher') WITH CHECK (${ROLE} = 'teacher');`;
+  const selectOnly = `CREATE POLICY "r" ON "visionquest"."R" FOR SELECT TO vq_app USING (${ROLE} = 'teacher');`;
+
+  it("lists tables with a permissive teacher write arm, scoped or not, and skips SELECT-only ones", () => {
+    const scoped = `CREATE POLICY "s" ON "visionquest"."S" FOR UPDATE TO vq_app USING (${ROLE} = 'teacher' AND "studentId" IN (SELECT ${MANAGED}));`;
+    const live = replayMigrations([{ folder: "a", sql: `${teacherWrite}\n${selectOnly}\n${scoped}` }]);
+    assert.deepEqual(teacherWriteTables(live), ["S", "T"]);
+  });
+
+  it("reports each write command until a restrictive is_tree_reader block covers it", () => {
+    const insertBlock = `CREATE POLICY "b" ON "visionquest"."T" AS RESTRICTIVE FOR INSERT TO vq_app WITH CHECK (NOT visionquest.is_tree_reader('x'));`;
+    const live = replayMigrations([{ folder: "a", sql: `${teacherWrite}\n${insertBlock}` }]);
+    assert.deepEqual(missingTreeReaderWriteBlocks(live), ["T:UPDATE", "T:DELETE"]);
+    const allBlock = `CREATE POLICY "c" ON "visionquest"."T" AS RESTRICTIVE FOR ALL TO vq_app USING (NOT visionquest.is_tree_reader('x'));`;
+    assert.deepEqual(missingTreeReaderWriteBlocks(replayMigrations([{ folder: "a", sql: `${teacherWrite}\n${allBlock}` }])), []);
+  });
+
+  it("does not count a permissive policy that mentions is_tree_reader as a block", () => {
+    const permissive = `CREATE POLICY "p" ON "visionquest"."T" FOR ALL TO vq_app USING (visionquest.is_tree_reader('x'));`;
+    const live = replayMigrations([{ folder: "a", sql: `${teacherWrite}\n${permissive}` }]);
+    assert.deepEqual(missingTreeReaderWriteBlocks(live), ["T:INSERT", "T:UPDATE", "T:DELETE"]);
+  });
+
+  it("emitted SQL parses back into blocks that close the gap, with the owner carve-out", () => {
+    const sql = writeBlockSql("StudentTask", "studentId");
+    assert.match(sql, /"student_task_tree_reader_no_insert"/);
+    assert.match(sql, /OR "studentId" = current_setting\('app\.current_user_id', true\)/);
+    const live = replayMigrations([{ folder: "a", sql: teacherWrite.replaceAll('"T"', '"StudentTask"') }, { folder: "b", sql }]);
+    assert.deepEqual(missingTreeReaderWriteBlocks(live), []);
+    assert.doesNotMatch(writeBlockSql("Employer", null), / OR "/);
+  });
+
+  it("picks the owner column from the schema", () => {
+    const schema = "model Goal {\n  id String\n  studentId String\n}\nmodel Employer {\n  id String\n}\n";
+    assert.equal(ownerColumnFor("Goal", schema), "studentId");
+    assert.equal(ownerColumnFor("Employer", schema), null);
+    assert.equal(ownerColumnFor("Student", schema), "id");
+    assert.equal(ownerColumnFor("SageOperation", schema), "actorId");
   });
 });
