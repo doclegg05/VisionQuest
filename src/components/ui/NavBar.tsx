@@ -44,6 +44,8 @@ export const STAFF_ITEMS: NavItem[] = [
 
 export const COORDINATOR_ITEMS: NavItem[] = [
   { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 },
+  // Owner decision, 2026-11-06: both coordinator roles may use Sage chat.
+  { href: "/coordinator/chat", label: "Sage", icon: ChatCircle, phase: 1 },
 ];
 
 /**
@@ -70,7 +72,8 @@ const ADMIN_ROSTER_ITEM: NavItem = STAFF_ITEMS[0];
 export const ADMIN_NAV_ITEMS: NavItem[] = [
   ...ADMIN_ITEMS,
   ADMIN_ROSTER_ITEM,
-  ...COORDINATOR_ITEMS,
+  // Admin keeps its own Sage (/admin/chat), so the coordinator copy is dropped.
+  ...COORDINATOR_ITEMS.filter((item) => item.href !== "/coordinator/chat"),
   ...STAFF_ITEMS.filter((item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library"),
 ].filter((item, index, all) => all.findIndex((other) => other.href === item.href) === index);
 
@@ -519,7 +522,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       </aside>
 
       {/* Floating Sage button + mini chat */}
-      {pathname !== "/chat" && pathname !== "/dashboard" && pathname !== "/teacher/chat" && pathname !== "/admin/chat" && (
+      {pathname !== "/chat" && pathname !== "/dashboard" && pathname !== "/teacher/chat" && pathname !== "/admin/chat" && pathname !== "/coordinator/chat" && (
         <>
           <button
             onClick={() => setSageMiniOpen((v) => !v)}

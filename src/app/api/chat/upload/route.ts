@@ -4,7 +4,8 @@ import { generateStorageKey, uploadFile, validateFile } from "@/lib/storage";
 import { validateUploadContent } from "@/lib/file-security";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
-import { ApiError, withAuth, badRequest, rateLimited } from "@/lib/api-error";
+import { ApiError, withAuth, badRequest, forbidden, rateLimited } from "@/lib/api-error";
+import { isCoordinatorRole } from "@/lib/org-roles";
 import { hasActiveConsent } from "@/lib/consent";
 import { rateLimit } from "@/lib/rate-limit";
 import { buildFileGist } from "@/lib/sage/file-gist";
@@ -21,6 +22,11 @@ import { safeUploadName } from "@/lib/upload-name";
  * by local text extraction. Either way the routing decision is AI-audited.
  */
 export const POST = withAuth(async (session, req: Request) => {
+  // Coordinators chat with Sage but hold no upload or attachment tool.
+  if (isCoordinatorRole(session.role)) {
+    throw forbidden("File uploads are not available on a coordinator account.");
+  }
+
   const rl = await rateLimit(`chat-upload:${session.id}`, 20, 60 * 60 * 1000);
   if (!rl.success) {
     throw rateLimited("Too many file uploads this hour. Please wait before uploading more.");

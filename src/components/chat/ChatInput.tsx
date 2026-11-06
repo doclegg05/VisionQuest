@@ -6,7 +6,7 @@ import { Command, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
 import { CommandPalette } from "./CommandPalette";
 import { useDemoAccount } from "@/components/demo/DemoAccountContext";
 import { DemoPrivacyNotice } from "@/components/demo/DemoPrivacyNotice";
-import { type ChatRole, type SlashCommand } from "@/lib/chat/commands";
+import { chatRoleCanAttachFiles, type ChatRole, type SlashCommand } from "@/lib/chat/commands";
 
 interface ChatInputProps {
   onSend: (message: string, attachmentIds?: string[]) => void;
@@ -18,6 +18,7 @@ interface ChatInputProps {
 }
 
 export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage }: ChatInputProps) {
+  const canAttachFiles = chatRoleCanAttachFiles(role);
   const [message, setMessage] = useState(initialMessage ?? "");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [serverCommands, setServerCommands] = useState<SlashCommand[] | undefined>();
@@ -294,7 +295,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
           />
 
           <div className={["flex items-center gap-2", compact ? "px-2 pb-2" : "px-3 pb-2.5"].join(" ")}>
-            <button
+            {canAttachFiles && <button
               onClick={handleFileButton}
               disabled={disabled || uploading}
               type="button"
@@ -308,7 +309,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
               aria-label="Upload file"
             >
               <Plus size={compact ? 17 : 19} weight="bold" />
-            </button>
+            </button>}
 
             <button
               onClick={handleCommandButton}

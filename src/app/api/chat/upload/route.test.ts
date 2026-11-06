@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
-import { mockStudentSession } from "@/lib/test-helpers";
+import type { Session } from "@/lib/api-error";
+import { mockStudentSession, mockTeacherSession } from "@/lib/test-helpers";
 
 /**
  * Same defense-in-depth as `/api/files`: handing Sage a file in chat writes
@@ -9,6 +10,7 @@ import { mockStudentSession } from "@/lib/test-helpers";
  */
 
 const student = mockStudentSession();
+let current: Session = student;
 const mockUploadFile = mock.fn(async () => undefined);
 
 const mockFileUploadCreate =
@@ -16,7 +18,7 @@ const mockFileUploadCreate =
 
 mock.module("@/lib/auth", {
   namedExports: {
-    getSession: async () => student,
+    getSession: async () => current,
   },
 });
 
@@ -88,6 +90,29 @@ function uploadRequest(filename: string) {
   form.set("file", new File(["%PDF-1.7\n"], filename, { type: "application/pdf" }));
   return new Request("http://localhost:3000/api/chat/upload", { method: "POST", body: form });
 }
+
+describe("POST /api/chat/upload — coordinators", () => {
+  beforeEach(() => {
+    mockUploadFile.mock.resetCalls();
+    mockFileUploadCreate.mock.resetCalls();
+  });
+
+  // Coordinators chat with Sage but hold no upload or attachment tool, so the
+  // upload write stays closed to them.
+  for (const role of ["coordinator", "program_coordinator"]) {
+    it(`refuses a ${role} before any write`, async () => {
+      current = mockTeacherSession({ id: `${role}-test-001`, role });
+      try {
+        const res = await route.POST(uploadRequest("notes.pdf") as never);
+        assert.equal(res.status, 403);
+      } finally {
+        current = student;
+      }
+      assert.equal(mockUploadFile.mock.callCount(), 0);
+      assert.equal(mockFileUploadCreate.mock.callCount(), 0);
+    });
+  }
+});
 
 describe("POST /api/chat/upload — persisted filename", () => {
   beforeEach(() => {

@@ -59,7 +59,7 @@ export function getCapabilitySummary(): Record<
   Role,
   { total: number; namespaces: ToolNamespace[] }
 > {
-  const roles: Role[] = ["student", "teacher", "admin"];
+  const roles: Role[] = ["student", "teacher", "admin", "coordinator", "program_coordinator"];
   const result = {} as Record<
     Role,
     { total: number; namespaces: ToolNamespace[] }

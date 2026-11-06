@@ -50,6 +50,12 @@ mock.module("@/lib/api-error", {
       e.name = "ApiError";
       return e;
     },
+    forbidden: (msg = "Forbidden") => {
+      const e = new Error(msg) as Error & { statusCode: number };
+      e.statusCode = 403;
+      e.name = "ApiError";
+      return e;
+    },
     withAuth:
       (handler: (s: Session, req: Request) => Promise<Response>) =>
       async (req: Request) => {
@@ -156,6 +162,19 @@ describe("POST /api/chat/tool-confirm", () => {
     assert.equal(mockClaimCreate.mock.callCount(), 0);
     assert.equal(mockExecuteAgentTool.mock.callCount(), 0);
   });
+
+  // Coordinators hold no write tools (coordinator-tool-roles.test.ts); the
+  // confirm route refuses them before verifying, claiming or executing, so a
+  // card minted for a coordinator session can never run.
+  for (const role of ["coordinator", "program_coordinator"]) {
+    it(`refuses a ${role} even with a validly signed card`, async () => {
+      session = mockTeacherSession({ id: `${role}-test-001`, role });
+      const res = await route.POST(confirmRequest(signedBody()));
+      assert.equal(res.status, 403);
+      assert.equal(mockClaimCreate.mock.callCount(), 0);
+      assert.equal(mockExecuteAgentTool.mock.callCount(), 0);
+    });
+  }
 
   it("executes a validly-confirmed tool call once", async () => {
     const res = await route.POST(confirmRequest(signedBody()));

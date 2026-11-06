@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import PageIntro from "@/components/ui/PageIntro";
 import CoordinatorDashboardClient from "@/components/coordinator/CoordinatorDashboardClient";
+import { AskSageLink } from "@/components/coordinator/AskSageLink";
 import { getSession } from "@/lib/auth";
 import { OrgPlacementSection } from "@/components/staff/OrgPlacementSection";
 import { StaffInvitePanel } from "@/components/staff/StaffInvitePanel";
@@ -25,6 +26,7 @@ export default async function CoordinatorDashboard() {
           eyebrow="Regional coordinator"
           title="Coordinator workspace"
           description="Regional oversight — rollups, grant progress, instructor metrics, funder-ready exports."
+          actions={<AskSageLink />}
         />
         <p className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-sm text-[var(--ink-muted)]">
           No regions are assigned to you yet. Ask an admin to add you to one via
@@ -43,6 +45,7 @@ export default async function CoordinatorDashboard() {
         eyebrow="Regional coordinator"
         title="Coordinator workspace"
         description="Regional rollups, grant progress, instructor metrics, and funder-ready exports."
+        actions={<AskSageLink />}
       />
       <CoordinatorDashboardClient regions={regions} />
       {session.role === "program_coordinator" && <OrgPlacementSection session={session} />}

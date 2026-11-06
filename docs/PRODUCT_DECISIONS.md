@@ -498,6 +498,7 @@ Decided during the build:
 - R18: Staff invite links are single-use links, valid for 14 days. The accept page does not fill in the email; the person types it. A link alone is not enough when the invite was emailed (R21): the person also needs a 6-digit code that VisionQuest emails to the invited address when they press "Send my code". The code works for 10 minutes, only its hash is stored, and 5 wrong codes lock the invite (R23). Only an admin can send a link-only invite, used when email is not set up or the send fails, and that link still works on its own. Phase 2 Microsoft sign-in will tie each invite to a work account.
 - R21: An emailed invite needs a 6-digit code, sent to the invite's email, before anyone can accept it. 5 wrong codes lock the invite, and asking for a new code does not reset the count. Only an admin can make a link-only invite.
 - R23: Each wrong code uses one of the invite's 5 tries, even when several guesses arrive at once, and the tries are counted before the code is checked.
+- Britt opened Sage chat to regional and program coordinators on 2026-11-06 and ruled that FERPA does not apply to coordinators and admins. AI routing by data sensitivity is unchanged.
 
 Before deploying, run `node scripts/org-tree-preflight.mjs` from the Terminal panel.
 It prints counts only: teachers, coordinators and classes that would land unplaced.

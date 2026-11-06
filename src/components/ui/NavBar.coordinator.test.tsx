@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+import { getVisibleNavItems, getVisibleSecondaryNavItems } from "@/lib/nav-items";
 import { ADMIN_NAV_ITEMS, COORDINATOR_ITEMS, staffPrimaryNavItemsFor } from "./NavBar";
 
 // The (teacher) layout admits only teacher and admin, so every /teacher/*
@@ -17,11 +18,25 @@ test("coordinator nav offers only routes the coordinator role can open", () => {
   }
 });
 
-test("coordinator nav is exactly the Coordinator entry", () => {
+// Owner decision, 2026-11-06: both coordinator roles may use Sage chat, so
+// the coordinator nav gains a Sage entry beside the workspace.
+test("coordinator nav is the Coordinator entry and Sage", () => {
   assert.deepEqual(
-    COORDINATOR_ITEMS.map((item) => item.href),
-    ["/coordinator"],
+    COORDINATOR_ITEMS.map((item) => `${item.href}|${item.label}`),
+    ["/coordinator|Coordinator", "/coordinator/chat|Sage"],
   );
+});
+
+test("students never see the coordinator Sage entry", () => {
+  for (const phase of [1, 2, 3] as const) {
+    for (const complete of [false, true]) {
+      const hrefs = [
+        ...getVisibleNavItems(phase, complete),
+        ...getVisibleSecondaryNavItems(phase, complete),
+      ].map((item) => item.href);
+      assert.ok(!hrefs.some((href) => href.startsWith("/coordinator")), `phase ${phase}`);
+    }
+  }
 });
 
 test("admin nav is unchanged by the coordinator list", () => {

@@ -2434,3 +2434,86 @@ describe("POST /api/chat/send — the new message reaches the model once", () =>
     assert.deepEqual(captured.messages, [...PRIOR_TURNS, { role: "user", content: NEW_MESSAGE }]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Owner decision, 2026-11-06: both coordinator roles chat with Sage. Their
+// turns take the coordinator_assistant stage and are treated like teacher
+// turns by the crisis layer: no request-time scan, no 988 block appended.
+// The gate itself (registry + RBAC) is pinned in
+// src/lib/registry/coordinator-chat-access.test.ts.
+// ---------------------------------------------------------------------------
+describe("POST /api/chat/send — coordinator roles", () => {
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_ENABLED = "false";
+    delete process.env.SAGE_AGENT_MODE;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  const CRISIS_MESSAGE = "A student told me they want to end it all. How should I respond?";
+
+  async function send(message: string): Promise<string> {
+    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
+    const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    assert.equal(res.status, 200);
+    return readSseBody(res);
+  }
+
+  for (const role of ["coordinator", "program_coordinator"]) {
+    it(`${role} gets the coordinator_assistant stage on a staff conversation`, async () => {
+      session = mockTeacherSession({ id: `${role}-test-001`, role });
+
+      const body = await send("Which forms does a new student sign?");
+
+      assert.match(body, /"done":true/);
+      assert.equal(mockBuildSystemPrompt.mock.calls[0].arguments[0], "coordinator_assistant");
+      assert.equal(mockBuildSystemPrompt.mock.calls[0].arguments[1].staffRole, role);
+      assert.equal(mockGetOrCreateTeacherConversation.mock.callCount(), 1);
+      assert.equal(mockGetOrCreateConversation.mock.callCount(), 0);
+    });
+
+    it(`${role} crisis wording is handled as for a teacher: no scan, no 988 block`, async () => {
+      session = mockTeacherSession({ id: `${role}-test-001`, role });
+
+      const body = await send(CRISIS_MESSAGE);
+
+      assert.doesNotMatch(body, /988/);
+      assert.equal(mockRecordWellbeingConcern.mock.callCount(), 0);
+      assert.ok(
+        mockRateLimit.mock.calls.every((call) => !String(call.arguments[0]).startsWith("crisis:")),
+        "coordinator chat must not touch the crisis record cap",
+      );
+    });
+  }
+
+  it("a teacher's crisis wording gets the same treatment (control)", async () => {
+    session = mockTeacherSession();
+
+    const body = await send(CRISIS_MESSAGE);
+
+    assert.doesNotMatch(body, /988/);
+    assert.equal(mockRecordWellbeingConcern.mock.callCount(), 0);
+  });
+
+  it("a student still gets the student stage, the scan, and the 988 block", async () => {
+    session = mockStudentSession();
+
+    const body = await send("I want to end it all.");
+
+    assert.notEqual(mockBuildSystemPrompt.mock.calls[0].arguments[0], "coordinator_assistant");
+    assert.equal(mockGetOrCreateConversation.mock.callCount(), 1);
+    assert.equal(mockGetOrCreateTeacherConversation.mock.callCount(), 0);
+    assert.equal(mockRecordWellbeingConcern.mock.callCount(), 1);
+    assert.match(body, /988/);
+  });
+});
