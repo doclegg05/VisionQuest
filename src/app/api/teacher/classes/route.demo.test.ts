@@ -54,7 +54,9 @@ mock.module("@/lib/db", {
     prisma: {
       spokesClass: { findMany: mockClassFindMany },
       student: { findMany: mockStudentFindMany },
+      regionInstructor: { findMany: async () => [] },
     },
+    prismaAdmin: {},
   },
 });
 

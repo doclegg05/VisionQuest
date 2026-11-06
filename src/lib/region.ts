@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma, prismaAdmin } from "@/lib/db";
 import { type Session } from "@/lib/api-error";
 import { seesWholeState } from "@/lib/org-roles";
 
@@ -85,5 +85,49 @@ export async function classIdsInRegion(
 export async function countUnregionedClasses(): Promise<number> {
   return prisma.spokesClass.count({
     where: { regionId: null, status: { not: "archived" } },
+  });
+}
+
+/**
+ * Region ids an instructor belongs to, from their own RegionInstructor rows.
+ * Reads through the RLS client: a teacher can read their own rows.
+ */
+export async function listInstructorRegionIds(instructorId: string): Promise<string[]> {
+  const rows = await prisma.regionInstructor.findMany({
+    where: { instructorId },
+    select: { regionId: true },
+  });
+  return rows.map((row) => row.regionId);
+}
+
+/**
+ * Active regions the session may create a classroom in: every active region
+ * for whole-state roles, the instructor's own active regions for everyone else.
+ */
+export async function listRegionsForClassCreation(session: Session): Promise<RegionSummary[]> {
+  if (seesWholeState(session.role)) return listRegionsForSession(session);
+  const rows = await prisma.regionInstructor.findMany({
+    where: { instructorId: session.id, region: { status: "active" } },
+    select: { region: { select: { id: true, name: true, code: true, status: true } } },
+    orderBy: { region: { name: "asc" } },
+  });
+  return rows.map((row) => row.region);
+}
+
+/**
+ * Counts how many of the given instructors belong to a region.
+ *
+ * Uses the admin client on purpose: an instructor can read only their own
+ * RegionInstructor rows, so the RLS client would hide every co-teacher and
+ * the check could never pass. The query returns a count only, scoped to the
+ * one region and id list the caller passes.
+ */
+export async function countInstructorsInRegion(
+  regionId: string,
+  instructorIds: string[],
+): Promise<number> {
+  if (instructorIds.length === 0) return 0;
+  return prismaAdmin.regionInstructor.count({
+    where: { regionId, instructorId: { in: instructorIds } },
   });
 }

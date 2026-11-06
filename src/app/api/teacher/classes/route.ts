@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { badRequest, conflict } from "@/lib/api-error";
+import { badRequest, conflict, forbidden, type Session } from "@/lib/api-error";
+import { parseBody, createClassSchema } from "@/lib/schemas";
+import { countInstructorsInRegion, listInstructorRegionIds, listRegionsForClassCreation } from "@/lib/region";
+import { seesWholeState } from "@/lib/org-roles";
 import { withRegistry } from "@/lib/registry/middleware";
 import {
   assertTeacherAssignmentLimit,
@@ -10,10 +13,9 @@ import {
 import { prisma } from "@/lib/db";
 import { isDemoInstructor } from "@/lib/demo/guards";
 import { logAuditEvent } from "@/lib/audit";
-import { isProgramType, type ProgramType } from "@/lib/program-type";
 
-function parseOptionalDate(value: unknown) {
-  if (typeof value !== "string" || !value.trim()) return null;
+function parseOptionalDate(value: string | null | undefined) {
+  if (!value?.trim()) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -81,7 +83,10 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
         orderBy: { displayName: "asc" },
       });
 
+  const regions = await listRegionsForClassCreation(session);
+
   return NextResponse.json({
+    regions,
     classes: classes.map((item) => ({
       ...item,
       instructors: item.instructors.map((entry) => entry.instructor),
@@ -92,48 +97,49 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
   });
 });
 
-export const POST = withRegistry("classes.create", async (session, req, _ctx, _tool) => {
-  const body = await req.json();
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  const code = normalizeClassCode(typeof body.code === "string" && body.code.trim() ? body.code : name);
-  const description = typeof body.description === "string" ? body.description.trim() : "";
-  const instructorIds = normalizeInstructorIds(
-    Array.isArray(body.instructorIds)
-      ? body.instructorIds.filter(
-        (value: unknown): value is string => typeof value === "string" && value.trim().length > 0,
-      )
-      : [],
-  );
-  const startDate = parseOptionalDate(body.startDate);
-  const endDate = parseOptionalDate(body.endDate);
-
-  let programType: ProgramType = "spokes";
-  if (body.programType !== undefined) {
-    if (typeof body.programType !== "string" || !isProgramType(body.programType)) {
-      throw badRequest(
-        "programType must be one of: spokes, adult_ed, ietp.",
+async function assertRegionAllowed(session: Session, regionId: string) {
+  if (!seesWholeState(session.role)) {
+    const ownRegionIds = await listInstructorRegionIds(session.id);
+    if (ownRegionIds.length === 0) {
+      throw forbidden(
+        "Ask your regional coordinator to add you to a region before creating a classroom.",
       );
     }
-    programType = body.programType;
-  }
-
-  let regionId: string | null = null;
-  if (body.regionId !== undefined && body.regionId !== null) {
-    if (typeof body.regionId !== "string" || !body.regionId.trim()) {
-      throw badRequest("regionId must be a non-empty string.");
+    if (!ownRegionIds.includes(regionId)) {
+      throw forbidden("You can only create classrooms in your own region.");
     }
-    const region = await prisma.region.findUnique({
-      where: { id: body.regionId },
-      select: { id: true, status: true },
-    });
-    if (!region) throw badRequest("regionId does not match any region.");
-    if (region.status !== "active") throw badRequest("Cannot assign a class to an archived region.");
-    regionId = region.id;
   }
+  const region = await prisma.region.findUnique({
+    where: { id: regionId },
+    select: { id: true, status: true },
+  });
+  if (!region) throw badRequest("That region does not exist.");
+  if (region.status !== "active") throw badRequest("Cannot assign a class to an archived region.");
+}
 
-  if (!name) {
-    throw badRequest("Class name is required.");
+async function assertCoTeachersInRegion(session: Session, regionId: string, instructorIds: string[]) {
+  if (!seesWholeState(session.role) && !instructorIds.includes(session.id)) {
+    throw badRequest("Add yourself as an instructor of this classroom.");
   }
+  const others = instructorIds.filter((id) => id !== session.id);
+  if (others.length === 0) return;
+  const inRegion = await countInstructorsInRegion(regionId, others);
+  if (inRegion !== others.length) throw badRequest("Co-teachers must be in the same region.");
+}
+
+export const POST = withRegistry("classes.create", async (session, req, _ctx, _tool) => {
+  const input = await parseBody(req, createClassSchema);
+  const name = input.name;
+  const code = normalizeClassCode(input.code?.trim() ? input.code : name);
+  const description = input.description?.trim() ?? "";
+  const instructorIds = normalizeInstructorIds(input.instructorIds);
+  const startDate = parseOptionalDate(input.startDate);
+  const endDate = parseOptionalDate(input.endDate);
+  const { programType, regionId } = input;
+
+  await assertRegionAllowed(session, regionId);
+  await assertCoTeachersInRegion(session, regionId, instructorIds);
+
   if (!code) {
     throw badRequest("A class code is required.");
   }

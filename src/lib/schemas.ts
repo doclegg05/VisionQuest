@@ -28,6 +28,31 @@ export async function parseBody<T extends z.ZodTypeAny>(
   return result.data;
 }
 
+// ─── Class Schemas ──────────────────────────────────────────────────────────
+
+const optionalIsoDate = z
+  .string()
+  .trim()
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), "Enter a valid date.")
+  .optional()
+  .nullable()
+  .or(z.literal(""));
+
+export const createClassSchema = z.object({
+  name: z.string().trim().min(1, "Class name is required.").max(120, "Class name must be 120 characters or fewer."),
+  code: z.string().optional(),
+  description: z.string().optional(),
+  instructorIds: z
+    .array(z.string().cuid("One or more selected instructors are invalid."))
+    .min(1, "Pick at least one instructor."),
+  startDate: optionalIsoDate,
+  endDate: optionalIsoDate,
+  programType: z
+    .enum(["spokes", "adult_ed", "ietp"], { message: "programType must be one of: spokes, adult_ed, ietp." })
+    .default("spokes"),
+  regionId: z.string({ message: "Pick a region for this classroom." }).cuid("Pick a region for this classroom."),
+});
+
 // ─── Auth Schemas ───────────────────────────────────────────────────────────
 
 export const loginSchema = z.object({
