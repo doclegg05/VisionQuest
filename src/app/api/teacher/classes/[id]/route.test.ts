@@ -16,6 +16,11 @@ const instructorFindMany = mock.fn() as any;
 const regionInstructorFindMany = mock.fn() as any;
 const regionFindUnique = mock.fn() as any;
 const auditCreate = mock.fn() as any;
+/** RegionInstructor rows the co-teacher check can see, as `${regionId}:${instructorId}`. */
+let regionMembers: Set<string>;
+const regionInstructorCount = mock.fn(async (args: any) =>
+  (args.where.instructorId.in as string[]).filter((id) => regionMembers.has(`${args.where.regionId}:${id}`)).length,
+) as any;
 
 const tx = {
   spokesClass: { update: classUpdate },
@@ -34,10 +39,11 @@ before(async () => {
         spokesClassInstructor: { findMany: instructorFindMany },
         regionInstructor: { findMany: regionInstructorFindMany },
         region: { findUnique: regionFindUnique },
-        student: { count: async () => 0 },
+        // Every id the route asks about is a teacher.
+        student: { count: async (args: any) => (args?.where?.id?.in ?? []).length },
         $transaction: async (work: (client: typeof tx) => Promise<unknown>) => work(tx),
       },
-      prismaAdmin: { auditLog: { create: auditCreate } },
+      prismaAdmin: { auditLog: { create: auditCreate }, regionInstructor: { count: regionInstructorCount } },
     },
   });
   ({ PATCH } = await import("./route"));
@@ -57,11 +63,14 @@ beforeEach(() => {
     fn.mock.resetCalls();
   }
   session = { id: "cteacher000000000000001", studentId: "t", displayName: "T", role: "teacher" };
+  regionMembers = new Set([`${REGION_A}:cteacher000000000000001`, `${REGION_A}:cteacher000000000000002`]);
+  regionInstructorCount.mock.resetCalls();
   classFindUnique.mock.mockImplementation(async () => ({
     id: CLASS_ID,
     name: "Morning",
     code: "morning",
     status: "active",
+    regionId: REGION_A,
     instructors: [{ instructorId: "cteacher000000000000001" }],
   }));
   // assertStaffCanManageClass finds the class; the duplicate-code lookup finds none.
@@ -114,5 +123,37 @@ describe("PATCH /api/teacher/classes/[id] regionId", () => {
     const res = await patch({ regionId: 12 });
     assert.equal(res.status, 400);
     assert.equal(classUpdate.mock.callCount(), 0);
+  });
+});
+
+describe("PATCH /api/teacher/classes/[id] instructorIds", () => {
+  const SELF = "cteacher000000000000001";
+  const SAME_REGION = "cteacher000000000000002";
+  const OTHER_REGION = "cteacher000000000000003";
+
+  it("refuses an instructor adding a co-teacher from another region, with 400 and no update", async () => {
+    const res = await patch({ instructorIds: [SELF, OTHER_REGION] });
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error, "Co-teachers must be in the same region.");
+    assert.equal(classUpdate.mock.callCount(), 0);
+  });
+
+  it("lets an instructor add a co-teacher from the class's region", async () => {
+    const res = await patch({ instructorIds: [SELF, SAME_REGION] });
+    assert.equal(res.status, 200);
+  });
+
+  it("checks co-teachers against the region the class is moving to", async () => {
+    regionMembers.add(`${REGION_B}:${SELF}`);
+    regionInstructorFindMany.mock.mockImplementation(async () => [{ regionId: REGION_A }, { regionId: REGION_B }]);
+    const res = await patch({ regionId: REGION_B, instructorIds: [SELF, SAME_REGION] });
+    assert.equal(res.status, 400);
+    assert.equal(classUpdate.mock.callCount(), 0);
+  });
+
+  it("leaves a whole-state caller free to assign any instructor", async () => {
+    session = { id: "cadmin0000000000000001", studentId: "a", displayName: "A", role: "admin" };
+    const res = await patch({ instructorIds: [OTHER_REGION] });
+    assert.equal(res.status, 200);
   });
 });

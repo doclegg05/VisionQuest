@@ -175,6 +175,8 @@ describe("teacher class update authorization", () => {
   });
 
   it("lets a teacher keep the class in a region they are in", async () => {
+    // The class's other instructor, teacher-1, is in region A too.
+    mockRegionInstructorCount.mock.mockImplementation(async () => 1);
     const { res } = await patchRegion(REGION_A);
     assert.equal(res.status, 200);
     assert.equal(mockTransaction.mock.callCount(), 1);
