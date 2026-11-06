@@ -852,6 +852,32 @@ describe("buildSystemPrompt — stage-gated knowledge injection", () => {
       assert.match(prompt, /regional coordinators and program coordinators/i);
       assert.match(prompt, /never change, create, or delete a student record/i);
     });
+    it(`coordinator_assistant (${tier}) allows names and open-item counts, never student record content`, () => {
+      for (const staffRole of ["coordinator", "program_coordinator"]) {
+        const prompt = buildSystemPrompt("coordinator_assistant", { staffRole }, tier);
+        assert.match(prompt, /You may name a student and give their open-item count/);
+        assert.match(
+          prompt,
+          /Never share what an item is about, alert or crisis details, chat content, uploads, or any other student record content/,
+        );
+        assert.ok(!prompt.includes("Never share individual student-level data"));
+        assert.ok(!prompt.includes("Only reason from aggregate/regional data"));
+        assert.ok(!prompt.includes("you work at the regional/aggregate level only"));
+      }
+    });
+
+    it(`coordinator_assistant (${tier}) fills the scope line before the staff name goes in`, () => {
+      const prompt = buildSystemPrompt(
+        "coordinator_assistant",
+        { staffRole: "program_coordinator", studentName: "Pat {coordinator_scope} {pathway_context} Program" },
+        tier,
+      );
+      // The name keeps its literal text; the real placeholder in the prompt body is filled.
+      assert.match(prompt, /\[STUDENT_NAME_START\]Pat \{coordinator_scope\} \{pathway_context\} Program\[STUDENT_NAME_END\]/);
+      assert.match(prompt, /This coordinator is a program coordinator\. Their scope is the whole state/);
+      const body = prompt.slice(prompt.indexOf("[STUDENT_NAME_END]"));
+      assert.ok(!body.includes("{coordinator_scope}"));
+    });
   }
 
   it("coordinator_assistant gives a program coordinator the program coordinator platform map", () => {

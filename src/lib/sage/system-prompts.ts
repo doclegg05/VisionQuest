@@ -668,16 +668,9 @@ function buildSystemPromptSections(
       ? COMPACT_STAGE_PROMPTS[stage]
       : STAGE_PROMPTS[stage];
 
-  // Inject context variables
-  if (context.studentName) {
-    // Bracket studentName to mitigate prompt injection via displayName.
-    // sanitizeForPrompt strips fake delimiters so students cannot escape the bracket.
-    const nameLabel =
-      stage === "teacher_assistant" || stage === "admin_assistant" || stage === "coordinator_assistant"
-        ? "The staff user's name is"
-        : "The student's name is";
-    stagePrompt = `${nameLabel} [STUDENT_NAME_START]${sanitizeForPrompt(context.studentName)}[STUDENT_NAME_END].\n\n${stagePrompt}`;
-  }
+  // Fill the system placeholders before any user-supplied text joins the
+  // prompt, so a display name that contains placeholder text cannot capture
+  // the substitution (String.replace fills only the first match).
   // Substitute {pathway_context} with program-appropriate framing
   stagePrompt = stagePrompt.replace("{pathway_context}", PATHWAY_CONTEXTS[programType]);
   stagePrompt = stagePrompt.replace(COORDINATOR_SCOPE_PLACEHOLDER, coordinatorScopeLine(context.staffRole));
@@ -710,6 +703,17 @@ function buildSystemPromptSections(
       "{career_profile_context}",
       `[CAREER_PROFILE_START]\n${context.career_profile_context}\n[CAREER_PROFILE_END]`,
     );
+  }
+
+  // The name goes in last, after every placeholder above is filled.
+  if (context.studentName) {
+    // Bracket studentName to mitigate prompt injection via displayName.
+    // sanitizeForPrompt strips fake delimiters so students cannot escape the bracket.
+    const nameLabel =
+      stage === "teacher_assistant" || stage === "admin_assistant" || stage === "coordinator_assistant"
+        ? "The staff user's name is"
+        : "The student's name is";
+    stagePrompt = `${nameLabel} [STUDENT_NAME_START]${sanitizeForPrompt(context.studentName)}[STUDENT_NAME_END].\n\n${stagePrompt}`;
   }
 
   // Teacher, admin, and coordinator assistants get a streamlined prompt stack —
