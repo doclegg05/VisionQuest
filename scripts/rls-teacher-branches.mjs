@@ -274,8 +274,20 @@ export function teacherWriteTables(live) {
 /**
  * Tables with a teacher write arm that lack a RESTRICTIVE tree-reader block
  * for INSERT, UPDATE or DELETE. A block is a restrictive policy for that
- * command whose expressions call is_tree_reader.
+ * command whose every clause starts with the tree-reader refusal.
  */
+/**
+ * The predicate `writeBlockSql` emits. A clause that merely mentions
+ * is_tree_reader (`is_tree_reader(x) OR true`) refuses nobody, so every clause
+ * the policy has must start with this.
+ */
+const TREE_READER_REFUSAL = /^NOT \(SELECT visionquest\.is_tree_reader\(/;
+
+function refusesTreeReaders(policy) {
+  const clauses = [policy.using, policy.withCheck].filter((clause) => clause != null);
+  return clauses.length > 0 && clauses.every((clause) => TREE_READER_REFUSAL.test(clause.trim()));
+}
+
 export function missingTreeReaderWriteBlocks(live) {
   const missing = [];
   for (const table of teacherWriteTables(live)) {
@@ -285,7 +297,7 @@ export function missingTreeReaderWriteBlocks(live) {
           p.table === table &&
           p.mode === "restrictive" &&
           (p.command === command || p.command === "ALL") &&
-          /is_tree_reader/.test(`${p.using ?? ""} ${p.withCheck ?? ""}`),
+          refusesTreeReaders(p),
       );
       if (!blocked) missing.push(`${table}:${command}`);
     }

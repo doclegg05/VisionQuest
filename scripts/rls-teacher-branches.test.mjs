@@ -107,6 +107,8 @@ describe("replayMigrations and findUnscopedBranches", () => {
 describe("tree-reader write blocks", () => {
   const teacherWrite = `CREATE POLICY "w" ON "visionquest"."T" FOR ALL TO vq_app USING (${ROLE} = 'teacher') WITH CHECK (${ROLE} = 'teacher');`;
   const selectOnly = `CREATE POLICY "r" ON "visionquest"."R" FOR SELECT TO vq_app USING (${ROLE} = 'teacher');`;
+  // The predicate writeBlockSql emits; a block must start every clause with it.
+  const REFUSE = `NOT (SELECT visionquest.is_tree_reader('x'))`;
 
   it("lists tables with a permissive teacher write arm, scoped or not, and skips SELECT-only ones", () => {
     const scoped = `CREATE POLICY "s" ON "visionquest"."S" FOR UPDATE TO vq_app USING (${ROLE} = 'teacher' AND "studentId" IN (SELECT ${MANAGED}));`;
@@ -115,11 +117,24 @@ describe("tree-reader write blocks", () => {
   });
 
   it("reports each write command until a restrictive is_tree_reader block covers it", () => {
-    const insertBlock = `CREATE POLICY "b" ON "visionquest"."T" AS RESTRICTIVE FOR INSERT TO vq_app WITH CHECK (NOT visionquest.is_tree_reader('x'));`;
+    const insertBlock = `CREATE POLICY "b" ON "visionquest"."T" AS RESTRICTIVE FOR INSERT TO vq_app WITH CHECK (${REFUSE});`;
     const live = replayMigrations([{ folder: "a", sql: `${teacherWrite}\n${insertBlock}` }]);
     assert.deepEqual(missingTreeReaderWriteBlocks(live), ["T:UPDATE", "T:DELETE"]);
-    const allBlock = `CREATE POLICY "c" ON "visionquest"."T" AS RESTRICTIVE FOR ALL TO vq_app USING (NOT visionquest.is_tree_reader('x'));`;
+    const allBlock = `CREATE POLICY "c" ON "visionquest"."T" AS RESTRICTIVE FOR ALL TO vq_app USING (${REFUSE});`;
     assert.deepEqual(missingTreeReaderWriteBlocks(replayMigrations([{ folder: "a", sql: `${teacherWrite}\n${allBlock}` }])), []);
+  });
+
+  it("does not count a restrictive policy that only mentions is_tree_reader as a block", () => {
+    const loose = [
+      `USING (visionquest.is_tree_reader('x') OR true)`,
+      `USING (true OR ${REFUSE})`,
+      `USING (${REFUSE}) WITH CHECK (true)`,
+    ];
+    for (const clauses of loose) {
+      const block = `CREATE POLICY "l" ON "visionquest"."T" AS RESTRICTIVE FOR ALL TO vq_app ${clauses};`;
+      const live = replayMigrations([{ folder: "a", sql: `${teacherWrite}\n${block}` }]);
+      assert.deepEqual(missingTreeReaderWriteBlocks(live), ["T:INSERT", "T:UPDATE", "T:DELETE"], clauses);
+    }
   });
 
   it("does not count a permissive policy that mentions is_tree_reader as a block", () => {
