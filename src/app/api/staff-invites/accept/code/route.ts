@@ -3,7 +3,7 @@ import { z } from "zod";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { requestStaffInviteCode } from "@/lib/staff-invite-email";
-import { limitInviteAttempts } from "@/lib/staff-invite-http";
+import { limitInviteAttemptsByIp, limitInviteAttemptsByToken } from "@/lib/staff-invite-http";
 
 const requestCodeSchema = z.object({ token: z.string().min(1).max(128) });
 
@@ -13,10 +13,12 @@ const requestCodeSchema = z.object({ token: z.string().min(1).max(128) });
  * emailed, so the route reveals nothing about invites. Limited like accept.
  */
 export const POST = withErrorHandler(async (req: Request) => {
-  const limited = await limitInviteAttempts(req, "staff-invite-code");
-  if (limited) return limited;
+  const limitedByIp = await limitInviteAttemptsByIp(req, "staff-invite-code");
+  if (limitedByIp) return limitedByIp;
 
   const { token } = await parseBody(req, requestCodeSchema);
+  const limitedByInvite = await limitInviteAttemptsByToken("staff-invite-code", token);
+  if (limitedByInvite) return limitedByInvite;
   await requestStaffInviteCode(token);
   return NextResponse.json({ success: true, data: { sent: true } });
 });

@@ -4,21 +4,23 @@ import { setSessionCookie } from "@/lib/auth";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { getRoleHomePath } from "@/lib/role-home";
-import { limitInviteAttempts, withInviteRefusals } from "@/lib/staff-invite-http";
+import { limitInviteAttemptsByIp, limitInviteAttemptsByToken, withInviteRefusals } from "@/lib/staff-invite-http";
 import { acceptStaffInvite, acceptStaffInviteSchema } from "@/lib/staff-invites";
 
 /**
  * Unauthenticated: the person has no account yet. The token is 256 bits of
  * randomness; an emailed invite also needs the 6-digit email code (Ruling
- * R21), so the limiters bound code guessing: 5 per IP and 20 route-wide per
- * 15 minutes, as `register-teacher` does. The proxy's Origin check covers this
+ * R21). Limits: 5 per IP before the body is read, then 20 per invite, per 15
+ * minutes; code guessing is capped per invite. The proxy's Origin check covers this
  * path; it is not a public exception.
  */
 export const POST = withErrorHandler(async (req: Request) => {
-  const limited = await limitInviteAttempts(req, "staff-invite-accept");
-  if (limited) return limited;
+  const limitedByIp = await limitInviteAttemptsByIp(req, "staff-invite-accept");
+  if (limitedByIp) return limitedByIp;
 
   const body = await parseBody(req, acceptStaffInviteSchema);
+  const limitedByInvite = await limitInviteAttemptsByToken("staff-invite-accept", body.token);
+  if (limitedByInvite) return limitedByInvite;
 
   return withInviteRefusals(async () => {
     const { staffId } = await acceptStaffInvite(body);
