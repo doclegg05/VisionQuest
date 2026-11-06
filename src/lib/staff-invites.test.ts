@@ -353,6 +353,22 @@ describe("acceptStaffInvite", () => {
     assert.equal(fake.state.regionInstructor.rows.length, 0);
   });
 
+  it("answers account_exists, not a database error, when another accept for the email commits first", async () => {
+    const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
+    // A second invite to the same email is accepted between this accept's
+    // email check and its insert, so the insert hits the unique email index.
+    fake.beforeCreate((table) => {
+      if (table === "student") {
+        fake.beforeCreate(() => undefined);
+        seedRow("student", { id: "racer-1", studentId: "pat.racer", email: "pat@example.org", role: "teacher" });
+      }
+    });
+
+    assert.equal(await refusal(accept(invite.token)), "account_exists");
+    assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
+    assert.equal(fake.state.regionInstructor.rows.length, 0);
+  });
+
   it("finds an existing account whose stored email differs only in casing", async () => {
     seedRow("student", { id: "existing-1", studentId: "pat.existing", email: "Pat@Example.ORG", role: "teacher" });
     const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });

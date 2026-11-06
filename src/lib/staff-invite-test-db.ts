@@ -131,7 +131,10 @@ export function createFakeDb() {
       const value = candidate[key];
       if (value === null || value === undefined) continue;
       const clash = table.rows.some((row, index) => index !== selfIndex && row[key] === value);
-      if (clash) throw Object.assign(new Error(`Unique constraint failed on ${key}`), { code: "P2002" });
+      // Prisma reports the clashing fields in meta.target.
+      if (clash) {
+        throw Object.assign(new Error(`Unique constraint failed on ${key}`), { code: "P2002", meta: { target: [key] } });
+      }
     }
   }
 

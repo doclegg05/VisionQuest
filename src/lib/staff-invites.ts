@@ -370,6 +370,15 @@ function isForeignKeyFailure(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2003";
 }
 
+/** A unique-index clash on `field`; Prisma names the clashing fields in `meta.target`. */
+function isUniqueFailureOn(error: unknown, field: string): boolean {
+  if (typeof error !== "object" || error === null || !("code" in error) || error.code !== "P2002") return false;
+  const target = "meta" in error && typeof error.meta === "object" && error.meta !== null && "target" in error.meta
+    ? error.meta.target
+    : null;
+  return Array.isArray(target) ? target.includes(field) : typeof target === "string" && target.includes(field);
+}
+
 async function claimAndCreate(
   input: z.infer<typeof acceptStaffInviteSchema>,
   passwordHash: string,
@@ -393,6 +402,9 @@ async function claimAndCreate(
   } catch (error) {
     // The region went away between the check and the insert.
     if (isForeignKeyFailure(error)) throw new StaffInviteRefused("invalid");
+    // Another invite to the same email was accepted between the email check
+    // and the insert; the transaction rolled back, so this invite stays usable.
+    if (isUniqueFailureOn(error, "email")) throw new StaffInviteRefused("account_exists");
     throw error;
   }
 }
