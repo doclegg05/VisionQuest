@@ -208,6 +208,21 @@ const REGION_A = "cmregionaaaaaaaaaaaaaaaaa";
 const REGION_B = "cmregionbbbbbbbbbbbbbbbbb";
 const PASSWORD = "a long enough password";
 
+const INVITERS: readonly Session[] = [admin, programCoordinator, regionalCoordinator, teacher];
+const INVITER_IDS = new Set(INVITERS.map((inviter) => inviter.id));
+
+/** Student rows other than the inviters every case seeds: the accounts a case made or seeded itself. */
+function accountRows(): Row[] {
+  return state.student.rows.filter((row) => !INVITER_IDS.has(String(row.id)));
+}
+
+function setStudent(id: string, patch: Row): void {
+  state.student = {
+    ...state.student,
+    rows: state.student.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+  };
+}
+
 function seedRow(name: TableName, row: Row): void {
   state[name] = { ...state[name], rows: [...state[name].rows, row] };
 }
@@ -245,6 +260,10 @@ beforeEach(() => {
   seedRow("region", { id: REGION_A, status: "active" });
   seedRow("region", { id: REGION_B, status: "active" });
   seedRow("regionCoordinator", { regionId: REGION_A, coordinatorId: regionalCoordinator.id });
+  // Accepting re-checks the inviter (I4), so every inviter has a live account.
+  for (const inviter of INVITERS) {
+    seedRow("student", { id: inviter.id, studentId: inviter.studentId, email: null, role: inviter.role, isActive: true });
+  }
 });
 
 describe("createStaffInvite", () => {
@@ -324,6 +343,53 @@ describe("createStaffInvite", () => {
 });
 
 describe("acceptStaffInvite", () => {
+  async function teacherInviteFromCoordinator() {
+    return lib.createStaffInvite(regionalCoordinator, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
+  }
+
+  async function assertRefusedAndUntouched(token: string, inviteId: string): Promise<void> {
+    assert.equal(await refusal(accept(token)), "inviter_no_longer_allowed");
+    assert.equal(accountRows().length, 0);
+    assert.equal(state.regionInstructor.rows.length, 0);
+    assert.equal(inviteRow(inviteId).acceptedAt, null);
+  }
+
+  it("refuses an invite whose inviter was deactivated", async () => {
+    const invite = await teacherInviteFromCoordinator();
+    setStudent(regionalCoordinator.id, { isActive: false });
+    await assertRefusedAndUntouched(invite.token, invite.inviteId);
+  });
+
+  it("refuses an invite whose inviter account is gone", async () => {
+    const invite = await teacherInviteFromCoordinator();
+    state.student = { ...state.student, rows: state.student.rows.filter((r) => r.id !== regionalCoordinator.id) };
+    await assertRefusedAndUntouched(invite.token, invite.inviteId);
+  });
+
+  it("refuses an invite whose inviter may no longer invite that role", async () => {
+    const invite = await lib.createStaffInvite(programCoordinator, {
+      email: "pat@example.org",
+      role: "coordinator",
+      regionId: REGION_B,
+    });
+    setStudent(programCoordinator.id, { role: "coordinator" });
+    assert.equal(await refusal(accept(invite.token)), "inviter_no_longer_allowed");
+    assert.equal(accountRows().length, 0);
+    assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
+  });
+
+  it("refuses a coordinator-sent invite once the coordinator left the invite's region", async () => {
+    const invite = await teacherInviteFromCoordinator();
+    state.regionCoordinator = { ...state.regionCoordinator, rows: [] };
+    await assertRefusedAndUntouched(invite.token, invite.inviteId);
+  });
+
+  it("still accepts while the coordinator coordinates the region", async () => {
+    const invite = await teacherInviteFromCoordinator();
+    await accept(invite.token);
+    assert.equal(accountRows().length, 1);
+  });
+
   it("creates one teacher account with a normalized email and a RegionInstructor row", async () => {
     const invite = await lib.createStaffInvite(regionalCoordinator, {
       email: "pat@example.org",
@@ -332,8 +398,8 @@ describe("acceptStaffInvite", () => {
     });
     const { staffId } = await accept(invite.token);
 
-    assert.equal(state.student.rows.length, 1);
-    const account = state.student.rows[0];
+    assert.equal(accountRows().length, 1);
+    const account = accountRows()[0];
     assert.equal(account.id, staffId);
     assert.equal(account.role, "teacher");
     assert.equal(account.email, "pat@example.org");
@@ -362,7 +428,7 @@ describe("acceptStaffInvite", () => {
     });
     const { staffId } = await accept(invite.token, "rc@example.org");
 
-    const account = state.student.rows.find((r) => r.id === staffId);
+    const account = accountRows().find((r) => r.id === staffId);
     assert.equal(account?.role, "coordinator");
     assert.ok(state.regionCoordinator.rows.some((r) => r.regionId === REGION_B && r.coordinatorId === staffId));
     assert.equal(state.regionInstructor.rows.length, 0);
@@ -372,7 +438,7 @@ describe("acceptStaffInvite", () => {
     const invite = await lib.createStaffInvite(admin, { email: "pc@example.org", role: "program_coordinator" });
     const { staffId } = await accept(invite.token, "pc@example.org");
 
-    assert.equal(state.student.rows.find((r) => r.id === staffId)?.role, "program_coordinator");
+    assert.equal(accountRows().find((r) => r.id === staffId)?.role, "program_coordinator");
     assert.equal(state.regionInstructor.rows.length, 0);
     assert.equal(state.regionCoordinator.rows.length, 1, "only the seeded coordinator row");
   });
@@ -380,28 +446,28 @@ describe("acceptStaffInvite", () => {
   it("ignores email casing", async () => {
     const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
     const { staffId } = await accept(invite.token, "Pat@Example.org");
-    assert.equal(state.student.rows.find((r) => r.id === staffId)?.email, "pat@example.org");
+    assert.equal(accountRows().find((r) => r.id === staffId)?.email, "pat@example.org");
   });
 
   it("refuses a second accept as used", async () => {
     const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
     await accept(invite.token);
     assert.equal(await refusal(accept(invite.token)), "used");
-    assert.equal(state.student.rows.length, 1);
+    assert.equal(accountRows().length, 1);
   });
 
   it("refuses an invite after expiresAt as expired", async () => {
     const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
     setInvite(invite.inviteId, { expiresAt: new Date(Date.now() - 1000) });
     assert.equal(await refusal(accept(invite.token)), "expired");
-    assert.equal(state.student.rows.length, 0);
+    assert.equal(accountRows().length, 0);
   });
 
   it("refuses a revoked invite as revoked", async () => {
     const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
     await lib.revokeStaffInvite(admin, invite.inviteId);
     assert.equal(await refusal(accept(invite.token)), "revoked");
-    assert.equal(state.student.rows.length, 0);
+    assert.equal(accountRows().length, 0);
   });
 
   it("refuses an unknown token as invalid", async () => {
@@ -418,7 +484,7 @@ describe("acceptStaffInvite", () => {
     assert.equal(rejected.length, 1);
     assert.ok(rejected[0].reason instanceof lib.StaffInviteRefused);
     assert.equal(rejected[0].reason.reason, "used");
-    assert.equal(state.student.rows.length, 1);
+    assert.equal(accountRows().length, 1);
     assert.equal(state.regionInstructor.rows.length, 1);
   });
 
@@ -426,10 +492,10 @@ describe("acceptStaffInvite", () => {
     const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
     assert.equal(await refusal(accept(invite.token, "someone@example.org")), "email_mismatch");
     assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
-    assert.equal(state.student.rows.length, 0);
+    assert.equal(accountRows().length, 0);
 
     await accept(invite.token);
-    assert.equal(state.student.rows.length, 1);
+    assert.equal(accountRows().length, 1);
   });
 
   it("refuses an invite whose email already has an account, and leaves the invite unaccepted", async () => {
@@ -438,7 +504,7 @@ describe("acceptStaffInvite", () => {
 
     assert.equal(await refusal(accept(invite.token)), "email_mismatch");
     assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
-    assert.equal(state.student.rows.length, 1);
+    assert.equal(accountRows().length, 1);
     assert.equal(state.regionInstructor.rows.length, 0);
   });
 
@@ -447,7 +513,7 @@ describe("acceptStaffInvite", () => {
     seedRow("student", { id: "existing-2", studentId: "pat-2", email: null, role: "student" });
     const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
     const { staffId } = await accept(invite.token);
-    assert.equal(state.student.rows.find((r) => r.id === staffId)?.studentId, "pat-3");
+    assert.equal(accountRows().find((r) => r.id === staffId)?.studentId, "pat-3");
   });
 
   it("enforces the staff registration password rules and creates nothing on a short one", async () => {
@@ -458,7 +524,7 @@ describe("acceptStaffInvite", () => {
     await assert.rejects(
       lib.acceptStaffInvite({ token: invite.token, email: "pat@example.org", displayName: "Pat", password: "x".repeat(129) }),
     );
-    assert.equal(state.student.rows.length, 0);
+    assert.equal(accountRows().length, 0);
     assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
   });
 });

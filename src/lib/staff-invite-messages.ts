@@ -14,6 +14,7 @@ export const STAFF_INVITE_MESSAGES: Record<StaffInviteError, string> = {
   not_allowed: "You cannot invite people to that role.",
   region_not_allowed: "You can invite people only to your own region.",
   region_required: "Choose a region for this person.",
+  inviter_no_longer_allowed: "This invite is no longer valid. Ask for a new one.",
 };
 
 const STAFF_INVITE_STATUSES: Record<StaffInviteError, number> = {
@@ -25,6 +26,7 @@ const STAFF_INVITE_STATUSES: Record<StaffInviteError, number> = {
   not_allowed: 403,
   region_not_allowed: 403,
   region_required: 400,
+  inviter_no_longer_allowed: 410,
 };
 
 export const STAFF_INVITE_REASONS = Object.keys(STAFF_INVITE_MESSAGES) as StaffInviteError[];

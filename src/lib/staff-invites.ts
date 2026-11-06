@@ -32,7 +32,8 @@ export type StaffInviteError =
   | "email_mismatch"
   | "not_allowed"
   | "region_not_allowed"
-  | "region_required";
+  | "region_required"
+  | "inviter_no_longer_allowed";
 
 export class StaffInviteRefused extends Error {
   constructor(readonly reason: StaffInviteError) {
@@ -164,6 +165,34 @@ async function placeInTree(tx: Prisma.TransactionClient, invite: StaffInvite, st
   }
 }
 
+/**
+ * The inviter must still be allowed to send this invite when it is used: an
+ * active account, a role that may invite this role, and for a regional
+ * coordinator, still coordinating the invite's region. Runs inside the accept
+ * transaction, so a refusal rolls the claim back.
+ */
+async function assertInviterStillAllowed(tx: Prisma.TransactionClient, invite: StaffInvite): Promise<void> {
+  const inviter = await tx.student.findUnique({
+    where: { id: invite.invitedById },
+    select: { role: true, isActive: true },
+  });
+  const allowed =
+    inviter !== null &&
+    inviter.isActive &&
+    isInvitableRole(invite.role) &&
+    canInviteRole(inviter.role, invite.role);
+  if (!allowed) throw new StaffInviteRefused("inviter_no_longer_allowed");
+  // Regional only: whole-state inviters reach every region.
+  if (inviter.role !== "coordinator") return;
+  const stillCoordinates =
+    invite.regionId !== null &&
+    (await tx.regionCoordinator.findUnique({
+      where: { regionId_coordinatorId: { regionId: invite.regionId, coordinatorId: invite.invitedById } },
+      select: { regionId: true },
+    })) !== null;
+  if (!stillCoordinates) throw new StaffInviteRefused("inviter_no_longer_allowed");
+}
+
 interface AcceptedInvite {
   invite: StaffInvite;
   staffId: string;
@@ -186,6 +215,7 @@ async function claimAndCreate(
     if (claim.count !== 1 || !invite) throw new StaffInviteRefused(unusableReason(invite, now));
 
     // Throwing from here on rolls the claim back, so the invite stays usable.
+    await assertInviterStillAllowed(tx, invite);
     if (normalizeEmail(input.email) !== invite.email) throw new StaffInviteRefused("email_mismatch");
     // Linking an existing account to an invite is Phase 2's job.
     const existing = await tx.student.findUnique({ where: { email: invite.email }, select: { id: true } });

@@ -26,4 +26,12 @@ describe("staff invite messages", () => {
   it("uses the region wording the brief asks for", () => {
     assert.equal(STAFF_INVITE_MESSAGES.region_not_allowed, "You can invite people only to your own region.");
   });
+
+  it("tells someone holding an invite from a person who lost the right to send it to ask for a new one", () => {
+    assert.equal(
+      STAFF_INVITE_MESSAGES.inviter_no_longer_allowed,
+      "This invite is no longer valid. Ask for a new one.",
+    );
+    assert.equal(staffInviteStatus("inviter_no_longer_allowed"), 410);
+  });
 });
