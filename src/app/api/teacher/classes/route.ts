@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { badRequest, conflict, forbidden, type Session } from "@/lib/api-error";
+import { badRequest, type Session } from "@/lib/api-error";
 import { parseBody, createClassSchema } from "@/lib/schemas";
-import { countInstructorsInRegion, listInstructorRegionIds, listRegionsForClassCreation } from "@/lib/region";
+import { countInstructorsInRegion, listRegionsForClassCreation } from "@/lib/region";
+import { assertRegionAllowed, createClassWithInstructors } from "@/lib/class-create";
 import { seesWholeState } from "@/lib/org-roles";
 import { withRegistry } from "@/lib/registry/middleware";
 import {
@@ -97,26 +98,6 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
   });
 });
 
-async function assertRegionAllowed(session: Session, regionId: string) {
-  if (!seesWholeState(session.role)) {
-    const ownRegionIds = await listInstructorRegionIds(session.id);
-    if (ownRegionIds.length === 0) {
-      throw forbidden(
-        "Ask your regional coordinator to add you to a region before creating a classroom.",
-      );
-    }
-    if (!ownRegionIds.includes(regionId)) {
-      throw forbidden("You can only create classrooms in your own region.");
-    }
-  }
-  const region = await prisma.region.findUnique({
-    where: { id: regionId },
-    select: { id: true, status: true },
-  });
-  if (!region) throw badRequest("That region does not exist.");
-  if (region.status !== "active") throw badRequest("Cannot assign a class to an archived region.");
-}
-
 async function assertCoTeachersInRegion(session: Session, regionId: string, instructorIds: string[]) {
   if (!seesWholeState(session.role) && !instructorIds.includes(session.id)) {
     throw badRequest("Add yourself as an instructor of this classroom.");
@@ -144,14 +125,6 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
     throw badRequest("A class code is required.");
   }
 
-  const existing = await prisma.spokesClass.findUnique({
-    where: { code },
-    select: { id: true },
-  });
-  if (existing) {
-    throw conflict("That class code is already in use.");
-  }
-
   if (instructorIds.length > 0) {
     const matchingTeachers = await prisma.student.count({
       where: {
@@ -166,30 +139,18 @@ export const POST = withRegistry("classes.create", async (session, req, _ctx, _t
     await assertTeacherAssignmentLimit(instructorIds);
   }
 
-  const createdClass = await prisma.spokesClass.create({
-    data: {
-      name,
-      code,
-      programType,
-      regionId,
-      description: description || null,
-      startDate,
-      endDate,
-      createdById: session.id,
-      instructors: {
-        create: instructorIds.map((instructorId: string) => ({
-          instructorId,
-        })),
-      },
-    },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      status: true,
-      programType: true,
-      regionId: true,
-    },
+  // Every check above has passed; the insert goes through prismaAdmin because
+  // RLS cannot admit a class before its instructor rows exist (Ruling R19).
+  const createdClass = await createClassWithInstructors({
+    name,
+    code,
+    programType,
+    regionId,
+    description: description || null,
+    startDate,
+    endDate,
+    createdById: session.id,
+    instructorIds,
   });
 
   await logAuditEvent({

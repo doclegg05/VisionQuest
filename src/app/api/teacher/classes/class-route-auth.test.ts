@@ -21,7 +21,13 @@ const mockLogAuditEvent = mock.fn() as any;
 const mockRegionInstructorFindMany = mock.fn() as any;
 const mockRegionInstructorCount = mock.fn() as any;
 const mockRegionFindUnique = mock.fn() as any;
+// The class insert runs inside prismaAdmin.$transaction (Ruling R19): the
+// RLS client's WITH CHECK cannot pass for a class with no instructor row yet.
 const mockClassCreate = mock.fn() as any;
+const mockInstructorCreateMany = mock.fn() as any;
+const mockAdminCodeLookup = mock.fn() as any;
+const mockAdminTransaction = mock.fn() as any;
+const mockRlsClassCreate = mock.fn() as any;
 
 function makeHttpError(statusCode: number, message: string) {
   const error = new Error(message) as Error & { statusCode: number };
@@ -82,12 +88,15 @@ mock.module("@/lib/classroom", {
 
 mock.module("@/lib/db", {
   namedExports: {
-    prismaAdmin: { regionInstructor: { count: mockRegionInstructorCount } },
+    prismaAdmin: {
+      regionInstructor: { count: mockRegionInstructorCount },
+      $transaction: mockAdminTransaction,
+    },
     prisma: {
       spokesClass: {
         findUnique: mockFindUnique,
         findFirst: mockFindFirst,
-        create: mockClassCreate,
+        create: mockRlsClassCreate,
       },
       region: { findUnique: mockRegionFindUnique },
       regionInstructor: { findMany: mockRegionInstructorFindMany },
@@ -194,6 +203,7 @@ describe("POST /api/teacher/classes region rules", () => {
     for (const fn of [
       mockFindUnique, mockCount, mockAssertTeacherAssignmentLimit, mockLogAuditEvent,
       mockRegionInstructorFindMany, mockRegionInstructorCount, mockRegionFindUnique, mockClassCreate,
+      mockInstructorCreateMany, mockAdminCodeLookup, mockAdminTransaction, mockRlsClassCreate,
     ]) {
       fn.mock.resetCalls();
     }
@@ -207,6 +217,16 @@ describe("POST /api/teacher/classes region rules", () => {
       id: where.id,
       status: "active",
     }));
+    mockAdminCodeLookup.mock.mockImplementation(async () => null);
+    mockInstructorCreateMany.mock.mockImplementation(async ({ data }: { data: unknown[] }) => ({
+      count: data.length,
+    }));
+    mockAdminTransaction.mock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        spokesClass: { findUnique: mockAdminCodeLookup, create: mockClassCreate },
+        spokesClassInstructor: { createMany: mockInstructorCreateMany },
+      }),
+    );
     mockClassCreate.mock.mockImplementation(async () => ({
       id: "class-new",
       name: "Morning class",
@@ -276,6 +296,37 @@ describe("POST /api/teacher/classes region rules", () => {
   it("answers 400 when regionId is missing", async () => {
     const { res } = await post({ regionId: undefined });
     assert.equal(res.status, 400);
+    assert.equal(mockClassCreate.mock.callCount(), 0);
+  });
+
+  it("writes the class and its instructor rows in one admin transaction, never through the RLS client", async () => {
+    const { res } = await post();
+    assert.equal(res.status, 200);
+    assert.equal(mockAdminTransaction.mock.callCount(), 1);
+    assert.equal(mockClassCreate.mock.callCount(), 1);
+    assert.equal(mockRlsClassCreate.mock.callCount(), 0);
+    const rows = mockInstructorCreateMany.mock.calls[0]?.arguments[0] as {
+      data: Array<{ classId: string; instructorId: string }>;
+    };
+    assert.deepEqual(rows.data, [{ classId: "class-new", instructorId: TEACHER_ID }]);
+  });
+
+  it("opens no admin transaction until every check has passed", async () => {
+    await post({ regionId: REGION_B });
+    await post({ instructorIds: [OTHER_ID] });
+    mockAssertTeacherAssignmentLimit.mock.mockImplementation(async () => {
+      throw makeHttpError(409, "limit");
+    });
+    await post();
+    assert.equal(mockAdminTransaction.mock.callCount(), 0);
+    assert.equal(mockRlsClassCreate.mock.callCount(), 0);
+  });
+
+  it("checks the class code against every class, not only the ones RLS lets a teacher see", async () => {
+    mockAdminCodeLookup.mock.mockImplementation(async () => ({ id: "someone-elses-class" }));
+    const { res, body } = await post();
+    assert.equal(res.status, 409);
+    assert.equal(body.error, "That class code is already in use.");
     assert.equal(mockClassCreate.mock.callCount(), 0);
   });
 
