@@ -184,7 +184,7 @@ test("buildManagedStudentWhere does NOT grant CDC unrestricted access", () => {
   });
 });
 
-test("TRIPWIRE (Slice D): coordinator sessions fail closed at BOTH the app layer and the RLS layer", () => {
+test("TRIPWIRE (Slice D): coordinator sessions fail closed at the app layer; RLS scopes them to their regions", () => {
   const coordinator = {
     id: "coord-1",
     studentId: "coord-1",
@@ -201,21 +201,12 @@ test("TRIPWIRE (Slice D): coordinator sessions fail closed at BOTH the app layer
     id: { in: [] },
   });
 
-  // RLS layer: rlsContextFor independently collapses coordinators to
-  // role="student", so the vq_app client returns zero Student rows even for
-  // code that bypasses buildManagedStudentWhere. Both layers now defend on
-  // their own — this assertion breaking means Slice D is making rlsContextFor
-  // coordinator-aware.
-  assert.equal(
-    rlsContextFor(coordinator).role,
-    "student",
-    "rlsContextFor no longer collapses coordinators — coordinator RLS policies " +
-      "are going live (Slice D). buildManagedStudentWhere currently fails closed " +
-      "for coordinators (impossible id-in-[] clause); replace that branch with " +
-      "real region scoping (mirror getCoordinatorInterventionQueue in " +
-      "src/lib/teacher/dashboard.ts) and audit its call sites before shipping. " +
-      "See docs/plans/rls-enforcement-runbook.md → Slice D.",
-  );
+  // RLS layer (organization tree, migration 20261107120000): rlsContextFor
+  // maps coordinators to the teacher RLS role, and managed_student_ids scopes
+  // them to students in their regions' classes. The database layer no longer
+  // returns zero rows on its own; the app-layer clause above still does until
+  // it is replaced with the same region scoping.
+  assert.equal(rlsContextFor(coordinator).role, "teacher");
 });
 
 test("STAFF_CAN_MANAGE_ANY contains staff roles with cross-class access", () => {
