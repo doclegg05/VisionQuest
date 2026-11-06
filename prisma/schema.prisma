@@ -2494,6 +2494,25 @@ model RegionInstructor {
   @@schema("visionquest")
 }
 
+/// An invitation for someone to join the organization tree as staff.
+/// Only the SHA-256 of the token is stored. See src/lib/staff-invites.ts.
+model StaffInvite {
+  id           String    @id @default(cuid())
+  email        String
+  role         String
+  regionId     String?
+  invitedById  String
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  acceptedById String?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([email])
+  @@schema("visionquest")
+}
+
 model GrantGoal {
   id          String   @id @default(cuid())
   regionId    String
