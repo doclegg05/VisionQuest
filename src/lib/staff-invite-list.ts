@@ -55,8 +55,8 @@ export async function listStaffInvites(actor: Session): Promise<StaffInviteRow[]
   }));
 }
 
+/** No email: the accept page never shows or pre-fills it (Ruling R18). */
 export interface StaffInvitePreview {
-  email: string;
   role: string;
   regionName: string | null;
 }
@@ -69,7 +69,7 @@ export async function previewStaffInvite(token: string): Promise<StaffInvitePrev
   const region = invite.regionId
     ? await prismaAdmin.region.findUnique({ where: { id: invite.regionId }, select: { name: true } })
     : null;
-  return { email: invite.email, role: invite.role, regionName: region?.name ?? null };
+  return { role: invite.role, regionName: region?.name ?? null };
 }
 
 export async function regionNameFor(regionId: string | undefined): Promise<string | null> {

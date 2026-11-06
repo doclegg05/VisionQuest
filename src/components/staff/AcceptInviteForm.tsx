@@ -8,12 +8,16 @@ import { FIELD_CLASS, LABEL_CLASS } from "./fieldStyles";
 
 interface AcceptInviteFormProps {
   token: string;
-  email: string;
 }
 
-export function AcceptInviteForm({ token, email: invitedEmail }: AcceptInviteFormProps) {
+/**
+ * The person types the email the invite was sent to; it is never pre-filled
+ * (Ruling R18). Until Phase 2 ties an invite to a work account, the link is a
+ * bearer link, and printing the address would hand it to whoever holds it.
+ */
+export function AcceptInviteForm({ token }: AcceptInviteFormProps) {
   const router = useRouter();
-  const [email, setEmail] = useState(invitedEmail);
+  const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);

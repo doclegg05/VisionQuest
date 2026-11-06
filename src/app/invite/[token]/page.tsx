@@ -25,7 +25,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
               {invite.regionName ? ` for ${invite.regionName}` : ""}.
             </p>
           </div>
-          <AcceptInviteForm token={token} email={invite.email} />
+          <AcceptInviteForm token={token} />
         </>
       ) : (
         <div role="alert">

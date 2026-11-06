@@ -495,6 +495,7 @@ Decided during the build:
 - R11: Coordinators can view classes but cannot move students between classes.
 - R16: Only admins create unlinked referrals. Program coordinators read them.
 - R17: Admins get a "Place in a classroom" control on the applicants-waiting list.
+- R18: Staff invite links are single-use bearer links, valid for 14 days. Anyone holding the link can create the invited account, so the accept page no longer fills in the email; the person types it. Phase 2 Microsoft sign-in will tie each invite to a work account.
 
 Before deploying, run `node scripts/org-tree-preflight.mjs` from the Terminal panel.
 It prints counts only: teachers, coordinators and classes that would land unplaced.
