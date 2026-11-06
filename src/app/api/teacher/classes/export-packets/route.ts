@@ -14,7 +14,7 @@ const classIdSchema = z.string().cuid();
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session || !["teacher", "coordinator", "admin"].includes(session.role)) {
+  if (!session || !["teacher", "coordinator", "program_coordinator", "admin"].includes(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
