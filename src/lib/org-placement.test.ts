@@ -160,4 +160,28 @@ describe("assignInstructorRegion", () => {
     await assert.rejects(() => mod.assignInstructorRegion(admin, { instructorId: "s1", regionId: "r1" }));
     assert.equal(regionInstructorUpsert.mock.callCount(), 0);
   });
+
+  it("limits a regional coordinator to unplaced instructors or ones already in their regions", async () => {
+    await mod.assignInstructorRegion(regional, { instructorId: "t1", regionId: "r1" });
+    const where = (studentFindFirst.mock.calls.at(-1)?.arguments[0] as any).where;
+    assert.equal(where.id, "t1");
+    assert.equal(where.role, "teacher");
+    assert.deepEqual(where.OR, [
+      { instructorRegions: { none: {} }, instructedClasses: { none: {} } },
+      { instructorRegions: { some: { region: { coordinators: { some: { coordinatorId: "c1" } } } } } },
+    ]);
+  });
+
+  it("refuses a regional coordinator an instructor placed in another region", async () => {
+    // The scoped lookup matches nothing for an instructor placed only outside the caller's regions.
+    studentFindFirst.mock.mockImplementationOnce(async () => null);
+    await assert.rejects(() => mod.assignInstructorRegion(regional, { instructorId: "t9", regionId: "r1" }));
+    assert.equal(regionInstructorUpsert.mock.callCount(), 0);
+  });
+
+  it("does not limit a whole-state caller to unplaced instructors", async () => {
+    await mod.assignInstructorRegion(admin, { instructorId: "t1", regionId: "r1" });
+    const where = (studentFindFirst.mock.calls.at(-1)?.arguments[0] as any).where;
+    assert.equal(where.OR, undefined);
+  });
 });
