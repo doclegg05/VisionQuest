@@ -63,6 +63,7 @@ import { runAgentTurn } from "@/lib/sage/agent/loop";
 import { executeAgentTool, executeSlashCommand } from "@/lib/sage/agent/executor";
 import { isAgentLoopEnabled } from "@/lib/sage/agent/flags";
 import { studentLogKey } from "@/lib/log-keys";
+import { staffChatStageFor } from "@/lib/sage/staff-chat-stage";
 
 // ─── Route handler ──────────────────────────────────────────────────────────
 
@@ -239,7 +240,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // Chat-shape only: which conversation getter/prompt path/rate-limit tier to
   // use. Provider routing, sensitivity, and audit logging stay keyed on
   // `isTeacher` (isStaffRole) — coordinators are not staff for those purposes.
-  const isStaffChat = isTeacher || session.role === "coordinator";
+  const staffChatStage = staffChatStageFor(session.role);
+  const isStaffChat = staffChatStage !== null;
   const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
   const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
 
@@ -650,16 +652,12 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   };
   let recentActivityBlock = "";
 
-  if (isStaffChat) {
-    const staffStage = isAdmin
-      ? "admin_assistant"
-      : session.role === "coordinator"
-        ? "coordinator_assistant"
-        : "teacher_assistant";
-    systemPrompt = buildTurnPrompt(staffStage, {
+  if (staffChatStage) {
+    systemPrompt = buildTurnPrompt(staffChatStage, {
       studentName: session.displayName,
       userMessage,
       staffStudentContext,
+      staffRole: session.role,
     }, promptTier);
   } else {
     // Canonical context feed: the bundle is the single entry point for Sage

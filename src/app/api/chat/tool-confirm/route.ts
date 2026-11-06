@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, badRequest, isStaffRole } from "@/lib/api-error";
+import { withAuth, badRequest, forbidden, isStaffRole } from "@/lib/api-error";
+import { isCoordinatorRole } from "@/lib/org-roles";
 import { executeAgentTool } from "@/lib/sage/agent/executor";
 import { verifyConfirmationToken } from "@/lib/sage/agent/confirmation";
 import { claimConfirmationToken } from "@/lib/sage/agent/confirmation-use";
@@ -24,6 +25,12 @@ const confirmSchema = z.object({
  * the executor runs; the executor then re-verifies inside the tool itself.
  */
 export const POST = withAuth(async (session, req: Request) => {
+  // Coordinators chat with Sage but hold no write tool, so no confirm card can
+  // be theirs. Refused before the token is read, claimed or executed.
+  if (isCoordinatorRole(session.role)) {
+    throw forbidden("Sage cannot make changes from a coordinator account.");
+  }
+
   const { toolName, args, token, conversationId, targetStudentId } = await parseBody(req, confirmSchema);
 
   // Staff-assisted flows only: a student must never confirm on behalf of

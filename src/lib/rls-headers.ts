@@ -1,4 +1,20 @@
+import { isCoordinatorRole } from "./org-roles";
 import type { RlsContext } from "./rls-context";
+
+/**
+ * Map an app role onto one of the three RLS roles the Postgres policies know.
+ *
+ * Both coordinator roles read through the teacher policy branches: the
+ * `managed_student_ids` function scopes them to their regions' students
+ * (program coordinators: every student), and RESTRICTIVE `is_tree_reader`
+ * policies keep them out of transcript tables. Everything else, `cdc`
+ * included, gets least privilege.
+ */
+export function rlsRoleFor(role: string): RlsContext["role"] {
+  if (role === "admin") return "admin";
+  if (role === "teacher" || isCoordinatorRole(role)) return "teacher";
+  return "student";
+}
 
 /**
  * Request headers the middleware (src/proxy.ts) sets when it decodes a valid
@@ -35,7 +51,7 @@ export interface SessionClaimsLike {
 export function rlsHeadersFromClaims(
   claims: SessionClaimsLike,
 ): Record<string, string> {
-  const role = claims.role === "admin" || claims.role === "teacher" ? claims.role : "student";
+  const role = rlsRoleFor(claims.role);
   const studentId = role === "student" ? claims.sub : "";
   return {
     [RLS_HEADER_USER_ID]: claims.sub,

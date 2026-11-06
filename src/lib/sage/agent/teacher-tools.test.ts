@@ -193,6 +193,27 @@ describe("getCoordinatorInterventionQueue — role guard", () => {
     );
     assert.equal(state.regionCoordinatorCalls, 0);
   });
+
+  it("gives a program coordinator every region, including classes with no region", async () => {
+    const { getCoordinatorInterventionQueue } = await import("@/lib/teacher/dashboard");
+    state.adminStudentRows = [queueStudentRow({ id: "stu-9", displayName: "Nora Noregion" })];
+
+    const { queue } = await getCoordinatorInterventionQueue({
+      id: "pc-1",
+      studentId: "",
+      displayName: "Pat Program",
+      role: "program_coordinator",
+    });
+
+    assert.equal(queue.length, 1);
+    // No RegionCoordinator lookup: a program coordinator holds no regions.
+    assert.equal(state.regionCoordinatorCalls, 0);
+    assert.equal(state.adminStudentWhere?.role, "student");
+    assert.equal(state.adminStudentWhere?.isActive, true);
+    const enrollmentScope = state.adminStudentWhere?.classEnrollments?.some;
+    assert.equal(enrollmentScope?.class?.regionId, undefined);
+    assert.deepEqual(enrollmentScope?.class?.status, { not: "archived" });
+  });
 });
 
 describe("list_students_needing_attention — staff sessions", () => {
@@ -207,5 +228,80 @@ describe("list_students_needing_attention — staff sessions", () => {
     assert.equal(state.appStudentCalls, 1);
     assert.equal(state.adminStudentCalls, 0);
     assert.equal(state.regionCoordinatorCalls, 0);
+  });
+});
+
+describe("list_students_needing_attention — program coordinator", () => {
+  const programCoordinator: Session = {
+    id: "pc-1",
+    studentId: "",
+    displayName: "Pat Program",
+    role: "program_coordinator",
+  };
+
+  it("is offered to a program coordinator", () => {
+    assert.ok(attentionTool.requiredRoles.some((role) => role === "program_coordinator"));
+  });
+
+  it("reads the whole-state coordinator queue, not the RLS instructor queue", async () => {
+    state.adminStudentRows = [queueStudentRow({ id: "stu-9", displayName: "Nora Noregion" })];
+
+    const result = await attentionTool.execute({}, ctxFor(programCoordinator));
+
+    assert.equal(result.status, "success");
+    assert.equal(state.adminStudentCalls, 1);
+    assert.equal(state.appStudentCalls, 0);
+    assert.equal(state.regionCoordinatorCalls, 0);
+  });
+});
+
+describe("list_students_needing_attention — what each role sees (R25)", () => {
+  const programCoordinator: Session = {
+    id: "pc-1",
+    studentId: "",
+    displayName: "Pat Program",
+    role: "program_coordinator",
+  };
+  // Alert content from queueStudentRow that a coordinator must never get.
+  const ALERT_CONTENT = ["Overdue tasks", "overdue_task", "Has overdue tasks piling up", "urgent alert", "open alert"];
+
+  for (const session of [coordinatorSession, programCoordinator]) {
+    it(`gives a ${session.role} names and an open-item count only, no alert content`, async () => {
+      state.regionAssignments = [{ regionId: "region-1" }];
+      state.adminStudentRows = [queueStudentRow({ id: "stu-1", displayName: "Alice Region" })];
+
+      const result = await attentionTool.execute({}, ctxFor(session));
+
+      assert.equal(result.status, "success");
+      const students = (result.data as { students: Array<Record<string, unknown>> }).students;
+      // One open alert plus two overdue tasks.
+      assert.deepEqual(students, [{ name: "Alice Region", openItemCount: 3 }]);
+      const everything = JSON.stringify(result);
+      for (const text of ALERT_CONTENT) {
+        assert.ok(!everything.includes(text), `${session.role} result leaks "${text}"`);
+      }
+      assert.equal(result.action?.target, "/coordinator");
+    });
+  }
+
+  for (const session of [teacherSession, { ...teacherSession, id: "admin-1", role: "admin" }]) {
+    it(`keeps the full shape for ${session.role}s`, async () => {
+      state.appStudentRows = [queueStudentRow({ id: "stu-2", displayName: "Marcus Managed" })];
+
+      const result = await attentionTool.execute({}, ctxFor(session));
+
+      const students = (result.data as { students: Array<Record<string, unknown>> }).students;
+      assert.equal(students[0]?.name, "Marcus Managed");
+      assert.equal(students[0]?.alert, "Overdue tasks");
+      assert.ok(Array.isArray(students[0]?.reasons));
+      assert.equal(typeof students[0]?.urgencyScore, "number");
+      assert.equal(typeof students[0]?.suggestedAction, "string");
+      assert.match(String(result.modelHint), /Marcus Managed/);
+      assert.equal(result.action?.target, "/teacher");
+    });
+  }
+
+  it("does not promise coordinators alert detail in its description", () => {
+    assert.ok(!/alert/i.test(attentionTool.description) || /instructors? see/i.test(attentionTool.description));
   });
 });

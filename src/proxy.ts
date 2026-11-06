@@ -59,7 +59,7 @@ function styleSrcElemRelaxed(): boolean {
  *
  * `/teacher/connect` is the staff console and is not a prefix match here.
  */
-const NOINDEX_PREFIXES = ["/credentials", "/connect"] as const;
+const NOINDEX_PREFIXES = ["/credentials", "/connect", "/invite"] as const;
 
 /** Pure: response headers a path earns from its prefix alone. */
 export function crawlerHeadersFor(pathname: string): Record<string, string> {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withTeacherAuth, badRequest, conflict } from "@/lib/api-error";
+import { withTeacherAuth, badRequest, conflict, forbidden } from "@/lib/api-error";
 import {
   assertStaffCanManageClass,
   assertTeacherAssignmentLimit,
@@ -9,6 +9,9 @@ import {
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { isProgramType } from "@/lib/program-type";
+import { assertRegionAllowed } from "@/lib/class-create";
+import { seesWholeState } from "@/lib/org-roles";
+import { parseBody, updateClassSchema } from "@/lib/schemas";
 
 function parseOptionalDate(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -90,7 +93,7 @@ export const PATCH = withTeacherAuth(async (
   { params }: { params: Promise<{ id: string }> },
 ) => {
     const { id } = await params;
-    const body = await req.json();
+    const body = await parseBody(req, updateClassSchema);
 
     const existing = await prisma.spokesClass.findUnique({
       where: { id },
@@ -126,7 +129,7 @@ export const PATCH = withTeacherAuth(async (
 
     let nextProgramType: string | undefined;
     if (body.programType !== undefined) {
-      if (typeof body.programType !== "string" || !isProgramType(body.programType)) {
+      if (!isProgramType(body.programType)) {
         throw badRequest(
           "programType must be one of: spokes, adult_ed, ietp.",
         );
@@ -137,23 +140,23 @@ export const PATCH = withTeacherAuth(async (
     let nextRegionId: string | null | undefined;
     if (body.regionId !== undefined) {
       if (body.regionId === null) {
+        // Creating a class requires a region, and a regionless class is hidden
+        // from the regional coordinator. Only whole-state roles may unset it.
+        if (!seesWholeState(session.role)) {
+          throw forbidden("Only an admin can remove a classroom from its region.");
+        }
         nextRegionId = null;
-      } else if (typeof body.regionId === "string" && body.regionId.trim()) {
-        const region = await prisma.region.findUnique({
-          where: { id: body.regionId },
-          select: { id: true, status: true },
-        });
-        if (!region) throw badRequest("regionId does not match any region.");
-        if (region.status !== "active") throw badRequest("Cannot assign a class to an archived region.");
-        nextRegionId = region.id;
+      } else if (body.regionId.trim()) {
+        // The same rule as creating a class: an instructor may use only a
+        // region they belong to; whole-state roles may use any active region.
+        await assertRegionAllowed(session, body.regionId);
+        nextRegionId = body.regionId;
       } else {
         throw badRequest("regionId must be a non-empty string or null.");
       }
     }
-    const instructorIds = Array.isArray(body.instructorIds)
-      ? normalizeInstructorIds(body.instructorIds.filter(
-          (value: unknown): value is string => typeof value === "string" && value.trim().length > 0,
-        ))
+    const instructorIds = body.instructorIds
+      ? normalizeInstructorIds(body.instructorIds.filter((value) => value.trim().length > 0))
       : null;
 
     if (!nextName) {
@@ -215,7 +218,7 @@ export const PATCH = withTeacherAuth(async (
         await tx.spokesClassInstructor.deleteMany({ where: { classId: id } });
         if (instructorIds.length > 0) {
           await tx.spokesClassInstructor.createMany({
-            data: instructorIds.map((instructorId: string) => ({
+            data: instructorIds.map((instructorId) => ({
               classId: id,
               instructorId,
             })),

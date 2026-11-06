@@ -81,3 +81,11 @@ describe("STAGE_OPENERS", () => {
     }
   });
 });
+
+describe("coordinator opener", () => {
+  it("fits both a regional and a program coordinator", () => {
+    const opener = STAGE_OPENERS.coordinator_assistant;
+    assert.ok(!/regional rollups/i.test(opener), opener);
+    assert.match(opener, /classes you oversee/);
+  });
+});

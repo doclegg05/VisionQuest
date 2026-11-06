@@ -82,6 +82,7 @@ export default function SpokesManager() {
   const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
   const [moduleTemplates, setModuleTemplates] = useState<ModuleTemplate[]>([]);
   const [referrals, setReferrals] = useState<ReferralRecord[]>([]);
+  const [canCreateReferrals, setCanCreateReferrals] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -147,6 +148,7 @@ export default function SpokesManager() {
       setChecklistTemplates(configPayload.checklistTemplates || []);
       setModuleTemplates(configPayload.moduleTemplates || []);
       setReferrals(referralPayload.referrals || []);
+      setCanCreateReferrals(referralPayload.canCreateReferrals === true);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load SPOKES configuration.");
@@ -442,127 +444,131 @@ export default function SpokesManager() {
         </div>
 
         <div className="mt-5 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-            <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Add referral</h4>
-            <div className="mt-3 grid gap-3">
-              <div className="grid gap-3 sm:grid-cols-2">
+          {canCreateReferrals ? (
+            <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+              <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Add referral</h4>
+              <div className="mt-3 grid gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className={FIELD_LABEL}>
+                    <span className={FIELD_LABEL_TEXT}>First name</span>
+                    <input
+                      value={referralForm.firstName}
+                      onChange={(event) =>
+                        setReferralForm((current) => ({ ...current, firstName: event.target.value }))
+                      }
+                      className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                    />
+                  </label>
+                  <label className={FIELD_LABEL}>
+                    <span className={FIELD_LABEL_TEXT}>Last name</span>
+                    <input
+                      value={referralForm.lastName}
+                      onChange={(event) =>
+                        setReferralForm((current) => ({ ...current, lastName: event.target.value }))
+                      }
+                      className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                    />
+                  </label>
+                </div>
                 <label className={FIELD_LABEL}>
-                  <span className={FIELD_LABEL_TEXT}>First name</span>
+                  <span className={FIELD_LABEL_TEXT}>Referral email</span>
                   <input
-                    value={referralForm.firstName}
+                    value={referralForm.referralEmail}
                     onChange={(event) =>
-                      setReferralForm((current) => ({ ...current, firstName: event.target.value }))
+                      setReferralForm((current) => ({ ...current, referralEmail: event.target.value }))
                     }
                     className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                   />
                 </label>
                 <label className={FIELD_LABEL}>
-                  <span className={FIELD_LABEL_TEXT}>Last name</span>
+                  <span className={FIELD_LABEL_TEXT}>County</span>
+                  {countyTemplates.length > 0 ? (
+                    <select
+                      value={referralForm.county}
+                      onChange={(event) =>
+                        setReferralForm((current) => ({ ...current, county: event.target.value }))
+                      }
+                      className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                    >
+                      <option value="">Select county</option>
+                      {countyTemplates.map((template) => (
+                        <option key={template.id} value={template.label}>
+                          {template.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={referralForm.county}
+                      onChange={(event) =>
+                        setReferralForm((current) => ({ ...current, county: event.target.value }))
+                      }
+                      className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                    />
+                  )}
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className={FIELD_LABEL}>
+                    <span className={FIELD_LABEL_TEXT}>Household type</span>
+                    <input
+                      value={referralForm.householdType}
+                      onChange={(event) =>
+                        setReferralForm((current) => ({ ...current, householdType: event.target.value }))
+                      }
+                      placeholder="1P or 2P"
+                      className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                    />
+                  </label>
+                  <label className={FIELD_LABEL}>
+                    <span className={FIELD_LABEL_TEXT}>Required hours</span>
+                    <input
+                      inputMode="decimal"
+                      value={referralForm.requiredParticipationHours}
+                      onChange={(event) =>
+                        setReferralForm((current) => ({
+                          ...current,
+                          requiredParticipationHours: event.target.value,
+                        }))
+                      }
+                      className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                    />
+                  </label>
+                </div>
+                <label className={FIELD_LABEL}>
+                  <span className={FIELD_LABEL_TEXT}>Referral date</span>
                   <input
-                    value={referralForm.lastName}
+                    type="date"
+                    value={referralForm.referralDate}
                     onChange={(event) =>
-                      setReferralForm((current) => ({ ...current, lastName: event.target.value }))
+                      setReferralForm((current) => ({ ...current, referralDate: event.target.value }))
                     }
                     className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                   />
                 </label>
+                <label className={FIELD_LABEL}>
+                  <span className={FIELD_LABEL_TEXT}>Notes</span>
+                  <textarea
+                    value={referralForm.notes}
+                    onChange={(event) =>
+                      setReferralForm((current) => ({ ...current, notes: event.target.value }))
+                    }
+                    rows={3}
+                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void createReferral()}
+                  disabled={creatingReferral}
+                  className="inline-flex items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
+                >
+                  {creatingReferral ? "Saving..." : "Add Referral"}
+                </button>
               </div>
-              <label className={FIELD_LABEL}>
-                <span className={FIELD_LABEL_TEXT}>Referral email</span>
-                <input
-                  value={referralForm.referralEmail}
-                  onChange={(event) =>
-                    setReferralForm((current) => ({ ...current, referralEmail: event.target.value }))
-                  }
-                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
-              </label>
-              <label className={FIELD_LABEL}>
-                <span className={FIELD_LABEL_TEXT}>County</span>
-                {countyTemplates.length > 0 ? (
-                  <select
-                    value={referralForm.county}
-                    onChange={(event) =>
-                      setReferralForm((current) => ({ ...current, county: event.target.value }))
-                    }
-                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                  >
-                    <option value="">Select county</option>
-                    {countyTemplates.map((template) => (
-                      <option key={template.id} value={template.label}>
-                        {template.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={referralForm.county}
-                    onChange={(event) =>
-                      setReferralForm((current) => ({ ...current, county: event.target.value }))
-                    }
-                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                  />
-                )}
-              </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className={FIELD_LABEL}>
-                  <span className={FIELD_LABEL_TEXT}>Household type</span>
-                  <input
-                    value={referralForm.householdType}
-                    onChange={(event) =>
-                      setReferralForm((current) => ({ ...current, householdType: event.target.value }))
-                    }
-                    placeholder="1P or 2P"
-                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                  />
-                </label>
-                <label className={FIELD_LABEL}>
-                  <span className={FIELD_LABEL_TEXT}>Required hours</span>
-                  <input
-                    inputMode="decimal"
-                    value={referralForm.requiredParticipationHours}
-                    onChange={(event) =>
-                      setReferralForm((current) => ({
-                        ...current,
-                        requiredParticipationHours: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                  />
-                </label>
-              </div>
-              <label className={FIELD_LABEL}>
-                <span className={FIELD_LABEL_TEXT}>Referral date</span>
-                <input
-                  type="date"
-                  value={referralForm.referralDate}
-                  onChange={(event) =>
-                    setReferralForm((current) => ({ ...current, referralDate: event.target.value }))
-                  }
-                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
-              </label>
-              <label className={FIELD_LABEL}>
-                <span className={FIELD_LABEL_TEXT}>Notes</span>
-                <textarea
-                  value={referralForm.notes}
-                  onChange={(event) =>
-                    setReferralForm((current) => ({ ...current, notes: event.target.value }))
-                  }
-                  rows={3}
-                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void createReferral()}
-                disabled={creatingReferral}
-                className="inline-flex items-center justify-center rounded-xl bg-[var(--accent-strong)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] transition hover:brightness-110 disabled:opacity-60 pointer-coarse:min-h-11"
-              >
-                {creatingReferral ? "Saving..." : "Add Referral"}
-              </button>
             </div>
-          </div>
+          ) : (
+            <p className="text-sm text-[var(--ink-muted)]">Ask an admin to add a new referral.</p>
+          )}
 
           <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <div className="flex items-center justify-between gap-3">

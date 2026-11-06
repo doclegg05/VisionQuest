@@ -160,18 +160,35 @@ function applyOperator(value: unknown, operator: string, operand: unknown): bool
   }
 }
 
+function isRelationRow(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !(value instanceof Date) && !Array.isArray(value);
+}
+
+function matchesListRelation(rows: unknown[], condition: object): boolean {
+  return Object.entries(condition).every(([operator, operand]) => {
+    if (operator !== "some") {
+      throw new Error(`matchesWhere does not support the "${operator}" list-relation operator`);
+    }
+    return rows.some((row) => isRelationRow(row) && matchesWhere(row, operand as WhereClause));
+  });
+}
+
 function matchesField(value: unknown, condition: unknown): boolean {
   if (condition === null || typeof condition !== "object" || condition instanceof Date) {
     return sameValue(value, condition);
   }
+  if (Array.isArray(value)) return matchesListRelation(value, condition);
+  if (isRelationRow(value)) return matchesWhere(value, condition as WhereClause);
   return Object.entries(condition).every(([operator, operand]) => applyOperator(value, operator, operand));
 }
 
 /**
  * Evaluate a Prisma where clause against an in-memory row, for fakes that
  * stand in for updateMany or findFirst. Supports equality (dates and null
- * included), lt / lte / gt / gte / in / startsWith, and AND / OR. Anything
- * else throws, so a fake never matches a filter it does not understand.
+ * included), lt / lte / gt / gte / in / startsWith, AND / OR, nested to-one
+ * relation filters (a null relation never matches) and `some` over list
+ * relations. Anything else throws, so a fake never matches a filter it does
+ * not understand.
  */
 export function matchesWhere(row: Record<string, unknown>, where: WhereClause): boolean {
   return Object.entries(where).every(([key, condition]) => {

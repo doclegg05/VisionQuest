@@ -9,6 +9,7 @@ import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
+import { isCoordinatorRole } from "@/lib/org-roles";
 
 interface Message {
   id: string;
@@ -80,7 +81,8 @@ function MiniActionList({ actions }: { actions: MiniAction[] }) {
 }
 
 export function SageMiniChat({ open, onClose, role = "student", initialMessage, onInitialMessageConsumed }: SageMiniChatProps) {
-  const isStaff = role === "teacher" || role === "admin";
+  const isCoordinator = isCoordinatorRole(role);
+  const isStaff = role === "teacher" || role === "admin" || isCoordinator;
   const { checkProgression } = useProgression();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -343,7 +345,9 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
                 {isStaff ? "Ask Sage for help" : "Ask Sage anything"}
               </p>
               <p className="mt-1 text-xs text-[var(--ink-muted)]">
-                {isStaff
+                {isCoordinator
+                  ? "Program info, forms, and who needs attention."
+                  : isStaff
                   ? "Program info, student advising, or drafting communications."
                   : "Goals, next steps, or what feels stuck."}
               </p>
@@ -371,7 +375,9 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
       </div>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={isLoading} compact />
+      {/* Only coordinators get their own chat role here (no attach button);
+          everyone else keeps the composer's default, as before. */}
+      <ChatInput onSend={handleSend} disabled={isLoading} compact role={isCoordinator ? "coordinator" : undefined} />
     </div>
   );
 }

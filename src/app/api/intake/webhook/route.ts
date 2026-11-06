@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { intakePayloadSchema } from "@/lib/intake/schema";
 import { provisionIntakeStudent } from "@/lib/intake/provision";
 import { getSession } from "@/lib/auth";
-import { isStaffRole, withErrorHandler } from "@/lib/api-error";
+import { ApiError, badRequest, isStaffRole, withErrorHandler, type Session } from "@/lib/api-error";
+import { assertStaffCanManageClass, staffCanManageStudent } from "@/lib/classroom";
 import { parseBody } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
 
@@ -75,10 +76,12 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   // Or check if invoked by a logged-in staff member from internal UI
   let hasStaffAuth = false;
+  let staffSession: Session | null = null;
   if (!hasWebhookAuth) {
     const session = await getSession();
     if (session && isStaffRole(session.role)) {
       hasStaffAuth = true;
+      staffSession = session;
     }
   }
 
@@ -94,12 +97,32 @@ export const POST = withErrorHandler(async (req: Request) => {
   // never about the database.
   const payload = await parseBody(req, intakePayloadSchema);
 
+  // A person at the keyboard places the student in a classroom they can
+  // manage. County matching is for the bearer-secret path only.
+  if (staffSession) {
+    if (!payload.classId) throw badRequest("Choose one of your classrooms.");
+    await assertStaffCanManageClass(staffSession, payload.classId);
+  }
+
+  // A signed-in caller may refresh only a student they already manage. A
+  // match outside their classes is refused with a generic 409 before any
+  // write. The bearer-secret path has no session and keeps today's behavior.
+  const session = staffSession;
+  const canAdoptExisting = session
+    ? (studentDbId: string) => staffCanManageStudent(session, studentDbId)
+    : undefined;
+
   try {
-    const result = await provisionIntakeStudent(payload, { source: "staff" });
+    const result = await provisionIntakeStudent(payload, {
+      source: "staff",
+      // A signed-in caller chose a classroom; never swap it for a county match.
+      requireNamedClass: staffSession !== null,
+      canAdoptExisting,
+    });
 
     if (result.outcome === "duplicate_pending_review") {
       // Unreachable from this door — an existing match on the staff path
-      // returns "updated" — but the union is exhaustive by design, so a future
+      // returns "updated" or is refused — but the union is exhaustive by design, so a future
       // outcome cannot fall through into an account-shaped response.
       return NextResponse.json({ success: true, status: "pending_review" }, { status: 202 });
     }
@@ -137,6 +160,9 @@ export const POST = withErrorHandler(async (req: Request) => {
       { status: 201 },
     );
   } catch (error: unknown) {
+    // A refusal provisioning chose to show the caller (for example an inactive
+    // classroom) carries its own status and a message about their input.
+    if (error instanceof ApiError) throw error;
     logger.error("Automated intake error", {
       alert: "intake_provision_failed",
       errorName: error instanceof Error ? error.name : "unknown",

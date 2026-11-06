@@ -465,3 +465,40 @@ affected user's access before relying on the page; the approved fallback is an
 explicit unavailable screen with the coordinator navigation entry hidden.
 Hiding a link alone does not address direct visits. The account check does not
 block recording this approved scope decision or the independent decisions below.
+
+## 2026-11-06: Coordinator freeze D2 reopened; organization tree adopted
+
+This supersedes the 2026-10-26 D2 entry above. The coordinator role is no longer
+frozen at `/coordinator`. VisionQuest adopts an organization tree: instructors
+belong to regional coordinators, and regional coordinators sit under program
+coordinators. Design: [2026-11-06-microsoft-365-and-org-tree-design.md](./superpowers/specs/2026-11-06-microsoft-365-and-org-tree-design.md).
+
+Britt's decisions:
+
+- Staff sign in with their Microsoft work account. Students keep their current sign-in.
+- Staff can register themselves with Microsoft, under a sharing-style setting.
+- Each classroom is its own class. Instructors see only their own classes. Regional coordinators see their region. Program coordinators see the whole state.
+- Instructors invite each new student straight into a classroom. The student signs in and starts orientation.
+- Coordinators mainly need a dashboard of measurable student results, starting with new students enrolled, goals made and goals achieved, with charts. Drilling down to individual students is optional. Regional coordinators see their region. Program coordinators see the state.
+- Instructors build their own classrooms, Schoology style.
+- Instructors belong to regional coordinators, in an organization tree.
+- Regional coordinators invite instructors to their region.
+- Testing starts on a personal Microsoft account.
+- The 2026-10-26 D2 coordinator freeze is reopened.
+
+Decided during the build:
+
+- R3: Program coordinators get every coordinator permission except editing grant goals, which stays with regional coordinators.
+- R5: Coordinators cannot read chat transcripts or anything derived from them. The database refuses it, not just the app.
+- R8: Coordinators cannot write student data. The database refuses writes on every table where teachers can write.
+- R10: Coordinators cannot read alert text or upload summaries either, because they can carry crisis or document content.
+- R11: Coordinators can view classes but cannot move students between classes.
+- R16: Only admins create unlinked referrals. Program coordinators read them.
+- R17: Admins get a "Place in a classroom" control on the applicants-waiting list.
+- R18: Staff invite links are single-use links, valid for 14 days. The accept page does not fill in the email; the person types it. A link alone is not enough when the invite was emailed (R21): the person also needs a 6-digit code that VisionQuest emails to the invited address when they press "Send my code". The code works for 10 minutes, only its hash is stored, and 5 wrong codes lock the invite (R23). Only an admin can send a link-only invite, used when email is not set up or the send fails, and that link still works on its own. Phase 2 Microsoft sign-in will tie each invite to a work account.
+- R21: An emailed invite needs a 6-digit code, sent to the invite's email, before anyone can accept it. 5 wrong codes lock the invite, and asking for a new code does not reset the count. Only an admin can make a link-only invite.
+- R23: Each wrong code uses one of the invite's 5 tries, even when several guesses arrive at once, and the tries are counted before the code is checked.
+- Britt opened Sage chat to regional and program coordinators on 2026-11-06 and ruled that FERPA does not apply to coordinators and admins. AI routing by data sensitivity is unchanged.
+
+Before deploying, run `node scripts/org-tree-preflight.mjs` from the Terminal panel.
+It prints counts only: teachers, coordinators and classes that would land unplaced.

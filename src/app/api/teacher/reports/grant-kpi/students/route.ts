@@ -42,13 +42,19 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     includeInactiveAccounts: true,
   });
 
+  // No managed students (no class, or another instructor's classId) means an
+  // empty drill-down, never an unfiltered one.
+  if (studentIds.length === 0) {
+    return NextResponse.json({ metric, programYear, count: 0, students: [] });
+  }
+
   const pyNum = parseInt(programYear.replace("PY", ""), 10);
   const { start: startDate, end: endDate } = programYearBoundsUtc(pyNum);
 
   const records = await prisma.spokesRecord.findMany({
     where: {
       referralDate: { gte: startDate, lt: endDate },
-      ...(studentIds.length > 0 ? { studentId: { in: studentIds } } : {}),
+      studentId: { in: studentIds },
     },
     select: {
       id: true,

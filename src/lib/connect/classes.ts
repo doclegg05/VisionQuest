@@ -1,18 +1,15 @@
 // =============================================================================
 // "Whose classes are these?" — for the Connect surfaces only.
 //
-// Match & Connect Phase 3. This deliberately answers the question NARROWLY
-// than `src/lib/classroom.ts` does, and the difference is load-bearing:
-//
-//   `canManageAnyClass` admits admin, teacher AND coordinator, so
-//   `listManagedClasses` returns every class in the program to a plain
-//   teacher. That is the repo's settled intent for classroom administration.
-//
-//   `job_lead_write`, the RLS policy this phase added, admits a teacher only
-//   for `instructor_class_ids()` — the classes they actually instruct. So on
-//   the Connect surfaces the app must ask the same question the database will,
-//   or a teacher gets offered a class in a picker and then a policy rejection
-//   on submit, which reads as a bug rather than a boundary.
+// Match & Connect Phase 3. This answers the question the database asks:
+// `job_lead_write`, the RLS policy this phase added, admits a teacher only for
+// `instructor_class_ids()`, the classes they actually instruct. So on the
+// Connect surfaces the app asks the same question, or a teacher gets offered a
+// class in a picker and then a policy rejection on submit, which reads as a
+// bug rather than a boundary. Since the organization tree (2026-11)
+// `listManagedClasses` in `src/lib/classroom.ts` also narrows a teacher to
+// their own classes. The two still differ for both coordinator roles: here only
+// admins see every class.
 //
 // Admin stays unrestricted, as everywhere else in this schema.
 // =============================================================================
@@ -126,11 +123,11 @@ export async function assertClassIsManaged(
  * function `Connection`/`SpokesRecord`/`Application` RLS actually calls, NOT
  * `classroom.ts`'s `listManagedStudentIds`.
  *
- * That distinction is load-bearing (SEC-W1, 2026-09 review): with no
- * `classId`, `listManagedStudentIds`'s `canManageAny && !classId` branch
- * returns EVERY student in the program to any teacher — the intentional
- * "single staff workspace" convention for classroom-administration surfaces
- * (intervention queue, grant-KPI, readiness reports). RLS still enforces the
+ * That distinction was load-bearing (SEC-W1, 2026-09 review): with no
+ * `classId`, `listManagedStudentIds` returned EVERY student in the program to
+ * any teacher under the old "single staff workspace" convention. Since the
+ * organization tree (2026-11) it narrows a teacher to their own classes too,
+ * but still differs for coordinators and program coordinators. RLS still enforces the
  * true boundary underneath any query built from that list, but the app-level
  * filter being wider than what RLS actually admits means an EMPTY result and
  * a REFUSED result look identical from here — exactly the ambiguity

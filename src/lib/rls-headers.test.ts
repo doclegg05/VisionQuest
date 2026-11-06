@@ -54,14 +54,28 @@ describe("rls-headers", () => {
       assert.equal(out[RLS_HEADER_STUDENT_ID], "x");
     });
 
-    it("TRIPWIRE (Slice D): coerces coordinator claims to the student role", () => {
-      // Unlike the generic unknown-role coercion above, this test names
-      // "coordinator" on purpose: it MUST break the day Slice D makes the
-      // header path coordinator-aware, so the developer audits the app-layer
-      // helpers that rely on today's fail-closed collapse.
-      const out = rlsHeadersFromClaims({ sub: "coord-1", role: "coordinator" });
-      assert.equal(out[RLS_HEADER_ROLE], "student", SLICE_D_TRIPWIRE);
-      assert.equal(out[RLS_HEADER_STUDENT_ID], "coord-1");
+    // The organization tree (2026-11): both coordinator roles read through
+    // the teacher RLS branches, scoped by managed_student_ids.
+    for (const role of ["coordinator", "program_coordinator"]) {
+      it(`maps a ${role} claim to the teacher role with empty studentId`, () => {
+        const out = rlsHeadersFromClaims({ sub: "coord-1", role });
+        assert.deepEqual(out, {
+          [RLS_HEADER_USER_ID]: "coord-1",
+          [RLS_HEADER_ROLE]: "teacher",
+          [RLS_HEADER_STUDENT_ID]: "",
+        });
+      });
+
+      it(`round-trips a ${role} claim through rlsContextFromHeaders`, () => {
+        const ctx = rlsContextFromHeaders(headerBag(rlsHeadersFromClaims({ sub: "coord-1", role })));
+        assert.deepEqual(ctx, { userId: "coord-1", role: "teacher", studentId: "" });
+      });
+    }
+
+    it("keeps cdc claims on the student role", () => {
+      const out = rlsHeadersFromClaims({ sub: "cdc-1", role: "cdc" });
+      assert.equal(out[RLS_HEADER_ROLE], "student");
+      assert.equal(out[RLS_HEADER_STUDENT_ID], "cdc-1");
     });
   });
 

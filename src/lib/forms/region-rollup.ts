@@ -1,28 +1,21 @@
 import { prismaAdmin } from "@/lib/db";
 import { isStaffRole, type Session } from "@/lib/api-error";
 import { canPerformElevatedStaffAction } from "@/lib/classroom";
+import { seesWholeState } from "@/lib/org-roles";
 
 /**
  * Region-scoped forms rollup for the coordinator dashboard.
  *
  * WHY prismaAdmin, and why this module does not call region.ts
  * ------------------------------------------------------------
- * `rlsContextFor` (src/lib/api-error.ts) collapses a coordinator session to
- * RLS role "student" with the coordinator's own id — coordinator policies do
- * not exist yet (Slice D). Under that context every table this rollup needs
- * is blind to a real coordinator:
- *
- *   RegionCoordinator  → `region_coordinator_admin_only` (admin only)
- *   SpokesClass        → `spokes_class_access` (admin, own-enrollment, or
- *                         instructing teacher — a coordinator is none of them)
- *   FormResponse       → `form_response_access` (own rows, managed students,
- *                         or admin)
- *
- * So `coordinatorHasRegion` and `classIdsInRegion` in src/lib/region.ts,
- * which both run on the app client, return false/[] for every real
- * coordinator — the reason the whole dashboard is dark for them today. This
- * module therefore reads through `prismaAdmin` and enforces the scope in the
- * query instead of relying on RLS to enforce it.
+ * This module was written when `rlsContextFor` (src/lib/api-error.ts)
+ * collapsed a coordinator session to RLS role "student", so every table the
+ * rollup needs was blind to a real coordinator under the app client. Since
+ * the organization tree (migration 20261107120000) coordinators map to the
+ * `teacher` RLS role and `managed_student_ids` / `instructor_class_ids` scope
+ * them to their regions. This module still reads through `prismaAdmin` and
+ * enforces the region scope in every query itself, so its correctness does
+ * not depend on those policies.
  *
  * SMALL-CELL SUPPRESSION (W1, 2026-09-07 audit)
  * -------------------------------------------
@@ -90,7 +83,7 @@ export interface RegionFormRollup {
 /**
  * Is this session allowed to read the named region?
  *
- * Admin: any region that exists. Coordinator: only a region they hold a
+ * Admin and program coordinator (`seesWholeState`): any region that exists. Coordinator: only a region they hold a
  * RegionCoordinator row for. Everyone else: no — the route's
  * `withCoordinatorAuth` wrapper has already refused them, and this is the
  * second, fail-closed answer rather than an assumption that it did.
@@ -104,10 +97,11 @@ export async function coordinatorCanReadRegion(
   session: Session,
   regionId: string,
 ): Promise<boolean> {
-  if (session.role === "admin") {
+  if (seesWholeState(session.role)) {
     const exists = await prismaAdmin.region.count({ where: { id: regionId } });
     return exists > 0;
   }
+  // Regional only: whole-state roles returned above, and program coordinators hold no regions.
   if (session.role !== "coordinator") return false;
 
   const row = await prismaAdmin.regionCoordinator.findUnique({

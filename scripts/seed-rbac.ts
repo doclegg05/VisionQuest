@@ -59,9 +59,9 @@ const PERMISSION_SEEDS: readonly PermSeed[] = [
   ["auth.security_questions_set", "auth", "Set Security Questions", "Store security questions and answers for password recovery", ["student", "teacher", "admin"]],
 
   // -- Sage --
-  ["sage.chat", "sage", "Sage Chat", "Send a message to the Sage AI coach and receive a streamed response", ["student", "teacher", "admin"]],
-  ["sage.conversations", "sage", "List Conversations", "List all Sage conversations for the current user", ["student", "teacher", "admin"]],
-  ["sage.history", "sage", "Chat History", "Retrieve message history for a specific conversation", ["student", "teacher", "admin"]],
+  ["sage.chat", "sage", "Sage Chat", "Send a message to the Sage AI coach and receive a streamed response", ["student", "teacher", "admin", "coordinator", "program_coordinator"]],
+  ["sage.conversations", "sage", "List Conversations", "List all Sage conversations for the current user", ["student", "teacher", "admin", "coordinator", "program_coordinator"]],
+  ["sage.history", "sage", "Chat History", "Retrieve message history for a specific conversation", ["student", "teacher", "admin", "coordinator", "program_coordinator"]],
   ["sage.goal_extraction", "sage", "Goal Extraction", "AI extracts actionable goals from a Sage conversation", ["student", "teacher", "admin"]],
   ["sage.mood_extraction", "sage", "Mood Extraction", "AI extracts emotional wellness scores from a conversation", ["student", "teacher", "admin"]],
   ["sage.discovery_extraction", "sage", "Career Discovery Extraction", "AI extracts career interest signals from a conversation", ["student", "teacher", "admin"]],

@@ -377,3 +377,50 @@ export async function getTeacherOutcomeReport(studentIds?: string[]) {
     })),
   };
 }
+
+export type TeacherOutcomeReport = Awaited<ReturnType<typeof getTeacherOutcomeReport>>;
+
+/**
+ * The outcome report for a caller who manages no students. It runs no query,
+ * so program-wide counts (opportunities, events) read zero too: an instructor
+ * with no class sees an empty report, not a partial one. `reporting.test.ts`
+ * pins it equal to a real report over zero rows, so the shapes cannot drift.
+ */
+export function emptyTeacherOutcomeReport(): TeacherOutcomeReport {
+  return {
+    summary: {
+      totalStudents: 0,
+      activeStudents7d: 0,
+      studentsNeedingAttention: 0,
+      openAlerts: 0,
+      highSeverityAlerts: 0,
+      overdueTasks: 0,
+      openTasks: 0,
+      upcomingAppointments7d: 0,
+      activeOpportunities: 0,
+      closingSoonOpportunities: 0,
+      applicationsInFlight: 0,
+      interviews: 0,
+      offers: 0,
+      upcomingEvents: 0,
+      eventRegistrations: 0,
+      completedCertifications: 0,
+      completedCertificationsVerified: 0,
+      completedCertificationsSelfReported: 0,
+      publicCredentialsLive: 0,
+      studentsWithoutCareerMomentum: 0,
+    },
+    funnel: [
+      "Enrolled",
+      "Orientation complete",
+      "Certification complete",
+      "Career activity started",
+      "Interviewing",
+      "Offer received",
+      "Public credential live",
+    ].map((label) => ({ label, value: 0 })),
+    attentionQueue: [],
+    recentApplications: [],
+    upcomingEvents: [],
+  };
+}

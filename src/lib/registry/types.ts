@@ -1,4 +1,4 @@
-export type Role = "student" | "teacher" | "admin";
+export type Role = "student" | "teacher" | "admin" | "coordinator" | "program_coordinator";
 
 export type AuditLevel = "none" | "basic" | "full";
 

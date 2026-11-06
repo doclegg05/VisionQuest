@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding covers Prisma methods with different signatures. */
 import assert from "node:assert/strict";
 import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
-import { mockTeacherSession } from "@/lib/test-helpers";
+import { mockAdminSession, mockTeacherSession } from "@/lib/test-helpers";
 
 /**
  * rankStudentsForLead / rankLeadsForStudent — the loading half of the matcher.
@@ -23,7 +23,7 @@ function record<T>(name: string, value: (args: any) => T) {
 
 const ROSTER_SIZE = 30;
 
-/** A regular teacher sees every class (single SPOKES staff workspace). */
+/** A regular teacher; the mocks here mostly ignore class scoping. */
 const teacher = mockTeacherSession();
 /** The shared cohort demo instructor is held to the one class it teaches. */
 const demoInstructor = mockTeacherSession({ id: "demo-instructor", demoAccount: "instructor" });
@@ -395,12 +395,12 @@ describe("candidate loading", () => {
 
 describe("candidate pool for a viewer held to their own classes", () => {
   // Two classes on one program. The cohort demo instructor teaches only
-  // class-demo; a regular teacher may see both. Each row remembers who teaches
+  // class-demo and a regular teacher only class-other; an admin sees both. Each row remembers who teaches
   // its class, and the fake applies the `class.instructors.some` filter the way
   // Postgres would, so the pool a viewer gets is the rows the query can reach.
   const INSTRUCTORS_BY_CLASS: Record<string, string[]> = {
     "class-demo": [demoInstructor.id],
-    "class-other": ["tch-other"],
+    "class-other": [teacher.id],
   };
 
   function row(classId: string, id: string) {
@@ -458,8 +458,13 @@ describe("candidate pool for a viewer held to their own classes", () => {
     assert.deepEqual(pool, DEMO_CLASS_IDS);
   });
 
-  it("still gives a regular teacher every class", async () => {
+  it("gives a regular teacher only the class they teach", async () => {
     const roster = await matching.rankRoster({ viewer: teacher, leadsPerStudent: 3 });
+    assert.deepEqual(roster.map((entry) => entry.studentId).sort(), ["other-1", "other-2"]);
+  });
+
+  it("still gives an admin every class", async () => {
+    const roster = await matching.rankRoster({ viewer: mockAdminSession(), leadsPerStudent: 3 });
     assert.deepEqual(roster.map((entry) => entry.studentId).sort(), EVERYONE);
   });
 });

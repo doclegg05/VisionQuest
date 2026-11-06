@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:clean": "node -e \"require('fs').rmSync('tsconfig.tsbuildinfo',{force:true})\" && tsc --noEmit",
     "test": "tsx --test --experimental-test-module-mocks \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
-    "test:rls": "tsx --test src/lib/rls.test.ts",
+    "test:rls": "tsx --test src/lib/rls.test.ts src/lib/org-tree-rls.test.ts",
     "test:ratelimit": "tsx --test src/lib/rate-limit.db.test.ts",
     "test:joblisting": "tsx --test src/lib/job-board/job-listing-unique.db.test.ts",
     "test:api": "tsx --test --experimental-test-module-mocks src/app/api/**/*.test.ts src/lib/test-helpers.test.ts",

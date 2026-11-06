@@ -101,7 +101,7 @@ const careerSkillsMatch: AgentTool = {
       },
     },
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
@@ -198,7 +198,7 @@ const careerOccupationProfile: AgentTool = {
     },
     required: ["occupation"],
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
@@ -268,7 +268,7 @@ const careerWages: AgentTool = {
     },
     required: ["occupation"],
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
@@ -350,7 +350,7 @@ const careerTrainingPrograms: AgentTool = {
     },
     required: ["occupation"],
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {
@@ -424,7 +424,7 @@ const careerToolsTechnology: AgentTool = {
     },
     required: ["occupation"],
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args): Promise<AgentToolResult> {

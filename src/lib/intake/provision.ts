@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { prismaAdmin as prisma } from "@/lib/db";
+import { badRequest, conflict } from "@/lib/api-error";
 import { hashPassword, normalizeEmail, normalizeStudentId } from "@/lib/auth";
 import { tryLogAuditEvent } from "@/lib/audit";
 import { invalidateChatContext } from "@/lib/cache";
@@ -42,7 +43,29 @@ export type IntakeSource = "public" | "staff";
 
 export interface ProvisionOptions {
   source: IntakeSource;
+  /**
+   * Set for a signed-in staff caller who must name the classroom. A named class
+   * that is not active is then refused instead of falling back to county
+   * matching, so the student never lands in a class the caller did not choose.
+   */
+  requireNamedClass?: boolean;
+  /**
+   * Set for a signed-in staff caller. Asked about an existing account the
+   * payload matched; `false` refuses the request before anything is written,
+   * so a caller cannot pull a student they do not already manage into their
+   * class by typing that student's email, or name and birth date. Unset on
+   * the bearer-secret path, which keeps today's behavior.
+   */
+  canAdoptExisting?: (studentDbId: string) => Promise<boolean>;
 }
+
+/**
+ * The refusal for a staff caller whose details matched someone else's
+ * student. Identical for an email match and a name plus birth date match, and
+ * carries no id or name, so the door is not an oracle for who is enrolled.
+ */
+export const EXISTING_STUDENT_NOT_MANAGED_MESSAGE =
+  "This student may already have an account. Ask an admin to add them to your class.";
 
 interface AccountSummary {
   studentDbId: string;
@@ -164,6 +187,7 @@ async function resolveActiveClass(
   county: string,
   explicitClassId: string | null | undefined,
   source: IntakeSource,
+  requireNamedClass = false,
 ): Promise<{ id: string; name: string } | null> {
   if (source === "staff" && explicitClassId) {
     const explicitClass = await prisma.spokesClass.findFirst({
@@ -171,6 +195,7 @@ async function resolveActiveClass(
       select: { id: true, name: true },
     });
     if (explicitClass) return explicitClass;
+    if (requireNamedClass) throw badRequest("That classroom is not active.");
   }
 
   return prisma.spokesClass.findFirst({
@@ -270,7 +295,7 @@ export async function provisionIntakeStudent(
   payload: IntakePayload,
   options: ProvisionOptions,
 ): Promise<ProvisionResult> {
-  const { source } = options;
+  const { source, requireNamedClass, canAdoptExisting } = options;
   const normalizedEmail = payload.email ? normalizeEmail(payload.email) : null;
   const birthDateObj = new Date(payload.birthDate);
 
@@ -312,8 +337,12 @@ export async function provisionIntakeStudent(
       return { outcome: "duplicate_pending_review" };
     }
 
+    if (canAdoptExisting && !(await canAdoptExisting(existingStudent.id))) {
+      throw conflict(EXISTING_STUDENT_NOT_MANAGED_MESSAGE);
+    }
+
     const student = existingStudent;
-    const activeClass = await resolveActiveClass(payload.county, payload.classId, source);
+    const activeClass = await resolveActiveClass(payload.county, payload.classId, source, requireNamedClass);
 
     const spokesRecord = await prisma.spokesRecord.upsert({
       where: { studentId: student.id },
@@ -390,7 +419,7 @@ export async function provisionIntakeStudent(
   }
 
   // --- Path B: Brand New Student ---
-  const activeClass = await resolveActiveClass(payload.county, payload.classId, source);
+  const activeClass = await resolveActiveClass(payload.county, payload.classId, source, requireNamedClass);
   const newStudentId = await generateUniqueStudentId(payload.firstName, payload.lastName);
   const displayName = `${payload.firstName} ${payload.lastName}`;
 

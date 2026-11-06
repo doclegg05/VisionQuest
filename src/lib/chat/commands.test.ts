@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   COMMANDS,
   STARTER_CHIPS,
+  chatRoleCanAttachFiles,
   filterCommands,
   getStarterChips,
 } from "./commands";
@@ -62,10 +63,11 @@ describe("getStarterChips", () => {
     assert.equal(getStarterChips("student").length, 5);
     assert.equal(getStarterChips("teacher").length, 4);
     assert.equal(getStarterChips("admin").length, 4);
+    assert.equal(getStarterChips("coordinator").length, 4);
   });
 
   it("each chip has a non-empty label and prefill", () => {
-    for (const role of ["student", "teacher", "admin"] as const) {
+    for (const role of ["student", "teacher", "admin", "coordinator"] as const) {
       for (const chip of getStarterChips(role)) {
         assert.ok(chip.label.trim().length > 0);
         assert.ok(chip.prefill.trim().length > 0);
@@ -90,5 +92,28 @@ describe("STARTER_CHIPS registry", () => {
     assert.ok("student" in STARTER_CHIPS);
     assert.ok("teacher" in STARTER_CHIPS);
     assert.ok("admin" in STARTER_CHIPS);
+    assert.ok("coordinator" in STARTER_CHIPS);
+  });
+});
+
+describe("coordinator chat (owner decision 2026-11-06)", () => {
+  // Coordinators hold read-only reference tools and a names-and-counts
+  // attention list, so their chips must not invite per-student work.
+  it("coordinator chips never ask about one student or draft a message", () => {
+    for (const chip of getStarterChips("coordinator")) {
+      assert.doesNotMatch(chip.prefill, /intervention|email|Tell me about /i, chip.label);
+    }
+  });
+
+  it("coordinators get the reference slash commands and none of the teacher student ones", () => {
+    const slashes = COMMANDS.filter((c) => c.roles.includes("coordinator")).map((c) => c.slash);
+    assert.deepEqual(slashes.sort(), ["/form", "/policy"]);
+  });
+
+  it("only the coordinator chat role cannot attach files", () => {
+    assert.equal(chatRoleCanAttachFiles("coordinator"), false);
+    for (const role of ["student", "teacher", "admin"] as const) {
+      assert.equal(chatRoleCanAttachFiles(role), true, role);
+    }
   });
 });

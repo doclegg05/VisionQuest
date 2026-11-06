@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   ApiError,
   rlsContextFor,
+  rlsRoleFor,
   unauthorized,
   badRequest,
   notFound,
@@ -306,16 +307,34 @@ test("rlsContextFor maps student sessions to their own row-ownership key", () =>
   });
 });
 
-test("TRIPWIRE (Slice D): coordinator sessions collapse to the student RLS role", () => {
-  assert.deepEqual(
-    rlsContextFor(sessionWith("coordinator")),
-    {
-      userId: "coordinator-1",
-      role: "student",
-      studentId: "coordinator-1",
-    },
-    SLICE_D_TRIPWIRE,
-  );
+// The organization tree (2026-11): coordinators read through the teacher RLS
+// branches, scoped by managed_student_ids to their regions (program
+// coordinators: every student). Transcript tables refuse them separately via
+// the is_tree_reader RESTRICTIVE policies.
+test("rlsContextFor maps coordinator sessions to the teacher RLS role", () => {
+  assert.deepEqual(rlsContextFor(sessionWith("coordinator")), {
+    userId: "coordinator-1",
+    role: "teacher",
+    studentId: "",
+  });
+});
+
+test("rlsContextFor maps program_coordinator sessions to the teacher RLS role", () => {
+  assert.deepEqual(rlsContextFor(sessionWith("program_coordinator")), {
+    userId: "program_coordinator-1",
+    role: "teacher",
+    studentId: "",
+  });
+});
+
+test("rlsRoleFor maps every role onto the three RLS roles", () => {
+  assert.equal(rlsRoleFor("admin"), "admin");
+  assert.equal(rlsRoleFor("teacher"), "teacher");
+  assert.equal(rlsRoleFor("coordinator"), "teacher");
+  assert.equal(rlsRoleFor("program_coordinator"), "teacher");
+  assert.equal(rlsRoleFor("student"), "student");
+  assert.equal(rlsRoleFor("cdc"), "student");
+  assert.equal(rlsRoleFor("superuser"), "student");
 });
 
 test("TRIPWIRE (Slice D): cdc sessions collapse to the student RLS role", () => {

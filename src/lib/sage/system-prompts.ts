@@ -13,6 +13,13 @@ import {
   getRelevantContent,
 } from "./knowledge-base";
 import { buildPlatformKnowledge, type PlatformRole } from "./platform-map";
+import {
+  COMPACT_COORDINATOR_ASSISTANT_PROMPT,
+  COORDINATOR_ASSISTANT_PROMPT,
+  COORDINATOR_SCOPE_PLACEHOLDER,
+  coordinatorPlatformRole,
+  coordinatorScopeLine,
+} from "./coordinator-prompt";
 import { normalizeProgramType, type ProgramType } from "@/lib/program-type";
 import type { PromptTier } from "@/lib/ai";
 import { stripInvisibleChars } from "./invisible-chars";
@@ -523,37 +530,7 @@ BOUNDARIES:
 - Never contradict program policy — if unsure, flag it
 - You support administrative judgment; you do not replace it`,
 
-  coordinator_assistant: `You are Sage, an AI assistant for SPOKES regional coordinators.
-
-Coordinators oversee program health across multiple classrooms and instructors within their assigned regions. Help them:
-
-REGIONAL OVERSIGHT
-- Summarize regional rollups: program health, enrollment, and activity across the classrooms in their regions
-- Help interpret grant and benchmark progress toward funder-required outcomes
-- Surface instructor metrics in aggregate — patterns across instructors in a region, not individual student cases
-- Help prepare funder-ready exports and reporting language
-
-PROGRAM KNOWLEDGE
-- Answer specific questions about SPOKES certifications, platforms, forms, and procedures
-- Reference policy when asked
-- Flag compliance-sensitive concerns when you notice them
-
-STUDENT RECORD ACCESS RULE:
-- VisionQuest does NOT inject per-student context into coordinator conversations — coordinators work at the regional/aggregate level, not individual student records.
-- Never claim you have access to a specific student's data or history. If a coordinator asks about an individual student, tell them plainly that you don't have per-student access from this chat and point them to the relevant instructor or the student's record.
-- Only reason from aggregate/regional data explicitly provided in this conversation. Do not infer or invent individual student facts.
-
-YOUR TONE WITH COORDINATORS:
-- Professional and concise — coordinators are time-constrained and often preparing for funder or leadership review
-- Data-literate — use specific numbers and comparisons when context is provided
-- Candid — if a plan, benchmark trend, or assumption looks weak, say so respectfully
-- Action-oriented — every response should leave the coordinator closer to a decision or a clear next step
-
-BOUNDARIES:
-- Never share individual student-level data — coordinators work at the regional/aggregate level
-- Never contradict program policy — if unsure, flag it for the coordinator to verify
-- Never make promises about grant outcomes or funder decisions
-- You support coordinator judgment; you do not replace it`,
+  coordinator_assistant: COORDINATOR_ASSISTANT_PROMPT,
 
   career_profile_review: `CURRENT TASK: Career Profile Review — help the student understand and act on their Career DNA results.
 
@@ -630,11 +607,7 @@ Help with program operations, usage patterns, reports, policy-sensitive question
 
 Do not expose student-level data unless it is explicitly provided in the current context. Support administrative judgment; do not replace it.`,
 
-  coordinator_assistant: `You are Sage, an AI assistant for SPOKES regional coordinators.
-
-Help with regional rollups, grant/benchmark progress, aggregate instructor metrics, and funder-ready exports. Be concise, data-literate, candid, and action-oriented.
-
-VisionQuest never injects per-student context into coordinator chat — you work at the regional/aggregate level only. Never claim access to an individual student's data; if asked about one, say so plainly and point to the instructor or student record. Support coordinator judgment; do not replace it.`,
+  coordinator_assistant: COMPACT_COORDINATOR_ASSISTANT_PROMPT,
 
   career_profile_review: `CURRENT TASK: Career Profile Review - help the student understand and act on their Career DNA results.
 
@@ -680,6 +653,8 @@ function buildSystemPromptSections(
     pathwayContext?: string;
     coachingArcContext?: string;
     staffStudentContext?: string | null;
+    /** Session role of a staff user; picks the coordinator scope. */
+    staffRole?: string;
     selfMetricsLine?: string;
   } = {},
   tier: PromptTier = "full",
@@ -693,18 +668,12 @@ function buildSystemPromptSections(
       ? COMPACT_STAGE_PROMPTS[stage]
       : STAGE_PROMPTS[stage];
 
-  // Inject context variables
-  if (context.studentName) {
-    // Bracket studentName to mitigate prompt injection via displayName.
-    // sanitizeForPrompt strips fake delimiters so students cannot escape the bracket.
-    const nameLabel =
-      stage === "teacher_assistant" || stage === "admin_assistant" || stage === "coordinator_assistant"
-        ? "The staff user's name is"
-        : "The student's name is";
-    stagePrompt = `${nameLabel} [STUDENT_NAME_START]${sanitizeForPrompt(context.studentName)}[STUDENT_NAME_END].\n\n${stagePrompt}`;
-  }
+  // Fill the system placeholders before any user-supplied text joins the
+  // prompt, so a display name that contains placeholder text cannot capture
+  // the substitution (String.replace fills only the first match).
   // Substitute {pathway_context} with program-appropriate framing
   stagePrompt = stagePrompt.replace("{pathway_context}", PATHWAY_CONTEXTS[programType]);
+  stagePrompt = stagePrompt.replace(COORDINATOR_SCOPE_PLACEHOLDER, coordinatorScopeLine(context.staffRole));
   // Append classroom-confirmation beat to onboarding until the student confirms
   if (stage === "onboarding" && !context.classroomConfirmedAt) {
     stagePrompt = `${stagePrompt}\n\n${CLASSROOM_CONFIRMATION_INSTRUCTION}`;
@@ -736,13 +705,28 @@ function buildSystemPromptSections(
     );
   }
 
+  // The name goes in last, after every placeholder above is filled.
+  if (context.studentName) {
+    // Bracket studentName to mitigate prompt injection via displayName.
+    // sanitizeForPrompt strips fake delimiters so students cannot escape the bracket.
+    const nameLabel =
+      stage === "teacher_assistant" || stage === "admin_assistant" || stage === "coordinator_assistant"
+        ? "The staff user's name is"
+        : "The student's name is";
+    stagePrompt = `${nameLabel} [STUDENT_NAME_START]${sanitizeForPrompt(context.studentName)}[STUDENT_NAME_END].\n\n${stagePrompt}`;
+  }
+
   // Teacher, admin, and coordinator assistants get a streamlined prompt stack —
   // no student personality/guardrails. All three roles span multiple programs,
   // so the full SPOKES knowledge base stays the shared reference here;
   // program-specific framing only matters for student conversations.
   if (stage === "teacher_assistant" || stage === "admin_assistant" || stage === "coordinator_assistant") {
     const staffPlatformRole: PlatformRole =
-      stage === "admin_assistant" ? "admin" : stage === "coordinator_assistant" ? "coordinator" : "teacher";
+      stage === "admin_assistant"
+        ? "admin"
+        : stage === "coordinator_assistant"
+          ? coordinatorPlatformRole(context.staffRole)
+          : "teacher";
     const parts: PromptSection[] = isCompact
       ? [
           { name: "procedural", content: stagePrompt },

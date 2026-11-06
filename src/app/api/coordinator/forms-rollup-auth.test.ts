@@ -367,3 +367,15 @@ describe("GET /api/coordinator/forms/[regionId] — authorization", () => {
     assert.equal(body.canExport, true);
   });
 });
+
+describe("GET /api/coordinator/forms/[regionId] — program coordinator", () => {
+  it("admits a program coordinator on any existing region, like an admin", async () => {
+    mockHasPermission.mock.mockImplementation(async () => true);
+    mockRegionCount.mock.mockImplementation(async () => 1);
+    mockRegionCoordinatorFindUnique.mock.mockImplementation(async () => null);
+    seedRollupRows();
+    currentSession = mockTeacherSession({ role: "program_coordinator" });
+    const res = await get(REGION_ID);
+    assert.equal(res.status, 200);
+  });
+});

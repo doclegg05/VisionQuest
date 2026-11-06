@@ -1,5 +1,6 @@
-import { prisma } from "@/lib/db";
+import { prisma, prismaAdmin } from "@/lib/db";
 import { type Session } from "@/lib/api-error";
+import { seesWholeState } from "@/lib/org-roles";
 
 export interface RegionSummary {
   id: string;
@@ -9,15 +10,15 @@ export interface RegionSummary {
 }
 
 /**
- * Returns the regions a coordinator oversees. Admins (and other
- * super-scoped roles) see every active region. Anyone else gets only the
+ * Returns the regions a coordinator oversees. Admins and program
+ * coordinators see every active region. Anyone else gets only the
  * regions they're explicitly assigned to via RegionCoordinator.
  *
  * Non-coordinator, non-admin sessions get an empty list — the calling route
  * should 403 on that rather than relying on this helper to throw.
  */
 export async function listRegionsForSession(session: Session): Promise<RegionSummary[]> {
-  if (session.role === "admin") {
+  if (seesWholeState(session.role)) {
     return prisma.region.findMany({
       where: { status: "active" },
       select: { id: true, name: true, code: true, status: true },
@@ -25,6 +26,7 @@ export async function listRegionsForSession(session: Session): Promise<RegionSum
     });
   }
 
+  // Regional only: whole-state roles returned above, and program coordinators hold no regions.
   if (session.role !== "coordinator") {
     return [];
   }
@@ -41,15 +43,16 @@ export async function listRegionsForSession(session: Session): Promise<RegionSum
 }
 
 /**
- * Authorizes the current session to access the given region. Admins pass
- * automatically. Coordinators must have an entry in RegionCoordinator.
+ * Authorizes the current session to access the given region. Admins and program
+ * coordinators pass automatically. Coordinators must have an entry in RegionCoordinator.
  * Throws nothing here — returns boolean so callers can craft their own 403.
  */
 export async function coordinatorHasRegion(session: Session, regionId: string): Promise<boolean> {
-  if (session.role === "admin") {
+  if (seesWholeState(session.role)) {
     const exists = await prisma.region.count({ where: { id: regionId } });
     return exists > 0;
   }
+  // Regional only: whole-state roles returned above, and program coordinators hold no regions.
   if (session.role !== "coordinator") return false;
   const row = await prisma.regionCoordinator.findUnique({
     where: { regionId_coordinatorId: { regionId, coordinatorId: session.id } },
@@ -84,5 +87,49 @@ export async function classIdsInRegion(
 export async function countUnregionedClasses(): Promise<number> {
   return prisma.spokesClass.count({
     where: { regionId: null, status: { not: "archived" } },
+  });
+}
+
+/**
+ * Region ids an instructor belongs to, from their own RegionInstructor rows.
+ * Reads through the RLS client: a teacher can read their own rows.
+ */
+export async function listInstructorRegionIds(instructorId: string): Promise<string[]> {
+  const rows = await prisma.regionInstructor.findMany({
+    where: { instructorId },
+    select: { regionId: true },
+  });
+  return rows.map((row) => row.regionId);
+}
+
+/**
+ * Active regions the session may create a classroom in: every active region
+ * for whole-state roles, the instructor's own active regions for everyone else.
+ */
+export async function listRegionsForClassCreation(session: Session): Promise<RegionSummary[]> {
+  if (seesWholeState(session.role)) return listRegionsForSession(session);
+  const rows = await prisma.regionInstructor.findMany({
+    where: { instructorId: session.id, region: { status: "active" } },
+    select: { region: { select: { id: true, name: true, code: true, status: true } } },
+    orderBy: { region: { name: "asc" } },
+  });
+  return rows.map((row) => row.region);
+}
+
+/**
+ * Counts how many of the given instructors belong to a region.
+ *
+ * Uses the admin client on purpose: an instructor can read only their own
+ * RegionInstructor rows, so the RLS client would hide every co-teacher and
+ * the check could never pass. The query returns a count only, scoped to the
+ * one region and id list the caller passes.
+ */
+export async function countInstructorsInRegion(
+  regionId: string,
+  instructorIds: string[],
+): Promise<number> {
+  if (instructorIds.length === 0) return 0;
+  return prismaAdmin.regionInstructor.count({
+    where: { regionId, instructorId: { in: instructorIds } },
   });
 }

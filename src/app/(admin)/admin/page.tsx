@@ -1,7 +1,15 @@
 import ClassRosterManager from "@/components/teacher/ClassRosterManager";
 import PageIntro from "@/components/ui/PageIntro";
+import { OrgPlacementSection } from "@/components/staff/OrgPlacementSection";
+import { StaffInvitePanel } from "@/components/staff/StaffInvitePanel";
+import { getSession } from "@/lib/auth";
+import { listRegionsForSession } from "@/lib/region";
 
-export default function AdminSettingsPage() {
+const ADMIN_INVITE_ROLES = ["program_coordinator", "coordinator", "teacher"] as const;
+
+export default async function AdminSettingsPage() {
+  const session = await getSession();
+  const regions = session ? await listRegionsForSession(session) : [];
   return (
     <div className="page-shell">
       <PageIntro
@@ -65,6 +73,16 @@ export default function AdminSettingsPage() {
       </div>
 
       <ClassRosterManager />
+
+      {session && (
+        <div className="mt-6">
+          <OrgPlacementSection session={session} />
+        </div>
+      )}
+
+      <div className="mt-6">
+        <StaffInvitePanel roles={ADMIN_INVITE_ROLES} regions={regions} />
+      </div>
     </div>
   );
 }

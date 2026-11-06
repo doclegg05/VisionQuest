@@ -23,13 +23,11 @@ interface RouteContext {
 //                                  are refused by the wrapper itself)
 //   canPerformElevatedStaffAction → admin/coordinator TIER
 //
-// Their intersection is admins. Coordinators are named in the tier predicate
-// but cannot reach this handler today, and admitting them here would be a
-// change of a different size: `rlsContextFor` collapses a coordinator session
-// to role="student", and `buildManagedStudentWhere` fails closed for
-// coordinators by design (see its Slice D invariant), so a coordinator would
-// need an explicitly region-scoped query — the getCoordinatorInterventionQueue
-// pattern — not simply a wider role list. Until that exists the honest error
+// Their intersection is admins. Both coordinator roles are named in the tier
+// predicate but `withTeacherAuth` refuses them, so they cannot reach this
+// handler. `buildManagedStudentWhere` now scopes a regional coordinator to
+// their regions (organization tree), so admitting coordinators would be a
+// wrapper decision, not a scoping one. Until it is made the honest error
 // message is "admins", not "admins and coordinators".
 export const GET = withTeacherAuth(async (session, req: Request, ctx: RouteContext) => {
   if (!canPerformElevatedStaffAction(session.role)) {

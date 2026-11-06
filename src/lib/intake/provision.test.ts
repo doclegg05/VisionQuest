@@ -14,6 +14,7 @@ mock.module("@/lib/auth", {
     hashPassword: (password: string) => ({ hash: `hashed:${password}`, salt: "salt" }),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
     normalizeStudentId: (raw: string) => raw.trim().toLowerCase(),
+    getSession: async () => null,
   },
 });
 
@@ -34,7 +35,8 @@ const EXISTING = { id: "stu_existing", studentId: "dana.hall", displayName: "Dan
 
 const state = {
   spokesMatch: null as typeof EXISTING | null,
-  classes: [] as Array<{ id: string; name: string; description: string | null }>,
+  emailMatch: null as typeof EXISTING | null,
+  classes: [] as Array<{ id: string; name: string; description: string | null; status?: string }>,
   countyFilter: null as string | null,
 };
 
@@ -48,7 +50,7 @@ const created = {
 
 const fakeClient = {
   student: {
-    findFirst: async () => null,
+    findFirst: async () => state.emailMatch,
     findUnique: async () => null,
     create: async ({ data }: { data: Record<string, unknown> }) => {
       const row = { id: `stu_new_${created.students.length}`, ...data };
@@ -68,7 +70,13 @@ const fakeClient = {
     findFirst: async (args: { where?: Record<string, unknown> }) => {
       const where = args?.where ?? {};
       if (typeof where.id === "string") {
-        return state.classes.find((c) => c.id === where.id) ?? null;
+        return (
+          state.classes.find(
+            (c) =>
+              c.id === where.id &&
+              (where.status === undefined || (c.status ?? "active") === where.status),
+          ) ?? null
+        );
       }
       if (state.countyFilter) {
         const needle = state.countyFilter.toLowerCase();
@@ -133,9 +141,11 @@ const PAYLOAD = {
 
 function reset() {
   state.spokesMatch = null;
+  state.emailMatch = null;
   state.classes = [
     { id: "class_kanawha", name: "Kanawha County SPOKES", description: null },
     { id: "class_mercer", name: "Mercer County SPOKES", description: null },
+    { id: "class_old", name: "Kanawha Old Cohort", description: null, status: "archived" },
   ];
   state.countyFilter = "Kanawha";
   created.students.length = 0;
@@ -197,6 +207,67 @@ describe("provisionIntakeStudent — an existing match on the staff path", () =>
     assert.equal(result.outcome, "updated");
     assert.equal(created.spokesUpserts.length, 1);
     assert.equal(created.alerts.length, 0);
+  });
+});
+
+describe("provisionIntakeStudent — a staff caller who cannot manage the matched student", () => {
+  beforeEach(reset);
+
+  const REFUSAL = "This student may already have an account. Ask an admin to add them to your class.";
+
+  async function refusalFor(match: "email" | "nameAndBirthDate"): Promise<unknown> {
+    if (match === "email") state.emailMatch = EXISTING;
+    else state.spokesMatch = EXISTING;
+    const asked: string[] = [];
+    const payload = match === "email" ? { ...PAYLOAD, email: "dana@example.org" } : PAYLOAD;
+    const error = await provision
+      .provisionIntakeStudent(payload, {
+        source: "staff",
+        requireNamedClass: true,
+        canAdoptExisting: async (id) => {
+          asked.push(id);
+          return false;
+        },
+      })
+      .then(
+        () => null,
+        (err: unknown) => err,
+      );
+    assert.deepEqual(asked, [EXISTING.id], "the check must be asked about the matched account");
+    return error;
+  }
+
+  for (const match of ["email", "nameAndBirthDate"] as const) {
+    it(`refuses a ${match} match with a generic 409 that names nobody`, async () => {
+      const error = await refusalFor(match);
+      assert.ok(error instanceof Error, "expected a refusal");
+      assert.equal((error as { statusCode?: number }).statusCode, 409);
+      assert.equal(error.message, REFUSAL);
+      const raw = JSON.stringify({ ...error, text: error.message });
+      assert.ok(!raw.includes(EXISTING.id), raw);
+      assert.ok(!raw.includes(EXISTING.studentId), raw);
+      assert.ok(!raw.includes(EXISTING.displayName), raw);
+    });
+
+    it(`writes nothing for a refused ${match} match`, async () => {
+      await refusalFor(match);
+      assert.equal(created.spokesUpserts.length, 0);
+      assert.equal(created.enrollments.length, 0);
+      assert.equal(created.students.length, 0);
+      assert.equal(created.alerts.length, 0);
+      assert.equal(created.progress.length, 0);
+      assert.equal(tryLogAuditEventMock.mock.callCount(), 0);
+    });
+  }
+
+  it("keeps today's update when the caller can manage the matched student", async () => {
+    state.emailMatch = EXISTING;
+    const result = await provision.provisionIntakeStudent(
+      { ...PAYLOAD, email: "dana@example.org" },
+      { source: "staff", canAdoptExisting: async () => true },
+    );
+    assert.equal(result.outcome, "updated");
+    assert.equal(created.spokesUpserts.length, 1);
   });
 });
 
@@ -333,5 +404,26 @@ describe("provisionIntakeStudent — class resolution", () => {
     });
 
     assert.equal(created.enrollments[0]?.classId, "class_mercer");
+  });
+
+  it("refuses a named class that is not active when the caller must name one, and creates nothing", async () => {
+    await assert.rejects(
+      provision.provisionIntakeStudent(
+        { ...PAYLOAD, classId: "class_old" },
+        { source: "staff", requireNamedClass: true },
+      ),
+      /That classroom is not active\./,
+    );
+
+    assert.equal(created.students.length, 0);
+    assert.equal(created.enrollments.length, 0);
+  });
+
+  it("keeps the county fallback for a named inactive class when the flag is off", async () => {
+    await provision.provisionIntakeStudent({ ...PAYLOAD, classId: "class_old" }, {
+      source: "staff",
+    });
+
+    assert.equal(created.enrollments[0]?.classId, "class_kanawha");
   });
 });

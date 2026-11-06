@@ -166,6 +166,46 @@ const PRONOUN_RE = /\b(his|hers?|theirs?|him|she|he|they)\b/iu;
  */
 export const STAFF_FACT_SUBJECT = "This instructor";
 
+/** How the extractor names the staff member a fact is about, per role. */
+export interface StaffFactSubject {
+  /** Fixed opener every fact must start with, e.g. "This instructor". */
+  readonly subject: string;
+  /** The role in plain words, e.g. "instructor". */
+  readonly noun: string;
+  /** Plural, for the prompt's opening line. */
+  readonly plural: string;
+}
+
+const INSTRUCTOR_SUBJECT: StaffFactSubject = {
+  subject: STAFF_FACT_SUBJECT,
+  noun: "instructor",
+  plural: "instructors",
+};
+
+/**
+ * Fixed table from session role to fact subject. Coordinators and admins chat
+ * with Sage too, and a "This instructor" fact about a coordinator would be a
+ * wrong fact. The role string only selects a row; it never reaches the prompt.
+ * Every subject is "This" plus lowercase words, so the proper-noun scan below
+ * sees only "This", as it always has.
+ */
+const STAFF_FACT_SUBJECTS_BY_ROLE: Readonly<Record<string, StaffFactSubject>> = {
+  teacher: INSTRUCTOR_SUBJECT,
+  coordinator: { subject: "This regional coordinator", noun: "regional coordinator", plural: "regional coordinators" },
+  program_coordinator: { subject: "This program coordinator", noun: "program coordinator", plural: "program coordinators" },
+  admin: { subject: "This admin", noun: "admin", plural: "admins" },
+};
+
+/** Every opener a stored staff fact may start with. */
+export const STAFF_FACT_SUBJECTS: readonly string[] = [
+  ...new Set(Object.values(STAFF_FACT_SUBJECTS_BY_ROLE).map((entry) => entry.subject)),
+];
+
+/** The fact subject for a session role. Any other role gets the instructor wording. */
+export function staffFactSubjectFor(role: string): StaffFactSubject {
+  return Object.hasOwn(STAFF_FACT_SUBJECTS_BY_ROLE, role) ? STAFF_FACT_SUBJECTS_BY_ROLE[role] : INSTRUCTOR_SUBJECT;
+}
+
 /**
  * Third-person gendered pronouns. In a fact about "this instructor" they point
  * at a third person. "they" and "their" are left out: the extractor uses them
@@ -241,7 +281,7 @@ export function looksLikeStudentReference(content: string): boolean {
   // the text after the frame was measured too and rejected: it dropped 8 of
   // the 66, mostly "This instructor performs their review pass…", because
   // any verb missing from the allowlist plus "their" fires it.
-  if (content.startsWith(STAFF_FACT_SUBJECT) && GENDERED_PRONOUN_RE.test(content)) {
+  if (STAFF_FACT_SUBJECTS.some((subject) => content.startsWith(subject)) && GENDERED_PRONOUN_RE.test(content)) {
     return true;
   }
 

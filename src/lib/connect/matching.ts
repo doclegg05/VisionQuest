@@ -261,10 +261,10 @@ interface Candidate {
  * be counted twice in "N fit". When a classId is named, the row for THAT class
  * wins, because it carries the region the location score uses.
  *
- * The pool is the viewer's to see. A viewer who may manage any class (every
- * regular teacher and admin) gets the whole program; anyone else, the cohort
- * demo instructor included, gets only classes they are an assigned instructor
- * of. The enrollment RLS policy should narrow a teacher the same way, but on
+ * The pool is the viewer's to see. A viewer who may manage any class (admin
+ * or program coordinator) gets the whole program; anyone else, every teacher
+ * and the cohort demo instructor included, gets only classes they are an
+ * assigned instructor of. The enrollment RLS policy should narrow a teacher the same way, but on
  * 2026-10-23 the live Connect page showed the demo instructor another class's
  * students, so this filter does not lean on it.
  */

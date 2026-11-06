@@ -94,6 +94,7 @@ model Student {
   formResponses           FormResponse[]           @relation("FormResponses")
   reviewedFormResponses   FormResponse[]           @relation("ReviewedFormResponses")
   regionAssignments       RegionCoordinator[]
+  instructorRegions       RegionInstructor[]       @relation("RegionInstructors")
   wagers                  Wager[]
   careerCampaigns         CareerCampaign[]
   failedExtractions       FailedExtraction[]
@@ -2458,6 +2459,7 @@ model Region {
   updatedAt   DateTime @updatedAt
 
   coordinators RegionCoordinator[]
+  instructors  RegionInstructor[]
   classes      SpokesClass[]
   grantGoals   GrantGoal[]
 
@@ -2475,6 +2477,47 @@ model RegionCoordinator {
 
   @@id([regionId, coordinatorId])
   @@index([coordinatorId])
+  @@schema("visionquest")
+}
+
+model RegionInstructor {
+  regionId     String
+  instructorId String
+  assignedAt   DateTime @default(now())
+  assignedById String?
+
+  region     Region  @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  instructor Student @relation("RegionInstructors", fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@id([regionId, instructorId])
+  @@index([instructorId])
+  @@schema("visionquest")
+}
+
+/// An invitation for someone to join the organization tree as staff.
+/// Only the SHA-256 of the token is stored. See src/lib/staff-invites.ts.
+model StaffInvite {
+  id           String    @id @default(cuid())
+  email        String
+  role         String
+  regionId     String?
+  invitedById  String
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  acceptedById String?
+  revokedAt    DateTime?
+  /// True when the invite email was sent. Accepting such an invite needs a
+  /// 6-digit code emailed to the same address (Ruling R21).
+  deliveredByEmail Boolean   @default(false)
+  /// SHA-256 of the current accept code. Never the code itself.
+  codeHash         String?
+  codeExpiresAt    DateTime?
+  codeAttempts     Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([email])
   @@schema("visionquest")
 }
 

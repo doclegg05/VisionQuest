@@ -189,8 +189,23 @@ describe("POST /api/teacher/students/:id/reassign-class", () => {
     assert.equal(res.status, 403);
   });
 
-  it("allows a coordinator session", async () => {
-    currentSession = { ...mockAdminSession(), role: "coordinator" };
+  // Ruling R11 (organization tree): coordinators read; they do not move students.
+  for (const role of ["coordinator", "program_coordinator"]) {
+    it(`refuses a ${role} session with 403 and writes nothing`, async () => {
+      currentSession = { ...mockAdminSession(), role };
+      const res = await callRoute({ newClassId: "class-target" });
+      assert.equal(res.status, 403);
+      const body = (await res.json()) as { error: string };
+      assert.equal(body.error, "Coordinators can view classes but cannot move students.");
+      assert.equal(mockStudentFindFirst.mock.callCount(), 0);
+      assert.equal(mockEnrollmentUpdate.mock.callCount(), 0);
+      assert.equal(mockEnrollmentCreate.mock.callCount(), 0);
+      assert.equal(mockAdminAuditLogCreate.mock.callCount(), 0);
+    });
+  }
+
+  it("allows an admin session", async () => {
+    currentSession = mockAdminSession();
     const res = await callRoute({ newClassId: "class-target" });
     assert.equal(res.status, 200);
   });

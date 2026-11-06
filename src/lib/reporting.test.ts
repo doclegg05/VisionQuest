@@ -52,8 +52,9 @@ mock.module("@/lib/db", {
 });
 
 let getTeacherOutcomeReport: typeof import("./reporting").getTeacherOutcomeReport;
+let emptyTeacherOutcomeReport: typeof import("./reporting").emptyTeacherOutcomeReport;
 before(async () => {
-  ({ getTeacherOutcomeReport } = await import("./reporting"));
+  ({ getTeacherOutcomeReport, emptyTeacherOutcomeReport } = await import("./reporting"));
 });
 
 const CRISIS: AlertRow = { id: "a-crisis", severity: "critical", title: "Wellbeing check-in needed" };
@@ -94,5 +95,16 @@ describe("getTeacherOutcomeReport urgent alerts", () => {
       order.indexOf("crisis") < order.indexOf("medium"),
       `expected crisis before medium, got ${order.join(", ")}`,
     );
+  });
+});
+
+describe("emptyTeacherOutcomeReport", () => {
+  it("has the shape a real report over zero students and zero program rows has", async () => {
+    students = [];
+    assert.deepEqual(emptyTeacherOutcomeReport(), await getTeacherOutcomeReport());
+  });
+
+  it("still refuses an empty scope list rather than reporting program-wide", async () => {
+    await assert.rejects(() => getTeacherOutcomeReport([]), /non-empty array or undefined/);
   });
 });

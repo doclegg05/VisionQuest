@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Users, Books, ChatCircle } from "@phosphor-icons/react/dist/ssr";
+import { UnplacedStaffNotice } from "@/components/staff/UnplacedStaffNotice";
 import { getSession } from "@/lib/auth";
+import { isUnplacedInstructor } from "@/lib/org-placement";
 import ClassContextSwitcher from "@/components/teacher/ClassContextSwitcher";
 import ClassOverview from "@/components/teacher/ClassOverview";
 import InterventionQueuePanel from "@/components/teacher/InterventionQueuePanel";
@@ -18,6 +20,12 @@ export default async function TeacherDashboard({ searchParams }: TeacherDashboar
 
   if (!session) {
     return null;
+  }
+
+  // An instructor with no region and no class sees this instead of the
+  // dashboard. It runs before any student data is read.
+  if (session.role === "teacher" && (await isUnplacedInstructor(session.id))) {
+    return <UnplacedStaffNotice />;
   }
 
   const params = await searchParams;

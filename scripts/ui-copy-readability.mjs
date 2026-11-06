@@ -117,6 +117,13 @@ const SCAN_ROOTS = [
   // with no account and no context at all. The advising hub renders the
   // alerts a nudge produces.
   { label: "components/settings", relPath: "src/components/settings" },
+  // Staff invite surfaces (org tree, Phase 1): the form, the open-invite list and the accept page.
+  { label: "components/staff", relPath: "src/components/staff" },
+  { label: "staff invite accept page", relPath: "src/app/invite" },
+  { label: "staff invite messages (src/lib carve-out)", relPath: "src/lib/staff-invite-messages.ts" },
+  // Coordinator drill-down (org tree, Phase 1): the two new components. The older coordinator panels are outside the gate.
+  { label: "coordinator drill-down region view", relPath: "src/components/coordinator/RegionDrilldown.tsx" },
+  { label: "coordinator drill-down class roster", relPath: "src/components/coordinator/ClassRosterList.tsx" },
   { label: "components/advising", relPath: "src/components/advising" },
   { label: "components/teacher/connect", relPath: "src/components/teacher/connect" },
   { label: "public employer response page", relPath: "src/app/connect" },

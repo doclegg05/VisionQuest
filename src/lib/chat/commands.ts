@@ -1,4 +1,5 @@
-export type ChatRole = "student" | "teacher" | "admin";
+/** Chat UI role. "coordinator" serves both coordinator roles: they share one tool set. */
+export type ChatRole = "student" | "teacher" | "admin" | "coordinator";
 
 export interface SlashCommand {
   slash: string;
@@ -120,14 +121,14 @@ export const COMMANDS: SlashCommand[] = [
     label: "Policy lookup",
     description: "Look up a SPOKES program policy",
     prefill: "What's the SPOKES policy on ",
-    roles: ["teacher"],
+    roles: ["teacher", "coordinator"],
   },
   {
     slash: "/form",
     label: "Find a form",
     description: "Locate a program form and its purpose",
     prefill: "Where's the ",
-    roles: ["teacher"],
+    roles: ["teacher", "coordinator"],
   },
 
   // Admin
@@ -175,6 +176,12 @@ export const STARTER_CHIPS: Record<ChatRole, StarterChip[]> = {
     { label: "Policy lookup", prefill: "What's the SPOKES policy on " },
     { label: "Find a form", prefill: "Where's the " },
   ],
+  coordinator: [
+    { label: "Find a form", prefill: "Where's the " },
+    { label: "Policy lookup", prefill: "What's the SPOKES policy on " },
+    { label: "Career wages", prefill: "What do jobs pay for " },
+    { label: "Who needs attention", prefill: "Which students need attention right now?" },
+  ],
   admin: [
     { label: "Usage this week", prefill: "Show me platform usage for this week." },
     { label: "Report", prefill: "Generate a report on " },
@@ -197,4 +204,12 @@ export function filterCommands(
 
 export function getStarterChips(role: ChatRole): StarterChip[] {
   return STARTER_CHIPS[role];
+}
+
+/**
+ * Whether the chat composer offers file attachments. Coordinators hold no
+ * upload or attachment tool, and /api/chat/upload refuses them.
+ */
+export function chatRoleCanAttachFiles(role: ChatRole): boolean {
+  return role !== "coordinator";
 }

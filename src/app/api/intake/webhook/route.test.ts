@@ -8,7 +8,54 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 
-mock.module("@/lib/auth", { namedExports: { getSession: async () => null } });
+let currentSession: Record<string, unknown> | null = null;
+mock.module("@/lib/auth", { namedExports: { getSession: async () => currentSession } });
+
+// A tiny stand-in for the class table: the real assertStaffCanManageClass runs
+// against it, so the instructor filter it builds is what decides the outcome.
+const CLASS_INSTRUCTORS: Record<string, string[]> = {
+  class_mine: ["teacher_1"],
+  class_other: ["teacher_2"],
+  class_archived: ["teacher_1"],
+};
+const CLASS_STATUS: Record<string, string> = { class_archived: "archived" };
+// Which class each existing student is enrolled in, for the real
+// staff-can-manage-student check the route hands to provisioning.
+const STUDENT_CLASS: Record<string, string> = { stu_mine: "class_mine", stu_elsewhere: "class_other" };
+type ManagedWhere = {
+  AND: [
+    { OR: Array<{ id?: string }> },
+    { classEnrollments?: { some: { class?: { instructors?: { some: { instructorId: string } } } } } },
+  ];
+};
+mock.module("@/lib/db", {
+  exports: {
+    prisma: {
+      student: {
+        findFirst: async (args: { where: ManagedWhere }) => {
+          const [identifier, managed] = args.where.AND;
+          const id = identifier.OR.find((clause) => clause.id)?.id ?? "";
+          const classId = STUDENT_CLASS[id];
+          if (!classId) return null;
+          const instructorId = managed.classEnrollments?.some.class?.instructors?.some.instructorId;
+          if (instructorId && !CLASS_INSTRUCTORS[classId]?.includes(instructorId)) return null;
+          return { id };
+        },
+      },
+      spokesClass: {
+        findFirst: async (args: {
+          where: { id: string; instructors?: { some: { instructorId: string } } };
+        }) => {
+          const { id, instructors } = args.where;
+          const roster = CLASS_INSTRUCTORS[id];
+          if (!roster) return null;
+          if (instructors && !roster.includes(instructors.some.instructorId)) return null;
+          return { id, name: id, code: id, status: CLASS_STATUS[id] ?? "active" };
+        },
+      },
+    },
+  },
+});
 
 class FakeApiError extends Error {
   constructor(
@@ -21,11 +68,13 @@ class FakeApiError extends Error {
 
 mock.module("@/lib/api-error", {
   namedExports: {
+    ApiError: FakeApiError,
     isStaffRole: (role: string) => role === "teacher" || role === "admin",
     // parseBody reaches for this on a schema failure; without it the route
     // would 500 on a bad payload and the 400 case would pass for the wrong
     // reason.
     badRequest: (message: string) => new FakeApiError(400, message),
+    forbidden: (message = "Forbidden") => new FakeApiError(403, message),
     // Faithful to the real wrapper's contract: ApiError renders as its own
     // status and message, anything else as a bare 500 with no detail.
     withErrorHandler:
@@ -60,8 +109,13 @@ mock.module("@/lib/logger", {
 
 let provisionResult: unknown = null;
 let provisionError: Error | null = null;
-const provisionMock = mock.fn(async (_payload: unknown, _options: unknown) => {
+const provisionMock = mock.fn(async (payload: unknown, options: unknown) => {
   if (provisionError) throw provisionError;
+  // Mirrors provision.ts: a required class that is not active is refused.
+  const named = (payload as { classId?: string }).classId;
+  if ((options as { requireNamedClass?: boolean }).requireNamedClass && named && CLASS_STATUS[named]) {
+    throw new FakeApiError(400, "That classroom is not active.");
+  }
   return provisionResult;
 });
 
@@ -109,6 +163,7 @@ function postWebhook(body: Record<string, unknown> = PAYLOAD): Request {
 describe("POST /api/intake/webhook", () => {
   beforeEach(() => {
     provisionError = null;
+    currentSession = null;
     provisionResult = {
       outcome: "provisioned",
       studentDbId: "stu_1",
@@ -224,5 +279,106 @@ describe("POST /api/intake/webhook", () => {
     assert.ok(!raw.includes("prisma"), `response leaked Prisma internals: ${raw}`);
     assert.ok(!raw.includes("Foreign key"), `response leaked the driver error: ${raw}`);
     assert.ok(!("message" in body), `response carried a raw message field: ${raw}`);
+  });
+
+  describe("a staff session caller", () => {
+    const teacher = { id: "teacher_1", role: "teacher", studentId: "t1", displayName: "T One" };
+
+    function postAsSession(extra: Record<string, unknown>): Request {
+      return new Request("http://localhost:3000/api/intake/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...PAYLOAD, ...extra }),
+      });
+    }
+
+    it("is refused a class they do not instruct, and no student is created", async () => {
+      currentSession = teacher;
+
+      const res = await route.POST(postAsSession({ classId: "class_other" }));
+
+      assert.equal(res.status, 403);
+      assert.equal(provisionMock.mock.callCount(), 0);
+    });
+
+    it("enrolls the student in a class they do instruct", async () => {
+      currentSession = teacher;
+
+      const res = await route.POST(postAsSession({ classId: "class_mine" }));
+
+      assert.equal(res.status, 201);
+      assert.equal(provisionMock.mock.callCount(), 1);
+      const payload = provisionMock.mock.calls[0]?.arguments[0] as { classId?: string };
+      assert.equal(payload.classId, "class_mine");
+    });
+
+    it("is told when their own class is no longer active, and the flag reaches provisioning", async () => {
+      currentSession = teacher;
+
+      const res = await route.POST(postAsSession({ classId: "class_archived" }));
+      const body = await res.json();
+
+      assert.equal(res.status, 400);
+      assert.equal(body.error, "That classroom is not active.");
+      const options = provisionMock.mock.calls[0]?.arguments[1] as { requireNamedClass?: boolean };
+      assert.equal(options.requireNamedClass, true);
+    });
+
+    it("must name a classroom", async () => {
+      currentSession = teacher;
+
+      const res = await route.POST(postAsSession({}));
+      const body = await res.json();
+
+      assert.equal(res.status, 400);
+      assert.equal(body.error, "Choose one of your classrooms.");
+      assert.equal(provisionMock.mock.callCount(), 0);
+    });
+
+    it("hands provisioning a check that refuses students outside the teacher's classes", async () => {
+      currentSession = teacher;
+
+      await route.POST(postAsSession({ classId: "class_mine" }));
+
+      const options = provisionMock.mock.calls[0]?.arguments[1] as {
+        canAdoptExisting?: (id: string) => Promise<boolean>;
+      };
+      assert.equal(typeof options.canAdoptExisting, "function");
+      assert.equal(await options.canAdoptExisting?.("stu_mine"), true);
+      assert.equal(await options.canAdoptExisting?.("stu_elsewhere"), false);
+    });
+
+    it("passes provisioning's generic 409 through unchanged", async () => {
+      currentSession = teacher;
+      const message = "This student may already have an account. Ask an admin to add them to your class.";
+      provisionError = new FakeApiError(409, message);
+
+      const res = await route.POST(postAsSession({ classId: "class_mine" }));
+      const body = await res.json();
+
+      assert.equal(res.status, 409);
+      assert.deepEqual(body, { error: message });
+    });
+
+    it("lets an admin name any class", async () => {
+      currentSession = { id: "admin_1", role: "admin", studentId: "a1", displayName: "A" };
+
+      const res = await route.POST(postAsSession({ classId: "class_other" }));
+
+      assert.equal(res.status, 201);
+    });
+  });
+
+  it("leaves the bearer-secret path alone: no class needed, county matching intact", async () => {
+    const res = await route.POST(postWebhook());
+
+    assert.equal(res.status, 201);
+    assert.equal(provisionMock.mock.callCount(), 1);
+    const options = provisionMock.mock.calls[0]?.arguments[1] as {
+      requireNamedClass?: boolean;
+      canAdoptExisting?: unknown;
+    };
+    assert.equal(options.requireNamedClass, false);
+    assert.equal(options.canAdoptExisting, undefined);
   });
 });

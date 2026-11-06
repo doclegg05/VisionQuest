@@ -11,6 +11,7 @@ import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
 import { tryLogAuditEvent } from "@/lib/audit";
 import { canPerformElevatedStaffAction } from "@/lib/classroom";
+import { isCoordinatorRole } from "@/lib/org-roles";
 import { type ProgramType } from "@/lib/program-type";
 import { getStudentProgramType } from "@/lib/program-type-server";
 
@@ -36,10 +37,14 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export const POST = withAuth(
   async (session, req: NextRequest, ctx: unknown) => {
-    // Privilege TIER, not scope breadth: canManageAnyClass admits plain
-    // teachers (they read across classes by design), which is not who may
-    // move a student's enrollment and rewrite their programType/cohort
-    // attribution. See the contrast doc block in src/lib/classroom.ts.
+    // Privilege TIER, not scope breadth: a plain teacher manages their own
+    // classes' students, which is not the same as who may move a student's
+    // enrollment and rewrite their programType/cohort attribution. See the
+    // contrast doc block in src/lib/classroom.ts.
+    // Ruling R11: coordinators read the tree; they never move a student.
+    if (isCoordinatorRole(session.role)) {
+      throw forbidden("Coordinators can view classes but cannot move students.");
+    }
     if (!canPerformElevatedStaffAction(session.role)) {
       throw forbidden("Only admins and coordinators can reassign students.");
     }

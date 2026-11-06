@@ -28,6 +28,51 @@ export async function parseBody<T extends z.ZodTypeAny>(
   return result.data;
 }
 
+// ─── Class Schemas ──────────────────────────────────────────────────────────
+
+const optionalIsoDate = z
+  .string()
+  .trim()
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), "Enter a valid date.")
+  .optional()
+  .nullable()
+  .or(z.literal(""));
+
+export const createClassSchema = z.object({
+  name: z.string().trim().min(1, "Class name is required.").max(120, "Class name must be 120 characters or fewer."),
+  code: z.string().optional(),
+  description: z.string().optional(),
+  instructorIds: z
+    .array(z.string().cuid("One or more selected instructors are invalid."))
+    .min(1, "Pick at least one instructor."),
+  startDate: optionalIsoDate,
+  endDate: optionalIsoDate,
+  programType: z
+    .enum(["spokes", "adult_ed", "ietp"], { message: "programType must be one of: spokes, adult_ed, ietp." })
+    .default("spokes"),
+  regionId: z.string({ message: "Pick a region for this classroom." }).cuid("Pick a region for this classroom."),
+});
+
+/**
+ * PATCH body for an existing class. Every field is optional; the route keeps
+ * the checks that need the stored class (blank name, status values, region
+ * rules). `regionId: null` means "remove the region", which only an admin may do.
+ */
+export const updateClassSchema = z.object({
+  name: z.string().optional(),
+  code: z.string().optional(),
+  status: z.string().optional(),
+  description: z.string().optional(),
+  programType: z.string({ message: "programType must be one of: spokes, adult_ed, ietp." }).optional(),
+  regionId: z
+    .string({ message: "regionId must be a non-empty string or null." })
+    .nullable()
+    .optional(),
+  instructorIds: z.array(z.string()).optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+});
+
 // ─── Auth Schemas ───────────────────────────────────────────────────────────
 
 export const loginSchema = z.object({

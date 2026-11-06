@@ -56,13 +56,13 @@ async function main() {
   const { PLATFORM_MAP } = await import("../../src/lib/sage/platform-map.ts");
 
   // Pull every registered tool + its requiredRoles by unioning
-  // getEnabledTools() across all four roles (there is no single exported
+  // getEnabledTools() across every role (there is no single exported
   // "all tools" list), then reconciling with getToolByName so the role set
   // reflects the tool's *declared* requiredRoles rather than the runtime
   // admin-superset behavior in getEnabledTools.
   const { getEnabledTools, getToolByName } = await import("../../src/lib/sage/agent/tools.ts");
   const toolNameSet = new Set();
-  for (const role of ["student", "teacher", "admin", "coordinator"]) {
+  for (const role of ["student", "teacher", "admin", "coordinator", "program_coordinator"]) {
     for (const tool of getEnabledTools(role)) toolNameSet.add(tool.name);
   }
   const toolNames = [...toolNameSet];

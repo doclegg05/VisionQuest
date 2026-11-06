@@ -3,7 +3,13 @@ import { getSession } from "./auth";
 import type { DemoAccountKind } from "./demo/config";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
+import { rlsRoleFor } from "./rls-headers";
 import { withRlsContext, type RlsContext } from "./rls-context";
+
+// Defined in the dependency-free rls-headers module so the proxy can use it
+// without loading this file's server imports; re-exported here as the
+// canonical entry point for auth wrappers.
+export { rlsRoleFor };
 
 /**
  * Translate a Session into the RLS context shape expected by
@@ -12,7 +18,7 @@ import { withRlsContext, type RlsContext } from "./rls-context";
  * withCoordinatorAuth) can share the exact same logic and stay in sync.
  */
 export function rlsContextFor(session: Session): RlsContext {
-  const role = session.role === "admin" || session.role === "teacher" ? session.role : "student";
+  const role = rlsRoleFor(session.role);
   return {
     userId: session.id,
     role,

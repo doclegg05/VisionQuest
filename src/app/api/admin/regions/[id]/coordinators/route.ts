@@ -39,6 +39,7 @@ export const POST = withAdminAuth(async (_session, req: Request, ctx: RouteConte
     select: { id: true, role: true, isActive: true },
   });
   if (!coordinator) throw notFound("Coordinator not found.");
+  // Regional only: a program coordinator sees the whole state and is never assigned a region.
   if (coordinator.role !== "coordinator" && coordinator.role !== "admin") {
     throw badRequest("Target user is not a coordinator or admin.");
   }

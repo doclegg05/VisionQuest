@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { getRoleHomePath, getRoleSettingsPath } from "@/lib/role-home";
+import { isCoordinatorRole } from "@/lib/org-roles";
 import { type NavPhase, type NavItem } from "@/lib/nav-progression";
 import { getVisibleNavItems, getVisibleSecondaryNavItems } from "@/lib/nav-items";
 import {
@@ -43,6 +44,8 @@ export const STAFF_ITEMS: NavItem[] = [
 
 export const COORDINATOR_ITEMS: NavItem[] = [
   { href: "/coordinator", label: "Coordinator", icon: Buildings, phase: 1 },
+  // Owner decision, 2026-11-06: both coordinator roles may use Sage chat.
+  { href: "/coordinator/chat", label: "Sage", icon: ChatCircle, phase: 1 },
 ];
 
 /**
@@ -69,7 +72,8 @@ const ADMIN_ROSTER_ITEM: NavItem = STAFF_ITEMS[0];
 export const ADMIN_NAV_ITEMS: NavItem[] = [
   ...ADMIN_ITEMS,
   ADMIN_ROSTER_ITEM,
-  ...COORDINATOR_ITEMS,
+  // Admin keeps its own Sage (/admin/chat), so the coordinator copy is dropped.
+  ...COORDINATOR_ITEMS.filter((item) => item.href !== "/coordinator/chat"),
   ...STAFF_ITEMS.filter((item) => item.href !== "/teacher/chat" && item.href !== "/teacher/library"),
 ].filter((item, index, all) => all.findIndex((other) => other.href === item.href) === index);
 
@@ -78,6 +82,13 @@ interface NavBarProps {
   role: string;
   navPhase?: NavPhase;
   orientationComplete?: boolean;
+}
+
+/** Sidebar items for a staff role. Both coordinator roles share the coordinator list. */
+export function staffPrimaryNavItemsFor(role: string): NavItem[] {
+  if (role === "admin") return ADMIN_NAV_ITEMS;
+  if (isCoordinatorRole(role)) return COORDINATOR_ITEMS;
+  return STAFF_ITEMS;
 }
 
 export default function NavBar({ studentName, role, navPhase, orientationComplete }: NavBarProps) {
@@ -119,11 +130,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
   const primaryItems =
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
-      : role === "admin"
-        ? ADMIN_NAV_ITEMS
-        : role === "coordinator"
-          ? COORDINATOR_ITEMS
-          : STAFF_ITEMS;
+      : staffPrimaryNavItemsFor(role);
 
   // Secondary nav items (student only)
   const secondaryItems =
@@ -515,7 +522,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       </aside>
 
       {/* Floating Sage button + mini chat */}
-      {pathname !== "/chat" && pathname !== "/dashboard" && pathname !== "/teacher/chat" && pathname !== "/admin/chat" && (
+      {pathname !== "/chat" && pathname !== "/dashboard" && pathname !== "/teacher/chat" && pathname !== "/admin/chat" && pathname !== "/coordinator/chat" && (
         <>
           <button
             onClick={() => setSageMiniOpen((v) => !v)}

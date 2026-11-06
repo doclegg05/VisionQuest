@@ -60,6 +60,7 @@ interface ClassDetail {
 interface ClassesResponse {
   classes: ClassSummary[];
   availableInstructors: InstructorOption[];
+  regions?: { id: string; name: string }[];
 }
 
 interface ClassDetailResponse {
@@ -110,6 +111,8 @@ export default function ClassRosterManager() {
   const [newClassStartDate, setNewClassStartDate] = useState("");
   const [newClassEndDate, setNewClassEndDate] = useState("");
   const [newInstructorIds, setNewInstructorIds] = useState<string[]>([]);
+  const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
+  const [newRegionId, setNewRegionId] = useState("");
   const [className, setClassName] = useState("");
   const [classCode, setClassCode] = useState("");
   const [classDescription, setClassDescription] = useState("");
@@ -137,6 +140,7 @@ export default function ClassRosterManager() {
 
       setClasses(payload.classes || []);
       setAvailableInstructors(payload.availableInstructors || []);
+      setRegions(payload.regions || []);
 
       const nextClassId =
         preferredClassId && payload.classes.some((item) => item.id === preferredClassId)
@@ -319,6 +323,7 @@ export default function ClassRosterManager() {
           startDate: newClassStartDate || null,
           endDate: newClassEndDate || null,
           instructorIds: newInstructorIds,
+          regionId: newRegionId,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -333,6 +338,7 @@ export default function ClassRosterManager() {
       setNewClassStartDate("");
       setNewClassEndDate("");
       setNewInstructorIds([]);
+      setNewRegionId("");
       await loadClasses(payload?.class?.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the class.");
@@ -469,6 +475,21 @@ export default function ClassRosterManager() {
                 onChange={(event) => setNewClassCode(event.target.value)}
                 className="field px-4 py-3 text-sm"
               />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="block text-sm font-medium text-[var(--ink-strong)]">Region</span>
+              <select
+                value={newRegionId}
+                onChange={(event) => setNewRegionId(event.target.value)}
+                className="field min-h-11 px-4 py-3 text-sm"
+              >
+                <option value="">Pick a region</option>
+                {regions.map((region) => (
+                  <option key={region.id} value={region.id}>
+                    {region.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block space-y-1.5">
               <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>

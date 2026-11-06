@@ -163,4 +163,12 @@ describe("GET /api/coordinator/rollup/[regionId] — authorization", () => {
     assert.equal(res.status, 200);
     assert.equal(mockHasPermission.mock.callCount(), 0);
   });
+
+  it("program coordinator gets 200 for any active region after the permission check", async () => {
+    currentSession = mockTeacherSession({ role: "program_coordinator" });
+    const req = mockRequest("/api/coordinator/rollup/rgn-any", { method: "GET" });
+    const res = await route.GET(req as never, { params: Promise.resolve({ regionId: "rgn-any" }) });
+    assert.equal(res.status, 200);
+    assert.equal(mockHasPermission.mock.callCount(), 1);
+  });
 });

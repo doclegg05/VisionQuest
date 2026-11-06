@@ -60,6 +60,7 @@ export async function listInstructorMetricsForRegion(regionId: string): Promise<
       where: { classId: { in: scopedClassIds } },
       select: { classId: true, studentId: true },
     }),
+    // Coordinators read zero StudentAlert rows here by design: RLS blocks alerts for tree readers.
     prisma.studentAlert.findMany({
       where: { status: "resolved", resolvedAt: { not: null }, student: studentScope },
       select: { studentId: true, detectedAt: true, resolvedAt: true },
