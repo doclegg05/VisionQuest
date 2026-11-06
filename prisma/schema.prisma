@@ -94,6 +94,7 @@ model Student {
   formResponses           FormResponse[]           @relation("FormResponses")
   reviewedFormResponses   FormResponse[]           @relation("ReviewedFormResponses")
   regionAssignments       RegionCoordinator[]
+  instructorRegions       RegionInstructor[]       @relation("RegionInstructors")
   wagers                  Wager[]
   careerCampaigns         CareerCampaign[]
   failedExtractions       FailedExtraction[]
@@ -2458,6 +2459,7 @@ model Region {
   updatedAt   DateTime @updatedAt
 
   coordinators RegionCoordinator[]
+  instructors  RegionInstructor[]
   classes      SpokesClass[]
   grantGoals   GrantGoal[]
 
@@ -2475,6 +2477,20 @@ model RegionCoordinator {
 
   @@id([regionId, coordinatorId])
   @@index([coordinatorId])
+  @@schema("visionquest")
+}
+
+model RegionInstructor {
+  regionId     String
+  instructorId String
+  assignedAt   DateTime @default(now())
+  assignedById String?
+
+  region     Region  @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  instructor Student @relation("RegionInstructors", fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@id([regionId, instructorId])
+  @@index([instructorId])
   @@schema("visionquest")
 }
 
