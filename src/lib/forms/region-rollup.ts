@@ -1,6 +1,7 @@
 import { prismaAdmin } from "@/lib/db";
 import { isStaffRole, type Session } from "@/lib/api-error";
 import { canPerformElevatedStaffAction } from "@/lib/classroom";
+import { seesWholeState } from "@/lib/org-roles";
 
 /**
  * Region-scoped forms rollup for the coordinator dashboard.
@@ -82,7 +83,7 @@ export interface RegionFormRollup {
 /**
  * Is this session allowed to read the named region?
  *
- * Admin: any region that exists. Coordinator: only a region they hold a
+ * Admin and program coordinator (`seesWholeState`): any region that exists. Coordinator: only a region they hold a
  * RegionCoordinator row for. Everyone else: no — the route's
  * `withCoordinatorAuth` wrapper has already refused them, and this is the
  * second, fail-closed answer rather than an assumption that it did.
@@ -96,7 +97,7 @@ export async function coordinatorCanReadRegion(
   session: Session,
   regionId: string,
 ): Promise<boolean> {
-  if (session.role === "admin") {
+  if (seesWholeState(session.role)) {
     const exists = await prismaAdmin.region.count({ where: { id: regionId } });
     return exists > 0;
   }
