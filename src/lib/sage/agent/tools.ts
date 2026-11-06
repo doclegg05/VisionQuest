@@ -15,6 +15,7 @@ import {
   FORMS,
   FORM_CATEGORIES,
   buildFormDownloadUrl,
+  canViewForm,
   resolveFormId,
 } from "@/lib/spokes/forms";
 import { searchForms } from "@/lib/spokes/form-search";
@@ -88,6 +89,10 @@ function buildDisambiguationNotes(candidateIds: string[]): string {
 // present_form
 // -----------------------------------------------------------------------------
 
+function formNotFoundSummary(query: string): string {
+  return `I couldn't find a form matching "${query}". Try the form name from your onboarding packet.`;
+}
+
 const presentForm: AgentTool = {
   name: "present_form",
   description:
@@ -124,6 +129,11 @@ const presentForm: AgentTool = {
     const exact =
       (resolvedId ? FORMS.find((form) => form.id === resolvedId) : undefined) ??
       FORMS.find((form) => form.title.toLowerCase() === query.toLowerCase());
+    // Same audience rule as search_forms: a form outside the caller's audience
+    // reads as not found, so asking by id cannot get around it.
+    if (exact && !canViewForm(exact, ctx.session.role)) {
+      return { status: "error", summary: formNotFoundSummary(query) };
+    }
 
     let match = exact;
     if (!match) {
@@ -137,10 +147,7 @@ const presentForm: AgentTool = {
     }
 
     if (!match) {
-      return {
-        status: "error",
-        summary: `I couldn't find a form matching "${query}". Try the form name from your onboarding packet.`,
-      };
+      return { status: "error", summary: formNotFoundSummary(query) };
     }
 
     return {
@@ -379,7 +386,7 @@ const lookupCertProgress: AgentTool = {
     label: "My certification progress",
     description: "See your Ready-to-Work checklist",
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin"],
   riskTier: "read",
   enabled: true,
   async execute(_args, ctx): Promise<AgentToolResult> {
@@ -462,7 +469,7 @@ const reviewPortfolio: AgentTool = {
     label: "Review my portfolio",
     description: "See your portfolio and what's missing",
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin"],
   riskTier: "read",
   enabled: true,
   async execute(_args, ctx): Promise<AgentToolResult> {
@@ -536,7 +543,7 @@ const lookupAppointment: AgentTool = {
     label: "Show my appointments",
     description: "Upcoming check-ins on your schedule",
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin"],
   riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
@@ -624,7 +631,7 @@ const findAppointmentSlots: AgentTool = {
     label: "Find a time to meet",
     description: "See open advising slots you can book",
   },
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin"],
   riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
@@ -828,7 +835,7 @@ const classifyAttachment: AgentTool = {
   },
   // No slash command — model-driven when an attachment is in context.
   requiresAttachment: true,
-  requiredRoles: ["student", "teacher", "admin", "coordinator"],
+  requiredRoles: ["student", "teacher", "admin"],
   riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {

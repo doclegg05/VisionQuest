@@ -112,6 +112,34 @@ describe("regional coordinator tool set", () => {
   });
 });
 
+describe("both coordinator roles (R25)", () => {
+  for (const role of ["coordinator", "program_coordinator"]) {
+    it(`${role} holds no per-student, upload or booking tool, even as a declared role`, () => {
+      for (const name of WITHHELD_TOOLS) {
+        const tool = getToolByName(name);
+        assert.ok(tool, `${name} exists`);
+        assert.ok(
+          !tool.requiredRoles.some((allowed) => allowed === role),
+          `${name} still lists ${role}`,
+        );
+      }
+    });
+
+    // An exact set: a new tool reaches coordinators only by a reviewed edit
+    // here. list_students_needing_attention is in it because coordinators get
+    // names and an open-item count only (pinned in teacher-tools.test.ts).
+    it(`${role} gets exactly the reviewed read-only tool set`, () => {
+      for (const mode of ["readonly", "full"] as const) {
+        assert.deepEqual(
+          [...enabledNames(role, mode)].sort(),
+          [...PROGRAM_COORDINATOR_TOOLS].sort(),
+          `${role} in ${mode} mode`,
+        );
+      }
+    });
+  }
+});
+
 describe("find_certification — both coordinator roles", () => {
   it("returns the same state-wide catalog to a regional and a program coordinator", async () => {
     const tool = getToolByName("find_certification");

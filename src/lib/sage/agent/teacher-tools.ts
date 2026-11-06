@@ -7,11 +7,13 @@
  * the same data the teacher dashboard ranks — scoped to the students that
  * staff member actually manages.
  *
- * Read-only. Teacher/admin/coordinator only. Per-student deep dives already
+ * Read-only. Teacher/admin/coordinator only; coordinators get counts, never
+ * alert content. Per-student deep dives already
  * arrive via staff-student-context when a teacher names a student.
  */
 
 import { isCoordinatorRole } from "@/lib/org-roles";
+import type { InterventionQueueEntry } from "@/lib/teacher/intervention-queue";
 import type { AgentTool, AgentToolResult } from "./types";
 
 // NOTE: @/lib/teacher/dashboard pulls in `server-only`, which throws if loaded
@@ -19,10 +21,57 @@ import type { AgentTool, AgentToolResult } from "./types";
 // registry). Import it LAZILY inside execute so the registry stays importable
 // in tests and client bundles; it only loads when the tool actually runs.
 
+type QueueEntry = InterventionQueueEntry;
+
+/**
+ * Coordinators get a name and a count of open items (alerts, overdue tasks,
+ * stalled goals) per student. No alert title, type, severity or reason text:
+ * coordinators never see alert content, and the RLS layer agrees.
+ */
+function coordinatorAttentionResult(top: QueueEntry[]): AgentToolResult {
+  const students = top.map((s) => ({
+    name: s.name,
+    openItemCount: s.signals.openAlertCount + s.signals.overdueTaskCount + s.signals.stalledGoalCount,
+  }));
+  return {
+    status: "success",
+    summary: `${top.length} student${top.length === 1 ? "" : "s"} have open items.`,
+    data: { students },
+    action: { action: "navigate", target: "/coordinator", label: "Open coordinator view" },
+    modelHint:
+      `Students with open items, most urgent first: ${students
+        .map((s) => `${s.name} (${s.openItemCount} open item${s.openItemCount === 1 ? "" : "s"})`)
+        .join("; ")}. ` +
+      "You have counts only, not what the items are. Tell the coordinator who to follow up on and that the student's instructor has the detail. Never guess what an item is.",
+  };
+}
+
+function staffAttentionResult(top: QueueEntry[]): AgentToolResult {
+  return {
+    status: "success",
+    summary: `${top.length} student${top.length === 1 ? "" : "s"} could use a check-in.`,
+    data: {
+      students: top.map((s) => ({
+        name: s.name,
+        urgencyScore: s.urgencyScore,
+        reasons: s.urgencyReasons,
+        alert: s.primaryAlert?.title ?? null,
+        suggestedAction: s.recommendedAction.label,
+      })),
+    },
+    action: { action: "navigate", target: "/teacher", label: "Open dashboard" },
+    modelHint:
+      `Students needing attention, most urgent first: ${top
+        .map((s) => `${s.name} (${s.urgencyReasons.join(", ") || "general concern"})`)
+        .join("; ")}. ` +
+      "Summarize for the teacher in plain language: lead with the 1-2 most urgent and exactly why, then a concrete next step for each (message them, review their plan, check evidence). Don't recite the whole list mechanically.",
+  };
+}
+
 const listStudentsNeedingAttention: AgentTool = {
   name: "list_students_needing_attention",
   description:
-    "List the students who most need a check-in right now, ranked by urgency, with plain-language reasons (stalled goals, overdue tasks, low activity, open alerts). Use when a teacher asks who's behind, who needs help, or where to focus today. Scoped to the students they manage.",
+    "List the students who most need a check-in right now, ranked by urgency. Use when staff ask who's behind, who needs help, or where to focus today. Scoped to the students they manage or oversee. Instructors and admins see the reasons (stalled goals, overdue tasks, low activity, open items); coordinators see a count of open items per student only.",
   parameters: {
     type: "object",
     properties: {
@@ -45,10 +94,10 @@ const listStudentsNeedingAttention: AgentTool = {
     // Coordinator sessions collapse to role="student" under RLS (Slice D not
     // shipped), so the RLS-scoped queue query silently returns zero rows for
     // them. Route coordinators through the region-scoped prismaAdmin read.
-    const { queue } =
-      isCoordinatorRole(ctx.session.role)
-        ? await getCoordinatorInterventionQueue(ctx.session)
-        : await getInterventionQueue(ctx.session);
+    const isCoordinator = isCoordinatorRole(ctx.session.role);
+    const { queue } = isCoordinator
+      ? await getCoordinatorInterventionQueue(ctx.session)
+      : await getInterventionQueue(ctx.session);
 
     if (queue.length === 0) {
       return {
@@ -56,30 +105,12 @@ const listStudentsNeedingAttention: AgentTool = {
         summary: "No students are flagged for attention right now.",
         data: { students: [] },
         modelHint:
-          "Everyone this teacher manages looks on track. Say so warmly and offer to look at a specific student if they'd like.",
+          "Everyone in this staff member's scope looks on track. Say so warmly and offer to look at a specific class if they'd like.",
       };
     }
 
     const top = queue.slice(0, limit);
-    return {
-      status: "success",
-      summary: `${top.length} student${top.length === 1 ? "" : "s"} could use a check-in.`,
-      data: {
-        students: top.map((s) => ({
-          name: s.name,
-          urgencyScore: s.urgencyScore,
-          reasons: s.urgencyReasons,
-          alert: s.primaryAlert?.title ?? null,
-          suggestedAction: s.recommendedAction.label,
-        })),
-      },
-      action: { action: "navigate", target: "/teacher", label: "Open dashboard" },
-      modelHint:
-        `Students needing attention, most urgent first: ${top
-          .map((s) => `${s.name} (${s.urgencyReasons.join(", ") || "general concern"})`)
-          .join("; ")}. ` +
-        "Summarize for the teacher in plain language: lead with the 1-2 most urgent and exactly why, then a concrete next step for each (message them, review their plan, check evidence). Don't recite the whole list mechanically.",
-    };
+    return isCoordinator ? coordinatorAttentionResult(top) : staffAttentionResult(top);
   },
 };
 
