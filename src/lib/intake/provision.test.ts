@@ -243,7 +243,7 @@ describe("provisionIntakeStudent — a staff caller who cannot manage the matche
       assert.ok(error instanceof Error, "expected a refusal");
       assert.equal((error as { statusCode?: number }).statusCode, 409);
       assert.equal(error.message, REFUSAL);
-      const raw = JSON.stringify({ message: error.message, ...error });
+      const raw = JSON.stringify({ ...error, text: error.message });
       assert.ok(!raw.includes(EXISTING.id), raw);
       assert.ok(!raw.includes(EXISTING.studentId), raw);
       assert.ok(!raw.includes(EXISTING.displayName), raw);
