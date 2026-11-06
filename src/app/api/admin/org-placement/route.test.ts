@@ -13,6 +13,11 @@ before(async () => {
   const realApi = await import("@/lib/api-error");
   mock.module("@/lib/org-placement", {
     exports: {
+      listUnregionedClasses: async (actor: TestSession) => {
+        calls.push("classes");
+        if (actor.role === "coordinator") throw realApi.forbidden();
+        return [{ id: "k1", name: "Night", instructorCount: 1, activeStudents: 4 }];
+      },
       listUnplacedStaff: async (actor: TestSession) => {
         calls.push("staff");
         if (actor.role === "coordinator") throw realApi.forbidden();
@@ -59,6 +64,7 @@ describe("GET /api/admin/org-placement", () => {
       assert.equal(json.success, true);
       assert.equal(json.data.unplacedStaff[0].displayName, "Tess");
       assert.equal(json.data.applicants[0].county, "Kanawha");
+      assert.equal(json.data.unregionedClasses[0].name, "Night");
     });
   }
 });

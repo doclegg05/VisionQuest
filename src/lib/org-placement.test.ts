@@ -8,6 +8,7 @@ const regionInstructorUpsert = mock.fn(async (_args?: unknown) => ({})) as any;
 const regionInstructorDelete = mock.fn(async (_args?: unknown) => ({})) as any;
 const studentFindMany = mock.fn(async (_args?: unknown) => [] as unknown[]) as any;
 const studentFindFirst = mock.fn(async (_args?: unknown) => ({ id: "t1" }) as unknown) as any;
+const classFindMany = mock.fn(async (_args?: unknown) => [] as unknown[]) as any;
 const regionCount = mock.fn(async (_args?: unknown) => 1) as any;
 const auditCalls: unknown[] = [];
 const coordinatorHasRegion = mock.fn(async () => true) as any;
@@ -23,6 +24,7 @@ mock.module("@/lib/db", {
       },
       spokesClassInstructor: { count: classInstructorCount },
       student: { findMany: studentFindMany, findFirst: studentFindFirst },
+      spokesClass: { findMany: classFindMany },
       region: { count: regionCount },
     },
   },
@@ -97,6 +99,39 @@ describe("lists", () => {
     assert.equal(where.role, "teacher");
     assert.deepEqual(where.instructorRegions, { none: {} });
     assert.deepEqual(where.instructedClasses, { none: {} });
+  });
+});
+
+describe("listUnregionedClasses", () => {
+  beforeEach(() => {
+    classFindMany.mock.resetCalls();
+    classFindMany.mock.mockImplementation(async () => []);
+  });
+
+  it("refuses a regional coordinator and an instructor, and reads nothing", async () => {
+    await assert.rejects(() => mod.listUnregionedClasses(regional), /Forbidden|forbidden|access/i);
+    await assert.rejects(() => mod.listUnregionedClasses(teacher));
+    assert.equal(classFindMany.mock.callCount(), 0);
+  });
+
+  it("asks only for non-archived classes with no region, with an explicit field set", async () => {
+    await mod.listUnregionedClasses(admin);
+    const args = classFindMany.mock.calls[0].arguments[0] as any;
+    assert.deepEqual(args.where, { regionId: null, status: { not: "archived" } });
+    assert.deepEqual(args.select, {
+      id: true,
+      name: true,
+      _count: { select: { instructors: true, enrollments: { where: { status: "active" } } } },
+    });
+  });
+
+  it("returns exactly id, name, instructorCount and activeStudents", async () => {
+    classFindMany.mock.mockImplementation(async () => [
+      { id: "k1", name: "Night", _count: { instructors: 2, enrollments: 7 } },
+    ]);
+    assert.deepEqual(await mod.listUnregionedClasses(admin), [
+      { id: "k1", name: "Night", instructorCount: 2, activeStudents: 7 },
+    ]);
   });
 });
 

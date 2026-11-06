@@ -9,7 +9,7 @@ const classes = [{ id: "c1", name: "Morning Class" }];
 
 function render(canPlace: boolean): string {
   return renderToString(
-    <OrgPlacementPanel unplacedStaff={[]} applicants={applicants} regions={[]} classes={classes} canPlace={canPlace} />,
+    <OrgPlacementPanel unplacedStaff={[]} applicants={applicants} unregionedClasses={[]} regions={[]} classes={classes} canPlace={canPlace} />,
   );
 }
 
@@ -25,5 +25,32 @@ describe("OrgPlacementPanel applicants", () => {
     assert.ok(html.includes("Sam Applicant"));
     assert.ok(!html.includes("Place in a classroom"));
     assert.ok(!html.includes("Morning Class"));
+  });
+});
+
+describe("OrgPlacementPanel classrooms with no region", () => {
+  it("lists them read-only under a plain heading", () => {
+    const html = renderToString(
+      <OrgPlacementPanel
+        unplacedStaff={[]}
+        applicants={[]}
+        regions={[]}
+        classes={[]}
+        canPlace={true}
+        unregionedClasses={[{ id: "k1", name: "Night Class", instructorCount: 2, activeStudents: 7 }]}
+      />,
+    );
+    assert.ok(html.includes("Classrooms with no region"));
+    assert.ok(html.includes("Night Class"));
+    assert.ok(html.includes("2 instructors"));
+    assert.ok(html.includes("7 students"));
+  });
+
+  it("says so when every classroom has a region", () => {
+    const html = renderToString(
+      <OrgPlacementPanel unplacedStaff={[]} applicants={[]} regions={[]} classes={[]} canPlace={true} unregionedClasses={[]} />,
+    );
+    assert.ok(html.includes("Classrooms with no region"));
+    assert.ok(html.includes("Every classroom has a region."));
   });
 });

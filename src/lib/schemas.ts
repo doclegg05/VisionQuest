@@ -53,6 +53,26 @@ export const createClassSchema = z.object({
   regionId: z.string({ message: "Pick a region for this classroom." }).cuid("Pick a region for this classroom."),
 });
 
+/**
+ * PATCH body for an existing class. Every field is optional; the route keeps
+ * the checks that need the stored class (blank name, status values, region
+ * rules). `regionId: null` means "remove the region", which only an admin may do.
+ */
+export const updateClassSchema = z.object({
+  name: z.string().optional(),
+  code: z.string().optional(),
+  status: z.string().optional(),
+  description: z.string().optional(),
+  programType: z.string({ message: "programType must be one of: spokes, adult_ed, ietp." }).optional(),
+  regionId: z
+    .string({ message: "regionId must be a non-empty string or null." })
+    .nullable()
+    .optional(),
+  instructorIds: z.array(z.string()).optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+});
+
 // ─── Auth Schemas ───────────────────────────────────────────────────────────
 
 export const loginSchema = z.object({

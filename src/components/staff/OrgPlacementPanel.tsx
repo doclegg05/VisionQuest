@@ -20,6 +20,13 @@ export interface WaitingApplicantItem {
   createdOn: string;
 }
 
+export interface UnregionedClassItem {
+  id: string;
+  name: string;
+  instructorCount: number;
+  activeStudents: number;
+}
+
 interface RegionOption {
   id: string;
   name: string;
@@ -28,6 +35,7 @@ interface RegionOption {
 interface OrgPlacementPanelProps {
   unplacedStaff: readonly UnplacedStaffItem[];
   applicants: readonly WaitingApplicantItem[];
+  unregionedClasses: readonly UnregionedClassItem[];
   regions: readonly RegionOption[];
   classes: readonly ClassOption[];
   /** Admins only. Everyone else sees the applicants list read-only. */
@@ -87,7 +95,7 @@ function AssignRow({ person, regions }: { person: UnplacedStaffItem; regions: re
   );
 }
 
-export function OrgPlacementPanel({ unplacedStaff, applicants, regions, classes, canPlace }: OrgPlacementPanelProps) {
+export function OrgPlacementPanel({ unplacedStaff, applicants, unregionedClasses, regions, classes, canPlace }: OrgPlacementPanelProps) {
   const [placedIds, setPlacedIds] = useState<readonly string[]>([]);
   const waiting = applicants.filter((applicant) => !placedIds.includes(applicant.id));
   return (
@@ -103,6 +111,27 @@ export function OrgPlacementPanel({ unplacedStaff, applicants, regions, classes,
           <ul className="mt-2 divide-y divide-[var(--border)]">
             {unplacedStaff.map((person) => (
               <AssignRow key={person.id} person={person} regions={regions} />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Classrooms with no region</h2>
+        <p className="mt-1 text-sm text-[var(--ink-muted)]">
+          Regional coordinators cannot see these classrooms. To fix one, open it on the class edit screen and pick a region.
+        </p>
+        {unregionedClasses.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--ink-muted)]">Every classroom has a region.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-[var(--border)]">
+            {unregionedClasses.map((item) => (
+              <li key={item.id} className="py-3 text-sm text-[var(--ink-strong)]">
+                <span className="font-semibold">{item.name}</span>
+                <span className="ml-2 text-[var(--ink-muted)]">
+                  {`${item.instructorCount} ${item.instructorCount === 1 ? "instructor" : "instructors"} · ${item.activeStudents} ${item.activeStudents === 1 ? "student" : "students"}`}
+                </span>
+              </li>
             ))}
           </ul>
         )}

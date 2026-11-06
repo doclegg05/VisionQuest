@@ -80,6 +80,36 @@ export async function listApplicantsWaiting(actor: Session): Promise<WaitingAppl
   }));
 }
 
+export interface UnregionedClassRow {
+  id: string;
+  name: string;
+  instructorCount: number;
+  activeStudents: number;
+}
+
+/**
+ * Classes that are not archived and have no region. A regional coordinator
+ * cannot see them, so they wait here for an admin to give them a region.
+ */
+export async function listUnregionedClasses(actor: Session): Promise<UnregionedClassRow[]> {
+  assertWholeState(actor);
+  const rows = await prismaAdmin.spokesClass.findMany({
+    where: { regionId: null, status: { not: "archived" } },
+    select: {
+      id: true,
+      name: true,
+      _count: { select: { instructors: true, enrollments: { where: { status: "active" } } } },
+    },
+    orderBy: { name: "asc" },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    instructorCount: row._count.instructors,
+    activeStudents: row._count.enrollments,
+  }));
+}
+
 /** Admins and program coordinators may assign any region; a regional coordinator only their own. */
 async function assertMayAssign(actor: Session, regionId: string): Promise<void> {
   // Whole-state roles, or a regional coordinator (program coordinators are whole-state).
