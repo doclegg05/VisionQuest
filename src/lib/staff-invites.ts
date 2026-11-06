@@ -65,7 +65,7 @@ export const acceptStaffInviteSchema = z.object({
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const AUDIT_TARGET = "staff_invite";
 
-function hashToken(token: string): string {
+export function hashToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 

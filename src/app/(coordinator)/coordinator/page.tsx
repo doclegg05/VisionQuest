@@ -3,7 +3,13 @@ import { redirect } from "next/navigation";
 import PageIntro from "@/components/ui/PageIntro";
 import CoordinatorDashboardClient from "@/components/coordinator/CoordinatorDashboardClient";
 import { getSession } from "@/lib/auth";
+import { StaffInvitePanel } from "@/components/staff/StaffInvitePanel";
 import { listRegionsForSession } from "@/lib/region";
+
+/** Regional coordinators invite instructors; program coordinators also invite regional coordinators. */
+function inviteRolesFor(role: string): readonly string[] {
+  return role === "coordinator" ? ["teacher"] : ["coordinator", "teacher"];
+}
 
 export default async function CoordinatorDashboard() {
   const session = await getSession();
@@ -38,6 +44,7 @@ export default async function CoordinatorDashboard() {
         description="Regional rollups, grant progress, instructor metrics, and funder-ready exports."
       />
       <CoordinatorDashboardClient regions={regions} />
+      <StaffInvitePanel roles={inviteRolesFor(session.role)} regions={regions} />
     </div>
   );
 }
