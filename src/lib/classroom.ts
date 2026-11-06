@@ -190,7 +190,16 @@ export async function assertStaffCanManageClass(session: Session, classId: strin
 
 /** The one query the assignment limit needs, so a transaction client can stand in for `prisma`. */
 export interface InstructorLinkReader {
-  spokesClassInstructor: Pick<typeof prisma.spokesClassInstructor, "findMany">;
+  spokesClassInstructor: {
+    findMany(args: {
+      where: {
+        instructorId: { in: string[] };
+        classId?: { not: string };
+        class: { status: { not: string } };
+      };
+      select: { instructorId: true };
+    }): Promise<Array<{ instructorId: string }>>;
+  };
 }
 
 /**
