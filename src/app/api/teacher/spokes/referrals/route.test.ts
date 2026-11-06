@@ -103,6 +103,22 @@ describe("GET /api/teacher/spokes/referrals", () => {
     assert.deepEqual(body.referrals, [APPLICANT]);
     assert.equal(mockRecordFindMany.mock.calls[0].arguments[0].where.studentId, null);
   });
+
+  it("tells an admin they can create referrals", async () => {
+    session.current = { id: "admin-1", role: "admin" };
+
+    const res = (await GET(new Request("http://localhost/api/teacher/spokes/referrals"))) as Response;
+    const body = await res.json();
+
+    assert.equal(body.canCreateReferrals, true);
+  });
+
+  it("tells an instructor they cannot create referrals", async () => {
+    const res = (await GET(new Request("http://localhost/api/teacher/spokes/referrals"))) as Response;
+    const body = await res.json();
+
+    assert.equal(body.canCreateReferrals, false);
+  });
 });
 
 describe("DELETE /api/teacher/spokes/referrals", () => {
