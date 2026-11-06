@@ -4,7 +4,8 @@ import { mockRequest } from "@/lib/test-helpers";
 
 let StaffInviteRefused: typeof import("@/lib/staff-invites").StaffInviteRefused;
 const rateLimitCalls: Array<[string, number, number]> = [];
-let rateLimitSuccess = true;
+/** Keys whose limiter refuses. Empty means every limiter allows. */
+let refusingKeys: RegExp | null = null;
 let acceptError: Error | null = null;
 const cookieCalls: unknown[][] = [];
 const acceptCalls: unknown[][] = [];
@@ -13,7 +14,8 @@ mock.module("@/lib/rate-limit", {
   exports: {
     rateLimit: async (key: string, limit: number, windowMs: number) => {
       rateLimitCalls.push([key, limit, windowMs]);
-      return { success: rateLimitSuccess, remaining: 0, resetTime: Date.now() + windowMs, degraded: false };
+      const success = !(refusingKeys && refusingKeys.test(key));
+      return { success, remaining: 0, resetTime: Date.now() + windowMs, degraded: false };
     },
   },
 });
@@ -70,20 +72,41 @@ function post(body: unknown = BODY) {
 
 beforeEach(() => {
   rateLimitCalls.length = 0;
-  rateLimitSuccess = true;
+  refusingKeys = null;
   acceptError = null;
   cookieCalls.length = 0;
   acceptCalls.length = 0;
 });
 
 describe("POST /api/staff-invites/accept", () => {
+  it("matches register-teacher: 5 per IP and a route-wide 20, each per 15 minutes", async () => {
+    await post();
+    assert.deepEqual(rateLimitCalls, [
+      ["staff-invite-accept:9.9.9.9", 5, 15 * 60 * 1000],
+      ["staff-invite-accept:global", 20, 15 * 60 * 1000],
+    ]);
+  });
+
   it("rate-limits by IP before it reads the body", async () => {
-    rateLimitSuccess = false;
+    refusingKeys = /^staff-invite-accept:9\.9\.9\.9$/;
     const res = await post();
     assert.equal(res.status, 429);
     assert.equal(acceptCalls.length, 0);
-    assert.match(rateLimitCalls[0][0], /^staff-invite-accept:/);
-    assert.ok(rateLimitCalls[0][0].includes("9.9.9.9"));
+  });
+
+  it("refuses at the route-wide ceiling with the same answer as the IP limiter", async () => {
+    refusingKeys = /^staff-invite-accept:9\.9\.9\.9$/;
+    const byIp = await post();
+    refusingKeys = /^staff-invite-accept:global$/;
+    const byGlobal = await post();
+    assert.equal(byGlobal.status, 429);
+    assert.deepEqual(await byGlobal.json(), await byIp.json());
+    assert.equal(acceptCalls.length, 0);
+  });
+
+  it("passes the email code through to the accept", async () => {
+    await post({ ...BODY, code: "123456" });
+    assert.deepEqual(acceptCalls[0][0], { ...BODY, code: "123456" });
   });
 
   it("signs the new account in and returns its role home", async () => {
@@ -99,6 +122,14 @@ describe("POST /api/staff-invites/accept", () => {
     const res = await post();
     assert.equal(res.status, 410);
     assert.match((await res.json()).error, /expired/);
+    assert.equal(cookieCalls.length, 0);
+  });
+
+  it("answers a wrong code with the plain message", async () => {
+    acceptError = new StaffInviteRefused("code_invalid");
+    const res = await post({ ...BODY, code: "000000" });
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), { error: "That code is not right. Check the email and try again." });
     assert.equal(cookieCalls.length, 0);
   });
 

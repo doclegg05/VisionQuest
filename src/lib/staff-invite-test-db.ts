@@ -73,6 +73,7 @@ function compareBound(actual: unknown, bound: unknown, op: "gt" | "lt"): boolean
 }
 
 function matchesFilter(actual: unknown, expected: Record<string, unknown>): boolean {
+  if ("in" in expected) return Array.isArray(expected.in) && expected.in.includes(actual);
   if ("gt" in expected) return compareBound(actual, expected.gt, "gt");
   if ("lt" in expected) return compareBound(actual, expected.lt, "lt");
   if ("startsWith" in expected) return typeof actual === "string" && actual.startsWith(String(expected.startsWith));
@@ -118,7 +119,12 @@ function applyData(row: Row, data: Row): Row {
 }
 
 export function createFakeDb() {
-  const db = { state: emptyState(), idCounter: 0, transactions: 0 };
+  const db: {
+    state: FakeState;
+    idCounter: number;
+    transactions: number;
+    beforeCreate: ((table: TableName) => void) | null;
+  } = { state: emptyState(), idCounter: 0, transactions: 0, beforeCreate: null };
 
   function assertUnique(table: Table, candidate: Row, selfIndex: number): void {
     for (const key of table.unique) {
@@ -148,6 +154,7 @@ export function createFakeDb() {
     return {
       async create(args: { data: Row }) {
         await tick();
+        db.beforeCreate?.(name);
         db.idCounter += 1;
         const defaults = name === "staffInvite" ? INVITE_DEFAULTS : {};
         const row: Row = { id: `${name}-${db.idCounter}`, createdAt: new Date(), ...defaults, ...args.data };
@@ -224,6 +231,11 @@ export function createFakeDb() {
     reset(): void {
       db.state = emptyState();
       db.transactions = 0;
+      db.beforeCreate = null;
+    },
+    /** Run `hook` just before every `create`, e.g. to delete a parent row mid-transaction. */
+    beforeCreate(hook: (table: TableName) => void): void {
+      db.beforeCreate = hook;
     },
     seed(name: TableName, row: Row): void {
       db.state[name] = { ...db.state[name], rows: [...db.state[name].rows, row] };

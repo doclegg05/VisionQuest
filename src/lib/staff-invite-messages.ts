@@ -15,6 +15,11 @@ export const STAFF_INVITE_MESSAGES: Record<StaffInviteError, string> = {
   region_not_allowed: "You can invite people only to your own region.",
   region_required: "Choose a region for this person.",
   inviter_no_longer_allowed: "This invite is no longer valid. Ask for a new one.",
+  email_required: "Email is not working right now, so only an admin can send this invite.",
+  account_exists: "You already have a VisionQuest account. Sign in instead.",
+  code_required: "Enter the 6-digit code we emailed you.",
+  code_invalid: "That code is not right. Check the email and try again.",
+  code_expired: "That code no longer works. Send a new code and try again.",
 };
 
 const STAFF_INVITE_STATUSES: Record<StaffInviteError, number> = {
@@ -27,6 +32,11 @@ const STAFF_INVITE_STATUSES: Record<StaffInviteError, number> = {
   region_not_allowed: 403,
   region_required: 400,
   inviter_no_longer_allowed: 410,
+  email_required: 503,
+  account_exists: 409,
+  code_required: 400,
+  code_invalid: 400,
+  code_expired: 400,
 };
 
 export const STAFF_INVITE_REASONS = Object.keys(STAFF_INVITE_MESSAGES) as StaffInviteError[];

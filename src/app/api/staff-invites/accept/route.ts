@@ -1,27 +1,22 @@
 import { NextResponse } from "next/server";
 import { prismaAdmin } from "@/lib/db";
 import { setSessionCookie } from "@/lib/auth";
-import { clientIpBucket } from "@/lib/client-ip";
-import { rateLimit } from "@/lib/rate-limit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { getRoleHomePath } from "@/lib/role-home";
-import { withInviteRefusals } from "@/lib/staff-invite-http";
+import { limitInviteAttempts, withInviteRefusals } from "@/lib/staff-invite-http";
 import { acceptStaffInvite, acceptStaffInviteSchema } from "@/lib/staff-invites";
 
-const ATTEMPT_LIMIT = 10;
-const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-
 /**
- * Unauthenticated: the person has no account yet. The token is the credential,
- * 256 bits of randomness, so the IP limiter only slows abuse of the endpoint.
- * The proxy's Origin check covers this path; it is not a public exception.
+ * Unauthenticated: the person has no account yet. The token is 256 bits of
+ * randomness; an emailed invite also needs the 6-digit email code (Ruling
+ * R21), so the limiters bound code guessing: 5 per IP and 20 route-wide per
+ * 15 minutes, as `register-teacher` does. The proxy's Origin check covers this
+ * path; it is not a public exception.
  */
 export const POST = withErrorHandler(async (req: Request) => {
-  const rl = await rateLimit(`staff-invite-accept:${clientIpBucket(req)}`, ATTEMPT_LIMIT, ATTEMPT_WINDOW_MS);
-  if (!rl.success) {
-    return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
-  }
+  const limited = await limitInviteAttempts(req, "staff-invite-accept");
+  if (limited) return limited;
 
   const body = await parseBody(req, acceptStaffInviteSchema);
 

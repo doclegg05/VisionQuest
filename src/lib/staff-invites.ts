@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { Prisma, StaffInvite } from "@prisma/client";
 import { prismaAdmin } from "@/lib/db";
@@ -6,6 +6,8 @@ import type { Session } from "@/lib/api-error";
 import { hashPassword, normalizeEmail, normalizeStudentId } from "@/lib/auth";
 import { tryLogAuditEvent } from "@/lib/audit";
 import { canInviteRole, inviteNeedsRegion, type InvitableRole } from "@/lib/org-roles";
+import { errorForLog } from "@/lib/log-error";
+import { logger } from "@/lib/logger";
 import { coordinatorHasRegion } from "@/lib/region";
 import { registerStaffSchema } from "@/lib/schemas";
 
@@ -20,9 +22,17 @@ import { registerStaffSchema } from "@/lib/schemas";
  * The invite table is admin-only under RLS, so every query here goes through
  * `prismaAdmin`, the way `register-teacher` creates staff accounts. Authority
  * is checked in this module before any write.
+ *
+ * Ruling R21: an invite whose email was sent needs a 6-digit code, emailed to
+ * the same address, before it can be accepted. Only an admin may create a
+ * link-only invite (email not set up, or the send failed); a link-only invite
+ * accepts with no code.
  */
 
 export const STAFF_INVITE_TTL_DAYS = 14;
+export const STAFF_INVITE_CODE_TTL_MINUTES = 10;
+/** Wrong codes allowed before the code is cleared and a new one must be sent. */
+export const STAFF_INVITE_CODE_MAX_ATTEMPTS = 5;
 
 export type StaffInviteError =
   | "invalid"
@@ -33,7 +43,12 @@ export type StaffInviteError =
   | "not_allowed"
   | "region_not_allowed"
   | "region_required"
-  | "inviter_no_longer_allowed";
+  | "inviter_no_longer_allowed"
+  | "email_required"
+  | "account_exists"
+  | "code_required"
+  | "code_invalid"
+  | "code_expired";
 
 export class StaffInviteRefused extends Error {
   constructor(readonly reason: StaffInviteError) {
@@ -61,13 +76,35 @@ export const acceptStaffInviteSchema = z.object({
   email: z.string().trim().pipe(registerStaffSchema.shape.email),
   displayName: z.string().trim().pipe(registerStaffSchema.shape.displayName),
   password: z.string().trim().pipe(registerStaffSchema.shape.password),
+  /** The 6-digit email code. Required for an invite that was emailed (R21). */
+  code: z.string().trim().regex(/^\d{6}$/).optional(),
 });
+
+export type AcceptStaffInviteInput = z.input<typeof acceptStaffInviteSchema>;
+export type CreateStaffInviteInput = { email: string; role: InvitableRole; regionId?: string };
+
+/** How the invite reached the person: emailed, the send threw, or email is not set up. */
+export type InviteDelivery = "sent" | "failed" | "not_configured";
+
+/** Sends the invite email for a token. Throws when the send fails. */
+export type InviteDeliverer = (token: string, expiresAt: Date) => Promise<void>;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const AUDIT_TARGET = "staff_invite";
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+/** SHA-256 of an accept code, bound to its invite so one hash cannot serve two invites. */
+export function hashInviteCode(inviteId: string, code: string): string {
+  return createHash("sha256").update(`${inviteId}:${code}`, "utf8").digest("hex");
+}
+
+function codeHashesMatch(stored: string, candidate: string): boolean {
+  const a = Buffer.from(stored, "hex");
+  const b = Buffer.from(candidate, "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /** Region checks shared by create and revoke. */
@@ -88,17 +125,46 @@ function isInvitableRole(role: string): role is InvitableRole {
   return INVITABLE_ROLES.some((candidate) => candidate === role);
 }
 
+/** Run the deliverer, if any. A send failure is logged by name only, never with the link. */
+async function deliverInvite(
+  deliver: InviteDeliverer | null,
+  token: string,
+  expiresAt: Date,
+  inviter: Session,
+): Promise<InviteDelivery> {
+  if (!deliver) return "not_configured";
+  try {
+    await deliver(token, expiresAt);
+    return "sent";
+  } catch (error) {
+    logger.error("staff_invite_email_failed", { actorId: inviter.id, error: errorForLog(error) });
+    return "failed";
+  }
+}
+
+/**
+ * Create an invite. With a deliverer, the email goes out before the row is
+ * written, so a send that throws leaves nothing behind for a non-admin
+ * (Ruling R21: only an admin may create a link-only invite). The emailed link
+ * starts working once the row exists, a moment after the send.
+ */
 export async function createStaffInvite(
   inviter: Session,
-  input: { email: string; role: InvitableRole; regionId?: string },
-): Promise<{ inviteId: string; token: string; expiresAt: Date }> {
+  input: CreateStaffInviteInput,
+  deliver: InviteDeliverer | null = null,
+): Promise<{ inviteId: string; token: string; expiresAt: Date; delivery: InviteDelivery }> {
   const parsed = createStaffInviteSchema.parse(input);
   // A program coordinator belongs to no region, so a supplied region is dropped.
   const regionId = inviteNeedsRegion(parsed.role) ? (parsed.regionId ?? null) : null;
   await assertMayInvite(inviter, parsed.role, regionId);
+  const mayLinkOnly = inviter.role === "admin";
+  if (!deliver && !mayLinkOnly) throw new StaffInviteRefused("email_required");
 
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + STAFF_INVITE_TTL_DAYS * MS_PER_DAY);
+  const delivery = await deliverInvite(deliver, token, expiresAt, inviter);
+  if (delivery !== "sent" && !mayLinkOnly) throw new StaffInviteRefused("email_required");
+
   const invite = await prismaAdmin.staffInvite.create({
     data: {
       email: normalizeEmail(parsed.email),
@@ -107,6 +173,7 @@ export async function createStaffInvite(
       invitedById: inviter.id,
       tokenHash: hashToken(token),
       expiresAt,
+      deliveredByEmail: delivery === "sent",
     },
     select: { id: true },
   });
@@ -118,21 +185,21 @@ export async function createStaffInvite(
     targetType: AUDIT_TARGET,
     targetId: invite.id,
     summary: `Staff invite created for role ${parsed.role}.`,
-    metadata: { role: parsed.role, regionId },
+    metadata: { role: parsed.role, regionId, deliveredByEmail: delivery === "sent" },
   });
 
-  return { inviteId: invite.id, token, expiresAt };
+  return { inviteId: invite.id, token, expiresAt, delivery };
 }
 
 type InviteState = Pick<StaffInvite, "acceptedAt" | "revokedAt" | "expiresAt">;
 
-/** Why an invite that could not be claimed is unusable. */
-function unusableReason(invite: InviteState | null, now: Date): StaffInviteError {
+/** Why an invite cannot be accepted now, or null when it can. */
+function unusableReason(invite: InviteState | null, now: Date): StaffInviteError | null {
   if (!invite) return "invalid";
   if (invite.acceptedAt) return "used";
   if (invite.revokedAt) return "revoked";
   if (invite.expiresAt.getTime() <= now.getTime()) return "expired";
-  return "invalid";
+  return null;
 }
 
 /**
@@ -193,59 +260,143 @@ async function assertInviterStillAllowed(tx: Prisma.TransactionClient, invite: S
   if (!stillCoordinates) throw new StaffInviteRefused("inviter_no_longer_allowed");
 }
 
-interface AcceptedInvite {
-  invite: StaffInvite;
-  staffId: string;
+/**
+ * A refusal from the code check. It is returned, not thrown, so the
+ * transaction commits the wrong-attempt count before the caller refuses.
+ */
+type AcceptOutcome =
+  | { kind: "accepted"; invite: StaffInvite; staffId: string }
+  | { kind: "refused"; reason: StaffInviteError };
+
+/** Count a wrong code; at the limit, clear it so a new one must be sent. */
+async function recordWrongCode(tx: Prisma.TransactionClient, invite: StaffInvite): Promise<void> {
+  // Keyed on this code's hash: a code sent since then starts its own count.
+  const sameCode = { id: invite.id, codeHash: invite.codeHash };
+  const counted = await tx.staffInvite.updateMany({ where: sameCode, data: { codeAttempts: { increment: 1 } } });
+  if (counted.count !== 1) return;
+  const after = await tx.staffInvite.findUnique({ where: { id: invite.id }, select: { codeAttempts: true } });
+  if ((after?.codeAttempts ?? 0) < STAFF_INVITE_CODE_MAX_ATTEMPTS) return;
+  await tx.staffInvite.updateMany({ where: sameCode, data: { codeHash: null, codeExpiresAt: null } });
+}
+
+/** Ruling R21: an emailed invite needs its current, unexpired code. */
+async function checkCode(
+  tx: Prisma.TransactionClient,
+  invite: StaffInvite,
+  code: string | undefined,
+  now: Date,
+): Promise<StaffInviteError | null> {
+  if (!invite.deliveredByEmail) return null;
+  if (!code) return "code_required";
+  const live =
+    invite.codeHash !== null &&
+    invite.codeExpiresAt !== null &&
+    invite.codeExpiresAt.getTime() > now.getTime() &&
+    invite.codeAttempts < STAFF_INVITE_CODE_MAX_ATTEMPTS;
+  if (!live || invite.codeHash === null) return "code_expired";
+  if (codeHashesMatch(invite.codeHash, hashInviteCode(invite.id, code))) return null;
+  await recordWrongCode(tx, invite);
+  return "code_invalid";
+}
+
+/**
+ * Claim the invite. A concurrent accept waits on the row lock, then finds
+ * acceptedAt set and claims nothing. For an emailed invite the claim also
+ * requires the code that was checked, and uses it up.
+ */
+async function claimInvite(tx: Prisma.TransactionClient, invite: StaffInvite, now: Date): Promise<void> {
+  const claim = await tx.staffInvite.updateMany({
+    where: {
+      id: invite.id,
+      acceptedAt: null,
+      revokedAt: null,
+      expiresAt: { gt: now },
+      ...(invite.deliveredByEmail ? { codeHash: invite.codeHash } : {}),
+    },
+    data: { acceptedAt: now, codeHash: null, codeExpiresAt: null },
+  });
+  if (claim.count === 1) return;
+  const current = await tx.staffInvite.findUnique({ where: { id: invite.id } });
+  // Still usable, so the code changed under us: a new one was sent.
+  throw new StaffInviteRefused(unusableReason(current, now) ?? "code_expired");
+}
+
+/** A region deleted since the invite was sent makes the invite unusable. */
+async function assertRegionStillExists(tx: Prisma.TransactionClient, invite: StaffInvite): Promise<void> {
+  if (!invite.regionId) return;
+  const region = await tx.region.findUnique({ where: { id: invite.regionId }, select: { id: true } });
+  if (!region) throw new StaffInviteRefused("invalid");
+}
+
+async function createAccount(
+  tx: Prisma.TransactionClient,
+  invite: StaffInvite,
+  input: z.infer<typeof acceptStaffInviteSchema>,
+  passwordHash: string,
+): Promise<string> {
+  await assertInviterStillAllowed(tx, invite);
+  if (normalizeEmail(input.email) !== invite.email) throw new StaffInviteRefused("email_mismatch");
+  // Linking an existing account to an invite is Phase 2's job. Stored emails
+  // are not all normalized, so the match ignores casing.
+  const existing = await tx.student.findFirst({
+    where: { email: { equals: invite.email, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (existing) throw new StaffInviteRefused("account_exists");
+  await assertRegionStillExists(tx, invite);
+
+  const account = await tx.student.create({
+    data: {
+      studentId: await pickLoginName(tx, invite.email),
+      displayName: input.displayName,
+      passwordHash,
+      email: invite.email,
+      role: invite.role,
+    },
+    select: { id: true },
+  });
+  await placeInTree(tx, invite, account.id);
+  await tx.staffInvite.update({ where: { id: invite.id }, data: { acceptedById: account.id } });
+  return account.id;
+}
+
+function isForeignKeyFailure(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2003";
 }
 
 async function claimAndCreate(
   input: z.infer<typeof acceptStaffInviteSchema>,
   passwordHash: string,
-): Promise<AcceptedInvite> {
+): Promise<AcceptOutcome> {
   const tokenHash = hashToken(input.token);
   const now = new Date();
-  return prismaAdmin.$transaction(async (tx) => {
-    // First statement: claim the invite. A concurrent accept waits on the row
-    // lock, then finds acceptedAt set and claims nothing.
-    const claim = await tx.staffInvite.updateMany({
-      where: { tokenHash, acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
-      data: { acceptedAt: now },
-    });
-    const invite = await tx.staffInvite.findUnique({ where: { tokenHash } });
-    if (claim.count !== 1 || !invite) throw new StaffInviteRefused(unusableReason(invite, now));
+  try {
+    return await prismaAdmin.$transaction(async (tx): Promise<AcceptOutcome> => {
+      const invite = await tx.staffInvite.findUnique({ where: { tokenHash } });
+      if (!invite) throw new StaffInviteRefused("invalid");
+      const unusable = unusableReason(invite, now);
+      if (unusable) throw new StaffInviteRefused(unusable);
+      const codeRefusal = await checkCode(tx, invite, input.code, now);
+      if (codeRefusal) return { kind: "refused", reason: codeRefusal };
 
-    // Throwing from here on rolls the claim back, so the invite stays usable.
-    await assertInviterStillAllowed(tx, invite);
-    if (normalizeEmail(input.email) !== invite.email) throw new StaffInviteRefused("email_mismatch");
-    // Linking an existing account to an invite is Phase 2's job.
-    const existing = await tx.student.findUnique({ where: { email: invite.email }, select: { id: true } });
-    if (existing) throw new StaffInviteRefused("email_mismatch");
-
-    const account = await tx.student.create({
-      data: {
-        studentId: await pickLoginName(tx, invite.email),
-        displayName: input.displayName,
-        passwordHash,
-        email: invite.email,
-        role: invite.role,
-      },
-      select: { id: true },
+      // Throwing from here on rolls the claim back, so the invite stays usable.
+      await claimInvite(tx, invite, now);
+      const staffId = await createAccount(tx, invite, input, passwordHash);
+      return { kind: "accepted", invite, staffId };
     });
-    await placeInTree(tx, invite, account.id);
-    await tx.staffInvite.update({ where: { id: invite.id }, data: { acceptedById: account.id } });
-    return { invite, staffId: account.id };
-  });
+  } catch (error) {
+    // The region went away between the check and the insert.
+    if (isForeignKeyFailure(error)) throw new StaffInviteRefused("invalid");
+    throw error;
+  }
 }
 
-export async function acceptStaffInvite(input: {
-  token: string;
-  email: string;
-  displayName: string;
-  password: string;
-}): Promise<{ staffId: string }> {
+export async function acceptStaffInvite(input: AcceptStaffInviteInput): Promise<{ staffId: string }> {
   const parsed = acceptStaffInviteSchema.parse(input);
   const { hash } = hashPassword(parsed.password);
-  const { invite, staffId } = await claimAndCreate(parsed, hash);
+  const outcome = await claimAndCreate(parsed, hash);
+  if (outcome.kind === "refused") throw new StaffInviteRefused(outcome.reason);
+  const { invite, staffId } = outcome;
 
   await tryLogAuditEvent({
     actorId: staffId,

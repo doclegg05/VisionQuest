@@ -78,8 +78,26 @@ async function refusal(promise: Promise<unknown>): Promise<string> {
   assert.fail("expected a refusal");
 }
 
+/** Stands in for a working invite email, so non-admins may create invites. */
+const delivered = async (): Promise<void> => {};
+
+const TEST_CODE = "246810";
+const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+
+/**
+ * Accept with the right email code. An emailed invite with no code yet gets
+ * one first, as if the person pressed "Send my code" (the code itself is
+ * covered in `staff-invite-email.test.ts`).
+ */
 function accept(token: string, email = "pat@example.org") {
-  return lib.acceptStaffInvite({ token, email, displayName: "Pat Doe", password: PASSWORD });
+  const row = fake.state.staffInvite.rows.find((r) => r.tokenHash === sha256(token));
+  if (row?.deliveredByEmail && row.codeHash === null) {
+    fake.patch("staffInvite", String(row.id), {
+      codeHash: sha256(`${String(row.id)}:${TEST_CODE}`),
+      codeExpiresAt: new Date(Date.now() + 10 * 60_000),
+    });
+  }
+  return lib.acceptStaffInvite({ token, email, displayName: "Pat Doe", password: PASSWORD, code: TEST_CODE });
 }
 
 beforeEach(() => {
@@ -96,7 +114,7 @@ beforeEach(() => {
 describe("createStaffInvite", () => {
   it("refuses a regional coordinator inviting a teacher to a region they do not coordinate", async () => {
     const reason = await refusal(
-      lib.createStaffInvite(regionalCoordinator, { email: "pat@example.org", role: "teacher", regionId: REGION_B }),
+      lib.createStaffInvite(regionalCoordinator, { email: "pat@example.org", role: "teacher", regionId: REGION_B }, delivered),
     );
     assert.equal(reason, "region_not_allowed");
     assert.equal(fake.state.staffInvite.rows.length, 0);
@@ -114,15 +132,15 @@ describe("createStaffInvite", () => {
 
   it("refuses roles the inviter may not invite", async () => {
     assert.equal(
-      await refusal(lib.createStaffInvite(regionalCoordinator, { email: "a@b.org", role: "coordinator", regionId: REGION_A })),
+      await refusal(lib.createStaffInvite(regionalCoordinator, { email: "a@b.org", role: "coordinator", regionId: REGION_A }, delivered)),
       "not_allowed",
     );
     assert.equal(
-      await refusal(lib.createStaffInvite(programCoordinator, { email: "a@b.org", role: "program_coordinator" })),
+      await refusal(lib.createStaffInvite(programCoordinator, { email: "a@b.org", role: "program_coordinator" }, delivered)),
       "not_allowed",
     );
     assert.equal(
-      await refusal(lib.createStaffInvite(teacher, { email: "a@b.org", role: "teacher", regionId: REGION_A })),
+      await refusal(lib.createStaffInvite(teacher, { email: "a@b.org", role: "teacher", regionId: REGION_A }, delivered)),
       "not_allowed",
     );
   });
@@ -140,7 +158,7 @@ describe("createStaffInvite", () => {
       email: "  Pat@Example.ORG ",
       role: "teacher",
       regionId: REGION_A,
-    });
+    }, delivered);
     assert.equal(lib.STAFF_INVITE_TTL_DAYS, 14);
     assert.match(result.token, /^[A-Za-z0-9_-]{43}$/);
     assert.equal(Buffer.from(result.token, "base64url").length, 32);
@@ -171,7 +189,7 @@ describe("createStaffInvite", () => {
 
 describe("acceptStaffInvite", () => {
   async function teacherInviteFromCoordinator() {
-    return lib.createStaffInvite(regionalCoordinator, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
+    return lib.createStaffInvite(regionalCoordinator, { email: "pat@example.org", role: "teacher", regionId: REGION_A }, delivered);
   }
 
   async function assertRefusedAndUntouched(token: string, inviteId: string): Promise<void> {
@@ -198,7 +216,7 @@ describe("acceptStaffInvite", () => {
       email: "pat@example.org",
       role: "coordinator",
       regionId: REGION_B,
-    });
+    }, delivered);
     setStudent(programCoordinator.id, { role: "coordinator" });
     assert.equal(await refusal(accept(invite.token)), "inviter_no_longer_allowed");
     assert.equal(accountRows().length, 0);
@@ -222,7 +240,7 @@ describe("acceptStaffInvite", () => {
       email: "pat@example.org",
       role: "teacher",
       regionId: REGION_A,
-    });
+    }, delivered);
     const { staffId } = await accept(invite.token);
 
     assert.equal(accountRows().length, 1);
@@ -252,7 +270,7 @@ describe("acceptStaffInvite", () => {
       email: "rc@example.org",
       role: "coordinator",
       regionId: REGION_B,
-    });
+    }, delivered);
     const { staffId } = await accept(invite.token, "rc@example.org");
 
     const account = accountRows().find((r) => r.id === staffId);
@@ -325,14 +343,45 @@ describe("acceptStaffInvite", () => {
     assert.equal(accountRows().length, 1);
   });
 
-  it("refuses an invite whose email already has an account, and leaves the invite unaccepted", async () => {
+  it("refuses an invite whose email already has an account as account_exists, and leaves the invite unaccepted", async () => {
     seedRow("student", { id: "existing-1", studentId: "pat.existing", email: "pat@example.org", role: "student" });
     const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
 
-    assert.equal(await refusal(accept(invite.token)), "email_mismatch");
+    assert.equal(await refusal(accept(invite.token)), "account_exists");
     assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
     assert.equal(accountRows().length, 1);
     assert.equal(fake.state.regionInstructor.rows.length, 0);
+  });
+
+  it("finds an existing account whose stored email differs only in casing", async () => {
+    seedRow("student", { id: "existing-1", studentId: "pat.existing", email: "Pat@Example.ORG", role: "teacher" });
+    const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
+
+    assert.equal(await refusal(accept(invite.token)), "account_exists");
+    assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
+    assert.equal(accountRows().length, 1);
+  });
+
+  it("refuses an invite whose region was deleted as invalid, never a database error", async () => {
+    const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
+    fake.remove("region", REGION_A);
+
+    assert.equal(await refusal(accept(invite.token)), "invalid");
+    assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
+    assert.equal(accountRows().length, 0);
+    assert.equal(fake.state.regionInstructor.rows.length, 0);
+  });
+
+  it("maps a region deleted mid-accept (a foreign-key failure) to invalid", async () => {
+    const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "coordinator", regionId: REGION_B });
+    // The region exists when the accept starts and is gone when its row is written.
+    fake.beforeCreate((table) => {
+      if (table === "regionCoordinator") fake.remove("region", REGION_B);
+    });
+
+    assert.equal(await refusal(accept(invite.token)), "invalid");
+    assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
+    assert.equal(accountRows().length, 0);
   });
 
   it("gives the login name a suffix when the email local part is taken", async () => {
@@ -362,7 +411,7 @@ describe("revokeStaffInvite", () => {
       email: "pat@example.org",
       role: "teacher",
       regionId: REGION_A,
-    });
+    }, delivered);
     await lib.revokeStaffInvite(regionalCoordinator, invite.inviteId);
     assert.ok(inviteRow(invite.inviteId).revokedAt instanceof Date);
   });
@@ -398,7 +447,7 @@ describe("audit", () => {
       email: "pat@example.org",
       role: "teacher",
       regionId: REGION_A,
-    });
+    }, delivered);
     const { staffId } = await accept(accepted.token);
     const revoked = await lib.createStaffInvite(admin, { email: "kim@example.org", role: "program_coordinator" });
     await lib.revokeStaffInvite(admin, revoked.inviteId);
@@ -423,6 +472,6 @@ describe("audit", () => {
       assert.ok(!serialized.includes(accepted.token), `${String(row.action)} row carries no token`);
     }
     const firstMetadata: unknown = JSON.parse(String(rows[0].metadata));
-    assert.deepEqual(firstMetadata, { role: "teacher", regionId: REGION_A });
+    assert.deepEqual(firstMetadata, { role: "teacher", regionId: REGION_A, deliveredByEmail: true });
   });
 });

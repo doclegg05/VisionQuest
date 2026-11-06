@@ -223,6 +223,7 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
   "POST /api/staff-invites",
   "DELETE /api/staff-invites/[id]",
   "POST /api/staff-invites/accept",
+  "POST /api/staff-invites/accept/code",
 
   "PUT /api/student/forms/[templateId]",
   "POST /api/student/forms/[templateId]/submit",

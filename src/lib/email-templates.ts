@@ -124,6 +124,32 @@ export function buildStaffInviteEmail(input: StaffInviteEmailInput): { subject: 
   return { subject, text, html };
 }
 
+export interface StaffInviteCodeEmailInput {
+  code: string;
+  minutes: number;
+}
+
+/** Subject, plain text and HTML for an invite's accept code. The code is only ever written into the message. */
+export function buildStaffInviteCodeEmail(input: StaffInviteCodeEmailInput): { subject: string; text: string; html: string } {
+  const subject = "Your VisionQuest code";
+  const intro = `Your code is ${input.code}. Type it on the invite page to set up your account.`;
+  const expiry = `The code works for ${input.minutes} minutes. If you did not ask for it, you can ignore this email.`;
+  const text = `${intro}\n\n${expiry}`;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:24px;background-color:#f4f4f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:12px;padding:32px;">
+    <h1 style="margin:0 0 16px;font-size:22px;color:#111827;">${escapeHtml(subject)}</h1>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151;">Type this code on the invite page to set up your account.</p>
+    <p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:6px;color:#111827;">${escapeHtml(input.code)}</p>
+    <p style="margin:0;font-size:13px;color:#6b7280;">${escapeHtml(expiry)}</p>
+  </div>
+</body>
+</html>`;
+  return { subject, text, html };
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
