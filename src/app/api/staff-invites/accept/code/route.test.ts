@@ -86,6 +86,17 @@ describe("POST /api/staff-invites/accept/code", () => {
     assert.equal(sent.length, before);
   });
 
+  it("answers a locked invite exactly as it answers an unknown token, and sends nothing (R23)", async () => {
+    const token = await emailedToken();
+    fake.patch("staffInvite", String(fake.state.staffInvite.rows[0].id), { codeAttempts: 5 });
+    const before = sent.length;
+    const locked = await post({ token });
+    const unknown = await post({ token: "not-a-real-token" });
+    assert.equal(locked.status, unknown.status);
+    assert.deepEqual(await locked.json(), await unknown.json());
+    assert.equal(sent.length, before);
+  });
+
   it("matches register-teacher: 5 per IP and a route-wide 20, each per 15 minutes", async () => {
     await post({ token: "x" });
     assert.deepEqual(rateLimitCalls, [

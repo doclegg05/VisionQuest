@@ -166,7 +166,7 @@ describe("sendStaffInvite", () => {
 });
 
 describe("requestStaffInviteCode", () => {
-  it("stores only the SHA-256 of a 6-digit code, for 10 minutes, and emails it to the invite's address", async () => {
+  it("stores only the SHA-256 of a 6-digit code, for 10 minutes, emails it, and keeps the attempt count (R23)", async () => {
     const { inviteId, token } = await emailedInvite();
     fake.patch("staffInvite", inviteId, { codeAttempts: 3 });
     const startedAt = Date.now();
@@ -177,7 +177,7 @@ describe("requestStaffInviteCode", () => {
     assert.equal(sent.at(-1)?.to, "pat@example.org");
     assert.equal(row.codeHash, createHash("sha256").update(`${inviteId}:${code}`).digest("hex"));
     assert.ok(!JSON.stringify(row).includes(`"${code}"`), "the plain code is never stored");
-    assert.equal(row.codeAttempts, 0);
+    assert.equal(row.codeAttempts, 3, "a new code does not reset the invite's wrong tries");
     const expiresAt = (row.codeExpiresAt as Date).getTime();
     assert.ok(expiresAt >= startedAt + 10 * 60_000 && expiresAt <= Date.now() + 10 * 60_000);
   });
@@ -242,19 +242,43 @@ describe("acceptStaffInvite with a code", () => {
     assert.equal(accountRows().length, 1);
   });
 
-  it("clears the code after 5 wrong tries, then refuses even the right code until a new one is sent", async () => {
+  it("locks the invite after 5 wrong tries, across codes, and refuses even the right code (R23)", async () => {
+    const { inviteId, token } = await emailedInvite();
+    const first = await requestCode(token);
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      assert.equal(await refusal(accept(token, wrongCodeFor(first))), "code_invalid", `attempt ${attempt}`);
+    }
+    // A new code does not buy new tries.
+    const second = await requestCode(token);
+    for (let attempt = 4; attempt <= 5; attempt += 1) {
+      assert.equal(await refusal(accept(token, wrongCodeFor(second))), "code_invalid", `attempt ${attempt}`);
+    }
+    assert.equal(inviteRow(inviteId).codeAttempts, 5);
+    assert.equal(await refusal(accept(token, second)), "code_locked");
+    assert.equal(inviteRow(inviteId).codeAttempts, 5, "a refused try on a locked invite is not counted");
+    assert.equal(accountRows().length, 0);
+  });
+
+  it("sends no new code for a locked invite", async () => {
+    const { inviteId, token } = await emailedInvite();
+    await requestCode(token);
+    fake.patch("staffInvite", inviteId, { codeAttempts: 5 });
+    const before = sent.length;
+    await delivery.requestStaffInviteCode(token);
+    assert.equal(sent.length, before);
+  });
+
+  it("compares at most 5 of 6 parallel wrong guesses and refuses the 6th without comparing (R23)", async () => {
     const { inviteId, token } = await emailedInvite();
     const code = await requestCode(token);
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
-      assert.equal(await refusal(accept(token, wrongCodeFor(code))), "code_invalid", `attempt ${attempt}`);
-    }
-    assert.equal(inviteRow(inviteId).codeHash, null);
-    assert.equal(await refusal(accept(token, code)), "code_expired");
-    assert.equal(accountRows().length, 0);
-
-    const fresh = await requestCode(token);
-    await accept(token, fresh);
-    assert.equal(accountRows().length, 1);
+    const reasons = await Promise.all(
+      Array.from({ length: 6 }, () => refusal(accept(token, wrongCodeFor(code)))),
+    );
+    // code_invalid means the guess was compared; code_locked means it was refused first.
+    assert.equal(reasons.filter((r) => r === "code_invalid").length, 5);
+    assert.equal(reasons.filter((r) => r === "code_locked").length, 1);
+    assert.equal(inviteRow(inviteId).codeAttempts, 5);
+    assert.equal(await refusal(accept(token, code)), "code_locked");
   });
 
   it("refuses a code after its 10 minutes as code_expired", async () => {

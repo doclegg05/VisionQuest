@@ -8,7 +8,7 @@ describe("inviteNotice", () => {
   });
 
   it("says the send failed, distinct from email not being set up", () => {
-    assert.equal(inviteNotice("failed"), "We could not send the email. Try again, or ask an admin.");
+    assert.equal(inviteNotice("failed"), "We could not send the email. Copy this link and send it yourself.");
     assert.equal(
       inviteNotice("not_configured"),
       "Email is not set up. Copy this link and send it to the person yourself.",

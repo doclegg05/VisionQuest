@@ -12,6 +12,7 @@ import {
   createStaffInvite,
   hashInviteCode,
   hashToken,
+  STAFF_INVITE_CODE_MAX_ATTEMPTS,
   STAFF_INVITE_CODE_TTL_MINUTES,
   type CreateStaffInviteInput,
   type InviteDeliverer,
@@ -59,9 +60,10 @@ const MS_PER_MINUTE = 60_000;
 
 /**
  * Email a fresh accept code for an emailed invite that can still be used.
- * Says nothing either way: an unknown token, a link-only invite or a used one
- * returns the same as a sent code, so the route can answer identically.
- * A new code replaces the old one and resets the wrong-attempt count.
+ * Says nothing either way: an unknown token, a link-only, used or locked
+ * invite returns the same as a sent code, so the route can answer identically.
+ * A new code replaces the old one but keeps the invite's try count (Ruling
+ * R23), so asking again never buys more guesses.
  */
 export async function requestStaffInviteCode(token: string): Promise<void> {
   const invite = await prismaAdmin.staffInvite.findUnique({
@@ -73,11 +75,16 @@ export async function requestStaffInviteCode(token: string): Promise<void> {
   const code = randomInt(0, CODE_SPACE).toString().padStart(6, "0");
   const now = new Date();
   const stored = await prismaAdmin.staffInvite.updateMany({
-    where: { id: invite.id, acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
+    where: {
+      id: invite.id,
+      acceptedAt: null,
+      revokedAt: null,
+      expiresAt: { gt: now },
+      codeAttempts: { lt: STAFF_INVITE_CODE_MAX_ATTEMPTS },
+    },
     data: {
       codeHash: hashInviteCode(invite.id, code),
       codeExpiresAt: new Date(now.getTime() + STAFF_INVITE_CODE_TTL_MINUTES * MS_PER_MINUTE),
-      codeAttempts: 0,
     },
   });
   if (stored.count !== 1) return;

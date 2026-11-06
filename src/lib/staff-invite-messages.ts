@@ -20,6 +20,7 @@ export const STAFF_INVITE_MESSAGES: Record<StaffInviteError, string> = {
   code_required: "Enter the 6-digit code we emailed you.",
   code_invalid: "That code is not right. Check the email and try again.",
   code_expired: "That code no longer works. Send a new code and try again.",
+  code_locked: "This invite is locked after too many wrong codes. Ask for a new invite.",
 };
 
 const STAFF_INVITE_STATUSES: Record<StaffInviteError, number> = {
@@ -37,6 +38,7 @@ const STAFF_INVITE_STATUSES: Record<StaffInviteError, number> = {
   code_required: 400,
   code_invalid: 400,
   code_expired: 400,
+  code_locked: 410,
 };
 
 export const STAFF_INVITE_REASONS = Object.keys(STAFF_INVITE_MESSAGES) as StaffInviteError[];

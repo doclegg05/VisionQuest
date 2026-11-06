@@ -31,7 +31,7 @@ import { registerStaffSchema } from "@/lib/schemas";
 
 export const STAFF_INVITE_TTL_DAYS = 14;
 export const STAFF_INVITE_CODE_TTL_MINUTES = 10;
-/** Wrong codes allowed before the code is cleared and a new one must be sent. */
+/** Code tries allowed per invite, across codes. At the limit the invite is locked (Ruling R23). */
 export const STAFF_INVITE_CODE_MAX_ATTEMPTS = 5;
 
 export type StaffInviteError =
@@ -48,7 +48,8 @@ export type StaffInviteError =
   | "account_exists"
   | "code_required"
   | "code_invalid"
-  | "code_expired";
+  | "code_expired"
+  | "code_locked";
 
 export class StaffInviteRefused extends Error {
   constructor(readonly reason: StaffInviteError) {
@@ -268,15 +269,22 @@ type AcceptOutcome =
   | { kind: "accepted"; invite: StaffInvite; staffId: string }
   | { kind: "refused"; reason: StaffInviteError };
 
-/** Count a wrong code; at the limit, clear it so a new one must be sent. */
-async function recordWrongCode(tx: Prisma.TransactionClient, invite: StaffInvite): Promise<void> {
-  // Keyed on this code's hash: a code sent since then starts its own count.
-  const sameCode = { id: invite.id, codeHash: invite.codeHash };
-  const counted = await tx.staffInvite.updateMany({ where: sameCode, data: { codeAttempts: { increment: 1 } } });
-  if (counted.count !== 1) return;
-  const after = await tx.staffInvite.findUnique({ where: { id: invite.id }, select: { codeAttempts: true } });
-  if ((after?.codeAttempts ?? 0) < STAFF_INVITE_CODE_MAX_ATTEMPTS) return;
-  await tx.staffInvite.updateMany({ where: sameCode, data: { codeHash: null, codeExpiresAt: null } });
+/**
+ * Claim one of the invite's tries before comparing (Ruling R23). The claim is
+ * a single conditional increment, so parallel guesses cannot all read a low
+ * count and all compare: at most `STAFF_INVITE_CODE_MAX_ATTEMPTS` ever do.
+ * Tries count per invite, across codes; a new code does not reset them. A
+ * right code also uses a try, and the claim that follows uses up the code.
+ */
+async function claimAttempt(tx: Prisma.TransactionClient, invite: StaffInvite): Promise<StaffInviteError | null> {
+  const claimed = await tx.staffInvite.updateMany({
+    where: { id: invite.id, codeHash: invite.codeHash, codeAttempts: { lt: STAFF_INVITE_CODE_MAX_ATTEMPTS } },
+    data: { codeAttempts: { increment: 1 } },
+  });
+  if (claimed.count === 1) return null;
+  const current = await tx.staffInvite.findUnique({ where: { id: invite.id }, select: { codeAttempts: true } });
+  // No try left: locked. Otherwise the code changed under us: a new one was sent.
+  return (current?.codeAttempts ?? 0) >= STAFF_INVITE_CODE_MAX_ATTEMPTS ? "code_locked" : "code_expired";
 }
 
 /** Ruling R21: an emailed invite needs its current, unexpired code. */
@@ -288,15 +296,13 @@ async function checkCode(
 ): Promise<StaffInviteError | null> {
   if (!invite.deliveredByEmail) return null;
   if (!code) return "code_required";
-  const live =
-    invite.codeHash !== null &&
-    invite.codeExpiresAt !== null &&
-    invite.codeExpiresAt.getTime() > now.getTime() &&
-    invite.codeAttempts < STAFF_INVITE_CODE_MAX_ATTEMPTS;
+  if (invite.codeAttempts >= STAFF_INVITE_CODE_MAX_ATTEMPTS) return "code_locked";
+  const live = invite.codeHash !== null && invite.codeExpiresAt !== null && invite.codeExpiresAt.getTime() > now.getTime();
   if (!live || invite.codeHash === null) return "code_expired";
-  if (codeHashesMatch(invite.codeHash, hashInviteCode(invite.id, code))) return null;
-  await recordWrongCode(tx, invite);
-  return "code_invalid";
+  const noTry = await claimAttempt(tx, invite);
+  if (noTry) return noTry;
+  // The try is spent and commits with the refusal, so it counts even when wrong.
+  return codeHashesMatch(invite.codeHash, hashInviteCode(invite.id, code)) ? null : "code_invalid";
 }
 
 /**

@@ -25,7 +25,8 @@ interface CreateResponse {
 
 const NOTICES: Record<InviteDelivery, string> = {
   sent: "Invite sent.",
-  failed: "We could not send the email. Try again, or ask an admin.",
+  // Only an admin reaches this: anyone else is refused email_required.
+  failed: "We could not send the email. Copy this link and send it yourself.",
   not_configured: "Email is not set up. Copy this link and send it to the person yourself.",
 };
 
