@@ -7,8 +7,9 @@ import type { Session } from "@/lib/api-error";
 // where-clause builder; it cannot also mock the database, because it imports
 // classroom.ts statically and the mock has to be in place first.
 //
-// Together they pin that a real teacher keeps cross-class access while the
-// demo instructor is held to classes it is an assigned instructor of.
+// Together they pin the organization tree: a real teacher and the demo
+// instructor are held to classes they instruct, a regional coordinator to the
+// classes in their regions, and admins and program coordinators see every class.
 
 const mockClassFindMany = mock.fn<(args: Record<string, unknown>) => Promise<unknown[]>>(
   async () => [],
@@ -51,6 +52,19 @@ const realTeacher: Session = {
   displayName: "Teacher",
   role: "teacher",
 };
+const regionalCoordinator: Session = {
+  id: "coord-1",
+  studentId: "coord-1",
+  displayName: "Coordinator",
+  role: "coordinator",
+};
+const programCoordinator: Session = {
+  id: "pc-1",
+  studentId: "pc-1",
+  displayName: "Program Coordinator",
+  role: "program_coordinator",
+};
+const regionClause = (id: string) => ({ region: { coordinators: { some: { coordinatorId: id } } } });
 const instructorsClause = (id: string) => ({ instructors: { some: { instructorId: id } } });
 
 function firstWhere(fn: { mock: { calls: Array<{ arguments: [Record<string, unknown>] }> } }) {
@@ -73,9 +87,25 @@ describe("listManagedClasses", () => {
     });
   });
 
-  it("keeps a real teacher's class list unscoped", async () => {
+  it("lists only the classes a real teacher teaches", async () => {
     await classroom.listManagedClasses(realTeacher);
-    assert.deepEqual(firstWhere(mockClassFindMany), { status: { not: "archived" } });
+    assert.deepEqual(firstWhere(mockClassFindMany), {
+      status: { not: "archived" },
+      ...instructorsClause(realTeacher.id),
+    });
+  });
+
+  it("lists only the classes in a regional coordinator's regions", async () => {
+    await classroom.listManagedClasses(regionalCoordinator);
+    assert.deepEqual(firstWhere(mockClassFindMany), {
+      status: { not: "archived" },
+      ...regionClause(regionalCoordinator.id),
+    });
+  });
+
+  it("lists every class for a program coordinator", async () => {
+    await classroom.listManagedClasses(programCoordinator, { includeArchived: true });
+    assert.deepEqual(firstWhere(mockClassFindMany), {});
   });
 });
 
@@ -96,8 +126,24 @@ describe("assertStaffCanManageClass", () => {
     );
   });
 
-  it("keeps a real teacher's class lookup unscoped", async () => {
+  it("looks a class up through the instructors clause for a real teacher", async () => {
     await classroom.assertStaffCanManageClass(realTeacher, "class-1");
+    assert.deepEqual(firstWhere(mockClassFindFirst), {
+      id: "class-1",
+      ...instructorsClause(realTeacher.id),
+    });
+  });
+
+  it("looks a class up through the region clause for a regional coordinator", async () => {
+    await classroom.assertStaffCanManageClass(regionalCoordinator, "class-1");
+    assert.deepEqual(firstWhere(mockClassFindFirst), {
+      id: "class-1",
+      ...regionClause(regionalCoordinator.id),
+    });
+  });
+
+  it("keeps a program coordinator's class lookup unscoped", async () => {
+    await classroom.assertStaffCanManageClass(programCoordinator, "class-1");
     assert.deepEqual(firstWhere(mockClassFindFirst), { id: "class-1" });
   });
 });
@@ -128,8 +174,16 @@ describe("student lookups", () => {
     assert.deepEqual(where.classEnrollments.some.class, instructorsClause(demoInstructor.id));
   });
 
-  it("keeps a real teacher's student lookups unscoped", async () => {
+  it("narrows a real teacher's student lookups to the classes they teach", async () => {
     await classroom.listManagedStudentIds(realTeacher);
+    const where = firstWhere(mockStudentFindMany) as {
+      classEnrollments: { some: { class: unknown } };
+    };
+    assert.deepEqual(where.classEnrollments.some.class, instructorsClause(realTeacher.id));
+  });
+
+  it("keeps a program coordinator's student lookups unscoped", async () => {
+    await classroom.listManagedStudentIds(programCoordinator);
     assert.deepEqual(firstWhere(mockStudentFindMany), { role: "student" });
   });
 });

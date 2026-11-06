@@ -2,9 +2,9 @@
  * What the shared demo instructor may do over HTTP.
  *
  * The demo instructor is one real teacher account that every visitor to the
- * cohort demo shares. In app code any teacher can manage any class or student
- * (`STAFF_CAN_MANAGE_ANY`, src/lib/classroom.ts), so left alone this account
- * could change the program's real content. src/proxy.ts asks this file about
+ * cohort demo shares. It is a real teacher account, so left alone it could
+ * change program-wide content that any teacher may edit, such as program
+ * documents and settings. src/proxy.ts asks this file about
  * every request that carries a demo instructor session, with no database
  * lookup, and answers 403 when the answer is no.
  *

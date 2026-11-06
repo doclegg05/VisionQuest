@@ -124,6 +124,33 @@ describe("matchesWhere", () => {
     assert.equal(matchesWhere({ ...row, key: "scrape:cfg-2" }, where), false);
   });
 
+  it("follows nested relation filters and `some` over list relations", () => {
+    const student = {
+      role: "student",
+      classEnrollments: [
+        { status: "active", class: { region: { coordinators: [{ coordinatorId: "CA" }] } } },
+        { status: "withdrawn", class: { region: null } },
+      ],
+    };
+    const inRegion = (coordinatorId: string) => ({
+      classEnrollments: {
+        some: { status: { in: ["active"] }, class: { region: { coordinators: { some: { coordinatorId } } } } },
+      },
+    });
+    assert.equal(matchesWhere(student, inRegion("CA")), true);
+    assert.equal(matchesWhere(student, inRegion("CB")), false);
+    assert.equal(matchesWhere({ ...student, classEnrollments: [] }, inRegion("CA")), false);
+  });
+
+  it("never matches a relation filter against a null relation", () => {
+    const enrollment = { class: { region: null } };
+    assert.equal(matchesWhere(enrollment, { class: { region: { coordinators: { some: {} } } } }), false);
+  });
+
+  it("throws on a list-relation operator it does not know", () => {
+    assert.throws(() => matchesWhere({ items: [] }, { items: { every: {} } }), /every/);
+  });
+
   it("throws on an operator it does not know, so a fake never matches by accident", () => {
     assert.throws(() => matchesWhere(row, { status: { contains: "process" } }), /contains/);
   });

@@ -1,23 +1,24 @@
 // =============================================================================
 // listConnectionsForConsole — whose introductions the pipeline board shows.
 //
-// The board names students. A regular teacher may see every class (single
-// SPOKES staff workspace), but the shared cohort demo instructor is held to the
-// one class it teaches, and this query must hold it there itself rather than
-// leave it to RLS alone.
+// The board names students. A teacher, the shared cohort demo instructor
+// included, is held to the classes they teach (organization tree, 2026-11), and
+// this query must hold them there itself rather than leave it to RLS alone.
+// Admins and program coordinators see every class.
 // =============================================================================
 
 import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
-import { mockTeacherSession } from "@/lib/test-helpers";
+import { mockAdminSession, mockTeacherSession } from "@/lib/test-helpers";
 
 const teacher = mockTeacherSession();
+const admin = mockAdminSession();
 const demoInstructor = mockTeacherSession({ id: "demo-instructor", demoAccount: "instructor" });
 
 /** Which instructors teach the class each student is enrolled in. */
 const INSTRUCTORS_BY_STUDENT: Record<string, string[]> = {
   "demo-student": [demoInstructor.id],
-  "other-student": ["tch-other"],
+  "other-student": [teacher.id],
 };
 
 function connectionRow(id: string, studentId: string) {
@@ -67,8 +68,13 @@ describe("listConnectionsForConsole", () => {
     assert.deepEqual(rows.map((row) => row.studentId), ["demo-student"]);
   });
 
-  it("still shows a regular teacher every class's introductions", async () => {
+  it("shows a regular teacher only their own class's introductions", async () => {
     const rows = await connections.listConnectionsForConsole(teacher);
+    assert.deepEqual(rows.map((row) => row.studentId), ["other-student"]);
+  });
+
+  it("still shows an admin every class's introductions", async () => {
+    const rows = await connections.listConnectionsForConsole(admin);
     assert.deepEqual(rows.map((row) => row.studentId).sort(), ["demo-student", "other-student"]);
   });
 });

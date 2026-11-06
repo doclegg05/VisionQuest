@@ -94,7 +94,16 @@ for (const route of cases) {
       assert.deepEqual(findFirst.mock.calls[0].arguments[0], {
         where: { AND: [
           { OR: [{ id: "other-account-id" }, { studentId: "other-account-id" }] },
-          { role: "student" },
+          // Organization tree: a teacher reaches only students in classes they instruct.
+          {
+            role: "student",
+            classEnrollments: {
+              some: {
+                status: { in: ["active", "inactive", "completed", "withdrawn"] },
+                class: { instructors: { some: { instructorId: "teacher-1" } } },
+              },
+            },
+          },
         ] },
         select: { id: true, displayName: true, studentId: true, role: true, isActive: true },
       });
