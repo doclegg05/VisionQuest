@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { before, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
 
-import { OrgPlacementPanel } from "./OrgPlacementPanel";
+// PlaceApplicantControl calls useRouter(), which needs a mounted app router.
+// Static rendering has none, so stand in a router.
+mock.module("next/navigation", {
+  namedExports: { useRouter: () => ({ refresh: () => {} }) },
+});
+
+let OrgPlacementPanel: typeof import("./OrgPlacementPanel").OrgPlacementPanel;
+before(async () => {
+  ({ OrgPlacementPanel } = await import("./OrgPlacementPanel"));
+});
 
 const applicants = [{ id: "s1", displayName: "Sam Applicant", county: "Kanawha", createdOn: "Jan 2, 2026" }];
 const classes = [{ id: "c1", name: "Morning Class" }];
