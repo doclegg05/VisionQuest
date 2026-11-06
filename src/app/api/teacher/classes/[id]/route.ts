@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
 import { isProgramType } from "@/lib/program-type";
+import { assertRegionAllowed } from "@/lib/class-create";
 
 function parseOptionalDate(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -139,13 +140,10 @@ export const PATCH = withTeacherAuth(async (
       if (body.regionId === null) {
         nextRegionId = null;
       } else if (typeof body.regionId === "string" && body.regionId.trim()) {
-        const region = await prisma.region.findUnique({
-          where: { id: body.regionId },
-          select: { id: true, status: true },
-        });
-        if (!region) throw badRequest("regionId does not match any region.");
-        if (region.status !== "active") throw badRequest("Cannot assign a class to an archived region.");
-        nextRegionId = region.id;
+        // The same rule as creating a class: an instructor may use only a
+        // region they belong to; whole-state roles may use any active region.
+        await assertRegionAllowed(session, body.regionId);
+        nextRegionId = body.regionId;
       } else {
         throw badRequest("regionId must be a non-empty string or null.");
       }

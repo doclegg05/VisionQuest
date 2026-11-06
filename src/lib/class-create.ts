@@ -18,7 +18,7 @@ export async function assertRegionAllowed(session: Session, regionId: string): P
       );
     }
     if (!ownRegionIds.includes(regionId)) {
-      throw forbidden("You can only create classrooms in your own region.");
+      throw forbidden("You can put classrooms only in your own region.");
     }
   }
   const region = await prisma.region.findUnique({

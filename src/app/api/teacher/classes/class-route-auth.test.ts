@@ -41,7 +41,7 @@ mock.module("@/lib/api-error", {
       <Args extends unknown[]>(handler: (sessionArg: typeof session, ...args: Args) => Promise<Response>) =>
       async (...args: Args) => {
         try {
-          return await handler(session, ...args);
+          return await handler(currentSession, ...args);
         } catch (error) {
           if (error && typeof error === "object" && "statusCode" in error) {
             const statusCode = Number((error as { statusCode: number }).statusCode);
@@ -153,6 +153,39 @@ describe("teacher class update authorization", () => {
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
     mockAssertStaffCanManageClass.mock.mockImplementation(async () => ({ id: "class-1" }));
     mockAssertTeacherAssignmentLimit.mock.mockImplementation(async () => undefined);
+    currentSession = session;
+    mockRegionInstructorFindMany.mock.mockImplementation(async () => [{ regionId: REGION_A }]);
+    mockRegionFindUnique.mock.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      id: where.id,
+      status: "active",
+    }));
+  });
+
+  async function patchRegion(regionId: string) {
+    const req = mockRequest("/api/teacher/classes/class-1", { method: "PATCH", body: { regionId } });
+    const res = await classRoute.PATCH(req as never, { params: Promise.resolve({ id: "class-1" }) });
+    return { res, body: await res.json() };
+  }
+
+  it("refuses a teacher moving their class to a region they are not in", async () => {
+    const { res, body } = await patchRegion(REGION_B);
+    assert.equal(res.status, 403);
+    assert.equal(body.error, "You can put classrooms only in your own region.");
+    assert.equal(mockTransaction.mock.callCount(), 0);
+  });
+
+  it("lets a teacher keep the class in a region they are in", async () => {
+    const { res } = await patchRegion(REGION_A);
+    assert.equal(res.status, 200);
+    assert.equal(mockTransaction.mock.callCount(), 1);
+  });
+
+  it("lets an admin move a class to any active region", async () => {
+    currentSession = mockAdminSession();
+    mockRegionInstructorFindMany.mock.mockImplementation(async () => []);
+    const { res } = await patchRegion(REGION_B);
+    assert.equal(res.status, 200);
+    assert.equal(mockTransaction.mock.callCount(), 1);
   });
 
   it("returns 403 and skips updates when the teacher does not manage the class", async () => {
@@ -249,8 +282,9 @@ describe("POST /api/teacher/classes region rules", () => {
   });
 
   it("refuses a teacher creating in a region they are not in", async () => {
-    const { res } = await post({ regionId: REGION_B });
+    const { res, body } = await post({ regionId: REGION_B });
     assert.equal(res.status, 403);
+    assert.equal(body.error, "You can put classrooms only in your own region.");
     assert.equal(mockClassCreate.mock.callCount(), 0);
   });
 
