@@ -173,6 +173,21 @@ CREATE POLICY "region_instructor_tree_reader_read" ON "visionquest"."RegionInstr
     AND "regionId" IN (SELECT visionquest.coordinated_region_ids(current_setting('app.current_user_id', true)))
   );
 
+-- Instructor links for every class the user reaches through
+-- instructor_class_ids: a coordinator reads who teaches the classes in their
+-- regions (the region overview and instructor metrics need it), a program
+-- coordinator reads them all, and an instructor also reads their co-teachers
+-- on classes they teach. The baseline teacher arm ("instructorId" = me) still
+-- covers an instructor's own rows. SELECT only: the restrictive policies in
+-- section 5 keep tree readers from writing here.
+DROP POLICY IF EXISTS "spokes_class_instructor_tree_read" ON "visionquest"."SpokesClassInstructor";
+CREATE POLICY "spokes_class_instructor_tree_read" ON "visionquest"."SpokesClassInstructor"
+  FOR SELECT TO vq_app
+  USING (
+    current_setting('app.current_role', true) = 'teacher'
+    AND "classId" IN (SELECT visionquest.instructor_class_ids(current_setting('app.current_user_id', true)))
+  );
+
 -- ---------------------------------------------------------------------
 -- 4. Transcript tables refuse tree readers, reads and writes.
 --    RESTRICTIVE policies are ANDed with the permissive ones. The function

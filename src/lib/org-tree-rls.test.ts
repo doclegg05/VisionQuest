@@ -421,6 +421,54 @@ if (!SHOULD_RUN) {
       assert.deepEqual(await read(t.P), [t.TA, t.TB].sort());
     });
 
+    // ---- Instructor links (SpokesClassInstructor) ----
+
+    async function visibleInstructorLinks(userId: string): Promise<string[]> {
+      const rows = await asRole("teacher", userId, (tx) =>
+        tx.spokesClassInstructor.findMany({
+          where: { classId: { in: classIds() } },
+          select: { classId: true, instructorId: true },
+        }),
+      );
+      return rows.map((r) => `${r.classId}:${r.instructorId}`).sort();
+    }
+
+    it("a regional coordinator reads their region's instructor links, not another region's", async () => {
+      assert.deepEqual(await visibleInstructorLinks(t.KA), [`${t.classA}:${t.TA}`]);
+    });
+
+    it("a program coordinator reads every instructor link", async () => {
+      assert.deepEqual(
+        await visibleInstructorLinks(t.P),
+        [`${t.classA}:${t.TA}`, `${t.classB}:${t.TB}`].sort(),
+      );
+    });
+
+    it("a coordinator with no region reads no instructor link", async () => {
+      assert.deepEqual(await visibleInstructorLinks(t.K0), []);
+    });
+
+    it("an instructor still reads their own instructor links", async () => {
+      assert.deepEqual(await visibleInstructorLinks(t.TA), [`${t.classA}:${t.TA}`]);
+    });
+
+    // ---- Class creation (Ruling R19) ----
+
+    it("a teacher's RLS insert of a new class is refused, which is why class creation writes through prismaAdmin", async () => {
+      // spokes_class_access WITH CHECK needs the class in instructor_class_ids(me),
+      // and no SpokesClassInstructor row can exist before the class does. Moving
+      // POST /api/teacher/classes back to the RLS client would fail every create.
+      await assert.rejects(
+        asRole("teacher", t.TA, (tx) =>
+          tx.spokesClass.createMany({
+            data: [{ name: `New ${suffix}`, code: `NEW-${suffix}`, regionId: t.regionA }],
+          }),
+        ),
+        RLS_REFUSED,
+      );
+      assert.equal(await db.spokesClass.count({ where: { code: `NEW-${suffix}` } }), 0);
+    });
+
     // ---- Transcript tables ----
 
     it("coordinator reads no conversation rows", async () => {
