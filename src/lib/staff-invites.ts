@@ -43,6 +43,7 @@ export type StaffInviteError =
   | "not_allowed"
   | "region_not_allowed"
   | "region_required"
+  | "region_inactive"
   | "inviter_no_longer_allowed"
   | "email_required"
   | "account_exists"
@@ -122,6 +123,16 @@ async function assertMayInvite(
   }
 }
 
+/**
+ * New invites go only to active regions. Not part of assertMayInvite, because
+ * revoking an invite must still work after its region is archived.
+ */
+async function assertRegionActive(regionId: string | null): Promise<void> {
+  if (!regionId) return;
+  const region = await prismaAdmin.region.findUnique({ where: { id: regionId }, select: { status: true } });
+  if (region?.status !== "active") throw new StaffInviteRefused("region_inactive");
+}
+
 function isInvitableRole(role: string): role is InvitableRole {
   return INVITABLE_ROLES.some((candidate) => candidate === role);
 }
@@ -158,6 +169,7 @@ export async function createStaffInvite(
   // A program coordinator belongs to no region, so a supplied region is dropped.
   const regionId = inviteNeedsRegion(parsed.role) ? (parsed.regionId ?? null) : null;
   await assertMayInvite(inviter, parsed.role, regionId);
+  await assertRegionActive(regionId);
   const mayLinkOnly = inviter.role === "admin";
   if (!deliver && !mayLinkOnly) throw new StaffInviteRefused("email_required");
 

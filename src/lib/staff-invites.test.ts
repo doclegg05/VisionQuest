@@ -120,6 +120,24 @@ describe("createStaffInvite", () => {
     assert.equal(fake.state.staffInvite.rows.length, 0);
   });
 
+  it("refuses an invite into an archived region, for a regional coordinator and an admin alike", async () => {
+    fake.patch("region", REGION_A, { status: "archived" });
+    for (const inviter of [regionalCoordinator, admin]) {
+      const reason = await refusal(
+        lib.createStaffInvite(inviter, { email: "pat@example.org", role: "teacher", regionId: REGION_A }, delivered),
+      );
+      assert.equal(reason, "region_inactive");
+    }
+    assert.equal(fake.state.staffInvite.rows.length, 0);
+  });
+
+  it("still lets an inviter revoke an invite after its region is archived", async () => {
+    const invite = await lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher", regionId: REGION_A });
+    fake.patch("region", REGION_A, { status: "archived" });
+    await lib.revokeStaffInvite(admin, invite.inviteId);
+    assert.ok(inviteRow(invite.inviteId).revokedAt);
+  });
+
   it("refuses a teacher invite with no region", async () => {
     const reason = await refusal(lib.createStaffInvite(admin, { email: "pat@example.org", role: "teacher" }));
     assert.equal(reason, "region_required");
