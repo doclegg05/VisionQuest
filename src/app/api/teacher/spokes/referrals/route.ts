@@ -67,7 +67,11 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
     seesWholeState(session.role) ? listUnlinkedReferrals(county) : Promise.resolve([]),
   ]);
 
-  return NextResponse.json({ countyOptions, referrals });
+  return NextResponse.json({
+    countyOptions,
+    referrals,
+    canCreateReferrals: session.role === "admin",
+  });
 });
 
 const optionalText = z
@@ -95,7 +99,8 @@ const createReferralSchema = z.object({
 // one could never see it again. Instructors place a student by adding them to
 // one of their own classes instead.
 export const POST = withTeacherAuth(async (session, req: Request) => {
-  if (!seesWholeState(session.role)) {
+  // Admin only: program coordinators read, they never create (Ruling R16).
+  if (session.role !== "admin") {
     throw forbidden("Choose one of your classrooms.");
   }
 

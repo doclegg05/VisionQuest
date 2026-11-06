@@ -41,8 +41,13 @@ mock.module("@/lib/api-error", {
   namedExports: {
     badRequest: (message: string) => Object.assign(new Error(message), { statusCode: 400 }),
     forbidden: (message = "Forbidden") => Object.assign(new Error(message), { statusCode: 403 }),
-    withTeacherAuth: (handler: (...args: unknown[]) => unknown) => (...args: unknown[]) =>
-      handler(session.current, ...args),
+    // Mirrors the real wrapper: only the roles `isStaffRole` admits reach the handler.
+    withTeacherAuth: (handler: (...args: unknown[]) => unknown) => (...args: unknown[]) => {
+      if (session.current.role !== "teacher" && session.current.role !== "admin") {
+        throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
+      }
+      return handler(session.current, ...args);
+    },
   },
 });
 
@@ -97,15 +102,6 @@ describe("GET /api/teacher/spokes/referrals", () => {
     assert.equal(res.status, 200);
     assert.deepEqual(body.referrals, [APPLICANT]);
     assert.equal(mockRecordFindMany.mock.calls[0].arguments[0].where.studentId, null);
-  });
-
-  it("lists unlinked applicants to a program coordinator", async () => {
-    session.current = { id: "pc-1", role: "program_coordinator" };
-
-    const res = (await GET(new Request("http://localhost/api/teacher/spokes/referrals"))) as Response;
-    const body = await res.json();
-
-    assert.deepEqual(body.referrals, [APPLICANT]);
   });
 });
 
@@ -165,12 +161,13 @@ describe("POST /api/teacher/spokes/referrals", () => {
     assert.equal(mockRecordCreate.mock.calls[0].arguments[0].data.firstName, "Ava");
   });
 
-  it("lets a program coordinator create one", async () => {
+  it("refuses a program coordinator before the handler runs, as the real wrapper does", async () => {
     session.current = { id: "pc-1", role: "program_coordinator" };
 
-    const res = (await POST(postRequest(valid))) as Response;
+    const status = await statusOf(() => POST(postRequest(valid)) as Promise<unknown>);
 
-    assert.equal(res.status, 201);
+    assert.equal(status, 403);
+    assert.equal(mockRecordCreate.mock.callCount(), 0);
   });
 
   it("rejects a body without a last name through the schema", async () => {

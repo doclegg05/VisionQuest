@@ -37,7 +37,12 @@ const UNPLACED_WHERE = {
   instructedClasses: { none: {} },
 } as const;
 
-/** A teacher with no `RegionInstructor` row and no class assignment. */
+/**
+ * A teacher with no `RegionInstructor` row and no class assignment.
+ *
+ * Callers pass the session's own id only. This reads through `prismaAdmin`
+ * with no role check, so it must never take an id from a request.
+ */
 export async function isUnplacedInstructor(staffId: string): Promise<boolean> {
   const row = await prismaAdmin.student.findFirst({
     where: { id: staffId, ...UNPLACED_WHERE },

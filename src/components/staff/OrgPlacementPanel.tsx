@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { api } from "@/lib/api";
 import { FIELD_CLASS, LABEL_CLASS } from "./fieldStyles";
+import { PlaceApplicantControl, type ClassOption } from "./PlaceApplicantControl";
 
 export interface UnplacedStaffItem {
   id: string;
@@ -29,6 +29,9 @@ interface OrgPlacementPanelProps {
   unplacedStaff: readonly UnplacedStaffItem[];
   applicants: readonly WaitingApplicantItem[];
   regions: readonly RegionOption[];
+  classes: readonly ClassOption[];
+  /** Admins only. Everyone else sees the applicants list read-only. */
+  canPlace: boolean;
 }
 
 function AssignRow({ person, regions }: { person: UnplacedStaffItem; regions: readonly RegionOption[] }) {
@@ -84,7 +87,9 @@ function AssignRow({ person, regions }: { person: UnplacedStaffItem; regions: re
   );
 }
 
-export function OrgPlacementPanel({ unplacedStaff, applicants, regions }: OrgPlacementPanelProps) {
+export function OrgPlacementPanel({ unplacedStaff, applicants, regions, classes, canPlace }: OrgPlacementPanelProps) {
+  const [placedIds, setPlacedIds] = useState<readonly string[]>([]);
+  const waiting = applicants.filter((applicant) => !placedIds.includes(applicant.id));
   return (
     <section className="theme-card space-y-6 rounded-xl p-5">
       <div>
@@ -106,13 +111,15 @@ export function OrgPlacementPanel({ unplacedStaff, applicants, regions }: OrgPla
       <div>
         <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Applicants waiting for a class</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          These people signed up but are not in a class. Open a record to move them into one.
+          {canPlace
+            ? "These people signed up but are not in a class. Pick a classroom to place them."
+            : "These people signed up but are not in a class. An admin places them."}
         </p>
-        {applicants.length === 0 ? (
+        {waiting.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--ink-muted)]">No one is waiting.</p>
         ) : (
           <ul className="mt-2 divide-y divide-[var(--border)]">
-            {applicants.map((applicant) => (
+            {waiting.map((applicant) => (
               <li key={applicant.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <p className="text-sm text-[var(--ink-strong)]">
                   <span className="font-semibold">{applicant.displayName}</span>
@@ -120,12 +127,13 @@ export function OrgPlacementPanel({ unplacedStaff, applicants, regions }: OrgPla
                     {applicant.county ?? "County not given"} · Joined {applicant.createdOn}
                   </span>
                 </p>
-                <Link
-                  href={`/teacher/students/${applicant.id}`}
-                  className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--ink-strong)] underline"
-                >
-                  Open record
-                </Link>
+                {canPlace ? (
+                  <PlaceApplicantControl
+                    applicantId={applicant.id}
+                    classes={classes}
+                    onPlaced={() => setPlacedIds((current) => [...current, applicant.id])}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

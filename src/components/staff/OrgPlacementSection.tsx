@@ -1,5 +1,7 @@
 import { OrgPlacementPanel } from "./OrgPlacementPanel";
 import type { Session } from "@/lib/api-error";
+import { listManagedClasses } from "@/lib/classroom";
+import { canPlaceApplicants } from "@/lib/org-placement-client";
 import { listApplicantsWaiting, listUnplacedStaff } from "@/lib/org-placement";
 import { listRegionsForSession } from "@/lib/region";
 
@@ -9,10 +11,12 @@ function formatDay(date: Date): string {
 
 /** Server wrapper: reads both lists for an admin or program coordinator. */
 export async function OrgPlacementSection({ session }: { session: Session }) {
-  const [staff, applicants, regions] = await Promise.all([
+  const canPlace = canPlaceApplicants(session.role);
+  const [staff, applicants, regions, classes] = await Promise.all([
     listUnplacedStaff(session),
     listApplicantsWaiting(session),
     listRegionsForSession(session),
+    canPlace ? listManagedClasses(session) : Promise.resolve([]),
   ]);
   return (
     <OrgPlacementPanel
@@ -23,6 +27,8 @@ export async function OrgPlacementSection({ session }: { session: Session }) {
         county: row.county,
         createdOn: formatDay(row.createdAt),
       }))}
+      canPlace={canPlace}
+      classes={classes.filter((item) => item.status === "active").map((item) => ({ id: item.id, name: item.name }))}
       regions={regions.map((region) => ({ id: region.id, name: region.name }))}
     />
   );
