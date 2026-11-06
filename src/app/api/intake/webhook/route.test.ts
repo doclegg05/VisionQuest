@@ -19,9 +19,29 @@ const CLASS_INSTRUCTORS: Record<string, string[]> = {
   class_archived: ["teacher_1"],
 };
 const CLASS_STATUS: Record<string, string> = { class_archived: "archived" };
+// Which class each existing student is enrolled in, for the real
+// staff-can-manage-student check the route hands to provisioning.
+const STUDENT_CLASS: Record<string, string> = { stu_mine: "class_mine", stu_elsewhere: "class_other" };
+type ManagedWhere = {
+  AND: [
+    { OR: Array<{ id?: string }> },
+    { classEnrollments?: { some: { class?: { instructors?: { some: { instructorId: string } } } } } },
+  ];
+};
 mock.module("@/lib/db", {
   exports: {
     prisma: {
+      student: {
+        findFirst: async (args: { where: ManagedWhere }) => {
+          const [identifier, managed] = args.where.AND;
+          const id = identifier.OR.find((clause) => clause.id)?.id ?? "";
+          const classId = STUDENT_CLASS[id];
+          if (!classId) return null;
+          const instructorId = managed.classEnrollments?.some.class?.instructors?.some.instructorId;
+          if (instructorId && !CLASS_INSTRUCTORS[classId]?.includes(instructorId)) return null;
+          return { id };
+        },
+      },
       spokesClass: {
         findFirst: async (args: {
           where: { id: string; instructors?: { some: { instructorId: string } } };
@@ -315,6 +335,31 @@ describe("POST /api/intake/webhook", () => {
       assert.equal(provisionMock.mock.callCount(), 0);
     });
 
+    it("hands provisioning a check that refuses students outside the teacher's classes", async () => {
+      currentSession = teacher;
+
+      await route.POST(postAsSession({ classId: "class_mine" }));
+
+      const options = provisionMock.mock.calls[0]?.arguments[1] as {
+        canAdoptExisting?: (id: string) => Promise<boolean>;
+      };
+      assert.equal(typeof options.canAdoptExisting, "function");
+      assert.equal(await options.canAdoptExisting?.("stu_mine"), true);
+      assert.equal(await options.canAdoptExisting?.("stu_elsewhere"), false);
+    });
+
+    it("passes provisioning's generic 409 through unchanged", async () => {
+      currentSession = teacher;
+      const message = "This student may already have an account. Ask an admin to add them to your class.";
+      provisionError = new FakeApiError(409, message);
+
+      const res = await route.POST(postAsSession({ classId: "class_mine" }));
+      const body = await res.json();
+
+      assert.equal(res.status, 409);
+      assert.deepEqual(body, { error: message });
+    });
+
     it("lets an admin name any class", async () => {
       currentSession = { id: "admin_1", role: "admin", studentId: "a1", displayName: "A" };
 
@@ -329,7 +374,11 @@ describe("POST /api/intake/webhook", () => {
 
     assert.equal(res.status, 201);
     assert.equal(provisionMock.mock.callCount(), 1);
-    const options = provisionMock.mock.calls[0]?.arguments[1] as { requireNamedClass?: boolean };
+    const options = provisionMock.mock.calls[0]?.arguments[1] as {
+      requireNamedClass?: boolean;
+      canAdoptExisting?: unknown;
+    };
     assert.equal(options.requireNamedClass, false);
+    assert.equal(options.canAdoptExisting, undefined);
   });
 });

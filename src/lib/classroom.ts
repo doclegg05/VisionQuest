@@ -260,6 +260,24 @@ export async function assertStaffCanManageStudent(session: Session, studentIdent
   return managedStudent;
 }
 
+/**
+ * Whether a staff session may already manage this student: the same tree
+ * `assertStaffCanManageStudent` enforces, as a yes or no for callers that
+ * must refuse without saying why (staff intake matching an existing account).
+ */
+export async function staffCanManageStudent(session: Session, studentDbId: string): Promise<boolean> {
+  const managed = await prisma.student.findFirst({
+    where: {
+      AND: [
+        buildStudentIdentifierWhere(studentDbId),
+        buildManagedStudentWhere(session, { includeArchivedEnrollments: false }),
+      ],
+    },
+    select: { id: true },
+  });
+  return managed !== null;
+}
+
 export async function listManagedClasses(session: Session, options: { includeArchived?: boolean } = {}) {
   const { includeArchived = false } = options;
 
