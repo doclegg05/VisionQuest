@@ -2,185 +2,15 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import type { Session } from "@/lib/api-error";
+import { createFakeDb, type Row, type TableName } from "@/lib/staff-invite-test-db";
 
-// Staff invites against an in-memory stand-in for Postgres. Only `@/lib/db`
-// is mocked: org-roles, region and the module under test all run for real
-// (MEMORY.md Known Issues: a mocked predicate hides the bug it should catch).
-//
-// Every fake call yields to the event loop first, so two accepts started
-// together interleave the way two requests would. `updateMany` checks and
-// writes in one synchronous step, like a row lock. A writing transaction that
-// throws is rolled back through an undo log.
-
-type Row = Record<string, unknown>;
-type Where = Record<string, unknown>;
-
-interface Table {
-  rows: Row[];
-  unique: string[];
-}
-
-interface FakeState {
-  staffInvite: Table;
-  student: Table;
-  regionCoordinator: Table;
-  regionInstructor: Table;
-  region: Table;
-  auditLog: Table;
-}
-
-type TableName = keyof FakeState;
-
-function emptyState(): FakeState {
-  return {
-    staffInvite: { rows: [], unique: ["id", "tokenHash"] },
-    student: { rows: [], unique: ["id", "studentId", "email"] },
-    regionCoordinator: { rows: [], unique: [] },
-    regionInstructor: { rows: [], unique: [] },
-    region: { rows: [], unique: ["id"] },
-    auditLog: { rows: [], unique: [] },
-  };
-}
-
-let state: FakeState = emptyState();
-let idCounter = 0;
-
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !(value instanceof Date);
-}
-
-function matchesField(actual: unknown, expected: unknown): boolean {
-  if (expected === null) return actual === null || actual === undefined;
-  if (expected instanceof Date) return actual instanceof Date && actual.getTime() === expected.getTime();
-  if (isPlainObject(expected)) {
-    if ("gt" in expected) {
-      const bound = expected.gt;
-      return actual instanceof Date && bound instanceof Date && actual.getTime() > bound.getTime();
-    }
-    if ("startsWith" in expected) {
-      return typeof actual === "string" && actual.startsWith(String(expected.startsWith));
-    }
-    throw new Error(`fake db: unsupported filter ${JSON.stringify(expected)}`);
-  }
-  return actual === expected;
-}
-
-function flattenWhere(where: Where): Where {
-  const flat: Where = {};
-  for (const [key, value] of Object.entries(where)) {
-    if (key.includes("_") && isPlainObject(value)) Object.assign(flat, value);
-    else flat[key] = value;
-  }
-  return flat;
-}
-
-function matches(row: Row, where: Where): boolean {
-  return Object.entries(flattenWhere(where)).every(([key, value]) => matchesField(row[key], value));
-}
-
-function assertUnique(table: Table, candidate: Row, selfIndex: number): void {
-  for (const key of table.unique) {
-    const value = candidate[key];
-    if (value === null || value === undefined) continue;
-    const clash = table.rows.some((row, index) => index !== selfIndex && row[key] === value);
-    if (clash) throw Object.assign(new Error(`Unique constraint failed on ${key}`), { code: "P2002" });
-  }
-}
-
-function makeDelegate(name: TableName, undo: Array<() => void> | null) {
-  const table = () => state[name];
-  const record = (restore: () => void) => undo?.push(restore);
-
-  return {
-    async create(args: { data: Row }) {
-      await tick();
-      idCounter += 1;
-      // Postgres returns null for a nullable column nobody set.
-      const nullDefaults = name === "staffInvite" ? { acceptedAt: null, acceptedById: null, revokedAt: null } : {};
-      const row: Row = { id: `${name}-${idCounter}`, createdAt: new Date(), ...nullDefaults, ...args.data };
-      assertUnique(table(), row, -1);
-      state[name] = { ...table(), rows: [...table().rows, row] };
-      record(() => {
-        state[name] = { ...table(), rows: table().rows.filter((r) => r !== row) };
-      });
-      return row;
-    },
-    async findUnique(args: { where: Where }) {
-      await tick();
-      return table().rows.find((row) => matches(row, args.where)) ?? null;
-    },
-    async findFirst(args: { where: Where }) {
-      await tick();
-      return table().rows.find((row) => matches(row, args.where)) ?? null;
-    },
-    async findMany(args: { where?: Where }) {
-      await tick();
-      return table().rows.filter((row) => matches(row, args.where ?? {}));
-    },
-    async count(args: { where?: Where }) {
-      await tick();
-      return table().rows.filter((row) => matches(row, args.where ?? {})).length;
-    },
-    async updateMany(args: { where: Where; data: Row }) {
-      await tick();
-      const before = table().rows;
-      const after = before.map((row) => (matches(row, args.where) ? { ...row, ...args.data } : row));
-      const count = before.filter((row) => matches(row, args.where)).length;
-      state[name] = { ...table(), rows: after };
-      record(() => {
-        state[name] = { ...table(), rows: before };
-      });
-      return { count };
-    },
-    async update(args: { where: Where; data: Row }) {
-      await tick();
-      const before = table().rows;
-      const index = before.findIndex((row) => matches(row, args.where));
-      if (index < 0) throw Object.assign(new Error("Record not found"), { code: "P2025" });
-      const updated = { ...before[index], ...args.data };
-      assertUnique(table(), updated, index);
-      state[name] = { ...table(), rows: before.map((row, i) => (i === index ? updated : row)) };
-      record(() => {
-        state[name] = { ...table(), rows: before };
-      });
-      return updated;
-    },
-  };
-}
-
-const TABLES: TableName[] = [
-  "staffInvite",
-  "student",
-  "regionCoordinator",
-  "regionInstructor",
-  "region",
-  "auditLog",
-];
-
-function makeClient(undo: Array<() => void> | null) {
-  return Object.fromEntries(TABLES.map((name) => [name, makeDelegate(name, undo)]));
-}
-
-const transactionCalls = { count: 0 };
-
-const fakeClient = {
-  ...makeClient(null),
-  async $transaction<T>(fn: (tx: ReturnType<typeof makeClient>) => Promise<T>): Promise<T> {
-    transactionCalls.count += 1;
-    const undo: Array<() => void> = [];
-    try {
-      return await fn(makeClient(undo));
-    } catch (error) {
-      for (const restore of [...undo].reverse()) restore();
-      throw error;
-    }
-  },
-};
+// Staff invites against an in-memory stand-in for Postgres
+// (`staff-invite-test-db.ts`). Only `@/lib/db` is mocked: org-roles, region
+// and the module under test all run for real.
+const fake = createFakeDb();
 
 mock.module("@/lib/db", {
-  exports: { prisma: fakeClient, prismaAdmin: fakeClient },
+  exports: { prisma: fake.client, prismaAdmin: fake.client },
 });
 
 let lib: typeof import("./staff-invites");
@@ -211,33 +41,31 @@ const PASSWORD = "a long enough password";
 const INVITERS: readonly Session[] = [admin, programCoordinator, regionalCoordinator, teacher];
 const INVITER_IDS = new Set(INVITERS.map((inviter) => inviter.id));
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !(value instanceof Date);
+}
+
 /** Student rows other than the inviters every case seeds: the accounts a case made or seeded itself. */
 function accountRows(): Row[] {
-  return state.student.rows.filter((row) => !INVITER_IDS.has(String(row.id)));
+  return fake.state.student.rows.filter((row) => !INVITER_IDS.has(String(row.id)));
 }
 
 function setStudent(id: string, patch: Row): void {
-  state.student = {
-    ...state.student,
-    rows: state.student.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-  };
+  fake.patch("student", id, patch);
 }
 
 function seedRow(name: TableName, row: Row): void {
-  state[name] = { ...state[name], rows: [...state[name].rows, row] };
+  fake.seed(name, row);
 }
 
 function inviteRow(inviteId: string): Row {
-  const row = state.staffInvite.rows.find((r) => r.id === inviteId);
+  const row = fake.state.staffInvite.rows.find((r) => r.id === inviteId);
   assert.ok(row, `invite ${inviteId} exists`);
   return row;
 }
 
 function setInvite(inviteId: string, patch: Row): void {
-  state.staffInvite = {
-    ...state.staffInvite,
-    rows: state.staffInvite.rows.map((r) => (r.id === inviteId ? { ...r, ...patch } : r)),
-  };
+  fake.patch("staffInvite", inviteId, patch);
 }
 
 async function refusal(promise: Promise<unknown>): Promise<string> {
@@ -255,8 +83,7 @@ function accept(token: string, email = "pat@example.org") {
 }
 
 beforeEach(() => {
-  state = emptyState();
-  transactionCalls.count = 0;
+  fake.reset();
   seedRow("region", { id: REGION_A, status: "active" });
   seedRow("region", { id: REGION_B, status: "active" });
   seedRow("regionCoordinator", { regionId: REGION_A, coordinatorId: regionalCoordinator.id });
@@ -272,7 +99,7 @@ describe("createStaffInvite", () => {
       lib.createStaffInvite(regionalCoordinator, { email: "pat@example.org", role: "teacher", regionId: REGION_B }),
     );
     assert.equal(reason, "region_not_allowed");
-    assert.equal(state.staffInvite.rows.length, 0);
+    assert.equal(fake.state.staffInvite.rows.length, 0);
   });
 
   it("refuses a teacher invite with no region", async () => {
@@ -350,7 +177,7 @@ describe("acceptStaffInvite", () => {
   async function assertRefusedAndUntouched(token: string, inviteId: string): Promise<void> {
     assert.equal(await refusal(accept(token)), "inviter_no_longer_allowed");
     assert.equal(accountRows().length, 0);
-    assert.equal(state.regionInstructor.rows.length, 0);
+    assert.equal(fake.state.regionInstructor.rows.length, 0);
     assert.equal(inviteRow(inviteId).acceptedAt, null);
   }
 
@@ -362,7 +189,7 @@ describe("acceptStaffInvite", () => {
 
   it("refuses an invite whose inviter account is gone", async () => {
     const invite = await teacherInviteFromCoordinator();
-    state.student = { ...state.student, rows: state.student.rows.filter((r) => r.id !== regionalCoordinator.id) };
+    fake.state.student = { ...fake.state.student, rows: fake.state.student.rows.filter((r) => r.id !== regionalCoordinator.id) };
     await assertRefusedAndUntouched(invite.token, invite.inviteId);
   });
 
@@ -380,7 +207,7 @@ describe("acceptStaffInvite", () => {
 
   it("refuses a coordinator-sent invite once the coordinator left the invite's region", async () => {
     const invite = await teacherInviteFromCoordinator();
-    state.regionCoordinator = { ...state.regionCoordinator, rows: [] };
+    fake.state.regionCoordinator = { ...fake.state.regionCoordinator, rows: [] };
     await assertRefusedAndUntouched(invite.token, invite.inviteId);
   });
 
@@ -409,15 +236,15 @@ describe("acceptStaffInvite", () => {
     assert.ok(!String(account.passwordHash).includes(PASSWORD));
 
     assert.deepEqual(
-      state.regionInstructor.rows.map(({ regionId, instructorId, assignedById }) => ({ regionId, instructorId, assignedById })),
+      fake.state.regionInstructor.rows.map(({ regionId, instructorId, assignedById }) => ({ regionId, instructorId, assignedById })),
       [{ regionId: REGION_A, instructorId: staffId, assignedById: regionalCoordinator.id }],
     );
-    assert.equal(state.regionCoordinator.rows.length, 1, "only the seeded coordinator row");
+    assert.equal(fake.state.regionCoordinator.rows.length, 1, "only the seeded coordinator row");
 
     const row = inviteRow(invite.inviteId);
     assert.ok(row.acceptedAt instanceof Date);
     assert.equal(row.acceptedById, staffId);
-    assert.equal(transactionCalls.count, 1);
+    assert.equal(fake.transactions, 1);
   });
 
   it("creates a RegionCoordinator row for a coordinator invite", async () => {
@@ -430,8 +257,8 @@ describe("acceptStaffInvite", () => {
 
     const account = accountRows().find((r) => r.id === staffId);
     assert.equal(account?.role, "coordinator");
-    assert.ok(state.regionCoordinator.rows.some((r) => r.regionId === REGION_B && r.coordinatorId === staffId));
-    assert.equal(state.regionInstructor.rows.length, 0);
+    assert.ok(fake.state.regionCoordinator.rows.some((r) => r.regionId === REGION_B && r.coordinatorId === staffId));
+    assert.equal(fake.state.regionInstructor.rows.length, 0);
   });
 
   it("creates no region row for a program-coordinator invite", async () => {
@@ -439,8 +266,8 @@ describe("acceptStaffInvite", () => {
     const { staffId } = await accept(invite.token, "pc@example.org");
 
     assert.equal(accountRows().find((r) => r.id === staffId)?.role, "program_coordinator");
-    assert.equal(state.regionInstructor.rows.length, 0);
-    assert.equal(state.regionCoordinator.rows.length, 1, "only the seeded coordinator row");
+    assert.equal(fake.state.regionInstructor.rows.length, 0);
+    assert.equal(fake.state.regionCoordinator.rows.length, 1, "only the seeded coordinator row");
   });
 
   it("ignores email casing", async () => {
@@ -485,7 +312,7 @@ describe("acceptStaffInvite", () => {
     assert.ok(rejected[0].reason instanceof lib.StaffInviteRefused);
     assert.equal(rejected[0].reason.reason, "used");
     assert.equal(accountRows().length, 1);
-    assert.equal(state.regionInstructor.rows.length, 1);
+    assert.equal(fake.state.regionInstructor.rows.length, 1);
   });
 
   it("refuses a typed email that does not match the invite, and leaves the invite usable", async () => {
@@ -505,7 +332,7 @@ describe("acceptStaffInvite", () => {
     assert.equal(await refusal(accept(invite.token)), "email_mismatch");
     assert.equal(inviteRow(invite.inviteId).acceptedAt, null);
     assert.equal(accountRows().length, 1);
-    assert.equal(state.regionInstructor.rows.length, 0);
+    assert.equal(fake.state.regionInstructor.rows.length, 0);
   });
 
   it("gives the login name a suffix when the email local part is taken", async () => {
@@ -576,7 +403,7 @@ describe("audit", () => {
     const revoked = await lib.createStaffInvite(admin, { email: "kim@example.org", role: "program_coordinator" });
     await lib.revokeStaffInvite(admin, revoked.inviteId);
 
-    const rows = state.auditLog.rows;
+    const rows = fake.state.auditLog.rows;
     assert.deepEqual(
       rows.map((r) => [r.action, r.actorId, r.targetId]),
       [
