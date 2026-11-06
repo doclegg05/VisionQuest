@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { api } from "@/lib/api";
@@ -17,8 +18,28 @@ interface PlaceApplicantControlProps {
   onPlaced: () => void;
 }
 
+interface PlaceApplicantArgs {
+  applicantId: string;
+  classId: string;
+  post: (url: string, body: unknown) => Promise<unknown>;
+  onPlaced: () => void;
+  refresh: () => void;
+}
+
+/**
+ * Posts the placement, then drops the row locally and refreshes the page so
+ * server-rendered counts update. A failed post throws before either runs.
+ */
+export async function placeApplicant({ applicantId, classId, post, onPlaced, refresh }: PlaceApplicantArgs) {
+  const request = placeApplicantRequest(applicantId, classId);
+  await post(request.url, request.body);
+  onPlaced();
+  refresh();
+}
+
 /** Admin-only control on an applicant row: pick an open class and move them in. */
 export function PlaceApplicantControl({ applicantId, classes, onPlaced }: PlaceApplicantControlProps) {
+  const router = useRouter();
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -32,9 +53,13 @@ export function PlaceApplicantControl({ applicantId, classes, onPlaced }: PlaceA
     setPending(true);
     setError("");
     try {
-      const request = placeApplicantRequest(applicantId, classId);
-      await api.post(request.url, request.body);
-      onPlaced();
+      await placeApplicant({
+        applicantId,
+        classId,
+        post: (url, body) => api.post(url, body),
+        onPlaced,
+        refresh: () => router.refresh(),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "We could not place this person. Please try again.");
       inFlight.current = false;
