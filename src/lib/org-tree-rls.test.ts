@@ -632,6 +632,7 @@ if (!SHOULD_RUN) {
             ],
           }),
         ),
+        /row-level security|42501/,
       );
       assert.equal(await db.staffInvite.count({ where: { tokenHash: `hash-${suffix}-blocked` } }), 0);
     });
