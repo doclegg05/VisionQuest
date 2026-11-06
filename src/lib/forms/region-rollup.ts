@@ -101,6 +101,7 @@ export async function coordinatorCanReadRegion(
     const exists = await prismaAdmin.region.count({ where: { id: regionId } });
     return exists > 0;
   }
+  // Regional only: whole-state roles returned above, and program coordinators hold no regions.
   if (session.role !== "coordinator") return false;
 
   const row = await prismaAdmin.regionCoordinator.findUnique({

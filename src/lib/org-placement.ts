@@ -82,6 +82,7 @@ export async function listApplicantsWaiting(actor: Session): Promise<WaitingAppl
 
 /** Admins and program coordinators may assign any region; a regional coordinator only their own. */
 async function assertMayAssign(actor: Session, regionId: string): Promise<void> {
+  // Whole-state roles, or a regional coordinator (program coordinators are whole-state).
   if (!seesWholeState(actor.role) && actor.role !== "coordinator") throw forbidden();
   if (!(await coordinatorHasRegion(actor, regionId))) throw forbidden("That region is not yours to assign.");
 }

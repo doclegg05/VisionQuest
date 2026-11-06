@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ADMIN_NAV_ITEMS, COORDINATOR_ITEMS } from "./NavBar";
+import { ADMIN_NAV_ITEMS, COORDINATOR_ITEMS, staffPrimaryNavItemsFor } from "./NavBar";
 
 // The (teacher) layout admits only teacher and admin, so every /teacher/*
 // href redirects a coordinator away. /coordinator is the one surface their
@@ -40,4 +40,10 @@ test("admin nav is unchanged by the coordinator list", () => {
       "/teacher/failed-extractions|AI Review",
     ],
   );
+});
+
+test("both coordinator roles get the coordinator nav, not the instructor nav", () => {
+  assert.equal(staffPrimaryNavItemsFor("program_coordinator"), COORDINATOR_ITEMS);
+  assert.equal(staffPrimaryNavItemsFor("coordinator"), COORDINATOR_ITEMS);
+  assert.equal(staffPrimaryNavItemsFor("admin"), ADMIN_NAV_ITEMS);
 });

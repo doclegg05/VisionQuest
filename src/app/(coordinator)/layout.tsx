@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import { getSession } from "@/lib/auth";
+import { isCoordinatorRole } from "@/lib/org-roles";
 import { getRoleHomePath } from "@/lib/role-home";
 
 export default async function CoordinatorLayout({
@@ -16,7 +17,7 @@ export default async function CoordinatorLayout({
     redirect("/");
   }
 
-  if (session.role !== "coordinator" && session.role !== "admin") {
+  if (!isCoordinatorRole(session.role) && session.role !== "admin") {
     redirect(getRoleHomePath(session.role));
   }
 

@@ -204,6 +204,7 @@ async function coordinatorQueueClassScope(
   if (seesWholeState(session.role)) {
     return {};
   }
+  // Regional only: whole-state roles returned above, and program coordinators hold no regions.
   if (session.role !== "coordinator") {
     throw forbidden("Coordinator session required.");
   }

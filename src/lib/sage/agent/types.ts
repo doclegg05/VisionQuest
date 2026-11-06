@@ -53,7 +53,7 @@ export interface AgentTool {
   };
 
   /** Roles allowed to invoke this tool. */
-  requiredRoles: ReadonlyArray<"student" | "teacher" | "admin" | "coordinator">;
+  requiredRoles: ReadonlyArray<"student" | "teacher" | "admin" | "coordinator" | "program_coordinator">;
 
   /**
    * Risk tier that governs which agent mode may run this tool and its

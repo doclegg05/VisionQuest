@@ -157,6 +157,18 @@ describe("loadIdentityInput — staff session", () => {
   });
 });
 
+describe("loadIdentityInput — program coordinator", () => {
+  it("treats a program coordinator as staff, so their roster names are vaulted", async () => {
+    findMany.mock.mockImplementation(async () => [{ displayName: "Rosa Roster" }]);
+    const identity = await loadIdentityInput({
+      studentId: "pc1",
+      sessionRole: "program_coordinator",
+      sessionDisplayName: "Pat Program",
+    });
+    assert.deepEqual(identity, { staffNames: ["Pat Program"], rosterNames: ["Rosa Roster"] });
+  });
+});
+
 describe("loadIdentityInput — a blocked lookup degrades, never throws", () => {
   it("returns an empty identity when the student row read is refused", async () => {
     findUnique.mock.mockImplementation(async () => {

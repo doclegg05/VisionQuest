@@ -13,6 +13,7 @@ const regionInstructorSchema = z.object({
 // Admins and program coordinators may use any region. A regional coordinator
 // may use their own; the library checks that against live RegionCoordinator rows.
 function assertMayPlace(session: Session): void {
+  // Whole-state roles, or a regional coordinator (program coordinators are whole-state).
   if (!seesWholeState(session.role) && session.role !== "coordinator") throw forbidden();
 }
 

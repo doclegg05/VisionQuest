@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { getRoleHomePath, getRoleSettingsPath } from "@/lib/role-home";
+import { isCoordinatorRole } from "@/lib/org-roles";
 import { type NavPhase, type NavItem } from "@/lib/nav-progression";
 import { getVisibleNavItems, getVisibleSecondaryNavItems } from "@/lib/nav-items";
 import {
@@ -80,6 +81,13 @@ interface NavBarProps {
   orientationComplete?: boolean;
 }
 
+/** Sidebar items for a staff role. Both coordinator roles share the coordinator list. */
+export function staffPrimaryNavItemsFor(role: string): NavItem[] {
+  if (role === "admin") return ADMIN_NAV_ITEMS;
+  if (isCoordinatorRole(role)) return COORDINATOR_ITEMS;
+  return STAFF_ITEMS;
+}
+
 export default function NavBar({ studentName, role, navPhase, orientationComplete }: NavBarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -119,11 +127,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
   const primaryItems =
     role === "student"
       ? getVisibleNavItems(navPhase ?? 3, orientationComplete)
-      : role === "admin"
-        ? ADMIN_NAV_ITEMS
-        : role === "coordinator"
-          ? COORDINATOR_ITEMS
-          : STAFF_ITEMS;
+      : staffPrimaryNavItemsFor(role);
 
   // Secondary nav items (student only)
   const secondaryItems =

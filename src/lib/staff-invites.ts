@@ -154,6 +154,7 @@ async function pickLoginName(tx: Prisma.TransactionClient, email: string): Promi
 
 async function placeInTree(tx: Prisma.TransactionClient, invite: StaffInvite, staffId: string): Promise<void> {
   if (!invite.regionId) return;
+  // Regional only: a program coordinator invite carries no region (inviteNeedsRegion).
   if (invite.role === "coordinator") {
     await tx.regionCoordinator.create({ data: { regionId: invite.regionId, coordinatorId: staffId } });
   } else if (invite.role === "teacher") {

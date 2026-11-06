@@ -40,6 +40,7 @@
 import { prisma } from "@/lib/db";
 import { buildManagedStudentWhere } from "@/lib/classroom";
 import { cached, invalidatePrefix } from "@/lib/cache";
+import { isCoordinatorRole } from "@/lib/org-roles";
 import type { Session } from "@/lib/api-error";
 import type { IdentityInput } from "./deidentify";
 
@@ -76,7 +77,7 @@ export interface LoadIdentityArgs {
 }
 
 function isStaff(role: string): boolean {
-  return role === "teacher" || role === "admin" || role === "coordinator";
+  return role === "teacher" || role === "admin" || isCoordinatorRole(role);
 }
 
 /** A trimmed non-empty string, or undefined. Never vault an empty value. */

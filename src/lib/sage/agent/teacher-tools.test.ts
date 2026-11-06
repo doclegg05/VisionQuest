@@ -230,3 +230,27 @@ describe("list_students_needing_attention — staff sessions", () => {
     assert.equal(state.regionCoordinatorCalls, 0);
   });
 });
+
+describe("list_students_needing_attention — program coordinator", () => {
+  const programCoordinator: Session = {
+    id: "pc-1",
+    studentId: "",
+    displayName: "Pat Program",
+    role: "program_coordinator",
+  };
+
+  it("is offered to a program coordinator", () => {
+    assert.ok(attentionTool.requiredRoles.some((role) => role === "program_coordinator"));
+  });
+
+  it("reads the whole-state coordinator queue, not the RLS instructor queue", async () => {
+    state.adminStudentRows = [queueStudentRow({ id: "stu-9", displayName: "Nora Noregion" })];
+
+    const result = await attentionTool.execute({}, ctxFor(programCoordinator));
+
+    assert.equal(result.status, "success");
+    assert.equal(state.adminStudentCalls, 1);
+    assert.equal(state.appStudentCalls, 0);
+    assert.equal(state.regionCoordinatorCalls, 0);
+  });
+});

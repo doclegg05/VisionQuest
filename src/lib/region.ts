@@ -26,6 +26,7 @@ export async function listRegionsForSession(session: Session): Promise<RegionSum
     });
   }
 
+  // Regional only: whole-state roles returned above, and program coordinators hold no regions.
   if (session.role !== "coordinator") {
     return [];
   }
@@ -51,6 +52,7 @@ export async function coordinatorHasRegion(session: Session, regionId: string): 
     const exists = await prisma.region.count({ where: { id: regionId } });
     return exists > 0;
   }
+  // Regional only: whole-state roles returned above, and program coordinators hold no regions.
   if (session.role !== "coordinator") return false;
   const row = await prisma.regionCoordinator.findUnique({
     where: { regionId_coordinatorId: { regionId, coordinatorId: session.id } },

@@ -11,6 +11,7 @@
  * arrive via staff-student-context when a teacher names a student.
  */
 
+import { isCoordinatorRole } from "@/lib/org-roles";
 import type { AgentTool, AgentToolResult } from "./types";
 
 // NOTE: @/lib/teacher/dashboard pulls in `server-only`, which throws if loaded
@@ -33,7 +34,7 @@ const listStudentsNeedingAttention: AgentTool = {
     label: "Who needs attention",
     description: "Students who most need a check-in",
   },
-  requiredRoles: ["teacher", "admin", "coordinator"],
+  requiredRoles: ["teacher", "admin", "coordinator", "program_coordinator"],
   riskTier: "read",
   enabled: true,
   async execute(args, ctx): Promise<AgentToolResult> {
@@ -45,7 +46,7 @@ const listStudentsNeedingAttention: AgentTool = {
     // shipped), so the RLS-scoped queue query silently returns zero rows for
     // them. Route coordinators through the region-scoped prismaAdmin read.
     const { queue } =
-      ctx.session.role === "coordinator"
+      isCoordinatorRole(ctx.session.role)
         ? await getCoordinatorInterventionQueue(ctx.session)
         : await getInterventionQueue(ctx.session);
 
