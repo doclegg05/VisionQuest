@@ -70,4 +70,17 @@ describe("tree-reader RLS coverage", () => {
       assert.ok(blocked, `${table} lost its tree-reader block`);
     });
   }
+
+  // Unlinked referrals (studentId IS NULL) are applicants with no class. They
+  // belong to admins alone at the database level; coordinators read as the
+  // teacher role, so a teacher-arm IS NULL clause would hand them every one.
+  it("SpokesRecord gives no teacher-mapped session the unlinked referral rows", () => {
+    const policy = live.get("SpokesRecord::spokes_record_access");
+    assert.ok(policy, "spokes_record_access is missing");
+    for (const clause of [policy.using, policy.withCheck]) {
+      assert.ok(clause, "spokes_record_access lost a clause");
+      assert.doesNotMatch(clause, /IS\s+NULL/i);
+      assert.match(clause, /'admin'/);
+    }
+  });
 });
