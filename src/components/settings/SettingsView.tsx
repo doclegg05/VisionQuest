@@ -386,7 +386,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
         <div className="surface-section mb-6 p-6">
           <div className="mb-4">
             <p className="page-eyebrow text-[var(--ink-muted)]">Profile</p>
-            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Personal info</h2>
+            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Personal Info</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
               Your birthdate helps your teacher report your enrollment to DoHS.
               We only share it with SPOKES staff.
@@ -449,7 +449,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           <div>
             <p className="page-eyebrow text-[var(--ink-muted)]">Classroom recovery</p>
             <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
-              Recovery questions
+              Recovery Questions
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
               This reset option is only for your classroom account. If you forget your password, answer these questions to choose a new one — no email needed.
@@ -579,7 +579,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
             </span>
             <div>
               <p className="page-eyebrow text-[var(--ink-muted)]">Quick guide</p>
-              <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">How to get your API key</h2>
+              <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">How to Get Your API Key</h2>
             </div>
           </button>
         </div>

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Books, Briefcase, CheckCircle, Target } from "@phosphor-icons/react";
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { LogoPlate } from "@/components/ui/LogoPlate";
 import { DemoEntryButtons } from "./DemoEntryButtons";
 import { lookupErrorMessage } from "./error-message-lookup";
 import { GOOGLE_BRAND_COLORS } from "./google-brand";
@@ -417,8 +418,12 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                 </a>
               )}
               <div className="mt-1 flex flex-wrap items-center justify-center gap-4 sm:mt-2 sm:gap-5">
-                <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />
-                <Image src="/spokes-logo.png" alt="SPOKES Logo" width={110} height={55} className="object-contain" />
+                <LogoPlate>
+                  <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />
+                </LogoPlate>
+                <LogoPlate>
+                  <Image src="/spokes-logo.png" alt="SPOKES Logo" width={110} height={55} className="object-contain" />
+                </LogoPlate>
               </div>
               <p className="text-xs uppercase font-semibold tracking-widest text-[var(--ink-muted)]">
                 Skills for Life

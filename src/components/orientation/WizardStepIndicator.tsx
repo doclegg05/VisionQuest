@@ -31,7 +31,7 @@ export default function WizardStepIndicator({
             position ("Document 3 of 16 — ..."), so nothing is lost. */}
         <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-muted)] md:hidden">
           <div
-            className="h-full rounded-full bg-[var(--accent-green)] transition-[width] duration-500"
+            className="h-full rounded-full progress-fill transition-[width] duration-500"
             style={{ width: `${percentComplete}%` }}
           />
         </div>

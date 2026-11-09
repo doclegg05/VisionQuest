@@ -314,7 +314,7 @@ export default function IntakeClient() {
           className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]"
         >
           <div
-            className="h-full bg-[var(--accent)] transition-all duration-300"
+            className="h-full progress-fill transition-all duration-300"
             style={{ width: `${(step / 3) * 100}%` }}
           />
         </div>

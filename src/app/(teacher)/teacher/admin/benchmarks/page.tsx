@@ -49,7 +49,7 @@ export default async function BenchmarksPage() {
 
       <section aria-labelledby="summary-heading" className="theme-card rounded-xl p-5">
         <h2 id="summary-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-          Where things stand
+          Where Things Stand
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           These counts cover the tests that block a merge when they fail.
@@ -75,7 +75,7 @@ export default async function BenchmarksPage() {
       {nothingHasRun && (
         <section className="theme-card rounded-xl p-5">
           <h2 className="text-base font-semibold text-[var(--ink-strong)]">
-            No results yet
+            No Results Yet
           </h2>
           <p className="mt-2 text-sm text-[var(--ink-muted)]">
             The nightly job has not saved a result to this branch yet. The list below still shows

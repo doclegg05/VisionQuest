@@ -74,11 +74,11 @@ export default async function DashboardPage() {
     <DashboardClient sessionId={session.id} moodContent={<MoodCheckIn />}
       intro={<>
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <div><h1 className="font-display text-2xl text-[var(--ink-strong)]">Your dashboard</h1><p className="mt-1 text-[var(--ink-muted)]">Your next action, plans, and recorded progress in one place.</p></div>
+          <div><h1 className="font-display text-2xl text-[var(--ink-strong)]">Your Dashboard</h1><p className="mt-1 text-[var(--ink-muted)]">Your next action, plans, and recorded progress in one place.</p></div>
           <Link href="/chat" className="secondary-button px-4 py-3">Talk to Sage</Link>
         </header>
         {needsIntakeSignature && <section aria-label="Student profile signature" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-5">
-          <div><h2 className="font-semibold text-[var(--ink-strong)]">Sign your student profile form</h2><p className="mt-1 text-sm text-[var(--ink-muted)]">Your class hours only count once your signed form is on file.</p></div>
+          <div><h2 className="font-semibold text-[var(--ink-strong)]">Sign Your Student Profile Form</h2><p className="mt-1 text-sm text-[var(--ink-muted)]">Your class hours only count once your signed form is on file.</p></div>
           <Link href="/orientation" className="primary-button px-5 py-3">Sign my form</Link>
         </section>}
       </>}

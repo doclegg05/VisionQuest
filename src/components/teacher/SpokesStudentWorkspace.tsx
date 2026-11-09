@@ -628,7 +628,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Intake</p>
-            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Referral, enrollment, and outcomes</h2>
+            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Referral, Enrollment, and Outcomes</h2>
           </div>
           <button
             type="button"
@@ -715,7 +715,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Profile & barriers</h3>
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Profile & Barriers</h3>
             <label className="block space-y-1.5">
               <span className="block text-sm font-medium text-[var(--ink-strong)]">Gender</span>
               <input value={profileForm.gender} onChange={(event) => setProfileForm((current) => ({ ...current, gender: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
@@ -755,7 +755,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Outcomes & follow-through</h3>
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Outcomes & Follow-Through</h3>
             <label className="block space-y-1.5">
               <span className="block text-sm font-medium text-[var(--ink-strong)]">Documented academic achievement date</span>
               <input type="date" value={profileForm.documentedAcademicAchievementAt} onChange={(event) => setProfileForm((current) => ({ ...current, documentedAcademicAchievementAt: event.target.value }))} className="w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]" />
@@ -848,7 +848,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <section className="surface-section p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Checklist</p>
-          <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Orientation and program files</h2>
+          <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Orientation and Program Files</h2>
           <div className="mt-5 space-y-4">
             {renderChecklistSection("Orientation items", orientationTemplates)}
             {renderChecklistSection("Program files", programFileTemplates)}
@@ -857,7 +857,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
 
         <section className="surface-section p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Modules</p>
-          <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Certifications & SPOKES modules</h2>
+          <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Certifications & SPOKES Modules</h2>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">
             Click a category to expand. Mark each certification complete with the date earned.
           </p>
@@ -1001,7 +1001,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Exit follow-through</p>
-            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Employment follow-up</h2>
+            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Employment Follow-Up</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               Record the 1-, 3-, and 6-month check-ins required after unsubsidized employment.
             </p>
@@ -1066,7 +1066,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
           </div>
 
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Record a follow-up</h3>
+            <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Record a Follow-Up</h3>
             <div className="mt-3 grid gap-3">
               <label className="block space-y-1.5">
                 <span className="block text-sm font-medium text-[var(--ink-strong)]">Checkpoint</span>

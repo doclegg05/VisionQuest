@@ -108,7 +108,7 @@ export default function SpokesReport() {
     <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">SPOKES</p>
-        <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Official program reporting snapshot</h2>
+        <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Official Program Reporting Snapshot</h2>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -157,7 +157,7 @@ export default function SpokesReport() {
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Attention queue</p>
-              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Students needing follow-through</h3>
+              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Students Needing Follow-Through</h3>
             </div>
             <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {data.attentionQueue.length} shown

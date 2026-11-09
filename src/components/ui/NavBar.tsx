@@ -384,7 +384,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             aria-labelledby="more-nav-title"
             className="panel panel-strong fixed bottom-16 left-3 right-3 z-50 rounded-3xl p-4 md:hidden"
           >
-            <h2 id="more-nav-title" className="sr-only">Navigation menu</h2>
+            <h2 id="more-nav-title" className="sr-only">Navigation Menu</h2>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {mobileMore.map((item) => (
                 <Link

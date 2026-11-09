@@ -97,7 +97,7 @@ export default function ForgotPasswordPage() {
         <section className="panel panel-strong w-full rounded-3xl p-6 md:p-8">
           <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
           <p className="page-eyebrow text-[var(--ink-muted)]">Account recovery</p>
-          <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Reset your password</h1>
+          <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Reset Your Password</h1>
           <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
             Use an email link, or answer your classroom recovery questions.
           </p>

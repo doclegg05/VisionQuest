@@ -337,7 +337,7 @@ export default function GrantKpiReport() {
 
       <div>
         <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Performance metrics</p>
-        <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Grant outcomes</h3>
+        <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Grant Outcomes</h3>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {metricEntries.map(({ key, metric: m }) => (
             <div key={m.label}>

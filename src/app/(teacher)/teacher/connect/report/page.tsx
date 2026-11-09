@@ -148,7 +148,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
         <>
           <section aria-labelledby="funnel-heading" className="theme-card rounded-xl p-5">
             <h2 id="funnel-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-              How far each introduction got
+              How Far Each Introduction Got
             </h2>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[420px] text-sm">
@@ -192,7 +192,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
 
           <section aria-labelledby="speed-heading" className="theme-card rounded-xl p-5">
             <h2 id="speed-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-              How fast things move
+              How Fast Things Move
             </h2>
             <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <div>
@@ -212,7 +212,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
 
           <section aria-labelledby="subsidy-heading" className="theme-card rounded-xl p-5">
             <h2 id="subsidy-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-              Hiring incentives
+              Hiring Incentives
             </h2>
             {!subsidyLinesOn && (
               <p className="mt-2 text-sm text-[var(--ink-muted)]">
@@ -254,7 +254,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
 
           <section aria-labelledby="employer-heading" className="theme-card rounded-xl p-5">
             <h2 id="employer-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-              By employer
+              By Employer
             </h2>
             {funnel.byEmployer.length === 0 ? (
               <p className="mt-3 text-sm text-[var(--ink-muted)]">No connections in this period.</p>
@@ -290,7 +290,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
 
           <section aria-labelledby="class-heading" className="theme-card rounded-xl p-5">
             <h2 id="class-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-              By class
+              By Class
             </h2>
             {funnel.byClass.length === 0 ? (
               <p className="mt-3 text-sm text-[var(--ink-muted)]">No connections in this period.</p>
@@ -326,7 +326,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
 
           <section aria-labelledby="comparison-heading" className="theme-card rounded-xl p-5">
             <h2 id="comparison-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-              Compared to applying on their own
+              Compared to Applying on Their Own
             </h2>
             <p className="mt-2 text-sm text-[var(--ink-muted)]">
               Same students, same time period, applications with no Connect introduction behind them.
@@ -355,7 +355,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
             id="pathway-outcomes-heading"
             className="text-base font-semibold text-[var(--ink-strong)]"
           >
-            Pathway outcomes
+            Pathway Outcomes
           </h2>
           <p className="mt-2 text-sm text-[var(--ink-muted)]">
             Which suggested career pathway actually led to a hire. {pathwayOutcomes.placementsWithPathway}{" "}
@@ -401,7 +401,7 @@ export default async function ConnectReportPage({ searchParams }: ConnectReportP
 
       <section aria-labelledby="export-heading" className="theme-card rounded-xl p-5">
         <h2 id="export-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-          DoHS export
+          DoHS Export
         </h2>
         <p className="mt-2 text-sm text-[var(--ink-muted)]">
           A CSV of enrollment, placement, and retention for the state report.

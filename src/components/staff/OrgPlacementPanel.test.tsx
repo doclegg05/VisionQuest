@@ -49,7 +49,7 @@ describe("OrgPlacementPanel classrooms with no region", () => {
         unregionedClasses={[{ id: "k1", name: "Night Class", instructorCount: 2, activeStudents: 7 }]}
       />,
     );
-    assert.ok(html.includes("Classrooms with no region"));
+    assert.ok(html.includes("Classrooms with No Region"));
     assert.ok(html.includes("Night Class"));
     assert.ok(html.includes("2 instructors"));
     assert.ok(html.includes("7 students"));
@@ -59,7 +59,7 @@ describe("OrgPlacementPanel classrooms with no region", () => {
     const html = renderToString(
       <OrgPlacementPanel unplacedStaff={[]} applicants={[]} regions={[]} classes={[]} canPlace={true} unregionedClasses={[]} />,
     );
-    assert.ok(html.includes("Classrooms with no region"));
+    assert.ok(html.includes("Classrooms with No Region"));
     assert.ok(html.includes("Every classroom has a region."));
   });
 });

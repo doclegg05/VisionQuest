@@ -126,7 +126,7 @@ export function PathToEmployment({
           className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]"
         >
           <div
-            className="h-full rounded-full bg-[var(--accent-green)] transition-[width] duration-500"
+            className="h-full rounded-full progress-fill transition-[width] duration-500"
             style={{ width: `${steps.length > 0 ? (completedCount / steps.length) * 100 : 0}%` }}
           />
         </div>

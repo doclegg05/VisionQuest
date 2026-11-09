@@ -16,7 +16,7 @@ export default async function CdcStubPage() {
   return (
     <main className="mx-auto max-w-xl px-6 py-16">
       <h1 className="text-2xl font-bold text-[var(--ink-strong)]">
-        Career Development Consultant workspace — coming soon
+        Career Development Consultant Workspace — Coming Soon
       </h1>
       <p className="mt-4 text-sm text-[var(--ink-muted)]">
         The CDC workspace is planned for a future phase of the VisionQuest redesign.

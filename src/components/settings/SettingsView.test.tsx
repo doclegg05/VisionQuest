@@ -23,14 +23,14 @@ describe("SettingsView role split", () => {
 
   it("hides student-only sections from staff", () => {
     const html = renderToString(<SettingsView initialRole="teacher" />);
-    assert.ok(!html.includes("Recovery questions"));
-    assert.ok(!html.includes("Personal info"));
+    assert.ok(!html.includes("Recovery Questions"));
+    assert.ok(!html.includes("Personal Info"));
   });
 
   it("shows student sections and no MFA panel for students", () => {
     const html = renderToString(<SettingsView initialRole="student" />);
-    assert.ok(html.includes("Recovery questions"));
-    assert.ok(html.includes("Personal info"));
+    assert.ok(html.includes("Recovery Questions"));
+    assert.ok(html.includes("Personal Info"));
     assert.ok(!html.includes("Loading MFA settings"));
   });
 
@@ -48,16 +48,16 @@ describe("SettingsView role split", () => {
     // Staff have no work profile of their own — /api/work-profile refuses
     // them — so rendering the form for staff would promise a save that 403s.
     const student = renderToString(<SettingsView initialRole="student" />);
-    assert.ok(student.includes("Work availability"));
+    assert.ok(student.includes("Work Availability"));
     assert.ok(student.includes("How do you get to work?"));
 
     const staff = renderToString(<SettingsView initialRole="teacher" />);
-    assert.ok(!staff.includes("Work availability"));
+    assert.ok(!staff.includes("Work Availability"));
 
     // Coordinators too: /api/work-profile refuses every non-student, so a
     // rendered form here would promise a save that 403s.
     const coordinator = renderToString(<SettingsView initialRole="coordinator" />);
-    assert.ok(!coordinator.includes("Work availability"));
+    assert.ok(!coordinator.includes("Work Availability"));
   });
 
   it("defaults to the student-safe render when no role is supplied", () => {

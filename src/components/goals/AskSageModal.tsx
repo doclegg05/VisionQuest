@@ -73,7 +73,7 @@ export function AskSageModal({ goal, onClose }: AskSageModalProps) {
           </span>
           <div>
             <h3 id={titleId} className="font-display text-lg text-[var(--ink-strong)]">
-              Ask Sage about this goal
+              Ask Sage About This Goal
             </h3>
             <p className="text-xs text-[var(--ink-muted)]">
               Sage will answer here. Your message also goes into your chat with Sage.

@@ -88,6 +88,6 @@ export default async function StudentDashboardPreview({ params }: { params: Prom
     <Region result={nextStep} what="The next step">{(v) => <NextStepSection nextStep={v} />}</Region>
     <Region result={overview} what="Outcomes">{(v) => <OutcomesList overview={v} />}</Region>
     <section><h2 className={sectionHeading}>Tasks</h2><Region result={tasks} what="Tasks">{(v) => <TasksList tasks={v} />}</Region></section>
-    <section><h2 className={sectionHeading}>Current task activity</h2><Region result={activity} what="Task activity">{(v) => <ActivityList activity={v} />}</Region></section>
+    <section><h2 className={sectionHeading}>Current Task Activity</h2><Region result={activity} what="Task activity">{(v) => <ActivityList activity={v} />}</Region></section>
   </div>;
 }

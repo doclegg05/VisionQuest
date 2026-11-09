@@ -58,7 +58,7 @@ export function LeadsBoard({ leads }: { leads: LeadsBoardItem[] }) {
   if (leads.length === 0) {
     return (
       <div className="theme-card rounded-xl p-5">
-        <h2 className="text-base font-semibold text-[var(--ink-strong)]">Open leads</h2>
+        <h2 className="text-base font-semibold text-[var(--ink-strong)]">Open Leads</h2>
         <p className="mt-3 text-sm text-[var(--ink-muted)]">
           No open leads yet. Add one below, or turn a job on a class board into a lead.
         </p>

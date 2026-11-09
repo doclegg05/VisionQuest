@@ -24,7 +24,7 @@ const emptyGrid = {
 describe("WorkAvailabilityPanel", () => {
   it("renders 'Not set yet' when the student has no work profile", () => {
     const html = renderToString(<WorkAvailabilityPanel workProfile={null} />);
-    assert.ok(html.includes("Work availability"));
+    assert.ok(html.includes("Work Availability"));
     assert.ok(html.includes("Not set yet"));
   });
 

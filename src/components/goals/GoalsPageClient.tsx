@@ -839,7 +839,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 )}
 
                 {isMProposed && (
-                  <div className="mt-2 bg-brand-deep-soft/80 p-2.5 rounded-lg border border-brand-deep text-xs text-brand-deep">
+                  <div className="mt-2 callout text-xs text-[var(--ink-strong)]">
                     <p className="font-semibold">Sage suggested this goal — ask your instructor to confirm it.</p>
                     <p className="mt-1">Not a good fit? You can remove it.</p>
                     <div className="mt-2 flex gap-2">

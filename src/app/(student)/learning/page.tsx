@@ -91,7 +91,7 @@ export default async function LearningPage() {
 
       <section id="platforms" className="mt-8">
         <div className="mb-4">
-          <h2 className="font-display text-2xl text-[var(--ink-strong)]">Training platforms</h2>
+          <h2 className="font-display text-2xl text-[var(--ink-strong)]">Training Platforms</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
             Open the learning tools your class uses and focus first on the ones matched to your active goals.
           </p>

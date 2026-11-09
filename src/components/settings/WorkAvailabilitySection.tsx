@@ -143,7 +143,7 @@ export function WorkAvailabilitySection() {
     <div className="surface-section mb-6 p-6">
       <div className="mb-4">
         <p className="page-eyebrow text-[var(--ink-muted)]">Jobs</p>
-        <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Work availability</h2>
+        <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Work Availability</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
           Tell us when you can work and how you get there. Your teacher can see
           this. We use it to find jobs that fit your life. You can change it any

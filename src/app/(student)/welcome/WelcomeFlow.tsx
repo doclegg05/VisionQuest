@@ -342,7 +342,7 @@ export function ScoreCard({ completedCount, totalCount, percent }: ScoreCardProp
             className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]"
           >
             <div
-              className="h-full rounded-full bg-[var(--accent-green)] transition-all duration-1000"
+              className="h-full rounded-full progress-fill transition-all duration-1000"
               style={{ width: `${percent}%` }}
             />
           </div>
@@ -589,7 +589,7 @@ export default function WelcomeFlow({
         {step === 2 && (
           <div className="text-center">
             <p className="mb-6 text-5xl">⚡</p>
-            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your first wins</h1>
+            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your First Wins</h1>
             <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
               {hasQuickWins
                 ? quickWinItems.length === 1
@@ -637,7 +637,7 @@ export default function WelcomeFlow({
         {step === 3 && (
           <div className="text-center">
             <p className="mb-6 text-5xl">🚀</p>
-            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your path to employment</h1>
+            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your Path to Employment</h1>
             <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
               VisionQuest is structured around one clear path to help you secure a job. Choose where you would like to start:
             </p>
