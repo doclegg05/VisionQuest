@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LogoPlate } from "@/components/ui/LogoPlate";
 
 interface BrandLockupProps {
   href?: string;
@@ -61,11 +62,8 @@ export default function BrandLockup({
 
   const content = (
     <div className={wrapperClassName}>
-      <div className="flex shrink-0 items-stretch gap-1.5">
-        <div
-          className="relative flex items-center justify-center overflow-hidden rounded-lg bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-card)]"
-          style={{ maxHeight: sizeConfig.imageHeight + 12, maxWidth: Math.round(sizeConfig.imageWidth * 0.9) + 12 }}
-        >
+      <div className="flex shrink-0 items-center gap-1.5">
+        <LogoPlate onDark={isDark}>
           <Image
             src="/wvae-logo.png"
             alt="WVAE logo"
@@ -74,11 +72,8 @@ export default function BrandLockup({
             priority={priority}
             className="h-auto max-h-full w-auto max-w-full object-contain"
           />
-        </div>
-        <div
-          className="relative flex items-center justify-center overflow-hidden rounded-lg bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-card)]"
-          style={{ maxHeight: sizeConfig.imageHeight + 12, maxWidth: sizeConfig.imageWidth + 12 }}
-        >
+        </LogoPlate>
+        <LogoPlate onDark={isDark}>
           <Image
             src="/spokes-logo.png"
             alt="SPOKES logo"
@@ -87,7 +82,7 @@ export default function BrandLockup({
             priority={priority}
             className="h-auto max-h-full w-auto max-w-full object-contain"
           />
-        </div>
+        </LogoPlate>
       </div>
       <div className={`min-w-0 ${stackOnMobile ? "basis-full pt-1" : ""}`}>
         <p className={titleClassName}>{title}</p>
