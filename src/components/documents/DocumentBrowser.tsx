@@ -217,12 +217,12 @@ export default function DocumentBrowser({
 
       {/* Error state */}
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-center">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="rounded-2xl border border-danger bg-danger-soft p-5 text-center">
+          <p className="text-sm text-danger">{error}</p>
           <button
             type="button"
             onClick={() => setFetchKey((k) => k + 1)}
-            className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-700 underline"
+            className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-danger underline"
           >
             Retry
           </button>

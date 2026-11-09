@@ -298,6 +298,8 @@ async function loadSavedJobSnapshots(now: Date): Promise<SavedJobSnapshot[]> {
       status: true,
       appliedAt: true,
       jobListing: { select: { title: true } },
+      // W4: a deleted listing now clears the link and keeps the save.
+      snapshotTitle: true,
     },
   });
   if (savedJobs.length === 0) return [];
@@ -330,7 +332,7 @@ async function loadSavedJobSnapshots(now: Date): Promise<SavedJobSnapshot[]> {
     return {
       id: job.id,
       studentId: job.studentId,
-      jobTitle: job.jobListing?.title ?? "the job",
+      jobTitle: job.jobListing?.title ?? job.snapshotTitle ?? "the job",
       status: job.status,
       appliedAt: job.appliedAt,
       alreadyAsked: deliveredAsks(history, key).length > 0,

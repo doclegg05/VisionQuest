@@ -159,15 +159,15 @@ export function TeacherJobResultsPanel({ classId, refreshKey }: TeacherJobResult
         <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[20rem]">
           <div className="rounded-lg border border-[var(--border)] px-2 py-2">
             <p className="text-base font-semibold text-[var(--ink-strong)]">{data?.totalUnique ?? 0}</p>
-            <p className="text-[0.68rem] text-[var(--ink-muted)]">roles</p>
+            <p className="text-xs text-[var(--ink-muted)]">roles</p>
           </div>
           <div className="rounded-lg border border-[var(--border)] px-2 py-2">
             <p className="text-base font-semibold text-[var(--ink-strong)]">{data?.duplicateGroups ?? 0}</p>
-            <p className="text-[0.68rem] text-[var(--ink-muted)]">merged</p>
+            <p className="text-xs text-[var(--ink-muted)]">merged</p>
           </div>
           <div className="rounded-lg border border-[var(--border)] px-2 py-2">
             <p className="text-base font-semibold text-[var(--ink-strong)]">{data?.filteredUnique ?? 0}</p>
-            <p className="text-[0.68rem] text-[var(--ink-muted)]">shown</p>
+            <p className="text-xs text-[var(--ink-muted)]">shown</p>
           </div>
         </div>
       </div>

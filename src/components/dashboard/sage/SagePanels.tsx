@@ -17,7 +17,7 @@ import { SagePanelActions } from "./SagePanelActions";
 function CardShell({ eyebrow, children }: { eyebrow: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
-      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-info">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-info">
         {eyebrow}
       </p>
       <div className="mt-1.5 text-sm text-[var(--ink-strong)]">{children}</div>

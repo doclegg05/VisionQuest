@@ -128,12 +128,12 @@ export default function FormTemplatesList() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="font-semibold text-[var(--ink-strong)]">{template.title}</h4>
                   {template.isOfficial && (
-                    <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--badge-info-text)]">
+                    <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--badge-info-text)]">
                       Official
                     </span>
                   )}
                   {template.status === "archived" && (
-                    <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--ink-muted)]">
+                    <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-muted)]">
                       Archived
                     </span>
                   )}

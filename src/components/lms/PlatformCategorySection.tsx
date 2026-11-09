@@ -22,7 +22,7 @@ export default function PlatformCategorySection({
       <div className="flex items-center gap-2">
         <span className="text-xl">{meta.icon}</span>
         <div>
-          <h2 className="font-display text-lg font-semibold text-[var(--ink-strong)]">
+          <h2 className="font-display text-lg text-[var(--ink-strong)]">
             {meta.label}
           </h2>
           <p className="text-xs text-[var(--ink-muted)]">{meta.description}</p>

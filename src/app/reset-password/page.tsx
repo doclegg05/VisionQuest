@@ -69,10 +69,10 @@ function ResetPasswordForm() {
   }
 
   return (
-    <section className="panel panel-strong w-full rounded-[2rem] p-6 md:p-8">
+    <section className="panel panel-strong w-full rounded-3xl p-6 md:p-8">
       <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
       <p className="page-eyebrow text-[var(--ink-muted)]">Account recovery</p>
-      <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Choose a new password</h1>
+      <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Choose a New Password</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
         Create a new password for your VisionQuest account. After the reset, we will sign you in. If your account uses two-step verification, we will ask for your code first.
       </p>
@@ -111,7 +111,7 @@ function ResetPasswordForm() {
         </div>
 
         {message && (
-          <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
             {message}
           </p>
         )}

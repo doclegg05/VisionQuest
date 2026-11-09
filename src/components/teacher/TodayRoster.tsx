@@ -45,7 +45,7 @@ export default function TodayRoster({ roster }: { roster: TodayRosterEntry[] }) 
           <li key={entry.id}>
             <Link
               href={`/teacher/students/${entry.studentId}`}
-              className="flex items-center gap-3 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)]"
+              className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-colors hover:bg-[var(--surface-muted)]"
             >
               <span
                 aria-label={PRESENCE_LABEL[entry.presence]}
@@ -69,7 +69,7 @@ export default function TodayRoster({ roster }: { roster: TodayRosterEntry[] }) 
               </div>
               {entry.highSeverityAlertCount > 0 && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full bg-[var(--badge-error-bg)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--badge-error-text)]"
+                  className="inline-flex items-center gap-1 rounded-full bg-[var(--badge-error-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--badge-error-text)]"
                   title={`${entry.highSeverityAlertCount} urgent alert${entry.highSeverityAlertCount === 1 ? "" : "s"}`}
                 >
                   <Warning size={12} weight="fill" aria-hidden />

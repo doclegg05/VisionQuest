@@ -53,7 +53,7 @@ export default async function LearningPage() {
         href="/resources"
         className="mt-4 block rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 transition-colors hover:bg-[var(--surface-interactive)]"
       >
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-info">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-info">
           Resource Center
         </p>
         <p className="mt-1 text-sm text-[var(--ink-strong)]">
@@ -91,7 +91,7 @@ export default async function LearningPage() {
 
       <section id="platforms" className="mt-8">
         <div className="mb-4">
-          <h2 className="font-display text-2xl text-[var(--ink-strong)]">Training platforms</h2>
+          <h2 className="font-display text-2xl text-[var(--ink-strong)]">Training Platforms</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
             Open the learning tools your class uses and focus first on the ones matched to your active goals.
           </p>

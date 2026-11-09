@@ -58,7 +58,7 @@ export function CommandPalette({
 
   return (
     <div
-      className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_24px_64px_rgba(7,23,43,0.18)] backdrop-blur-md"
+      className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_24px_64px_rgba(0,19,63,0.18)] backdrop-blur-md"
       role="dialog"
       aria-label="Sage command palette"
     >

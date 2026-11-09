@@ -33,7 +33,7 @@ export default function StudentPathwayPlan({ goals }: StudentPathwayPlanProps) {
   return (
     <section id="pathway-plan" className="mt-8">
       <div className="mb-4">
-        <h2 className="font-display text-2xl text-[var(--ink-strong)]">Your plan</h2>
+        <h2 className="font-display text-2xl text-[var(--ink-strong)]">Your Plan</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
           Your instructor has matched your goals to approved learning pathways. These are the certifications and platforms that will help you get where you want to go.
         </p>

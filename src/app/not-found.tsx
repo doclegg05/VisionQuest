@@ -6,7 +6,7 @@ export default function NotFound() {
       id="main-content"
       className="flex min-h-screen flex-col items-center justify-center px-4 text-center"
     >
-      <h1 className="font-display text-6xl font-bold text-[var(--ink-strong)]">
+      <h1 className="font-display text-6xl text-[var(--ink-strong)]">
         404
       </h1>
       <p className="mt-3 text-lg text-[var(--ink-muted)]">

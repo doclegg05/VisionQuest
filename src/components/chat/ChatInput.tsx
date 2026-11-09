@@ -251,7 +251,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
         <div
           className={[
             "relative flex flex-col overflow-visible rounded-2xl border bg-[var(--chat-panel-bg)]",
-            "shadow-[0_8px_28px_rgba(7,23,43,0.08)] transition-[box-shadow,border-color] duration-200",
+            "shadow-[0_8px_28px_rgba(0,19,63,0.08)] transition-[box-shadow,border-color] duration-200",
             focused
               ? "border-[var(--chat-sage-mark)] shadow-[0_0_0_3px_var(--chat-composer-focus)]"
               : "border-[var(--chat-panel-border)]",
@@ -343,7 +343,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
               className={[
                 "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors",
                 canSend && !disabled
-                  ? "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-[0_8px_18px_rgba(42,138,60,0.28)] hover:opacity-95"
+                  ? "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-[0_8px_18px_rgba(55,181,80,0.28)] hover:opacity-95"
                   : "cursor-not-allowed bg-[var(--surface-interactive)] text-[var(--ink-muted)] shadow-none",
               ].join(" ")}
             >

@@ -96,7 +96,7 @@ function RadarChart({ scores }: { scores: RiasecScores }) {
       {/* Score polygon fill */}
       <path
         d={polyPath}
-        fill="rgba(42,138,60,0.18)"
+        fill="rgba(55,181,80,0.18)"
         stroke="var(--accent-strong)"
         strokeWidth="2"
         strokeLinejoin="round"
@@ -156,7 +156,7 @@ function RiasecSection({
       </p>
       {hollandCode && (
         <div className="mt-3 flex flex-wrap items-baseline gap-3">
-          <span className="font-display text-5xl font-bold text-success">
+          <span className="font-display text-5xl text-success">
             {hollandCode}
           </span>
           <span className="text-sm text-[var(--ink-muted)]">
@@ -195,12 +195,12 @@ function RiasecSection({
 // ─── Section B: Transferable Skills ──────────────────────────────────────────
 
 const CATEGORY_COLORS: Record<string, string> = {
-  communication:  "bg-sky-100 text-sky-800",
-  organization:   "bg-violet-100 text-violet-800",
-  technical:      "bg-cyan-100 text-cyan-800",
-  interpersonal:  "bg-rose-100 text-rose-800",
-  analytical:     "bg-amber-100 text-amber-800",
-  leadership:     "bg-emerald-100 text-emerald-800",
+  communication:  "bg-info-soft text-info",
+  organization:   "bg-brand-deep-soft text-brand-deep",
+  technical:      "bg-info-soft text-info",
+  interpersonal:  "bg-danger-soft text-danger",
+  analytical:     "bg-warning-soft text-warning",
+  leadership:     "bg-success-soft text-success",
 };
 
 function SkillsSection({ skills }: { skills: TransferableSkill[] }) {
@@ -232,7 +232,7 @@ function SkillsSection({ skills }: { skills: TransferableSkill[] }) {
               {items.map((s) => (
                 <div
                   key={s.skill}
-                  className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)]/70 p-3"
+                  className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)]/70 p-3"
                 >
                   <p className="text-sm font-semibold text-[var(--ink-strong)]">{s.skill}</p>
                   {s.evidence && (
@@ -270,7 +270,7 @@ function ValuesSection({ values }: { values: WorkValue[] }) {
       <ol className="mt-4 space-y-3">
         {top5.map((v, idx) => (
           <li key={v.value} className="flex items-center gap-3">
-            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(42,138,60,0.1)] text-xs font-bold text-success">
+            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(55,181,80,0.1)] text-xs font-bold text-success">
               {idx + 1}
             </span>
             <div className="min-w-0 flex-1">
@@ -319,7 +319,7 @@ function ClustersSection({ clusters }: { clusters: NationalClusterScore[] }) {
           return (
             <div
               key={nc.cluster_name}
-              className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)]/70 p-4"
+              className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)]/70 p-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -328,7 +328,7 @@ function ClustersSection({ clusters }: { clusters: NationalClusterScore[] }) {
                   </span>
                   <p className="font-semibold text-[var(--ink-strong)]">{nc.cluster_name}</p>
                 </div>
-                <span className="flex-shrink-0 rounded-full bg-[rgba(42,138,60,0.1)] px-2.5 py-0.5 text-xs font-bold text-success">
+                <span className="flex-shrink-0 rounded-full bg-[rgba(55,181,80,0.1)] px-2.5 py-0.5 text-xs font-bold text-success">
                   {matchPct}% match
                 </span>
               </div>

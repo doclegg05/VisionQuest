@@ -36,7 +36,7 @@ export default async function CareerDnaCallout({ studentId }: CareerDnaCalloutPr
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-display text-xl font-bold text-[var(--ink-strong)]">
+                <h2 className="font-display text-xl text-[var(--ink-strong)]">
                   Career DNA
                 </h2>
                 <span className="rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
@@ -49,7 +49,7 @@ export default async function CareerDnaCallout({ studentId }: CareerDnaCalloutPr
                   : "Let Sage learn about your interests, strengths, and work values so jobs and next steps can fit you better."}
               </p>
               {discovery?.sageSummary ? (
-                <p className="mt-3 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm leading-6 text-[var(--ink-strong)]">
+                <p className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm leading-6 text-[var(--ink-strong)]">
                   {discovery.sageSummary}
                 </p>
               ) : null}

@@ -35,7 +35,7 @@ export default async function RecoverySetupPage() {
         <div className="surface-section p-6 sm:p-8">
           <p className="page-eyebrow text-[var(--ink-muted)]">One quick step</p>
           <h1 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
-            Keep your account safe
+            Keep Your Account Safe
           </h1>
           <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
             Before you start, set up your recovery questions. They&apos;re how you

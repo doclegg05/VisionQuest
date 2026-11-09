@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LogoPlate } from "@/components/ui/LogoPlate";
 
 interface BrandLockupProps {
   href?: string;
@@ -13,6 +14,8 @@ interface BrandLockupProps {
 
 const SIZE_MAP = {
   sm: {
+    spokesBound: "max-w-[54px] max-h-[36px]",
+    wvaeBound: "max-w-[49px] max-h-[32px]",
     imageWidth: 54,
     imageHeight: 36,
     titleClassName: "text-base",
@@ -20,6 +23,8 @@ const SIZE_MAP = {
     gapClassName: "gap-2.5",
   },
   md: {
+    spokesBound: "max-w-[76px] max-h-[50px]",
+    wvaeBound: "max-w-[68px] max-h-[45px]",
     imageWidth: 76,
     imageHeight: 50,
     titleClassName: "text-xl",
@@ -27,6 +32,8 @@ const SIZE_MAP = {
     gapClassName: "gap-3",
   },
   lg: {
+    spokesBound: "max-w-[108px] max-h-[72px]",
+    wvaeBound: "max-w-[97px] max-h-[65px]",
     imageWidth: 108,
     imageHeight: 72,
     titleClassName: "text-[1.85rem]",
@@ -61,33 +68,27 @@ export default function BrandLockup({
 
   const content = (
     <div className={wrapperClassName}>
-      <div className="flex shrink-0 items-stretch gap-1.5">
-        <div
-          className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-card)]"
-          style={{ maxHeight: sizeConfig.imageHeight + 12, maxWidth: Math.round(sizeConfig.imageWidth * 0.9) + 12 }}
-        >
+      <div className="flex shrink-0 items-center gap-1.5">
+        <LogoPlate onDark={isDark}>
           <Image
             src="/wvae-logo.png"
             alt="WVAE logo"
             width={Math.round(sizeConfig.imageWidth * 0.9)}
             height={Math.round(sizeConfig.imageHeight * 0.9)}
             priority={priority}
-            className="h-auto max-h-full w-auto max-w-full object-contain"
+            className={`h-auto w-auto object-contain ${sizeConfig.wvaeBound}`}
           />
-        </div>
-        <div
-          className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-card)]"
-          style={{ maxHeight: sizeConfig.imageHeight + 12, maxWidth: sizeConfig.imageWidth + 12 }}
-        >
+        </LogoPlate>
+        <LogoPlate onDark={isDark}>
           <Image
             src="/spokes-logo.png"
             alt="SPOKES logo"
             width={sizeConfig.imageWidth}
             height={sizeConfig.imageHeight}
             priority={priority}
-            className="h-auto max-h-full w-auto max-w-full object-contain"
+            className={`h-auto w-auto object-contain ${sizeConfig.spokesBound}`}
           />
-        </div>
+        </LogoPlate>
       </div>
       <div className={`min-w-0 ${stackOnMobile ? "basis-full pt-1" : ""}`}>
         <p className={titleClassName}>{title}</p>

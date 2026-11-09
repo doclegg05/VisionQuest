@@ -101,7 +101,7 @@ export function OrgPlacementPanel({ unplacedStaff, applicants, unregionedClasses
   return (
     <section className="theme-card space-y-6 rounded-xl p-5">
       <div>
-        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Staff waiting for a region</h2>
+        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Staff Waiting for a Region</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           These instructors have no region and no class. They cannot see students until you place them.
         </p>
@@ -117,7 +117,7 @@ export function OrgPlacementPanel({ unplacedStaff, applicants, unregionedClasses
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Classrooms with no region</h2>
+        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Classrooms with No Region</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           Regional coordinators cannot see these classrooms. To fix one, open it on the class edit screen and pick a region.
         </p>
@@ -138,7 +138,7 @@ export function OrgPlacementPanel({ unplacedStaff, applicants, unregionedClasses
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Applicants waiting for a class</h2>
+        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Applicants Waiting for a Class</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
           {canPlace
             ? "These people signed up but are not in a class. Pick a classroom to place them."

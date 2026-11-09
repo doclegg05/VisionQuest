@@ -81,7 +81,7 @@ export default function StudentSpokesHub({
 
   function renderChecklist(title: string, templates: ChecklistTemplate[]) {
     return (
-      <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink-strong)]">{title}</h3>
         <div className="mt-3 space-y-2">
           {templates.map((template) => {
@@ -100,7 +100,7 @@ export default function StudentSpokesHub({
                   <div>
                     <p className="text-sm font-medium text-[var(--ink-strong)]">
                       {template.label}
-                      {template.required ? <span className="ml-1 text-xs text-rose-500">*</span> : null}
+                      {template.required ? <span className="ml-1 text-xs text-danger">*</span> : null}
                     </p>
                     {template.description ? (
                       <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">{template.description}</p>
@@ -109,7 +109,7 @@ export default function StudentSpokesHub({
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
                       progress?.completed
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-success-soft text-success"
                         : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                     }`}
                   >
@@ -168,7 +168,7 @@ export default function StudentSpokesHub({
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <section className="surface-section p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Milestones</p>
-              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Where you are in the SPOKES process</h2>
+              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Where You Are in the SPOKES Process</h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="theme-card rounded-xl p-4">
                   <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">Referral logged</p>
@@ -203,7 +203,7 @@ export default function StudentSpokesHub({
 
             <section className="surface-section p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Modules</p>
-              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Required modules</h2>
+              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Required Modules</h2>
               <div className="mt-5 space-y-3">
                 {moduleTemplates.map((template) => {
                   const progress = moduleProgress.find((item) => item.templateId === template.id);
@@ -220,7 +220,7 @@ export default function StudentSpokesHub({
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             progress
-                              ? "bg-emerald-100 text-emerald-700"
+                              ? "bg-success-soft text-success"
                               : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                           }`}
                         >
@@ -240,7 +240,7 @@ export default function StudentSpokesHub({
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <section className="surface-section p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Paperwork</p>
-              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Orientation and files</h2>
+              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Orientation and Files</h2>
               <div className="mt-5 space-y-4">
                 {renderChecklist("Orientation items", orientationTemplates)}
                 {renderChecklist("Program files", programFileTemplates)}
@@ -249,7 +249,7 @@ export default function StudentSpokesHub({
 
             <section className="surface-section p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">Follow-up</p>
-              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Employment checkpoints</h2>
+              <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Employment Checkpoints</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
                 Your teachers will log the 1-, 3-, and 6-month check-ins here after unsubsidized employment.
                 {summary.employmentFollowUpsDue > 0 ? ` ${summary.employmentFollowUpsDue} check-in(s) are due.` : ""}
@@ -267,9 +267,9 @@ export default function StudentSpokesHub({
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold ${
                           item.status === "completed"
-                            ? "bg-emerald-100 text-emerald-700"
+                            ? "bg-success-soft text-success"
                             : item.status === "due"
-                              ? "bg-amber-100 text-amber-800"
+                              ? "bg-warning-soft text-warning"
                               : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                         }`}
                       >

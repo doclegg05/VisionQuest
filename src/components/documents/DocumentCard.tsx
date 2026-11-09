@@ -156,7 +156,7 @@ export default function DocumentCard({
         </div>
       </div>
       {downloadError && (
-        <p role="alert" className="mt-2 text-xs text-red-600">Download failed. Try again or use View.</p>
+        <p role="alert" className="mt-2 text-xs text-danger">Download failed. Try again or use View.</p>
       )}
     </div>
   );

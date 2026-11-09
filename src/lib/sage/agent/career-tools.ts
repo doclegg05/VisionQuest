@@ -379,13 +379,19 @@ const lookupSavedJobs: AgentTool = {
       };
     }
 
-    const jobs = saved.map((s) => ({
-      jobListingId: s.jobListing.id,
-      title: s.jobListing.title,
-      company: s.jobListing.company,
-      location: s.jobListing.location,
-      status: s.status,
-    }));
+    // The where clause above only matches rows that still have a listing;
+    // the narrowing is for the type (W4 made the link nullable).
+    const jobs = saved.flatMap((s) =>
+      s.jobListing
+        ? [{
+            jobListingId: s.jobListing.id,
+            title: s.jobListing.title,
+            company: s.jobListing.company,
+            location: s.jobListing.location,
+            status: s.status,
+          }]
+        : [],
+    );
 
     return {
       status: "success",

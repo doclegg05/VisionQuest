@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { spokesColor } from "@/lib/spokes-palette";
 
 type ControlStatus = "pass" | "warn" | "info";
 
@@ -62,11 +63,11 @@ function downloadHtmlReport(report: AiSafetyReport) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>VisionQuest AI Safety Audit Report</title>
   <style>
-    body { font-family: Arial, sans-serif; color: #17211f; line-height: 1.55; margin: 40px; }
+    body { font-family: Arial, sans-serif; color: ${spokesColor("royal")}; line-height: 1.55; margin: 40px; }
     h1 { font-size: 24px; margin-bottom: 6px; }
-    .meta { color: #52615d; font-size: 13px; margin-bottom: 24px; }
+    .meta { color: ${spokesColor("gray")}; font-size: 13px; margin-bottom: 24px; }
     pre { white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 14px; }
-    .hash { border-top: 1px solid #d8e1dd; margin-top: 24px; padding-top: 12px; font-size: 12px; color: #52615d; }
+    .hash { border-top: 1px solid ${spokesColor("offwhite")}; margin-top: 24px; padding-top: 12px; font-size: 13px; color: ${spokesColor("gray")}; }
   </style>
 </head>
 <body>

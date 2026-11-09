@@ -76,7 +76,7 @@ export function StudentConnectionsList({
   return (
     <section className="surface-section p-6" aria-labelledby="your-introductions">
       <h2 id="your-introductions" className="text-lg font-semibold text-[var(--ink-strong)]">
-        Your job introductions
+        Your Job Introductions
       </h2>
       <ul className="mt-4 flex flex-col gap-4">
         {connections.map((connection) => (
@@ -107,7 +107,7 @@ export function StudentConnectionsList({
             ) : (
               <>
                 {errors[connection.id] && (
-                  <p className="mt-2 text-base text-red-600" role="alert">
+                  <p className="mt-2 text-base text-danger" role="alert">
                     {errors[connection.id]}
                   </p>
                 )}

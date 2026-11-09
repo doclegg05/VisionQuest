@@ -96,7 +96,7 @@ export default function AssignedFormsCard() {
               <Link
                 href={`/forms/${entry.templateId}`}
                 prefetch={false}
-                className="flex items-center gap-3 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-transform hover:-translate-y-0.5"
+                className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 transition-transform hover:-translate-y-0.5"
               >
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--surface-muted)] text-[var(--ink-muted)]">
                   {tone.tone === "warn" ? (

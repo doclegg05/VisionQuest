@@ -1,5 +1,9 @@
 # Process Optimizations Implementation Plan
 
+> **Standalone task list retired on 2026-11-09.** Code delivered in #269; operator steps are W1, privacy decision D8; median gate still conditional.
+> Follow the [consolidated remaining-work plan](../../plans/2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Dispatch every implementer and reviewer subagent with `model: "sonnet"`.
 
 **Goal:** Cut the recurring costs in how VisionQuest is built and run: the oversized memory file, red scheduled workflows, a flaky eval gate, gotchas that live only as notes, branch clutter, and session sandbox blocks.

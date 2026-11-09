@@ -67,7 +67,7 @@ export default function StudentCards({
             </div>
 
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
-              <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-0.5 text-xs font-semibold text-info">
+              <span className="rounded-full bg-[rgba(0,123,175,0.1)] px-2.5 py-0.5 text-xs font-semibold text-info">
                 Lvl {student.level}
               </span>
               <span className="text-xs text-[var(--ink-muted)]">{student.xp} XP</span>
@@ -153,7 +153,7 @@ export default function StudentCards({
               <Link
                 href={links.orientation}
                 prefetch={false}
-                className="inline-flex items-center rounded-full border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.08)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-info transition-colors hover:bg-[rgba(15,154,146,0.14)]"
+                className="inline-flex items-center rounded-full border border-[rgba(0,123,175,0.2)] bg-[rgba(0,123,175,0.08)] px-3 py-1.5 text-xs font-semibold pointer-coarse:min-h-11 text-info transition-colors hover:bg-[rgba(0,123,175,0.14)]"
               >
                 Orientation
               </Link>

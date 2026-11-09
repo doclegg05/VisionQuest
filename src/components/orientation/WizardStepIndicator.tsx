@@ -31,7 +31,7 @@ export default function WizardStepIndicator({
             position ("Document 3 of 16 — ..."), so nothing is lost. */}
         <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-muted)] md:hidden">
           <div
-            className="h-full rounded-full bg-[var(--accent-green)] transition-[width] duration-500"
+            className="h-full rounded-full progress-fill transition-[width] duration-500"
             style={{ width: `${percentComplete}%` }}
           />
         </div>
@@ -50,7 +50,7 @@ export default function WizardStepIndicator({
                   aria-current={isCurrent ? "step" : undefined}
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                     isComplete
-                      ? "bg-emerald-500 text-white"
+                      ? "bg-success text-white"
                       : isCurrent
                         ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                         : "bg-[var(--surface-strong)] text-[var(--ink-faint)]"
@@ -61,7 +61,7 @@ export default function WizardStepIndicator({
                 {i < totalSteps - 1 && (
                   <div
                     className={`h-0.5 w-3 rounded-full transition-colors lg:w-4 ${
-                      isComplete ? "bg-emerald-500" : "bg-[var(--surface-strong)]"
+                      isComplete ? "bg-success" : "bg-[var(--surface-strong)]"
                     }`}
                   />
                 )}

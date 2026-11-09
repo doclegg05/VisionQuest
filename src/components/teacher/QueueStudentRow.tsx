@@ -92,7 +92,7 @@ export function QueueStudentRow({
   const mainLabel = `${student.recommendedAction.label} for ${student.name}`;
 
   return (
-    <li className="rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
+    <li className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
       {/* Line 1: who, and how urgent */}
       <div className="flex items-center justify-between gap-3">
         <Link href={`/teacher/students/${student.studentId}`} className="inline-flex min-h-11 min-w-0 items-center gap-2">

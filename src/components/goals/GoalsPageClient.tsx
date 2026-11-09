@@ -567,10 +567,10 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
       ) : null}
 
       {/* Long-term Big Vision goal */}
-      <div className="surface-section p-6 bg-gradient-to-br from-amber-50/80 to-orange-50/50 border-amber-200/80 dark:from-[#1b1c20] dark:to-[#171412] dark:border-amber-950/60 relative overflow-hidden rounded-2xl">
-        <div className="tape-effect bg-amber-400/40 border-amber-400/20" />
+      <div className="surface-section p-6 bg-gradient-to-br from-warning-soft/80 to-warning-soft/50 border-warning/80 relative overflow-hidden rounded-2xl">
+        <div className="tape-effect bg-warning/40 border-warning/20" />
         <div className="flex items-center gap-2 mb-3">
-          <Sparkle className="text-amber-500 animate-pulse" size={24} weight="fill" />
+          <Sparkle className="text-warning animate-pulse" size={24} weight="fill" />
           <h2 className="font-display text-2xl text-[var(--ink-strong)]">My Big Vision</h2>
         </div>
         <p className="text-sm text-[var(--ink-muted)] mb-4 leading-relaxed">
@@ -579,9 +579,9 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
         {bhags.length > 0 ? (
           bhags.map((bhag) => (
-            <div key={bhag.id} className="bg-white/80 dark:bg-black/20 p-4 rounded-xl border border-amber-200/60 dark:border-amber-900/40 shadow-sm">
+            <div key={bhag.id} className="bg-white/80 dark:bg-black/20 p-4 rounded-xl border border-warning/60 shadow-sm">
               {bhag.status === "proposed" && (
-                <span className="mb-2 inline-flex min-h-8 items-center rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                <span className="mb-2 inline-flex min-h-8 items-center rounded-full border border-warning bg-warning-soft px-3 py-1 text-sm font-semibold text-warning">
                   Status: Waiting for instructor confirmation
                 </span>
               )}
@@ -598,7 +598,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                     aria-label="Big Vision"
                     value={editingGoalContent}
                     onChange={(e) => setEditingGoalContent(e.target.value)}
-                    className="min-h-11 flex-1 px-3 py-2 text-sm border border-amber-300 dark:border-amber-800 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="min-h-11 flex-1 px-3 py-2 text-sm border border-warning rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-warning"
                     autoFocus
                   />
                   <button type="submit" className="primary-button min-h-11 px-4 py-2 text-sm">Save</button>
@@ -612,7 +612,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => handleReadAloud(bhag.id, `My Big Vision: ${bhag.content}`)}
-                      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-amber-100 dark:hover:bg-amber-950/60 text-[var(--ink-muted)] hover:text-amber-700 transition-colors ${speakingId === bhag.id ? "text-amber-600 animate-pulse bg-amber-50 dark:bg-amber-950/20" : ""}`}
+                      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-warning-soft text-[var(--ink-muted)] hover:text-warning transition-colors ${speakingId === bhag.id ? "text-warning animate-pulse bg-warning-soft" : ""}`}
                       aria-label="Read Big Vision aloud"
                       title="Read Big Vision aloud"
                     >
@@ -624,14 +624,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                           setEditingGoalId(bhag.id);
                           setEditingGoalContent(bhag.content);
                         }}
-                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-amber-100 dark:hover:bg-amber-950/60 text-[var(--ink-muted)] hover:text-amber-700"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-warning-soft text-[var(--ink-muted)] hover:text-warning"
                         aria-label="Edit Big Vision"
                       >
                         <PencilSimple size={16} />
                       </button>
                       <button
                         onClick={() => handleRemoveGoal(bhag.id)}
-                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-red-50 dark:hover:bg-red-950/40 text-[var(--ink-muted)] hover:text-red-500"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 hover:bg-danger-soft text-[var(--ink-muted)] hover:text-danger"
                         aria-label="Remove Big Vision"
                       >
                         <Trash size={16} aria-hidden="true" />
@@ -643,7 +643,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
             </div>
           ))
         ) : (
-          <div className="border border-dashed border-amber-300/60 dark:border-amber-900/40 rounded-xl p-4 text-center">
+          <div className="border border-dashed border-warning/60 rounded-xl p-4 text-center">
             {addingBhag ? (
               <form
                 onSubmit={(e) => {
@@ -663,7 +663,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                   placeholder="e.g. Become a certified welder"
                   value={addingBhagContent}
                   onChange={(e) => setAddingBhagContent(e.target.value)}
-                  className="min-h-11 flex-1 px-3 py-2 text-sm border border-amber-300 dark:border-amber-800 rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="min-h-11 flex-1 px-3 py-2 text-sm border border-warning rounded-lg bg-[var(--surface-raised)] text-[var(--ink-strong)] focus:outline-none focus:ring-1 focus:ring-warning"
                   autoFocus
                 />
                 <button type="submit" className="primary-button min-h-11 px-4 py-2 text-sm" disabled={!addingBhagContent.trim()}>Add</button>
@@ -672,7 +672,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
             ) : (
               <button
                 onClick={() => setAddingBhag(true)}
-                className="mx-auto flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-amber-700 hover:underline dark:text-amber-500"
+                className="mx-auto flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-warning hover:underline"
               >
                 <Plus size={16} weight="bold" /> Define your Big Vision
               </button>
@@ -739,10 +739,10 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       </span>
                       {isMProposed && (
                         <>
-                          <span className="rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 px-2 py-0.5 text-xs font-semibold">
+                          <span className="rounded-full bg-brand-deep-soft text-brand-deep px-2 py-0.5 text-xs font-semibold">
                             SAGE SUGGESTION
                           </span>
-                          <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-xs font-semibold">
+                          <span className="rounded-full bg-warning-soft text-warning px-2 py-0.5 text-xs font-semibold">
                             Awaiting instructor confirmation
                           </span>
                         </>
@@ -774,7 +774,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleReadAloud(monthly.id, `Monthly Plan: ${monthly.content}`)}
-                        className={`inline-flex size-11 items-center justify-center rounded-full hover:bg-[var(--border)] transition-colors text-[var(--ink-muted)] hover:text-[var(--ink-strong)] ${speakingId === monthly.id ? "text-emerald-500 animate-pulse bg-emerald-50 dark:bg-emerald-950/20" : ""}`}
+                        className={`inline-flex size-11 items-center justify-center rounded-full hover:bg-[var(--border)] transition-colors text-[var(--ink-muted)] hover:text-[var(--ink-strong)] ${speakingId === monthly.id ? "text-success animate-pulse bg-success-soft" : ""}`}
                         aria-label="Read goal aloud"
                         title="Read goal aloud"
                       >
@@ -783,7 +783,7 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                       <button
                         type="button"
                         onClick={() => setSageModalGoal(monthly)}
-                        className="flex min-h-11 items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors shrink-0"
+                        className="flex min-h-11 items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full border border-brand-deep bg-brand-deep-soft/50 text-brand-deep hover:bg-brand-deep-soft transition-colors shrink-0"
                         title="Ask Sage to help break down this goal"
                       >
                         <Sparkle size={10} weight="fill" />
@@ -815,18 +815,18 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
 
                 {/* Mountain Trail Progress Bar */}
                 {totalDescendants > 0 && (
-                  <div className="mt-3 mb-5 bg-slate-50/55 dark:bg-slate-900/30 p-2.5 rounded-xl border border-[var(--border)]/60">
+                  <div className="mt-3 mb-5 bg-surface-muted/55 p-2.5 rounded-xl border border-[var(--border)]/60">
                     <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] mb-1">
                       <span>Mountain Trail Progress</span>
                       <span>{progressPercent}% Complete ({completedDescendants}/{totalDescendants})</span>
                     </div>
-                    <div className="relative h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full mt-3 mb-2 overflow-visible">
+                    <div className="relative h-2 w-full bg-surface-muted rounded-full mt-3 mb-2 overflow-visible">
                       <div 
-                        className="absolute top-0 left-0 h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out"
+                        className="absolute top-0 left-0 h-full bg-success rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${progressPercent}%` }}
                       />
                       <div 
-                        className="absolute -top-3 flex items-center justify-center w-7 h-7 bg-white dark:bg-slate-900 border border-emerald-500 rounded-full shadow-sm transition-all duration-500 ease-out -ml-3.5 select-none"
+                        className="absolute -top-3 flex items-center justify-center w-7 h-7 bg-white border border-success rounded-full shadow-sm transition-all duration-500 ease-out -ml-3.5 select-none"
                         style={{ left: `${progressPercent}%` }}
                       >
                         <span className="text-xs">🏃</span>
@@ -839,14 +839,14 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
                 )}
 
                 {isMProposed && (
-                  <div className="mt-2 bg-indigo-50/80 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-950 text-xs text-indigo-900 dark:text-indigo-200">
+                  <div className="mt-2 callout text-xs text-[var(--ink-strong)]">
                     <p className="font-semibold">Sage suggested this goal — ask your instructor to confirm it.</p>
                     <p className="mt-1">Not a good fit? You can remove it.</p>
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
                         onClick={() => handleRemoveGoal(monthly.id)}
-                        className="inline-flex min-h-11 items-center border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-black/30 text-indigo-700 dark:text-indigo-300 font-semibold rounded px-2.5 py-1 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                        className="inline-flex min-h-11 items-center border border-brand-deep bg-white dark:bg-black/30 text-brand-deep font-semibold rounded px-2.5 py-1 hover:bg-brand-deep-soft"
                       >
                         Remove
                       </button>
@@ -1228,12 +1228,12 @@ export default function GoalsPageClient({ initialGoals, initialGoalPlans }: Goal
             reports count is hidden here (F24 / VQ-R-008). */}
         {orphanGoals.length > 0 && (
           <article className="organic-paper-card w-full shadow-md relative overflow-hidden transition-transform duration-300 hover:shadow-lg">
-            <div className="tape-effect bg-purple-400/30 border-purple-400/10" />
+            <div className="tape-effect bg-brand-deep/30 border-brand-deep/10" />
 
             <div className="mb-4 pr-1">
               <div className="flex items-start justify-between gap-3 border-b border-dashed border-[var(--border)] pb-2">
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 block">
+                  <span className="text-xs font-bold uppercase tracking-wider text-brand-deep block">
                     Additional Checklist
                   </span>
                   <h3 className="font-display text-lg text-[var(--ink-strong)] mt-1">

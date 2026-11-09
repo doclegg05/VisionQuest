@@ -1,5 +1,9 @@
 # Loose-ends sprint: 2026-09-08 → 2026-09-11 (Tue–Fri)
 
+> **Standalone task list retired on 2026-11-09.** Expired sprint retired; later RAG release completed; selected-model/cron verification is W1.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 **Status**: PLANNED. Owner-directed priority for the week of Sept 8.
 **Why this exists**: on 2026-09-04 Britt found that several long-open items were not visible
 anywhere they would be read. This document is the single place they live until they are closed.

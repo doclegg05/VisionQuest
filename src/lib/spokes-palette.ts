@@ -8,14 +8,15 @@ import { parseColor } from "./wcag-contrast";
  */
 export const SPOKES_COLORS: ReadonlyMap<string, string> = new Map(Object.entries(palette.colors));
 
-function colorNamed(name: string): string {
+/** Hex of a named palette color, for canvas and other drawing code that needs a literal. */
+export function spokesColor(name: string): string {
   const hex = SPOKES_COLORS.get(name);
   if (!hex) throw new Error(`spokes-palette.json chartSeries names unknown color "${name}"`);
   return hex;
 }
 
 /** Chart series in an order where neighbors differ in lightness, not only hue. */
-export const SPOKES_CHART_SERIES: readonly string[] = palette.chartSeries.map(colorNamed);
+export const SPOKES_CHART_SERIES: readonly string[] = palette.chartSeries.map(spokesColor);
 
 const channels = (hex: string) => {
   const { r, g, b } = parseColor(hex);

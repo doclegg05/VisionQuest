@@ -4,6 +4,7 @@ import { DM_Serif_Display, Outfit } from "next/font/google";
 import { MotionProvider } from "@/components/ui/MotionProvider";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { getThemePreferenceFromCookie, THEME_BOOT_SCRIPT, THEME_COOKIE } from "@/lib/theme";
+import { spokesColor } from "@/lib/spokes-palette";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -31,10 +32,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    // eslint-disable-next-line spokes/no-off-palette-color -- the viewport API takes literal colors; this is a SPOKES palette value
-    { media: "(prefers-color-scheme: light)", color: "#edf3f7" },
-    // eslint-disable-next-line spokes/no-off-palette-color -- the viewport API takes literal colors; this is a SPOKES palette value
-    { media: "(prefers-color-scheme: dark)", color: "#00133f" },
+    { media: "(prefers-color-scheme: light)", color: spokesColor("muted") },
+    { media: "(prefers-color-scheme: dark)", color: spokesColor("royal") },
   ],
 };
 

@@ -1,5 +1,9 @@
 # Persistent jobs and responsive discovery
 
+> **Standalone task list retired on 2026-11-09.** Proposed scope consolidated into W4; approval remains pending.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 Status: proposed implementation plan, September 10, 2026. Planning only. Companion to [dashboard data and live updates](2026-09-10-dashboard-data-and-live-updates.md).
 
 ## Outcome

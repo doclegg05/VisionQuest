@@ -24,7 +24,7 @@ export function SharedWithEmployers({ packets }: { packets: SharedPacket[] }) {
   return (
     <section className="surface-section mb-6 p-6" aria-labelledby="shared-with-employers">
       <h2 id="shared-with-employers" className="page-eyebrow text-[var(--ink-muted)]">
-        Shared with employers
+        Shared with Employers
       </h2>
 
       {packets.length === 0 ? (

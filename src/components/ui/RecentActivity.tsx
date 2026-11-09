@@ -21,7 +21,7 @@ export default function RecentActivity({ achievements, lastLevelUp, currentStrea
   return (
     <div className="space-y-2">
       {lastLevelUp && (
-        <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-3">
+        <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-warning-soft to-warning-soft border border-warning p-3">
           <span className="text-lg">🚀</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-[var(--ink-strong)]">Reached Level {lastLevelUp.level}</p>

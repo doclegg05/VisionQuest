@@ -18,12 +18,12 @@ export default function WizardCompletion({ completedForms }: WizardCompletionPro
   return (
     <div className="mx-auto max-w-xl text-center">
       <div className="text-5xl mb-4">🎉</div>
-      <h2 className="font-display text-2xl font-bold text-success">
+      <h2 className="font-display text-2xl text-success">
         Orientation Complete!
       </h2>
       <p className="mt-2 text-sm text-[var(--ink-muted)]">
         You signed all your documents and earned{" "}
-        <span className="font-bold text-amber-500">75 XP</span>
+        <span className="font-bold text-warning">75 XP</span>
       </p>
 
       <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-5 text-left">
@@ -33,7 +33,7 @@ export default function WizardCompletion({ completedForms }: WizardCompletionPro
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {completedForms.map((form) => (
             <div key={form.title} className="flex items-center gap-2 text-sm text-success">
-              <span className="text-emerald-500">✓</span>
+              <span className="text-success">✓</span>
               <span className="truncate">{form.title}</span>
             </div>
           ))}

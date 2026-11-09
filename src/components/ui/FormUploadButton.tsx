@@ -71,7 +71,7 @@ export default function FormUploadButton({
   // Status badge rendering
   if (currentStatus === "approved") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success">
         ✓ Approved
       </span>
     );
@@ -81,7 +81,7 @@ export default function FormUploadButton({
     return (
       <div className="inline-flex flex-col items-start">
         <div className="inline-flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+          <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-semibold text-warning">
             ⏳ Pending Review
           </span>
           <button
@@ -109,7 +109,7 @@ export default function FormUploadButton({
     return (
       <div className="inline-flex flex-col items-start">
         <div className="inline-flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+          <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-semibold text-danger">
             ✗ Rejected
           </span>
           <button
@@ -139,7 +139,7 @@ export default function FormUploadButton({
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[rgba(15,154,146,0.12)] disabled:opacity-50"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(0,123,175,0.2)] bg-[rgba(0,123,175,0.06)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[rgba(0,123,175,0.12)] disabled:opacity-50"
       >
         <span aria-hidden="true">📎</span>
         <span>{uploading ? "Uploading..." : "Upload Form"}</span>

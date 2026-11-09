@@ -79,7 +79,7 @@ export default function GoalsPlanTab({
               Track which assigned resources have real student activity and what still needs instructor follow-up.
             </p>
           </div>
-          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-info">
+          <span className="rounded-full bg-[rgba(0,123,175,0.12)] px-3 py-1 text-xs font-semibold text-info">
             {reviewQueue.length} open review item{reviewQueue.length === 1 ? "" : "s"}
           </span>
         </div>

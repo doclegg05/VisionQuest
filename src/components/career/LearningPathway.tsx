@@ -10,24 +10,24 @@ interface LearningPathwayProps {
 const STATUS_CONFIG = {
   complete: {
     circleCls:
-      "bg-emerald-500 border-emerald-500 text-white",
+      "bg-success border-success text-white",
     icon: (
       <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
       </svg>
     ),
-    badgeCls: "bg-emerald-100 text-emerald-800",
+    badgeCls: "bg-success-soft text-success",
     badgeLabel: "Complete",
     textCls: "text-[var(--ink-muted)] line-through",
     cardCls: "opacity-70",
   },
   in_progress: {
     circleCls:
-      "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.12)] text-success",
+      "border-[var(--accent-strong)] bg-[rgba(0,123,175,0.12)] text-success",
     icon: (
       <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent-strong)]" />
     ),
-    badgeCls: "bg-[rgba(15,154,146,0.12)] text-success",
+    badgeCls: "bg-[rgba(0,123,175,0.12)] text-success",
     badgeLabel: "In Progress",
     textCls: "text-[var(--ink-strong)] font-semibold",
     cardCls: "",
@@ -99,7 +99,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
                   className={[
                     "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2",
                     config.circleCls,
-                    step.isCurrent ? "shadow-[0_0_0_4px_rgba(15,154,146,0.15)]" : "",
+                    step.isCurrent ? "shadow-[0_0_0_4px_rgba(0,123,175,0.15)]" : "",
                   ].join(" ")}
                   aria-label={`Step ${index + 1}: ${step.name} — ${config.badgeLabel}`}
                 >
@@ -117,10 +117,10 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
               {/* Step card */}
               <div
                 className={[
-                  "mb-3 min-w-0 flex-1 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)]/60 px-4 py-3",
+                  "mb-3 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)]/60 px-4 py-3",
                   config.cardCls,
                   step.isCurrent
-                    ? "border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.04)]"
+                    ? "border-[rgba(0,123,175,0.2)] bg-[rgba(0,123,175,0.04)]"
                     : "",
                 ].join(" ")}
               >

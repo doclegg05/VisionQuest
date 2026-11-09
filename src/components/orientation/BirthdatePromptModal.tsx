@@ -95,7 +95,7 @@ export default function BirthdatePromptModal({
           id="birthdate-prompt-title"
           className="mb-1 text-lg font-semibold text-[var(--ink-strong)]"
         >
-          One last thing — your birthday
+          One Last Thing — Your Birthday
         </h2>
         <p className="mb-5 text-sm text-[var(--ink-muted)]">
           SPOKES reports enrollment to DoHS using your age, so having your
@@ -121,7 +121,7 @@ export default function BirthdatePromptModal({
           <p
             id="birthdate-prompt-error"
             role="alert"
-            className="mt-2 text-xs text-red-600"
+            className="mt-2 text-xs text-danger"
           >
             {error}
           </p>

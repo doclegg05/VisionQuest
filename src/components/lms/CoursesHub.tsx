@@ -116,7 +116,7 @@ export default function CoursesHub() {
   if (error) {
     return (
       <div className="surface-section p-8 text-center">
-        <p className="text-red-600 mb-4">{error}</p>
+        <p className="text-danger mb-4">{error}</p>
         <button
           onClick={fetchPlatforms}
           className="inline-flex min-h-11 items-center px-4 py-2 bg-[var(--accent-strong)] text-[var(--on-accent)] rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
@@ -133,7 +133,7 @@ export default function CoursesHub() {
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
           Learning setup
         </p>
-        <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No platforms yet</h3>
+        <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No Platforms Yet</h3>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
           No learning platforms available yet.
         </p>

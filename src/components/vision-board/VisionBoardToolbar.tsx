@@ -14,10 +14,10 @@ interface GoalOption {
 }
 
 const NOTE_COLOR_OPTIONS = [
-  { id: "yellow", label: "Yellow", className: "bg-amber-200 border-amber-300" },
-  { id: "pink", label: "Pink", className: "bg-pink-200 border-pink-300" },
-  { id: "blue", label: "Blue", className: "bg-sky-200 border-sky-300" },
-  { id: "green", label: "Green", className: "bg-emerald-200 border-emerald-300" },
+  { id: "yellow", label: "Yellow", className: "bg-warning-soft border-warning" },
+  { id: "pink", label: "Pink", className: "bg-danger-soft border-danger" },
+  { id: "blue", label: "Blue", className: "bg-info-soft border-info" },
+  { id: "green", label: "Green", className: "bg-success-soft border-success" },
   { id: "white", label: "White", className: "bg-[var(--surface-raised)] border-[var(--border-strong)]" },
 ];
 
@@ -239,9 +239,9 @@ export default function VisionBoardToolbar({ onItemAdded }: VisionBoardToolbarPr
                 <button
                   key={goal.id}
                   onClick={() => handleLinkGoal(goal)}
-                  className="min-h-11 w-full theme-card-subtle rounded-lg p-2.5 text-left text-xs transition-colors hover:bg-[rgba(15,154,146,0.06)] hover:border-[rgba(15,154,146,0.2)]"
+                  className="min-h-11 w-full theme-card-subtle rounded-lg p-2.5 text-left text-xs transition-colors hover:bg-[rgba(0,123,175,0.06)] hover:border-[rgba(0,123,175,0.2)]"
                 >
-                  <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-[9px] font-semibold text-info">
+                  <span className="rounded-full bg-[rgba(0,123,175,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
                     {GOAL_LEVEL_META[goal.level as keyof typeof GOAL_LEVEL_META]?.label || goal.level}
                   </span>
                   <p className="mt-1 text-[var(--ink-strong)]">{goal.content}</p>

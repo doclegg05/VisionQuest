@@ -116,7 +116,7 @@ export function BatchWorkforceButton({ classes }: BatchWorkforceButtonProps) {
       className="theme-card rounded-xl p-5"
     >
       <h2 id="batch-workforce-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-        Send students to WorkForce WV
+        Send Students to WorkForce WV
       </h2>
       <p className="mt-2 text-sm text-[var(--ink-muted)]">
         This makes a file of the students in one class who are ready for work and have said yes to

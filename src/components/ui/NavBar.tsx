@@ -236,7 +236,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       <Link
         key={item.href}
         href={item.href}
-        className={`premium-nav-link mb-1 flex min-h-11 items-center gap-3 rounded-[1.15rem] px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
+        className={`premium-nav-link mb-1 flex min-h-11 items-center gap-3 rounded-2xl px-4 ${small ? "py-2" : "py-3"} text-sm font-medium transition-all ${
           active
             ? "premium-nav-link-active bg-[var(--accent-green)] text-[var(--on-accent)] shadow-[0_18px_36px_rgba(55,181,80,0.25)]"
             : "premium-nav-link-idle text-white/90 hover:text-white"
@@ -258,7 +258,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
 
   return (
     <>
-      <div className="app-mobile-topbar fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface-base)]/95 px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur-xl md:hidden">
+      <div className="app-mobile-topbar fixed left-3 right-3 top-3 z-50 flex items-center gap-3 rounded-3xl border border-[var(--border)] bg-[var(--surface-base)]/95 px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur-xl md:hidden">
         <div className="min-w-0 flex-1">
           <BrandLockup
             href={homeHref}
@@ -351,7 +351,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           {role === "student" ? <Dialog.Root>
             <Dialog.Trigger asChild><button type="button" className="flex flex-col items-center gap-0.5 px-3 py-2.5" aria-label="More navigation options"><DotsThreeOutline size={22} /><span className="text-xs font-medium">More</span></button></Dialog.Trigger>
             <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[80] bg-black/50 md:hidden" /><Dialog.Content className="fixed bottom-3 left-3 right-3 z-[81] max-h-[80dvh] overflow-y-auto rounded-2xl bg-[var(--surface-raised)] p-5 text-[var(--ink-strong)] md:hidden">
-              <Dialog.Title className="font-display text-lg font-semibold">Your workspace</Dialog.Title><Dialog.Description className="sr-only">Choose a page or update your settings.</Dialog.Description>
+              <Dialog.Title className="font-display text-lg">Your workspace</Dialog.Title><Dialog.Description className="sr-only">Choose a page or update your settings.</Dialog.Description>
               <div className="mt-4 grid grid-cols-2 gap-2">{mobileMore.map((item) => <Dialog.Close asChild key={item.href}><Link href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 hover:bg-[var(--surface-soft)]"><item.icon size={20} />{item.label}</Link></Dialog.Close>)}</div>
               <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-3">{settingsHref && <Dialog.Close asChild><Link className="inline-flex items-center pointer-coarse:min-h-11 min-h-11 py-2" href={settingsHref}>Settings</Link></Dialog.Close>}<button className="min-h-11 py-2" onClick={handleLogout}>Log out</button><Dialog.Close className="secondary-button px-4 py-2">Close menu</Dialog.Close></div>
             </Dialog.Content></Dialog.Portal>
@@ -382,16 +382,16 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             role="dialog"
             aria-modal="true"
             aria-labelledby="more-nav-title"
-            className="panel panel-strong fixed bottom-16 left-3 right-3 z-50 rounded-[1.75rem] p-4 md:hidden"
+            className="panel panel-strong fixed bottom-16 left-3 right-3 z-50 rounded-3xl p-4 md:hidden"
           >
-            <h2 id="more-nav-title" className="sr-only">Navigation menu</h2>
+            <h2 id="more-nav-title" className="sr-only">Navigation Menu</h2>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {mobileMore.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-xl px-1 py-3 text-xs transition-colors ${
                     isActive(item.href)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
@@ -407,7 +407,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
                 <Link
                   href={settingsHref}
                   onClick={() => setMoreOpen(false)}
-                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-[1.1rem] px-1 py-3 text-xs transition-colors ${
+                  className={`flex min-h-11 min-w-0 flex-col items-center rounded-xl px-1 py-3 text-xs transition-colors ${
                     isActive(settingsHref)
                       ? "bg-[var(--surface-overlay)] text-[var(--ink-strong)]"
                       : "text-[var(--ink-muted)] hover:bg-[var(--surface-overlay)]"
@@ -426,7 +426,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
       <aside
         // Always-dark sidebar gradient — intentional raw rgba for the navy→teal ramp.
         // eslint-disable-next-line no-restricted-syntax
-        className="app-sidebar fixed inset-y-4 left-4 z-40 hidden w-[17rem] flex-col overflow-hidden rounded-[2rem] border border-[var(--border-strong)] bg-[linear-gradient(180deg,rgba(7,23,43,0.96),rgba(16,37,62,0.94)_34%,rgba(8,68,80,0.92))] text-white shadow-[0_30px_90px_rgba(7,23,43,0.28)] md:flex"
+        className="app-sidebar fixed inset-y-4 left-4 z-40 hidden w-[17rem] flex-col overflow-hidden rounded-3xl border border-[var(--border-strong)] bg-[linear-gradient(180deg,rgba(0,19,63,0.96),rgba(0,19,63,0.94)_34%,rgba(0,64,113,0.92))] text-white shadow-[0_30px_90px_rgba(0,19,63,0.28)] md:flex"
         role="navigation"
         aria-label="Main navigation"
       >
@@ -484,7 +484,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
             <div
               ref={profileMenuRef}
               role="menu"
-              className="absolute bottom-full left-4 right-4 mb-2 rounded-2xl border border-white/10 bg-[rgba(7,23,43,0.98)] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+              className="absolute bottom-full left-4 right-4 mb-2 rounded-2xl border border-white/10 bg-[rgba(0,19,63,0.98)] p-3 shadow-[0_16px_40px_rgba(0,19,63,0.4)] backdrop-blur-xl"
             >
               <p className="mb-2 break-words px-2 text-sm font-semibold text-white">
                 {studentName}
@@ -527,7 +527,7 @@ export default function NavBar({ studentName, role, navPhase, orientationComplet
           <button
             onClick={() => setSageMiniOpen((v) => !v)}
             type="button"
-            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl shadow-[0_8px_30px_var(--glow-green)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(8,68,80,0.95)] text-[#f0efe8]" : "bg-[var(--accent-green)] text-[var(--on-accent)]"}`}
+            className={`fixed bottom-6 right-6 z-50 hidden h-14 w-14 items-center justify-center rounded-full text-2xl shadow-[0_8px_30px_var(--glow-green)] transition-all hover:scale-110 md:flex ${sageMiniOpen ? "bg-[rgba(0,64,113,0.95)] text-[var(--on-primary)]" : "bg-[var(--accent-green)] text-[var(--on-accent)]"}`}
             aria-label={sageMiniOpen ? "Close Sage chat" : "Open Sage chat"}
             aria-expanded={sageMiniOpen}
           >

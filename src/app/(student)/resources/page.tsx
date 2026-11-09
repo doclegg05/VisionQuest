@@ -39,7 +39,7 @@ export default async function ResourcesPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
               Action forms
             </p>
-            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">SPOKES form library</h2>
+            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">SPOKES Form Library</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
               Open the form you need. Upload it when required. Your paperwork stays linked to your goals.
             </p>
@@ -53,7 +53,7 @@ export default async function ResourcesPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
               Reference docs
             </p>
-            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Document library</h2>
+            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Document Library</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
               Find program guides, certification references, and printable documents here anytime.
             </p>

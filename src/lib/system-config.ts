@@ -71,6 +71,11 @@ export const SYSTEM_CONFIG_KEYS = [
   // Unset/empty → no student is ever texted by the nudge runner. Both this and
   // connect_enabled_classes must admit a class before its students get SMS.
   "sms_nudges_enabled_classes",
+  // W4 rollback switch for the job board's Not interested / Restore buttons
+  // (plain value). "off" hides them, answers 404 on /api/jobs/hidden and stops
+  // filtering hidden jobs; stored StudentHiddenJob rows are kept. Unset or any
+  // other value leaves hiding ON. See src/lib/job-board/job-preferences.ts.
+  "job_hide_enabled",
 ] as const;
 export type SystemConfigKey = (typeof SYSTEM_CONFIG_KEYS)[number];
 

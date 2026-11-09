@@ -210,7 +210,7 @@ export function ConnectionApprovalCard({
       </p>
 
       {error && (
-        <p className="mt-3 text-base text-red-600" role="alert">
+        <p className="mt-3 text-base text-danger" role="alert">
           {error}
         </p>
       )}

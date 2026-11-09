@@ -127,7 +127,7 @@ export default function StudentProfileFormStep({ onComplete }: StudentProfileFor
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-red-500">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}

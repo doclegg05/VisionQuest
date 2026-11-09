@@ -403,7 +403,7 @@ export default function ProgressTab({
                       </p>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
+                      <span className="rounded-full bg-[rgba(0,123,175,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
                         {conv.stage}
                       </span>
                       <span className="text-xs text-[var(--ink-muted)]">
@@ -444,7 +444,7 @@ function PublicCredentialBanner({
   publicCredentialPage: PublicCredentialPageData | null;
 }) {
   return (
-    <div className="mt-4 rounded-lg border border-[rgba(15,154,146,0.14)] bg-[rgba(15,154,146,0.07)] p-4">
+    <div className="mt-4 rounded-lg border border-[rgba(0,123,175,0.14)] bg-[rgba(0,123,175,0.07)] p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-info">
         Public credential
       </p>

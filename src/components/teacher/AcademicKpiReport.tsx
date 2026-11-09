@@ -88,7 +88,7 @@ function GoalAdoptionSection({ data }: { data: GoalAdoptionKpis }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Goal adoption</p>
-      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Who is planning</h3>
+      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Who Is Planning</h3>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {ADOPTION_CARDS.map((card) => (
@@ -110,7 +110,7 @@ function ResourcePipelineSection({ data, totalStudents }: { data: ResourcePipeli
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Resource pipeline</p>
-      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">From assignment to completion</h3>
+      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">From Assignment to Completion</h3>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <div className="theme-card rounded-xl p-4">
@@ -154,7 +154,7 @@ function TimeToMilestoneSection({ data }: { data: TimeToMilestoneKpis }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Time to milestone</p>
-      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">How fast students move</h3>
+      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">How Fast Students Move</h3>
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
@@ -192,7 +192,7 @@ function ReadinessDistributionSection({ data }: { data: ReadinessDistributionKpi
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Readiness score</p>
-      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Where students stand</h3>
+      <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Where Students Stand</h3>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="theme-card rounded-xl p-5">
@@ -246,7 +246,7 @@ function AcademicFunnelSection({ steps, totalStudents }: { steps: AcademicFunnel
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-muted)]">Pipeline</p>
-          <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Academic journey funnel</h3>
+          <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Academic Journey Funnel</h3>
         </div>
         <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
           {totalStudents} learners
@@ -333,7 +333,7 @@ export default function AcademicKpiReport() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
           Academic effectiveness
         </p>
-        <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Goal-centric KPIs</h2>
+        <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Goal-Centric KPIs</h2>
       </div>
 
       <GoalAdoptionSection data={data.goalAdoption} />

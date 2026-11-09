@@ -179,7 +179,7 @@ export default function AiConfigPanel() {
         </div>
       )}
       {message && (
-        <div className="rounded-2xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+        <div className="rounded-2xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
           {message}
         </div>
       )}

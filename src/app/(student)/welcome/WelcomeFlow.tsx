@@ -211,7 +211,7 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
           event.preventDefault();
           onChoose(choice);
         }}
-        className={`group flex items-start gap-4 rounded-[1.5rem] border bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg ${
+        className={`group flex items-start gap-4 rounded-3xl border bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg ${
           hasError
             ? "border-[var(--badge-error-text)]"
             : choice.recommended
@@ -224,11 +224,11 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
         </span>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-display text-lg font-semibold text-[var(--ink-strong)]">
+            <p className="font-display text-lg text-[var(--ink-strong)]">
               {choice.title}
             </p>
             {choice.recommended && (
-              <span className="rounded-full bg-[var(--accent-strong)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-success">
+              <span className="rounded-full bg-[var(--accent-strong)]/10 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-success">
                 Recommended
               </span>
             )}
@@ -262,7 +262,7 @@ interface QuickWinCardProps {
 export function QuickWinCard({ item, done, saving, hasError, onComplete }: QuickWinCardProps) {
   // Colors come from theme tokens, not hardcoded light values: the app themes
   // with [data-theme], while Tailwind's dark: variant keys off the OS setting,
-  // so a `bg-green-50` card left white body text on pale green whenever the
+  // so a pale-green card left white body text on pale green whenever the
   // two disagreed.
   return (
     <div
@@ -342,7 +342,7 @@ export function ScoreCard({ completedCount, totalCount, percent }: ScoreCardProp
             className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]"
           >
             <div
-              className="h-full rounded-full bg-[var(--accent-green)] transition-all duration-1000"
+              className="h-full rounded-full progress-fill transition-all duration-1000"
               style={{ width: `${percent}%` }}
             />
           </div>
@@ -589,7 +589,7 @@ export default function WelcomeFlow({
         {step === 2 && (
           <div className="text-center">
             <p className="mb-6 text-5xl">⚡</p>
-            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your first wins</h1>
+            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your First Wins</h1>
             <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
               {hasQuickWins
                 ? quickWinItems.length === 1
@@ -637,7 +637,7 @@ export default function WelcomeFlow({
         {step === 3 && (
           <div className="text-center">
             <p className="mb-6 text-5xl">🚀</p>
-            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your path to employment</h1>
+            <h1 className="font-display text-3xl text-[var(--ink-strong)]">Your Path to Employment</h1>
             <p className="mt-4 text-base leading-7 text-[var(--ink-muted)]">
               VisionQuest is structured around one clear path to help you secure a job. Choose where you would like to start:
             </p>

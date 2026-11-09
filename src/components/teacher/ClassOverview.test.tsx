@@ -33,7 +33,7 @@ describe("ClassOverview", () => {
   });
 
   it("shows upcoming appointments without a toggle", () => {
-    assert.match(html, /Upcoming appointments/);
+    assert.match(html, /Upcoming Appointments/);
     assert.match(html, /Résumé check-in/);
     assert.match(html, /in person/);
   });

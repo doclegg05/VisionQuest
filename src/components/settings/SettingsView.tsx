@@ -386,7 +386,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
         <div className="surface-section mb-6 p-6">
           <div className="mb-4">
             <p className="page-eyebrow text-[var(--ink-muted)]">Profile</p>
-            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Personal info</h2>
+            <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Personal Info</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
               Your birthdate helps your teacher report your enrollment to DoHS.
               We only share it with SPOKES staff.
@@ -449,7 +449,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           <div>
             <p className="page-eyebrow text-[var(--ink-muted)]">Classroom recovery</p>
             <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
-              Recovery questions
+              Recovery Questions
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
               This reset option is only for your classroom account. If you forget your password, answer these questions to choose a new one — no email needed.
@@ -523,7 +523,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
             <button
               onClick={handleRemove}
               type="button"
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-danger px-4 py-2 text-sm font-semibold text-danger transition-colors hover:bg-danger-soft"
             >
               Remove key
             </button>
@@ -579,7 +579,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
             </span>
             <div>
               <p className="page-eyebrow text-[var(--ink-muted)]">Quick guide</p>
-              <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">How to get your API key</h2>
+              <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">How to Get Your API Key</h2>
             </div>
           </button>
         </div>
@@ -610,7 +610,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
                 body: "Gemini keys usually start with AIza. Paste yours below, and we will check it before saving.",
               },
             ].map((item) => (
-              <div key={item.step} className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+              <div key={item.step} className="rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
                 <div className="mb-3 flex items-center gap-3">
                   <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[var(--accent-strong)] text-sm font-bold text-[var(--on-accent)]">
                     {item.step}
@@ -623,7 +623,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           </div>
         )}
 
-        <div className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
+        <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-5">
           {platformKeyConfigured && (
             <p className="mb-3 text-sm text-[var(--ink-muted)]">
               Your program already set up a Gemini key. Adding your own key here is optional, and it will replace the shared key for your account.
@@ -708,7 +708,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
             >
               <span
                 className={`relative inline-flex h-7 w-12 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
-                  emailEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
+                  emailEnabled ? "bg-[var(--accent-strong)]" : "bg-[var(--surface-muted)]"
                 }`}
               >
                 <span
@@ -743,7 +743,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
               >
                 <span
                   className={`relative inline-flex h-7 w-12 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
-                    smsEnabled ? "bg-[var(--accent-strong,#6d28d9)]" : "bg-[var(--surface-muted)]"
+                    smsEnabled ? "bg-[var(--accent-strong)]" : "bg-[var(--surface-muted)]"
                   }`}
                 >
                   <span

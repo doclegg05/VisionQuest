@@ -71,7 +71,7 @@ export function CoachingArcBar({ currentWeek, totalWeeks = 6 }: CoachingArcBarPr
                     isDone
                       ? "bg-[var(--accent-strong)] text-[var(--on-accent)]"
                       : isCurrent
-                        ? "animate-pulse bg-[var(--accent-strong)] text-[var(--on-accent)] ring-4 ring-[rgba(15,154,146,0.20)]"
+                        ? "animate-pulse bg-[var(--accent-strong)] text-[var(--on-accent)] ring-4 ring-[rgba(0,123,175,0.20)]"
                         : "bg-[var(--surface-muted)] text-[var(--ink-muted)]",
                   ].join(" ")}
                 >

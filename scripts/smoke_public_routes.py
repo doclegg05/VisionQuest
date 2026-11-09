@@ -83,7 +83,7 @@ def run() -> None:
             page.wait_for_url(f"{BASE_URL}/forgot-password")
             page.wait_for_load_state("networkidle")
             expect(
-                page.get_by_role("heading", name="Reset your password").is_visible(),
+                page.get_by_role("heading", name="Reset Your Password").is_visible(),
                 "Forgot password page did not load.",
             )
 

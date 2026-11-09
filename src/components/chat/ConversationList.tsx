@@ -55,7 +55,7 @@ export function ConversationListItem({ conv, isActive, isDeleting, onSelect, onD
         <div className="flex items-start justify-between gap-2">
           <span
             className={[
-              "min-w-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.12em]",
+              "min-w-0 flex-1 text-xs font-semibold uppercase tracking-[0.12em]",
               isActive ? "text-[var(--chat-sage-action)]" : "text-[var(--ink-muted)]",
             ].join(" ")}
           >

@@ -28,7 +28,7 @@ export default function SecurityQuestionAnswerFields({
   }
 
   return (
-    <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
       <div className="mb-4">
         <p className="text-sm font-semibold text-[var(--ink-strong)]">{title}</p>
         <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">{description}</p>

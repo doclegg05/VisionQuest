@@ -24,7 +24,7 @@ export function CareerDnaEmptyState({ completeness }: CareerDnaEmptyStateProps) 
         <div className="min-w-0 flex-1">
           <h2
             id="career-dna-empty-heading"
-            className="font-display text-xl font-bold text-[var(--ink-strong)]"
+            className="font-display text-xl text-[var(--ink-strong)]"
           >
             {started ? "Your Career DNA is still growing" : "Build your Career DNA with Sage"}
           </h2>

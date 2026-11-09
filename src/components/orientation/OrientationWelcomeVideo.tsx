@@ -95,7 +95,7 @@ export default function OrientationWelcomeVideo() {
         ) : (
           <p className="text-sm text-[var(--ink-muted)]">Finish the video to complete this Orientation step and earn {WELCOME_VIDEO_XP} XP.</p>
         )}
-        {error && <p role="alert" className="mt-1 text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="mt-1 text-sm text-danger">{error}</p>}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">

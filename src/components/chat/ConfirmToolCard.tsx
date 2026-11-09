@@ -68,7 +68,7 @@ export function ConfirmToolCard({ label, summary, meta }: ConfirmToolCardProps) 
   }
 
   return (
-    <div className="max-w-[34rem] overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] shadow-[0_4px_16px_rgba(7,23,43,0.06)]">
+    <div className="max-w-[34rem] overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] shadow-[0_4px_16px_rgba(0,19,63,0.06)]">
       <div className="border-l-[3px] border-l-[var(--accent-gold)] p-3">
         <div className="flex items-start gap-2">
           <ShieldCheck size={18} weight="bold" className="mt-0.5 shrink-0 text-[var(--chat-sage-mark)]" />
