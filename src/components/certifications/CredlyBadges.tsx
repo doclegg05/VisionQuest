@@ -17,6 +17,7 @@ export default function CredlyBadges() {
   const [badges, setBadges] = useState<CredlyBadge[]>([]);
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   // Self-configuration state
   const [inputValue, setInputValue] = useState("");
@@ -28,6 +29,7 @@ export default function CredlyBadges() {
       .then((data) => {
         setBadges(data.badges || []);
         setUsername(data.username || null);
+        setUnavailable(data.unavailable === true);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -56,6 +58,7 @@ export default function CredlyBadges() {
           .then((r) => r.json())
           .then((badgeData) => {
             setBadges(badgeData.badges || []);
+            setUnavailable(badgeData.unavailable === true);
           })
           .catch(() => {});
       } else {
@@ -183,7 +186,9 @@ export default function CredlyBadges() {
           </a>
         </div>
         <p className="mt-3 text-sm text-[var(--ink-muted)]">
-          No badges found yet. Badges appear here automatically after you pass a Certiport exam and accept the badge on Credly.
+          {unavailable
+            ? "We could not reach Credly just now. Your badges are not gone. Please try again in a few minutes."
+            : "No badges found yet. Badges appear here automatically after you pass a Certiport exam and accept the badge on Credly."}
         </p>
       </div>
     );

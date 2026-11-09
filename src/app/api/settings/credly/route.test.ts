@@ -67,12 +67,13 @@ mock.module("@/lib/rate-limit", {
 });
 
 const mockUpdate = mock.fn(async () => ({})) as any;
+const mockFindUnique = mock.fn(async () => ({ credlyUsername: null as string | null })) as any;
 
 mock.module("@/lib/db", {
   namedExports: {
     prisma: {
       student: {
-        findUnique: mock.fn(async () => ({ credlyUsername: null })) as any,
+        findUnique: mockFindUnique,
         update: mockUpdate,
       },
     },
@@ -89,6 +90,7 @@ beforeEach(() => {
   rateLimitCalls.length = 0;
   windowCounts = new Map();
   mockUpdate.mock.resetCalls();
+  mockFindUnique.mock.mockImplementation(async () => ({ credlyUsername: null }));
 });
 
 function post(username: string): Promise<Response> {
@@ -150,5 +152,43 @@ describe("POST /api/settings/credly rate limit", () => {
     assert.equal(res.status, 200);
     assert.equal(body.credlyUsername, "alice-rivers", "URL extraction is unchanged");
     assert.equal(mockUpdate.mock.callCount(), 1);
+  });
+});
+
+describe("Credly badge cache is bound to the saved account", () => {
+  function updateData(): Record<string, unknown> {
+    return (mockUpdate.mock.calls[0].arguments[0] as { data: Record<string, unknown> }).data;
+  }
+
+  it("clears the stored badges when the username changes", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({ credlyUsername: "old-name" }));
+    await post("new-name");
+    const data = updateData();
+    assert.equal(data.credlyUsername, "new-name");
+    assert.equal(data.credlyBadgesCache, null);
+    assert.equal(data.credlyBadgesCachedAt, null);
+  });
+
+  it("clears the stored badges when a username is saved for the first time", async () => {
+    await post("new-name");
+    assert.equal(updateData().credlyBadgesCache, null);
+    assert.equal(updateData().credlyBadgesCachedAt, null);
+  });
+
+  it("keeps the stored badges when the same username is saved again", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({ credlyUsername: "same-name" }));
+    await post("same-name");
+    const data = updateData();
+    assert.equal(data.credlyUsername, "same-name");
+    assert.ok(!("credlyBadgesCache" in data));
+    assert.ok(!("credlyBadgesCachedAt" in data));
+  });
+
+  it("clears the stored badges when the username is removed", async () => {
+    await (route.DELETE as unknown as () => Promise<Response>)();
+    const data = updateData();
+    assert.equal(data.credlyUsername, null);
+    assert.equal(data.credlyBadgesCache, null);
+    assert.equal(data.credlyBadgesCachedAt, null);
   });
 });

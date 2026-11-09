@@ -51,9 +51,19 @@ export const POST = withAuth(async (session, req: Request) => {
   if (!username) throw badRequest("Credly username is required.");
   if (username.length > 100) throw badRequest("Username is too long.");
 
+  const current = await prisma.student.findUnique({
+    where: { id: session.id },
+    select: { credlyUsername: true },
+  });
+  // Stored badges belong to the account they were fetched for. A new account
+  // starts with no cache; saving the same name again keeps it.
+  const changed = (current?.credlyUsername ?? null) !== username;
+
   await prisma.student.update({
     where: { id: session.id },
-    data: { credlyUsername: username },
+    data: changed
+      ? { credlyUsername: username, credlyBadgesCache: null, credlyBadgesCachedAt: null }
+      : { credlyUsername: username },
   });
 
   return NextResponse.json({ credlyUsername: username });
@@ -65,7 +75,7 @@ export const POST = withAuth(async (session, req: Request) => {
 export const DELETE = withAuth(async (session) => {
   await prisma.student.update({
     where: { id: session.id },
-    data: { credlyUsername: null },
+    data: { credlyUsername: null, credlyBadgesCache: null, credlyBadgesCachedAt: null },
   });
   return NextResponse.json({ credlyUsername: null });
 });
