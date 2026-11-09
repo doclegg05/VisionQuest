@@ -1,5 +1,9 @@
 # Dashboard data, persistence, and live updates
 
+> **Standalone task list retired on 2026-11-09.** Proposed scope consolidated into W3/W5; approval remains pending.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 Status: proposed implementation plan, September 10, 2026. Planning only; no application, schema, production configuration, or external account changes.
 
 ## Outcome and scope

@@ -1,5 +1,9 @@
 # Which local model should serve which role
 
+> **Standalone task list retired on 2026-11-09.** Per-role selection superseded by the October 8 model decision; selected-model acceptance is W1.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 **Date**: 2026-08-21
 **Status**: capability shipped; **the model picks are not yet made** — they need one bake-off run on the real host
 **Supersedes nothing.** Extends `docs/plans/2026-07-02-local-model-acceptance-report.md`, whose verdict ("NO-GO for this specific configuration, pending a hardware/config check") has never been revisited with a full run.

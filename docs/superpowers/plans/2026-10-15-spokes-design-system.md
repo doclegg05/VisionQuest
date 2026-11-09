@@ -1,5 +1,9 @@
 # SPOKES Design System Implementation Plan
 
+> **Standalone task list retired on 2026-11-09.** Partly delivered; remaining PR2–4 are W2.
+> Follow the [consolidated remaining-work plan](../../plans/2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Bring VisionQuest's look in line with the SPOKES Design System in four PRs: tokens, student sweep, remaining sweep, polish.

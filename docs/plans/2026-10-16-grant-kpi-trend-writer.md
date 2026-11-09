@@ -1,5 +1,9 @@
 # Grant KPI trend: compute it instead of scheduling a snapshot
 
+> **Standalone task list retired on 2026-11-09.** Open decisions consolidated into D4/W7; historical empty-roster and role assumptions need rebasing.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 The Grant KPI Report on Program Setup has a trend line under each metric
 card, fed by `GrantKpiSnapshot`. Nothing has ever written that table. This is
 the same class of gap as review finding F6, found while tracing the reports

@@ -1,5 +1,9 @@
 # One Intervention Queue Implementation Plan
 
+> **Standalone task list retired on 2026-11-09.** Implementation delivered in #249; field acceptance is W1.
+> Follow the [consolidated remaining-work plan](../../plans/2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The teacher home page shows one ranked intervention queue that holds everything the second "Students Needing Attention" list shows today, with students in crisis always at the top.
