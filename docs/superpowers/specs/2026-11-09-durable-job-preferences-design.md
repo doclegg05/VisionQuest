@@ -85,7 +85,7 @@ New `StudentHiddenJob`:
 - For each `StudentSavedJob` with a `jobListingId` and no `vacancyKey`, it computes the key and snapshot from the linked listing.
 - When two of one student's saves map to the same key (the same posting saved in two classes), it keys the most recently updated row and leaves the others unkeyed. It prints counts only, never ids; the header of the script has the SQL that finds the unkeyed rows. Unkeyed rows still work through `jobListingId`.
 - It skips rows that already have a key, and each write requires the row to still be unkeyed, so a second run changes nothing. The planning logic is `scripts/lib/job-preferences-backfill-planner.mjs`, which is pure and tested.
-- Order at deploy: `prisma migrate deploy`, then `node --import tsx scripts/job-preferences-backfill.mjs` (dry run), then the same with `--apply`. It needs `DATABASE_URL` and `ADMIN_DATABASE_URL` and refuses to run unless the admin client bypasses RLS. Until the apply runs, a deleted listing leaves a legacy save with no snapshot; it shows as "This job is no longer listed." No listing is deleted on a schedule today, so that window carries little risk.
+- Order at deploy: `prisma migrate deploy`, then `node --import tsx scripts/job-preferences-backfill.mjs` (dry run), then the same with `--apply`. It needs `DATABASE_URL` and `ADMIN_DATABASE_URL` and refuses to run unless the admin client bypasses RLS. Until the apply runs, a deleted listing leaves a legacy save with no snapshot. No screen shows such a save today, but `totalSaved` in `GET /api/jobs` still counts it. No listing is deleted on a schedule today, so that window carries little risk.
 
 ### Rollback
 
@@ -107,6 +107,11 @@ ON CONFLICT (key) DO UPDATE SET value = 'off', "updatedAt" = now();
 Delete the row, or set it to `on`, to turn hiding back on. The app caches config for 60 seconds.
 
 Saves of browse jobs and the save snapshot are not behind the flag. They fix data loss rather than add a discovery feature.
+
+### Follow-ups
+
+- A saved-jobs view built from the snapshots, so a save whose listing is gone still shows.
+- `totalSaved` (`src/app/api/jobs/route.ts`) should count only the saves the student can see, or the view should show all of them.
 
 ## Variables
 
