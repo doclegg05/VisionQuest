@@ -184,6 +184,7 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
   "POST /api/internal/sage/briefing",
   "POST /api/internal/wagers/resolve",
 
+  "POST /api/jobs/hidden",
   "POST /api/jobs/save",
 
   "POST /api/lms/platforms/visit",
