@@ -723,40 +723,12 @@ select.theme-input::placeholder {
   justify-content: space-between;
   padding: clamp(1.15rem, 0.75rem + 2vw, 1.75rem);
   margin-bottom: clamp(1.1rem, 0.9rem + 0.8vw, 1.5rem);
-  border-radius: clamp(1.35rem, 1.05rem + 1vw, 1.75rem);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background:
-    linear-gradient(135deg, rgba(0, 64, 113, 0.97), rgba(0, 123, 175, 0.88) 52%, rgba(30, 122, 46, 0.82));
-  color: white;
-  box-shadow:
-    0 28px 90px rgba(0, 64, 113, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
-}
-
-.page-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 18px),
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
-  opacity: 0.42;
-  z-index: 0;
-}
-
-.page-hero::after {
-  content: "";
-  position: absolute;
-  top: 18%;
-  right: -10%;
-  width: min(34rem, 68%);
-  height: 2px;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(211, 178, 87, 0.84), transparent);
-  box-shadow: 0 0 22px rgba(211, 178, 87, 0.28);
-  transform: rotate(-12deg);
-  z-index: 0;
+  border: none;
+  border-radius: var(--radius-xl);
+  /* SPOKES --grad-title */
+  background: linear-gradient(135deg, var(--primary) 0%, var(--dark) 100%);
+  color: var(--light);
+  box-shadow: var(--shadow-card-lg);
 }
 
 .page-hero > * {
@@ -765,29 +737,45 @@ select.theme-input::placeholder {
 }
 
 .page-eyebrow {
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   font-weight: 700;
-  letter-spacing: 0.24em;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.76);
+  color: var(--light);
 }
 
 .page-title {
   margin-top: 0.55rem;
-  font-family: var(--font-display), var(--font-body), sans-serif;
-  font-size: 2rem;
-  line-height: 1.01;
-  letter-spacing: 0;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 2.125rem;
+  font-synthesis-weight: none;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   text-wrap: balance;
+}
+
+.page-title::after {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 3px;
+  margin-top: 0.75rem;
+  background: var(--gold);
 }
 
 .page-subtitle {
   margin-top: 0.75rem;
   max-width: 44rem;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 1rem;
-  line-height: 1.65;
+  color: var(--light);
+  font-size: 1.0625rem;
+  line-height: 1.6;
   text-wrap: pretty;
+}
+
+@media (min-width: 640px) {
+  .page-title {
+    font-size: 2.5rem;
+  }
 }
 
 .page-actions {
@@ -1094,8 +1082,7 @@ a[role="button"]:active,
 
   .app-frame::before,
   .app-main::before,
-  .app-sidebar::before,
-  .page-hero::after {
+  .app-sidebar::before {
     display: none;
   }
 
