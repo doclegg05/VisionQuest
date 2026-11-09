@@ -442,6 +442,18 @@ body {
 }
 
 @layer components {
+  /* SPOKES left-border card, for tips, Sage suggestions, and activity prompts only. */
+  .callout {
+    border-left: 6px solid var(--success-border);
+    background: var(--surface-muted);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+  }
+
+  .callout-gold {
+    border-left-color: var(--gold);
+  }
+
   /* DM Serif Display ships one weight; never let the browser fake a bold. */
   .font-display {
     font-family: var(--font-display), Georgia, serif;
@@ -451,34 +463,21 @@ body {
 }
 
 .panel {
-  background:
-    linear-gradient(180deg, var(--surface-sheen), transparent 44%),
-    linear-gradient(180deg, var(--surface-raised), var(--surface-soft));
-  backdrop-filter: blur(18px);
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  box-shadow:
-    var(--shadow-premium),
-    inset 0 1px 0 var(--surface-overlay);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .panel-strong {
-  background:
-    linear-gradient(180deg, var(--surface-sheen), transparent 42%),
-    var(--surface-strong);
+  background: var(--surface-raised);
 }
 
 .theme-card {
-  background:
-    linear-gradient(180deg, var(--surface-sheen), transparent 42%),
-    linear-gradient(180deg, var(--surface-raised), var(--surface-soft));
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-premium);
-}
-
-[data-theme="dark"] .theme-card {
-  box-shadow:
-    0 22px 48px rgba(0, 19, 63, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .theme-card-subtle {
@@ -816,13 +815,10 @@ select.theme-input::placeholder {
 
 .surface-section {
   position: relative;
-  border-radius: 1.5rem;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  background:
-    linear-gradient(180deg, var(--surface-sheen), transparent 44%),
-    linear-gradient(180deg, var(--surface-raised), var(--surface-soft));
-  backdrop-filter: blur(16px) saturate(1.05);
-  box-shadow: var(--shadow-premium);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   transition:
     background-color 300ms var(--ease-smooth),
     border-color 300ms var(--ease-smooth),
@@ -831,8 +827,11 @@ select.theme-input::placeholder {
 }
 
 @media (hover: hover) {
-  .surface-section:hover {
-    border-color: var(--border-strong);
+  /* Only cards that are links or buttons lift; a static section that moves under
+     the pointer suggests it can be clicked. */
+  .surface-section:is(a, button):hover,
+  .theme-card:is(a, button):hover {
+    transform: translateY(-5px);
     box-shadow: var(--shadow-premium-hover);
   }
 }
@@ -1102,7 +1101,8 @@ a[role="button"]:active,
 
   .primary-button:hover,
   .primary-button:active,
-  .surface-section:hover {
+  .surface-section:is(a, button):hover,
+  .theme-card:is(a, button):hover {
     transform: none;
   }
 }
