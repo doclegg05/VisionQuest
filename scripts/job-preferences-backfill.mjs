@@ -21,19 +21,25 @@
  * WHERE "vacancyKey" IS NULL AND "jobListingId" IS NOT NULL;
  *
  * Dry run by default. Prints COUNTS ONLY, never a student id or job content.
+ * Every run prints the target host (host only). loadEnvFile() can load the
+ * production connection strings, so --apply against any host that is not
+ * loopback also needs --confirm-host=<that host>, or the script exits 2
+ * before it connects (scripts/lib/backfill-target-guard.mjs).
  * Uses prismaAdmin and refuses to run unless the admin client bypasses RLS,
  * since under vq_app a cross-student read silently returns zero rows.
  *
  * Usage:
  *   node --import tsx scripts/job-preferences-backfill.mjs            (dry run)
- *   node --import tsx scripts/job-preferences-backfill.mjs --apply
+ *   node --import tsx scripts/job-preferences-backfill.mjs --apply                              (loopback only)
+ *   node --import tsx scripts/job-preferences-backfill.mjs --apply --confirm-host=<db host>      (remote)
  *
- * Exit codes: 0 done (dry run or applied), 2 no connection, the admin client
- * is not privileged, or the run failed.
+ * Exit codes: 0 done (dry run or applied), 2 no connection, an unconfirmed
+ * remote write, the admin client is not privileged, or the run failed.
  */
 
 import { loadEnvFile, parseArgs } from "./lib/sage-rag-utils.mjs";
 import { planJobPreferencesBackfill } from "./lib/job-preferences-backfill-planner.mjs";
+import { checkBackfillTarget } from "./lib/backfill-target-guard.mjs";
 
 const EXIT_OK = 0;
 const EXIT_USAGE = 2;
@@ -87,9 +93,22 @@ async function applyPlan(prismaAdmin, planned) {
 }
 
 async function main() {
-  const apply = Boolean(parseArgs().apply);
+  const args = parseArgs();
+  const apply = Boolean(args.apply);
   if (!process.env.DATABASE_URL || !process.env.ADMIN_DATABASE_URL) {
     console.error(`${NAME}: set DATABASE_URL and ADMIN_DATABASE_URL (the postgres-role connection) first.`);
+    return EXIT_USAGE;
+  }
+
+  // Before any connection: name the target, and refuse an unconfirmed remote write.
+  const target = checkBackfillTarget({
+    databaseUrls: [process.env.DATABASE_URL, process.env.ADMIN_DATABASE_URL],
+    apply,
+    confirmHost: typeof args["confirm-host"] === "string" ? args["confirm-host"] : undefined,
+  });
+  console.log(`${NAME}: target host ${[...new Set(target.hosts)].join(", ")}`);
+  if (!target.allowed) {
+    console.error(`${NAME}: refusing to write: ${target.reason}.`);
     return EXIT_USAGE;
   }
 
