@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type ReadinessBreakdown } from "@/lib/progression/readiness-score";
+import { badgeRect, canvasHeight } from "./mountain-geometry";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -30,7 +31,7 @@ interface Particle {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const MILESTONES: Milestone[] = [
+export const MILESTONES: Milestone[] = [
   { key: "orientation",    label: "Base Camp",       x: 0.22, y: 0.88 },
   { key: "goalPlanning",   label: "First Ridge",     x: 0.30, y: 0.72 },
   { key: "bhagAchieved",   label: "Tree Line",       x: 0.40, y: 0.56 },
@@ -115,7 +116,7 @@ export default function MountainProgress({
 
     const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    const h = rect.width < 640 ? 200 : rect.width < 768 ? 260 : 320;
+    const h = canvasHeight(rect.width);
 
     sizeRef.current = { w: rect.width, h };
     canvas.width = rect.width * dpr;
@@ -392,12 +393,14 @@ export default function MountainProgress({
   }
 
   function drawScoreBadge(ctx: CanvasRenderingContext2D, w: number, h: number, score: number, lvl: number) {
-    const bx = 16;
-    const by = h - 16;
+    // Lower-right, where no milestone sits (mountain-geometry.test.ts proves it).
+    const box = badgeRect(w, h);
+    const bx = box.x;
+    const by = box.y + box.h - 4;
     // Background
     ctx.fillStyle = "rgba(0,19,63,0.35)";
     ctx.beginPath();
-    ctx.roundRect(bx, by - 44, 136, 48, 12);
+    ctx.roundRect(box.x, box.y, box.w, box.h, 12);
     ctx.fill();
     // Score
     ctx.fillStyle = "rgba(255,255,255,0.95)";
