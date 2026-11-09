@@ -328,7 +328,7 @@ export default function MountainProgress({
 
       // Label
       ctx.fillStyle = complete ? "rgba(209,211,212,0.9)" : "rgba(255,255,255,0.45)";
-      ctx.font = "600 10px system-ui, sans-serif";
+      ctx.font = "600 13px system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.fillText(m.label, px + 10, py + 4);
     }
@@ -397,17 +397,17 @@ export default function MountainProgress({
     // Background
     ctx.fillStyle = "rgba(0,19,63,0.35)";
     ctx.beginPath();
-    ctx.roundRect(bx, by - 38, 90, 42, 12);
+    ctx.roundRect(bx, by - 44, 136, 48, 12);
     ctx.fill();
     // Score
     ctx.fillStyle = "rgba(255,255,255,0.95)";
     ctx.font = "bold 20px system-ui, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`${Math.round(score)}%`, bx + 10, by - 10);
+    ctx.fillText(`${Math.round(score)}%`, bx + 10, by - 18);
     // Label
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.font = "600 9px system-ui, sans-serif";
-    ctx.fillText(`LVL ${lvl} READINESS`, bx + 10, by + 2);
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText(`LVL ${lvl} READINESS`, bx + 10, by);
   }
 
   // ─── Animation loop ───────────────────────────────────────────────────

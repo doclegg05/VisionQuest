@@ -12,22 +12,22 @@ interface VisionBoardPinProps {
 
 const NOTE_COLORS: Record<string, { shell: string; text: string; line: string }> = {
   yellow: {
-    shell: "border-[rgba(211,178,87,0.7)] bg-[linear-gradient(rgba(211,178,87,0.35),rgba(211,178,87,0.35)),var(--surface-raised)]",
+    shell: "border-[rgba(211,178,87,0.7)] bg-surface-raised bg-[linear-gradient(rgba(211,178,87,0.35),rgba(211,178,87,0.35))]",
     text: "text-[var(--ink-strong)]",
     line: "bg-[rgba(211,178,87,0.25)]",
   },
   pink: {
-    shell: "border-[rgba(167,37,63,0.7)] bg-[linear-gradient(rgba(167,37,63,0.15),rgba(167,37,63,0.15)),var(--surface-raised)]",
+    shell: "border-[rgba(167,37,63,0.7)] bg-surface-raised bg-[linear-gradient(rgba(167,37,63,0.15),rgba(167,37,63,0.15))]",
     text: "text-[var(--ink-strong)]",
     line: "bg-[rgba(167,37,63,0.25)]",
   },
   blue: {
-    shell: "border-[rgba(0,123,175,0.7)] bg-[linear-gradient(rgba(0,123,175,0.2),rgba(0,123,175,0.2)),var(--surface-raised)]",
+    shell: "border-[rgba(0,123,175,0.7)] bg-surface-raised bg-[linear-gradient(rgba(0,123,175,0.2),rgba(0,123,175,0.2))]",
     text: "text-[var(--ink-strong)]",
     line: "bg-[rgba(0,123,175,0.25)]",
   },
   green: {
-    shell: "border-[rgba(55,181,80,0.7)] bg-[linear-gradient(rgba(55,181,80,0.2),rgba(55,181,80,0.2)),var(--surface-raised)]",
+    shell: "border-[rgba(55,181,80,0.7)] bg-surface-raised bg-[linear-gradient(rgba(55,181,80,0.2),rgba(55,181,80,0.2))]",
     text: "text-[var(--ink-strong)]",
     line: "bg-[rgba(55,181,80,0.25)]",
   },

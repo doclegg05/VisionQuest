@@ -374,7 +374,7 @@ export default function OrientationWizard() {
         <button
           type="button"
           onClick={() => { setError(null); setLoading(true); void fetchData(); }}
-          className="inline-flex min-h-11 items-center px-4 py-2 bg-info text-white rounded-lg hover:bg-info/90"
+          className="inline-flex min-h-11 items-center px-4 py-2 bg-info text-on-info rounded-lg hover:bg-brand-dark"
         >
           Try Again
         </button>

@@ -413,7 +413,7 @@ export default function ResumeBuilder() {
               className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 saved
                   ? "bg-success-soft text-success"
-                  : "bg-info text-white hover:bg-info/90"
+                  : "bg-info text-on-info hover:bg-brand-dark"
               }`}
             >
               {saved ? "Saved" : saving ? "Saving..." : "Save Resume"}
@@ -898,7 +898,7 @@ export default function ResumeBuilder() {
         onClick={() => void handleSave()}
         disabled={saving}
         className={`w-full rounded-xl py-3 text-sm font-semibold transition-colors ${
-          saved ? "bg-success-soft text-success" : "bg-info text-white hover:bg-info/90"
+          saved ? "bg-success-soft text-success" : "bg-info text-on-info hover:bg-brand-dark"
         }`}
       >
         {saved ? "Resume Saved" : saving ? "Saving..." : "Save Resume"}

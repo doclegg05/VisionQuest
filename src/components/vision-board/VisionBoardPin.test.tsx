@@ -163,11 +163,22 @@ describe("resizeWidthForKey", () => {
 });
 
 describe("sticky note tints keep their text readable", () => {
-  const source = readFileSync(new URL("./VisionBoardPin.tsx", import.meta.url), "utf8");
+  const source = readFileSync(process.env.PIN_SOURCE ?? new URL("./VisionBoardPin.tsx", import.meta.url), "utf8");
   const tints = [...source.matchAll(/bg-\[linear-gradient\(rgba\((\d+),(\d+),(\d+),([\d.]+)\)/g)];
 
   it("finds all four tinted notes", () => {
     assert.equal(tints.length, 4);
+  });
+
+  // A color is not a valid background-image layer: `bg-[linear-gradient(...),var(--x)]`
+  // is dropped at computed time and the note loses its ground. The ground is its own class.
+  it("keeps the ground color out of the gradient and in bg-surface-raised", () => {
+    const shells = [...source.matchAll(/shell: "([^"]*rgba[^"]*)"/g)].map((m) => m[1]);
+    assert.equal(shells.length, 4);
+    for (const shell of shells) {
+      assert.doesNotMatch(shell, /bg-\[linear-gradient\([^\]]*var\(/, `color layer inside the gradient: ${shell}`);
+      assert.match(shell, /(^|\s)bg-surface-raised(\s|$)/, `no opaque ground: ${shell}`);
+    }
   });
 
   for (const [theme, ink, ground] of [

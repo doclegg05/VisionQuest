@@ -267,7 +267,7 @@ export default function PortfolioGrid() {
   if (error) return (
     <div className="text-center py-12">
       <p className="text-danger mb-4">{error}</p>
-      <button onClick={fetchItems} className="inline-flex min-h-11 items-center justify-center px-4 py-2 bg-info text-white rounded-lg hover:bg-info/90">
+      <button onClick={fetchItems} className="inline-flex min-h-11 items-center justify-center px-4 py-2 bg-info text-on-info rounded-lg hover:bg-brand-dark">
         Try Again
       </button>
     </div>
