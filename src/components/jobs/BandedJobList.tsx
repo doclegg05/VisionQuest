@@ -10,6 +10,8 @@ export type BandedJob = ListJob & { band?: JobBand | null };
 interface BandedJobListProps {
   jobs: BandedJob[];
   onSave: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
+  /** W4: "Not interested". Omitted while hiding is off. */
+  onHide?: (jobId: string) => Promise<void>;
 }
 
 /**
@@ -19,11 +21,11 @@ interface BandedJobListProps {
  * band (no-personalization student), it renders exactly the flat JobList it
  * always has — no headings, no layout change.
  */
-export function BandedJobList({ jobs, onSave }: BandedJobListProps) {
+export function BandedJobList({ jobs, onSave, onHide }: BandedJobListProps) {
   const sections = groupJobsByBand(jobs);
 
   if (sections.length === 1 && sections[0].key === "ungrouped") {
-    return <JobList jobs={jobs} onSave={onSave} />;
+    return <JobList jobs={jobs} onSave={onSave} onHide={onHide} />;
   }
 
   return (
@@ -46,7 +48,7 @@ export function BandedJobList({ jobs, onSave }: BandedJobListProps) {
                 </p>
               )}
             </div>
-            <JobList jobs={[...section.jobs]} onSave={onSave} />
+            <JobList jobs={[...section.jobs]} onSave={onSave} onHide={onHide} />
           </section>
         ))}
     </div>

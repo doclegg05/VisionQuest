@@ -432,11 +432,11 @@ const saveJob: AgentTool = {
       where: { id: jobListingId, classConfig: { classId: enrollment.classId } },
       select: { id: true, title: true, company: true },
     });
-    // S4: same code POST /api/jobs/save uses for the same ambiguity (the id
-    // may be a JobBrowseListing row, or a different class's board) — a
-    // student asking Sage to save a job gets the same plain-language
-    // explanation the Career tab's Save button now gives, instead of a
-    // bare "not found" that doesn't say what to do about it.
+    // S4: the route answers this same ambiguity (the id may be a
+    // JobBrowseListing row, or a different class's board) with a bare 400
+    // "Job listing not found" and no code. Sage reuses the plain-language
+    // `not_your_class_board` copy from describeSaveError so the student is
+    // told what to do about it instead.
     if (!listing) return { status: "error", summary: describeSaveError("not_your_class_board") };
 
     return executeAndLedger("save_job", { jobListingId }, ctx, async () => {

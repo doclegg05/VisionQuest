@@ -15,6 +15,8 @@ const mockSavedJobFindMany = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockDiscoveryFindUnique = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockResumeFindUnique = mock.fn<(args: unknown) => Promise<unknown>>();
 const mockLoadBrowseJobs = mock.fn<(args: unknown) => Promise<unknown[]>>();
+const mockHiddenFindMany = mock.fn<(args: unknown) => Promise<unknown[]>>();
+const mockSystemConfigFindUnique = mock.fn<(args: unknown) => Promise<unknown>>();
 
 mock.module("@/lib/api-error", {
   namedExports: {
@@ -36,7 +38,19 @@ mock.module("@/lib/db", {
       studentSavedJob: { findMany: mockSavedJobFindMany },
       careerDiscovery: { findUnique: mockDiscoveryFindUnique },
       resumeData: { findUnique: mockResumeFindUnique },
+      studentHiddenJob: { findMany: mockHiddenFindMany },
     },
+    prismaAdmin: {
+      systemConfig: { findUnique: mockSystemConfigFindUnique },
+    },
+  },
+});
+
+// The real cache would keep the first job_hide_enabled read across tests.
+mock.module("@/lib/cache", {
+  namedExports: {
+    cached: async (_key: string, _ttl: number, load: () => Promise<unknown>) => load(),
+    invalidatePrefix: () => undefined,
   },
 });
 
@@ -163,6 +177,8 @@ describe("GET /api/jobs band annotation", () => {
     mockDiscoveryFindUnique.mock.mockImplementation(async () => discoveryRow);
     mockResumeFindUnique.mock.mockImplementation(async () => null);
     mockLoadBrowseJobs.mock.mockImplementation(async () => [browseRow]);
+    mockHiddenFindMany.mock.mockImplementation(async () => []);
+    mockSystemConfigFindUnique.mock.mockImplementation(async () => null);
   });
 
   it("tags each class job with a band and browse jobs with band null", async () => {
@@ -262,5 +278,135 @@ describe("GET /api/jobs band annotation", () => {
     const body = await (await route.GET(mockRequest("/api/jobs", { searchParams: { proximity: "all", workMode: "remote" } }))).json();
     assert.deepEqual(body.jobs, []);
     assert.equal(mockLoadBrowseJobs.mock.callCount(), 0);
+  });
+});
+
+describe("GET /api/jobs saved and hidden vacancies", () => {
+  const lookAlikeA = { ...classJobA, id: "look-a", sourceId: "adzuna:111", source: "adzuna" };
+  const lookAlikeB = { ...lookAlikeA, id: "look-b", sourceId: "adzuna:222", url: "https://example.com/jobs/b2" };
+
+  function savedRow(overrides: Record<string, unknown>) {
+    return {
+      jobListingId: null,
+      jobBrowseListingId: null,
+      vacancyKey: null,
+      status: "saved",
+      notes: null,
+      appliedAt: null,
+      snapshotCompany: null,
+      snapshotSource: null,
+      jobListing: null,
+      jobBrowseListing: null,
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    for (const fn of [
+      mockEnrollmentFindFirst,
+      mockConfigFindUnique,
+      mockJobListingFindMany,
+      mockSavedJobFindMany,
+      mockDiscoveryFindUnique,
+      mockResumeFindUnique,
+      mockLoadBrowseJobs,
+      mockHiddenFindMany,
+      mockSystemConfigFindUnique,
+    ]) {
+      fn.mock.resetCalls();
+    }
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => ({ classId: "class-1" }));
+    mockConfigFindUnique.mock.mockImplementation(async () => ({
+      id: "config-1",
+      classId: "class-1",
+      region: "Charleston, WV",
+      localJobPriority: "prefer_local",
+    }));
+    mockJobListingFindMany.mock.mockImplementation(async () => [lookAlikeA, lookAlikeB]);
+    mockSavedJobFindMany.mock.mockImplementation(async () => []);
+    mockDiscoveryFindUnique.mock.mockImplementation(async () => null);
+    mockResumeFindUnique.mock.mockImplementation(async () => null);
+    mockLoadBrowseJobs.mock.mockImplementation(async () => [browseRow]);
+    mockHiddenFindMany.mock.mockImplementation(async () => []);
+    mockSystemConfigFindUnique.mock.mockImplementation(async () => null);
+  });
+
+  async function jobIds(): Promise<string[]> {
+    const body = await (await route.GET(jobsRequest())).json();
+    return body.jobs.map((job: { id: string }) => job.id);
+  }
+
+  it("shows one card for two look-alike openings when nothing is hidden", async () => {
+    assert.equal((await jobIds()).filter((id) => id.startsWith("look-")).length, 1);
+  });
+
+  it("hides the student's hidden vacancy and still shows the distinct look-alike requisition", async () => {
+    mockHiddenFindMany.mock.mockImplementation(async () => [{ vacancyKey: "v1:adzuna:adzuna:111" }]);
+
+    const ids = await jobIds();
+
+    assert.deepEqual(ids.filter((id) => id.startsWith("look-")), ["look-b"]);
+    const where = (mockHiddenFindMany.mock.calls[0].arguments[0] as { where: unknown }).where;
+    assert.deepEqual(where, { studentId: session.id, restoredAt: null });
+  });
+
+  it("hides a browse-pool vacancy too", async () => {
+    mockHiddenFindMany.mock.mockImplementation(async () => [{ vacancyKey: "v1:remotive:rem-1" }]);
+    assert.equal((await jobIds()).includes("browse-1"), false);
+  });
+
+  it("stops filtering when job_hide_enabled is off, without touching stored rows", async () => {
+    mockHiddenFindMany.mock.mockImplementation(async () => [{ vacancyKey: "v1:remotive:rem-1" }]);
+    mockSystemConfigFindUnique.mock.mockImplementation(async () => ({ value: "off" }));
+
+    assert.equal((await jobIds()).includes("browse-1"), true);
+    assert.equal(mockHiddenFindMany.mock.callCount(), 0);
+  });
+
+  it("shows a save on a reimported row through the vacancy key, and on a browse row", async () => {
+    mockSavedJobFindMany.mock.mockImplementation(async () => [
+      savedRow({ vacancyKey: "v1:adzuna:adzuna:111", status: "applied", notes: "Sent", jobListingId: null }),
+      savedRow({ vacancyKey: "v1:remotive:rem-1", jobBrowseListingId: "browse-1" }),
+    ]);
+    mockJobListingFindMany.mock.mockImplementation(async () => [lookAlikeA]);
+
+    const body = await (await route.GET(jobsRequest())).json();
+    const byId = new Map(body.jobs.map((job: { id: string }) => [job.id, job]));
+
+    assert.equal((byId.get("look-a") as { savedStatus: string }).savedStatus, "applied");
+    assert.equal((byId.get("look-a") as { savedNotes: string }).savedNotes, "Sent");
+    assert.equal((byId.get("browse-1") as { savedStatus: string }).savedStatus, "saved");
+    assert.equal(body.totalSaved, 2);
+  });
+
+  it("picks the most recent active class that has a job setup", async () => {
+    await route.GET(jobsRequest());
+
+    const args = mockEnrollmentFindFirst.mock.calls[0].arguments[0] as { where: unknown; orderBy: unknown };
+    assert.deepEqual(args.where, {
+      studentId: session.id,
+      status: "active",
+      class: { jobConfig: { isNot: null } },
+    });
+    assert.deepEqual(args.orderBy, { enrolledAt: "desc" });
+  });
+
+  it("gives browse-only students their saved status, saved count and hidden filter", async () => {
+    mockEnrollmentFindFirst.mock.mockImplementation(async () => null);
+    mockLoadBrowseJobs.mock.mockImplementation(async () => [
+      browseRow,
+      { ...browseRow, id: "browse-2", sourceId: "rem-2" },
+    ]);
+    mockHiddenFindMany.mock.mockImplementation(async () => [{ vacancyKey: "v1:remotive:rem-2" }]);
+    mockSavedJobFindMany.mock.mockImplementation(async () => [
+      savedRow({ vacancyKey: "v1:remotive:rem-1", jobBrowseListingId: "browse-1" }),
+    ]);
+
+    const body = await (await route.GET(jobsRequest())).json();
+
+    assert.deepEqual(body.jobs.map((job: { id: string }) => job.id), ["browse-1"]);
+    assert.equal(body.jobs[0].savedStatus, "saved");
+    assert.equal(body.totalSaved, 1);
+    assert.deepEqual(Object.keys(body).sort(), [...RESPONSE_KEYS].sort());
   });
 });

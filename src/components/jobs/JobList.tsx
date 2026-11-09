@@ -48,9 +48,11 @@ export interface ListJob {
 interface JobListProps {
   jobs: ListJob[];
   onSave: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
+  /** W4: "Not interested". Omitted while hiding is off. */
+  onHide?: (jobId: string) => Promise<void>;
 }
 
-export function JobList({ jobs, onSave }: JobListProps) {
+export function JobList({ jobs, onSave, onHide }: JobListProps) {
   // Adjust-during-render (same pattern as JobCard's draft-state reset):
   // a new `jobs` array means new data — from a filter change, a refetch
   // after a save, etc. — so pagination re-collapses to the first page
@@ -101,7 +103,7 @@ export function JobList({ jobs, onSave }: JobListProps) {
             tabIndex={isFirstRevealed ? -1 : undefined}
             data-first-revealed={isFirstRevealed ? "true" : undefined}
           >
-            <JobCard {...job} onSave={onSave} />
+            <JobCard {...job} onSave={onSave} onHide={onHide} />
           </div>
         );
       })}

@@ -7,6 +7,7 @@ import OpportunitiesHub from "@/components/career/OpportunitiesHub";
 import { JobFilters, type JobProximityFilter } from "@/components/jobs/JobFilters";
 import { BandedJobList } from "@/components/jobs/BandedJobList";
 import { JobRecommendations } from "@/components/jobs/JobRecommendations";
+import { HiddenJobsPanel, useHiddenJobs } from "@/components/jobs/HiddenJobsPanel";
 import type { JobTrackingUpdate } from "@/components/jobs/JobCard";
 import { describeSaveError, SaveJobError } from "@/lib/job-board/save-error";
 import AskSageLink from "@/components/sage/AskSageLink";
@@ -168,6 +169,29 @@ export default function CareerHub({
     setRefreshKey((key) => key + 1);
   }, []);
 
+  // W4: "Not interested" and Restore. Both throw on a failed response so the
+  // card or the hidden-jobs panel can show the failure; a success refetches
+  // the board and the hidden list.
+  const hidden = useHiddenJobs(refreshKey);
+  const postHiddenAction = useCallback(async (body: Record<string, string>) => {
+    const res = await fetch("/api/jobs/hidden", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`hidden job action failed with ${res.status}`);
+    setRefreshKey((key) => key + 1);
+  }, []);
+  const handleHideJob = useCallback(
+    (jobId: string) => postHiddenAction({ action: "hide", jobListingId: jobId }),
+    [postHiddenAction],
+  );
+  const handleRestoreJob = useCallback(
+    (hiddenJobId: string) => postHiddenAction({ action: "restore", hiddenJobId }),
+    [postHiddenAction],
+  );
+  const onHide = hidden.hideEnabled ? handleHideJob : undefined;
+
   const matchedCount =
     jobsData?.jobs.filter((job) => job.matchScore >= 50).length ?? 0;
   const hasPersonalizedMatches = jobsData?.hasPersonalization ?? jobsData?.hasDiscovery ?? false;
@@ -243,7 +267,7 @@ export default function CareerHub({
             )}
 
             {hasPersonalizedMatches && (
-              <JobRecommendations jobs={jobsData.jobs} onSave={handleSaveJob} />
+              <JobRecommendations jobs={jobsData.jobs} onSave={handleSaveJob} onHide={onHide} />
             )}
 
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -274,6 +298,8 @@ export default function CareerHub({
               />
             </div>
 
+            <HiddenJobsPanel state={hidden} onRestore={handleRestoreJob} />
+
             {jobsData.jobs.length === 0 ? (
               <div className="surface-section rounded-xl p-6 text-center text-sm text-[var(--ink-muted)]">
                 {proximity === "local"
@@ -283,7 +309,7 @@ export default function CareerHub({
                     : "No jobs available right now. Check back after your teacher's next refresh."}
               </div>
             ) : (
-              <BandedJobList jobs={jobsData.jobs} onSave={handleSaveJob} />
+              <BandedJobList jobs={jobsData.jobs} onSave={handleSaveJob} onHide={onHide} />
             )}
           </div>
         )}
