@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut, X } from "@phosphor-icons/react";
+import { Briefcase, MapPin, CurrencyDollar, BookmarkSimple, ArrowSquareOut, X, EyeSlash } from "@phosphor-icons/react";
 import type { JobMatchReason, JobWorkMode, SavedJobStatus } from "@/lib/job-board/types";
 import { formatJobWorkMode } from "@/lib/job-board/work-mode";
 import { JOB_SOURCE_OPTIONS } from "@/lib/job-board/source-options";
@@ -39,7 +39,12 @@ interface JobCardProps {
   source?: string | null;
   compact?: boolean;
   onSave?: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
+  /** W4: "Not interested". Absent when hiding is off (job_hide_enabled = off). */
+  onHide?: (jobId: string) => Promise<void>;
 }
+
+/** Plain-language copy when a "Not interested" tap fails. */
+export const HIDE_ERROR_MESSAGE = "We couldn't hide that job. Try again.";
 
 // Theme-aware badge pairs (light and dark values, 4.5:1 or better together).
 const SUCCESS_PILL = "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]";
@@ -85,6 +90,24 @@ export async function runSaveAndDescribeError(
     // thrown non-Error) falls back to the generic message rather than
     // leaking a raw error string onto the page.
     return err instanceof SaveJobError ? err.message : describeSaveError();
+  }
+}
+
+/**
+ * W4: the pure decision behind the "Not interested" error banner. Returns
+ * the message to show, or null when the hide worked.
+ */
+export async function runHideAndDescribeError(
+  onHide: JobCardProps["onHide"],
+  id: string,
+): Promise<string | null> {
+  if (!onHide) return null;
+  try {
+    await onHide(id);
+    return null;
+  } catch {
+    // The failure is shown to the student here; the route already logged it.
+    return HIDE_ERROR_MESSAGE;
   }
 }
 
@@ -162,6 +185,7 @@ export function JobCard({
   source,
   compact = false,
   onSave,
+  onHide,
 }: JobCardProps) {
   const primaryCluster = clusters[0];
   const visibleReasons = matchReasons.slice(0, 3);
@@ -181,6 +205,14 @@ export function JobCard({
     setPrevSavedNotes(savedNotes);
     setDraftStatus(savedStatus ?? "saved");
     setDraftNotes(savedNotes ?? "");
+  }
+
+  async function hideJob() {
+    setSaving(true);
+    setSaveError(null);
+    const message = await runHideAndDescribeError(onHide, id);
+    setSaveError(message);
+    setSaving(false);
   }
 
   async function persistTracking(update: JobTrackingUpdate) {
@@ -321,8 +353,9 @@ export function JobCard({
             </div>
           ) : null}
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
               onClick={() => void persistTracking({ status: "saved" })}
               disabled={saving}
               className={`flex min-h-11 items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
@@ -343,6 +376,18 @@ export function JobCard({
               <ArrowSquareOut size={14} />
               View
             </a>
+            {onHide ? (
+              <button
+                type="button"
+                onClick={() => void hideJob()}
+                disabled={saving}
+                aria-label={`Not interested in ${title}`}
+                className="flex min-h-11 items-center gap-1 rounded-lg bg-[var(--surface-raised)] px-3 py-1.5 text-xs text-[var(--ink-muted)] transition-colors hover:text-[var(--ink-strong)] disabled:opacity-50"
+              >
+                <EyeSlash size={14} aria-hidden="true" />
+                Not interested
+              </button>
+            ) : null}
             {savedAppliedAt ? (
               <span className="text-xs text-[var(--ink-muted)]">
                 Applied {new Date(savedAppliedAt).toLocaleDateString()}
