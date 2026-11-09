@@ -2613,6 +2613,16 @@ if (!SHOULD_RUN) {
     describe("policy-bearing table coverage (D6)", () => {
       /** Deterministic, per-run, greppable id for a fixture row. */
       const d6 = (name: string) => `d6-${fixtures.suffix}-${name}`;
+      const HIDDEN_JOB_ROW = (studentId: string) => ({
+        studentId,
+        vacancyKey: d6("hidden-key-write"),
+        snapshotTitle: "D6 hidden",
+        snapshotCompany: "D6 Co",
+        snapshotLocation: "Charleston, WV",
+        snapshotUrl: "https://example.com/d6",
+        snapshotSource: "d6",
+        snapshotSourceId: "write",
+      });
       /** Everything this section creates lives under this prefix. */
       const d6Prefix = () => `d6-${fixtures.suffix}-`;
 
@@ -3091,6 +3101,33 @@ if (!SHOULD_RUN) {
           ],
         });
 
+        await db.studentHiddenJob.createMany({
+          data: [
+            {
+              id: d6("hidden-a"),
+              studentId: fixtures.studentA,
+              vacancyKey: d6("hidden-key-a"),
+              snapshotTitle: "D6 hidden",
+              snapshotCompany: "D6 Co",
+              snapshotLocation: "Charleston, WV",
+              snapshotUrl: "https://example.com/d6",
+              snapshotSource: "d6",
+              snapshotSourceId: "a",
+            },
+            {
+              id: d6("hidden-c"),
+              studentId: fixtures.studentC,
+              vacancyKey: d6("hidden-key-c"),
+              snapshotTitle: "D6 hidden",
+              snapshotCompany: "D6 Co",
+              snapshotLocation: "Charleston, WV",
+              snapshotUrl: "https://example.com/d6",
+              snapshotSource: "d6",
+              snapshotSourceId: "c",
+            },
+          ],
+        });
+
         await db.careerDiscovery.createMany({
           data: [
             { id: d6("disc-a"), studentId: fixtures.studentA },
@@ -3500,6 +3537,7 @@ if (!SHOULD_RUN) {
         await db.formAssignment.deleteMany({ where: { id: p } });
         await db.formTemplate.deleteMany({ where: { id: p } });
         await db.studentSavedJob.deleteMany({ where: { id: p } });
+        await db.studentHiddenJob.deleteMany({ where: { id: p } });
         await db.jobScrapeSourceResult.deleteMany({ where: { id: p } });
         await db.jobScrapeRun.deleteMany({ where: { id: p } });
         await db.jobListing.deleteMany({ where: { id: p } });
@@ -3835,6 +3873,42 @@ if (!SHOULD_RUN) {
                       jobListingId: ids.listingAlpha,
                     },
                   ],
+                }),
+              ),
+            /row-level security/i,
+          );
+        });
+
+        it("StudentHiddenJob: a student reads their own hidden job and not another student's", async () => {
+          const rows = await asRole("student", fixtures.studentA, (tx) =>
+            tx.studentHiddenJob.findMany({
+              where: { id: { in: [d6("hidden-a"), d6("hidden-c")] } },
+              select: { id: true },
+            }),
+          );
+          assert.deepEqual(rows.map((r) => r.id), [d6("hidden-a")]);
+        });
+
+        // createMany, not create: a create's RETURNING is filtered by USING and would
+        // look like a WITH CHECK proof when it is not.
+        it("StudentHiddenJob: a student cannot write a hidden job onto another student", async () => {
+          await assert.rejects(
+            () =>
+              asRole("student", fixtures.studentA, (tx) =>
+                tx.studentHiddenJob.createMany({
+                  data: [HIDDEN_JOB_ROW(fixtures.studentB)],
+                }),
+              ),
+            /row-level security/i,
+          );
+        });
+
+        it("StudentHiddenJob: a teacher cannot write a hidden job (the teacher policy is SELECT only)", async () => {
+          await assert.rejects(
+            () =>
+              asRole("teacher", fixtures.teacher, (tx) =>
+                tx.studentHiddenJob.createMany({
+                  data: [HIDDEN_JOB_ROW(fixtures.studentA)],
                 }),
               ),
             /row-level security/i,

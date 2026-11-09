@@ -28,9 +28,11 @@ interface RecommendedJob {
 interface JobRecommendationsProps {
   jobs: RecommendedJob[];
   onSave: (jobId: string, updates?: JobTrackingUpdate) => void | Promise<void>;
+  /** W4: "Not interested". Omitted while hiding is off. */
+  onHide?: (jobId: string) => Promise<void>;
 }
 
-export function JobRecommendations({ jobs, onSave }: JobRecommendationsProps) {
+export function JobRecommendations({ jobs, onSave, onHide }: JobRecommendationsProps) {
   // Only show jobs with score >= 50
   const recommended = jobs.filter((j) => j.matchScore >= 50);
 
@@ -44,7 +46,7 @@ export function JobRecommendations({ jobs, onSave }: JobRecommendationsProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {recommended.slice(0, 6).map((job) => (
           <div key={job.id} className="border-l-4 border-[var(--primary)] rounded-xl">
-            <JobCard {...job} onSave={onSave} />
+            <JobCard {...job} onSave={onSave} onHide={onHide} />
           </div>
         ))}
       </div>

@@ -65,12 +65,20 @@ mock.module("@/lib/rate-limit", {
   },
 });
 
+// Mirrors the real `cached()`: a fetcher that throws propagates and stores nothing.
+const memo = new Map<string, unknown>();
 mock.module("@/lib/cache", {
   namedExports: {
-    cached: async <T>(_key: string, _ttl: number, fetcher: () => Promise<T>): Promise<T> => fetcher(),
+    cached: async <T>(key: string, _ttl: number, fetcher: () => Promise<T>): Promise<T> => {
+      if (memo.has(key)) return memo.get(key) as T;
+      const value = await fetcher();
+      memo.set(key, value);
+      return value;
+    },
   },
 });
 
+const mockUpdate = mock.fn(async () => ({})) as any;
 const mockFindUnique = mock.fn(async () => ({
   credlyUsername: null,
   credlyBadgesCache: null,
@@ -84,12 +92,13 @@ mock.module("@/lib/db", {
         get findUnique() {
           return mockFindUnique;
         },
-        update: mock.fn(async () => ({})) as any,
+        update: mockUpdate,
       },
     },
   },
 });
 
+const realFetch = globalThis.fetch;
 let route: Awaited<typeof import("./route")>;
 
 before(async () => {
@@ -100,6 +109,9 @@ beforeEach(() => {
   rateLimitCalls.length = 0;
   windowCounts = new Map();
   mockFindUnique.mock.resetCalls();
+  mockUpdate.mock.resetCalls();
+  memo.clear();
+  globalThis.fetch = realFetch;
 });
 
 // The route handler takes no request argument — it reads only the session.
@@ -143,5 +155,136 @@ describe("GET /api/credly/badges rate limit", () => {
       0,
       "a refused request must not run the student lookup",
     );
+  });
+});
+
+const STORED = [
+  { id: "b1", name: "IC3", description: "", imageUrl: "", issuedAt: "2026-01-01", issuerName: "Certiport", badgeUrl: "https://www.credly.com/badges/b1" },
+];
+
+function student(overrides: Record<string, unknown> = {}) {
+  mockFindUnique.mock.mockImplementation(async () => ({
+    credlyUsername: "alice",
+    credlyBadgesCache: null,
+    credlyBadgesCachedAt: null,
+    ...overrides,
+  }));
+}
+
+function storedFor(username: string, badges: unknown[] = STORED): string {
+  return JSON.stringify({ username, badges });
+}
+
+function stubFetch(impl: () => Promise<Response>) {
+  const fn = mock.fn(impl);
+  globalThis.fetch = fn as unknown as typeof fetch;
+  return fn;
+}
+
+const okJson = (data: unknown) => async () => Response.json(data);
+const credlyBody = { data: [{ id: "b9", badge_template: { name: "MOS" } }] };
+
+describe("GET /api/credly/badges upstream failures", () => {
+  const failures: [string, () => Promise<Response>][] = [
+    ["a non-OK status", async () => new Response("down", { status: 503 })],
+    ["a network error", async () => { throw new TypeError("fetch failed"); }],
+    ["an unparseable body", async () => new Response("<html>oops", { status: 200 })],
+    ["a body with no data array", async () => Response.json({ nope: true })],
+  ];
+
+  for (const [label, impl] of failures) {
+    it(`reports unavailable, not an empty list, on ${label}`, async () => {
+      student();
+      stubFetch(impl);
+      const res = await get();
+      const body = (await res.json()) as { badges: unknown[]; unavailable?: boolean; error?: string };
+      assert.equal(res.status, 502);
+      assert.equal(body.unavailable, true);
+      assert.ok(body.error && body.error.length > 0);
+      assert.deepEqual(body.badges, []);
+    });
+  }
+
+  it("does not cache a failure as an empty result", async () => {
+    student();
+    stubFetch(async () => new Response("down", { status: 503 }));
+    await get();
+    assert.equal(memo.size, 0, "a failed lookup must not be stored");
+
+    stubFetch(okJson(credlyBody));
+    const res = await get();
+    const body = (await res.json()) as { badges: { id: string }[] };
+    assert.equal(res.status, 200);
+    assert.equal(body.badges[0].id, "b9");
+  });
+
+  it("serves last-good badges for this username when the lookup fails", async () => {
+    student({ credlyBadgesCache: storedFor("alice"), credlyBadgesCachedAt: new Date(0) });
+    stubFetch(async () => new Response("down", { status: 503 }));
+    const res = await get();
+    const body = (await res.json()) as { badges: unknown[]; stale?: boolean };
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.badges, STORED);
+    assert.equal(body.stale, true);
+  });
+
+  it("still returns an empty list when Credly answers OK with no badges", async () => {
+    student();
+    stubFetch(okJson({ data: [] }));
+    const res = await get();
+    const body = (await res.json()) as { badges: unknown[]; unavailable?: boolean };
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.badges, []);
+    assert.notEqual(body.unavailable, true);
+  });
+});
+
+describe("GET /api/credly/badges stored badges are bound to the username", () => {
+  it("serves fresh stored badges saved for the same username without fetching", async () => {
+    student({ credlyBadgesCache: storedFor("Alice"), credlyBadgesCachedAt: new Date() });
+    const fetchMock = stubFetch(okJson(credlyBody));
+    const res = await get();
+    const body = (await res.json()) as { badges: unknown[]; cached?: boolean };
+    assert.deepEqual(body.badges, STORED);
+    assert.equal(body.cached, true);
+    assert.equal(fetchMock.mock.callCount(), 0);
+  });
+
+  it("never serves badges stored for a different username", async () => {
+    student({ credlyBadgesCache: storedFor("bob"), credlyBadgesCachedAt: new Date() });
+    const fetchMock = stubFetch(okJson(credlyBody));
+    const res = await get();
+    const body = (await res.json()) as { badges: { id: string }[] };
+    assert.equal(fetchMock.mock.callCount(), 1);
+    assert.equal(body.badges[0].id, "b9");
+  });
+
+  it("does not use another account's badges as the outage fallback", async () => {
+    student({ credlyBadgesCache: storedFor("bob"), credlyBadgesCachedAt: new Date() });
+    stubFetch(async () => new Response("down", { status: 503 }));
+    const res = await get();
+    const body = (await res.json()) as { badges: unknown[]; unavailable?: boolean };
+    assert.equal(res.status, 502);
+    assert.equal(body.unavailable, true);
+    assert.deepEqual(body.badges, []);
+  });
+
+  it("ignores an old unbound cache with no username", async () => {
+    student({ credlyBadgesCache: JSON.stringify(STORED), credlyBadgesCachedAt: new Date() });
+    const fetchMock = stubFetch(okJson(credlyBody));
+    await get();
+    assert.equal(fetchMock.mock.callCount(), 1);
+  });
+
+  it("stores fetched badges together with the username", async () => {
+    student();
+    stubFetch(okJson(credlyBody));
+    await get();
+    await new Promise((r) => setImmediate(r));
+    assert.equal(mockUpdate.mock.callCount(), 1);
+    const data = (mockUpdate.mock.calls[0].arguments[0] as { data: { credlyBadgesCache: string } }).data;
+    const stored = JSON.parse(data.credlyBadgesCache) as { username: string; badges: unknown[] };
+    assert.equal(stored.username, "alice");
+    assert.equal(stored.badges.length, 1);
   });
 });

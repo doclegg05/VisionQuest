@@ -87,6 +87,7 @@ model Student {
   notificationPreferences NotificationPreference[]
   coachingArcs            CoachingArc[]
   savedJobs               StudentSavedJob[]
+  hiddenJobs              StudentHiddenJob[]
   llmCallLogs             LlmCallLog[]
   createdPathways         Pathway[]                @relation("PathwayCreator")
   createdFormTemplates    FormTemplate[]           @relation("CreatedFormTemplates")
@@ -2286,6 +2287,8 @@ model JobBrowseListing {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  savedByStudents StudentSavedJob[]
+
   @@unique([source, sourceId])
   @@index([status, postedAt])
   @@index([status, workMode])
@@ -2293,20 +2296,68 @@ model JobBrowseListing {
 }
 
 model StudentSavedJob {
-  id           String    @id @default(cuid())
-  studentId    String
-  jobListingId String
-  status       String    @default("saved")
-  notes        String?   @db.Text
-  savedAt      DateTime  @default(now())
-  appliedAt    DateTime?
-  updatedAt    DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  studentId          String
+  // W4 (2026-11-09): nullable, and SetNull below. Deleting a listing clears
+  // the link and keeps the save, its notes and its dates. The snapshot
+  // columns keep the posting readable after the link is gone.
+  jobListingId       String?
+  jobBrowseListingId String?
+  // v1:<source>:<sourceId> from src/lib/job-board/vacancy-identity.ts. Null on
+  // legacy rows until scripts/job-preferences-backfill.mjs keys them.
+  vacancyKey         String?
+  // "class" | "browse": where the save was made. Survives the link clearing.
+  listingKind        String?
+  status             String    @default("saved")
+  notes              String?   @db.Text
+  savedAt            DateTime  @default(now())
+  appliedAt          DateTime?
+  updatedAt          DateTime  @updatedAt
+  snapshotTitle      String?
+  snapshotCompany    String?
+  snapshotLocation   String?
+  snapshotUrl        String?
+  snapshotSource     String?
+  snapshotSourceId   String?
+  snapshotPostedAt   DateTime?
+  snapshotExpiresAt  DateTime?
+  snapshotAt         DateTime?
 
-  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  jobListing JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  student          Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  jobListing       JobListing?       @relation(fields: [jobListingId], references: [id], onDelete: SetNull)
+  jobBrowseListing JobBrowseListing? @relation(fields: [jobBrowseListingId], references: [id], onDelete: SetNull)
 
   @@unique([studentId, jobListingId])
+  @@unique([studentId, vacancyKey])
   @@index([jobListingId])
+  @@index([jobBrowseListingId])
+  @@schema("visionquest")
+}
+
+/// W4 (2026-11-09): a student's "Not interested" choice for one vacancy.
+/// Matched by vacancyKey only, with no listing foreign key, so listing
+/// deletion, expiry and reimport never touch it. Restore sets restoredAt and
+/// keeps the row as history; hiding again reopens it.
+model StudentHiddenJob {
+  id                String    @id @default(cuid())
+  studentId         String
+  vacancyKey        String
+  snapshotTitle     String
+  snapshotCompany   String
+  snapshotLocation  String
+  snapshotUrl       String
+  snapshotSource    String
+  snapshotSourceId  String
+  snapshotPostedAt  DateTime?
+  snapshotExpiresAt DateTime?
+  hiddenAt          DateTime  @default(now())
+  restoredAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, vacancyKey])
   @@schema("visionquest")
 }
 

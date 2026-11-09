@@ -1,5 +1,9 @@
 # What better means for VisionQuest
 
+> **Standalone task list retired on 2026-11-09.** Approved/executed product reference retained; remaining evidence checks are W1. This notice retires the build queue, not the charter authority.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 **Status: DRAFT for owner review.** Successor to the lapsed March 23 to June 21 charter window in `docs/PRODUCT_GUIDE.md`, which says plainly that authoring the next window is owner work. This document is that draft, built from Britt's definition of better (2026-08-19) plus a 15-agent verified review of the codebase at commit `2c52e3a`.
 
 **Method:** 8 parallel dimension reviewers (student workflow, instructor workflow, Sage accuracy, Sage speed/reliability, living-agent memory, pathways/CareerOneStop, measurement instruments, ease of use), 6 adversarial verifications of the highest-severity claims, 1 completeness critic. 61 gaps found; every claim below that carries a file citation was checked in code, and the six most load-bearing claims were independently attacked before being accepted. Where a verifier corrected a reviewer, the corrected version is what appears here.

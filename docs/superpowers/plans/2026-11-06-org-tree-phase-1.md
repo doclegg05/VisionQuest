@@ -1,5 +1,9 @@
 # Organization tree, Phase 1, implementation plan
 
+> **Standalone task list retired on 2026-11-09.** Code delivered in #290; release acceptance W0 and successor planning W8 remain.
+> Follow the [consolidated remaining-work plan](../../plans/2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace VisionQuest's program-wide staff view with an organization tree. Instructors see only their own classes, regional coordinators see their region, and a new program coordinator sees the state. Staff join the tree through invites.

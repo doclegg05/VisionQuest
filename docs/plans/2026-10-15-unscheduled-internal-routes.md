@@ -1,5 +1,9 @@
 # Four unscheduled internal routes: schedule, delete, or keep manual
 
+> **Standalone task list retired on 2026-11-09.** Mostly delivered; only browse-pool decision D3/W7 and fresh operational verification W1 remain.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 Review finding F6 (`docs/audits/2026-09-01-full-review.md`) named six
 bearer-authenticated routes that no pg_cron job calls. PR #240 scheduled two
 of them (`evidence-gap-detection`, `goal-stale-detection`). This report

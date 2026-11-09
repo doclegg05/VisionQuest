@@ -1,5 +1,9 @@
 # Research: the NLx → MACC job-search handout and VisionQuest's mission
 
+> **Standalone task list retired on 2026-11-09.** Historical research retained; current jobs work and external questions are W4/W7/D5.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 **Date:** 2026-09-04
 **Status:** Research memo — awaiting owner decisions (D1–D3 at the end)
 **Source reviewed:** "National Labor Exchange" instruction sheet shared by Sandra Adkins (WVDE, wvk12 SharePoint, shared to britt.legg@wvesc.org). The SharePoint link needs a WV K-12 sign-in; the review was done from two full-page screenshots supplied by Britt.

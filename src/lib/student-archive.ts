@@ -552,7 +552,23 @@ export async function generateStudentArchive(
           notes: true,
           savedAt: true,
           appliedAt: true,
+          listingKind: true,
+          snapshotTitle: true,
+          snapshotCompany: true,
+          snapshotLocation: true,
+          snapshotUrl: true,
           jobListing: { select: { title: true, company: true } },
+          jobBrowseListing: { select: { title: true, company: true } },
+        },
+      },
+      hiddenJobs: {
+        orderBy: { hiddenAt: "asc" },
+        select: {
+          snapshotTitle: true,
+          snapshotCompany: true,
+          snapshotLocation: true,
+          hiddenAt: true,
+          restoredAt: true,
         },
       },
       wagers: {
@@ -1078,6 +1094,7 @@ export async function generateStudentArchive(
   // 14. Job search activity.
   addJsonSection("applications.json", "application", student.applications);
   addJsonSection("saved-jobs.json", "saved_job", student.savedJobs);
+  addJsonSection("hidden-jobs.json", "hidden_job", student.hiddenJobs);
   addJsonSection("wagers.json", "wager", student.wagers);
 
   // 15. Advising — tasks, appointments, event sign-ups, orientation checklist.

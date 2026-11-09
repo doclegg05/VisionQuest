@@ -1,5 +1,7 @@
 # VisionQuest Product Guide
 
+Current delivery backlog: [consolidated remaining-work plan](./plans/2026-11-09-consolidated-remaining-work.md) (2026-11-09). It reconciles historical plan status; this guide and PRODUCT_DECISIONS.md retain product/scope authority.
+
 Status: Window lapsed — the successor outcome frame is [docs/plans/2026-08-19-what-better-means-charter.md](./plans/2026-08-19-what-better-means-charter.md) ("What better means for VisionQuest"), owner-approved for execution 2026-08-20 with Phases 1–5 shipped (PR #158). It stays formally DRAFT — a separate, dated 90-day window with its own outcome percentages was never authored on top of it — but it is the document agents should read for current outcomes, not the lapsed table below.  
 Effective window: March 23, 2026 through June 21, 2026 (ended). See "90-Day Outcomes" below for a per-outcome status against that lapsed window, and the charter linked above for what "better" means now.  
 Audience: AI agents, coding agents, and development contributors

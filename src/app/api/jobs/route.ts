@@ -15,6 +15,13 @@ import { parseJobFilters, buildJobFilterWhere } from "@/lib/job-board/job-filter
 import { isJobWorkMode } from "@/lib/job-board/work-mode";
 import { parseStoredResumeData } from "@/lib/resume";
 import { loadBrowseJobs } from "@/lib/job-board/browse-jobs";
+import {
+  loadHiddenVacancyKeys,
+  loadSavedJobsForBoard,
+  resolveBoardConfig,
+} from "@/lib/job-board/job-preferences";
+import { buildSavedLookup, savedMetaFor, toInteractionInputs, type SavedLookup } from "@/lib/job-board/saved-job-lookup";
+import { excludeHiddenVacancies } from "@/lib/job-board/vacancy-identity";
 
 const VALID_PROXIMITY_FILTERS = new Set(["local", "remote", "all"]);
 
@@ -24,6 +31,12 @@ const VALID_PROXIMITY_FILTERS = new Set(["local", "remote", "all"]);
  * Returns active job listings for the student's enrolled class,
  * with recommendation scores if the student has CareerDiscovery or resume skill data.
  * When no enrollment or class config exists, falls back to the program-wide browse pool.
+ *
+ * W4 (2026-11-09): the board class is the most recent active enrollment with
+ * a job setup (resolveBoardConfig). Vacancies the student marked "Not
+ * interested" are left out of both pools before display grouping, and saved
+ * status attaches by vacancy key, so it shows on reimported rows and on
+ * browse rows too. Queries live in src/lib/job-board/job-preferences.ts.
  *
  * Query params:
  *   cluster   - filter by cluster ID
@@ -46,12 +59,10 @@ export const GET = withAuth(async (session: Session, req: Request) => {
    * Maps a JobBrowseListing row to the same response shape the UI consumes
    * for class-scoped JobListing rows. Browse jobs carry no personalization.
    */
-  function mapBrowseRow(row: Awaited<ReturnType<typeof loadBrowseJobs>>[number]) {
+  function mapBrowseRow(row: Awaited<ReturnType<typeof loadBrowseJobs>>[number], saved: SavedLookup) {
     return {
       ...row,
-      savedStatus: null,
-      savedNotes: null,
-      savedAppliedAt: null,
+      ...savedMetaFor(saved, row),
       matchScore: 0,
       matchLabel: null,
       clusterOverlap: [] as string[],
@@ -69,13 +80,15 @@ export const GET = withAuth(async (session: Session, req: Request) => {
    * Serve the browse pool so counts are always numeric and jobs still show.
    */
   async function browseOnlyResponse() {
-    const browseRows = await loadBrowseJobs({
-      proximity: proximityFilter,
-      sort,
-      searchParams: url.searchParams,
-    });
+    const [browseRows, hiddenKeys, savedJobs] = await Promise.all([
+      loadBrowseJobs({ proximity: proximityFilter, sort, searchParams: url.searchParams }),
+      loadHiddenVacancyKeys(session.id),
+      loadSavedJobsForBoard(session.id),
+    ]);
+    const saved = buildSavedLookup(savedJobs);
+    const visibleRows = excludeHiddenVacancies(browseRows, hiddenKeys);
     // Browse rows carry no recommendation and no discovery context → band: null.
-    const jobs = annotateJobsWithBands(browseRows.map(mapBrowseRow), [], null);
+    const jobs = annotateJobsWithBands(visibleRows.map((row) => mapBrowseRow(row, saved)), [], null);
     return NextResponse.json({
       jobs,
       hasDiscovery: false,
@@ -85,28 +98,15 @@ export const GET = withAuth(async (session: Session, req: Request) => {
       totalLocal: 0,
       totalRemote: jobs.length,
       proximity: proximityFilter,
-      totalSaved: 0,
+      totalSaved: savedJobs.length,
     });
   }
 
-  // Find student's enrolled class
-  const enrollment = await prisma.studentClassEnrollment.findFirst({
-    where: { studentId: session.id, status: "active" },
-    select: { classId: true },
-  });
-
-  if (!enrollment) {
-    return browseOnlyResponse();
-  }
-
-  // Get class config
-  const config = await prisma.jobClassConfig.findUnique({
-    where: { classId: enrollment.classId },
-  });
-
+  const config = await resolveBoardConfig(session.id);
   if (!config) {
     return browseOnlyResponse();
   }
+  const hiddenKeys = await loadHiddenVacancyKeys(session.id);
 
   const priority = (config.localJobPriority ?? "prefer_local") as LocalJobPriority;
 
@@ -136,7 +136,9 @@ export const GET = withAuth(async (session: Session, req: Request) => {
       : { createdAt: "desc" },
     take: 500,
   });
-  const dedupedJobs = dedupeJobsForDisplay(activeJobs);
+  // Hidden vacancies go first, so a hidden opening never stands in for a
+  // visible look-alike in display grouping.
+  const dedupedJobs = dedupeJobsForDisplay(excludeHiddenVacancies(activeJobs, hiddenKeys));
 
   // Classify proximity for every deduped job so the UI can show accurate counts
   // on the Local/Remote toggle even when one section is hidden.
@@ -161,22 +163,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     });
 
   const [savedJobs, discovery, resumeRecord] = await Promise.all([
-    prisma.studentSavedJob.findMany({
-      where: { studentId: session.id },
-      select: {
-        jobListingId: true,
-        status: true,
-        notes: true,
-        appliedAt: true,
-        jobListing: {
-          select: {
-            clusters: true,
-            company: true,
-            source: true,
-          },
-        },
-      },
-    }),
+    loadSavedJobsForBoard(session.id),
     prisma.careerDiscovery.findUnique({
       where: { studentId: session.id },
       select: { topClusters: true, hollandCode: true, transferableSkills: true },
@@ -186,7 +173,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
       select: { data: true },
     }),
   ]);
-  const savedMap = new Map(savedJobs.map((s) => [s.jobListingId, s]));
+  const saved = buildSavedLookup(savedJobs);
 
   const resume = resumeRecord ? parseStoredResumeData(resumeRecord.data) : null;
   const studentProfile = buildStudentJobProfile({
@@ -195,7 +182,7 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     resumeExperienceTitles: resume?.experience.map((item) => item.title),
     discoverySkills: parseTransferableSkillNames(discovery?.transferableSkills),
   });
-  const interactionProfile = buildJobInteractionProfile(savedJobs);
+  const interactionProfile = buildJobInteractionProfile(toInteractionInputs(savedJobs));
   const hasInteractionSignals =
     interactionProfile.preferredClusters.length > 0 ||
     interactionProfile.avoidedClusters.length > 0 ||
@@ -209,12 +196,9 @@ export const GET = withAuth(async (session: Session, req: Request) => {
   // Build response with saved status merged in (class jobs only)
   const classJobsWithMeta = classJobs.map((job) => {
     const rec = recommendations.find((r) => r.jobListingId === job.id);
-    const saved = savedMap.get(job.id);
     return {
       ...job,
-      savedStatus: saved?.status ?? null,
-      savedNotes: saved?.notes ?? null,
-      savedAppliedAt: saved?.appliedAt?.toISOString() ?? null,
+      ...savedMetaFor(saved, job),
       matchScore: rec?.score ?? 0,
       matchLabel: rec?.matchLabel ?? null,
       clusterOverlap: rec?.clusterOverlap ?? [],
@@ -248,10 +232,10 @@ export const GET = withAuth(async (session: Session, req: Request) => {
     searchParams: url.searchParams,
   });
 
-  const uniqueBrowseRows = browseRows.filter(
+  const uniqueBrowseRows = excludeHiddenVacancies(browseRows, hiddenKeys).filter(
     (row) => !classJobKeys.has(`${row.source}:${row.sourceId}`),
   );
-  const browseMapped = proximityFilter === "local" ? [] : uniqueBrowseRows.map(mapBrowseRow);
+  const browseMapped = proximityFilter === "local" ? [] : uniqueBrowseRows.map((row) => mapBrowseRow(row, saved));
   const browseRemoteCount = uniqueBrowseRows.length;
 
   // Combine: class jobs first (already ranked/sorted), then browse jobs appended.
