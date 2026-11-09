@@ -44,7 +44,7 @@ export function RegionDrilldown({ regionId }: { regionId: string }) {
   return (
     <section className="surface-section p-5">
       <header className="mb-4">
-        <h2 className="font-display text-xl text-[var(--ink-strong)]">Instructors and classes</h2>
+        <h2 className="font-display text-xl text-[var(--ink-strong)]">Instructors and Classes</h2>
         <p className="mt-1 text-xs text-[var(--ink-muted)]">
           Pick a class to see its students. You can read this list. You cannot change it.
         </p>

@@ -13,7 +13,7 @@ export default function MemoryPage() {
       />
 
       <div className="surface-section mb-6 p-6">
-        <h2 className="page-eyebrow text-[var(--ink-muted)]">Where these notes come from</h2>
+        <h2 className="page-eyebrow text-[var(--ink-muted)]">Where These Notes Come From</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
           Sage writes a short note after some of your chats. This helps Sage remember your goals
           and what you are working on, so it does not have to ask you the same question twice.

@@ -97,7 +97,7 @@ function VerifyContent() {
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft text-danger">
           <Warning size={32} weight="bold" />
         </div>
-        <h2 className="mt-4 text-xl font-bold text-ink-strong">We could not verify this document</h2>
+        <h2 className="mt-4 text-xl font-bold text-ink-strong">We Could Not Verify This Document</h2>
         <p className="mt-2 text-sm text-ink-muted">
           {error || "This document could not be matched to a SPOKES record."}
         </p>

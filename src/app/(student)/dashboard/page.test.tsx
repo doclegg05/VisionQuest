@@ -114,7 +114,7 @@ describe("DashboardPage intake signature banner", () => {
     intakeSubmissionCount = 0;
     const html = renderToString(await DashboardPage());
 
-    assert.match(html, /Sign your student profile form/);
+    assert.match(html, /Sign Your Student Profile Form/);
     assert.match(html, /Your class hours only count once your signed form is on file\./);
   });
 
@@ -133,7 +133,7 @@ describe("DashboardPage intake signature banner", () => {
     intakeSubmissionCount = 1;
     try {
       const html = renderToString(await DashboardPage());
-      assert.doesNotMatch(html, /Sign your student profile form/);
+      assert.doesNotMatch(html, /Sign Your Student Profile Form/);
     } finally {
       intakeSubmissionCount = 0;
     }

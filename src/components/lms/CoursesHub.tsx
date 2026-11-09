@@ -133,7 +133,7 @@ export default function CoursesHub() {
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
           Learning setup
         </p>
-        <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No platforms yet</h3>
+        <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No Platforms Yet</h3>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
           No learning platforms available yet.
         </p>

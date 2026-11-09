@@ -454,7 +454,7 @@ export default function ClassRosterManager() {
         <div className="surface-section space-y-4 p-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Admin</p>
-            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Create a class</h2>
+            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Create a Class</h2>
             <p className="mt-2 text-sm text-[var(--ink-muted)]">
               Classes organize students and instructors. Create student accounts from the class roster below.
             </p>
@@ -551,7 +551,7 @@ export default function ClassRosterManager() {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
               {adminMode ? "Admin settings" : "Teacher roster"}
             </p>
-            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Class roster</h2>
+            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Class Roster</h2>
           </div>
           <label className="min-w-[18rem]">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
@@ -783,7 +783,7 @@ export default function ClassRosterManager() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Roster</p>
-                  <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Students in this class</h3>
+                  <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Students in This Class</h3>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button

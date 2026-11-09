@@ -229,7 +229,7 @@ export default function StaffMfaPanel() {
           <div>
             <p className="page-eyebrow text-[var(--ink-muted)]">Account security</p>
             <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
-              Multi-factor authentication
+              Multi-Factor Authentication
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
               Staff accounts can require an authenticator app at sign-in. If your phone is unavailable, use a backup code instead. Store your codes somewhere safe.
@@ -417,7 +417,7 @@ export default function StaffMfaPanel() {
         <div className="rounded-3xl border border-[rgba(173,136,6,0.35)] bg-[rgba(173,136,6,0.12)] p-5">
           <p className="page-eyebrow text-[var(--ink-muted)]">Save now</p>
           <h3 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
-            One-time backup codes
+            One-Time Backup Codes
           </h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
             These codes are shown once. Copy or print them before you leave this screen. Each code works a single time.

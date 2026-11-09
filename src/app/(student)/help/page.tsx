@@ -27,7 +27,7 @@ export default function HelpPage() {
             <ArrowClockwise size={20} weight="bold" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-xl text-[var(--ink-strong)]">Something won&apos;t load</h2>
+            <h2 className="font-display text-xl text-[var(--ink-strong)]">Something Won&apos;t Load</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               Refresh the page first. If it still will not load, tell your teacher.
             </p>
@@ -44,7 +44,7 @@ export default function HelpPage() {
             <CalendarDots size={20} weight="bold" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-xl text-[var(--ink-strong)]">Talk to your teacher or coach</h2>
+            <h2 className="font-display text-xl text-[var(--ink-strong)]">Talk to Your Teacher or Coach</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               You can ask your teacher in class. You can also book a time on the Advising page.
             </p>
@@ -68,7 +68,7 @@ export default function HelpPage() {
             <ChatCircle size={20} weight="bold" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-xl text-[var(--ink-strong)]">What Sage can help with</h2>
+            <h2 className="font-display text-xl text-[var(--ink-strong)]">What Sage Can Help With</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               Sage can help with goals, forms, and certificates. Sage can also help you plan next steps.
             </p>

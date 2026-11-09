@@ -19,7 +19,7 @@ export default function GlobalError({
       className="flex min-h-screen flex-col items-center justify-center px-4 text-center"
     >
       <h1 className="font-display text-4xl text-[var(--ink-strong)]">
-        Something went wrong
+        Something Went Wrong
       </h1>
       <p className="mt-3 text-lg text-[var(--ink-muted)]">
         An unexpected error occurred. Please try again.

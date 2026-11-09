@@ -179,7 +179,7 @@ export function AddLeadForm({ employers, classes, certifications }: AddLeadFormP
   return (
     <section aria-labelledby="add-lead-heading" className="theme-card rounded-xl p-5">
       <h2 id="add-lead-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-        Add a lead
+        Add a Lead
       </h2>
 
       <form ref={formRef} onSubmit={handleSubmit} className="mt-4 space-y-4">

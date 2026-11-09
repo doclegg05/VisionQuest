@@ -289,7 +289,7 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
             Goal counts
           </p>
           <h3 className="text-lg font-semibold text-[var(--ink-strong)] mb-4">
-            Progress toward plans
+            Progress Toward Plans
           </h3>
           <div className="space-y-3">
             <ProgressRow label="Total goals" value={summary.totalGoals} max={summary.totalGoals} />
@@ -347,7 +347,7 @@ export default function MonthlyKpiDashboard({ classId }: MonthlyKpiDashboardProp
               Class requirements
             </p>
             <h3 className="text-lg font-semibold text-[var(--ink-strong)] mb-4">
-              Compliance status
+              Compliance Status
             </h3>
             <div className="space-y-3">
               <ProgressRow

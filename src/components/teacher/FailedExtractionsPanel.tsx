@@ -171,7 +171,7 @@ export function FailedExtractionsPanel() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
           Sage operations
         </p>
-        <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Failed extractions</h2>
+        <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Failed Extractions</h2>
         {!loading && !error && rows.length > 0 && (
           <p className="mt-1 text-xs text-[var(--ink-muted)]">
             {rows.length} open failure{rows.length !== 1 ? "s" : ""} awaiting review

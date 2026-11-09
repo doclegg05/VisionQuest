@@ -111,7 +111,7 @@ export function EmployerResponseActions({
 
       {mode === "interested" && (
         <div className="mt-4">
-          <h3 className="text-base font-semibold text-[var(--ink-strong)]">Pick a time to meet</h3>
+          <h3 className="text-base font-semibold text-[var(--ink-strong)]">Pick a Time to Meet</h3>
           {slots.length === 0 ? (
             <p className="mt-2 text-base text-[var(--ink-muted)]">
               There are no open times right now. Reply to the email and we will set one up.

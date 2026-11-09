@@ -397,7 +397,7 @@ export default function SpokesManager() {
           Handbook-aligned setup
         </p>
         <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">
-          SPOKES workflow templates, counties, and referrals
+          SPOKES Workflow Templates, Counties, and Referrals
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
           Configure the orientation/program templates used inside the student workspace, define county
@@ -413,7 +413,7 @@ export default function SpokesManager() {
               Referral queue
             </p>
             <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">
-              County-scoped standalone referrals
+              County-Scoped Standalone Referrals
             </h3>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -628,7 +628,7 @@ export default function SpokesManager() {
                 Workflow templates
               </p>
               <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">
-                Checklists, counties, and benchmark helpers
+                Checklists, Counties, and Benchmark Helpers
               </h3>
             </div>
             <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
@@ -802,7 +802,7 @@ export default function SpokesManager() {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
                 Modules
               </p>
-              <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Required SPOKES modules</h3>
+              <h3 className="mt-2 font-display text-xl text-[var(--ink-strong)]">Required SPOKES Modules</h3>
             </div>
             <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {moduleTemplates.length} modules

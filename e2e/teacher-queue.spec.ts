@@ -24,7 +24,7 @@ test("teacher home shows one queue, keeps appointments and the roster, with 44px
     await page.goto(`/teacher?classId=${fixtureClass.id}`);
 
     await expect(page.getByRole("heading", { name: /intervention queue/i })).toHaveCount(1, { timeout: 20_000 });
-    await expect(page.getByRole("heading", { name: "Upcoming appointments" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Upcoming Appointments" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "All Students" })).toBeVisible();
 
     const queuePanel = page.locator("section").filter({ hasText: "Needs attention" }).first();

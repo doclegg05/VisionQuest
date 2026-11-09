@@ -154,7 +154,7 @@ export function OutcomesReportView({ data }: { data: ReportPayload }) {
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Pipeline</p>
-              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Student outcome funnel</h3>
+              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Student Outcome Funnel</h3>
             </div>
             <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {data.summary.totalStudents} learners
@@ -184,7 +184,7 @@ export function OutcomesReportView({ data }: { data: ReportPayload }) {
 
         <div className="theme-card rounded-xl p-5">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Operational snapshot</p>
-          <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">What needs follow-through</h3>
+          <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">What Needs Follow-Through</h3>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--urgency-high-bg)] p-4">
@@ -222,7 +222,7 @@ export function OutcomesReportView({ data }: { data: ReportPayload }) {
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Outreach queue</p>
-              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Students who may need a touchpoint</h3>
+              <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Students Who May Need a Touchpoint</h3>
             </div>
             <span className="rounded-full bg-[var(--surface-interactive)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
               {data.attentionQueue.length} shown
@@ -300,7 +300,7 @@ export function OutcomesReportView({ data }: { data: ReportPayload }) {
         <div className="space-y-4">
           <div className="theme-card rounded-xl p-5">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Recent applications</p>
-            <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Career pipeline movement</h3>
+            <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Career Pipeline Movement</h3>
 
             {data.recentApplications.length === 0 ? (
               <p className="mt-4 text-sm text-[var(--ink-muted)]">No applications have moved into the active pipeline yet.</p>
@@ -330,7 +330,7 @@ export function OutcomesReportView({ data }: { data: ReportPayload }) {
 
           <div className="theme-card rounded-xl p-5">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-faint)]">Upcoming events</p>
-            <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Who is showing up</h3>
+            <h3 className="mt-2 text-lg font-semibold text-[var(--ink-strong)]">Who Is Showing Up</h3>
 
             {data.upcomingEvents.length === 0 ? (
               <p className="mt-4 text-sm text-[var(--ink-muted)]">No upcoming events are currently scheduled.</p>

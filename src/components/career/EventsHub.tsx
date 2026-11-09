@@ -87,7 +87,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
             Event readiness
           </p>
-          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No events scheduled yet</h3>
+          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">No Events Scheduled Yet</h3>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
             You can still get ready. Prepare a short introduction, employer questions, and a resume checklist.
           </p>

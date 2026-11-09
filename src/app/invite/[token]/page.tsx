@@ -29,7 +29,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
         </>
       ) : (
         <div role="alert">
-          <h1 className="text-2xl font-bold text-[var(--ink-strong)]">This invite cannot be used</h1>
+          <h1 className="text-2xl font-bold text-[var(--ink-strong)]">This Invite Cannot Be Used</h1>
           <p className="mt-2 text-sm text-[var(--ink-muted)]">{STAFF_INVITE_MESSAGES.invalid}</p>
         </div>
       )}

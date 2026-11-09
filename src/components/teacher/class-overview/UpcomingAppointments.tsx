@@ -16,7 +16,7 @@ export function UpcomingAppointments({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-info">This week</p>
           <h2 id="upcoming-appointments-heading" className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
-            Upcoming appointments
+            Upcoming Appointments
           </h2>
         </div>
         <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-info">

@@ -9,7 +9,7 @@ export default function StudentError({
 }) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-      <h2 className="font-display text-2xl text-[var(--ink-strong)]">Something went wrong</h2>
+      <h2 className="font-display text-2xl text-[var(--ink-strong)]">Something Went Wrong</h2>
       <p className="mt-3 max-w-md text-sm text-[var(--ink-muted)]">
         We hit an unexpected error. You can try again, or head back to your dashboard.
       </p>

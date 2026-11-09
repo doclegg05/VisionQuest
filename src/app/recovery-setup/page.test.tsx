@@ -69,7 +69,7 @@ describe("recovery setup page", () => {
     assert.equal(await redirectTarget(), null);
 
     const html = renderToString(await Page());
-    assert.ok(html.includes("Keep your account safe"));
+    assert.ok(html.includes("Keep Your Account Safe"));
   });
 
   it("sends a real student who already finished setup to the dashboard", async () => {
