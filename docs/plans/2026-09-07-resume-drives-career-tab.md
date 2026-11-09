@@ -1,5 +1,9 @@
 # Research: should the Portfolio résumé configure the Career tab?
 
+> **Standalone task list retired on 2026-11-09.** Remaining decisions and implementation delta are D2/W6.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 **Date:** 2026-09-07
 **Status:** Research memo — awaiting owner decisions (D1–D4 at the end). No code changed.
 **Source:** the PRODUCT IDEA recorded by Britt on 2026-08-21 in `.claude/MEMORY.md` ("Portfolio resume should configure the Career tab").

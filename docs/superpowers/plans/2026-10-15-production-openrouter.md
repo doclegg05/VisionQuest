@@ -1,5 +1,9 @@
 # Production AI through OpenRouter Implementation Plan
 
+> **Standalone task list retired on 2026-11-09.** Deferred under current local-only operation; see D6.
+> Follow the [consolidated remaining-work plan](../../plans/2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Production Sage runs on `google/gemini-3.1-flash-lite` through OpenRouter, with the same routing, cloud policy, de-identification and audit it had on Google.

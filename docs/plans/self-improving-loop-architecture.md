@@ -1,5 +1,9 @@
 # VisionQuest Recursive Self-Improving Loop — Implementation Plan (codename: **Ouroboros**)
 
+> **Standalone task list retired on 2026-11-09.** Deferred; locked historical PM decisions preserved; see D7.
+> Follow the [consolidated remaining-work plan](2026-11-09-consolidated-remaining-work.md) for current sequencing, decisions and acceptance. The original text below is a historical record; its checkboxes and execution instructions are not the active queue.
+
+
 **Status:** DRAFT FOR APPROVAL (rev2 — 10 decisions LOCKED §14.0 + PM review findings incorporated §14.1) · **Author:** Staff Eng (subagent) · **Date:** 2026-06-04 · **Audience:** Britt (PM/approver + sole builder/operator)
 
 **Ground-truth provenance:** All load-bearing file facts in this plan are **re-verified this session against the DEPLOY branch `fix/ci-direct-url` @ `dea72c9`** (the branch Render ships from), not merely an upstream feature branch. See **§0 (Provenance Reconciliation)** for the pasted command outputs and the branch-diff proof. A prior draft cited `feat/rag-pipeline @ 7dece79`; that branch and `fix/ci-direct-url` are **byte-identical for every load-bearing file** (proof in §0), so the safety case transfers — but the canonical reference is now the shipping branch. **Caveat (PM review, 2026-06-04):** repo facts are **not** *platform* truth — Render service settings (linked deploy branch, `autoDeployTrigger`) and GitHub branch protection / auto-merge are **not** derivable from the repo and require a **live API/dashboard preflight** (see "Live-platform preflight" below, enforced as Gate 0 in §6).
