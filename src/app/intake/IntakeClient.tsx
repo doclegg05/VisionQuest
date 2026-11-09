@@ -252,7 +252,7 @@ export default function IntakeClient() {
             </div>
 
             <h1 className="mt-4 font-display text-2xl text-[var(--ink-strong)] sm:text-3xl">
-              Your Form Was Sent
+              Your form was sent
             </h1>
 
             <p className="mt-3 text-base text-[var(--ink-muted)]">{successMessage}</p>

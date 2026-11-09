@@ -2,7 +2,7 @@
 // Title-cases literal text directly inside h1, h2, h3, and .page-title elements.
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import ts from "typescript";
-import { titleCase } from "./lib/title-case.mjs";
+import { isSentence, titleCase } from "./lib/title-case.mjs";
 
 const args = process.argv.slice(2);
 const paths = args.find((a) => a.startsWith("--paths="))?.slice(8);
@@ -32,6 +32,7 @@ function headingEdits(file) {
         const start = target.getStart(file) + (literal ? 1 : 0);
         const end = target.getEnd() - (literal ? 1 : 0);
         const before = file.text.slice(start, end);
+        if (isSentence(before)) continue;
         const after = titleCase(before);
         if (after !== before) edits.push({ start, end, before, after, line: file.getLineAndCharacterOfPosition(start).line + 1 });
       }

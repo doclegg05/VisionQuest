@@ -169,7 +169,7 @@ export function BatchWorkforceButton({ classes }: BatchWorkforceButtonProps) {
       {preview && (
         <div className="mt-4 rounded-lg border border-[var(--border)] p-4">
           <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
-            Check This Before You Download
+            Check this before you download
           </h3>
 
           {preview.count === 0 ? (

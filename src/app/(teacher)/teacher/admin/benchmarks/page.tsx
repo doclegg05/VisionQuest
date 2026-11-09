@@ -87,7 +87,7 @@ export default async function BenchmarksPage() {
       {data.problems.length > 0 && (
         <section aria-labelledby="problems-heading" className="theme-card rounded-xl p-5">
           <h2 id="problems-heading" className="text-base font-semibold text-[var(--ink-strong)]">
-            Files We Could Not Read
+            Files we could not read
           </h2>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--ink-muted)]">
             {data.problems.map((problem) => (

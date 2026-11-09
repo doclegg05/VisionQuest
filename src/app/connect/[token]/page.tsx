@@ -193,7 +193,7 @@ export default async function EmployerConnectPage({
             The student's own card applies the same rule, so the two surfaces
             agree by construction rather than by coincidence. */}
         {included.has("subsidy_line") && (
-          <section className="surface-section p-6">
+          <section className="surface-section p-6" data-testid="subsidy-block">
             <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Money for Hiring</h2>
             <p className="mt-2 text-base text-[var(--ink-strong)]">
               {view.packet.subsidyLine ?? SUBSIDY_FALLBACK_LINE}

@@ -27,7 +27,7 @@ export default function HelpPage() {
             <ArrowClockwise size={20} weight="bold" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-xl text-[var(--ink-strong)]">Something Won&apos;t Load</h2>
+            <h2 className="font-display text-xl text-[var(--ink-strong)]">Something won&apos;t load</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               Refresh the page first. If it still will not load, tell your teacher.
             </p>

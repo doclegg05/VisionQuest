@@ -97,6 +97,9 @@ before(async () => {
   EmployerConnectPage = (await import("@/app/connect/[token]/page")).default as typeof EmployerConnectPage;
 });
 
+/** Stable marker on the employer page subsidy block; heading wording may change case. */
+const SUBSIDY_MARKER = 'data-testid="subsidy-block"';
+
 describe("the approval card and the employer page render the SAME packet", () => {
   it("shows every disclosed value on both surfaces", async () => {
     const cardHtml = renderToString(
@@ -145,6 +148,11 @@ describe("the approval card and the employer page render the SAME packet", () =>
     const startYear = PACKET.earliestStart?.slice(0, 4) ?? "";
     assert.ok(employerHtml.includes(startYear));
 
+    // Positive control for the absence check below: with the subsidy line
+    // approved, its block carries the stable marker. If this stops holding,
+    // the "left out" assertion would pass vacuously.
+    assert.ok(employerHtml.includes(SUBSIDY_MARKER), "the approved subsidy block lost its marker");
+
     // And nothing from outside the packet: the résumé's own contact block is
     // stripped before the PDF is rendered, so no address or phone can appear
     // through it either.
@@ -184,7 +192,7 @@ describe("the approval card and the employer page render the SAME packet", () =>
       "the employer read a teacher's endorsement the student did not approve",
     );
     assert.ok(
-      !html.includes("Money for hiring"),
+      !html.includes(SUBSIDY_MARKER) && !/money for hiring/i.test(html),
       "the subsidy block rendered despite being left out of the approved list",
     );
     // The fields that ARE approved still render, so this is not passing by

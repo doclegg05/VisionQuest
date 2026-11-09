@@ -14,6 +14,8 @@ interface BrandLockupProps {
 
 const SIZE_MAP = {
   sm: {
+    spokesBound: "max-w-[54px] max-h-[36px]",
+    wvaeBound: "max-w-[49px] max-h-[32px]",
     imageWidth: 54,
     imageHeight: 36,
     titleClassName: "text-base",
@@ -21,6 +23,8 @@ const SIZE_MAP = {
     gapClassName: "gap-2.5",
   },
   md: {
+    spokesBound: "max-w-[76px] max-h-[50px]",
+    wvaeBound: "max-w-[68px] max-h-[45px]",
     imageWidth: 76,
     imageHeight: 50,
     titleClassName: "text-xl",
@@ -28,6 +32,8 @@ const SIZE_MAP = {
     gapClassName: "gap-3",
   },
   lg: {
+    spokesBound: "max-w-[108px] max-h-[72px]",
+    wvaeBound: "max-w-[97px] max-h-[65px]",
     imageWidth: 108,
     imageHeight: 72,
     titleClassName: "text-[1.85rem]",
@@ -70,7 +76,7 @@ export default function BrandLockup({
             width={Math.round(sizeConfig.imageWidth * 0.9)}
             height={Math.round(sizeConfig.imageHeight * 0.9)}
             priority={priority}
-            className="h-auto max-h-full w-auto max-w-full object-contain"
+            className={`h-auto w-auto object-contain ${sizeConfig.wvaeBound}`}
           />
         </LogoPlate>
         <LogoPlate onDark={isDark}>
@@ -80,7 +86,7 @@ export default function BrandLockup({
             width={sizeConfig.imageWidth}
             height={sizeConfig.imageHeight}
             priority={priority}
-            className="h-auto max-h-full w-auto max-w-full object-contain"
+            className={`h-auto w-auto object-contain ${sizeConfig.spokesBound}`}
           />
         </LogoPlate>
       </div>

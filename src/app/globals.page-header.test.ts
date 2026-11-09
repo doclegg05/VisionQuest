@@ -17,7 +17,11 @@ describe("SPOKES page header", () => {
   });
 
   it("keeps eyebrow, title, and subtitle fully white, which clears 4.5:1 on primary", () => {
-    for (const selector of [".page-eyebrow", ".page-subtitle"]) assert.match(ruleBody(selector), /color: var\(--light\)/);
+    for (const selector of [".page-hero .page-eyebrow", ".page-subtitle"]) assert.match(ruleBody(selector), /color: var\(--light\)/);
+  });
+
+  it("does not paint eyebrows white outside .page-hero, where the ground is light", () => {
+    assert.doesNotMatch(ruleBody(".page-eyebrow"), /color:/);
   });
 
   it("underlines the title with a 48px by 3px gold rule", () => {
