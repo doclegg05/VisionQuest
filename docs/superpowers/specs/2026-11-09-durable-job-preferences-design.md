@@ -83,18 +83,28 @@ New `StudentHiddenJob`:
 `scripts/job-preferences-backfill.mjs`, dry run by default, `--apply` to write. Never run in this session.
 
 - For each `StudentSavedJob` with a `jobListingId` and no `vacancyKey`, it computes the key and snapshot from the linked listing.
-- When two of one student's saves map to the same key (the same posting saved in two classes), it keys the most recently updated row and leaves the others unkeyed. It prints those pairs for review. Unkeyed rows still work through `jobListingId`.
-- It skips rows that already have a key, so a second run changes nothing.
-- Order at deploy: `prisma migrate deploy`, then the dry run, then `--apply`. Until the apply runs, a deleted listing leaves a legacy save with no snapshot; it shows as "This job is no longer listed." No listing is deleted on a schedule today, so that window carries little risk.
+- When two of one student's saves map to the same key (the same posting saved in two classes), it keys the most recently updated row and leaves the others unkeyed. It prints counts only, never ids; the header of the script has the SQL that finds the unkeyed rows. Unkeyed rows still work through `jobListingId`.
+- It skips rows that already have a key, and each write requires the row to still be unkeyed, so a second run changes nothing. The planning logic is `scripts/lib/job-preferences-backfill-planner.mjs`, which is pure and tested.
+- Order at deploy: `prisma migrate deploy`, then `node --import tsx scripts/job-preferences-backfill.mjs` (dry run), then the same with `--apply`. It needs `DATABASE_URL` and `ADMIN_DATABASE_URL` and refuses to run unless the admin client bypasses RLS. Until the apply runs, a deleted listing leaves a legacy save with no snapshot; it shows as "This job is no longer listed." No listing is deleted on a schedule today, so that window carries little risk.
 
 ### Rollback
 
 SystemConfig key `job_hide_enabled`. Unset, or any value but `off`, leaves hiding on. `off` does this:
 
-- The Not interested and Restore buttons and the hidden-jobs panel are not shown (`GET /api/jobs` returns `hideEnabled: false`).
-- `POST /api/jobs/hidden` and `GET /api/jobs/hidden` answer 404 `job_hide_disabled`.
+- The Not interested and Restore buttons and the hidden-jobs panel are not shown: `GET /api/jobs/hidden` returns `{ hideEnabled: false, hiddenJobs: [] }`, and the Career hub reads that before showing any button. `GET /api/jobs` keeps its response shape.
+- `POST /api/jobs/hidden` answers 404 `job_hide_disabled`.
 - The board stops filtering hidden vacancies, so nothing stays hidden with no way back.
 - Stored `StudentHiddenJob` rows stay untouched. Turning the key back on restores every choice.
+
+There is no admin screen for this key yet. To turn hiding off, run in the Supabase SQL editor:
+
+```sql
+INSERT INTO visionquest."SystemConfig" (id, key, value, "updatedAt", "updatedBy")
+VALUES ('job-hide-enabled', 'job_hide_enabled', 'off', now(), 'britt')
+ON CONFLICT (key) DO UPDATE SET value = 'off', "updatedAt" = now();
+```
+
+Delete the row, or set it to `on`, to turn hiding back on. The app caches config for 60 seconds.
 
 Saves of browse jobs and the save snapshot are not behind the flag. They fix data loss rather than add a discovery feature.
 
@@ -118,10 +128,10 @@ Saves of browse jobs and the save snapshot are not behind the flag. They fix dat
 ## Deliverables
 
 - `prisma/schema.prisma` and `prisma/migrations/20261109120000_durable_job_preferences/migration.sql`
-- `src/lib/job-board/vacancy-identity.ts` (pure), `src/lib/job-board/job-preferences.ts` (queries)
+- `src/lib/job-board/vacancy-identity.ts` and `src/lib/job-board/saved-job-lookup.ts` (pure), `src/lib/job-board/job-preferences.ts` (queries)
 - `src/app/api/jobs/save/route.ts` (browse saves), `src/app/api/jobs/hidden/route.ts` (hide, restore, list), `src/app/api/jobs/route.ts` (filter and saved status by key)
-- Not interested and Restore buttons in `src/components/jobs/JobCard.tsx` and a hidden-jobs panel in the Career hub
-- `scripts/job-preferences-backfill.mjs`
+- Not interested and Restore buttons in `src/components/jobs/JobCard.tsx` and `src/components/jobs/HiddenJobsPanel.tsx`, wired in `src/components/career/CareerHub.tsx`
+- `scripts/job-preferences-backfill.mjs` and `scripts/lib/job-preferences-backfill-planner.mjs`
 - The `hidden-jobs.json` section in `src/lib/student-archive.ts`
 
 ## Definition of done
@@ -148,9 +158,10 @@ Saves of browse jobs and the save snapshot are not behind the flag. They fix dat
 | Restore | Set `restoredAt`, keep the row | Delete the row | Keeps history for rollback and review, at the cost of one row per vacancy. |
 | Backfill | Script, run after deploy | An `UPDATE` inside the migration | The brief asks for a script; collision reporting needs a human to read it. The cost is the short window above. |
 | Collisions in backfill | Key the most recent row, report the rest | Merge rows | Merging notes and dates is a judgment call; reporting keeps it with a person. |
+| Hide flag on the client | `GET /api/jobs/hidden` returns `hideEnabled` | A `hideEnabled` field on `GET /api/jobs` | Leaves the board's pinned response contract unchanged. |
 | Request shape | Keep `jobListingId`; resolve class first, then browse | A `listingKind` field in the body | Current clients keep working, and cuids do not collide across tables. |
 | Response shape | Plain objects (`{ savedJob }`, `{ hiddenJob }`, `{ hiddenJobs }`) | The `{ success, data }` envelope from `.claude/rules/api-conventions.md` | The jobs family already returns plain objects, and the brief says to match it. |
 | RLS for `StudentHiddenJob` | Admin or own row for all commands; managed teachers read only | Copy `StudentSavedJob`'s teacher write branch | No staff code writes hides. A read-only teacher branch needs no tree-reader write blocks. |
 | Hidden filtering | In memory, after the query | A SQL `NOT IN` on source and source id | A student hides few jobs, and in-memory matching uses the exact same key function as the write path. The board's 500-row cap applies before the filter. |
-| Rollback switch | One SystemConfig key, default on | An env var | Britt can flip it in Program Setup without a deploy. |
+| Rollback switch | One SystemConfig key, default on | An env var | One SQL row turns it off with no deploy or restart. An admin screen for it is a follow-up. |
 | Board class for multi-class students | Most recent active enrollment with a job setup | A merged board across classes | A merged board changes ranking, region and counts; that is a product change beyond W4. |
