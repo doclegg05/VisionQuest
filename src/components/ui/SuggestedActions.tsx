@@ -115,10 +115,10 @@ export default function SuggestedActions({
 
   if (topActions.length === 0) {
     return (
-      <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-4 text-center">
+      <div className="rounded-xl bg-gradient-to-r from-success-soft to-info-soft border border-success p-4 text-center">
         <p className="text-lg mb-1">{"\u2728"}</p>
-        <p className="text-sm font-medium text-emerald-800">You&apos;re making great progress!</p>
-        <p className="text-xs text-emerald-600 mt-0.5">Keep talking to Sage and working toward your goals.</p>
+        <p className="text-sm font-medium text-success">You&apos;re making great progress!</p>
+        <p className="text-xs text-success mt-0.5">Keep talking to Sage and working toward your goals.</p>
       </div>
     );
   }
@@ -130,7 +130,7 @@ export default function SuggestedActions({
           key={action.href + action.title}
           href={action.href}
           prefetch={false}
-          className="group flex items-start gap-3 theme-card rounded-xl p-3 transition-all hover:-translate-y-0.5 hover:border-[rgba(15,154,146,0.25)] hover:shadow-sm"
+          className="group flex items-start gap-3 theme-card rounded-xl p-3 transition-all hover:-translate-y-0.5 hover:border-[rgba(0,123,175,0.25)] hover:shadow-sm"
         >
           <span className="text-xl">{action.emoji}</span>
           <div className="flex-1 min-w-0">

@@ -10,12 +10,12 @@ interface PlatformCardProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  "certification-prep": "from-orange-400 to-amber-500",
-  "academic-hse": "from-blue-400 to-indigo-500",
-  "esl-language": "from-emerald-400 to-teal-500",
-  "career-skills": "from-violet-400 to-purple-500",
-  "work-ethic": "from-rose-400 to-pink-500",
-  "career-readiness": "from-cyan-400 to-sky-500",
+  "certification-prep": "from-warning to-warning",
+  "academic-hse": "from-info to-brand-deep",
+  "esl-language": "from-success to-info",
+  "career-skills": "from-brand-deep to-brand-deep",
+  "work-ethic": "from-danger to-danger",
+  "career-readiness": "from-info to-info",
 };
 
 export default function PlatformCard({
@@ -60,7 +60,7 @@ export default function PlatformCard({
             {platform.icon}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-display text-base font-semibold text-[var(--ink-strong)]">
+            <h3 className="font-display text-base text-[var(--ink-strong)]">
               {platform.name}
             </h3>
             <p className="text-sm text-[var(--ink-muted)] mt-1 leading-relaxed">

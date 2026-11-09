@@ -176,7 +176,7 @@ export default function MountainProgress({
 
   function drawFarMountains(ctx: CanvasRenderingContext2D, w: number, h: number) {
     // Far ridge 1
-    ctx.fillStyle = "rgba(40,55,90,0.5)";
+    ctx.fillStyle = "rgba(0,64,113,0.5)";
     ctx.beginPath();
     ctx.moveTo(0, h);
     ctx.lineTo(0, h * 0.55);
@@ -189,7 +189,7 @@ export default function MountainProgress({
     ctx.fill();
 
     // Far ridge 2
-    ctx.fillStyle = "rgba(30,45,75,0.4)";
+    ctx.fillStyle = "rgba(0,19,63,0.4)";
     ctx.beginPath();
     ctx.moveTo(0, h);
     ctx.lineTo(0, h * 0.6);
@@ -204,10 +204,10 @@ export default function MountainProgress({
   function drawMainMountain(ctx: CanvasRenderingContext2D, w: number, h: number) {
     // Mountain body
     const grad = ctx.createLinearGradient(w * 0.5, h * 0.05, w * 0.5, h);
-    grad.addColorStop(0, "rgb(70,85,110)");
-    grad.addColorStop(0.3, "rgb(55,70,95)");
-    grad.addColorStop(0.7, "rgb(40,55,75)");
-    grad.addColorStop(1, "rgb(28,40,60)");
+    grad.addColorStop(0, "rgb(96,99,107)");
+    grad.addColorStop(0.3, "rgb(96,99,107)");
+    grad.addColorStop(0.7, "rgb(0,19,63)");
+    grad.addColorStop(1, "rgb(0,19,63)");
     ctx.fillStyle = grad;
 
     ctx.beginPath();
@@ -222,7 +222,7 @@ export default function MountainProgress({
     ctx.fill();
 
     // Snow cap
-    ctx.fillStyle = "rgba(220,230,245,0.85)";
+    ctx.fillStyle = "rgba(237,243,247,0.85)";
     ctx.beginPath();
     ctx.moveTo(w * 0.44, h * 0.20);
     ctx.quadraticCurveTo(w * 0.47, h * 0.10, w * 0.50, h * 0.06);
@@ -254,11 +254,11 @@ export default function MountainProgress({
     // Draw the completed portion (bright)
     if (progress > 0) {
       const litGrad = ctx.createLinearGradient(0, h, 0, 0);
-      litGrad.addColorStop(0, "rgba(255,200,100,0.8)");
-      litGrad.addColorStop(1, "rgba(255,255,200,0.9)");
+      litGrad.addColorStop(0, "rgba(211,178,87,0.8)");
+      litGrad.addColorStop(1, "rgba(237,243,247,0.9)");
       ctx.strokeStyle = litGrad;
       ctx.lineWidth = 3;
-      ctx.shadowColor = "rgba(255,200,100,0.4)";
+      ctx.shadowColor = "rgba(211,178,87,0.4)";
       ctx.shadowBlur = 8;
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
@@ -297,23 +297,23 @@ export default function MountainProgress({
       if (complete) {
         // Glow
         const pulse = reducedMotion.current ? 1 : 0.85 + 0.15 * Math.sin(t * 0.03 + i);
-        ctx.shadowColor = "rgba(255,200,80,0.6)";
+        ctx.shadowColor = "rgba(211,178,87,0.6)";
         ctx.shadowBlur = 10 * pulse;
-        ctx.fillStyle = "rgba(255,210,100,0.95)";
+        ctx.fillStyle = "rgba(211,178,87,0.95)";
         ctx.beginPath();
         ctx.arc(px, py, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
       } else if (dim.score > 0) {
         // Partial — amber outline with fill proportional to progress
-        ctx.strokeStyle = "rgba(255,200,100,0.6)";
+        ctx.strokeStyle = "rgba(211,178,87,0.6)";
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(px, py, 6, 0, Math.PI * 2);
         ctx.stroke();
         // Partial fill
         const pct = dim.score / dim.max;
-        ctx.fillStyle = `rgba(255,210,100,${0.3 + pct * 0.5})`;
+        ctx.fillStyle = `rgba(211,178,87,${0.3 + pct * 0.5})`;
         ctx.beginPath();
         ctx.arc(px, py, 4, 0, Math.PI * 2);
         ctx.fill();
@@ -327,7 +327,7 @@ export default function MountainProgress({
       }
 
       // Label
-      ctx.fillStyle = complete ? "rgba(255,230,160,0.9)" : "rgba(255,255,255,0.45)";
+      ctx.fillStyle = complete ? "rgba(209,211,212,0.9)" : "rgba(255,255,255,0.45)";
       ctx.font = "600 10px system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.fillText(m.label, px + 10, py + 4);
@@ -352,7 +352,7 @@ export default function MountainProgress({
     ctx.stroke();
 
     // Flag
-    ctx.fillStyle = "rgba(255,120,50,0.9)";
+    ctx.fillStyle = "rgba(211,178,87,0.9)";
     ctx.beginPath();
     ctx.moveTo(cx, cy - 4);
     ctx.lineTo(cx + 10, cy - 1);
@@ -361,9 +361,9 @@ export default function MountainProgress({
     ctx.fill();
 
     // Glow
-    ctx.shadowColor = "rgba(255,150,50,0.5)";
+    ctx.shadowColor = "rgba(211,178,87,0.5)";
     ctx.shadowBlur = 12;
-    ctx.fillStyle = "rgba(255,180,80,0.3)";
+    ctx.fillStyle = "rgba(211,178,87,0.3)";
     ctx.beginPath();
     ctx.arc(cx, cy + 4, 8, 0, Math.PI * 2);
     ctx.fill();
@@ -373,7 +373,7 @@ export default function MountainProgress({
   function drawParticles(ctx: CanvasRenderingContext2D, particles: Particle[], w: number) {
     for (const p of particles) {
       ctx.globalAlpha = p.alpha;
-      ctx.fillStyle = "rgba(220,230,245,0.6)";
+      ctx.fillStyle = "rgba(237,243,247,0.6)";
       ctx.beginPath();
       ctx.ellipse(p.x, p.y, p.size, p.size * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -395,7 +395,7 @@ export default function MountainProgress({
     const bx = 16;
     const by = h - 16;
     // Background
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillStyle = "rgba(0,19,63,0.35)";
     ctx.beginPath();
     ctx.roundRect(bx, by - 38, 90, 42, 12);
     ctx.fill();
@@ -516,7 +516,7 @@ export default function MountainProgress({
         ref={canvasRef}
         role="img"
         aria-label={`Mountain climb progress: ${Math.round(readinessScore)}% complete. ${completedCount} of 6 milestones reached.`}
-        className="block w-full rounded-[1.5rem]"
+        className="block w-full rounded-3xl"
         onMouseMove={handlePointer}
         onTouchStart={handlePointer}
         onMouseLeave={handleLeave}
@@ -525,7 +525,7 @@ export default function MountainProgress({
       {/* Tooltip overlay */}
       {activeMilestone && (
         <div
-          className="pointer-events-none absolute z-10 rounded-xl border border-white/20 bg-[rgba(10,20,40,0.85)] px-3 py-2 text-xs text-white shadow-lg"
+          className="pointer-events-none absolute z-10 rounded-xl border border-white/20 bg-[rgba(0,19,63,0.85)] px-3 py-2 text-xs text-white shadow-lg"
           style={{
             top: tooltipPos.y,
             left: tooltipPos.x,

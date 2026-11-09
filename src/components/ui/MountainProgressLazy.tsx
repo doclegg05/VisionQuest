@@ -8,7 +8,7 @@ const MountainProgress = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[200px] animate-pulse rounded-[1.5rem] bg-gradient-to-b from-[#1a2a4a] to-[#4a7cb8] md:h-[320px]" />
+      <div className="h-[200px] animate-pulse rounded-3xl bg-gradient-to-b from-brand-royal to-brand-primary md:h-[320px]" />
     ),
   },
 );

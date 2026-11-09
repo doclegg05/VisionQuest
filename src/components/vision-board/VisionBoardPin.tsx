@@ -12,37 +12,37 @@ interface VisionBoardPinProps {
 
 const NOTE_COLORS: Record<string, { shell: string; text: string; line: string }> = {
   yellow: {
-    shell: "border-[#e3c763] bg-[#f4e38d]",
-    text: "text-[#5b4c22]",
-    line: "bg-[rgba(116,89,28,0.1)]",
+    shell: "border-[rgba(211,178,87,0.7)] bg-[linear-gradient(rgba(211,178,87,0.35),rgba(211,178,87,0.35)),var(--surface-raised)]",
+    text: "text-[var(--ink-strong)]",
+    line: "bg-[rgba(211,178,87,0.25)]",
   },
   pink: {
-    shell: "border-[#e8b5c4] bg-[#f8d7e2]",
-    text: "text-[#6d3750]",
-    line: "bg-[rgba(124,73,91,0.1)]",
+    shell: "border-[rgba(167,37,63,0.7)] bg-[linear-gradient(rgba(167,37,63,0.15),rgba(167,37,63,0.15)),var(--surface-raised)]",
+    text: "text-[var(--ink-strong)]",
+    line: "bg-[rgba(167,37,63,0.25)]",
   },
   blue: {
-    shell: "border-[#b7d4ea] bg-[#d8ecfb]",
-    text: "text-[#355468]",
-    line: "bg-[rgba(67,97,118,0.1)]",
+    shell: "border-[rgba(0,123,175,0.7)] bg-[linear-gradient(rgba(0,123,175,0.2),rgba(0,123,175,0.2)),var(--surface-raised)]",
+    text: "text-[var(--ink-strong)]",
+    line: "bg-[rgba(0,123,175,0.25)]",
   },
   green: {
-    shell: "border-[#b8ddc1] bg-[#d8f0dc]",
-    text: "text-[#30573b]",
-    line: "bg-[rgba(58,97,65,0.1)]",
+    shell: "border-[rgba(55,181,80,0.7)] bg-[linear-gradient(rgba(55,181,80,0.2),rgba(55,181,80,0.2)),var(--surface-raised)]",
+    text: "text-[var(--ink-strong)]",
+    line: "bg-[rgba(55,181,80,0.25)]",
   },
   white: {
-    shell: "border-[#d9d9d2] bg-[#fcfbf7]",
-    text: "text-[#494949]",
-    line: "bg-[rgba(72,72,72,0.08)]",
+    shell: "border-[var(--border)] bg-[var(--surface-raised)]",
+    text: "text-[var(--ink-strong)]",
+    line: "bg-[var(--surface-muted)]",
   },
 };
 
 const PIN_COLORS: Record<string, string> = {
-  red: "from-red-400 to-red-600",
-  blue: "from-blue-400 to-blue-600",
-  green: "from-green-400 to-green-600",
-  yellow: "from-yellow-400 to-yellow-500",
+  red: "from-danger to-danger",
+  blue: "from-info to-info",
+  green: "from-success to-success",
+  yellow: "from-warning to-warning",
 };
 
 const WIDTH_BOUNDS: Record<VisionBoardItemData["type"], { min: number; max: number; minPx: number }> = {
@@ -290,8 +290,8 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
     >
       <div className="absolute -top-2 left-1/2 z-10 -translate-x-1/2">
         <div
-          className={`h-4 w-4 rounded-full bg-gradient-to-br ${pinGradient} shadow-[0_2px_4px_rgba(0,0,0,0.3)]`}
-          style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.3), inset 0 -1px 2px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.3) inset" }}
+          className={`h-4 w-4 rounded-full bg-gradient-to-br ${pinGradient} shadow-[0_2px_4px_rgba(0,19,63,0.3)]`}
+          style={{ boxShadow: "0 2px 4px rgba(0,19,63,0.3), inset 0 -1px 2px rgba(0,19,63,0.2), 0 0 0 1px rgba(255,255,255,0.3) inset" }}
         />
         <div className="absolute left-1/2 top-3 h-1 w-2 -translate-x-1/2 rounded-full bg-black/10 blur-[1px]" />
       </div>
@@ -308,7 +308,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
       >
         <span
           aria-hidden="true"
-          className="grid size-6 place-items-center rounded-full bg-red-500 text-white shadow-md transition-colors group-hover/remove:bg-red-600"
+          className="grid size-6 place-items-center rounded-full bg-danger text-white shadow-md transition-colors group-hover/remove:bg-danger/80"
         >
           <X size={12} weight="bold" />
         </span>
@@ -316,25 +316,25 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
 
       {item.type === "note" ? (
         <div
-          className={`relative mt-2 overflow-hidden rounded-[1rem] border px-4 pb-4 pt-5 shadow-[2px_4px_10px_rgba(0,0,0,0.14)] ${
-            hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,0,0,0.18)]" : ""
+          className={`relative mt-2 overflow-hidden rounded-xl border px-4 pb-4 pt-5 shadow-[2px_4px_10px_rgba(0,19,63,0.14)] ${
+            hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,19,63,0.18)]" : ""
           } ${noteStyle.shell}`}
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.38),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.22),transparent_32%)]" />
           <div className="pointer-events-none absolute inset-0 opacity-45 [background-image:repeating-linear-gradient(180deg,transparent_0_1.45rem,rgba(255,255,255,0.14)_1.45rem_1.52rem)]" />
           <div className={`pointer-events-none absolute inset-x-0 top-4 h-px ${noteStyle.line}`} />
-          <div className="pointer-events-none absolute right-0 top-0 h-7 w-7 translate-x-[24%] -translate-y-[24%] rotate-45 rounded-sm bg-[var(--surface-raised)]/35 shadow-[0_1px_3px_rgba(0,0,0,0.08)]" />
+          <div className="pointer-events-none absolute right-0 top-0 h-7 w-7 translate-x-[24%] -translate-y-[24%] rotate-45 rounded-sm bg-[var(--surface-raised)]/35 shadow-[0_1px_3px_rgba(0,19,63,0.08)]" />
           <p className={`relative text-sm leading-6 whitespace-pre-wrap ${noteStyle.text}`}>
             {item.content}
           </p>
         </div>
       ) : item.type === "goal" ? (
         <div
-          className={`relative mt-2 overflow-hidden rounded-[1rem] border border-[rgba(15,154,146,0.2)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(235,249,248,0.94))] p-4 shadow-[2px_4px_10px_rgba(0,0,0,0.14)] ${
-            hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,0,0,0.18)]" : ""
+          className={`relative mt-2 overflow-hidden rounded-xl border border-[rgba(0,123,175,0.2)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(237,243,247,0.94))] p-4 shadow-[2px_4px_10px_rgba(0,19,63,0.14)] ${
+            hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,19,63,0.18)]" : ""
           }`}
         >
-          <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(180deg,transparent_0_1.6rem,rgba(15,154,146,0.08)_1.6rem_1.66rem)]" />
+          <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(180deg,transparent_0_1.6rem,rgba(0,123,175,0.08)_1.6rem_1.66rem)]" />
           <div className="relative">
             {/* The goal card stays light in both themes, so its text is fixed SPOKES dark. */}
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-dark">
@@ -346,14 +346,14 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
       ) : (
         <div
           className={[
-            "mt-2 overflow-hidden rounded-[1rem] border border-white/70 bg-[var(--surface-raised)] p-2 shadow-[2px_4px_10px_rgba(0,0,0,0.14)]",
-            hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,0,0,0.18)]" : "",
+            "mt-2 overflow-hidden rounded-xl border border-white/70 bg-[var(--surface-raised)] p-2 shadow-[2px_4px_10px_rgba(0,19,63,0.14)]",
+            hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,19,63,0.18)]" : "",
           ]
             .filter(Boolean)
             .join(" ")}
         >
           {item.fileId ? (
-            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[0.85rem] bg-[var(--surface-interactive)]">
+            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[var(--surface-interactive)]">
               <Image
                 src={`/api/files/download?id=${item.fileId}`}
                 alt="Vision board image"
@@ -383,12 +383,12 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
       >
         <span
           aria-hidden="true"
-          className="flex size-6 items-center justify-center rounded-full border border-white/70 bg-[var(--surface-raised)]/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,0,0,0.12)] transition-opacity group-hover/resize:opacity-100"
+          className="flex size-6 items-center justify-center rounded-full border border-white/70 bg-[var(--surface-raised)]/88 text-[var(--ink-muted)] opacity-80 shadow-[0_6px_14px_rgba(0,19,63,0.12)] transition-opacity group-hover/resize:opacity-100"
         >
           <span
             // Decorative hatch pattern inside resize handle — intentional raw rgba.
             // eslint-disable-next-line no-restricted-syntax
-            className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(16,37,62,0.45)_34%_44%,transparent_44%_58%,rgba(16,37,62,0.45)_58%_68%,transparent_68%)]"
+            className="block h-3 w-3 bg-[linear-gradient(135deg,transparent_0_34%,rgba(0,19,63,0.45)_34%_44%,transparent_44%_58%,rgba(0,19,63,0.45)_58%_68%,transparent_68%)]"
           />
         </span>
       </div>

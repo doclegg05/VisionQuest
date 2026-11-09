@@ -36,7 +36,7 @@ export function SharedWithEmployersPanel() {
     <>
       <SharedWithEmployers packets={packets} />
       {error && (
-        <p className="mb-6 text-sm text-red-600" role="alert">
+        <p className="mb-6 text-sm text-danger" role="alert">
           {error}
         </p>
       )}

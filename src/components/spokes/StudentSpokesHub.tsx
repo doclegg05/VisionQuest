@@ -81,7 +81,7 @@ export default function StudentSpokesHub({
 
   function renderChecklist(title: string, templates: ChecklistTemplate[]) {
     return (
-      <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink-strong)]">{title}</h3>
         <div className="mt-3 space-y-2">
           {templates.map((template) => {
@@ -100,7 +100,7 @@ export default function StudentSpokesHub({
                   <div>
                     <p className="text-sm font-medium text-[var(--ink-strong)]">
                       {template.label}
-                      {template.required ? <span className="ml-1 text-xs text-rose-500">*</span> : null}
+                      {template.required ? <span className="ml-1 text-xs text-danger">*</span> : null}
                     </p>
                     {template.description ? (
                       <p className="mt-1 text-xs leading-5 text-[var(--ink-muted)]">{template.description}</p>
@@ -109,7 +109,7 @@ export default function StudentSpokesHub({
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
                       progress?.completed
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-success-soft text-success"
                         : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                     }`}
                   >
@@ -220,7 +220,7 @@ export default function StudentSpokesHub({
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             progress
-                              ? "bg-emerald-100 text-emerald-700"
+                              ? "bg-success-soft text-success"
                               : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                           }`}
                         >
@@ -267,9 +267,9 @@ export default function StudentSpokesHub({
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold ${
                           item.status === "completed"
-                            ? "bg-emerald-100 text-emerald-700"
+                            ? "bg-success-soft text-success"
                             : item.status === "due"
-                              ? "bg-amber-100 text-amber-800"
+                              ? "bg-warning-soft text-warning"
                               : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                         }`}
                       >

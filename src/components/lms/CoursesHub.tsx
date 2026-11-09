@@ -116,7 +116,7 @@ export default function CoursesHub() {
   if (error) {
     return (
       <div className="surface-section p-8 text-center">
-        <p className="text-red-600 mb-4">{error}</p>
+        <p className="text-danger mb-4">{error}</p>
         <button
           onClick={fetchPlatforms}
           className="inline-flex min-h-11 items-center px-4 py-2 bg-[var(--accent-strong)] text-[var(--on-accent)] rounded-lg hover:opacity-90 transition-opacity cursor-pointer"

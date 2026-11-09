@@ -60,18 +60,18 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
       {/* Mobile: stacked scrollable card list */}
       <div className="md:hidden space-y-3">
         {items.length === 0 ? (
-          <div className="flex items-center justify-center rounded-[1.35rem] border border-[rgba(196,168,124,0.4)] bg-[linear-gradient(145deg,#c4a87c_0%,#b8956a_24%,#c9a97a_49%,#a88656_74%,#c4a87c_100%)] px-6 py-12 text-center shadow-[0_8px_24px_rgba(52,34,15,0.15)]">
-            <div className="rounded-[1.4rem] border border-white/55 bg-[var(--surface-raised)]/82 p-6 shadow-[0_18px_45px_rgba(68,43,18,0.18)]">
+          <div className="flex items-center justify-center rounded-2xl border border-[rgba(211,178,87,0.4)] bg-[linear-gradient(145deg,rgba(211,178,87,0.55)_0%,rgba(173,136,6,0.5)_24%,rgba(211,178,87,0.6)_49%,rgba(173,136,6,0.55)_74%,rgba(211,178,87,0.55)_100%)] px-6 py-12 text-center shadow-[0_8px_24px_rgba(0,19,63,0.15)]">
+            <div className="rounded-3xl border border-white/55 bg-[var(--surface-raised)]/82 p-6 shadow-[0_18px_45px_rgba(0,19,63,0.18)]">
               <p className="mb-3 text-3xl">📌</p>
-              <p className="font-display text-base text-[#5A3E20]">Your vision board is empty</p>
-              <p className="mt-2 text-sm text-[#8B6F47]">
+              <p className="font-display text-base text-[var(--ink-muted)]">Your vision board is empty</p>
+              <p className="mt-2 text-sm text-[var(--ink-muted)]">
                 Start by pinning a note, image, or goal.
               </p>
             </div>
           </div>
         ) : (
           items.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-[rgba(196,168,124,0.35)] bg-[linear-gradient(145deg,#c9a97a,#b8956a)] p-1">
+            <div key={item.id} className="rounded-2xl border border-[rgba(211,178,87,0.35)] bg-[linear-gradient(145deg,rgba(211,178,87,0.55)_0%,rgba(173,136,6,0.5)_24%,rgba(211,178,87,0.6)_49%,rgba(173,136,6,0.55)_74%,rgba(211,178,87,0.55)_100%)] p-1">
               <div className="rounded-xl bg-[var(--surface-raised)]/90 px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -110,26 +110,26 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
         ref={canvasRef}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="relative h-[72vh] min-h-[42rem] min-w-[68rem] overflow-hidden rounded-[1.35rem] border-[10px] border-transparent bg-[linear-gradient(145deg,#c4a87c_0%,#b8956a_24%,#c9a97a_49%,#a88656_74%,#c4a87c_100%)] shadow-[0_24px_80px_rgba(52,34,15,0.2)] [border-image:linear-gradient(135deg,#8B6F47_0%,#6B4F2F_30%,#8B6F47_52%,#5A3E20_72%,#8B6F47_100%)_1]"
+        className="relative h-[72vh] min-h-[42rem] min-w-[68rem] overflow-hidden rounded-2xl border-[10px] border-transparent bg-[linear-gradient(145deg,rgba(211,178,87,0.55)_0%,rgba(173,136,6,0.5)_24%,rgba(211,178,87,0.6)_49%,rgba(173,136,6,0.55)_74%,rgba(211,178,87,0.55)_100%)] shadow-[0_24px_80px_rgba(0,19,63,0.2)] [border-image:linear-gradient(135deg,rgba(173,136,6,1)_0%,rgba(0,64,113,0.6)_30%,rgba(173,136,6,1)_52%,rgba(0,64,113,0.6)_72%,rgba(173,136,6,1)_100%)_1]"
       >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_24%,rgba(255,246,228,0.18)_0%,transparent_42%),radial-gradient(ellipse_at_78%_18%,rgba(255,246,228,0.14)_0%,transparent_36%),radial-gradient(ellipse_at_50%_84%,rgba(102,69,29,0.12)_0%,transparent_44%)]" />
-        <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(rgba(92,58,20,0.18)_0.7px,transparent_0.7px)] [background-size:14px_14px]" />
-        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_8px_rgba(0,0,0,0.15),inset_0_-2px_10px_rgba(0,0,0,0.12)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_24%,rgba(237,243,247,0.18)_0%,transparent_42%),radial-gradient(ellipse_at_78%_18%,rgba(237,243,247,0.14)_0%,transparent_36%),radial-gradient(ellipse_at_50%_84%,rgba(167,37,63,0.12)_0%,transparent_44%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(rgba(167,37,63,0.18)_0.7px,transparent_0.7px)] [background-size:14px_14px]" />
+        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_2px_8px_rgba(0,19,63,0.15),inset_0_-2px_10px_rgba(0,19,63,0.12)]" />
 
         {/* Empty state */}
         {items.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
-            <div className="rounded-[1.4rem] border border-white/55 bg-[var(--surface-raised)]/82 p-8 shadow-[0_18px_45px_rgba(68,43,18,0.18)]">
+            <div className="rounded-3xl border border-white/55 bg-[var(--surface-raised)]/82 p-8 shadow-[0_18px_45px_rgba(0,19,63,0.18)]">
               <p className="mb-3 text-3xl">📌</p>
-              <p className="font-display text-lg text-[#5A3E20]">Your vision board is empty</p>
-              <p className="mt-2 text-sm text-[#8B6F47]">
+              <p className="font-display text-lg text-[var(--ink-muted)]">Your vision board is empty</p>
+              <p className="mt-2 text-sm text-[var(--ink-muted)]">
                 Start by pinning a note, image, or goal. You can drag cards anywhere and resize them from the lower corner.
               </p>
             </div>
           </div>
         )}
 
-        <div className="pointer-events-none absolute left-5 top-4 rounded-full bg-[var(--surface-raised)]/24 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/80 shadow-[0_8px_16px_rgba(70,42,10,0.14)]">
+        <div className="pointer-events-none absolute left-5 top-4 rounded-full bg-[var(--surface-raised)]/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--ink-strong)] shadow-[0_8px_16px_rgba(0,19,63,0.14)]">
           Creative workspace
         </div>
 

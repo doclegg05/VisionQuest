@@ -142,14 +142,14 @@ export default function NotificationBell() {
                     key={n.id}
                     type="button"
                     onClick={handleClick}
-                    className={`w-full text-left border-b border-[var(--border)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""} cursor-pointer hover:bg-[rgba(0,123,175,0.04)]`}
+                    className={`w-full text-left border-b border-[var(--border)] px-4 py-3 ${!n.read ? "bg-[rgba(173,136,6,0.04)]" : ""} cursor-pointer hover:bg-[rgba(0,123,175,0.04)]`}
                   >
                     {inner}
                   </button>
                 ) : (
                   <div
                     key={n.id}
-                    className={`border-b border-[var(--border)] px-4 py-3 ${!n.read ? "bg-[rgba(249,115,22,0.04)]" : ""}`}
+                    className={`border-b border-[var(--border)] px-4 py-3 ${!n.read ? "bg-[rgba(173,136,6,0.04)]" : ""}`}
                   >
                     {inner}
                   </div>

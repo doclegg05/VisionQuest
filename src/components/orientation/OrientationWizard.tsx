@@ -370,11 +370,11 @@ export default function OrientationWizard() {
   if (error && steps.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
+        <p className="text-danger mb-4">{error}</p>
         <button
           type="button"
           onClick={() => { setError(null); setLoading(true); void fetchData(); }}
-          className="inline-flex min-h-11 items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="inline-flex min-h-11 items-center px-4 py-2 bg-info text-white rounded-lg hover:bg-info/90"
         >
           Try Again
         </button>
@@ -385,16 +385,16 @@ export default function OrientationWizard() {
   const syncNotice = syncError ? (
     <div
       role="alert"
-      className="mx-auto mb-6 flex max-w-xl flex-wrap items-center justify-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3"
+      className="mx-auto mb-6 flex max-w-xl flex-wrap items-center justify-center gap-3 rounded-2xl border border-warning bg-warning-soft px-4 py-3"
     >
-      <p className="text-sm text-amber-800">
+      <p className="text-sm text-warning">
         We couldn&apos;t save your completion — your progress is safe.
       </p>
       <button
         type="button"
         onClick={() => void syncCompletion()}
         disabled={syncing}
-        className="min-h-11 rounded-lg border border-amber-400 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-h-11 rounded-lg border border-warning px-4 py-2 text-sm font-medium text-warning hover:bg-warning-soft disabled:cursor-not-allowed disabled:opacity-50"
       >
         {syncing ? "Saving..." : "Try again"}
       </button>
@@ -418,7 +418,7 @@ export default function OrientationWizard() {
     return (
       <div className="mx-auto max-w-xl text-center py-10">
         <div className="text-5xl mb-4">⏳</div>
-        <h2 className="font-display text-2xl font-bold text-[var(--ink-strong)]">
+        <h2 className="font-display text-2xl text-[var(--ink-strong)]">
           Almost there!
         </h2>
         <p className="mt-3 text-sm text-[var(--ink-muted)]">
@@ -428,18 +428,18 @@ export default function OrientationWizard() {
           </span>
           . You&apos;ll be marked Onboarded as soon as they confirm.
         </p>
-        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
-          <p className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2">
+        <div className="mt-6 rounded-2xl border border-warning bg-warning-soft p-4 text-left">
+          <p className="text-xs font-bold uppercase tracking-widest text-warning mb-2">
             Waiting on your instructor
           </p>
           <div className="space-y-1.5">
             {items
               .filter((item) => pendingIds.has(item.id))
               .map((item) => (
-                <p key={item.id} className="flex items-center gap-2 text-sm text-amber-800">
+                <p key={item.id} className="flex items-center gap-2 text-sm text-warning">
                   <span aria-hidden>✓</span>
                   <span className="truncate">{item.label}</span>
-                  <span className="ml-auto shrink-0 text-xs text-amber-600">sent</span>
+                  <span className="ml-auto shrink-0 text-xs text-warning">sent</span>
                 </p>
               ))}
           </div>
@@ -472,10 +472,10 @@ export default function OrientationWizard() {
       {justSentTitle && (
         <div
           role="status"
-          className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+          className="flex items-center gap-2 rounded-2xl border border-success bg-success-soft px-4 py-3"
         >
-          <span className="text-emerald-600" aria-hidden>✓</span>
-          <p className="text-sm text-emerald-800">
+          <span className="text-success" aria-hidden>✓</span>
+          <p className="text-sm text-success">
             Sent — your instructor will verify &ldquo;{justSentTitle}&rdquo;.
           </p>
         </div>
@@ -497,7 +497,7 @@ export default function OrientationWizard() {
             <p className="text-sm text-[var(--ink-muted)] text-center max-w-md">{step.stepDescription}</p>
           )}
           {step.needsRedo && (
-            <p className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+            <p className="rounded-lg bg-warning-soft px-3 py-1.5 text-xs text-warning">
               Your instructor asked you to redo this step.
             </p>
           )}
@@ -514,7 +514,7 @@ export default function OrientationWizard() {
             Your instructor will provide a paper copy.
           </p>
           {step.needsRedo && (
-            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+            <p className="mt-3 rounded-lg bg-warning-soft px-3 py-1.5 text-xs text-warning">
               Your instructor asked you to redo this step.
             </p>
           )}
@@ -553,7 +553,7 @@ export default function OrientationWizard() {
               type="checkbox"
               checked={hasRead}
               onChange={(e) => setHasRead(e.target.checked)}
-              className="h-5 w-5 rounded border-[var(--border-strong)] text-emerald-600 focus:ring-emerald-500"
+              className="h-5 w-5 rounded border-[var(--border-strong)] text-success focus:ring-success"
             />
             <span className="text-sm text-[var(--ink-strong)]">
               I have read this document
@@ -627,7 +627,7 @@ export default function OrientationWizard() {
         )}
 
         {error && (
-          <p className="text-sm text-red-500">{error}</p>
+          <p className="text-sm text-danger">{error}</p>
         )}
       </div>
       )}

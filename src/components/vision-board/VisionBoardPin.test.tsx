@@ -1,9 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { renderToString } from "react-dom/server";
 
 import VisionBoardPin, { removePinLabel, resizePinLabel, resizeWidthForKey } from "./VisionBoardPin";
 import type { VisionBoardItemData } from "./VisionBoard";
+import { composite, contrastRatio, parseColor } from "@/lib/wcag-contrast";
 
 const GOAL_ITEM: VisionBoardItemData = {
   id: "g1",
@@ -158,4 +160,26 @@ describe("resizeWidthForKey", () => {
     assert.equal(resizeWidthForKey(" ", 20, bounds), null);
     assert.equal(resizeWidthForKey("Tab", 20, bounds), null);
   });
+});
+
+describe("sticky note tints keep their text readable", () => {
+  const source = readFileSync(new URL("./VisionBoardPin.tsx", import.meta.url), "utf8");
+  const tints = [...source.matchAll(/bg-\[linear-gradient\(rgba\((\d+),(\d+),(\d+),([\d.]+)\)/g)];
+
+  it("finds all four tinted notes", () => {
+    assert.equal(tints.length, 4);
+  });
+
+  for (const [theme, ink, ground] of [
+    ["light", "#004071", "#ffffff"],
+    ["dark", "#ffffff", "#004071"],
+  ] as const) {
+    it(`${theme} theme: ink on every tint clears 4.5:1`, () => {
+      for (const [, r, g, b, a] of tints) {
+        const tint = composite({ r: Number(r), g: Number(g), b: Number(b), a: Number(a) }, parseColor(ground));
+        const ratio = contrastRatio(ink, tint);
+        assert.ok(ratio >= 4.5, `rgba(${r},${g},${b},${a}) under ${ink} is ${ratio.toFixed(2)}:1`);
+      }
+    });
+  }
 });

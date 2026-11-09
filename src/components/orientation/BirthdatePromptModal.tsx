@@ -121,7 +121,7 @@ export default function BirthdatePromptModal({
           <p
             id="birthdate-prompt-error"
             role="alert"
-            className="mt-2 text-xs text-red-600"
+            className="mt-2 text-xs text-danger"
           >
             {error}
           </p>

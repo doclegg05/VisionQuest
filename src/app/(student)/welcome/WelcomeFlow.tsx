@@ -211,7 +211,7 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
           event.preventDefault();
           onChoose(choice);
         }}
-        className={`group flex items-start gap-4 rounded-[1.5rem] border bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg ${
+        className={`group flex items-start gap-4 rounded-3xl border bg-[var(--surface-raised)] p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg ${
           hasError
             ? "border-[var(--badge-error-text)]"
             : choice.recommended
@@ -224,11 +224,11 @@ export function PathChoiceCard({ choice, saving, hasError, onChoose }: PathChoic
         </span>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-display text-lg font-semibold text-[var(--ink-strong)]">
+            <p className="font-display text-lg text-[var(--ink-strong)]">
               {choice.title}
             </p>
             {choice.recommended && (
-              <span className="rounded-full bg-[var(--accent-strong)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-success">
+              <span className="rounded-full bg-[var(--accent-strong)]/10 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-success">
                 Recommended
               </span>
             )}

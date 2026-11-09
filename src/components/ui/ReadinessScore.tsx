@@ -14,7 +14,7 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
   const offset = circumference - (score / 100) * circumference;
 
   // Color based on score
-  const color = score >= 75 ? "var(--accent-secondary)" : score >= 50 ? "#f59e0b" : "var(--accent-strong)";
+  const color = score >= 75 ? "var(--accent-secondary)" : score >= 50 ? "var(--muted-gold)" : "var(--accent-strong)";
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -43,8 +43,8 @@ export default function ReadinessScore({ score, breakdown, size = "md" }: Readin
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={["font-display font-bold text-[var(--ink-strong)]", dims.text].join(" ")}>{score}%</span>
-          {size === "md" && <span className="text-[9px] text-[var(--ink-muted)] uppercase tracking-wider">Ready</span>}
+          <span className={["font-display text-[var(--ink-strong)]", dims.text].join(" ")}>{score}%</span>
+          {size === "md" && <span className="text-xs text-[var(--ink-muted)] uppercase tracking-wider">Ready</span>}
         </div>
       </div>
 

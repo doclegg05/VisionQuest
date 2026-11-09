@@ -68,7 +68,7 @@ export function AskSageModal({ goal, onClose }: AskSageModalProps) {
         </button>
 
         <div className="mb-4 flex items-center gap-2 pr-10">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-deep-soft text-brand-deep">
             <Sparkle size={20} weight="fill" aria-hidden="true" />
           </span>
           <div>
@@ -81,8 +81,8 @@ export function AskSageModal({ goal, onClose }: AskSageModalProps) {
           </div>
         </div>
 
-        <div className="mb-4 rounded-xl border border-indigo-100/50 bg-indigo-50/30 p-3.5 dark:border-indigo-950/40 dark:bg-indigo-950/10">
-          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Your goal</p>
+        <div className="mb-4 rounded-xl border border-brand-deep/50 bg-brand-deep-soft/30 p-3.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-deep">Your goal</p>
           <p className="mt-1 text-sm font-medium italic text-[var(--ink-strong)]">&ldquo;{goal.content}&rdquo;</p>
         </div>
 
@@ -108,7 +108,7 @@ export function AskSageModal({ goal, onClose }: AskSageModalProps) {
             >
               {sendState === "sending" && !reply ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center text-[var(--ink-muted)]">
-                  <div className="mb-2 h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" aria-hidden="true" />
+                  <div className="mb-2 h-6 w-6 animate-spin rounded-full border-2 border-brand-deep border-t-transparent" aria-hidden="true" />
                   <p className="text-xs">Sage is thinking...</p>
                 </div>
               ) : sendState === "error" ? (

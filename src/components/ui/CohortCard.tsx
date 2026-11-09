@@ -36,7 +36,7 @@ export function CohortCard({
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
     <div>
-      <p className="font-display text-2xl font-bold text-[var(--ink-strong)]">{value}</p>
+      <p className="font-display text-2xl text-[var(--ink-strong)]">{value}</p>
       <p className="text-xs text-[var(--ink-muted)]">{label}</p>
     </div>
   );
