@@ -320,7 +320,7 @@ export default function VisionBoardPin({ item, onDelete }: VisionBoardPinProps) 
             hovering ? "scale-[1.02] shadow-[4px_8px_16px_rgba(0,19,63,0.18)]" : ""
           } ${noteStyle.shell}`}
         >
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.38),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.22),transparent_32%)]" />
+          <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.38),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.22),transparent_32%)]" />
           <div className="pointer-events-none absolute inset-0 opacity-45 [background-image:repeating-linear-gradient(180deg,transparent_0_1.45rem,rgba(255,255,255,0.14)_1.45rem_1.52rem)]" />
           <div className={`pointer-events-none absolute inset-x-0 top-4 h-px ${noteStyle.line}`} />
           <div className="pointer-events-none absolute right-0 top-0 h-7 w-7 translate-x-[24%] -translate-y-[24%] rotate-45 rounded-sm bg-[var(--surface-raised)]/35 shadow-[0_1px_3px_rgba(0,19,63,0.08)]" />
