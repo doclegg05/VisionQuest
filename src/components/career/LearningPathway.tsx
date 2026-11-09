@@ -10,13 +10,13 @@ interface LearningPathwayProps {
 const STATUS_CONFIG = {
   complete: {
     circleCls:
-      "bg-emerald-500 border-emerald-500 text-white",
+      "bg-success border-success text-white",
     icon: (
       <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
       </svg>
     ),
-    badgeCls: "bg-emerald-100 text-emerald-800",
+    badgeCls: "bg-success-soft text-success",
     badgeLabel: "Complete",
     textCls: "text-[var(--ink-muted)] line-through",
     cardCls: "opacity-70",
@@ -117,7 +117,7 @@ export function LearningPathway({ pathway }: LearningPathwayProps) {
               {/* Step card */}
               <div
                 className={[
-                  "mb-3 min-w-0 flex-1 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)]/60 px-4 py-3",
+                  "mb-3 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)]/60 px-4 py-3",
                   config.cardCls,
                   step.isCurrent
                     ? "border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.04)]"

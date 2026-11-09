@@ -37,7 +37,7 @@ export function GoalRowActions({ label, goalId, onEdit, onDismiss, iconSize = 14
         type="button"
         onClick={onDismiss}
         aria-label={`Remove ${label}`}
-        className={`${BUTTON_BASE} hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/40`}
+        className={`${BUTTON_BASE} hover:bg-danger-soft hover:text-danger`}
       >
         <Trash size={iconSize} aria-hidden="true" />
       </button>
