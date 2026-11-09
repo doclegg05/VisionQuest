@@ -24,7 +24,7 @@ export function CareerDnaHighlights({ topInterests, profileSource }: CareerDnaHi
     <section aria-labelledby="career-dna-highlights-heading" className="surface-section p-5">
       <h2
         id="career-dna-highlights-heading"
-        className="font-display text-xl font-bold text-[var(--ink-strong)]"
+        className="font-display text-xl text-[var(--ink-strong)]"
       >
         Your top interests
       </h2>
@@ -37,7 +37,7 @@ export function CareerDnaHighlights({ topInterests, profileSource }: CareerDnaHi
         {topInterests.map((interest, idx) => (
           <li
             key={interest.key}
-            className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)]/70 p-4"
+            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)]/70 p-4"
           >
             <div className="flex items-center justify-between gap-2">
               <span
@@ -50,7 +50,7 @@ export function CareerDnaHighlights({ topInterests, profileSource }: CareerDnaHi
                 {interest.percent}%
               </span>
             </div>
-            <p className="mt-3 font-display text-lg font-bold text-[var(--ink-strong)]">
+            <p className="mt-3 font-display text-lg text-[var(--ink-strong)]">
               {interest.nickname}
             </p>
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--ink-muted)]">

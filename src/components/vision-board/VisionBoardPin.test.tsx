@@ -1,9 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { renderToString } from "react-dom/server";
 
 import VisionBoardPin, { removePinLabel, resizePinLabel, resizeWidthForKey } from "./VisionBoardPin";
 import type { VisionBoardItemData } from "./VisionBoard";
+import { composite, contrastRatio, cssTokenValue, parseColor } from "@/lib/wcag-contrast";
 
 const GOAL_ITEM: VisionBoardItemData = {
   id: "g1",
@@ -158,4 +160,51 @@ describe("resizeWidthForKey", () => {
     assert.equal(resizeWidthForKey(" ", 20, bounds), null);
     assert.equal(resizeWidthForKey("Tab", 20, bounds), null);
   });
+});
+
+describe("sticky note tints keep their text readable", () => {
+  const source = readFileSync(new URL("./VisionBoardPin.tsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const tints = [...source.matchAll(/bg-\[linear-gradient\(rgba\((\d+),(\d+),(\d+),([\d.]+)\)/g)];
+
+  // The white gloss sits between the tint and the text. Its class decides which themes show it.
+  const glossClass = source.match(/className="([^"]*)(?=[^"]*radial-gradient\(circle_at_top_left,rgba\(255,255,255,0\.38\))[^"]*"/)?.[0] ?? "";
+  const glossAlphas = [...glossClass.matchAll(/rgba\(255,255,255,([\d.]+)\)/g)].map((m) => Number(m[1])).slice(0, 2);
+  const glossHiddenInDark = /\bdark:(hidden|opacity-0)\b/.test(glossClass);
+
+  it("finds all four tinted notes", () => {
+    assert.equal(tints.length, 4);
+  });
+
+  it("finds the two gloss layers", () => {
+    assert.deepEqual(glossAlphas, [0.38, 0.22]);
+  });
+
+  // A color is not a valid background-image layer: `bg-[linear-gradient(...),var(--x)]`
+  // is dropped at computed time and the note loses its ground. The ground is its own class.
+  it("keeps the ground color out of the gradient and in bg-surface-raised", () => {
+    const shells = [...source.matchAll(/shell: "([^"]*rgba[^"]*)"/g)].map((m) => m[1]);
+    assert.equal(shells.length, 4);
+    for (const shell of shells) {
+      assert.doesNotMatch(shell, /bg-\[linear-gradient\([^\]]*var\(/, `color layer inside the gradient: ${shell}`);
+      assert.match(shell, /(^|\s)bg-surface-raised(\s|$)/, `no opaque ground: ${shell}`);
+    }
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    it(`${theme} theme: ink on every tint, gloss included, clears 4.5:1`, () => {
+      const ink = cssTokenValue(css, "--ink-strong", theme) as string;
+      const ground = cssTokenValue(css, "--surface-raised", theme) as string;
+      const glossShown = theme === "light" || !glossHiddenInDark;
+      for (const [, r, g, b, a] of tints) {
+        let painted = composite({ r: Number(r), g: Number(g), b: Number(b), a: Number(a) }, parseColor(ground));
+        // The corner stacks both gloss layers; that is the worst case under the text.
+        if (glossShown) {
+          for (const alpha of glossAlphas) painted = composite({ r: 255, g: 255, b: 255, a: alpha }, parseColor(painted));
+        }
+        const ratio = contrastRatio(ink, painted);
+        assert.ok(ratio >= 4.5, `rgba(${r},${g},${b},${a}) under ${ink} is ${ratio.toFixed(2)}:1`);
+      }
+    });
+  }
 });

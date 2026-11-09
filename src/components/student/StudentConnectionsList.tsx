@@ -107,7 +107,7 @@ export function StudentConnectionsList({
             ) : (
               <>
                 {errors[connection.id] && (
-                  <p className="mt-2 text-base text-red-600" role="alert">
+                  <p className="mt-2 text-base text-danger" role="alert">
                     {errors[connection.id]}
                   </p>
                 )}

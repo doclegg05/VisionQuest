@@ -144,10 +144,10 @@ export default function CredlyBadges() {
             Go to credly.com, click your name in the top-right, then &quot;View Profile.&quot; Copy the URL — it should look like credly.com/users/your-name.
           </p>
           {connectStatus === "success" && (
-            <p className="mt-2 text-sm text-emerald-600">Credly profile connected!</p>
+            <p className="mt-2 text-sm text-success">Credly profile connected!</p>
           )}
           {connectStatus === "error" && (
-            <p className="mt-2 text-sm text-red-600">Could not connect your Credly profile. Please check the username and try again.</p>
+            <p className="mt-2 text-sm text-danger">Could not connect your Credly profile. Please check the username and try again.</p>
           )}
         </div>
 

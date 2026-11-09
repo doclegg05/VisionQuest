@@ -186,7 +186,7 @@ export default function OpportunitiesHub({
       </div>
 
       {message ? (
-        <div className="surface-section border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] p-4 text-sm text-[var(--ink-strong)]">
+        <div className="surface-section border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] p-4 text-sm text-[var(--ink-strong)]">
           {message}
         </div>
       ) : null}
@@ -219,7 +219,7 @@ export default function OpportunitiesHub({
                       <h2 className="break-words font-display text-2xl text-[var(--ink-strong)]">{opportunity.title}</h2>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         opportunity.status === "open"
-                          ? "bg-emerald-100 text-emerald-700"
+                          ? "bg-success-soft text-success"
                           : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                       }`}>
                         {opportunity.status}
@@ -289,7 +289,7 @@ export default function OpportunitiesHub({
                           type="button"
                           onClick={() => void removeAttachedResume(opportunity.id)}
                           disabled={savingId === opportunity.id || attachingId === opportunity.id}
-                          className="min-h-11 rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="min-h-11 rounded-full border border-danger px-4 py-2 text-sm font-semibold text-danger hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Remove Resume
                         </button>
@@ -311,7 +311,7 @@ export default function OpportunitiesHub({
                       }))
                     }
                     aria-label="Application status"
-                    className="theme-card-subtle min-h-11 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="theme-card-subtle min-h-11 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-info"
                   >
                     {APPLICATION_STATUSES.map((status) => (
                       <option key={status.value} value={status.value}>
@@ -333,7 +333,7 @@ export default function OpportunitiesHub({
                     aria-label="Application notes"
                     placeholder="Notes, follow-up steps, or interview details"
                     rows={3}
-                    className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-info"
                   />
                   <button
                     type="button"

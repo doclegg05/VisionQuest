@@ -11,7 +11,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange }: { task: TaskDto;
     <Dialog.Portal>
       <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/50" />
       <Dialog.Content className="fixed left-1/2 top-1/2 z-[101] max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-[var(--surface-raised)] p-6 text-[var(--ink-strong)] shadow-xl">
-        <Dialog.Title className="font-display text-xl font-semibold break-words">{task.title}</Dialog.Title>
+        <Dialog.Title className="font-display text-xl break-words">{task.title}</Dialog.Title>
         <Dialog.Description className="mt-2 text-sm text-[var(--ink-muted)]">Assigned by staff. Only staff can change these details.</Dialog.Description>
         <dl className="mt-5 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
           <dt className="font-semibold">Status</dt><dd>{STATUS_LABELS[task.status] ?? "Unknown status"}</dd>

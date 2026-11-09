@@ -63,7 +63,7 @@ export default function BrandLockup({
     <div className={wrapperClassName}>
       <div className="flex shrink-0 items-stretch gap-1.5">
         <div
-          className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-card)]"
+          className="relative flex items-center justify-center overflow-hidden rounded-lg bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-card)]"
           style={{ maxHeight: sizeConfig.imageHeight + 12, maxWidth: Math.round(sizeConfig.imageWidth * 0.9) + 12 }}
         >
           <Image
@@ -76,7 +76,7 @@ export default function BrandLockup({
           />
         </div>
         <div
-          className="relative flex items-center justify-center overflow-hidden rounded-[0.8rem] bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-card)]"
+          className="relative flex items-center justify-center overflow-hidden rounded-lg bg-[var(--surface-raised)] p-1.5 shadow-[var(--shadow-card)]"
           style={{ maxHeight: sizeConfig.imageHeight + 12, maxWidth: sizeConfig.imageWidth + 12 }}
         >
           <Image

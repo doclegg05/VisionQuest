@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { spokesColor } from "@/lib/spokes-palette";
 
 type SignatureMode = "draw" | "type";
 
@@ -20,7 +21,7 @@ const CANVAS_HEIGHT = 150;
 // Fixed dark ink, because the exported PNG is drawn on white. Both pads are
 // therefore paper in either theme: bg-white plus data-theme="light", so the
 // tokens inside (caption, placeholder, typed name) take their light values.
-const STROKE_COLOR = "#1a2a3a";
+const STROKE_COLOR = spokesColor("royal");
 const STROKE_WIDTH = 2;
 
 export default function SignaturePad({ onSign, onCancel, submitting = false }: SignaturePadProps) {
@@ -300,7 +301,7 @@ function TypePad({
     if (!ctx) return;
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, width, CANVAS_HEIGHT);
-    ctx.strokeStyle = "#d1d5db";
+    ctx.strokeStyle = spokesColor("offwhite");
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(24, CANVAS_HEIGHT - 30);
@@ -333,7 +334,7 @@ function TypePad({
           {trimmed && (
             <div className="mt-4 border-t border-[var(--border)] pt-3">
               <p className="text-xs text-[var(--ink-muted)] mb-1">Preview</p>
-              <p className="font-serif text-2xl italic text-[#1a2a3a]">{trimmed}</p>
+              <p className="font-serif text-2xl italic text-[var(--ink-strong)]">{trimmed}</p>
             </div>
           )}
         </div>

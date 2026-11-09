@@ -114,7 +114,7 @@ export default function CredentialSharePanel() {
       </div>
 
       {!data?.eligible ? (
-        <div className="mt-4 rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+        <div className="mt-4 rounded-2xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
           Finish certification first. Once your Ready to Work certification is completed and verified, you can publish a public credential page here.
         </div>
       ) : (
@@ -127,7 +127,7 @@ export default function CredentialSharePanel() {
                   type="text"
                   value={form.headline}
                   onChange={(event) => setForm((current) => ({ ...current, headline: event.target.value }))}
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-info"
                 />
               </label>
               <label className="block space-y-1.5">
@@ -137,7 +137,7 @@ export default function CredentialSharePanel() {
                   onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
                   rows={4}
                   placeholder="What should visitors know about this credential and what it represents?"
-                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-info"
                 />
               </label>
               <label className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
@@ -158,7 +158,7 @@ export default function CredentialSharePanel() {
               </button>
             </div>
 
-            <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4">
+            <div className="rounded-2xl border border-[rgba(0,123,175,0.15)] bg-[rgba(0,123,175,0.08)] p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-info">Preview</p>
               <p className="mt-3 font-display text-2xl text-[var(--ink-strong)]">
                 {form.headline || "Ready to Work Certified"}

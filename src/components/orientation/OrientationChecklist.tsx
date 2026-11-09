@@ -225,8 +225,8 @@ export default function OrientationChecklist({
 
   if (error) return (
     <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchItems} className="inline-flex min-h-11 items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+      <p className="text-danger mb-4">{error}</p>
+      <button onClick={fetchItems} className="inline-flex min-h-11 items-center px-4 py-2 bg-info text-on-info rounded-lg hover:bg-brand-dark">
         Try Again
       </button>
     </div>
@@ -260,9 +260,9 @@ export default function OrientationChecklist({
               key={group.section}
               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                 isComplete
-                  ? "bg-green-100 text-green-700"
+                  ? "bg-success-soft text-success"
                   : sDone > 0
-                    ? "bg-amber-50 text-amber-800"
+                    ? "bg-warning-soft text-warning"
                     : "bg-[var(--surface-interactive)] text-[var(--ink-muted)]"
               }`}
             >
@@ -281,7 +281,7 @@ export default function OrientationChecklist({
         </div>
         <div className="h-2.5 bg-[var(--surface-strong)] rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
+            className="h-full bg-gradient-to-r from-success to-success rounded-full transition-all duration-500"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -301,7 +301,7 @@ export default function OrientationChecklist({
               <h3 className="text-sm font-bold text-[var(--ink-strong)]">
                 {group.section}
                 {sectionComplete && (
-                  <span className="ml-2 text-green-500">✓</span>
+                  <span className="ml-2 text-success">✓</span>
                 )}
               </h3>
               <span className="text-xs text-[var(--ink-muted)]">
@@ -313,7 +313,7 @@ export default function OrientationChecklist({
             <div className="mb-3 h-1.5 rounded-full bg-[var(--surface-strong)] overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  sectionComplete ? "bg-green-500" : "bg-amber-400"
+                  sectionComplete ? "bg-success" : "bg-warning"
                 }`}
                 style={{ width: `${sectionPct}%` }}
               />
@@ -330,7 +330,7 @@ export default function OrientationChecklist({
                     <label
                       className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                         item.completed
-                          ? "bg-green-50 border-green-200"
+                          ? "bg-success-soft border-success"
                           : "bg-[var(--surface-raised)] border-[var(--border)] hover:bg-[var(--surface-soft)] bg-opacity-[86%]"
                       }`}
                     >
@@ -338,7 +338,7 @@ export default function OrientationChecklist({
                         type="checkbox"
                         checked={item.completed}
                         onChange={() => toggleItem(item.id, !item.completed)}
-                        className="h-5 w-5 rounded border-[var(--border-strong)] text-green-600 focus:ring-green-500 shrink-0 cursor-pointer"
+                        className="h-5 w-5 rounded border-[var(--border-strong)] text-success focus:ring-success shrink-0 cursor-pointer"
                       />
                       <div
                         className="flex-1 min-w-0"
@@ -349,22 +349,22 @@ export default function OrientationChecklist({
                           }
                         }}
                       >
-                        <p className={`text-[15px] font-medium ${item.completed ? "text-green-800 line-through opacity-80" : "text-[var(--ink-strong)]"}`}>
+                        <p className={`text-[15px] font-medium ${item.completed ? "text-success line-through" : "text-[var(--ink-strong)]"}`}>
                           {item.label}
                           {item.required && (
-                            <span className="ml-1 text-xs text-red-400 font-normal">*</span>
+                            <span className="ml-1 text-xs text-danger font-normal">*</span>
                           )}
                         </p>
                         {item.description && (
                           <p className="text-sm text-[var(--ink-muted)] mt-0.5">{item.description}</p>
                         )}
                         {!item.completed && item.verificationStatus === "pending" && (
-                          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning">
                             ✓ Sent — waiting on your instructor
                           </p>
                         )}
                         {!item.completed && item.verificationStatus === "declined" && (
-                          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger">
                             Your instructor asked you to redo this step
                           </p>
                         )}
@@ -383,7 +383,7 @@ export default function OrientationChecklist({
                         </span>
                       )}
                       {item.completed && !hasDetails && (
-                        <span className="text-green-500 shrink-0 text-sm ml-1">✓</span>
+                        <span className="text-success shrink-0 text-sm ml-1">✓</span>
                       )}
                     </label>
                     {expandedItem === item.id && hasDetails && (
@@ -403,10 +403,10 @@ export default function OrientationChecklist({
       })}
 
       {done === total && total > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+        <div className="bg-success-soft border border-success rounded-xl p-4 text-center">
           <p className="text-lg mb-1">🎉</p>
-          <p className="text-sm font-medium text-green-800">Orientation complete!</p>
-          <p className="text-xs text-green-700 mt-0.5">You&apos;re all set to get started with SPOKES.</p>
+          <p className="text-sm font-medium text-success">Orientation complete!</p>
+          <p className="text-xs text-success mt-0.5">You&apos;re all set to get started with SPOKES.</p>
         </div>
       )}
 

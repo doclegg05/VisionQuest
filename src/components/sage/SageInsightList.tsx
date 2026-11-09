@@ -21,11 +21,11 @@ interface SageInsightListProps {
 }
 
 const CATEGORY_STYLES: Record<SageInsight["category"], string> = {
-  goal: "bg-sky-100 text-sky-800",
-  barrier: "bg-amber-100 text-amber-800",
-  strength: "bg-emerald-100 text-emerald-800",
-  context: "bg-indigo-100 text-indigo-800",
-  concern: "bg-rose-100 text-rose-800",
+  goal: "bg-info-soft text-info",
+  barrier: "bg-warning-soft text-warning",
+  strength: "bg-success-soft text-success",
+  context: "bg-brand-deep-soft text-brand-deep",
+  concern: "bg-danger-soft text-danger",
 };
 
 function formatCategory(category: string): string {
@@ -112,14 +112,14 @@ export default function SageInsightList({
           </p>
         </div>
         {insights.length > 0 ? (
-          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-success">
+          <span className="rounded-full bg-[rgba(0,123,175,0.12)] px-3 py-1 text-xs font-semibold text-success">
             {insights.length} active
           </span>
         ) : null}
       </div>
 
       {error ? (
-        <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">
+        <p className="mt-3 rounded-lg border border-danger bg-danger-soft px-3 py-2 text-sm text-danger" role="alert">
           {error}
         </p>
       ) : null}

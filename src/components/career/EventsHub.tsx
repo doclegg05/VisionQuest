@@ -77,7 +77,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
       </div>
 
       {message ? (
-        <div className="surface-section border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] p-4 text-sm text-[var(--ink-strong)]">
+        <div className="surface-section border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] p-4 text-sm text-[var(--ink-strong)]">
           {message}
         </div>
       ) : null}
@@ -111,7 +111,7 @@ export default function EventsHub({ events }: { events: EventItem[] }) {
                       <h2 className="font-display text-2xl text-[var(--ink-strong)]">{event.title}</h2>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         event.status === "scheduled"
-                          ? "bg-emerald-100 text-emerald-700"
+                          ? "bg-success-soft text-success"
                           : "bg-[var(--surface-interactive)] text-[var(--ink-strong)]"
                       }`}>
                         {event.status}

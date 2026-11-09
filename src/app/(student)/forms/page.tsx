@@ -49,12 +49,12 @@ export default async function StudentFormsPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-[var(--ink-strong)]">{form.title}</h3>
                       {form.requiredForCompletion && (
-                        <span className="rounded-full bg-[var(--badge-warning-bg)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--badge-warning-text)]">
+                        <span className="rounded-full bg-[var(--badge-warning-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--badge-warning-text)]">
                           Required
                         </span>
                       )}
                       {form.isOfficial && (
-                        <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--badge-info-text)]">
+                        <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--badge-info-text)]">
                           Official
                         </span>
                       )}

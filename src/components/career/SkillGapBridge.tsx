@@ -12,8 +12,8 @@ interface SkillGapBridgeProps {
 // ─── Importance Badge ─────────────────────────────────────────────────────────
 
 const IMPORTANCE_STYLES: Record<SkillGapItem["importance"], { dot: string; label: string }> = {
-  essential: { dot: "bg-red-500", label: "essential" },
-  important:  { dot: "bg-amber-400", label: "important" },
+  essential: { dot: "bg-danger", label: "essential" },
+  important:  { dot: "bg-warning", label: "important" },
   helpful:    { dot: "bg-[var(--surface-muted)]", label: "helpful" },
 };
 
@@ -33,7 +33,7 @@ function ImportanceBadge({ importance }: { importance: SkillGapItem["importance"
 
 function SkillCard({ skill }: { skill: SkillGapItem }) {
   return (
-    <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)]/70 p-3">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)]/70 p-3">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold leading-snug text-[var(--ink-strong)]">
           {skill.name}
@@ -77,7 +77,7 @@ interface ColumnProps {
 function Column({ title, count, skills, headerClass, emptyText }: ColumnProps) {
   return (
     <div className="flex flex-col gap-3">
-      <div className={`rounded-[1rem] px-3 py-2 ${headerClass}`}>
+      <div className={`rounded-xl px-3 py-2 ${headerClass}`}>
         <p className="text-xs font-bold uppercase tracking-[0.14em]">{title}</p>
         <p className="text-2xl font-bold leading-none">{count}</p>
       </div>
@@ -126,12 +126,12 @@ function ReadinessBar({
 
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]">
         <div
-          className="h-full bg-emerald-500 transition-all"
+          className="h-full bg-success transition-all"
           style={{ width: `${havePct}%` }}
           title={`Have: ${haveCount}`}
         />
         <div
-          className="h-full bg-amber-400 transition-all"
+          className="h-full bg-warning transition-all"
           style={{ width: `${buildingPct}%` }}
           title={`Building: ${buildingCount}`}
         />
@@ -139,11 +139,11 @@ function ReadinessBar({
 
       <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ink-muted)]">
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-emerald-500" />
+          <span className="h-2 w-2 rounded-sm bg-success" />
           Have ({haveCount})
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-amber-400" />
+          <span className="h-2 w-2 rounded-sm bg-warning" />
           Building ({buildingCount})
         </span>
         <span className="flex items-center gap-1">
@@ -207,21 +207,21 @@ export function SkillGapBridge({ analysis }: SkillGapBridgeProps) {
           title="Have"
           count={analysis.haveCount}
           skills={haveSkills}
-          headerClass="bg-emerald-50 text-emerald-800"
+          headerClass="bg-success-soft text-success"
           emptyText="No matched skills yet — complete your career discovery."
         />
         <Column
           title="Building"
           count={analysis.buildingCount}
           skills={buildingSkills}
-          headerClass="bg-amber-50 text-amber-800"
+          headerClass="bg-warning-soft text-warning"
           emptyText="Start a certification to see skills in progress."
         />
         <Column
           title="Need"
           count={analysis.needCount}
           skills={needSkills}
-          headerClass="bg-red-50 text-red-800"
+          headerClass="bg-danger-soft text-danger"
           emptyText="Great — no skill gaps identified."
         />
       </div>

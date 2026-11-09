@@ -25,7 +25,7 @@ interface ResumeAssistResponse {
 }
 
 const INPUT_CLASS =
-  "w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full theme-card-subtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-info";
 const LABEL_TEXT_CLASS = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]";
 const SECONDARY_BUTTON_CLASS =
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--ink-strong)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-60";
@@ -412,8 +412,8 @@ export default function ResumeBuilder() {
               disabled={saving}
               className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 saved
-                  ? "bg-green-100 text-green-700"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
+                  ? "bg-success-soft text-success"
+                  : "bg-info text-on-info hover:bg-brand-dark"
               }`}
             >
               {saved ? "Saved" : saving ? "Saving..." : "Save Resume"}
@@ -422,7 +422,7 @@ export default function ResumeBuilder() {
         </div>
 
         {error ? (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mt-4 rounded-xl border border-danger bg-danger-soft px-4 py-3 text-sm text-danger">
             {error}
           </div>
         ) : null}
@@ -514,22 +514,22 @@ export default function ResumeBuilder() {
         </div>
 
         {uploading && (
-          <div className="mt-4 flex items-center gap-3 rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3">
+          <div className="mt-4 flex items-center gap-3 rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent-strong)] border-t-transparent" />
             <p className="text-sm text-[var(--ink-strong)]">Sage is extracting and rebuilding your resume with ATS-optimized language...</p>
           </div>
         )}
 
         {!uploading && dragOver && (
-          <div className="mt-4 rounded-xl border-2 border-dashed border-[var(--accent-strong)] bg-[rgba(15,154,146,0.04)] px-4 py-8 text-center">
+          <div className="mt-4 rounded-xl border-2 border-dashed border-[var(--accent-strong)] bg-[rgba(0,123,175,0.04)] px-4 py-8 text-center">
             <p className="text-sm font-medium text-success">Drop your resume here</p>
           </div>
         )}
 
         {uploadImprovements.length > 0 && (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-900">Suggestions to strengthen your resume:</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+          <div className="mt-4 rounded-xl border border-warning bg-warning-soft px-4 py-3">
+            <p className="text-sm font-semibold text-warning">Suggestions to strengthen your resume:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warning">
               {uploadImprovements.map((item, i) => (
                 <li key={i}>{item}</li>
               ))}
@@ -564,20 +564,20 @@ export default function ResumeBuilder() {
             onChange={(event) => setAssistantPrompt(event.target.value)}
             placeholder="Example: Tailor this for entry-level office administrator roles. Highlight customer service, Microsoft Office, reliability, and any training or certifications."
             rows={4}
-            className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-info"
           />
         </label>
 
         {assistantMessage ? (
-          <div className="mt-4 rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+          <div className="mt-4 rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
             {assistantMessage}
           </div>
         ) : null}
 
         {missingInformation.length > 0 ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-900">Sage still needs:</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+          <div className="mt-4 rounded-xl border border-warning bg-warning-soft px-4 py-3">
+            <p className="text-sm font-semibold text-warning">Sage still needs:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warning">
               {missingInformation.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -663,7 +663,7 @@ export default function ResumeBuilder() {
           onChange={(event) => setResume((current) => ({ ...current, objective: event.target.value }))}
           placeholder="Write 2-4 lines summarizing the kind of work you want, the strengths you bring, and the training or experience that supports you."
           rows={5}
-          className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-info"
         />
       </div>
 
@@ -673,10 +673,10 @@ export default function ResumeBuilder() {
           {resume.skills.map((skill, index) => (
             <span
               key={`${skill}-${index}`}
-              className="flex items-center gap-2 rounded-full bg-blue-50 px-3 text-xs font-medium text-blue-700"
+              className="flex items-center gap-2 rounded-full bg-info-soft px-3 text-xs font-medium text-info"
             >
               {skill}
-              <button type="button" onClick={() => removeSkill(index)} className="inline-flex min-h-11 items-center text-blue-500 hover:text-blue-700">
+              <button type="button" onClick={() => removeSkill(index)} className="inline-flex min-h-11 items-center text-info hover:underline">
                 Remove
               </button>
             </span>
@@ -706,7 +706,7 @@ export default function ResumeBuilder() {
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Work Experience</h4>
-          <button type="button" onClick={addExperience} className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
+          <button type="button" onClick={addExperience} className="inline-flex min-h-11 items-center text-sm font-semibold text-info hover:underline">
             Add Experience
           </button>
         </div>
@@ -718,7 +718,7 @@ export default function ResumeBuilder() {
             <div key={`experience-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Experience {index + 1}</p>
-                <button type="button" onClick={() => removeExperience(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-red-500 hover:text-red-700">
+                <button type="button" onClick={() => removeExperience(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-danger hover:underline">
                   Remove
                 </button>
               </div>
@@ -764,7 +764,7 @@ export default function ResumeBuilder() {
                   onChange={(event) => updateExperience(index, "description", event.target.value)}
                   rows={4}
                   placeholder={"Use short bullet lines, for example:\n- Helped customers with questions and scheduling\n- Organized records and completed data entry accurately"}
-                  className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-info"
                 />
               </label>
             </div>
@@ -775,7 +775,7 @@ export default function ResumeBuilder() {
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Education</h4>
-          <button type="button" onClick={addEducation} className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
+          <button type="button" onClick={addEducation} className="inline-flex min-h-11 items-center text-sm font-semibold text-info hover:underline">
             Add Education
           </button>
         </div>
@@ -787,7 +787,7 @@ export default function ResumeBuilder() {
             <div key={`education-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Education {index + 1}</p>
-                <button type="button" onClick={() => removeEducation(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-red-500 hover:text-red-700">
+                <button type="button" onClick={() => removeEducation(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-danger hover:underline">
                   Remove
                 </button>
               </div>
@@ -834,7 +834,7 @@ export default function ResumeBuilder() {
       <div className="surface-section p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Certifications</h4>
-          <button type="button" onClick={addCertification} className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-600 hover:text-blue-800">
+          <button type="button" onClick={addCertification} className="inline-flex min-h-11 items-center text-sm font-semibold text-info hover:underline">
             Add Certification
           </button>
         </div>
@@ -846,7 +846,7 @@ export default function ResumeBuilder() {
             <div key={`certification-${index}`} className="rounded-xl border border-[var(--border)] p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Certification {index + 1}</p>
-                <button type="button" onClick={() => removeCertification(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-red-500 hover:text-red-700">
+                <button type="button" onClick={() => removeCertification(index)} className="inline-flex min-h-11 items-center text-xs font-semibold text-danger hover:underline">
                   Remove
                 </button>
               </div>
@@ -889,7 +889,7 @@ export default function ResumeBuilder() {
           onChange={(event) => setResume((current) => ({ ...current, references: event.target.value }))}
           placeholder="Usually this should be: Available upon request"
           rows={3}
-          className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-xl border border-[var(--border)] px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-info"
         />
       </div>
 
@@ -898,7 +898,7 @@ export default function ResumeBuilder() {
         onClick={() => void handleSave()}
         disabled={saving}
         className={`w-full rounded-xl py-3 text-sm font-semibold transition-colors ${
-          saved ? "bg-green-100 text-green-700" : "bg-blue-600 text-white hover:bg-blue-700"
+          saved ? "bg-success-soft text-success" : "bg-info text-on-info hover:bg-brand-dark"
         }`}
       >
         {saved ? "Resume Saved" : saving ? "Saving..." : "Save Resume"}

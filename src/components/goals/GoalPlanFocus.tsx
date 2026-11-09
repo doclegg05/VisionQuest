@@ -83,7 +83,7 @@ export default function GoalPlanFocus({
             return (
               <article
                 key={plan.goalId}
-                className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4"
+                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -124,7 +124,7 @@ export default function GoalPlanFocus({
                                 <p className="mt-2 text-xs leading-5 text-[var(--ink-muted)]">{link.notes}</p>
                               ) : null}
                               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                                <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-1 font-semibold text-info">
+                                <span className="rounded-full bg-[rgba(0,123,175,0.1)] px-2.5 py-1 font-semibold text-info">
                                   {GOAL_RESOURCE_LINK_STATUS_LABELS[link.status]}
                                 </span>
                                 {dueLabel ? (

@@ -50,7 +50,7 @@ function SignAndSubmitButton({
 
   if (currentStatus === "approved") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success">
         Signed & Approved
       </span>
     );
@@ -59,7 +59,7 @@ function SignAndSubmitButton({
   if (currentStatus === "pending") {
     return (
       <div className="inline-flex items-center gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+        <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-semibold text-warning">
           Signed — Pending Review
         </span>
         <button
@@ -84,7 +84,7 @@ function SignAndSubmitButton({
           onCancel={() => setShowPad(false)}
           submitting={submitting}
         />
-        {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+        {error && <p className="mt-1 text-xs text-danger">{error}</p>}
       </div>
     );
   }
@@ -94,16 +94,16 @@ function SignAndSubmitButton({
       <button
         onClick={() => setShowPad(true)}
         type="button"
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(15,154,146,0.2)] bg-[rgba(15,154,146,0.06)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[rgba(15,154,146,0.12)]"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[rgba(0,123,175,0.2)] bg-[rgba(0,123,175,0.06)] px-3 py-1.5 text-xs font-semibold text-info transition-colors hover:bg-[rgba(0,123,175,0.12)]"
       >
         {currentStatus === "rejected" ? "Re-sign" : "Sign & Submit"}
       </button>
       {currentStatus === "rejected" && (
-        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-semibold text-danger">
           Returned — please re-sign
         </span>
       )}
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -126,7 +126,7 @@ function OrientationFormCard({
   const usesSignaturePad = form.requiresSignature && form.id !== "student-profile";
 
   return (
-    <div className="rounded-xl border border-[rgba(15,154,146,0.12)] bg-[rgba(15,154,146,0.06)] p-3">
+    <div className="rounded-xl border border-[rgba(0,123,175,0.12)] bg-[rgba(0,123,175,0.06)] p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-[var(--ink-strong)]">{form.title}</p>
@@ -134,17 +134,17 @@ function OrientationFormCard({
         </div>
         <div className="flex shrink-0 gap-1.5">
           {form.fillable && (
-            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
+            <span className="rounded-full bg-[rgba(0,123,175,0.1)] px-2 py-0.5 text-xs font-semibold text-info">
               Fillable
             </span>
           )}
           {form.requiresSignature && (
-            <span className="rounded-full bg-[rgba(99,102,241,0.1)] px-2 py-0.5 text-xs font-semibold text-indigo-600">
+            <span className="rounded-full bg-[rgba(0,123,175,0.1)] px-2 py-0.5 text-xs font-semibold text-brand-deep">
               Signature
             </span>
           )}
           {form.required && (
-            <span className="rounded-full bg-[rgba(249,115,22,0.1)] px-2 py-0.5 text-xs font-semibold text-success">
+            <span className="rounded-full bg-[rgba(173,136,6,0.1)] px-2 py-0.5 text-xs font-semibold text-success">
               Required
             </span>
           )}

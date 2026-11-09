@@ -266,8 +266,8 @@ export default function PortfolioGrid() {
 
   if (error) return (
     <div className="text-center py-12">
-      <p className="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchItems} className="inline-flex min-h-11 items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+      <p className="text-danger mb-4">{error}</p>
+      <button onClick={fetchItems} className="inline-flex min-h-11 items-center justify-center px-4 py-2 bg-info text-on-info rounded-lg hover:bg-brand-dark">
         Try Again
       </button>
     </div>
@@ -333,17 +333,17 @@ export default function PortfolioGrid() {
                       <div className="flex gap-2 mt-2">
                         {item.fileId && (
                           <a href={`/api/files/download?id=${item.fileId}`} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800">View file</a>
+                            className="inline-flex min-h-11 items-center text-xs text-info hover:underline">View file</a>
                         )}
                         {item.url && (
                           <a href={item.url} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800">Open link ↗</a>
+                            className="inline-flex min-h-11 items-center text-xs text-info hover:underline">Open link ↗</a>
                         )}
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => startEdit(item)} className="inline-flex min-h-11 items-center text-xs text-blue-600 hover:text-blue-800 px-1">Edit</button>
-                      <button onClick={() => handleDelete(item.id)} className="inline-flex min-h-11 items-center text-xs text-red-500 hover:text-red-700 px-1">Del</button>
+                      <button onClick={() => startEdit(item)} className="inline-flex min-h-11 items-center text-xs text-info hover:underline px-1">Edit</button>
+                      <button onClick={() => handleDelete(item.id)} className="inline-flex min-h-11 items-center text-xs text-danger hover:underline px-1">Del</button>
                     </div>
                   </div>
                 </div>
@@ -375,7 +375,7 @@ export default function PortfolioGrid() {
                   onClick={() => chooseType(opt.value)}
                   className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all ${
                     form.type === opt.value
-                      ? "border-[var(--accent-strong)] bg-[rgba(42,138,60,0.06)] shadow-sm"
+                      ? "border-[var(--accent-strong)] bg-[rgba(55,181,80,0.06)] shadow-sm"
                       : "border-[var(--border)] hover:border-[var(--accent-secondary)]"
                   }`}
                 >
@@ -392,7 +392,7 @@ export default function PortfolioGrid() {
           <div className="mt-5 space-y-4">
             <div>
               <label htmlFor="portfolio-title" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-                Title <span className="text-red-400">*</span>
+                Title <span className="text-danger">*</span>
               </label>
               <input
                 id="portfolio-title"
@@ -438,16 +438,16 @@ export default function PortfolioGrid() {
                 Attach file <span className="text-[var(--ink-muted)]">(PDF, JPG, or PNG — max 10MB)</span>
               </p>
               {form.fileId ? (
-                <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-                  <CheckCircle size={20} weight="fill" aria-hidden className="text-green-600" />
-                  <span className="flex-1 text-sm font-medium text-green-800">File attached</span>
+                <div className="flex items-center gap-3 rounded-xl border border-success bg-success-soft px-4 py-3">
+                  <CheckCircle size={20} weight="fill" aria-hidden className="text-success" />
+                  <span className="flex-1 text-sm font-medium text-success">File attached</span>
                   <button
                     type="button"
                     onClick={() => {
                       setForm({ ...form, fileId: "" });
                       setCertificationRequirementId("");
                     }}
-                    className="inline-flex min-h-11 items-center text-xs font-medium text-red-500 hover:text-red-700"
+                    className="inline-flex min-h-11 items-center text-xs font-medium text-danger hover:underline"
                   >
                     Remove
                   </button>
@@ -569,7 +569,7 @@ export default function PortfolioGrid() {
           </div>
 
           {error && (
-            <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>
+            <p role="alert" className="mt-3 text-sm text-danger">{error}</p>
           )}
         </div>
       ) : items.length > 0 ? (

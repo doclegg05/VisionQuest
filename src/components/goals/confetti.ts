@@ -35,7 +35,7 @@ interface Particle {
 
 export const CONFETTI_PARTICLES_PER_BURST = 40;
 
-const COLORS = ["#37b550", "#2a8a3c", "#007baf", "#d3b257", "#ad8806"];
+const COLORS = ["#37b550", "#1e7a2e", "#007baf", "#d3b257", "#ad8806"];
 const GRAVITY = 0.2;
 const FRICTION = 0.97;
 const UPWARD_BIAS = 2.5;

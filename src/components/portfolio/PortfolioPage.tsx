@@ -51,7 +51,7 @@ export default function PortfolioPage() {
             onClick={() => setTab(item.key)}
             onKeyDown={(event) => selectAdjacentTab(event, item.key)}
             type="button"
-            className={`min-h-11 rounded-[1rem] px-2 py-3 text-sm font-semibold transition-colors ${
+            className={`min-h-11 rounded-xl px-2 py-3 text-sm font-semibold transition-colors ${
               tab === item.key
                 ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
                 : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
