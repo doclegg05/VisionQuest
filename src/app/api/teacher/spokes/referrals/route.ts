@@ -14,7 +14,7 @@ const deleteReferralSchema = z.object({
 // Unlinked referrals (studentId: null) are applicants with no class yet. They
 // belong to admins: withTeacherAuth admits only teachers and admins, and RLS
 // gives unlinked rows to the admin role alone (migration
-// 20261108100000_spokes_record_unlinked_admin_only). An instructor sees an
+// 20261109130000_spokes_record_unlinked_admin_only). An instructor sees an
 // empty list (SpokesManager loads this with its config, so a 403 would blank
 // the whole panel) and cannot delete one.
 async function listUnlinkedReferrals(county: string) {
