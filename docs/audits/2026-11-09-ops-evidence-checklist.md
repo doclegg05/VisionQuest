@@ -29,7 +29,7 @@ Never paste a secret, connection string or student name into this file.
 | Fail-closed with the host stopped | Stop the host, send a Sage turn, expect a refusal, not a cloud answer | Britt | | not run | |
 | Provider routing matches the report | `npm run sage:ai:accountability` against production | Britt | | not run | |
 | Selected 12B model evals | `npm run sage:agent:eval`, `npm run sage:redteam:eval -- --provider=ollama`, `npm run sage:quality:eval`; record SHA and `SAGE_PROMPT_REVISION` | Implementer | | not run | |
-| Cron jobs registered and healthy | `npm run cron:health`; needs the `CRON_CHECK_DATABASE_URL` secret | Britt | | not run | |
+| Cron jobs registered and healthy | `npm run cron:health`; needs the `CRON_CHECK_DATABASE_URL` secret, added in GitHub repository Settings, Secrets and variables, Actions, as a repository secret named `CRON_CHECK_DATABASE_URL` | Britt | | not run | |
 | Cold-queue triage under 5 minutes | Time an instructor; check the action panel at 375px | Britt | | not run | |
 | Benchmark result PRs allowed | GitHub Settings, Actions, General, "Allow GitHub Actions to create and approve pull requests" | Britt | | not run | |
 | Restore drill | [Backup and restore runbook](../runbooks/backup-restore.md) | Britt | | not run | |

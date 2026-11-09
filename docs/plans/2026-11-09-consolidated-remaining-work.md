@@ -175,6 +175,19 @@ Then confirm the session behavior, disable demo entry under the existing lifecyc
 | D7 | Reopen Ouroboros feasibility against current architecture and locked PM decisions, with a manual baseline, correction cost, stop condition and containment. | Excluded from execution; historical decisions are preserved, not expanded into autonomy authorization. |
 | D8 | Should any nonzero privacy leak fail the memory evaluation? Implement separately if approved; median voting is a different conditional choice. | Do not claim the current duplicate/hit-rate grader enforces printed leak counts. |
 
+## Progress on 2026-11-09
+
+| Branch | Plan item | State | Next step |
+| --- | --- | --- | --- |
+| `fix/credly-account-cache` | W3a | Built and reviewed locally, not pushed | Britt pushes, CI, review, merge |
+| `design/spokes-student-sweep` | W2 (PR 2) | Built and reviewed locally, not pushed | Britt pushes, CI, screenshot review, merge PR 2 first |
+| `design/spokes-remaining-sweep` | W2 (PR 3) | Built and reviewed locally, not pushed | Merge after PR 2, with the screenshot review |
+| `design/spokes-polish` | W2 (PR 4) | Built and reviewed locally, not pushed | Merge after PR 3, with the screenshot review |
+| `feat/durable-job-preferences` | W4 | Built and reviewed locally, not pushed | Britt pushes, CI (including the `rls-coverage` gate), review, merge |
+| `docs/consolidated-remaining-work` | W3 inventory (`docs/audits/2026-11-09-record-truth-inventory.md`), W5 spike (`docs/audits/2026-11-09-dashboard-propagation-spike.md`), ops checklist (`docs/audits/2026-11-09-ops-evidence-checklist.md`) | Built and reviewed locally, not pushed | Britt pushes, CI, review, merge |
+
+W6 and W7 wait on D2 to D4.
+
 ## Completion and maintenance
 
 A work item closes only with evidence matched to its claim: code and local gates for implementation, actual executions for operations, user observation for usability, deployed SHA/config for release. Mark unavailable dependencies explicitly. Store sanitized evidence under `docs/audits/` with date/config/revision and a short recovery record. Completed implementation checkboxes are not a reason to skip production acceptance; unticked historical checkboxes are not a reason to rebuild.
