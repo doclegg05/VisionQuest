@@ -26,7 +26,7 @@ export function CareerDnaHighlights({ topInterests, profileSource }: CareerDnaHi
         id="career-dna-highlights-heading"
         className="font-display text-xl text-[var(--ink-strong)]"
       >
-        Your top interests
+        Your Top Interests
       </h2>
       <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
         {assessed

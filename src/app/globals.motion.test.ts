@@ -14,7 +14,7 @@ describe("reduced motion", () => {
   });
 
   it("cancels the hover lifts, not just their animation", () => {
-    for (const selector of [".primary-button:hover", ".surface-section:hover"]) {
+    for (const selector of [".primary-button:hover", ".surface-section:is(a, button):hover"]) {
       const at = reduced.indexOf(selector);
       assert.ok(at >= 0, `${selector} missing from the reduced-motion block`);
       assert.match(reduced.slice(at, reduced.indexOf("}", at)), /transform: none/);

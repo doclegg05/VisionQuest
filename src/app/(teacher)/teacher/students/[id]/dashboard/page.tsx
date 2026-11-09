@@ -16,7 +16,7 @@ type Activity = Awaited<ReturnType<typeof readActivity>>;
 type TaskPage = Awaited<ReturnType<typeof readTasks>>;
 type NextStep = Awaited<ReturnType<typeof getStudentNextStep>>;
 
-const sectionHeading = "font-display text-xl font-semibold";
+const sectionHeading = "font-display text-xl";
 const mutedNote = "mt-2 text-sm text-[var(--ink-muted)]";
 
 function Unavailable({ what }: { what: string }) {
@@ -81,13 +81,13 @@ export default async function StudentDashboardPreview({ params }: { params: Prom
 
   return <div className="page-shell space-y-6 text-[var(--ink-strong)]">
     <header>
-      <h1 className="font-display text-2xl font-semibold">{student.displayName}’s dashboard preview</h1>
+      <h1 className="font-display text-2xl">{student.displayName}’s dashboard preview</h1>
       <p className="mt-2 text-[var(--ink-muted)]">Read-only snapshot of student records, taken {fetchedAt} UTC. Manage assignments and reviews from Student Detail.</p>
       <Link className="mt-3 inline-flex min-h-11 items-center underline" href={`/teacher/students/${student.id}`}>Back to Student Detail</Link>
     </header>
     <Region result={nextStep} what="The next step">{(v) => <NextStepSection nextStep={v} />}</Region>
     <Region result={overview} what="Outcomes">{(v) => <OutcomesList overview={v} />}</Region>
     <section><h2 className={sectionHeading}>Tasks</h2><Region result={tasks} what="Tasks">{(v) => <TasksList tasks={v} />}</Region></section>
-    <section><h2 className={sectionHeading}>Current task activity</h2><Region result={activity} what="Task activity">{(v) => <ActivityList activity={v} />}</Region></section>
+    <section><h2 className={sectionHeading}>Current Task Activity</h2><Region result={activity} what="Task activity">{(v) => <ActivityList activity={v} />}</Region></section>
   </div>;
 }

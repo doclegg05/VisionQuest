@@ -111,7 +111,7 @@ export function DemoEntryButtons() {
         {continueTarget && (
           <a
             href={continueTarget.href}
-            className="flex h-11 w-full items-center justify-center rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 text-base font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
+            className="flex h-11 w-full items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 text-base font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
           >
             <span className="truncate">{continueTarget.label}</span>
           </a>

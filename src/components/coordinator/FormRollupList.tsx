@@ -98,7 +98,7 @@ export default function FormRollupList({ regionId }: { regionId: string }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-[var(--ink-strong)]">{template.title}</p>
                   {template.isOfficial && (
-                    <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--badge-info-text)]">
+                    <span className="rounded-full bg-[var(--badge-info-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--badge-info-text)]">
                       Official
                     </span>
                   )}

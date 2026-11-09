@@ -388,7 +388,7 @@ export default function AiProviderPanel() {
         </div>
       )}
       {message && (
-        <div className="rounded-2xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+        <div className="rounded-2xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
           {message}
         </div>
       )}
@@ -407,7 +407,7 @@ export default function AiProviderPanel() {
           onClick={() => setProvider("local")}
           className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
             provider === "local"
-              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-success"
+              ? "border-[var(--accent-strong)] bg-[rgba(0,123,175,0.08)] text-success"
               : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
           }`}
         >
@@ -418,7 +418,7 @@ export default function AiProviderPanel() {
           onClick={() => setProvider("cloud")}
           className={`flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
             provider === "cloud"
-              ? "border-[var(--accent-strong)] bg-[rgba(15,154,146,0.08)] text-success"
+              ? "border-[var(--accent-strong)] bg-[rgba(0,123,175,0.08)] text-success"
               : "border-[var(--border)] text-[var(--ink-muted)] hover:bg-[var(--surface-raised)]"
           }`}
         >

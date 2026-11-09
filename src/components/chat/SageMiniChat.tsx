@@ -294,7 +294,7 @@ export function SageMiniChat({ open, onClose, role = "student", initialMessage, 
       aria-label="Chat with Sage"
       tabIndex={-1}
       onKeyDown={trapFocus}
-      className="fixed bottom-20 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] shadow-[0_24px_64px_rgba(7,23,43,0.28)] md:bottom-6 md:right-6"
+      className="fixed bottom-20 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] shadow-[0_24px_64px_rgba(0,19,63,0.28)] md:bottom-6 md:right-6"
       style={{ maxHeight: "min(32rem, calc(100dvh - 7rem))" }}
     >
       {/* Header */}

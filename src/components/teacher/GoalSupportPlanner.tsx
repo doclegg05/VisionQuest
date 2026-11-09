@@ -390,7 +390,7 @@ export default function GoalSupportPlanner({ goals, goalPlans, onChanged }: Goal
                 {plan.suggestions.map((suggestion) => (
                   <span
                     key={suggestion}
-                    className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs text-info"
+                    className="rounded-full bg-[rgba(0,123,175,0.1)] px-3 py-1 text-xs text-info"
                   >
                     {suggestion}
                   </span>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
 import {
   createEmptySecurityQuestionAnswers,
@@ -60,7 +61,8 @@ export default function RecoverySetupForm({ redirectTo }: RecoverySetupFormProps
       />
 
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+          <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
           {error}
         </p>
       )}

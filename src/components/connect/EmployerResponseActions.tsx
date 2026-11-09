@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 
 import {
   NOT_NOW_REASONS,
@@ -78,7 +79,8 @@ export function EmployerResponseActions({
       <h2 className="text-lg font-semibold text-[var(--ink-strong)]">What would you like to do?</h2>
 
       {error && (
-        <p className="mt-3 text-base text-red-600" role="alert">
+        <p role="alert" className="mt-3 flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-base text-danger">
+          <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
           {error}
         </p>
       )}
@@ -111,7 +113,7 @@ export function EmployerResponseActions({
 
       {mode === "interested" && (
         <div className="mt-4">
-          <h3 className="text-base font-semibold text-[var(--ink-strong)]">Pick a time to meet</h3>
+          <h3 className="text-base font-semibold text-[var(--ink-strong)]">Pick a Time to Meet</h3>
           {slots.length === 0 ? (
             <p className="mt-2 text-base text-[var(--ink-muted)]">
               There are no open times right now. Reply to the email and we will set one up.

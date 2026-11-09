@@ -702,7 +702,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             {optimisticGreeting && !streamingContent && (
               <div>
                 <MessageBubble role="assistant" content={optimisticGreeting} isStreaming />
-                <p className="ml-11 mt-1 text-[11px] text-[var(--ink-muted)]">sending…</p>
+                <p className="ml-11 mt-1 text-xs text-[var(--ink-muted)]">sending…</p>
               </div>
             )}
 

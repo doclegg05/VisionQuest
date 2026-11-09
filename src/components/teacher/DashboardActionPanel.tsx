@@ -448,7 +448,7 @@ export default function DashboardActionPanel({
                   <p className="text-sm font-semibold text-[var(--ink-strong)]">
                     {GOAL_LEVEL_META[selectedGoal.goal.level as keyof typeof GOAL_LEVEL_META]?.label || selectedGoal.goal.level}
                   </p>
-                  <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-2.5 py-1 text-xs font-semibold text-info">
+                  <span className="rounded-full bg-[rgba(0,123,175,0.1)] px-2.5 py-1 text-xs font-semibold text-info">
                     {goalStatusLabel(selectedGoal.goal.status)}
                   </span>
                 </div>

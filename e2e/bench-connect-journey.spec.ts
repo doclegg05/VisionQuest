@@ -282,7 +282,7 @@ test("Connect journey: propose → approve → send → employer views, books, h
         // ── 5. Interested, with a time ───────────────────────────────────
         await employerPage.getByRole("button", { name: "I want to meet them" }).click();
         await expect(
-          employerPage.getByRole("heading", { name: "Pick a time to meet" }),
+          employerPage.getByRole("heading", { name: "Pick a Time to Meet" }),
         ).toBeVisible();
 
         const slot = employerPage.getByRole("button", { name: /\d{1,2}:\d{2}/u }).first();

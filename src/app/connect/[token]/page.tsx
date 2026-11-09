@@ -119,7 +119,7 @@ export default async function EmployerConnectPage({
         </section>
 
         <section className="surface-section p-6">
-          <h2 className="text-lg font-semibold text-[var(--ink-strong)]">About them</h2>
+          <h2 className="text-lg font-semibold text-[var(--ink-strong)]">About Them</h2>
           <dl className="mt-4 flex flex-col gap-4">
             {included.has("verified_certifications") && view.packet.certifications.length > 0 && (
               <div>
@@ -193,8 +193,8 @@ export default async function EmployerConnectPage({
             The student's own card applies the same rule, so the two surfaces
             agree by construction rather than by coincidence. */}
         {included.has("subsidy_line") && (
-          <section className="surface-section p-6">
-            <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Money for hiring</h2>
+          <section className="surface-section p-6" data-testid="subsidy-block">
+            <h2 className="text-lg font-semibold text-[var(--ink-strong)]">Money for Hiring</h2>
             <p className="mt-2 text-base text-[var(--ink-strong)]">
               {view.packet.subsidyLine ?? SUBSIDY_FALLBACK_LINE}
             </p>

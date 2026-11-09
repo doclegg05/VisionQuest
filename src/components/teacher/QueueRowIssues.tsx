@@ -27,7 +27,7 @@ export function QueueRowIssues({ id, studentName, groups, now, onQuickAction, on
       {groups.map((group) => (
         <li
           key={group.key}
-          className={`rounded-[0.85rem] border px-3 py-2.5 ${
+          className={`rounded-lg border px-3 py-2.5 ${
             group.urgent
               ? "border-[var(--border-strong)] bg-[var(--surface-raised)]"
               : "border-[var(--border)] bg-[var(--surface-raised)]"

@@ -180,7 +180,7 @@ export default function FileManager() {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
             File starter
           </p>
-          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Upload one useful file</h3>
+          <h3 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Upload One Useful File</h3>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--ink-muted)]">
             Good first files include a resume, certificate, program form, ID document, or work sample.
           </p>

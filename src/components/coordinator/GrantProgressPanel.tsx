@@ -47,7 +47,7 @@ export default function GrantProgressPanel({ goals, regionId, onChange }: GrantP
     <section className="surface-section p-5">
       <header className="mb-4 flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="font-display text-xl text-[var(--ink-strong)]">Grant progress</h2>
+          <h2 className="font-display text-xl text-[var(--ink-strong)]">Grant Progress</h2>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">
             Targets vs actuals. Actuals are derived from underlying enrollments, certifications, and placements.
           </p>
@@ -106,7 +106,7 @@ export default function GrantProgressPanel({ goals, regionId, onChange }: GrantP
                     </p>
                   </div>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${STATUS_STYLE[goal.status]}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[goal.status]}`}
                   >
                     {STATUS_LABEL[goal.status]}
                   </span>

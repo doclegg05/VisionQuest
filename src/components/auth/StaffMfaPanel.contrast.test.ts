@@ -36,13 +36,12 @@ test("StaffMfaPanel cards use the adaptive surface token", () => {
   );
 });
 
-test("designed red danger styles are untouched (no over-sweep)", () => {
-  // The error box and the danger button hover are hardcoded red pairs that
-  // are self-consistent in both themes — they are NOT the bug class and must
-  // survive contrast sweeps unchanged.
-  const redSurfaces = source.match(/bg-red-50/g) ?? [];
-  assert.ok(
-    redSurfaces.length >= 2,
-    `expected the two designed bg-red-50 uses to remain, found ${redSurfaces.length}`
-  );
+test("danger styles use the danger role pair (no over-sweep, no raw red)", () => {
+  // SPOKES sweep: the error box and the danger button hover moved from the
+  // hardcoded bg-red-50 / text-red-700 pair to the danger role, whose soft
+  // surface and text token are tuned together for both themes (white text in
+  // dark, where no SPOKES red clears 4.5:1). They must keep the pairing.
+  const soft = source.match(/bg-danger-soft|hover:bg-danger-soft/g) ?? [];
+  assert.ok(soft.length >= 2, `expected the two danger-soft uses to remain, found ${soft.length}`);
+  assert.doesNotMatch(source, /\b(bg|text|border)-red-\d+/, "raw red palette classes must not come back");
 });

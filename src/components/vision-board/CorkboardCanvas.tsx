@@ -142,7 +142,7 @@ export default function CorkboardCanvas({ items, onMove, onResize, onDelete }: C
           />
         ))}
       </div>
-      <p className="mt-2 px-1 text-xs text-[var(--ink-muted)]">
+      <p className="callout mt-2 text-xs text-[var(--ink-strong)]">
         Tip: if the board feels larger than your screen, scroll sideways inside the workspace to reach the full corkboard.
       </p>
       </div>

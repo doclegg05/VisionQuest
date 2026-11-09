@@ -54,7 +54,7 @@ export default function InstructorGrid({ metrics }: { metrics: InstructorMetrics
 function Metric({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-lg bg-[var(--surface-raised)] p-2">
-      <dt className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">{label}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">{label}</dt>
       <dd className="mt-1 font-display text-lg text-[var(--ink-strong)]">{value}</dd>
     </div>
   );

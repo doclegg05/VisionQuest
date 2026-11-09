@@ -94,7 +94,7 @@ function SageEffectivenessCard({ metrics }: { metrics: RollupResponse["sageEffec
             Proposed goals accepted by students or staff during this reporting period.
           </p>
         </div>
-        <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-success">
+        <span className="rounded-full bg-[rgba(0,123,175,0.12)] px-3 py-1 text-xs font-semibold text-success">
           {formatPercent(metrics.confirmationRateWithin14Days)} within 14 days
         </span>
       </div>
@@ -135,7 +135,7 @@ function WagerHitRateCard({ metrics }: { metrics: RollupResponse["wagerHitRate"]
             Goal-proposal wagers settled in the last 30 days — not region-scoped.
           </p>
         </div>
-        <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-success">
+        <span className="rounded-full bg-[rgba(0,123,175,0.12)] px-3 py-1 text-xs font-semibold text-success">
           {formatPercent(metrics.hitRate)} hit rate
         </span>
       </div>

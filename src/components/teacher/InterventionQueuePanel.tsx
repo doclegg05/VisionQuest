@@ -29,7 +29,7 @@ function QueueSkeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="h-14 animate-pulse rounded-[1.15rem] bg-[var(--border)] opacity-60"
+          className="h-14 animate-pulse rounded-2xl bg-[var(--border)] opacity-60"
         />
       ))}
     </div>
@@ -374,7 +374,7 @@ function InlineActionPanel({
       tabIndex={-1}
       role="group"
       aria-label={`Action for ${intent.student.displayName}`}
-      className="mt-3 rounded-[1rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)]"
+      className="mt-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)]"
     >
       <DashboardActionPanel intent={intent} onClose={onClose} onChanged={onChanged} />
     </div>
@@ -540,7 +540,7 @@ export default function InterventionQueuePanel({
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success">
             Needs attention
           </p>
           <h2 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">Intervention Queue</h2>
@@ -585,13 +585,13 @@ export default function InterventionQueuePanel({
       {body.kind === "loading" && <QueueSkeleton />}
 
       {body.kind === "error" && (
-        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-danger" role="alert">
+        <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
 
       {body.kind === "empty" && (
-        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+        <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
           All students are on track. No follow-up needed right now.
         </p>
       )}
@@ -601,7 +601,7 @@ export default function InterventionQueuePanel({
           {body.stale ? (
             <div
               role="alert"
-              className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2"
+              className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2"
             >
               <p className="text-sm text-danger">
                 Could not refresh the queue. The list below may be out of date.

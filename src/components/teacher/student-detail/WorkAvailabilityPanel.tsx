@@ -75,7 +75,7 @@ export function WorkAvailabilityPanel({ workProfile }: { workProfile: WorkProfil
         id="work-availability-heading"
         className="font-display text-lg text-[var(--ink-strong)]"
       >
-        Work availability
+        Work Availability
       </h3>
 
       {!workProfile ? (
