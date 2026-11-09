@@ -342,7 +342,7 @@ export function ScoreCard({ completedCount, totalCount, percent }: ScoreCardProp
             className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]"
           >
             <div
-              className="h-full rounded-full bg-[var(--accent-green)] transition-all duration-1000"
+              className="h-full rounded-full progress-fill transition-all duration-1000"
               style={{ width: `${percent}%` }}
             />
           </div>

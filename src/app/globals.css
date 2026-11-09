@@ -442,6 +442,11 @@ body {
 }
 
 @layer components {
+  .progress-fill {
+    background: var(--grad-progress);
+    box-shadow: inset 0 0 0 1px var(--progress-edge);
+  }
+
   /* SPOKES left-border card, for tips, Sage suggestions, and activity prompts only. */
   .callout {
     border-left: 6px solid var(--success-border);
