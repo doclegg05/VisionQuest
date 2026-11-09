@@ -239,7 +239,12 @@ const searchJobs: AgentTool = {
       resumeExperienceTitles: resume?.experience.map((item) => item.title),
       discoverySkills: parseTransferableSkillNames(discovery?.transferableSkills),
     });
-    const interactionProfile = buildJobInteractionProfile(savedJobs);
+    // W4 made the listing link nullable (a deleted listing now clears it and
+    // keeps the save). Rows without a listing are skipped, as before W4 when
+    // such rows were deleted with their listing.
+    const interactionProfile = buildJobInteractionProfile(
+      savedJobs.flatMap((s) => (s.jobListing ? [{ status: s.status, jobListing: s.jobListing }] : [])),
+    );
 
     const ranked = rankJobs(
       jobs,

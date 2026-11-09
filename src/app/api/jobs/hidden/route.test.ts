@@ -214,7 +214,7 @@ describe("/api/jobs/hidden", () => {
       { id: HIDDEN_ID, snapshotTitle: "Cashier", snapshotCompany: "Kroger", snapshotLocation: "Charleston, WV", hiddenAt: new Date() },
     ]);
 
-    const res = await route.GET(mockRequest("/api/jobs/hidden") as never);
+    const res = await route.GET();
     const body = await res.json();
 
     assert.equal(res.status, 200);
@@ -229,7 +229,7 @@ describe("/api/jobs/hidden", () => {
   it("turns hide and restore off with job_hide_enabled = off, keeping stored rows", async () => {
     mockConfigFindUnique.mock.mockImplementation(async () => ({ value: "off" }));
 
-    const list = await (await route.GET(mockRequest("/api/jobs/hidden") as never)).json();
+    const list = await (await route.GET()).json();
     const hide = await post({ action: "hide", jobListingId: LISTING_ID });
     const restore = await post({ action: "restore", hiddenJobId: HIDDEN_ID });
 
