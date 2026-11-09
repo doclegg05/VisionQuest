@@ -1,9 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding covers Prisma methods with different signatures. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
-import { mockRequest, mockStudentSession } from "@/lib/test-helpers";
+import { mockAdminSession, mockRequest, mockStudentSession, mockTeacherSession } from "@/lib/test-helpers";
 
 const session = mockStudentSession();
+const STAFF_SESSIONS = [
+  mockTeacherSession(),
+  mockTeacherSession({ role: "coordinator" }),
+  mockAdminSession(),
+];
+// Fix round 1: the route under test reads this, so a case can act as staff.
+let currentSession = session;
 
 const mockEnrollmentFindMany = mock.fn() as any;
 const mockJobFindFirst = mock.fn() as any;
@@ -31,7 +38,7 @@ mock.module("@/lib/api-error", {
       <Args extends unknown[]>(handler: (sessionArg: typeof session, ...args: Args) => Promise<Response>) =>
       async (...args: Args) => {
         try {
-          return await handler(session, ...args);
+          return await handler(currentSession, ...args);
         } catch (error) {
           if (error instanceof MockApiError) {
             return Response.json(
@@ -43,6 +50,7 @@ mock.module("@/lib/api-error", {
         }
       },
     badRequest: (message: string) => new MockApiError(400, message, "BAD_REQUEST"),
+    forbidden: (message = "Forbidden") => new MockApiError(403, message, "FORBIDDEN"),
     ApiError: MockApiError,
   },
 });
@@ -104,6 +112,7 @@ function post(body: Record<string, unknown>) {
 
 describe("/api/jobs/hidden", () => {
   beforeEach(() => {
+    currentSession = session;
     for (const fn of [
       mockEnrollmentFindMany,
       mockJobFindFirst,
@@ -225,6 +234,24 @@ describe("/api/jobs/hidden", () => {
       restoredAt: null,
     });
   });
+
+  for (const staff of STAFF_SESSIONS) {
+    it(`refuses a ${staff.role} session on GET and POST with 403 and writes nothing`, async () => {
+      currentSession = staff;
+
+      const list = await route.GET();
+      const hide = await post({ action: "hide", jobListingId: LISTING_ID });
+      const restore = await post({ action: "restore", hiddenJobId: HIDDEN_ID });
+
+      assert.equal(list.status, 403);
+      assert.equal(hide.status, 403);
+      assert.equal(restore.status, 403);
+      assert.equal(mockHiddenFindMany.mock.callCount(), 0);
+      assert.equal(mockHiddenUpsert.mock.callCount(), 0);
+      assert.equal(mockHiddenUpdate.mock.callCount(), 0);
+      assert.equal(mockLogAuditEvent.mock.callCount(), 0);
+    });
+  }
 
   it("turns hide and restore off with job_hide_enabled = off, keeping stored rows", async () => {
     mockConfigFindUnique.mock.mockImplementation(async () => ({ value: "off" }));

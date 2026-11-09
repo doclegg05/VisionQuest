@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { withAuth, badRequest, ApiError, type Session } from "@/lib/api-error";
+import { withAuth, badRequest, forbidden, ApiError, type Session } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { parseBody } from "@/lib/schemas";
 import {
@@ -23,6 +23,13 @@ const hiddenActionSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+/** Only students hide jobs. Staff would write onto their own row. */
+function requireStudent(session: Session): void {
+  if (session.role !== "student") {
+    throw forbidden("Only students can hide jobs.");
+  }
+}
+
 function hideDisabled() {
   return new ApiError(404, "Hiding jobs is turned off right now.", "job_hide_disabled");
 }
@@ -35,6 +42,7 @@ function hideDisabled() {
  * client to show no hide or restore buttons; stored rows are kept.
  */
 export const GET = withAuth(async (session: Session) => {
+  requireStudent(session);
   if (!(await isJobHideEnabled())) {
     return NextResponse.json({ hideEnabled: false, hiddenJobs: [] });
   }
@@ -50,6 +58,7 @@ export const GET = withAuth(async (session: Session) => {
  * Hiding never touches the saved-job tracker or an Application.
  */
 export const POST = withAuth(async (session: Session, req: Request) => {
+  requireStudent(session);
   const body = await parseBody(req, hiddenActionSchema);
   if (!(await isJobHideEnabled())) {
     throw hideDisabled();

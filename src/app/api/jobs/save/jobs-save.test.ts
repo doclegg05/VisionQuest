@@ -1,9 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding covers Prisma methods with different signatures. */
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
-import { mockRequest, mockStudentSession } from "@/lib/test-helpers";
+import { mockAdminSession, mockRequest, mockStudentSession, mockTeacherSession } from "@/lib/test-helpers";
 
 const session = mockStudentSession();
+const STAFF_SESSIONS = [
+  mockTeacherSession(),
+  mockTeacherSession({ role: "coordinator" }),
+  mockAdminSession(),
+];
+// Fix round 1: the route under test reads this, so a case can act as staff.
+let currentSession = session;
 
 const mockEnrollmentFindMany = mock.fn() as any;
 const mockJobFindFirst = mock.fn() as any;
@@ -36,7 +43,7 @@ mock.module("@/lib/api-error", {
       <Args extends unknown[]>(handler: (sessionArg: typeof session, ...args: Args) => Promise<Response>) =>
       async (...args: Args) => {
         try {
-          return await handler(session, ...args);
+          return await handler(currentSession, ...args);
         } catch (error) {
           if (error && typeof error === "object" && "statusCode" in error) {
             const statusCode = Number((error as { statusCode: number }).statusCode);
@@ -51,6 +58,7 @@ mock.module("@/lib/api-error", {
     // not an absent code — the mock must match so a test asserting on
     // `body.code` sees what production actually sends.
     badRequest: (message: string) => makeHttpError(400, message, "BAD_REQUEST"),
+    forbidden: (message = "Forbidden") => makeHttpError(403, message, "FORBIDDEN"),
     ApiError: MockApiError,
   },
 });
@@ -118,6 +126,7 @@ function post(body: Record<string, unknown>) {
 
 describe("POST /api/jobs/save", () => {
   beforeEach(() => {
+    currentSession = session;
     for (const fn of [
       mockEnrollmentFindMany,
       mockJobFindFirst,
@@ -264,6 +273,20 @@ describe("POST /api/jobs/save", () => {
     assert.equal(res.status, 400);
     assert.equal(mockSavedJobCreate.mock.callCount(), 0);
   });
+
+  for (const staff of STAFF_SESSIONS) {
+    it(`refuses a ${staff.role} session with 403 and writes nothing`, async () => {
+      currentSession = staff;
+      mockBrowseListingFindUnique.mock.mockImplementation(async () => browseListing);
+
+      const res = await post({ jobListingId: BROWSE_ID });
+
+      assert.equal(res.status, 403);
+      assert.equal(mockSavedJobCreate.mock.callCount(), 0);
+      assert.equal(mockSavedJobUpdate.mock.callCount(), 0);
+      assert.equal(mockLogAuditEvent.mock.callCount(), 0);
+    });
+  }
 
   it("rejects an id that is not a cuid", async () => {
     const res = await post({ jobListingId: "not-a-cuid" });
