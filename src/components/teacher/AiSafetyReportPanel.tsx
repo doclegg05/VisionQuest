@@ -67,7 +67,7 @@ function downloadHtmlReport(report: AiSafetyReport) {
     h1 { font-size: 24px; margin-bottom: 6px; }
     .meta { color: ${spokesColor("gray")}; font-size: 13px; margin-bottom: 24px; }
     pre { white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 14px; }
-    .hash { border-top: 1px solid ${spokesColor("offwhite")}; margin-top: 24px; padding-top: 12px; font-size: 12px; color: ${spokesColor("gray")}; }
+    .hash { border-top: 1px solid ${spokesColor("offwhite")}; margin-top: 24px; padding-top: 12px; font-size: 13px; color: ${spokesColor("gray")}; }
   </style>
 </head>
 <body>
