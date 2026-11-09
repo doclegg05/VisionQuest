@@ -340,6 +340,27 @@ if (!SHOULD_RUN) {
       assert.deepEqual(await visibleStudents("teacher", t.P), [t.SA, t.SB, t.SN].sort());
     });
 
+    // ---- Unlinked referrals (SpokesRecord.studentId IS NULL) ----
+
+    it("only an admin reads or updates an unlinked referral", async () => {
+      const referral = await db.spokesRecord.create({ data: { firstName: "Unlinked", lastName: suffix } });
+      try {
+        const reads = (role: RlsRole, userId: string) =>
+          asRole(role, userId, (tx) => tx.spokesRecord.count({ where: { id: referral.id } }));
+        for (const userId of [t.TA, t.KA, t.P]) {
+          assert.equal(await reads("teacher", userId), 0, `teacher-mapped ${userId} read an unlinked referral`);
+        }
+        assert.equal(await reads("admin", t.TA), 1);
+
+        const updated = await asRole("teacher", t.TA, (tx) =>
+          tx.spokesRecord.updateMany({ where: { id: referral.id }, data: { notes: "changed" } }),
+        );
+        assert.equal(updated.count, 0);
+      } finally {
+        await db.spokesRecord.deleteMany({ where: { id: referral.id } });
+      }
+    });
+
     it("a teacher-role user with a stale RegionCoordinator row reaches nobody in that region", async () => {
       assert.deepEqual(await visibleStudents("teacher", t.TX), []);
       assert.deepEqual(await visibleClasses(t.TX), []);

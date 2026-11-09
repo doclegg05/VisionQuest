@@ -11,6 +11,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { isProgramType } from "@/lib/program-type";
 import { assertRegionAllowed } from "@/lib/class-create";
 import { seesWholeState } from "@/lib/org-roles";
+import { countInstructorsInRegion } from "@/lib/region";
 import { parseBody, updateClassSchema } from "@/lib/schemas";
 
 function parseOptionalDate(value: unknown) {
@@ -102,6 +103,7 @@ export const PATCH = withTeacherAuth(async (
         name: true,
         code: true,
         status: true,
+        regionId: true,
         instructors: {
           select: {
             instructorId: true,
@@ -193,6 +195,15 @@ export const PATCH = withTeacherAuth(async (
     }
 
     const nextInstructorIds = instructorIds ?? existing.instructors.map((entry) => entry.instructorId);
+    // The same rule as creating a class: an instructor's co-teachers must be in
+    // the class's region, checked against the region it is moving to.
+    if (!seesWholeState(session.role) && (instructorIds || nextRegionId !== undefined)) {
+      const regionId = nextRegionId !== undefined ? nextRegionId : existing.regionId;
+      const others = nextInstructorIds.filter((instructorId) => instructorId !== session.id);
+      if (regionId && others.length > 0 && (await countInstructorsInRegion(regionId, others)) !== others.length) {
+        throw badRequest("Co-teachers must be in the same region.");
+      }
+    }
     await assertTeacherAssignmentLimit(nextInstructorIds, {
       excludeClassId: id,
       targetClassStatus: nextStatus,

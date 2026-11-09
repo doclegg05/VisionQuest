@@ -3,7 +3,7 @@ import { forbidden, type Session } from "@/lib/api-error";
 import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { STAFF_INVITE_MESSAGES, staffInviteStatus } from "@/lib/staff-invite-messages";
-import { StaffInviteRefused } from "@/lib/staff-invites";
+import { hashToken, StaffInviteRefused } from "@/lib/staff-invites";
 
 /** Roles that may send or revoke invites. The per-role rule lives in `canInviteRole`. */
 const INVITER_ROLES: readonly string[] = ["admin", "program_coordinator", "coordinator"];
@@ -27,23 +27,34 @@ export async function withInviteRefusals(work: () => Promise<Response>): Promise
   }
 }
 
-/** The same limits as `register-teacher`: 5 per IP and a route-wide 20, per 15 minutes. */
+/** 5 per IP and 20 per invite, per 15 minutes. */
 const PER_IP_LIMIT = 5;
-const ROUTE_LIMIT = 20;
+const PER_INVITE_LIMIT = 20;
 const WINDOW_MS = 15 * 60 * 1000;
 const TOO_MANY_ATTEMPTS = "Too many attempts. Please try again later.";
 
-/**
- * Rate-limit an unauthenticated invite route before its body is read. The
- * route-wide ceiling bounds code guessing that spreads across addresses; both
- * limiters refuse with the same answer, so neither can be told from the other.
- * Returns the 429 to send, or null to go on.
- */
-export async function limitInviteAttempts(req: Request, prefix: string): Promise<Response | null> {
-  const perIp = await rateLimit(`${prefix}:${clientIpBucket(req)}`, PER_IP_LIMIT, WINDOW_MS);
-  if (perIp.success) {
-    const routeWide = await rateLimit(`${prefix}:global`, ROUTE_LIMIT, WINDOW_MS);
-    if (routeWide.success) return null;
-  }
+function tooManyAttempts(): Response {
   return NextResponse.json({ error: TOO_MANY_ATTEMPTS }, { status: 429 });
+}
+
+/**
+ * Rate-limit an unauthenticated invite route by client IP, before its body is
+ * read. Returns the 429 to send, or null to go on.
+ */
+export async function limitInviteAttemptsByIp(req: Request, prefix: string): Promise<Response | null> {
+  const perIp = await rateLimit(`${prefix}:${clientIpBucket(req)}`, PER_IP_LIMIT, WINDOW_MS);
+  return perIp.success ? null : tooManyAttempts();
+}
+
+/**
+ * Rate-limit by invite, keyed on the token's hash. There is no shared
+ * route-wide bucket: the client IP can be spoofed, so a shared ceiling let one
+ * client lock out every invitee with junk tokens. A junk token spends only its
+ * own bucket. Code guessing is already capped at 5 tries per invite inside
+ * `acceptStaffInvite`. Same answer as the IP limiter, so neither can be told
+ * from the other.
+ */
+export async function limitInviteAttemptsByToken(prefix: string, token: string): Promise<Response | null> {
+  const perInvite = await rateLimit(`${prefix}:invite:${hashToken(token)}`, PER_INVITE_LIMIT, WINDOW_MS);
+  return perInvite.success ? null : tooManyAttempts();
 }

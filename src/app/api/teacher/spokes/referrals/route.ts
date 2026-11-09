@@ -3,7 +3,6 @@ import { z } from "zod";
 import { forbidden, withTeacherAuth } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { seesWholeState } from "@/lib/org-roles";
 import { parseBody } from "@/lib/schemas";
 
 const COUNTY_CATEGORY = "county";
@@ -12,10 +11,12 @@ const deleteReferralSchema = z.object({
   id: z.string().min(1, "id is required."),
 });
 
-// Unlinked referrals (studentId: null) are applicants with no class yet. Under
-// the organization tree they belong to admins and program coordinators only;
-// an instructor sees an empty list (SpokesManager loads this with its config,
-// so a 403 would blank the whole panel) and cannot delete one.
+// Unlinked referrals (studentId: null) are applicants with no class yet. They
+// belong to admins: withTeacherAuth admits only teachers and admins, and RLS
+// gives unlinked rows to the admin role alone (migration
+// 20261109130000_spokes_record_unlinked_admin_only). An instructor sees an
+// empty list (SpokesManager loads this with its config, so a 403 would blank
+// the whole panel) and cannot delete one.
 async function listUnlinkedReferrals(county: string) {
   return prisma.spokesRecord.findMany({
     where: {
@@ -64,7 +65,7 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
         sortOrder: true,
       },
     }),
-    seesWholeState(session.role) ? listUnlinkedReferrals(county) : Promise.resolve([]),
+    session.role === "admin" ? listUnlinkedReferrals(county) : Promise.resolve([]),
   ]);
 
   return NextResponse.json({
@@ -137,11 +138,8 @@ export const POST = withTeacherAuth(async (session, req: Request) => {
 });
 
 export const DELETE = withTeacherAuth(async (session, req: Request) => {
-  if (!seesWholeState(session.role)) {
-    return NextResponse.json(
-      { error: "Only admins and program coordinators manage unlinked referrals." },
-      { status: 403 },
-    );
+  if (session.role !== "admin") {
+    return NextResponse.json({ error: "Only an admin manages unlinked referrals." }, { status: 403 });
   }
 
   const body = await parseBody(req, deleteReferralSchema);
