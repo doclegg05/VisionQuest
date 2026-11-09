@@ -78,7 +78,7 @@ export function EmployerResponseActions({
       <h2 className="text-lg font-semibold text-[var(--ink-strong)]">What would you like to do?</h2>
 
       {error && (
-        <p className="mt-3 text-base text-red-600" role="alert">
+        <p className="mt-3 text-base text-danger" role="alert">
           {error}
         </p>
       )}

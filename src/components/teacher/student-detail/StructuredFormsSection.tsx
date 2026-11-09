@@ -95,7 +95,7 @@ export default function StructuredFormsSection({ studentId }: { studentId: strin
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${STATUS_STYLE[row.status]}`}
+                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[row.status]}`}
                 >
                   {STATUS_LABEL[row.status]}
                 </span>

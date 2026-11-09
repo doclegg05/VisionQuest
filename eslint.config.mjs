@@ -312,25 +312,6 @@ const rawPaletteSyntax = [
   },
 ];
 
-// Folders not yet swept onto SPOKES role utilities (spec Design 6.4). The rule
-// only warns here. Each sweep PR deletes its entries; the last deletes the list.
-const SPOKES_UNSWEPT = [
-  "src/app/(coordinator)/coordinator/*",
-  "src/app/forgot-password/*",
-  "src/app/reset-password/*",
-  "src/components/advising/*",
-  "src/components/auth/*",
-  "src/components/chat/*",
-  "src/components/connect/*",
-  "src/components/coordinator/*",
-  "src/components/library/*",
-  "src/components/progression/*",
-  "src/components/teacher/*",
-  "src/components/teacher/class-overview/*",
-  "src/components/teacher/forms/*",
-  "src/components/teacher/student-detail/*",
-];
-
 // Document renderers outside the SPOKES spec (Design 9: PDFs, email, resume print).
 const SPOKES_OUT_OF_SCOPE = [
   "src/lib/certificate-generator.ts",
@@ -414,17 +395,6 @@ const eslintConfig = defineConfig([
     ignores: ["src/**/*.test.ts", "src/**/*.test.tsx", ...SPOKES_OUT_OF_SCOPE],
     rules: { "spokes/no-off-palette-color": "error" },
   },
-  // Spread only while folders remain: ESLint can reject an empty `files` array,
-  // and the last sweep task deletes the list.
-  ...(SPOKES_UNSWEPT.length > 0
-    ? [
-        {
-          files: SPOKES_UNSWEPT,
-          ignores: ["src/**/*.test.ts", "src/**/*.test.tsx", ...SPOKES_OUT_OF_SCOPE],
-          rules: { "spokes/no-off-palette-color": "warn" },
-        },
-      ]
-    : []),
   appPrismaImportWithoutSession,
   browserZodImports,
   intakeZodImports,

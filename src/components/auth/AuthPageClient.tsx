@@ -8,6 +8,7 @@ import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { DemoEntryButtons } from "./DemoEntryButtons";
 import { lookupErrorMessage } from "./error-message-lookup";
+import { GOOGLE_BRAND_COLORS } from "./google-brand";
 
 const ERROR_MESSAGES: Record<string, string> = {
   oauth_not_configured: "Google sign-in is not set up here. Use the form below to sign in.",
@@ -165,7 +166,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
   return (
     <main id="main-content" className="relative min-h-screen px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6">
       <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-7xl gap-4 lg:min-h-[calc(100vh-2rem)] lg:grid-cols-[1.15fr_0.85fr] lg:gap-6">
-        <section className="auth-hero-panel relative overflow-hidden rounded-[2rem] border border-white/10 p-5 text-white sm:p-7 md:p-10 lg:p-12">
+        <section className="auth-hero-panel relative overflow-hidden rounded-3xl border border-white/10 p-5 text-white sm:p-7 md:p-10 lg:p-12">
           <div className="relative flex h-full flex-col">
             <div className="max-w-2xl">
               <BrandLockup
@@ -186,7 +187,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
               {HIGHLIGHTS.map((highlight) => (
                 <div
                   key={highlight}
-                  className="flex items-start gap-3 rounded-[1.35rem] border border-white/12 bg-[var(--surface-raised)]/10 px-3.5 py-3 sm:rounded-2xl sm:px-4"
+                  className="flex items-start gap-3 rounded-2xl border border-white/12 bg-[var(--surface-raised)]/10 px-3.5 py-3 sm:rounded-2xl sm:px-4"
                 >
                   <CheckCircle
                     aria-hidden="true"
@@ -203,7 +204,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
               {MODULE_SPOTLIGHT.map((module) => {
                 const Icon = module.icon;
                 return (
-                  <div key={module.label} className="rounded-[1.35rem] border border-white/12 bg-[rgba(6,16,31,0.24)] p-3.5 sm:rounded-[1.4rem] sm:p-4">
+                  <div key={module.label} className="rounded-2xl border border-white/12 bg-[rgba(0,19,63,0.24)] p-3.5 sm:rounded-3xl sm:p-4">
                     <div className="mb-2.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--surface-raised)]/14 text-xl sm:mb-3 sm:h-11 sm:w-11">
                       <Icon aria-hidden="true" size={23} weight="duotone" />
                     </div>
@@ -215,15 +216,15 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
             </div>
 
             <div className="mt-6 grid gap-3 pt-6 sm:mt-auto sm:grid-cols-3 sm:pt-8">
-              <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
+              <div className="rounded-2xl border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-3xl sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/75">Sage</p>
                 <p className="mt-2 text-lg font-semibold">Coaching with context</p>
               </div>
-              <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
+              <div className="rounded-2xl border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-3xl sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/75">Progression</p>
                 <p className="mt-2 text-lg font-semibold">Wins that stay visible</p>
               </div>
-              <div className="rounded-[1.3rem] border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-[1.5rem] sm:py-4">
+              <div className="rounded-2xl border border-white/12 bg-[var(--surface-raised)]/10 px-4 py-3.5 sm:rounded-3xl sm:py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-white/75">Portfolio</p>
                 <p className="mt-2 text-lg font-semibold">Proof of readiness</p>
               </div>
@@ -231,7 +232,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
           </div>
         </section>
 
-        <section className="panel panel-strong flex items-start rounded-[2rem] p-4 sm:p-5 md:p-8 lg:items-center">
+        <section className="panel panel-strong flex items-start rounded-3xl p-4 sm:p-5 md:p-8 lg:items-center">
           <div className="w-full">
             <div className="mb-7 sm:mb-8">
               <p className="page-eyebrow text-[var(--ink-muted)]">Portal access</p>
@@ -248,7 +249,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
             {oauthErrorMessage && (
               <div
                 role="alert"
-                className="mb-5 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                className="mb-5 flex items-start gap-2 rounded-2xl border border-danger bg-danger-soft px-4 py-3 text-sm text-danger"
               >
                 <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
                 {oauthErrorMessage}
@@ -281,13 +282,13 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                 </div>
 
                 {mfaMessage && (
-                  <p className="rounded-2xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+                  <p className="rounded-2xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
                     {mfaMessage}
                   </p>
                 )}
 
                 {error && (
-                  <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <p role="alert" className="flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
                     <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
                     {error}
                   </p>
@@ -309,7 +310,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                     setMfaMessage("");
                     setError("");
                   }}
-                  className="w-full rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive-hover)]"
                 >
                   Use a different account
                 </button>
@@ -345,7 +346,7 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                 </div>
 
                 {error && (
-                  <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <p role="alert" className="flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
                     <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
                     {error}
                   </p>
@@ -381,15 +382,15 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
 
                 <a
                   href="/api/auth/google"
-                  className="flex w-full items-center justify-center gap-3 rounded-[1rem] border border-[var(--border)]
+                  className="flex w-full items-center justify-center gap-3 rounded-xl border border-[var(--border)]
                              bg-[var(--surface-raised)] px-4 py-3 text-base font-semibold text-[var(--ink-strong)] transition-colors
                              hover:bg-[var(--surface-interactive-hover)]"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    <path fill={GOOGLE_BRAND_COLORS.blue} d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                    <path fill={GOOGLE_BRAND_COLORS.green} d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill={GOOGLE_BRAND_COLORS.yellow} d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill={GOOGLE_BRAND_COLORS.red} d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
                   Sign in with Google
                 </a>

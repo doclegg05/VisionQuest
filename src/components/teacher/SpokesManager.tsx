@@ -381,7 +381,7 @@ export default function SpokesManager() {
   return (
     <div className="space-y-6">
       {message ? (
-        <div className="rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+        <div className="rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
           {message}
         </div>
       ) : null}
@@ -445,7 +445,7 @@ export default function SpokesManager() {
 
         <div className="mt-5 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           {canCreateReferrals ? (
-            <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
               <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Add referral</h4>
               <div className="mt-3 grid gap-3">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -570,7 +570,7 @@ export default function SpokesManager() {
             <p className="text-sm text-[var(--ink-muted)]">Ask an admin to add a new referral.</p>
           )}
 
-          <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-semibold text-[var(--ink-strong)]">Pending referrals</h4>
               <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ink-strong)]">
@@ -611,7 +611,7 @@ export default function SpokesManager() {
               ))}
 
               {referrals.length === 0 ? (
-                <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+                <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                   No standalone referrals match the selected county filter.
                 </p>
               ) : null}
@@ -638,13 +638,13 @@ export default function SpokesManager() {
 
           <div className="mt-4 space-y-4">
             {groupedChecklistTemplates.map((group) => (
-              <div key={group.category} className="rounded-[1rem] border border-[var(--border)] p-4">
+              <div key={group.category} className="rounded-xl border border-[var(--border)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-muted)]">
                   {group.label}
                 </p>
                 <div className="mt-3 space-y-3">
                   {group.templates.map((template) => (
-                    <div key={template.id} className="rounded-[1rem] border border-[var(--border)] p-4">
+                    <div key={template.id} className="rounded-xl border border-[var(--border)] p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-[var(--ink-strong)]">{template.label}</p>
@@ -693,13 +693,13 @@ export default function SpokesManager() {
             ))}
 
             {groupedChecklistTemplates.length === 0 ? (
-              <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+              <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                 No SPOKES workflow templates have been configured yet.
               </p>
             ) : null}
           </div>
 
-          <div className="mt-5 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+          <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <h4 className="text-sm font-semibold text-[var(--ink-strong)]">
               {editingChecklistId ? "Edit workflow template" : "Add workflow template"}
             </h4>
@@ -811,7 +811,7 @@ export default function SpokesManager() {
 
           <div className="mt-4 space-y-3">
             {moduleTemplates.map((template) => (
-              <div key={template.id} className="rounded-[1rem] border border-[var(--border)] p-4">
+              <div key={template.id} className="rounded-xl border border-[var(--border)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-[var(--ink-strong)]">{template.label}</p>
@@ -852,13 +852,13 @@ export default function SpokesManager() {
             ))}
 
             {moduleTemplates.length === 0 ? (
-              <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+              <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
                 No SPOKES modules have been configured yet.
               </p>
             ) : null}
           </div>
 
-          <div className="mt-5 rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+          <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <h4 className="text-sm font-semibold text-[var(--ink-strong)]">
               {editingModuleId ? "Edit module" : "Add module"}
             </h4>

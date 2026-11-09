@@ -89,7 +89,7 @@ export function ActionCard({
   const working = state === "working";
 
   return (
-    <div className="max-w-[34rem] overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] shadow-[0_4px_16px_rgba(7,23,43,0.06)]">
+    <div className="max-w-[34rem] overflow-hidden rounded-2xl border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] shadow-[0_4px_16px_rgba(0,19,63,0.06)]">
       <div className="flex border-l-[3px] border-l-[var(--chat-sage-mark)]">
         <div className="min-w-0 flex-1 p-3">
           <div className="flex items-start gap-3">

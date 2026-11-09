@@ -106,7 +106,7 @@ export default function GrantProgressPanel({ goals, regionId, onChange }: GrantP
                     </p>
                   </div>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${STATUS_STYLE[goal.status]}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[goal.status]}`}
                   >
                     {STATUS_LABEL[goal.status]}
                   </span>

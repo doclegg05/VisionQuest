@@ -445,7 +445,7 @@ export default function ClassRosterManager() {
         </div>
       ) : null}
       {message ? (
-        <div className="surface-section border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] p-4 text-sm text-[var(--ink-strong)]">
+        <div className="surface-section border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] p-4 text-sm text-[var(--ink-strong)]">
           {message}
         </div>
       ) : null}
@@ -754,7 +754,7 @@ export default function ClassRosterManager() {
                     </div>
                   ) : null}
                   {createdCredentials ? (
-                    <div className="rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] p-3 text-sm text-[var(--ink-strong)]">
+                    <div className="rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] p-3 text-sm text-[var(--ink-strong)]">
                       <p className="font-semibold">Account created — share these credentials:</p>
                       <div className="mt-2 space-y-1 font-mono text-sm">
                         <p>Username: <span className="font-semibold">{createdCredentials.username}</span></p>

@@ -16,7 +16,7 @@ type Activity = Awaited<ReturnType<typeof readActivity>>;
 type TaskPage = Awaited<ReturnType<typeof readTasks>>;
 type NextStep = Awaited<ReturnType<typeof getStudentNextStep>>;
 
-const sectionHeading = "font-display text-xl font-semibold";
+const sectionHeading = "font-display text-xl";
 const mutedNote = "mt-2 text-sm text-[var(--ink-muted)]";
 
 function Unavailable({ what }: { what: string }) {
@@ -81,7 +81,7 @@ export default async function StudentDashboardPreview({ params }: { params: Prom
 
   return <div className="page-shell space-y-6 text-[var(--ink-strong)]">
     <header>
-      <h1 className="font-display text-2xl font-semibold">{student.displayName}’s dashboard preview</h1>
+      <h1 className="font-display text-2xl">{student.displayName}’s dashboard preview</h1>
       <p className="mt-2 text-[var(--ink-muted)]">Read-only snapshot of student records, taken {fetchedAt} UTC. Manage assignments and reviews from Student Detail.</p>
       <Link className="mt-3 inline-flex min-h-11 items-center underline" href={`/teacher/students/${student.id}`}>Back to Student Detail</Link>
     </header>

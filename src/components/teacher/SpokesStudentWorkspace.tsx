@@ -524,7 +524,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
 
   function renderChecklistSection(title: string, templates: ChecklistTemplate[]) {
     return (
-      <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink-strong)]">{title}</h3>
         <div className="mt-3 space-y-2">
           {templates.map((template) => {
@@ -585,13 +585,13 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             {payload.student.email ? ` • ${payload.student.email}` : ""}
           </p>
         </div>
-        <div className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 text-sm text-[var(--ink-muted)]">
           Status: <span className="font-semibold text-[var(--ink-strong)]">{payload.summary.status.replaceAll("_", " ")}</span>
         </div>
       </div>
 
       {message ? (
-        <div className="rounded-xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+        <div className="rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
           {message}
         </div>
       ) : null}
@@ -885,7 +885,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                 return (
                   <div
                     key={categoryKey}
-                    className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)]"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)]"
                   >
                     <button
                       type="button"
@@ -924,7 +924,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
                           return (
                             <div
                               key={template.id}
-                              className="rounded-[0.85rem] border border-[var(--border)] bg-[var(--surface-base)] p-4"
+                              className="rounded-lg border border-[var(--border)] bg-[var(--surface-base)] p-4"
                             >
                               <div className="flex items-start justify-between gap-3 flex-wrap">
                                 <div>
@@ -1009,7 +1009,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
         </div>
 
         <div className="mt-5 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Schedule</h3>
             <div className="mt-3 space-y-3">
               {payload.summary.employmentFollowUpSchedule.map((item) => (
@@ -1065,7 +1065,7 @@ export default function SpokesStudentWorkspace({ studentId }: { studentId: strin
             </div>
           </div>
 
-          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
             <h3 className="text-sm font-semibold text-[var(--ink-strong)]">Record a follow-up</h3>
             <div className="mt-3 grid gap-3">
               <label className="block space-y-1.5">

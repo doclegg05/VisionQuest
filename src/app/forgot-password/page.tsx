@@ -94,7 +94,7 @@ export default function ForgotPasswordPage() {
   return (
     <main id="main-content" className="relative min-h-screen px-4 py-6 md:px-6 md:py-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-2xl items-center">
-        <section className="panel panel-strong w-full rounded-[2rem] p-6 md:p-8">
+        <section className="panel panel-strong w-full rounded-3xl p-6 md:p-8">
           <BrandLockup size="sm" subtitle="SPOKES Program Portal" />
           <p className="page-eyebrow text-[var(--ink-muted)]">Account recovery</p>
           <h1 className="mt-3 font-display text-4xl text-[var(--ink-strong)]">Reset your password</h1>
@@ -110,7 +110,7 @@ export default function ForgotPasswordPage() {
                 setMessage("");
                 setStatus("idle");
               }}
-              className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
+              className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
                 mode === "questions"
                   ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
@@ -125,7 +125,7 @@ export default function ForgotPasswordPage() {
                 setMessage("");
                 setStatus("idle");
               }}
-              className={`rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
+              className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
                 mode === "email"
                   ? "bg-[var(--surface-raised)] text-[var(--ink-strong)] shadow-[var(--shadow-card)]"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink-strong)]"
@@ -201,8 +201,8 @@ export default function ForgotPasswordPage() {
                   role="alert"
                   className={`rounded-2xl px-4 py-3 text-sm ${
                     status === "error"
-                      ? "bg-red-50 text-red-700"
-                      : "bg-emerald-50 text-emerald-700"
+                      ? "bg-danger-soft text-danger"
+                      : "bg-success-soft text-success"
                   }`}
                 >
                   {message}
@@ -243,8 +243,8 @@ export default function ForgotPasswordPage() {
                   role="alert"
                   className={`rounded-2xl px-4 py-3 text-sm ${
                     status === "error"
-                      ? "bg-red-50 text-red-700"
-                      : "bg-emerald-50 text-emerald-700"
+                      ? "bg-danger-soft text-danger"
+                      : "bg-success-soft text-success"
                   }`}
                 >
                   {message}

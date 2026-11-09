@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { spokesColor } from "@/lib/spokes-palette";
 import { Copy, Printer, X, QrCode as QrIcon, CheckCircle } from "@phosphor-icons/react";
 
 interface ClassIntakeFlyerModalProps {
@@ -40,8 +41,8 @@ export default function ClassIntakeFlyerModal({
       width: 320,
       margin: 2,
       color: {
-        dark: "#007baf", // SPOKES primary blue
-        light: "#ffffff",
+        dark: spokesColor("primary"),
+        light: spokesColor("light"),
       },
     })
       .then((data) => {
@@ -83,11 +84,11 @@ export default function ClassIntakeFlyerModal({
           <X size={20} />
         </button>
 
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--accent)] print:text-black">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-success print:text-black">
           <QrIcon size={18} weight="bold" /> SPOKES Classroom Intake & Enrollment
         </div>
 
-        <h2 className="mt-2 font-display text-2xl font-bold text-[var(--ink-strong)]">
+        <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">
           {className}
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">

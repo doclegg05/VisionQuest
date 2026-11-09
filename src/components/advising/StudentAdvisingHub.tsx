@@ -164,13 +164,13 @@ export default function StudentAdvisingHub({
               Pick an open time with a teacher. You do not have to wait for someone to set it up.
             </p>
           </div>
-          <span className="rounded-full bg-[rgba(15,154,146,0.12)] px-3 py-1 text-xs font-semibold text-info">
+          <span className="rounded-full bg-[rgba(0,123,175,0.12)] px-3 py-1 text-xs font-semibold text-info">
             {bookableAdvisors.reduce((sum, advisor) => sum + advisor.slots.length, 0)} open slots
           </span>
         </div>
 
         {bookableAdvisors.length === 0 ? (
-          <div className="mt-4 rounded-[1.2rem] border border-dashed border-[var(--border)] p-4">
+          <div className="mt-4 rounded-2xl border border-dashed border-[var(--border)] p-4">
             <p className="text-sm leading-6 text-[var(--ink-muted)]">
               Your teachers haven&apos;t published bookable office hours yet. Check back soon or message staff directly.
             </p>
@@ -183,7 +183,7 @@ export default function StudentAdvisingHub({
           </div>
         ) : (
           <div className="mt-4 grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
-            <div className="space-y-3 rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4">
+            <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4">
               <label className="block text-sm text-[var(--ink-muted)]">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">
                   Advisor
@@ -263,7 +263,7 @@ export default function StudentAdvisingHub({
               ) : null}
             </div>
 
-            <div className="rounded-[1.2rem] border border-[rgba(15,154,146,0.15)] bg-[rgba(15,154,146,0.08)] p-4">
+            <div className="rounded-2xl border border-[rgba(0,123,175,0.15)] bg-[rgba(0,123,175,0.08)] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-info">
                 Selected slot
               </p>
@@ -307,13 +307,13 @@ export default function StudentAdvisingHub({
                 Meetings your advisors have scheduled with you.
               </p>
             </div>
-            <span className="rounded-full bg-[rgba(15,154,146,0.1)] px-3 py-1 text-xs font-semibold text-info">
+            <span className="rounded-full bg-[rgba(0,123,175,0.1)] px-3 py-1 text-xs font-semibold text-info">
               {upcomingAppointments.length} upcoming
             </span>
           </div>
 
           {upcomingAppointments.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+            <div className="rounded-2xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
               No upcoming advising appointments are on your calendar right now.
             </div>
           ) : (
@@ -321,7 +321,7 @@ export default function StudentAdvisingHub({
               {upcomingAppointments.map((appointment) => (
                 <div
                   key={appointment.id}
-                  className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4"
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -369,13 +369,13 @@ export default function StudentAdvisingHub({
                 Items that need a response so nothing slips.
               </p>
             </div>
-            <span className="rounded-full bg-[rgba(249,115,22,0.12)] px-3 py-1 text-xs font-semibold text-success">
+            <span className="rounded-full bg-[rgba(173,136,6,0.12)] px-3 py-1 text-xs font-semibold text-success">
               {alerts.length} open
             </span>
           </div>
 
           {alerts.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+            <div className="rounded-2xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
               You&apos;re caught up. New alerts will show up here when a follow-up becomes overdue.
             </div>
           ) : (
@@ -389,7 +389,7 @@ export default function StudentAdvisingHub({
                   // this page is not for them.
                   <div
                     key={alert.id}
-                    className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4"
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4"
                   >
                     <p className="break-words font-semibold text-[var(--ink-strong)]">
                       {alert.title}
@@ -403,7 +403,7 @@ export default function StudentAdvisingHub({
                     </Link>
                   </div>
                 ) : (
-                  <div key={alert.id} className="rounded-[1.2rem] border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] p-4">
+                  <div key={alert.id} className="rounded-2xl border border-[var(--toast-celebration-border)] bg-[var(--badge-warning-bg)] p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <p className="break-words font-semibold text-[var(--ink-strong)]">{alert.title}</p>
                       <span className="rounded-full bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--badge-warning-text)]">
@@ -437,7 +437,7 @@ export default function StudentAdvisingHub({
           </div>
 
           {tasks.length === 0 ? (
-            <div className="rounded-[1.2rem] border border-dashed border-[var(--border)] p-4">
+            <div className="rounded-2xl border border-dashed border-[var(--border)] p-4">
               <p className="text-sm leading-6 text-[var(--ink-muted)]">
                 No follow-up tasks have been assigned yet.
               </p>
@@ -459,7 +459,7 @@ export default function StudentAdvisingHub({
                 return (
                   <div
                     key={task.id}
-                    className={`rounded-[1.2rem] border p-4 ${
+                    className={`rounded-2xl border p-4 ${
                       isCompleted
                         ? "border-[var(--accent-green)]/20 bg-[var(--badge-success-bg)]"
                         : "border-[var(--border)] bg-[var(--surface-raised)]"
@@ -534,7 +534,7 @@ export default function StudentAdvisingHub({
               ) : (
                 <div className="mt-2 space-y-2">
                   {pastAppointments.slice(0, 5).map((appointment) => (
-                    <div key={appointment.id} className="rounded-[1rem] border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+                    <div key={appointment.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{appointment.title}</p>
                         <span className="text-xs text-[var(--ink-muted)]">
@@ -557,7 +557,7 @@ export default function StudentAdvisingHub({
               ) : (
                 <div className="mt-2 space-y-2">
                   {completedTasks.slice(0, 5).map((task) => (
-                    <div key={task.id} className="rounded-[1rem] border border-[var(--accent-green)]/20 bg-[var(--badge-success-bg)] p-3">
+                    <div key={task.id} className="rounded-xl border border-[var(--accent-green)]/20 bg-[var(--badge-success-bg)] p-3">
                       <p className="break-words text-sm font-semibold text-[var(--ink-strong)]">{task.title}</p>
                       <p className="mt-1 text-xs text-[var(--ink-muted)]">
                         Completed {task.completedAt ? dateFormatter.format(new Date(task.completedAt)) : "recently"}

@@ -262,7 +262,7 @@ interface QuickWinCardProps {
 export function QuickWinCard({ item, done, saving, hasError, onComplete }: QuickWinCardProps) {
   // Colors come from theme tokens, not hardcoded light values: the app themes
   // with [data-theme], while Tailwind's dark: variant keys off the OS setting,
-  // so a `bg-green-50` card left white body text on pale green whenever the
+  // so a pale-green card left white body text on pale green whenever the
   // two disagreed.
   return (
     <div

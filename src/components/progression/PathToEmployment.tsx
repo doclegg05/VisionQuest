@@ -215,7 +215,7 @@ export function PathToEmployment({
             )}
           </div>
 
-          <h2 className="font-display text-lg leading-snug font-semibold text-[var(--ink-strong)]">
+          <h2 className="font-display text-lg leading-snug text-[var(--ink-strong)]">
             {title}
           </h2>
 

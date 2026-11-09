@@ -251,7 +251,7 @@ export default function IntakeClient() {
               <CheckCircle size={40} weight="fill" />
             </div>
 
-            <h1 className="mt-4 font-display text-2xl font-bold text-[var(--ink-strong)] sm:text-3xl">
+            <h1 className="mt-4 font-display text-2xl text-[var(--ink-strong)] sm:text-3xl">
               Your form was sent
             </h1>
 
@@ -341,7 +341,7 @@ export default function IntakeClient() {
                   <h1
                     ref={stepHeadingRef}
                     tabIndex={-1}
-                    className="font-display text-xl font-bold text-[var(--ink-strong)]"
+                    className="font-display text-xl text-[var(--ink-strong)]"
                   >
                     About You & Your Location
                   </h1>
@@ -600,7 +600,7 @@ export default function IntakeClient() {
                   <h1
                     ref={stepHeadingRef}
                     tabIndex={-1}
-                    className="font-display text-xl font-bold text-[var(--ink-strong)]"
+                    className="font-display text-xl text-[var(--ink-strong)]"
                   >
                     Demographics & Goals
                   </h1>
@@ -852,7 +852,7 @@ export default function IntakeClient() {
                   <h1
                     ref={stepHeadingRef}
                     tabIndex={-1}
-                    className="font-display text-xl font-bold text-[var(--ink-strong)]"
+                    className="font-display text-xl text-[var(--ink-strong)]"
                   >
                     Agreements & Digital Signature
                   </h1>

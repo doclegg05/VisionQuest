@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { SPOKES_CHART_SERIES, spokesColor } from "@/lib/spokes-palette";
+import { contrastRatio } from "@/lib/wcag-contrast";
 
 /**
  * Simplified interactive map of the six WV Adult Ed / SPOKES regions.
@@ -56,11 +58,18 @@ interface RegionShape {
   labelY: number;
 }
 
+/** Label ink with the higher contrast against a region fill (royal or white). */
+function labelInk(fill: string): string {
+  const dark = spokesColor("royal");
+  const light = spokesColor("light");
+  return contrastRatio(light, fill) >= contrastRatio(dark, fill) ? light : dark;
+}
+
 const REGION_SHAPES: RegionShape[] = [
   {
     code: "NORTHERN",
     displayName: "Northern",
-    color: "#1FA3D4", // blue
+    color: SPOKES_CHART_SERIES[0],
     path: "M 290 30 L 330 30 L 345 120 L 352 190 L 340 260 L 310 290 L 275 285 L 250 245 L 248 170 L 258 100 Z",
     labelX: 300,
     labelY: 170,
@@ -68,7 +77,7 @@ const REGION_SHAPES: RegionShape[] = [
   {
     code: "NORTH_CENTRAL",
     displayName: "North Central",
-    color: "#2FAD47", // green
+    color: SPOKES_CHART_SERIES[1],
     path: "M 352 190 L 470 195 L 478 260 L 470 325 L 410 345 L 360 335 L 340 290 L 340 260 Z",
     labelX: 407,
     labelY: 265,
@@ -76,7 +85,7 @@ const REGION_SHAPES: RegionShape[] = [
   {
     code: "EASTERN_PANHANDLE",
     displayName: "Eastern Panhandle",
-    color: "#C55A6B", // rose
+    color: SPOKES_CHART_SERIES[2],
     path: "M 478 200 L 605 195 L 615 250 L 600 285 L 540 295 L 485 275 L 478 240 Z",
     labelX: 545,
     labelY: 245,
@@ -84,7 +93,7 @@ const REGION_SHAPES: RegionShape[] = [
   {
     code: "MID_OHIO_VALLEY",
     displayName: "Mid-Ohio Valley",
-    color: "#E8B93A", // gold
+    color: SPOKES_CHART_SERIES[3],
     path: "M 175 220 L 250 245 L 310 290 L 340 290 L 350 360 L 290 385 L 220 375 L 180 340 L 165 280 Z",
     labelX: 250,
     labelY: 315,
@@ -92,7 +101,7 @@ const REGION_SHAPES: RegionShape[] = [
   {
     code: "SOUTH_WEST",
     displayName: "South West",
-    color: "#858B8D", // slate gray
+    color: SPOKES_CHART_SERIES[4],
     path: "M 180 340 L 290 385 L 310 430 L 290 475 L 230 485 L 170 460 L 150 400 Z",
     labelX: 230,
     labelY: 425,
@@ -100,7 +109,7 @@ const REGION_SHAPES: RegionShape[] = [
   {
     code: "SOUTH_EAST",
     displayName: "South East",
-    color: "#14487A", // navy
+    color: SPOKES_CHART_SERIES[5],
     path: "M 310 430 L 470 325 L 478 370 L 490 430 L 455 485 L 380 495 L 320 470 L 290 475 L 310 430 Z",
     labelX: 400,
     labelY: 430,
@@ -164,7 +173,7 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
               const isSeeded = Boolean(region);
 
               const baseOpacity = isActive ? 1 : isSeeded ? 0.9 : 0.35;
-              const strokeColor = isActive ? "#ffffff" : "rgba(0,0,0,0.15)";
+              const strokeColor = isActive ? "var(--ink-strong)" : "rgba(0,19,63,0.15)";
               const strokeWidth = isActive ? 3 : 1;
 
               return (
@@ -195,9 +204,8 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
                     x={shape.labelX}
                     y={shape.labelY}
                     textAnchor="middle"
-                    className="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-wide"
-                    fill="#ffffff"
-                    style={{ filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.35))" }}
+                    className="pointer-events-none select-none text-xs font-semibold uppercase tracking-wide"
+                    fill={isSeeded ? labelInk(shape.color) : "var(--ink-strong)"}
                   >
                     {shape.displayName}
                   </text>

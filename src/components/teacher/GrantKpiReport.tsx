@@ -148,7 +148,7 @@ function ProgramOfTheYearBadge({
 // Sparkline — tiny inline SVG trend chart
 // ---------------------------------------------------------------------------
 
-function Sparkline({ values, color = "#0ea5e9" }: { values: number[]; color?: string }) {
+function Sparkline({ values, color = "var(--info-border)" }: { values: number[]; color?: string }) {
   if (values.length < 2) return null;
 
   const width = 120;
@@ -346,7 +346,7 @@ export default function GrantKpiReport() {
                 <div className="mt-1 flex items-center gap-2 px-1">
                   <Sparkline
                     values={getTrendValues(key)}
-                    color={m.meetsTarget === true ? "#059669" : m.meetsTarget === false ? "#d97706" : "#6b7280"}
+                    color={m.meetsTarget === true ? "var(--success-border)" : m.meetsTarget === false ? "var(--warning-border)" : "var(--ink-muted)"}
                   />
                   <span className="text-xs text-[var(--ink-muted)]">
                     {trendData.length} snapshots

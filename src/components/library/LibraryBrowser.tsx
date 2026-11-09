@@ -343,7 +343,7 @@ function DocumentCard({ doc, onPreview }: DocumentCardProps) {
       </div>
 
       <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[0.65rem] text-[var(--ink-muted)]">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-[var(--ink-muted)]">
           <span className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 font-medium uppercase tracking-wide">
             {mimeToLabel(doc.mimeType)}
           </span>

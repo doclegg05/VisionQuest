@@ -63,7 +63,7 @@ function ListSkeleton() {
   return (
     <div className="space-y-2" aria-busy="true" aria-label="Loading failed extractions">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="h-14 animate-pulse rounded-[1.15rem] bg-[var(--border)] opacity-60" />
+        <div key={i} className="h-14 animate-pulse rounded-2xl bg-[var(--border)] opacity-60" />
       ))}
     </div>
   );
@@ -79,7 +79,7 @@ function FailureRow({
   onAction: (id: string, action: "replay" | "dismiss") => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[1.15rem] border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 lg:flex-row lg:items-center">
+    <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 lg:flex-row lg:items-center">
       <WarningCircle size={24} weight="duotone" className="shrink-0 text-[var(--badge-warning-text)]" aria-hidden />
 
       <div className="min-w-0 flex-1">
@@ -187,13 +187,13 @@ export function FailedExtractionsPanel() {
       {loading && <ListSkeleton />}
 
       {!loading && error && (
-        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-danger" role="alert">
+        <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
 
       {!loading && !error && rows.length === 0 && (
-        <p className="rounded-[1rem] border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
+        <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--ink-muted)]">
           No failed extractions. Sage&apos;s background analysis is running clean.
         </p>
       )}

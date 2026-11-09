@@ -12,10 +12,18 @@ interface MoodSparklineProps {
   showDateLabels?: boolean;
 }
 
+// Dots carry the hue (non-text, 3:1); the score number uses the role text token,
+// which is white in the dark theme where no SPOKES hue clears 4.5:1 as text.
 function scoreDotColor(score: number): string {
-  if (score >= 7) return "#16a34a"; // green-600
-  if (score >= 4) return "#d97706"; // amber-600
-  return "#dc2626"; // red-600
+  if (score >= 7) return "var(--success-border)";
+  if (score >= 4) return "var(--warning-border)";
+  return "var(--danger-border)";
+}
+
+function scoreTextColor(score: number): string {
+  if (score >= 7) return "var(--success-text)";
+  if (score >= 4) return "var(--warning-text)";
+  return "var(--danger-text)";
 }
 
 function formatDate(iso: string): string {
@@ -51,7 +59,7 @@ export function MoodSparkline({ entries, showDateLabels = false }: MoodSparkline
       <div className="flex items-center gap-3">
         <span
           className="text-3xl font-bold tabular-nums"
-          style={{ color: scoreDotColor(latestScore) }}
+          style={{ color: scoreTextColor(latestScore) }}
         >
           {latestScore}
         </span>
@@ -93,7 +101,7 @@ export function MoodSparkline({ entries, showDateLabels = false }: MoodSparkline
       <div className="mb-2 flex items-baseline gap-2">
         <span
           className="text-3xl font-bold tabular-nums leading-none"
-          style={{ color: scoreDotColor(latestScore) }}
+          style={{ color: scoreTextColor(latestScore) }}
         >
           {latestScore}
         </span>

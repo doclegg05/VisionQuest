@@ -214,17 +214,17 @@ export default function StaffMfaPanel() {
   return (
     <div className="space-y-5">
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-danger bg-danger-soft px-4 py-3 text-sm text-danger">
           {error}
         </div>
       )}
       {message && (
-        <div className="rounded-2xl border border-[rgba(15,154,146,0.18)] bg-[rgba(15,154,146,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+        <div className="rounded-2xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
           {message}
         </div>
       )}
 
-      <div className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
+      <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="page-eyebrow text-[var(--ink-muted)]">Account security</p>
@@ -281,7 +281,7 @@ export default function StaffMfaPanel() {
         )}
 
         {setupSecret && (
-          <div className="mt-5 space-y-4 rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
+          <div className="mt-5 space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <p className="text-sm font-semibold text-[var(--ink-strong)]">Step 1: Add this secret to your authenticator app</p>
@@ -360,7 +360,7 @@ export default function StaffMfaPanel() {
                 setError("");
                 setMessage("");
               }}
-              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50"
+              className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-danger px-4 py-2 text-sm font-semibold text-danger transition-colors hover:bg-danger-soft"
             >
               Disable MFA
             </button>
@@ -368,7 +368,7 @@ export default function StaffMfaPanel() {
         )}
 
         {enabled && pendingAction && (
-          <div className="mt-5 rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-5">
+          <div className="mt-5 rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-5">
             <label htmlFor={confirmCodeId} className="block text-sm font-semibold text-[var(--ink-strong)]">
               {pendingAction === "disable"
                 ? "Enter a current 6-digit code to disable MFA"
@@ -414,7 +414,7 @@ export default function StaffMfaPanel() {
       </div>
 
       {revealedBackupCodes.length > 0 && (
-        <div className="rounded-[1.4rem] border border-[rgba(255,154,77,0.35)] bg-[rgba(255,154,77,0.12)] p-5">
+        <div className="rounded-3xl border border-[rgba(173,136,6,0.35)] bg-[rgba(173,136,6,0.12)] p-5">
           <p className="page-eyebrow text-[var(--ink-muted)]">Save now</p>
           <h3 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">
             One-time backup codes
