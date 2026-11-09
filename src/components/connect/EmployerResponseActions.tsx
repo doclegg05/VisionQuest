@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 
 import {
   NOT_NOW_REASONS,
@@ -78,7 +79,8 @@ export function EmployerResponseActions({
       <h2 className="text-lg font-semibold text-[var(--ink-strong)]">What would you like to do?</h2>
 
       {error && (
-        <p className="mt-3 text-base text-danger" role="alert">
+        <p role="alert" className="mt-3 flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-base text-danger">
+          <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
           {error}
         </p>
       )}
