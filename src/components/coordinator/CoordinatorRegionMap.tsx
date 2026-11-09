@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { SPOKES_CHART_SERIES, spokesColor } from "@/lib/spokes-palette";
-import { contrastRatio } from "@/lib/wcag-contrast";
+import { SPOKES_CHART_SERIES } from "@/lib/spokes-palette";
+import { labelInk, REGION_STROKE_TOKEN, SEEDED_OPACITY, UNSEEDED_OPACITY } from "./region-map-style";
 
 /**
  * Simplified interactive map of the six WV Adult Ed / SPOKES regions.
@@ -56,13 +56,6 @@ interface RegionShape {
   // Label placement — roughly the centroid of each path.
   labelX: number;
   labelY: number;
-}
-
-/** Label ink with the higher contrast against a region fill (royal or white). */
-function labelInk(fill: string): string {
-  const dark = spokesColor("royal");
-  const light = spokesColor("light");
-  return contrastRatio(light, fill) >= contrastRatio(dark, fill) ? light : dark;
 }
 
 const REGION_SHAPES: RegionShape[] = [
@@ -172,8 +165,8 @@ export default function CoordinatorRegionMap({ regions, activeRegionId, onSelect
               const isActive = activeCode === shape.code;
               const isSeeded = Boolean(region);
 
-              const baseOpacity = isActive ? 1 : isSeeded ? 0.9 : 0.35;
-              const strokeColor = isActive ? "var(--ink-strong)" : "rgba(0,19,63,0.15)";
+              const baseOpacity = isSeeded ? SEEDED_OPACITY : UNSEEDED_OPACITY;
+              const strokeColor = isActive ? "var(--ink-strong)" : `var(${REGION_STROKE_TOKEN})`;
               const strokeWidth = isActive ? 3 : 1;
 
               return (

@@ -72,7 +72,7 @@ export function MoodSparkline({ entries, showDateLabels = false }: MoodSparkline
 
   // SVG dimensions
   const svgWidth = 300;
-  const svgHeight = showDateLabels ? 80 : 60;
+  const svgHeight = showDateLabels ? 54 : 60;
   const paddingX = 12;
   const paddingY = 8;
   const chartWidth = svgWidth - paddingX * 2;
@@ -164,31 +164,15 @@ export function MoodSparkline({ entries, showDateLabels = false }: MoodSparkline
             </title>
           </circle>
         ))}
-
-        {/* Date labels */}
-        {showDateLabels && (
-          <>
-            <text
-              x={paddingX}
-              y={svgHeight - 2}
-              fontSize={9}
-              fill="var(--ink-faint)"
-              textAnchor="start"
-            >
-              {firstLabel}
-            </text>
-            <text
-              x={svgWidth - paddingX}
-              y={svgHeight - 2}
-              fontSize={9}
-              fill="var(--ink-faint)"
-              textAnchor="end"
-            >
-              {lastLabel}
-            </text>
-          </>
-        )}
       </svg>
+
+      {/* Date labels are HTML so they stay at the text-xs size (13px) however far the SVG scales down. */}
+      {showDateLabels && (
+        <div className="mt-1 flex justify-between px-[4%]">
+          <span className="text-xs text-[var(--ink-faint)]">{firstLabel}</span>
+          <span className="text-xs text-[var(--ink-faint)]">{lastLabel}</span>
+        </div>
+      )}
     </div>
   );
 }
