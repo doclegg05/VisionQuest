@@ -4,6 +4,7 @@ import { renderToString } from "react-dom/server";
 import ChatInput from "@/components/chat/ChatInput";
 import { DEMO_PRIVACY_NOTICE } from "@/lib/demo/copy";
 import { SECURITY_QUESTIONS } from "@/lib/security-questions";
+import { SAGE_NOTICE_VERSION } from "@/lib/about-sage/notice";
 
 // The student layout is the recovery-question gate. These cases pin who it
 // sends to /recovery-setup: a real student with no questions, and nobody else.
@@ -13,6 +14,9 @@ class RedirectSignal extends Error {}
 
 let session: { id: string; studentId: string; displayName: string; role: string; demoAccount?: "student" | "instructor" } | null;
 let questionKeys: string[];
+// Scopes of the student's open ConsentRecord rows (the Sage notice is one).
+let consentScopes: string[];
+const CURRENT_NOTICE = `sage_notice:${SAGE_NOTICE_VERSION}`;
 
 mock.module("@/lib/auth", { exports: { getSession: async () => session } });
 
@@ -32,6 +36,12 @@ mock.module("@/lib/db", {
       orientationProgress: { count: async () => 0 },
       securityQuestionAnswer: {
         findMany: async () => questionKeys.map((questionKey) => ({ questionKey })),
+      },
+      consentRecord: {
+        findFirst: async ({ where }: { where: { studentId: string; scope: string; revokedAt: null } }) =>
+          where.studentId === session?.id && where.revokedAt === null && consentScopes.includes(where.scope)
+            ? { id: "ack" }
+            : null,
       },
     },
   },
@@ -66,6 +76,7 @@ describe("student layout recovery gate", () => {
   beforeEach(() => {
     session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
     questionKeys = [];
+    consentScopes = [CURRENT_NOTICE];
   });
 
   it("sends a real student with no recovery questions to setup", async () => {
@@ -98,6 +109,7 @@ describe("student layout demo privacy notice", () => {
   beforeEach(() => {
     session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
     questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+    consentScopes = [CURRENT_NOTICE];
   });
 
   async function renderLayoutWithChatInput(): Promise<string> {
@@ -113,5 +125,56 @@ describe("student layout demo privacy notice", () => {
 
   it("shows a real student no notice", async () => {
     assert.ok(!(await renderLayoutWithChatInput()).includes(DEMO_PRIVACY_NOTICE));
+  });
+});
+
+// The Sage notice gate (H6). Forced steps run in this order: the password
+// change (src/proxy.ts, before any page), then this notice, then recovery
+// questions. The notice page lives outside the (student) group, so the
+// redirect cannot loop.
+describe("student layout Sage notice gate", () => {
+  beforeEach(() => {
+    session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
+    questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+    consentScopes = [];
+  });
+
+  it("sends a student who has not acknowledged the notice to it", async () => {
+    assert.equal(await redirectTarget(), "/sage-notice");
+  });
+
+  it("lets a student who acknowledged the current notice in", async () => {
+    consentScopes = [CURRENT_NOTICE];
+
+    assert.equal(await redirectTarget(), null);
+  });
+
+  it("asks again when the student acknowledged only an older notice", async () => {
+    consentScopes = ["sage_notice:2020-01-01"];
+
+    assert.equal(await redirectTarget(), "/sage-notice");
+  });
+
+  it("does not ask a demo student", async () => {
+    session = { ...session!, demoAccount: "student" };
+
+    assert.equal(await redirectTarget(), null);
+  });
+
+  it("asks for the notice before the recovery questions", async () => {
+    questionKeys = [];
+
+    assert.equal(await redirectTarget(), "/sage-notice");
+  });
+
+  it("sends a teacher or an admin to their own home without asking", async () => {
+    session = { ...session!, role: "teacher" };
+    assert.equal(await redirectTarget(), "/teacher");
+
+    session = { ...session!, role: "admin" };
+    assert.equal(await redirectTarget(), "/admin");
+
+    session = { ...session!, role: "coordinator" };
+    assert.equal(await redirectTarget(), "/coordinator");
   });
 });

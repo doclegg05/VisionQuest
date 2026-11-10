@@ -6,6 +6,8 @@ import { parseState, createInitialState } from "@/lib/progression/engine";
 import { computeNavPhase, type NavPhase } from "@/lib/nav-progression";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import { needsRecoverySetup } from "@/lib/security-questions";
+import { hasAcknowledgedSageNotice } from "@/lib/consent";
+import { needsSageNotice, SAGE_NOTICE_ACK_PATH, SAGE_NOTICE_VERSION } from "@/lib/about-sage/notice";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import ProgressionProvider from "@/components/progression/ProgressionProvider";
@@ -27,7 +29,7 @@ export default async function StudentLayout({
   }
 
   // Lightweight fetch for nav phase (cached by Next.js request dedup)
-  const [goalCount, progression, orientationDone, securityKeys] = await Promise.all([
+  const [goalCount, progression, orientationDone, securityKeys, noticeAcknowledged] = await Promise.all([
     prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
     prisma.progression.findUnique({ where: { studentId: session.id }, select: { state: true } }),
     prisma.orientationProgress.count({ where: { studentId: session.id, completed: true } }),
@@ -35,7 +37,17 @@ export default async function StudentLayout({
       where: { studentId: session.id },
       select: { questionKey: true },
     }),
+    hasAcknowledgedSageNotice(session.id, SAGE_NOTICE_VERSION),
   ]);
+
+  // One-time Sage notice gate (H6): a student reads what Sage keeps and who
+  // can see it before using the app, and again whenever the notice's version
+  // changes. It comes after the forced password change (src/proxy.ts holds
+  // that session before any page renders) and before the recovery questions.
+  // The notice page is outside this group, so the redirect cannot loop.
+  if (needsSageNotice({ demoAccount: session.demoAccount, acknowledged: noticeAcknowledged })) {
+    redirect(SAGE_NOTICE_ACK_PATH);
+  }
 
   // One-time recovery gate: staff-created accounts have no recovery questions,
   // so a forgotten password can lock a student out when SMTP is unconfigured.

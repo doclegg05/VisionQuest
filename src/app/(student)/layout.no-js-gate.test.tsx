@@ -34,6 +34,8 @@ mock.module("@/lib/db", {
       progression: { findUnique: async () => null },
       orientationProgress: { count: async () => 0 },
       securityQuestionAnswer: { findMany: async () => [{ questionKey: "stub" }] },
+      // An acknowledged notice, so the Sage notice gate lets the page render.
+      consentRecord: { findFirst: async () => ({ id: "ack" }) },
     },
   },
 });
