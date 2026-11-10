@@ -465,6 +465,7 @@ jobs:
           e2e/regions-admin.spec.ts
           e2e/theme-variant.spec.ts
           e2e/cohort-demo-off.spec.ts
+          e2e/first-day-journey.spec.ts
           --reporter=line --timeout=120000
 
       # Cohort demo mode, switch ON. COHORT_DEMO_MODE is set on this step and
