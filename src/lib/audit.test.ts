@@ -107,6 +107,20 @@ describe("recordStudentView", () => {
     );
   });
 
+  it("records every archive download, even when a same-day row exists", async () => {
+    mockFindFirst.mock.mockImplementation(async () => ({ id: "audit-1" }));
+
+    await audit.recordStudentView({ ...baseInput, surface: "archive" });
+    await audit.recordStudentView({ ...baseInput, surface: "archive" });
+
+    assert.equal(mockFindFirst.mock.callCount(), 0);
+    assert.equal(mockCreate.mock.callCount(), 2);
+    assert.equal(
+      mockCreate.mock.calls[0].arguments[0].data.action,
+      "teacher.student.view.archive",
+    );
+  });
+
   it("swallows a thrown prisma error from the dedup lookup with a warning", async () => {
     mockFindFirst.mock.mockImplementation(async () => {
       throw new Error("db down");

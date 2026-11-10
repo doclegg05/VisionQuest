@@ -57,7 +57,37 @@ export async function tryLogAuditEvent(
 }
 
 /** Where in the app the staff member viewed the student's data. */
-export type StudentViewSurface = "student_detail" | "conversations" | "export" | "sage_operations" | "class_roster";
+export type StudentViewSurface =
+  | "student_detail"
+  | "conversations"
+  | "export"
+  | "sage_operations"
+  | "class_roster"
+  /** The full archive download: every chat, file and record in one zip. */
+  | "archive"
+  /** What Sage remembers about the student. */
+  | "memories"
+  | "mood"
+  /** Staff case notes. */
+  | "notes"
+  /** Form submissions, structured form responses and one response's answers. */
+  | "forms"
+  /** AI token usage. */
+  | "usage"
+  /** The SPOKES record. */
+  | "spokes"
+  /** Pathway suggestions for one of the student's goals. */
+  | "pathway"
+  /** One failed extraction's stored conversation snapshot. */
+  | "failed_extraction";
+
+/**
+ * Surfaces written on every read instead of once a day. The archive download
+ * hands over the whole record in one file, so each download is its own event:
+ * a second copy taken the same afternoon must leave its own row. These skip
+ * the same-day lookup below.
+ */
+const UNSAMPLED_SURFACES: ReadonlySet<StudentViewSurface> = new Set(["archive"]);
 
 interface StudentViewInput {
   actorId: string;
@@ -74,7 +104,8 @@ const STUDENT_VIEW_ACTION_PREFIX = "teacher.student.view";
  *
  * Sampled to at most ONE row per (actor, student, surface) per local day.
  * The sampling exists purely to control audit volume — the first view each
- * day is always recorded, so nothing is concealed.
+ * day is always recorded, so nothing is concealed. Surfaces in
+ * `UNSAMPLED_SURFACES` (the archive download) are written on every call.
  *
  * Fire-and-forget safe: never throws into the request path. Failures are
  * logged as warnings and swallowed.
@@ -83,19 +114,21 @@ export async function recordStudentView(input: StudentViewInput): Promise<void> 
   try {
     const action = `${STUDENT_VIEW_ACTION_PREFIX}.${input.surface}`;
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    if (!UNSAMPLED_SURFACES.has(input.surface)) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
 
-    const existing = await prisma.auditLog.findFirst({
-      where: {
-        actorId: input.actorId,
-        action,
-        targetId: input.targetStudentId,
-        createdAt: { gte: startOfToday },
-      },
-      select: { id: true },
-    });
-    if (existing) return;
+      const existing = await prisma.auditLog.findFirst({
+        where: {
+          actorId: input.actorId,
+          action,
+          targetId: input.targetStudentId,
+          createdAt: { gte: startOfToday },
+        },
+        select: { id: true },
+      });
+      if (existing) return;
+    }
 
     await logAuditEvent({
       actorId: input.actorId,
