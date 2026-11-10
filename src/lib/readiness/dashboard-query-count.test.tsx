@@ -8,8 +8,9 @@
  * first render in a new process. "Warm" is a second render straight after,
  * with the in-process caches the first one filled.
  *
- * What they are not: production truth. No SQL is sent, so the count is of
- * Prisma calls, not statements or round trips. Real data can take branches
+ * What they are not: production truth. No SQL is sent. The calls are counted;
+ * round trips are estimated from them by `estimateRoundTrips` (the rules are in
+ * src/lib/query-counter.test-support.ts). Real data can take branches
  * this fixture does not. Requests the browser makes after the page loads
  * (notifications, progression check-in) are a different metric, M2.
  *
@@ -34,10 +35,12 @@ import { createInitialState } from "@/lib/progression/engine";
 import {
   countsByFunction,
   createQueryCounter,
+  estimateRoundTrips,
   formatQueryBreakdown,
   queryCountLine,
   summarizeQueries,
   type RecordedQuery,
+  type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
 import { SECURITY_QUESTIONS } from "@/lib/security-questions";
 import { signToken } from "@/lib/session-token";
@@ -52,7 +55,11 @@ const DASHBOARD_ADMIN_QUERIES_COLD = 2;
 /** Nothing on the app client is cached today, so warm equals cold. */
 const DASHBOARD_APP_QUERIES_WARM = 40;
 const DASHBOARD_ADMIN_QUERIES_WARM = 0;
-const DASHBOARD_RELATION_LOADS = 3;
+/** [app, admin] nested relation loads, counted only below a level that returned rows. */
+const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
+/** M1: what `node scripts/readiness/query-count.mjs dashboard` prints. */
+const DASHBOARD_APP_ROUND_TRIPS_COLD = 161;
+const DASHBOARD_APP_ROUND_TRIPS_WARM = 161;
 /** "file › function" -> [app, admin] for the cold render. */
 const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -188,6 +195,7 @@ mock.module("@/components/dashboard/MoodCheckInCard", {
 interface Render {
   html: string;
   queries: readonly RecordedQuery[];
+  transactions: readonly RecordedTransaction[];
   errors: unknown[];
 }
 
@@ -210,7 +218,7 @@ async function renderDashboard(
     await new Promise((resolve) => setImmediate(resolve));
     return html;
   });
-  return { html: section.value, queries: section.queries, errors };
+  return { html: section.value, queries: section.queries, transactions: section.transactions, errors };
 }
 
 before(async () => {
@@ -243,11 +251,12 @@ describe("M1: student dashboard query count", () => {
   it("cold render issues the pinned number of queries on each client", (t) => {
     for (const line of formatQueryBreakdown("M1 dashboard, cold", cold.queries).split("\n")) t.diagnostic(line);
     const summary = summarizeQueries(cold.queries);
-    t.diagnostic(queryCountLine({ path: "dashboard", cache: "cold", queries: cold.queries, readNotExecuted: 0 }));
+    t.diagnostic(queryCountLine({ path: "dashboard", cache: "cold", queries: cold.queries, transactions: cold.transactions, readNotExecuted: 0 }));
 
     assert.equal(summary.app, DASHBOARD_APP_QUERIES_COLD);
     assert.equal(summary.admin, DASHBOARD_ADMIN_QUERIES_COLD);
-    assert.equal(summary.relationLoads, DASHBOARD_RELATION_LOADS);
+    assert.deepEqual([summary.appNestedLoads, summary.adminNestedLoads], DASHBOARD_NESTED_LOADS_COLD);
+    assert.equal(estimateRoundTrips(cold.queries, cold.transactions).app.roundTrips, DASHBOARD_APP_ROUND_TRIPS_COLD);
   });
 
   it("cold render's queries come from the pinned functions", () => {
@@ -257,9 +266,10 @@ describe("M1: student dashboard query count", () => {
   it("warm render issues the pinned number of queries on each client", (t) => {
     for (const line of formatQueryBreakdown("M1 dashboard, warm", warm.queries).split("\n")) t.diagnostic(line);
     const summary = summarizeQueries(warm.queries);
-    t.diagnostic(queryCountLine({ path: "dashboard", cache: "warm", queries: warm.queries, readNotExecuted: 0 }));
+    t.diagnostic(queryCountLine({ path: "dashboard", cache: "warm", queries: warm.queries, transactions: warm.transactions, readNotExecuted: 0 }));
 
     assert.equal(summary.app, DASHBOARD_APP_QUERIES_WARM);
     assert.equal(summary.admin, DASHBOARD_ADMIN_QUERIES_WARM);
+    assert.equal(estimateRoundTrips(warm.queries, warm.transactions).app.roundTrips, DASHBOARD_APP_ROUND_TRIPS_WARM);
   });
 });

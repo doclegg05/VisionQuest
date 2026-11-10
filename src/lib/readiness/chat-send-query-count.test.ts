@@ -47,10 +47,12 @@ import { createInitialState } from "@/lib/progression/engine";
 import {
   countsByFunction,
   createQueryCounter,
+  estimateRoundTrips,
   formatQueryBreakdown,
   queryCountLine,
   summarizeQueries,
   type RecordedQuery,
+  type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
 import { signToken } from "@/lib/session-token";
 
@@ -65,6 +67,8 @@ const CHAT_SEND_ADMIN_QUERIES_COLD = 22;
 const CHAT_SEND_APP_QUERIES_WARM = 27;
 /** Four audit rows, the rate limit counter and the wager read, every turn. */
 const CHAT_SEND_ADMIN_QUERIES_WARM = 6;
+const CHAT_SEND_ROUND_TRIPS_COLD = 155;
+const CHAT_SEND_ROUND_TRIPS_WARM = 116;
 /** "file › function" -> [app, admin] for the cold turn. */
 const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -217,15 +221,21 @@ globalThis.fetch = async (input, init) => {
   throw new Error(`The chat route made an unexpected network call to ${url}`);
 };
 
-/** Query counts at each moment the route constructed its response stream. */
-const queryCountsAtStreamCreation: number[] = [];
+interface StreamMark {
+  readonly queries: number;
+  readonly transactions: number;
+}
+/** Query and transaction counts at each moment the route constructed its response stream. */
+const queryCountsAtStreamCreation: StreamMark[] = [];
 const THIS_FILE = "chat-send-query-count.test.ts";
 globalThis.ReadableStream = new Proxy(globalThis.ReadableStream, {
   construct(target, args, newTarget) {
     // The first frame outside this file is whoever wrote `new ReadableStream`.
     const frames = (new Error("stream constructed here").stack ?? "").split("\n").slice(1);
     const constructedBy = frames.find((frame) => !frame.includes(THIS_FILE)) ?? "";
-    if (constructedBy.includes(ROUTE_FILE)) queryCountsAtStreamCreation.push(counter.queries().length);
+    if (constructedBy.includes(ROUTE_FILE)) {
+      queryCountsAtStreamCreation.push({ queries: counter.queries().length, transactions: counter.transactions().length });
+    }
     return Reflect.construct(target, args, newTarget);
   },
 });
@@ -234,6 +244,7 @@ interface Turn {
   status: number;
   body: string;
   beforeStream: readonly RecordedQuery[];
+  transactionsBeforeStream: readonly RecordedTransaction[];
   afterStream: readonly RecordedQuery[];
 }
 
@@ -251,6 +262,7 @@ async function settle(): Promise<void> {
 
 async function sendTurn(post: typeof import("@/app/api/chat/send/route").POST, message: string): Promise<Turn> {
   const start = counter.queries().length;
+  const transactionStart = counter.transactions().length;
   const marksBefore = queryCountsAtStreamCreation.length;
   const response = await post(
     new NextRequest("http://localhost:3000/api/chat/send", {
@@ -267,9 +279,18 @@ async function sendTurn(post: typeof import("@/app/api/chat/send/route").POST, m
   return {
     status: response.status,
     body,
-    beforeStream: streamCreatedAt === undefined ? [] : all.slice(start, streamCreatedAt),
-    afterStream: streamCreatedAt === undefined ? all.slice(start) : all.slice(streamCreatedAt),
+    beforeStream: streamCreatedAt === undefined ? [] : all.slice(start, streamCreatedAt.queries),
+    transactionsBeforeStream: streamCreatedAt === undefined
+      ? []
+      : counter.transactions().slice(transactionStart, streamCreatedAt.transactions),
+    afterStream: streamCreatedAt === undefined ? all.slice(start) : all.slice(streamCreatedAt.queries),
   };
+}
+
+/** M3: app plus admin, what `node scripts/readiness/query-count.mjs chat-send` prints. */
+function roundTrips(turn: Turn): number {
+  const { app, admin } = estimateRoundTrips(turn.beforeStream, turn.transactionsBeforeStream);
+  return app.roundTrips + admin.roundTrips;
 }
 
 let cold: Turn;
@@ -297,10 +318,13 @@ describe("M3: chat send query count before the response stream", () => {
     const after = summarizeQueries(cold.afterStream);
     t.diagnostic(`after the stream was created (not pinned): app ${after.app}, admin ${after.admin}`);
     const summary = summarizeQueries(cold.beforeStream);
-    t.diagnostic(queryCountLine({ path: "chat-send", cache: "cold", queries: cold.beforeStream, readNotExecuted: 0 }));
+    t.diagnostic(queryCountLine({
+      path: "chat-send", cache: "cold", queries: cold.beforeStream, transactions: cold.transactionsBeforeStream, readNotExecuted: 0,
+    }));
 
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_COLD);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_COLD);
+    assert.equal(roundTrips(cold), CHAT_SEND_ROUND_TRIPS_COLD);
   });
 
   it("cold turn's queries come from the pinned functions", () => {
@@ -310,9 +334,12 @@ describe("M3: chat send query count before the response stream", () => {
   it("warm turn issues the pinned number of queries on each client before the stream", (t) => {
     for (const line of formatQueryBreakdown("M3 chat send, warm, before stream", warm.beforeStream).split("\n")) t.diagnostic(line);
     const summary = summarizeQueries(warm.beforeStream);
-    t.diagnostic(queryCountLine({ path: "chat-send", cache: "warm", queries: warm.beforeStream, readNotExecuted: 0 }));
+    t.diagnostic(queryCountLine({
+      path: "chat-send", cache: "warm", queries: warm.beforeStream, transactions: warm.transactionsBeforeStream, readNotExecuted: 0,
+    }));
 
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_WARM);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_WARM);
+    assert.equal(roundTrips(warm), CHAT_SEND_ROUND_TRIPS_WARM);
   });
 });

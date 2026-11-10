@@ -9,23 +9,20 @@
 //
 // The last line of stdout is the count as a bare number, printed only when
 // the measurement ran clean. By default it is the cold count in estimated
-// round trips to the database:
+// round trips to the database, as `estimateRoundTrips` in
+// src/lib/query-counter.test-support.ts computes it and the test prints it:
 //   4 for each app-client call (BEGIN, set_config, the query, COMMIT: see the
 //     RLS wrapper in src/lib/db.ts),
-//   1 for each admin-client call,
-//   1 for each nested relation a call loads (one more SELECT in the same
-//     transaction).
-// So turning three calls into one call with two includes reads 12 to 6, as it
-// does on the wire. --unit=statements counts calls plus nested loads with no
-// weights; --unit=calls counts calls only. Dashboard and teacher-home count
-// the app client; chat-send counts app plus admin.
-//
-// Known limits, from the 2026-11-10 database review: the nested figure is
-// derived from each call's select and include, even when the parent returns
-// nothing; two reads inside one interactive transaction are weighted as two
-// wrapped calls; same-tick findUnique calls on the admin client are counted
-// one each although Prisma batches them; and the chat-send fixture is not yet
-// a normal turn. Task T4 in the readiness plan closes these.
+//   1 for each admin-client call, with same-tick findUnique calls of one shape
+//     counted once, as Prisma's dataloader sends them,
+//   1 for each nested relation a call loads, when the level above it returned
+//     rows,
+//   withAppTransaction as it runs: 4 around its queries, each query 1;
+//   any other $transaction: 2 around its queries.
+// --unit=statements counts the statements that carry a query (calls after
+// batching, plus nested loads); --unit=calls counts calls only. Dashboard and
+// teacher-home count the app client; chat-send counts app plus admin.
+// What the estimate cannot see is listed in the support file's header.
 //
 // How it measures: it runs the path's test file under src/lib/readiness/ in a
 // child process and reads the QUERY_COUNT lines that test prints. It does not
@@ -49,8 +46,12 @@ const PATHS = {
 const CACHES = ["cold", "warm"];
 const CLIENTS = ["app", "admin", "all"];
 const UNITS = ["round-trips", "statements", "calls"];
-const APP_CALL_ROUND_TRIPS = 4;
-const COUNT_LINE = /QUERY_COUNT path=(\S+) cache=(cold|warm) app=(\d+) admin=(\d+) relationLoads=(\d+) read=(\d+)/;
+const COUNT_FIELDS = [
+  "app", "admin", "appNested", "adminNested", "appStatements", "adminStatements", "appRoundTrips", "adminRoundTrips", "read",
+];
+const COUNT_LINE = new RegExp(
+  `QUERY_COUNT path=(\\S+) cache=(cold|warm) ${COUNT_FIELDS.map((field) => `${field}=(\\d+)`).join(" ")}`,
+);
 
 function usage(problem) {
   console.error(`${problem}\nUsage: query-count.mjs <${Object.keys(PATHS).join("|")}> [--cache=${CACHES.join("|")}] [--client=${CLIENTS.join("|")}] [--unit=${UNITS.join("|")}]`);
@@ -84,18 +85,23 @@ function parseCounts(name, output) {
   for (const line of output.split("\n")) {
     const match = COUNT_LINE.exec(line);
     if (!match || match[1] !== name) continue;
-    const [app, admin, relationLoads, read] = match.slice(3).map(Number);
-    counts[match[2]] = { app, admin, relationLoads, read };
+    const values = match.slice(3).map(Number);
+    counts[match[2]] = Object.fromEntries(COUNT_FIELDS.map((field, index) => [field, values[index]]));
   }
   return counts;
 }
 
+const UNIT_FIELDS = {
+  "round-trips": { app: "appRoundTrips", admin: "adminRoundTrips" },
+  statements: { app: "appStatements", admin: "adminStatements" },
+  calls: { app: "app", admin: "admin" },
+};
+
 function total(count, { client, unit }) {
-  const app = client === "admin" ? 0 : count.app;
-  const admin = client === "app" ? 0 : count.admin;
-  const nested = unit === "calls" ? 0 : count.relationLoads;
-  const appWeight = unit === "round-trips" ? APP_CALL_ROUND_TRIPS : 1;
-  return app * appWeight + admin + nested + count.read;
+  const fields = UNIT_FIELDS[unit];
+  const app = client === "admin" ? 0 : count[fields.app];
+  const admin = client === "app" ? 0 : count[fields.admin];
+  return app + admin + count.read;
 }
 
 const options = parseArguments(process.argv.slice(2));
@@ -116,8 +122,11 @@ for (const cache of CACHES) {
   const count = counts[cache];
   if (!count) continue;
   console.log(
-    `  ${cache}: app ${count.app}, admin ${count.admin}, nested relation loads ${count.relationLoads}` +
-      ` (executed ${count.app + count.admin}, read not executed ${count.read})`,
+    `  ${cache}: calls app ${count.app}, admin ${count.admin};` +
+      ` nested loads app ${count.appNested}, admin ${count.adminNested};` +
+      ` statements app ${count.appStatements}, admin ${count.adminStatements};` +
+      ` round trips app ${count.appRoundTrips}, admin ${count.adminRoundTrips}` +
+      ` (read not executed ${count.read})`,
   );
 }
 const clientLabel = options.client === "all" ? "app + admin" : options.client;

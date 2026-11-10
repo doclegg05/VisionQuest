@@ -8,11 +8,12 @@
  * first render in a new process. "Warm" is a second render straight after,
  * with the in-process caches the first one filled.
  *
- * What they are not: production truth. No SQL is sent, so the count is of
- * Prisma calls. The three roster reads each select many nested relations, and
- * Prisma's default strategy sends one more SELECT per nested relation; that
- * figure is reported as "nested relation loads" and is read from the call
- * arguments, not observed. Real data can take branches this fixture does not.
+ * What they are not: production truth. No SQL is sent. The calls are counted;
+ * round trips are estimated from them by `estimateRoundTrips` (the rules are in
+ * src/lib/query-counter.test-support.ts). The three roster reads each select
+ * many nested relations, and Prisma's default strategy sends one more SELECT
+ * per nested relation below a level that returned rows; that figure is
+ * reported as "nested relation loads" and is derived, not observed. Real data can take branches this fixture does not.
  * Requests the browser makes after the page loads are not counted.
  *
  * Read, not executed: 0 queries. `src/proxy.ts` and the root layout
@@ -37,10 +38,12 @@ import { createInitialState } from "@/lib/progression/engine";
 import {
   countsByFunction,
   createQueryCounter,
+  estimateRoundTrips,
   formatQueryBreakdown,
   queryCountLine,
   summarizeQueries,
   type RecordedQuery,
+  type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
 import { signToken } from "@/lib/session-token";
 
@@ -56,8 +59,16 @@ const TEACHER_HOME_ADMIN_QUERIES_COLD = 3;
 const TEACHER_HOME_APP_QUERIES_WARM = 18;
 /** The placement check is not cached. */
 const TEACHER_HOME_ADMIN_QUERIES_WARM = 1;
-/** 16 on each of the two roster selects in dashboard.ts, 6 in today.ts, 1 on appointments. */
-const TEACHER_HOME_RELATION_LOADS = 39;
+/**
+ * [app, admin] nested relation loads, counted only below a level that returned
+ * rows: 16 on each of the two roster selects in dashboard.ts, 6 in today.ts, 1
+ * on appointments. The fixture rows leave those relations out, so each is
+ * counted in full.
+ */
+const TEACHER_HOME_NESTED_LOADS_COLD: [number, number] = [39, 0];
+/** M6: what `node scripts/readiness/query-count.mjs teacher-home` prints. */
+const TEACHER_HOME_APP_ROUND_TRIPS_COLD = 111;
+const TEACHER_HOME_APP_ROUND_TRIPS_WARM = 111;
 /** "file › function" -> [app, admin] for the cold render. */
 const TEACHER_HOME_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -193,6 +204,7 @@ mock.module("@/components/teacher/InterventionQueuePanel", {
 interface Render {
   html: string;
   queries: readonly RecordedQuery[];
+  transactions: readonly RecordedTransaction[];
   errors: unknown[];
 }
 
@@ -215,7 +227,7 @@ async function renderTeacherHome(
     await new Promise((resolve) => setImmediate(resolve));
     return html;
   });
-  return { html: section.value, queries: section.queries, errors };
+  return { html: section.value, queries: section.queries, transactions: section.transactions, errors };
 }
 
 before(async () => {
@@ -245,11 +257,12 @@ describe("M6: teacher home query count", () => {
   it("cold render issues the pinned number of queries on each client", (t) => {
     for (const line of formatQueryBreakdown("M6 teacher home, cold", cold.queries).split("\n")) t.diagnostic(line);
     const summary = summarizeQueries(cold.queries);
-    t.diagnostic(queryCountLine({ path: "teacher-home", cache: "cold", queries: cold.queries, readNotExecuted: 0 }));
+    t.diagnostic(queryCountLine({ path: "teacher-home", cache: "cold", queries: cold.queries, transactions: cold.transactions, readNotExecuted: 0 }));
 
     assert.equal(summary.app, TEACHER_HOME_APP_QUERIES_COLD);
     assert.equal(summary.admin, TEACHER_HOME_ADMIN_QUERIES_COLD);
-    assert.equal(summary.relationLoads, TEACHER_HOME_RELATION_LOADS);
+    assert.deepEqual([summary.appNestedLoads, summary.adminNestedLoads], TEACHER_HOME_NESTED_LOADS_COLD);
+    assert.equal(estimateRoundTrips(cold.queries, cold.transactions).app.roundTrips, TEACHER_HOME_APP_ROUND_TRIPS_COLD);
   });
 
   it("cold render's queries come from the pinned functions", () => {
@@ -259,9 +272,10 @@ describe("M6: teacher home query count", () => {
   it("warm render issues the pinned number of queries on each client", (t) => {
     for (const line of formatQueryBreakdown("M6 teacher home, warm", warm.queries).split("\n")) t.diagnostic(line);
     const summary = summarizeQueries(warm.queries);
-    t.diagnostic(queryCountLine({ path: "teacher-home", cache: "warm", queries: warm.queries, readNotExecuted: 0 }));
+    t.diagnostic(queryCountLine({ path: "teacher-home", cache: "warm", queries: warm.queries, transactions: warm.transactions, readNotExecuted: 0 }));
 
     assert.equal(summary.app, TEACHER_HOME_APP_QUERIES_WARM);
     assert.equal(summary.admin, TEACHER_HOME_ADMIN_QUERIES_WARM);
+    assert.equal(estimateRoundTrips(warm.queries, warm.transactions).app.roundTrips, TEACHER_HOME_APP_ROUND_TRIPS_WARM);
   });
 });
