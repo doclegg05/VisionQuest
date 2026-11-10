@@ -1,0 +1,13 @@
+{
+  "id": "T3",
+  "kind": "task",
+  "set": "launch",
+  "title": "Page weight script",
+  "doneWhen": "It reproduces the 322 KB sign-in figure against production.",
+  "check": {
+    "type": "test",
+    "files": [
+      "scripts/readiness/__tests__/page-weight.test.mjs"
+    ]
+  }
+}

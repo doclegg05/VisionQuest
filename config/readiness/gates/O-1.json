@@ -1,0 +1,17 @@
+{
+  "id": "O-1",
+  "kind": "owner",
+  "set": "launch",
+  "title": "Regions, connection string mode and deploy-on-merge recorded",
+  "doneWhen": "Record four facts: the Render region, the Supabase region, whether either connection string uses port 6543 or `pgbouncer=true`, and whether a merge to `main` deploys on its own.",
+  "check": {
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "O-1: Render region recorded",
+      "O-1: Supabase region recorded",
+      "O-1: Connection string mode recorded",
+      "O-1: Whether a merge to main deploys on its own"
+    ]
+  }
+}

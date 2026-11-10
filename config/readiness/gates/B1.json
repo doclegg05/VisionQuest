@@ -1,0 +1,10 @@
+{
+  "id": "B1",
+  "kind": "task",
+  "set": "launch",
+  "title": "Regions screen",
+  "doneWhen": "Component tests pass. A CI e2e test has an admin on an empty system create a region and then a class.",
+  "check": {
+    "type": "pending"
+  }
+}

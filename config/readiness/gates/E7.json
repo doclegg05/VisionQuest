@@ -1,0 +1,10 @@
+{
+  "id": "E7",
+  "kind": "task",
+  "set": "pilot",
+  "title": "The mini chat has Retry and Help on failure",
+  "doneWhen": "Component test.",
+  "check": {
+    "type": "pending"
+  }
+}

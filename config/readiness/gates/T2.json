@@ -1,0 +1,10 @@
+{
+  "id": "T2",
+  "kind": "task",
+  "set": "launch",
+  "title": "Query counter",
+  "doneWhen": "Two runs give the same counts.",
+  "check": {
+    "type": "pending"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "H7",
+  "kind": "task",
+  "set": "launch",
+  "title": "Release hygiene",
+  "doneWhen": "A workflow test pins the filter. `/robots.txt` is served.",
+  "check": {
+    "type": "pending"
+  }
+}

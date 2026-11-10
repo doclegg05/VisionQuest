@@ -1,0 +1,10 @@
+{
+  "id": "C6",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Program Setup is safe",
+  "doneWhen": "Route tests enforce R6. Component tests show failed loads and saves.",
+  "check": {
+    "type": "pending"
+  }
+}

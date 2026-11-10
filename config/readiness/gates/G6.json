@@ -1,0 +1,10 @@
+{
+  "id": "G6",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Loading and error coverage",
+  "doneWhen": "Each route group has both files.",
+  "check": {
+    "type": "pending"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "H5",
+  "kind": "task",
+  "set": "launch",
+  "title": "Jobs survive a restart",
+  "doneWhen": "A test strands a job and finds it claimed again.",
+  "check": {
+    "type": "pending"
+  }
+}

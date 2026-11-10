@@ -121,6 +121,13 @@ jobs:
         # src/**/*.test.ts glob, so they need their own step.
         run: npm run bench:test
 
+      - name: Readiness scorecard unit tests
+        # The scorecard decides what a readiness gate means, so its status
+        # rules, exit codes and the page weight script are unit-tested. Same
+        # reason as above: scripts/readiness/__tests__/ (.mjs) sits outside
+        # `npm test`'s glob.
+        run: npm run readiness:test
+
       - name: Benchmark scorer unit tests
         # The scorers' own tests, same reason: scripts/bench/suites/**/*.test
         # .mjs sits outside every other glob and so ran in no workflow at all.

@@ -1,0 +1,10 @@
+{
+  "id": "C7",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Staff wording and narrow screens",
+  "doneWhen": "`ui-copy:readability` passes on the staff roots.",
+  "check": {
+    "type": "pending"
+  }
+}

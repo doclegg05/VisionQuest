@@ -1,0 +1,17 @@
+{
+  "id": "O-3",
+  "kind": "owner",
+  "set": "launch",
+  "title": "Backups",
+  "doneWhen": "Backups: confirm the Supabase plan tier, schedule a Storage export, keep the Render secrets in a password manager, and run one restore drill.",
+  "check": {
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "O-3: Supabase plan tier confirmed",
+      "O-3: Storage export scheduled",
+      "O-3: Render secrets kept in a password manager",
+      "Restore drill"
+    ]
+  }
+}

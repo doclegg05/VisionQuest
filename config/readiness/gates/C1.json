@@ -1,0 +1,10 @@
+{
+  "id": "C1",
+  "kind": "task",
+  "set": "launch",
+  "title": "Verify buttons report failure",
+  "doneWhen": "Component tests show a visible error for a mocked 500 on each action.",
+  "check": {
+    "type": "pending"
+  }
+}

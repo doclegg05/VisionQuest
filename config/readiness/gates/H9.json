@@ -1,0 +1,10 @@
+{
+  "id": "H9",
+  "kind": "task",
+  "set": "pilot",
+  "title": "A per-user limit on uploads",
+  "doneWhen": "A route test refuses the upload over the limit.",
+  "check": {
+    "type": "pending"
+  }
+}

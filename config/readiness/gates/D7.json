@@ -1,0 +1,10 @@
+{
+  "id": "D7",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Student wording, and the text-message setup dead end",
+  "doneWhen": "A component test reaches the phone field with texts off.",
+  "check": {
+    "type": "pending"
+  }
+}

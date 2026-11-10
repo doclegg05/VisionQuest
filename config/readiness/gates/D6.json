@@ -1,0 +1,10 @@
+{
+  "id": "D6",
+  "kind": "task",
+  "set": "pilot",
+  "title": "One error line",
+  "doneWhen": "The lint rule is an error and the tree passes it.",
+  "check": {
+    "type": "pending"
+  }
+}

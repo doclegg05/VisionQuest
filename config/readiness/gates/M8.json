@@ -1,0 +1,15 @@
+{
+  "id": "M8",
+  "kind": "metric",
+  "set": "pilot",
+  "title": "Signed-in student dashboard, median server time in production",
+  "doneWhen": "under 1 second",
+  "check": {
+    "type": "metric",
+    "run": null,
+    "baseline": null,
+    "target": 1000,
+    "direction": "atMost",
+    "unit": "ms"
+  }
+}

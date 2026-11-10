@@ -1,0 +1,19 @@
+{
+  "id": "O-2",
+  "kind": "owner",
+  "set": "launch",
+  "title": "Legal basis and FERPA decisions",
+  "doneWhen": "Written legal basis, and FERPA decisions D-E, D-G, D-H, D-I and D-J.",
+  "check": {
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "O-2: Legal basis in writing",
+      "O-2: FERPA decision D-E, lane C host",
+      "O-2: FERPA decision D-G, student notice and the consent form",
+      "O-2: FERPA decision D-H, four questions for counsel",
+      "O-2: FERPA decision D-I, the residual accepted in writing",
+      "O-2: FERPA decision D-J, the mood extractor and the summariser instruction"
+    ]
+  }
+}

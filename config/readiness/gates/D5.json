@@ -1,0 +1,10 @@
+{
+  "id": "D5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Forms keep what was typed",
+  "doneWhen": "Component tests fail a mocked save and find the text still in the field.",
+  "check": {
+    "type": "pending"
+  }
+}

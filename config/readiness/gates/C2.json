@@ -1,0 +1,10 @@
+{
+  "id": "C2",
+  "kind": "task",
+  "set": "launch",
+  "title": "Alert age is real",
+  "doneWhen": "A test runs the sync twice and `detectedAt` does not move.",
+  "check": {
+    "type": "pending"
+  }
+}

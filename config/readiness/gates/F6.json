@@ -1,0 +1,10 @@
+{
+  "id": "F6",
+  "kind": "task",
+  "set": "pilot",
+  "title": "The jobs list sends only what it shows",
+  "doneWhen": "A test finds no `description` in the response.",
+  "check": {
+    "type": "pending"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "D3",
+  "kind": "task",
+  "set": "launch",
+  "title": "Sign-in form first on phones",
+  "doneWhen": "The CI a11y and touch-target suites stay green. A test pins the shared label.",
+  "check": {
+    "type": "pending"
+  }
+}

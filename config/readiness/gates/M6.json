@@ -1,0 +1,15 @@
+{
+  "id": "M6",
+  "kind": "metric",
+  "set": "pilot",
+  "title": "App queries for one teacher home render",
+  "doneWhen": "20 or fewer",
+  "check": {
+    "type": "metric",
+    "run": null,
+    "baseline": 44,
+    "target": 20,
+    "direction": "atMost",
+    "unit": "queries"
+  }
+}

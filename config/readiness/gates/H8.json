@@ -1,0 +1,10 @@
+{
+  "id": "H8",
+  "kind": "task",
+  "set": "launch",
+  "title": "Incident basics page at `docs/runbooks/incident-basics.md`",
+  "doneWhen": "Britt's approval is recorded.",
+  "check": {
+    "type": "pending"
+  }
+}

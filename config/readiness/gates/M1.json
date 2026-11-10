@@ -1,0 +1,15 @@
+{
+  "id": "M1",
+  "kind": "metric",
+  "set": "launch",
+  "title": "App queries for one student dashboard render",
+  "doneWhen": "20 or fewer",
+  "check": {
+    "type": "metric",
+    "run": null,
+    "baseline": 39,
+    "target": 20,
+    "direction": "atMost",
+    "unit": "queries"
+  }
+}

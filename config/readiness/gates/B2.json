@@ -1,0 +1,10 @@
+{
+  "id": "B2",
+  "kind": "task",
+  "set": "launch",
+  "title": "An unplaced instructor is not stranded",
+  "doneWhen": "Tests cover the unplaced state end to end.",
+  "check": {
+    "type": "pending"
+  }
+}

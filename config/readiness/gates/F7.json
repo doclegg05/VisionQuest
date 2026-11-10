@@ -1,0 +1,10 @@
+{
+  "id": "F7",
+  "kind": "task",
+  "set": "hold",
+  "title": "A cheaper RLS wrapper",
+  "doneWhen": "Not scheduled.",
+  "check": {
+    "type": "pending"
+  }
+}

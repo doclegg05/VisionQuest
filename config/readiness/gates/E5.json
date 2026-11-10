@@ -1,0 +1,10 @@
+{
+  "id": "E5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Smooth typing on slow phones",
+  "doneWhen": "A render-count test shows earlier bubbles do not re-render per token.",
+  "check": {
+    "type": "pending"
+  }
+}

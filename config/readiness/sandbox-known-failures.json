@@ -1,0 +1,14 @@
+{
+  "failures": [
+    {
+      "file": "src/lib/spokes/forms-delivery.test.ts",
+      "name": "stages a bundled PDF for every FORMS[] entry with a storageKey",
+      "reason": "Spawns the tsx CLI, which the session sandbox blocks. CI runs it."
+    },
+    {
+      "file": "src/lib/zod-csp.test.ts",
+      "name": "browser task validation never probes dynamic Function under strict CSP",
+      "reason": "Spawns a child Node process that loads tsx, which the session sandbox blocks. CI runs it."
+    }
+  ]
+}

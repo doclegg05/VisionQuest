@@ -1,0 +1,10 @@
+{
+  "id": "C4",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Teacher home leads with the queue",
+  "doneWhen": "Tests cover order and nav. The CI touch-target and a11y suites stay green.",
+  "check": {
+    "type": "pending"
+  }
+}

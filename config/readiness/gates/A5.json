@@ -1,0 +1,10 @@
+{
+  "id": "A5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "A signed-out student is told why",
+  "doneWhen": "Tests cover the notice and reject an off-site `next`.",
+  "check": {
+    "type": "pending"
+  }
+}

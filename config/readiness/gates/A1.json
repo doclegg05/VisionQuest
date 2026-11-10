@@ -1,0 +1,10 @@
+{
+  "id": "A1",
+  "kind": "task",
+  "set": "launch",
+  "title": "Classroom-safe sign-in limits",
+  "doneWhen": "A test signs in 30 accounts from one address inside one window and all succeed. The per-account lock test still passes. CI `test:ratelimit` is green.",
+  "check": {
+    "type": "pending"
+  }
+}

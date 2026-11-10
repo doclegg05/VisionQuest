@@ -1,0 +1,10 @@
+{
+  "id": "F2",
+  "kind": "task",
+  "set": "launch",
+  "title": "Dashboard read diet",
+  "doneWhen": "M1 and M2 at target. A test proves a write clears the cache.",
+  "check": {
+    "type": "pending"
+  }
+}

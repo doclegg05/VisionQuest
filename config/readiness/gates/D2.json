@@ -1,0 +1,10 @@
+{
+  "id": "D2",
+  "kind": "task",
+  "set": "launch",
+  "title": "Orientation documents open on phones",
+  "doneWhen": "Component test for the link. Owner row O-10 for real phones.",
+  "check": {
+    "type": "pending"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "H2",
+  "kind": "task",
+  "set": "launch",
+  "title": "Demo and real students can never coexist",
+  "doneWhen": "Boot check tests for each combination.",
+  "check": {
+    "type": "pending"
+  }
+}

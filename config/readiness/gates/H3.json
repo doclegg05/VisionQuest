@@ -1,0 +1,10 @@
+{
+  "id": "H3",
+  "kind": "task",
+  "set": "launch",
+  "title": "Sage's state is visible",
+  "doneWhen": "Tests for both states. The workflow fails when the flag is false.",
+  "check": {
+    "type": "pending"
+  }
+}

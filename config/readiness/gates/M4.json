@@ -1,0 +1,16 @@
+{
+  "id": "M4",
+  "kind": "metric",
+  "set": "launch",
+  "title": "Compressed scripts and styles on the sign-in page",
+  "doneWhen": "235 KB or less",
+  "check": {
+    "type": "metric",
+    "run": "node scripts/readiness/page-weight.mjs https://visionquest.onrender.com/",
+    "baseline": 322,
+    "target": 235,
+    "direction": "atMost",
+    "unit": "KB",
+    "needs": "network"
+  }
+}

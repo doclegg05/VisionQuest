@@ -1,0 +1,10 @@
+{
+  "id": "F4",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Transactions that fit",
+  "doneWhen": "The CI RLS suites are green. A test covers a bulk change of 20 tasks.",
+  "check": {
+    "type": "pending"
+  }
+}

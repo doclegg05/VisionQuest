@@ -1,0 +1,10 @@
+{
+  "id": "D1",
+  "kind": "task",
+  "set": "launch",
+  "title": "The signed-form banner tells the truth, per R5",
+  "doneWhen": "Tests: a teacher-created student sees no banner, a QR-intake student without a signed packet sees it, and signing clears it.",
+  "check": {
+    "type": "pending"
+  }
+}

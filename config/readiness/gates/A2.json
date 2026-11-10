@@ -1,0 +1,10 @@
+{
+  "id": "A2",
+  "kind": "task",
+  "set": "launch",
+  "title": "One password rule",
+  "doneWhen": "A test fails when any on-screen hint disagrees with the schema.",
+  "check": {
+    "type": "pending"
+  }
+}
