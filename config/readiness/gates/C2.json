@@ -5,6 +5,9 @@
   "title": "Alert age is real",
   "doneWhen": "A test runs the sync twice and `detectedAt` does not move.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/advising-sync-apply.test.ts"
+    ]
   }
 }

@@ -238,6 +238,26 @@ export function buildStudentAlertSyncPlan({
   };
 }
 
+/** The part of the app client, or of its transaction, that reads alerts. */
+type AlertReader = { studentAlert: Pick<typeof prisma.studentAlert, "findMany"> };
+
+/**
+ * Which of these alerts are open right now. `existing` cannot say: it holds no
+ * resolved rows, and only the alert types the context read lists.
+ */
+async function readOpenAlertKeys(
+  tx: AlertReader,
+  studentId: string,
+  alertKeys: string[],
+): Promise<Set<string>> {
+  if (alertKeys.length === 0) return new Set();
+  const open = await tx.studentAlert.findMany({
+    where: { studentId, alertKey: { in: alertKeys }, status: "open" },
+    select: { alertKey: true },
+  });
+  return new Set(open.map((alert) => alert.alertKey));
+}
+
 export async function applyStudentAlertSyncPlan({
   studentId,
   now,
@@ -253,6 +273,8 @@ export async function applyStudentAlertSyncPlan({
   const existingByKey = new Map(existing.map((alert) => [alert.alertKey, alert]));
 
   await prisma.$transaction(async (tx) => {
+    const openKeys = await readOpenAlertKeys(tx, studentId, [...desiredKeys]);
+
     for (const alert of desiredAlerts) {
       if (isHeldByTeacher(existingByKey.get(alert.alertKey), now)) {
         await tx.studentAlert.update({
@@ -275,7 +297,9 @@ export async function applyStudentAlertSyncPlan({
             summary: alert.summary,
             sourceType: alert.sourceType,
             sourceId: alert.sourceId,
-            detectedAt: now,
+            // detectedAt is when this spell of the alert began, and the queue
+            // prints it as the alert's age. Only a reopened alert restarts it.
+            ...(openKeys.has(alert.alertKey) ? {} : { detectedAt: now }),
             resolvedAt: null,
             snoozedUntil: null,
             snoozedBy: null,
