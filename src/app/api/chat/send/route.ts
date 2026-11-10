@@ -36,6 +36,13 @@ import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, g
 import { transcriptWindowFor } from "@/lib/chat/transcript-window";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
+import {
+  classifyProviderInitFailure,
+  classifyStreamFailure,
+  sageFailureMessage,
+  withFailureCapture,
+  type FailureCapture,
+} from "@/lib/chat/sage-failure";
 import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
 import { formatAttachmentContext } from "@/lib/chat/attachment-context";
 import { loadOpenOrientationItems } from "@/lib/chat/open-orientation-items";
@@ -142,18 +149,6 @@ const STUDENT_VISIBLE_ALERT_TYPE_SET: ReadonlySet<string> = new Set(STUDENT_VISI
  */
 function studentVisibleAlerts(alerts: readonly AlertSummary[] | undefined): AlertSummary[] {
   return (alerts ?? []).filter((alert) => STUDENT_VISIBLE_ALERT_TYPE_SET.has(alert.type));
-}
-
-function formatStreamErrorForClient(message: string, cause?: string): string {
-  const raw = cause ? `${message} ${cause}` : message;
-  const localAiUnavailable =
-    /Local AI|Ollama|Relay:|Cloudflare Access service token|Bad Gateway|gateway|timed out|timeout|\b(?:502|503|504|520|522|523|524|525|526|527|530)\b/i.test(raw);
-
-  if (localAiUnavailable) {
-    return "Sage is offline right now because the local AI server is not reachable. Please try again in a few minutes or tell staff to check the local AI service.";
-  }
-
-  return `AI streaming failed: ${message}${cause ? ` (${cause})` : ""}`;
 }
 
 class ChatSseClientClosedError extends Error {
@@ -434,13 +429,15 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       errorCode: isOffline ? "LOCAL_AI_UNAVAILABLE" : "AI_PROVIDER_UNAVAILABLE",
     });
 
+    // Nothing is saved yet on this path, so the sentence makes no claim
+    // that the student's message was kept.
+    const failure = classifyProviderInitFailure(err);
     return new Response(
       JSON.stringify({
         error: withCrisisResources(
-          isOffline
-            ? "Sage is offline right now. The local AI server is not reachable. Please try again later."
-            : "Sage is temporarily unavailable. Please try again in a moment.",
+          sageFailureMessage(failure, { audience: isStaffChat ? "staff" : "student", messageSaved: false }),
         ),
+        failure,
       }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
@@ -912,6 +909,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     async start(controller) {
       let streamClosed = false;
       let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+      /** Set once the provider is wrapped; the catch below reads its last error. */
+      let failureCapture: FailureCapture | null = null;
       // A confirm card was proposed this turn. The card's Skip is client-only
       // (no server round trip), so "declined" is never observable here; the
       // chat limit is instead given back once the turn completes. Set from
@@ -983,10 +982,14 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         // non-streaming fallback, plain stream fallback) logs one
         // LlmCallLog row per model call with real provider usage when
         // available, estimated otherwise.
-        const loggedProvider = withUsageLogging(provider, {
-          studentId: session.id,
-          callSite: "sage_chat",
-        });
+        const capture = withFailureCapture(
+          withUsageLogging(provider, {
+            studentId: session.id,
+            callSite: "sage_chat",
+          }),
+        );
+        failureCapture = capture;
+        const loggedProvider = capture.provider;
 
         const agentLoopEnabled = agentLoopEnabledEarly;
 
@@ -1305,10 +1308,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         sendEvent({ done: true, conversationId: conversation.id }, "done");
         closeStream();
       } catch (error) {
-        // For the audit row and the client's error event below; the log lines
-        // carry the name and code only, with one level of cause.
+        // For the audit row below; the log lines carry the name and code only.
         const msg = error instanceof Error ? error.message : String(error);
-        const cause = error instanceof Error && error.cause ? String(error.cause) : undefined;
         const clientClosed = error instanceof ChatSseClientClosedError || streamClosed;
         const errorCode = clientClosed ? "CLIENT_STREAM_CLOSED" : "AI_STREAM_FAILED";
         if (clientClosed) {
@@ -1366,8 +1367,16 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
           },
         });
         if (!clientClosed) {
+          // The student's message was saved before the stream opened.
+          const failure = classifyStreamFailure(failureCapture?.lastError() ?? error);
+          const errorEvent = {
+            error:
+              sageFailureMessage(failure, { audience: isStaffChat ? "staff" : "student", messageSaved: true }) +
+              crisisBlock,
+            failure,
+          };
           try {
-            sendEvent({ error: formatStreamErrorForClient(msg, cause) + crisisBlock }, "error");
+            sendEvent(errorEvent, "error");
           } catch {
             // The client went away while we were reporting the original error.
           }
