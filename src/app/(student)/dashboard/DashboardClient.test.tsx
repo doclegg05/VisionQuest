@@ -44,4 +44,12 @@ describe("DashboardClient layout", () => {
     assert.ok(intro >= 0, "intro not rendered");
     assert.ok(cta < intro, "the next-step card must come before the intro");
   });
+
+  it("says how often the advising region checks for changes", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    // Fresh data, so the region shows its status line rather than "Refreshing".
+    const html = renderToString(<DashboardClient sessionId="s1" initialSupport={{ ...support, fetchedAt: new Date().toISOString() }} />);
+    assert.match(html, /checks every 2 minutes while visible/);
+    assert.doesNotMatch(html, /every 30 seconds/);
+  });
 });

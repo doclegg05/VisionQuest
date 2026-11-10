@@ -56,11 +56,21 @@ import {
  * F2 step 5: 64.5 to 26.3. The advising and overview polls serve the slow
  * signals kept for ten minutes (getSlowSignals) and read only the live ones:
  * alerts, the next appointment, saved jobs, applications and open tasks.
+ * F2 step 6: 26.3 to 7.1 (and the window from 10 minutes to 60). Tasks and
+ * advising poll every 2 minutes, the outcome summaries and task charts every
+ * 10 (regionPollMs). Per hour: 30 polls of tasks and advising at 10
+ * statements each with the session, 6 of the summaries and charts at 2, and
+ * 5 refills of the kept shell, slow signals and global rows at 25.
  */
-const IDLE_STATEMENTS_PER_MINUTE = 26.3;
+const IDLE_STATEMENTS_PER_MINUTE = 7.1;
 
-/** Long enough to hold whole cycles of every interval the client uses. */
-const WINDOW_MS = 10 * 60_000;
+/**
+ * An hour: whole cycles of every poll interval, and long enough that entries
+ * kept for ten minutes refill at their steady rate (a refill lands on the first
+ * poll after expiry, so every 12 minutes at a 2 minute poll). A shorter window
+ * counts that refill once whatever its rate. Rates are per minute either way.
+ */
+const WINDOW_MS = 60 * 60_000;
 const SESSION_COOKIE = "vq-session";
 
 process.env.JWT_SECRET = DASHBOARD_JWT_SECRET;
@@ -133,7 +143,7 @@ before(async () => {
 });
 after(() => { mock.timers.reset(); });
 
-/** One decimal: the window is whole minutes, so a rate is statements / 10. */
+/** One decimal is the precision pinned. */
 const round = (n: number) => Math.round(n * 10) / 10;
 
 function perMinute(result: IdleResult): { app: number; admin: number; total: number } {
