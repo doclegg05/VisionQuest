@@ -4,7 +4,6 @@ import { describe, it } from "node:test";
 import { PLAIN_LANGUAGE_IDEAL_GRADE, assessReadability } from "@/lib/sage/readability";
 import {
   REGIONS_COPY,
-  archiveConfirm,
   classCountLabel,
   regionCountLabel,
   removeCoordinatorConfirm,
@@ -24,21 +23,15 @@ describe("regions copy", () => {
     assert.equal(classCountLabel(4), "4 classes");
   });
 
-  it("counts regions in plain words, and says how many are archived", () => {
-    assert.equal(regionCountLabel(0, 0), "No regions yet");
-    assert.equal(regionCountLabel(1, 0), "1 region");
-    assert.equal(regionCountLabel(3, 0), "3 regions");
-    assert.equal(regionCountLabel(3, 2), "3 regions, 2 archived");
-    assert.equal(regionCountLabel(0, 1), "No active regions, 1 archived");
+  it("counts regions in plain words", () => {
+    assert.equal(regionCountLabel(0), "No regions yet");
+    assert.equal(regionCountLabel(1), "1 region");
+    assert.equal(regionCountLabel(3), "3 regions");
   });
 
-  it("names the region and says what archiving does", () => {
-    const dialog = archiveConfirm({ name: "North", classCount: 2 });
-    assert.equal(dialog.title, "Archive North?");
-    assert.equal(dialog.confirmLabel, "Archive region");
-    assert.match(dialog.message, /2 classes stay in it/);
-    assert.match(dialog.message, /restore it later/);
-    assert.equal(dialog.destructive, false, "an archive can be undone, so the button is not red");
+  it("has no words for archiving or restoring, which this screen does not offer", () => {
+    const words = JSON.stringify(REGIONS_COPY);
+    assert.doesNotMatch(words, /archiv|restor/i);
   });
 
   it("warns when a coordinator is about to lose their only region", () => {
@@ -53,8 +46,6 @@ describe("regions copy", () => {
 
 describe("regions copy reading level", () => {
   const built = [
-    archiveConfirm({ name: "North", classCount: 0 }).message,
-    archiveConfirm({ name: "North", classCount: 2 }).message,
     removeCoordinatorConfirm({ personName: "Pat Lee", regionName: "North", onlyRegion: true }).message,
     removeCoordinatorConfirm({ personName: "Pat Lee", regionName: "North", onlyRegion: false }).message,
   ];

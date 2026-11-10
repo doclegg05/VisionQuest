@@ -169,36 +169,11 @@ describe("renaming a region", () => {
   });
 });
 
-describe("archiving and restoring", () => {
-  it("asks first, naming the region and its classes", async () => {
+describe("archive and restore", () => {
+  it("are not offered: the controller has no handler for either", () => {
     const h = harness({ regions: [north] });
-    await h.controller.onArchive(north);
-    assert.equal(h.confirms.length, 1);
-    assert.equal(h.confirms[0].title, "Archive North?");
-    assert.match(h.confirms[0].message, /2 classes stay in it/);
-  });
-
-  it("sends nothing when the admin cancels", async () => {
-    const h = harness({ regions: [north], confirmWith: false });
-    await h.controller.onArchive(north);
-    assert.deepEqual(h.requests, []);
-    assert.deepEqual(h.actions, []);
-  });
-
-  it("archives the region when the admin confirms", async () => {
-    const h = harness({ regions: [north] });
-    await h.controller.onArchive(north);
-    assert.deepEqual(h.requests, ['PATCH /api/admin/regions/r1 {"status":"archived"}']);
-    assert.deepEqual(regionsOf(h.state()).map((region) => region.status), ["archived"]);
-  });
-
-  it("restores a region without asking", async () => {
-    const archived: AdminRegion = { ...north, status: "archived" };
-    const h = harness({ regions: [archived] });
-    await h.controller.onRestore(archived);
-    assert.deepEqual(h.confirms, []);
-    assert.deepEqual(h.requests, ['PATCH /api/admin/regions/r1 {"status":"active"}']);
-    assert.deepEqual(regionsOf(h.state()).map((region) => region.status), ["active"]);
+    assert.equal("onArchive" in h.controller, false);
+    assert.equal("onRestore" in h.controller, false);
   });
 });
 

@@ -6,13 +6,12 @@ import {
   loadRegions,
   removeCoordinator,
   renameRegion,
-  setRegionStatus,
   type NewRegionInput,
   type Outcome,
   type RegionsHttp,
 } from "./regions-api";
-import { REGION_NOTICES, archiveConfirm, removeCoordinatorConfirm, type ConfirmCopy } from "./regions-copy";
-import type { AdminRegion, RegionListChange, RegionPerson, RegionStatus } from "./regions-model";
+import { REGION_NOTICES, removeCoordinatorConfirm, type ConfirmCopy } from "./regions-copy";
+import type { AdminRegion, RegionListChange, RegionPerson } from "./regions-model";
 import type { RegionsAction, SaveTarget } from "./regions-reducer";
 
 export interface RegionsControllerDeps {
@@ -26,8 +25,6 @@ export interface RegionsControllerDeps {
 /** The card's handlers. The ones that ask first resolve when the whole step is done. */
 export interface RegionsController extends RegionsHandlers {
   load: () => Promise<void>;
-  onArchive: (region: AdminRegion) => Promise<void>;
-  onRestore: (region: AdminRegion) => Promise<void>;
   onRemove: (request: RemoveCoordinatorRequest) => Promise<void>;
 }
 
@@ -68,12 +65,7 @@ function createSave({ dispatch, onSaved }: RegionsControllerDeps): Save {
   };
 }
 
-function regionHandlers({ http, confirm }: RegionsControllerDeps, save: Save) {
-  const setStatus = (region: AdminRegion, status: RegionStatus): Promise<boolean> =>
-    save(rowOf(region), () => setRegionStatus(http, region.id, status), (saved) => ({
-      change: { kind: "region-changed", regionId: region.id, change: { status: saved } },
-      notice: saved === "archived" ? REGION_NOTICES.archived(region.name) : REGION_NOTICES.restored(region.name),
-    }));
+function regionHandlers({ http }: RegionsControllerDeps, save: Save) {
   return {
     onCreate: (input: NewRegionInput) =>
       save({ kind: "create" }, () => createRegion(http, input), (region) => ({
@@ -85,12 +77,6 @@ function regionHandlers({ http, confirm }: RegionsControllerDeps, save: Save) {
         change: { kind: "region-changed", regionId: region.id, change: { name: saved } },
         notice: REGION_NOTICES.renamed(saved),
       })),
-    onArchive: async (region: AdminRegion) => {
-      if (await confirm(archiveConfirm(region))) await setStatus(region, "archived");
-    },
-    onRestore: async (region: AdminRegion) => {
-      await setStatus(region, "active");
-    },
   };
 }
 

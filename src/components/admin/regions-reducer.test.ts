@@ -38,11 +38,6 @@ describe("loading the regions", () => {
     assert.equal(state.open, true);
   });
 
-  it("opens the card when every region is archived, because there is still none to pick", () => {
-    const state = ready(run([{ type: "load-succeeded", regions: [region({ status: "archived" })] }]));
-    assert.equal(state.open, true);
-  });
-
   it("keeps the card closed when regions already exist", () => {
     const state = ready(run([{ type: "load-succeeded", regions: [region()] }]));
     assert.equal(state.open, false);

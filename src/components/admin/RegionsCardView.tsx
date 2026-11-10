@@ -1,8 +1,7 @@
 import { AddRegionForm } from "./AddRegionForm";
-import { ActiveRegionRow, ArchivedRegionRow, type RegionRowHandlers } from "./RegionRows";
+import { RegionRow, type RegionRowHandlers } from "./RegionRows";
 import type { NewRegionInput } from "./regions-api";
 import { REGIONS_COPY, regionCountLabel } from "./regions-copy";
-import type { AdminRegion } from "./regions-model";
 import { failureFor, type ReadyState, type RegionsState } from "./regions-reducer";
 import { ALERT_CLASS, MUTED_TEXT, SECONDARY_BUTTON, SUBHEADING } from "./regionStyles";
 
@@ -31,7 +30,6 @@ function isOpen(state: ReadyState): boolean {
 
 function CardHeader({ state, onToggle }: { state: RegionsState; onToggle: () => void }) {
   const ready = state.kind === "ready" ? state : null;
-  const active = ready?.regions.filter((region) => region.status === "active").length ?? 0;
   const total = ready?.regions.length ?? 0;
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -39,7 +37,7 @@ function CardHeader({ state, onToggle }: { state: RegionsState; onToggle: () => 
         <h2 id="regions-heading" className={SUBHEADING}>{REGIONS_COPY.heading}</h2>
         <p className={`mt-1 ${MUTED_TEXT}`}>{REGIONS_COPY.intro}</p>
         {ready && total > 0 && (
-          <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">{regionCountLabel(active, total - active)}</p>
+          <p className="mt-2 text-sm font-semibold text-[var(--ink-strong)]">{regionCountLabel(total)}</p>
         )}
         {/* Always in the page, so a screen reader hears each saved change. */}
         {ready && (
@@ -64,18 +62,12 @@ function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
-interface RegionListProps {
-  state: ReadyState;
-  regions: readonly AdminRegion[];
-  handlers: RegionsHandlers;
-}
-
-function ActiveRegions({ state, regions, handlers }: RegionListProps) {
-  if (regions.length === 0) return null;
+function RegionList({ state, handlers }: { state: ReadyState; handlers: RegionsHandlers }) {
+  if (state.regions.length === 0) return null;
   return (
     <ul className="divide-y divide-[var(--border)]">
-      {regions.map((region) => (
-        <ActiveRegionRow
+      {state.regions.map((region) => (
+        <RegionRow
           key={region.id}
           region={region}
           regions={state.regions}
@@ -90,30 +82,7 @@ function ActiveRegions({ state, regions, handlers }: RegionListProps) {
   );
 }
 
-function ArchivedRegions({ state, regions, handlers }: RegionListProps) {
-  if (regions.length === 0) return null;
-  return (
-    <div>
-      <h3 className={SUBHEADING}>{REGIONS_COPY.archivedHeading}</h3>
-      <ul className="divide-y divide-[var(--border)]">
-        {regions.map((region) => (
-          <ArchivedRegionRow
-            key={region.id}
-            region={region}
-            busy={state.busy !== null}
-            saving={isSaving(state, region.id)}
-            error={failureFor(state, { kind: "region", regionId: region.id })}
-            handlers={handlers}
-          />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function RegionsPanel({ state, handlers }: { state: ReadyState; handlers: RegionsHandlers }) {
-  const active = state.regions.filter((region) => region.status === "active");
-  const archived = state.regions.filter((region) => region.status === "archived");
   return (
     <div id={PANEL_ID} className="space-y-5">
       {state.regions.length === 0 && (
@@ -121,8 +90,7 @@ function RegionsPanel({ state, handlers }: { state: ReadyState; handlers: Region
           {REGIONS_COPY.empty}
         </p>
       )}
-      <ActiveRegions state={state} regions={active} handlers={handlers} />
-      <ArchivedRegions state={state} regions={archived} handlers={handlers} />
+      <RegionList state={state} handlers={handlers} />
       <AddRegionForm
         busy={state.busy !== null}
         adding={state.busy?.kind === "create"}

@@ -4,7 +4,6 @@ import {
   parseRegionList,
   parseRegionReply,
   type AdminRegion,
-  type RegionStatus,
 } from "./regions-model";
 
 /** The four calls this screen makes. The app's `api` client fits; a test passes a stand-in. */
@@ -85,13 +84,6 @@ export async function renameRegion(http: RegionsHttp, regionId: string, name: st
   return attempt(async () => {
     const region = parseRegionReply(await http.patch(regionUrl(regionId), { name: trimmed }));
     return { ok: true, value: region?.name ?? trimmed };
-  }, MESSAGES.saveFailed);
-}
-
-export function setRegionStatus(http: RegionsHttp, regionId: string, status: RegionStatus): Promise<Outcome<RegionStatus>> {
-  return attempt(async () => {
-    await http.patch(regionUrl(regionId), { status });
-    return { ok: true, value: status };
   }, MESSAGES.saveFailed);
 }
 

@@ -22,7 +22,7 @@ describe("RegionsCard first paint", () => {
     assert.ok(html.includes("Loading regions"));
   });
 
-  it("carries the confirm dialog that archive and remove use", () => {
+  it("carries the confirm dialog that removing a coordinator uses", () => {
     assert.ok(renderToString(<RegionsCard />).includes('role="alertdialog"'));
   });
 });

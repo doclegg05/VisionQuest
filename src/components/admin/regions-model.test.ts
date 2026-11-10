@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  activeRegionCount,
   applyRegionChange,
   coordinatorChoices,
   mergePeople,
   parseRegionReply,
   parseRegionList,
+  regionCountFor,
   suggestRegionCode,
   withCoordinatorAdded,
   withCoordinatorRemoved,
@@ -44,6 +44,11 @@ describe("parseRegionList", () => {
     assert.deepEqual(parseRegionList({ regions: [serverRegion] }), [
       { id: "r1", name: "North", code: "north", status: "active", classCount: 2, coordinators: [pat] },
     ]);
+  });
+
+  it("leaves out archived regions, because this screen cannot archive or restore one", () => {
+    const archived = { ...serverRegion, id: "r9", name: "Old Valley", status: "archived" };
+    assert.deepEqual(parseRegionList({ regions: [archived, serverRegion] })?.map((item) => item.id), ["r1"]);
   });
 
   it("reads an empty list as no regions, not as a failure", () => {
@@ -107,10 +112,10 @@ describe("suggestRegionCode", () => {
 });
 
 describe("list changes", () => {
-  it("adds a region and keeps active regions first, by name", () => {
-    const start = [region({ id: "r1", name: "North" }), region({ id: "r3", name: "Old", status: "archived" })];
+  it("adds a region and keeps the list by name", () => {
+    const start = [region({ id: "r1", name: "North" }), region({ id: "r3", name: "West" })];
     const next = withRegionAdded(start, region({ id: "r2", name: "East" }));
-    assert.deepEqual(next.map((item) => item.name), ["East", "North", "Old"]);
+    assert.deepEqual(next.map((item) => item.name), ["East", "North", "West"]);
     assert.equal(start.length, 2, "the list passed in is not changed");
   });
 
@@ -119,12 +124,6 @@ describe("list changes", () => {
     const next = withRegionChanged(start, "r1", { name: "Northern" });
     assert.deepEqual(next.map((item) => item.name), ["East", "Northern"]);
     assert.equal(start[0].name, "North");
-  });
-
-  it("moves an archived region below the active ones", () => {
-    const start = [region({ id: "r1", name: "East" }), region({ id: "r2", name: "North" })];
-    const next = withRegionChanged(start, "r1", { status: "archived" });
-    assert.deepEqual(next.map((item) => `${item.name}:${item.status}`), ["North:active", "East:archived"]);
   });
 
   it("adds a coordinator to one region only", () => {
@@ -179,13 +178,13 @@ describe("people who can be added as a coordinator", () => {
     assert.deepEqual(coordinatorChoices([pat, sam], region({ coordinators: [pat] })), [sam]);
   });
 
-  it("counts the active regions a coordinator holds", () => {
+  it("counts the regions a coordinator holds", () => {
     const regions = [
       region({ id: "r1", coordinators: [pat] }),
-      region({ id: "r2", coordinators: [pat], status: "archived" }),
+      region({ id: "r2", coordinators: [pat, sam] }),
       region({ id: "r3", coordinators: [sam] }),
     ];
-    assert.equal(activeRegionCount(regions, "u1"), 1);
-    assert.equal(activeRegionCount(regions, "nobody"), 0);
+    assert.equal(regionCountFor(regions, "u1"), 2);
+    assert.equal(regionCountFor(regions, "nobody"), 0);
   });
 });

@@ -39,13 +39,13 @@ export type RegionsAction =
 
 export const INITIAL_REGIONS_STATE: RegionsState = { kind: "loading" };
 
-/** With no active region the card opens on its own: adding one is the admin's first step. */
+/** With no region the card opens on its own: adding one is the admin's first step. */
 function loaded(regions: readonly AdminRegion[]): ReadyState {
   return {
     kind: "ready",
     regions,
     people: mergePeople([], regions),
-    open: !regions.some((region) => region.status === "active"),
+    open: regions.length === 0,
     busy: null,
     failure: null,
     notice: "",

@@ -10,7 +10,7 @@ import { createRegionsController } from "./regions-controller";
 import { INITIAL_REGIONS_STATE, regionsReducer } from "./regions-reducer";
 
 /**
- * The admin's Regions card: list, add, rename, archive and restore regions,
+ * The admin's Regions card: list, add and rename regions,
  * and assign or remove their coordinators. This file only wires React to the
  * controller; the requests and the state rules live in the regions-* modules.
  */

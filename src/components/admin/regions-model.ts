@@ -18,7 +18,6 @@ export interface AdminRegion {
 
 export interface RegionChange {
   name?: string;
-  status?: RegionStatus;
 }
 
 /** The server's limits on a region code (src/app/api/admin/regions/route.ts). */
@@ -66,10 +65,19 @@ function parseRegion(value: unknown): AdminRegion | null {
   return { id, name, code, status, classCount: typeof classCount === "number" ? classCount : 0, coordinators };
 }
 
-/** Reads GET /api/admin/regions. Null when the reply is not a list of regions. */
+/**
+ * Reads GET /api/admin/regions. Null when the reply is not a list of regions.
+ *
+ * Archived regions are left out. This screen cannot archive or restore a
+ * region yet: archiving does not end a coordinator's access
+ * (`coordinated_region_ids` and `coordinatorHasRegion` ignore the status), and
+ * it drops the region's students from every dashboard. Until a migration fixes
+ * that, a region archived some other way is simply not listed here.
+ */
 export function parseRegionList(payload: unknown): AdminRegion[] | null {
   if (!isRecord(payload) || !Array.isArray(payload.regions)) return null;
-  return parseAll(payload.regions, parseRegion);
+  const regions = parseAll(payload.regions, parseRegion);
+  return regions && regions.filter((region) => region.status === "active");
 }
 
 /** Reads the `{ region }` reply of a create or an update. It carries no classes or coordinators. */
@@ -91,9 +99,8 @@ function byName(a: { name: string }, b: { name: string }): number {
   return a.name.localeCompare(b.name);
 }
 
-/** The server's order: active regions first, each group by name. */
 function sortRegions(regions: readonly AdminRegion[]): AdminRegion[] {
-  return [...regions].sort((a, b) => a.status.localeCompare(b.status) || byName(a, b));
+  return [...regions].sort(byName);
 }
 
 function mapRegion(
@@ -168,9 +175,7 @@ export function coordinatorChoices(people: readonly RegionPerson[], region: Admi
   return people.filter((person) => !assigned.has(person.id));
 }
 
-/** How many active regions a coordinator holds. Archived regions are hidden from them. */
-export function activeRegionCount(regions: readonly AdminRegion[], coordinatorId: string): number {
-  return regions.filter(
-    (region) => region.status === "active" && region.coordinators.some((person) => person.id === coordinatorId),
-  ).length;
+/** How many of the listed regions a coordinator holds. */
+export function regionCountFor(regions: readonly AdminRegion[], coordinatorId: string): number {
+  return regions.filter((region) => region.coordinators.some((person) => person.id === coordinatorId)).length;
 }

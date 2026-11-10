@@ -25,14 +25,11 @@ export const REGIONS_COPY = {
   codeHelp: "Letters, numbers and dashes. No spaces.",
   add: "Add region",
   adding: "Adding…",
-  archivedHeading: "Archived regions",
   rename: "Rename",
   renameLabel: "New name",
   saveName: "Save name",
   saving: "Saving…",
   cancel: "Cancel",
-  archive: "Archive",
-  restore: "Restore",
   coordinatorsHeading: "Coordinators",
   noCoordinators: "No coordinator yet.",
   addCoordinatorLabel: "Add a coordinator",
@@ -52,23 +49,8 @@ export function classCountLabel(count: number): string {
 }
 
 /** The one-line summary on the closed card. */
-export function regionCountLabel(active: number, archived: number): string {
-  if (active === 0 && archived === 0) return "No regions yet";
-  const activePart = active === 0 ? "No active regions" : plural(active, "region", "regions");
-  return archived === 0 ? activePart : `${activePart}, ${archived} archived`;
-}
-
-export function archiveConfirm(region: { name: string; classCount: number }): ConfirmCopy {
-  const classes =
-    region.classCount === 0
-      ? ""
-      : `Its ${plural(region.classCount, "class stays", "classes stay")} in it. `;
-  return {
-    title: `Archive ${region.name}?`,
-    message: `${classes}No one can pick it for a new class or new staff. Its coordinators will stop seeing it. You can restore it later.`,
-    confirmLabel: "Archive region",
-    destructive: false,
-  };
+export function regionCountLabel(count: number): string {
+  return count === 0 ? "No regions yet" : plural(count, "region", "regions");
 }
 
 export function removeCoordinatorConfirm(input: { personName: string; regionName: string; onlyRegion: boolean }): ConfirmCopy {
@@ -86,8 +68,6 @@ export function removeCoordinatorConfirm(input: { personName: string; regionName
 export const REGION_NOTICES = {
   added: (regionName: string) => `${regionName} was added.`,
   renamed: (regionName: string) => `The region is now called ${regionName}.`,
-  archived: (regionName: string) => `${regionName} was archived.`,
-  restored: (regionName: string) => `${regionName} was restored.`,
   coordinatorAdded: (personName: string, regionName: string) => `${personName} was added to ${regionName}.`,
   coordinatorRemoved: (personName: string, regionName: string) => `${personName} was removed from ${regionName}.`,
 } as const;

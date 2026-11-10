@@ -7,7 +7,6 @@ import {
   loadRegions,
   removeCoordinator,
   renameRegion,
-  setRegionStatus,
   type RegionsHttp,
 } from "./regions-api";
 
@@ -131,17 +130,10 @@ describe("renameRegion", () => {
   });
 });
 
-describe("setRegionStatus", () => {
-  it("archives a region", async () => {
-    const http = fakeHttp(() => ({ region: { id: "r1", name: "North", code: "north", status: "archived" } }));
-    const outcome = await setRegionStatus(http, "r1", "archived");
-    assert.deepEqual(http.calls, [{ method: "PATCH", url: "/api/admin/regions/r1", body: { status: "archived" } }]);
-    assert.deepEqual(outcome, { ok: true, value: "archived" });
-  });
-
-  it("passes the server's own message on when the save fails", async () => {
-    const outcome = await setRegionStatus(fakeHttp(failing(new Error("Region not found."))), "r1", "active");
-    assert.deepEqual(outcome, { ok: false, message: "Region not found." });
+describe("archive and restore", () => {
+  it("are not offered: this screen sends no status change", async () => {
+    const api = await import("./regions-api");
+    assert.equal("setRegionStatus" in api, false);
   });
 });
 

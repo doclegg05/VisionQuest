@@ -12,8 +12,6 @@ const handlers: RegionsHandlers = {
   onToggle: () => {},
   onCreate: async () => true,
   onRename: async () => true,
-  onArchive: () => {},
-  onRestore: () => {},
   onAssign: async () => true,
   onRemove: () => {},
 };
@@ -23,10 +21,9 @@ const sam: RegionPerson = { id: "u2", displayName: "Sam Roy", email: null };
 
 const north: AdminRegion = { id: "r1", name: "North", code: "north", status: "active", classCount: 2, coordinators: [pat] };
 const east: AdminRegion = { id: "r2", name: "East", code: "east", status: "active", classCount: 0, coordinators: [] };
-const old: AdminRegion = { id: "r3", name: "Old Valley", code: "old", status: "archived", classCount: 1, coordinators: [] };
 
 function ready(overrides: Partial<ReadyState> = {}): ReadyState {
-  return { kind: "ready", regions: [east, north, old], people: [pat, sam], open: true, busy: null, failure: null, notice: "", ...overrides };
+  return { kind: "ready", regions: [east, north], people: [pat, sam], open: true, busy: null, failure: null, notice: "", ...overrides };
 }
 
 /** React escapes apostrophes and splits text with comment markers; undo both to read the copy. */
@@ -86,7 +83,8 @@ describe("RegionsCardView with regions, closed", () => {
   const html = render(ready({ open: false }));
 
   it("sums the regions up in one line", () => {
-    assert.ok(html.includes("2 regions, 1 archived"));
+    assert.ok(html.includes("2 regions"));
+    assert.equal(html.includes("archived"), false);
   });
 
   it("offers a labelled control to open the list", () => {
@@ -95,7 +93,7 @@ describe("RegionsCardView with regions, closed", () => {
   });
 
   it("keeps the list and the form out of the way", () => {
-    assert.equal(html.includes("Old Valley"), false);
+    assert.equal(html.includes("North"), false);
     assert.equal(html.includes("Add region"), false);
   });
 });
@@ -110,10 +108,8 @@ describe("RegionsCardView with regions, open", () => {
     assert.ok(html.includes("No classes yet"));
   });
 
-  it("says in words that an archived region is archived, and offers to restore it", () => {
-    assert.ok(html.includes("Archived regions"));
-    assert.ok(html.includes("Old Valley"));
-    assert.ok(html.includes(">Restore</button>"));
+  it("offers no way to archive or restore a region", () => {
+    assert.doesNotMatch(html, /archiv|restor/i);
   });
 
   it("lists a region's coordinators with a remove control that names them", () => {
@@ -153,9 +149,9 @@ describe("RegionsCardView when a save fails", () => {
   it("shows the server's message as an alert on the region that failed, and only there", () => {
     const html = render(ready({ failure: { target: { kind: "region", regionId: "r1" }, message: "Region not found." } }));
     assert.deepEqual(alerts(html), ["Region not found."]);
-    // Rows render in list order: East (r2), North (r1), then the archived one (r3).
+    // Rows render in list order: East (r2), then North (r1).
     const eastRow = html.slice(html.indexOf('id="region-r2"'), html.indexOf('id="region-r1"'));
-    const northRow = html.slice(html.indexOf('id="region-r1"'), html.indexOf('id="region-r3"'));
+    const northRow = html.slice(html.indexOf('id="region-r1"'));
     assert.equal(eastRow.includes("Region not found."), false);
     assert.ok(northRow.includes("Region not found."));
   });

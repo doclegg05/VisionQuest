@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 import { FIELD_CLASS, LABEL_CLASS } from "@/components/staff/fieldStyles";
 import { REGIONS_COPY, classCountLabel } from "./regions-copy";
-import { activeRegionCount, coordinatorChoices, type AdminRegion, type RegionPerson } from "./regions-model";
+import { coordinatorChoices, regionCountFor, type AdminRegion, type RegionPerson } from "./regions-model";
 import { ALERT_CLASS, MUTED_TEXT, SECONDARY_BUTTON, SUBHEADING } from "./regionStyles";
 
 export interface RemoveCoordinatorRequest {
@@ -16,27 +16,22 @@ export interface RemoveCoordinatorRequest {
 
 export interface RegionRowHandlers {
   onRename: (region: AdminRegion, name: string) => Promise<boolean>;
-  onArchive: (region: AdminRegion) => void;
-  onRestore: (region: AdminRegion) => void;
   onAssign: (region: AdminRegion, person: RegionPerson) => Promise<boolean>;
   onRemove: (request: RemoveCoordinatorRequest) => void;
 }
 
 interface RegionRowProps {
   region: AdminRegion;
+  /** Every region, to tell whether a coordinator holds another one. */
+  regions: readonly AdminRegion[];
+  /** Everyone who can be offered as a coordinator. */
+  people: readonly RegionPerson[];
   /** Any request is in flight, so nothing may be sent. */
   busy: boolean;
   /** This row's own request is in flight. */
   saving: boolean;
   error: string | null;
   handlers: RegionRowHandlers;
-}
-
-interface ActiveRegionRowProps extends RegionRowProps {
-  /** Every region, to tell whether a coordinator holds another one. */
-  regions: readonly AdminRegion[];
-  /** Everyone who can be offered as a coordinator. */
-  people: readonly RegionPerson[];
 }
 
 function RegionTitle({ region }: { region: AdminRegion }) {
@@ -161,10 +156,10 @@ function AddCoordinatorForm({ region, choices, busy, onAssign }: AddCoordinatorF
   );
 }
 
-function RegionCoordinators({ region, regions, people, busy, handlers }: Omit<ActiveRegionRowProps, "saving" | "error">) {
+function RegionCoordinators({ region, regions, people, busy, handlers }: Omit<RegionRowProps, "saving" | "error">) {
   const choices = coordinatorChoices(people, region);
   const remove = (person: RegionPerson) =>
-    handlers.onRemove({ region, person, onlyRegion: activeRegionCount(regions, person.id) === 1 });
+    handlers.onRemove({ region, person, onlyRegion: regionCountFor(regions, person.id) === 1 });
   return (
     <div className="space-y-2">
       <p className={SUBHEADING}>{REGIONS_COPY.coordinatorsHeading}</p>
@@ -178,7 +173,7 @@ function RegionCoordinators({ region, regions, people, busy, handlers }: Omit<Ac
   );
 }
 
-export function ActiveRegionRow({ region, regions, people, busy, saving, error, handlers }: ActiveRegionRowProps) {
+export function RegionRow({ region, regions, people, busy, saving, error, handlers }: RegionRowProps) {
   const [renaming, setRenaming] = useState(false);
   const renameButton = useRef<HTMLButtonElement>(null);
 
@@ -196,38 +191,19 @@ export function ActiveRegionRow({ region, regions, people, busy, saving, error, 
     <li id={`region-${region.id}`} className="space-y-3 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <RegionTitle region={region} />
-        <div className="flex flex-wrap gap-2">
-          <button
-            ref={renameButton}
-            type="button"
-            aria-expanded={renaming}
-            disabled={busy}
-            onClick={() => setRenaming((open) => !open)}
-            className={SECONDARY_BUTTON}
-          >
-            {REGIONS_COPY.rename}
-          </button>
-          <button type="button" disabled={busy} onClick={() => handlers.onArchive(region)} className={SECONDARY_BUTTON}>
-            {REGIONS_COPY.archive}
-          </button>
-        </div>
+        <button
+          ref={renameButton}
+          type="button"
+          aria-expanded={renaming}
+          disabled={busy}
+          onClick={() => setRenaming((open) => !open)}
+          className={SECONDARY_BUTTON}
+        >
+          {REGIONS_COPY.rename}
+        </button>
       </div>
       {renaming && <RenameForm region={region} busy={busy} saving={saving} onSave={saveName} onCancel={closeRename} />}
       <RegionCoordinators region={region} regions={regions} people={people} busy={busy} handlers={handlers} />
-      {error && <p role="alert" className={ALERT_CLASS}>{error}</p>}
-    </li>
-  );
-}
-
-export function ArchivedRegionRow({ region, busy, saving, error, handlers }: RegionRowProps) {
-  return (
-    <li id={`region-${region.id}`} className="space-y-3 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <RegionTitle region={region} />
-        <button type="button" disabled={busy} onClick={() => handlers.onRestore(region)} className={SECONDARY_BUTTON}>
-          {saving ? REGIONS_COPY.saving : REGIONS_COPY.restore}
-        </button>
-      </div>
       {error && <p role="alert" className={ALERT_CLASS}>{error}</p>}
     </li>
   );
