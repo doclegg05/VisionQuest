@@ -44,6 +44,19 @@ describe("SettingsView role split", () => {
     assert.ok(student.includes("files you hand to Sage in chat"));
   });
 
+  it("shows the Change Your Password section to students only", () => {
+    // POST /api/settings/password refuses every role but student, so the
+    // form would promise staff a save that answers 403.
+    const student = renderToString(<SettingsView initialRole="student" />);
+    assert.ok(student.includes("Change Your Password"));
+    assert.ok(student.includes('id="settings-password-new"'));
+
+    for (const role of ["teacher", "admin", "coordinator"]) {
+      const staff = renderToString(<SettingsView initialRole={role} />);
+      assert.ok(!staff.includes("Change Your Password"), role);
+    }
+  });
+
   it("shows the Work availability form to students only", () => {
     // Staff have no work profile of their own — /api/work-profile refuses
     // them — so rendering the form for staff would promise a save that 403s.

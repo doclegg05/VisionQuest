@@ -6,6 +6,7 @@ import PageIntro from "@/components/ui/PageIntro";
 import StaffMfaPanel from "@/components/auth/StaffMfaPanel";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
+import { ChangePasswordSection } from "@/components/settings/ChangePasswordSection";
 import { ConsentSection } from "@/components/settings/ConsentSection";
 import { WorkAvailabilitySection } from "@/components/settings/WorkAvailabilitySection";
 import {
@@ -442,6 +443,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
           "not staff": /api/work-profile refuses every non-student, so a
           coordinator would have been shown a form whose Save button 403s. */}
       {sessionRole === "student" && <WorkAvailabilitySection />}
+      {sessionRole === "student" && <ChangePasswordSection />}
 
       {sessionRole !== "teacher" && sessionRole !== "admin" && (
       <div className="surface-section mb-6 p-6">

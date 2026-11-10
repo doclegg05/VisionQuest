@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
-import { MIN_PASSWORD_LENGTH, PASSWORD_LENGTH_HINT, PASSWORD_TOO_SHORT_MESSAGE } from "@/lib/password-policy";
+import { StudentPasswordField, isPasswordTooShort } from "@/components/settings/StudentPasswordField";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -14,9 +14,12 @@ function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [message, setMessage] = useState("");
+  // True once the form was sent, so the password field names a short password.
+  const [passwordSent, setPasswordSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setPasswordSent(true);
 
     if (!token) {
       setStatus("error");
@@ -24,9 +27,10 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setStatus("error");
-      setMessage(PASSWORD_TOO_SHORT_MESSAGE);
+    // The field names this problem itself, counted the way the server counts.
+    if (isPasswordTooShort(password)) {
+      setStatus("idle");
+      setMessage("");
       return;
     }
 
@@ -79,21 +83,14 @@ function ResetPasswordForm() {
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-        <div>
-          <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-            New password
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={PASSWORD_LENGTH_HINT}
-            required
-            className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
-          />
-        </div>
+        <StudentPasswordField
+          id="password"
+          label="New password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          showError={passwordSent}
+        />
 
         <div>
           <label htmlFor="confirm-password" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
