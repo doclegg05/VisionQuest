@@ -1,0 +1,10 @@
+{
+  "id": "D8",
+  "kind": "task",
+  "set": "pilot",
+  "title": "An instructor can get a missing Student Profile form signed",
+  "doneWhen": "An instructor action files the signed packet and the roster's \"Missing intake\" clears. Route and component tests cover it.",
+  "check": {
+    "type": "pending"
+  }
+}
