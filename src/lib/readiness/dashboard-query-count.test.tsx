@@ -59,6 +59,7 @@ import {
   type RecordedQuery,
   type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
+import { unansweredLoadProblems, type UnansweredAllowances } from "./unanswered-loads";
 import { SECURITY_QUESTIONS } from "@/lib/security-questions";
 import { signToken } from "@/lib/session-token";
 
@@ -99,6 +100,12 @@ const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/sage/panel-data.ts › getLatestPanelSpec": [1, 0],
   "src/lib/mood.ts › hasMoodEntryToday": [1, 0],
 };
+/**
+ * Calls on the measured path that no fixture answers although they load a
+ * nested relation, each with why. Anything else unanswered with a nested
+ * relation fails the test below: the empty default hides what real rows load.
+ */
+const DASHBOARD_UNANSWERED_WITH_NESTED: UnansweredAllowances = {};
 
 const STUDENT_ID = "stu-readiness-001";
 const NOW = new Date("2026-11-10T15:00:00.000Z");
@@ -302,5 +309,9 @@ describe("M1: student dashboard query count", () => {
     assert.equal(summary.app, DASHBOARD_APP_QUERIES_WARM);
     assert.equal(summary.admin, DASHBOARD_ADMIN_QUERIES_WARM);
     assert.equal(allRoundTrips(warm.queries, warm.transactions), DASHBOARD_ROUND_TRIPS_WARM);
+  });
+
+  it("answers every call that loads a nested relation, or names it with a reason", () => {
+    assert.deepEqual(unansweredLoadProblems([...cold.queries, ...warm.queries], DASHBOARD_UNANSWERED_WITH_NESTED), []);
   });
 });

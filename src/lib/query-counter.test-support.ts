@@ -54,7 +54,8 @@ export interface RecordedQuery {
   /**
    * The nested SELECTs the call would send for the result it got: a level that
    * returned no rows sends none below it. Where the result does not show a
-   * relation (a write, or a fixture that leaves it out), the arguments decide.
+   * relation (a write, or a fixture that leaves it out), or no fixture answered
+   * the call, the arguments decide.
    */
   readonly nestedLoads: number;
   /**
@@ -223,9 +224,10 @@ function loadedSelection(model: string, selection: unknown, parents: readonly un
 }
 
 /**
- * Nested loads for the rows a call returned. A level with no rows sends no
+ * Nested loads for the rows a fixture returned. A level with no rows sends no
  * SELECT for the relations below it; a relation the result does not show is
- * counted in full from the arguments, the larger answer.
+ * counted in full from the arguments, the larger answer. A call no fixture
+ * answered is not passed here: its loads are counted in full.
  */
 function loadedRelations(model: string, args: unknown, result: unknown): number {
   const parents = asRows(result);
@@ -466,7 +468,9 @@ class Recorder {
     // Answering on a microtask instead would merge calls awaited one after another.
     await new Promise((settle) => setImmediate(settle));
     const result = await resolve();
-    const settled: RecordedQuery = { ...query, nestedLoads: loadedRelations(pending.model, args, result) };
+    // An unanswered call's empty result is the counter's guess, not data: count its loads in full.
+    const nestedLoads = pending.answeredBy === "default" ? relationLoads : loadedRelations(pending.model, args, result);
+    const settled: RecordedQuery = { ...query, nestedLoads };
     this.queries[index] = settled;
     this.observer?.({ query: settled, prismaModel: PRISMA_MODEL_BY_CLIENT_NAME.get(query.model), args, result });
     return result;

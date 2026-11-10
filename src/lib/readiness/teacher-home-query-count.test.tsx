@@ -45,6 +45,7 @@ import {
   type RecordedQuery,
   type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
+import { unansweredLoadProblems, type UnansweredAllowances } from "./unanswered-loads";
 import { signToken } from "@/lib/session-token";
 
 // Set to the measured value. A change to any of these is a change in what the
@@ -84,6 +85,12 @@ const TEACHER_HOME_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/teacher/dashboard.ts › getTeacherDashboardPage": [5, 0],
   "src/lib/progression/fetch-readiness-data.ts › fetchReadinessDataForStudents": [8, 0],
 };
+/**
+ * Calls on the measured path that no fixture answers although they load a
+ * nested relation, each with why. Anything else unanswered with a nested
+ * relation fails the test below: the empty default hides what real rows load.
+ */
+const TEACHER_HOME_UNANSWERED_WITH_NESTED: UnansweredAllowances = {};
 
 const TEACHER_ID = "tch-readiness-001";
 const NOW = new Date("2026-11-10T15:00:00.000Z");
@@ -287,5 +294,9 @@ describe("M6: teacher home query count", () => {
     assert.equal(summary.app, TEACHER_HOME_APP_QUERIES_WARM);
     assert.equal(summary.admin, TEACHER_HOME_ADMIN_QUERIES_WARM);
     assert.equal(allRoundTrips(warm.queries, warm.transactions), TEACHER_HOME_ROUND_TRIPS_WARM);
+  });
+
+  it("answers every call that loads a nested relation, or names it with a reason", () => {
+    assert.deepEqual(unansweredLoadProblems([...cold.queries, ...warm.queries], TEACHER_HOME_UNANSWERED_WITH_NESTED), []);
   });
 });

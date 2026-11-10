@@ -48,8 +48,13 @@
  *   the prompt stage stays "weekly"), no form, no crisis signal, no attachment
  * - retrieval finds one program document and its best passage (so the passage
  *   read runs), and memory recall finds one memory. An active coaching arc
- *   exists, so none is created. Reads the turn does not branch on are left
- *   empty (see "answered by default" in the output)
+ *   exists, so none is created
+ * - enrolled in one active class, and the in-progress certificate has one
+ *   requirement row, so the class and template loads below them are counted
+ * - reads the turn does not branch on are left empty (see "answered by
+ *   default" in the output). A call left unanswered still counts its nested
+ *   loads in full, and the last test fails on any such call not listed with
+ *   a reason in CHAT_SEND_UNANSWERED_WITH_NESTED
  */
 import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
@@ -68,6 +73,7 @@ import {
   type RecordedQuery,
   type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
+import { unansweredLoadProblems, type UnansweredAllowances } from "./unanswered-loads";
 import { signToken } from "@/lib/session-token";
 
 // Set to the measured value. A change to any of these is a change in what a
@@ -82,8 +88,8 @@ const CHAT_SEND_APP_QUERIES_WARM = 29;
 /** Four audit rows, the rate limit counter and the wager read, every turn. */
 const CHAT_SEND_ADMIN_QUERIES_WARM = 6;
 /** M3: app plus admin round trips, what `node scripts/readiness/query-count.mjs chat-send` prints. */
-const CHAT_SEND_ROUND_TRIPS_COLD = 188;
-const CHAT_SEND_ROUND_TRIPS_WARM = 125;
+const CHAT_SEND_ROUND_TRIPS_COLD = 190;
+const CHAT_SEND_ROUND_TRIPS_WARM = 127;
 /** "file › function" -> [app, admin] for the cold turn. */
 const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -112,6 +118,12 @@ const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/sage/knowledge-base-server.ts › (anonymous)": [1, 0],
   "src/lib/sage/hybrid-retrieval.ts › getBestChunks": [1, 0],
 };
+/**
+ * Calls on the measured path that no fixture answers although they load a
+ * nested relation, each with why. Anything else unanswered with a nested
+ * relation fails the test below: the empty default hides what real rows load.
+ */
+const CHAT_SEND_UNANSWERED_WITH_NESTED: UnansweredAllowances = {};
 
 const STUDENT_ID = "stu-readiness-001";
 const CONVERSATION_ID = "cm9readiness0000000000000a";
@@ -217,8 +229,14 @@ const counter = createQueryCounter({
     transferableSkills: JSON.stringify([{ skill: "Scheduling", category: "organization" }]),
   },
   "certification.findMany": [
-    { id: "cert-1", studentId: STUDENT_ID, certType: "ic3", status: "in_progress", startedAt: NOW, completedAt: null, requirements: [] },
+    {
+      id: "cert-1", studentId: STUDENT_ID, certType: "ic3", status: "in_progress", startedAt: NOW, completedAt: null,
+      // One requirement row, so the requirement level returns rows and its template load is counted.
+      requirements: [{ completed: false, completedAt: null, verifiedAt: null, template: { required: true } }],
+    },
   ],
+  // An active enrollment, as an enrolled student has: the class load below it runs.
+  "studentClassEnrollment.findFirst": { class: { programType: "spokes" } },
   "coachingArc.findUnique": {
     id: "arc-1", studentId: STUDENT_ID, arcType: "standard_6week", weekNumber: 3, status: "active", startedAt: NOW, milestones: [],
   },
@@ -397,5 +415,9 @@ describe("M3: chat send query count before the response stream", () => {
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_WARM);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_WARM);
     assert.equal(roundTrips(warm), CHAT_SEND_ROUND_TRIPS_WARM);
+  });
+
+  it("answers every call that loads a nested relation, or names it with a reason", () => {
+    assert.deepEqual(unansweredLoadProblems([...cold.beforeStream, ...warm.beforeStream], CHAT_SEND_UNANSWERED_WITH_NESTED), []);
   });
 });

@@ -297,6 +297,7 @@ describe("query counter: summary", () => {
 
   it("writes the one line the readiness script reads", async () => {
     await loadGoals("s1");
+    counter.useFixtures({ "admin:student.findMany": [] });
     await db.prismaAdmin.student.findMany({ select: { goals: true } });
     counter.useFixtures({ "admin:student.findMany": [{ id: "s1" }] });
     await db.prismaAdmin.student.findMany({ select: { goals: true } });
@@ -312,11 +313,22 @@ describe("query counter: summary", () => {
 });
 
 describe("query counter: nested loads follow the rows the call returned", () => {
-  it("counts no nested load when the parent returns nothing", async () => {
+  it("counts no nested load when a fixture says the parent returns nothing", async () => {
+    counter.useFixtures({ "goal.findMany": [], "student.findUnique": null });
     await db.prisma.goal.findMany({ include: { student: true } });
     await db.prisma.student.findUnique({ where: { id: "s1" }, select: { goals: { select: { id: true } } } });
 
     assert.deepEqual(counter.queries().map((q) => [q.relationLoads, q.nestedLoads]), [[1, 0], [1, 0]]);
+  });
+
+  it("counts every nested load of a call no fixture answers: unknown, not empty", async () => {
+    await db.prisma.goal.findMany({ include: { student: true } });
+    await db.prisma.certification.findFirst({ include: { requirements: { include: { template: true } } } });
+
+    assert.deepEqual(
+      counter.queries().map((q) => [q.answeredBy, q.relationLoads, q.nestedLoads]),
+      [["default", 1, 1], ["default", 2, 2]],
+    );
   });
 
   it("stops at a relation the result shows empty, and keeps counting where the fixture is silent", async () => {
