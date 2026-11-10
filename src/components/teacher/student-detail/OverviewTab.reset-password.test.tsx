@@ -71,9 +71,8 @@ const DATA: StudentData = {
   workProfile: null,
 };
 
-/** The open reset controls, from the field's label to the Reset button. */
-function resetControls(newPassword: string): string {
-  const html = renderToString(
+function renderOverview(newPassword: string, resetStatus: "idle" | "saving" | "done" = "idle"): string {
+  return renderToString(
     <OverviewTab
       data={DATA}
       moodEntries={[]}
@@ -82,7 +81,7 @@ function resetControls(newPassword: string): string {
       onToggleResetPw={noop}
       newPassword={newPassword}
       onNewPasswordChange={noop}
-      resetStatus="idle"
+      resetStatus={resetStatus}
       onResetPassword={noop}
       confirmDeactivate={false}
       onSetConfirmDeactivate={noop}
@@ -91,14 +90,17 @@ function resetControls(newPassword: string): string {
       archiving={false}
       onArchive={noop}
       archiveResult={null}
-      archiveError={null}
-      resetError={null}
     />,
   );
+}
+
+/** The open reset controls, from the field's label to the Reset password button. */
+function resetControls(newPassword: string): string {
+  const html = renderOverview(newPassword);
   const start = html.indexOf('<label for="reset-password-input"');
-  const end = html.indexOf(">Reset</button>");
+  const end = html.indexOf(">Reset password</button>");
   assert.ok(start >= 0 && end > start, "the reset controls did not render");
-  return html.slice(start, end + ">Reset</button>".length).replace(/<!--[\s\S]*?-->/gu, "");
+  return html.slice(start, end + ">Reset password</button>".length).replace(/<!--[\s\S]*?-->/gu, "");
 }
 
 function tag(html: string, pattern: RegExp, name: string): string {
@@ -108,7 +110,7 @@ function tag(html: string, pattern: RegExp, name: string): string {
 }
 
 const field = (html: string) => tag(html, /<input\b[^>]*\bid="reset-password-input"[^>]*>/u, "password field");
-const resetButton = (html: string) => tag(html, /<button\b[^>]*>Reset<\/button>/u, "Reset button");
+const resetButton = (html: string) => tag(html, /<button\b[^>]*>Reset password<\/button>/u, "Reset password button");
 /** The attribute, not the `disabled:` Tailwind variant in the class list. */
 const DISABLED = /\sdisabled=""/u;
 
@@ -125,6 +127,10 @@ describe("instructor password reset: what the screen says", () => {
 
     assert.ok(stated.length > 0, "the screen never says how long the password must be");
     assert.deepEqual([...new Set(stated)], [MIN_PASSWORD_LENGTH]);
+  });
+
+  it("says the generated password uses only small letters and numbers", () => {
+    assert.ok(resetControls("").includes("All small letters and numbers."));
   });
 
   for (const length of [6, MIN_PASSWORD_LENGTH - 1]) {
@@ -151,6 +157,10 @@ describe("instructor password reset: the field", () => {
     }
   });
 
+  it("is at least 44px tall on touch screens", () => {
+    assert.match(field(resetControls("")), /pointer-coarse:min-h-11/u);
+  });
+
   it("ties the length hint to the field for screen readers", () => {
     const html = resetControls("");
     const hintId = field(html).match(/aria-describedby="([^"]+)"/u)?.[1];
@@ -159,16 +169,55 @@ describe("instructor password reset: the field", () => {
   });
 });
 
-describe("instructor password reset: Make a password", () => {
+describe("instructor password reset: Make a password for me", () => {
   it("offers the button beside the field", () => {
-    assert.match(resetControls(""), /<button\b[^>]*\stype="button"[^>]*>Make a password<\/button>/u);
+    assert.match(resetControls(""), /<button\b[^>]*\stype="button"[^>]*>Make a password for me<\/button>/u);
   });
 
   it("fills the field with a generated password when pressed (wiring)", () => {
-    const button = tag(SOURCE, /<button\b(?:(?!<button\b)[\s\S])*?>\s*Make a password\s*<\/button>/u, "Make a password button");
+    const button = tag(SOURCE, /<button\b(?:(?!<button\b)[\s\S])*?>\s*Make a password for me\s*<\/button>/u, "Make a password button");
     assert.ok(
       button.includes("onNewPasswordChange(generatePassword())"),
       "the button must pass generatePassword() to onNewPasswordChange",
     );
+    assert.ok(button.includes("setMadePassword(true)"), "the screen reader line must be turned on");
+  });
+
+  it("keeps a polite screen reader line ready for the new password", () => {
+    assert.match(resetControls(""), /<p\b[^>]*aria-live="polite"[^>]*class="sr-only"/u);
+    assert.match(SOURCE, /A new password is in the box\./u);
+  });
+});
+
+describe("instructor password reset: the toggle", () => {
+  it("says whether the panel is open", () => {
+    const open = renderOverview("");
+    assert.match(tag(open, /<button\b[^>]*>Reset Password<\/button>/u, "toggle"), /aria-expanded="true"/u);
+  });
+});
+
+describe("instructor password reset: after it works", () => {
+  const html = renderOverview("k7mq-x2vd-p9rt", "done");
+  const words = html.replace(/<[^>]+>/gu, " ").replace(/\s+/gu, " ");
+
+  it("keeps the password on screen in a monospace line until Close", () => {
+    assert.ok(
+      words.includes("Password changed. Give the student this password: k7mq-x2vd-p9rt They are now signed out everywhere else. Close"),
+      words,
+    );
+    assert.match(html, /<p\b[^>]*class="[^"]*\bfont-mono\b[^"]*"[^>]*>k7mq-x2vd-p9rt<\/p>/u);
+  });
+
+  it("replaces the controls and says it worked only once", () => {
+    assert.doesNotMatch(html, /id="reset-password-input"/u);
+    assert.equal(words.split("Password changed").length - 1, 1);
+    assert.ok(!words.includes("Done!"), words);
+  });
+
+  it("Close is a 44px button that closes the panel (wiring)", () => {
+    const close = tag(html, /<button\b[^>]*>Close<\/button>/u, "Close button");
+    assert.match(close, /\bmin-h-11\b/u);
+    assert.match(SOURCE, /onClick=\{onClose\}\s*>\s*Close/u);
+    assert.match(SOURCE, /<ResetDonePanel password=\{newPassword\} onClose=\{onToggleResetPw\} \/>/u);
   });
 });

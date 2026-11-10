@@ -5,7 +5,6 @@ import { describe, it } from "node:test";
 import { renderToString } from "react-dom/server";
 
 import StudentDetail, { showsLoadingLine } from "./StudentDetail";
-import OverviewTab from "./student-detail/OverviewTab";
 import ProgressTab from "./student-detail/ProgressTab";
 import type { StudentData } from "./student-detail/types";
 
@@ -57,7 +56,7 @@ const RAW_REQUEST = /\b(?:apiFetch|fetch)\(|\bapi\.(?:post|put|patch|del)\(/u;
 
 /** The text of one handler, from its declaration to its closing brace. */
 function handlerSource(name: string): string {
-  const start = SOURCE.search(new RegExp(`(?:async function|const) ${name}\\b`, "u"));
+  const start = SOURCE.search(new RegExp(`(?:async function|function|const) ${name}\\b`, "u"));
   assert.ok(start > -1, `${name} is not declared in StudentDetail.tsx`);
   const end = SOURCE.slice(start).search(/\n {2}\};?\n/u);
   assert.ok(end > -1, `could not find the end of ${name}`);
@@ -92,21 +91,86 @@ describe("StudentDetail writes go through the shared helper (source scan)", () =
     });
   }
 
-  it("a handler that sends the request itself puts the failure on screen", () => {
-    // runStudentAction reports for its caller. A handler that calls
-    // sendStudentAction has the result in hand and must show it.
+  it("every sendStudentAction result is branched on .ok", () => {
+    // A result that is never read is a failure nobody sees.
     for (const name of ACTION_HANDLERS) {
       const source = handlerSource(name);
-      if (!source.includes("sendStudentAction(")) continue;
-      assert.match(source, /\.message\b/u, `${name} drops the failure message`);
+      const names = [...source.matchAll(/const (\w+) = await sendStudentAction\(/gu)].map((match) => match[1]);
+      for (const result of names) {
+        assert.match(source, new RegExp(`\\b${result}\\.ok\\b`, "u"), `${name} never checks ${result}.ok`);
+      }
+      const unread = (source.match(/(?<!= )await sendStudentAction\(/gu) ?? []).length;
+      const allowed = source.includes('"/api/orientation/complete"') ? 1 : 0;
+      assert.equal(unread, allowed, `${name} sends a request and ignores the answer`);
     }
   });
 
-  it("the page banner is announced as an alert", () => {
-    const start = SOURCE.indexOf("{panelMessage ? (");
-    assert.ok(start > -1, "the panelMessage banner is gone");
-    const banner = SOURCE.slice(start, SOURCE.indexOf(") : null}", start));
-    assert.ok(banner.includes('role="alert"'), banner);
+  it("every in-flight flag is cleared in a finally block", () => {
+    // Without finally, a thrown error leaves a button saying "..." for good.
+    const SETS_IN_FLIGHT = /\bset\w+\((?:true|\w+Id|\{ kind: "saving" \})\)/u;
+    for (const name of ACTION_HANDLERS) {
+      const source = handlerSource(name);
+      if (!SETS_IN_FLIGHT.test(source)) continue;
+      assert.match(source, /\} finally \{/u, `${name} clears its in-flight flag outside finally`);
+    }
+  });
+
+  it("every failure goes to the one pinned message", () => {
+    assert.ok(SOURCE.includes("<ActionNotice notice={notice}"), "the pinned message is not rendered");
+    assert.ok(!SOURCE.includes("panelMessage"), "the old banner above the tabs is still there");
+    assert.ok(!SOURCE.includes("applicationVerifyError"), "a second error line is still there");
+    assert.ok(!SOURCE.includes("archiveError"), "a second error line is still there");
+  });
+
+  it("clears the message when the instructor changes tab", () => {
+    const tabs = SOURCE.match(/<ShownTab key="(?:coach|progress|forms|admin)" onShown=\{clearNotice\}>/gu) ?? [];
+    assert.equal(tabs.length, 4);
+  });
+
+  it("uses the plain fallbacks the review asked for", () => {
+    assert.ok(SOURCE.includes('"That job application was not verified."'));
+    assert.ok(SOURCE.includes('"The records archive was not created."'));
+    assert.ok(!SOURCE.includes("Could not verify that."));
+    assert.ok(!SOURCE.includes("The archive was not made."));
+    assert.ok(!SOURCE.includes("Check your connection"));
+  });
+});
+
+describe("StudentDetail guards against a double tap and an unwanted un-verify (source scan)", () => {
+  it("a goal action already in flight does not send another", () => {
+    const source = handlerSource("handleGoalAction");
+    const guard = source.indexOf("if (goalActionRef.current) return;");
+    assert.ok(guard > -1, "no re-entry guard");
+    assert.ok(guard < source.indexOf("runStudentAction("), "the guard must come before the request");
+    assert.match(source, /setGoalActionId\(goalId\)/u);
+    assert.ok(SOURCE.includes("goalActionId={goalActionId}"), "GoalsPlanTab is not told which goal is busy");
+  });
+
+  it("asks before it removes a verification", () => {
+    const source = handlerSource("handleVerify");
+    const ask = source.indexOf("Remove the verification for ${label}?");
+    assert.ok(ask > -1, "no confirm before un-verifying");
+    assert.ok(ask < source.indexOf("runStudentAction("), "the confirm must come before the request");
+  });
+});
+
+describe("StudentDetail keeps a new password on screen until it is closed (source scan)", () => {
+  it("does not clear the password or close the panel on its own after a reset", () => {
+    const source = handlerSource("handleResetPassword");
+    assert.ok(!source.includes('setNewPassword("")'), source);
+    assert.ok(!source.includes("setTimeout"), source);
+    assert.ok(!source.includes("setShowResetPw(false)"), source);
+  });
+
+  it("closing the panel drops the password and the done state", () => {
+    const source = handlerSource("toggleResetPanel");
+    assert.ok(source.includes('setNewPassword("")'), source);
+    assert.ok(source.includes('setReset({ kind: "idle" })'), source);
+  });
+
+  it("editing the field clears a stale reset failure", () => {
+    const source = handlerSource("handlePasswordInput");
+    assert.ok(source.includes('origin === "reset"'), source);
   });
 });
 
@@ -191,6 +255,10 @@ function studentData(overrides: Partial<StudentData> = {}): StudentData {
 }
 
 function renderProgress(verificationStatus: "pending" | "declined"): string {
+  return stripTags(renderProgressHtml(verificationStatus));
+}
+
+function renderProgressHtml(verificationStatus: "pending" | "declined"): string {
   const data = studentData({
     orientation: {
       items: [{ id: "item-1", label: "Tour the classroom", required: true }],
@@ -199,8 +267,7 @@ function renderProgress(verificationStatus: "pending" | "declined"): string {
       ],
     },
   });
-  return stripTags(
-    renderToString(
+  return renderToString(
       <ProgressTab
         data={data}
         dateFormatter={dateFormatter}
@@ -209,14 +276,12 @@ function renderProgress(verificationStatus: "pending" | "declined"): string {
         certOutcomeVerifying={false}
         onCertOutcomeVerify={() => {}}
         applicationVerifying={null}
-        applicationVerifyError={null}
         onApplicationVerify={() => {}}
         orientationVerifying={null}
         onOrientationVerify={() => {}}
         showAllConversations
         onShowAllConversations={() => {}}
       />,
-    ),
   );
 }
 
@@ -226,59 +291,25 @@ describe("orientation badges read as plain words", () => {
   // this tab use dashes of their own and are not this test's business.
   it("the waiting badge shows no escape code and no dash", () => {
     const text = renderProgress("pending");
-    assert.ok(text.includes("Required Student marked done: verify Confirm Decline"), text);
+    assert.ok(text.includes("Not done Tour the classroom Required Student says done Confirm Send back"), text);
     assert.ok(!text.includes("\\u2014"), text);
+  });
+
+  it("the buttons are named for the step they act on", () => {
+    const html = renderProgressHtml("pending");
+    assert.ok(html.includes('aria-label="Confirm orientation step: Tour the classroom"'), html);
+    assert.ok(html.includes('aria-label="Send back orientation step: Tour the classroom"'), html);
+  });
+
+  it("the done and not done marks are hidden from screen readers and named in words", () => {
+    const html = renderProgressHtml("pending");
+    assert.match(html, /<span aria-hidden="true"[^>]*>○<\/span><span class="sr-only">Not done<\/span>/u);
   });
 
   it("the declined badge shows no escape code and no dash", () => {
     const text = renderProgress("declined");
-    assert.ok(text.includes("Required Declined: student will redo Ready to Work"), text);
+    assert.ok(text.includes("Required Sent back to student Ready to Work"), text);
     assert.ok(!text.includes("\\u2014"), text);
-  });
-});
-
-function renderReset(resetError: string | null): string {
-  return stripTags(
-    renderToString(
-      <OverviewTab
-        data={studentData()}
-        moodEntries={[]}
-        dateFormatter={dateFormatter}
-        showResetPw
-        onToggleResetPw={() => {}}
-        newPassword="short"
-        onNewPasswordChange={() => {}}
-        resetStatus={resetError ? "error" : "idle"}
-        resetError={resetError}
-        onResetPassword={() => {}}
-        confirmDeactivate={false}
-        onSetConfirmDeactivate={() => {}}
-        deactivating={false}
-        onToggleStudentStatus={() => {}}
-        archiving={false}
-        onArchive={() => {}}
-        archiveResult={null}
-        archiveError={null}
-      />,
-    ),
-  );
-}
-
-describe("password reset says why it failed", () => {
-  it("shows the server's reason in place of 'Failed'", () => {
-    const text = renderReset("Password must be at least 12 characters");
-    assert.ok(text.includes("Password must be at least 12 characters"), text);
-    assert.ok(!/\bFailed\b/u.test(text), text);
-  });
-
-  it("shows no error text when there is no error", () => {
-    const text = renderReset(null);
-    assert.ok(!text.includes("Password must be at least 12 characters"), text);
-    assert.ok(!/\bFailed\b/u.test(text), text);
-  });
-
-  it("StudentDetail hands the message to both copies of the tab (source scan)", () => {
-    assert.equal(SOURCE.split("resetError={").length - 1, 2);
   });
 });
 

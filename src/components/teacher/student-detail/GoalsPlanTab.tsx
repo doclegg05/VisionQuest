@@ -32,6 +32,8 @@ interface GoalsPlanTabProps {
   dateFormatter: Intl.DateTimeFormat;
   onChanged: () => Promise<void>;
   onGoalAction: (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null }) => Promise<void>;
+  /** The goal whose Confirm or Mark Reviewed is in flight. Both its buttons are off until it ends. */
+  goalActionId?: string | null;
 }
 
 export default function GoalsPlanTab({
@@ -39,6 +41,7 @@ export default function GoalsPlanTab({
   dateFormatter,
   onChanged,
   onGoalAction,
+  goalActionId = null,
 }: GoalsPlanTabProps) {
   const {
     goals,
@@ -249,14 +252,18 @@ export default function GoalsPlanTab({
                     </div>
                     <div className="flex gap-2">
                       <button
+                        type="button"
                         onClick={() => void onGoalAction(goal.id, { confirm: true })}
-                        className="min-h-11 rounded-lg bg-[var(--badge-success-bg)] px-3 py-2 text-sm font-medium text-[var(--badge-success-text)] hover:ring-1 hover:ring-current"
+                        disabled={goalActionId === goal.id}
+                        className="min-h-11 disabled:opacity-50 rounded-lg bg-[var(--badge-success-bg)] px-3 py-2 text-sm font-medium text-[var(--badge-success-text)] hover:ring-1 hover:ring-current"
                       >
                         Confirm
                       </button>
                       <button
+                        type="button"
                         onClick={() => void onGoalAction(goal.id, { reviewed: true })}
-                        className="min-h-11 rounded-lg bg-[var(--surface-interactive)] px-3 py-2 text-sm font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-strong)]"
+                        disabled={goalActionId === goal.id}
+                        className="min-h-11 disabled:opacity-50 rounded-lg bg-[var(--surface-interactive)] px-3 py-2 text-sm font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-strong)]"
                       >
                         Mark Reviewed
                       </button>

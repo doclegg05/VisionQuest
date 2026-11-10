@@ -87,7 +87,6 @@ function render(
       certOutcomeVerifying={false}
       onCertOutcomeVerify={() => {}}
       applicationVerifying={null}
-      applicationVerifyError={null}
       onApplicationVerify={(id) => calls.push(id)}
       orientationVerifying={null}
       onOrientationVerify={() => {}}
@@ -103,8 +102,8 @@ describe("per-application Verify — what an instructor sees", () => {
   it("offers a Verify control on a self-reported application", () => {
     const { html } = render([application()]);
     const text = stripTags(html);
-    assert.ok(text.includes("Student-reported"), text);
-    assert.ok(text.includes("Verify"), text);
+    // The badge and button read together, with no dash between them.
+    assert.ok(text.includes("Updated 9/1/2026 Student reported: verify Verify"), text);
   });
 
   it("names the job in the accessible label, not just 'Verify'", () => {
@@ -121,7 +120,7 @@ describe("per-application Verify — what an instructor sees", () => {
     const { html } = render([application({ verificationStatus: "verified" })]);
     const text = stripTags(html);
     assert.ok(text.includes("Outcome verified"), text);
-    assert.ok(!text.includes("Student-reported"), text);
+    assert.ok(!text.includes("Student reported"), text);
   });
 
   it("treats a legacy row with no provenance as not verified", () => {
@@ -137,14 +136,6 @@ describe("per-application Verify — what an instructor sees", () => {
     const disabled = (html.match(/disabled=""/gu) ?? []).length;
     assert.equal(disabled, 1, html);
   });
-
-  it("shows the failure instead of leaving the row looking unchanged", () => {
-    const { html } = render([application()], {
-      applicationVerifyError: "Could not verify that.",
-    });
-    assert.ok(html.includes('role="alert"'), html);
-    assert.ok(stripTags(html).includes("Could not verify that."), stripTags(html));
-  });
 });
 
 describe("per-application Verify — the wiring", () => {
@@ -158,21 +149,18 @@ describe("per-application Verify — the wiring", () => {
     assert.ok(handler.includes("targetId: applicationId"), handler);
   });
 
-  it("the handler stops on a failed response rather than reloading", () => {
+  it("the handler goes through the shared helper, which shows a failure and reloads only on success", () => {
+    // runStudentAction's own tests pin that it never reloads after a failure.
     const handler = STUDENT_DETAIL.slice(
       STUDENT_DETAIL.indexOf("async function handleApplicationVerify"),
       STUDENT_DETAIL.indexOf("async function handleOrientationVerify"),
     );
-    const guard = handler.indexOf("if (!res.ok)");
-    const reload = handler.indexOf("await loadData()");
-    assert.ok(guard > -1, "the response status must be checked");
-    assert.ok(guard < reload, "the guard must come before the reload");
-    assert.ok(handler.includes("Could not verify that."), handler);
+    assert.ok(handler.includes("runStudentAction("), handler);
+    assert.ok(handler.includes('"That job application was not verified."'), handler);
   });
 
-  it("StudentDetail passes both the handler and the error down", () => {
+  it("StudentDetail passes the handler down", () => {
     assert.ok(STUDENT_DETAIL.includes("onApplicationVerify={handleApplicationVerify}"));
-    assert.ok(STUDENT_DETAIL.includes("applicationVerifyError={applicationVerifyError}"));
   });
 
   it("the student-detail API selects the field the button reads", () => {

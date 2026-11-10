@@ -14,7 +14,8 @@ interface ProgressTabProps {
   dateFormatter: Intl.DateTimeFormat;
   /** Certification verification callback */
   verifying: string | null;
-  onVerify: (requirementId: string, verified: boolean) => void;
+  /** `label` names the step in the confirm shown before a verification is removed. */
+  onVerify: (requirementId: string, verified: boolean, label: string) => void;
   /** Certification outcome verification (P1-4) */
   certOutcomeVerifying: boolean;
   onCertOutcomeVerify: (certificationId: string) => void;
@@ -25,8 +26,6 @@ interface ProgressTabProps {
    * can count.
    */
   applicationVerifying: string | null;
-  /** Set when the last verify failed; shown next to the applications list. */
-  applicationVerifyError: string | null;
   onApplicationVerify: (applicationId: string) => void;
   /** Orientation honor-system verification (P1-1) */
   orientationVerifying: string | null;
@@ -34,6 +33,18 @@ interface ProgressTabProps {
   /** Conversations show-all toggle */
   showAllConversations: boolean;
   onShowAllConversations: () => void;
+}
+
+/** A done or not done mark. The symbol is hidden from screen readers, which hear the words. */
+function DoneMark({ done }: { done: boolean }) {
+  return (
+    <>
+      <span aria-hidden="true" className={done ? "text-[var(--badge-success-text)]" : "text-[var(--ink-faint)]"}>
+        {done ? "\u2713" : "\u25CB"}
+      </span>
+      <span className="sr-only">{done ? "Done" : "Not done"}</span>
+    </>
+  );
 }
 
 export default function ProgressTab({
@@ -44,7 +55,6 @@ export default function ProgressTab({
   certOutcomeVerifying,
   onCertOutcomeVerify,
   applicationVerifying,
-  applicationVerifyError,
   onApplicationVerify,
   orientationVerifying,
   onOrientationVerify,
@@ -95,9 +105,7 @@ export default function ProgressTab({
               const busy = orientationVerifying === item.id;
               return (
                 <div key={item.id} className="flex items-center gap-2 text-sm flex-wrap">
-                  <span className={progressItem?.completed ? "text-[var(--badge-success-text)]" : "text-[var(--ink-faint)]"}>
-                    {progressItem?.completed ? "\u2713" : "\u25CB"}
-                  </span>
+                  <DoneMark done={Boolean(progressItem?.completed)} />
                   <span className={progressItem?.completed ? "text-[var(--ink-strong)]" : "text-[var(--ink-muted)]"}>
                     {item.label}
                   </span>
@@ -107,7 +115,7 @@ export default function ProgressTab({
                   {pendingVerification && (
                     <>
                       <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">
-                        Student marked done: verify
+                        Student says done
                       </span>
                       <button
                         onClick={() => onOrientationVerify(item.id, "confirm")}
@@ -120,16 +128,16 @@ export default function ProgressTab({
                       <button
                         onClick={() => onOrientationVerify(item.id, "decline")}
                         disabled={busy}
-                        aria-label={`Decline orientation step: ${item.label}`}
+                        aria-label={`Send back orientation step: ${item.label}`}
                         className="inline-flex items-center text-xs px-2.5 py-1 rounded-lg bg-[var(--badge-error-bg)] text-[var(--badge-error-text)] hover:ring-1 hover:ring-current transition-colors disabled:opacity-50 pointer-coarse:min-h-11"
                       >
-                        {busy ? "..." : "Decline"}
+                        {busy ? "..." : "Send back"}
                       </button>
                     </>
                   )}
                   {declined && (
                     <span className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">
-                      Declined: student will redo
+                      Sent back to student
                     </span>
                   )}
                   {progressItem?.completed && progressItem.verificationStatus === "verified" && progressItem.verifiedAt && (
@@ -158,7 +166,7 @@ export default function ProgressTab({
         {certification.cert?.verificationStatus === "self_reported" && (
           <div className="mb-3 flex items-center gap-2 flex-wrap">
             <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">
-              Self-reported progress {"—"} verify
+              Self-reported progress: verify
             </span>
             <button
               onClick={() => certification.cert && onCertOutcomeVerify(certification.cert.id)}
@@ -185,9 +193,7 @@ export default function ProgressTab({
                 <div key={template.id} className="theme-input rounded-lg p-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
-                      <span className={requirement?.completed ? "text-[var(--badge-success-text)]" : "text-[var(--ink-faint)]"}>
-                        {requirement?.completed ? "\u2713" : "\u25CB"}
-                      </span>
+                      <DoneMark done={Boolean(requirement?.completed)} />
                       <span className="text-sm text-[var(--ink-strong)]">{template.label}</span>
                       {template.required && (
                         <span className="text-xs bg-[var(--badge-info-bg)] text-[var(--badge-info-text)] px-1.5 py-0.5 rounded">Required</span>
@@ -208,7 +214,7 @@ export default function ProgressTab({
 
                       {template.needsVerify && requirement?.completed && (
                         <button
-                          onClick={() => onVerify(requirement.id, !requirement.verifiedBy)}
+                          onClick={() => onVerify(requirement.id, !requirement.verifiedBy, template.label)}
                           disabled={verifying === requirement.id}
                           className={`inline-flex items-center text-xs px-3 py-1 rounded-lg transition-colors pointer-coarse:min-h-11 ${
                             requirement.verifiedBy
@@ -249,11 +255,6 @@ export default function ProgressTab({
         <div className="grid gap-6 xl:grid-cols-2">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-faint)]">Applications</p>
-            {applicationVerifyError && (
-              <p role="alert" className="mt-2 text-sm text-[var(--badge-error-text)]">
-                {applicationVerifyError}
-              </p>
-            )}
             {applications.length === 0 ? (
               <p className="mt-3 text-sm text-[var(--ink-faint)]">No tracked applications yet.</p>
             ) : (
@@ -280,7 +281,7 @@ export default function ProgressTab({
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">
                           {application.verificationStatus === "self_reported"
-                            ? "Student-reported \u2014 verify"
+                            ? "Student reported: verify"
                             : "Not verified"}
                         </span>
                         <button

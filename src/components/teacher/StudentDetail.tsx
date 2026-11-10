@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import SageInsightList from "@/components/sage/SageInsightList";
 import type {
@@ -21,27 +21,29 @@ import {
 import { useConfirm } from "@/components/ui/useConfirm";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
 import {
+  actionOutcome,
   runStudentAction,
   sendStudentAction,
+  type Notice,
   type StudentActionPage,
 } from "@/lib/teacher/student-action";
+import { ActionNotice, ShownTab } from "./student-detail/ActionNotice";
 
 type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled";
 
-/** Where a password reset stands. A failure always carries the words to show. */
-type ResetState =
-  | { kind: "idle" }
-  | { kind: "saving" }
-  | { kind: "done" }
-  | { kind: "error"; message: string };
+/** Where a password reset stands. A failure goes to the pinned message. */
+type ResetState = { kind: "idle" } | { kind: "saving" } | { kind: "done" };
+
+type GoalAction = { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null };
 
 interface ArchiveResult {
   storageKey: string;
   fileCount: number;
 }
 
-/** What every failed request ends with, after the part that says what did not happen. */
-const TRY_AGAIN = "Check your connection and try again.";
+/** The archive was made on the server, but the answer had no link to it. */
+const ARCHIVE_LINK_MISSING =
+  "The records archive was created, but its download link did not come back. Reload the page, then try again.";
 
 const EMPTY_APPOINTMENT_FORM = {
   title: "",
@@ -105,7 +107,6 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [verifying, setVerifying] = useState<string | null>(null);
   const [certOutcomeVerifying, setCertOutcomeVerifying] = useState(false);
   const [applicationVerifying, setApplicationVerifying] = useState<string | null>(null);
-  const [applicationVerifyError, setApplicationVerifyError] = useState<string | null>(null);
   const [orientationVerifying, setOrientationVerifying] = useState<string | null>(null);
   const [showResetPw, setShowResetPw] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -114,9 +115,10 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [archiveResult, setArchiveResult] = useState<ArchiveResult | null>(null);
-  const [archiveError, setArchiveError] = useState<string | null>(null);
   const [showAllConversations, setShowAllConversations] = useState(false);
-  const [panelMessage, setPanelMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [goalActionId, setGoalActionId] = useState<string | null>(null);
+  const goalActionRef = useRef<string | null>(null);
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
@@ -172,104 +174,124 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     minute: "2-digit",
   });
 
-  /** How an action reports to this page: failures go to the banner. */
-  const page: StudentActionPage = { report: setPanelMessage, reload: loadData };
+  /** How an action reports to this page: one pinned message, then a reload on success. */
+  const page: StudentActionPage = { notify: setNotice, reload: loadData };
+  const clearNotice = useCallback(() => setNotice(null), []);
 
-  async function handleVerify(requirementId: string, verified: boolean) {
+  async function handleVerify(requirementId: string, verified: boolean, label: string) {
+    if (
+      !verified &&
+      !(await confirm({
+        title: `Remove the verification for ${label}?`,
+        message: "Grant reports count only verified steps.",
+        confirmLabel: "Remove verification",
+      }))
+    ) {
+      return;
+    }
     setVerifying(requirementId);
-    await runStudentAction(
-      {
-        url: "/api/teacher/certifications",
-        method: "PUT",
-        body: { requirementId, verified },
-        fallback: verified
-          ? `That step was not verified. ${TRY_AGAIN}`
-          : `That step is still verified. ${TRY_AGAIN}`,
-      },
-      page,
-    );
-    setVerifying(null);
+    try {
+      await runStudentAction(
+        {
+          url: "/api/teacher/certifications",
+          method: "PUT",
+          body: { requirementId, verified },
+          failed: verified ? "That step was not verified." : "That step is still verified.",
+          done: verified ? "Step verified." : "Verification removed.",
+        },
+        page,
+      );
+    } finally {
+      setVerifying(null);
+    }
   }
 
   // P1-4: cert-level outcome verification — stamps the Certification row
   // (verificationStatus "verified") that grant reports count.
   async function handleCertOutcomeVerify(certificationId: string) {
     setCertOutcomeVerifying(true);
-    await runStudentAction(
-      {
-        url: "/api/teacher/outcomes/verify",
-        method: "POST",
-        body: { targetType: "certification", targetId: certificationId },
-        fallback: `The certification was not verified. ${TRY_AGAIN}`,
-      },
-      page,
-    );
-    setCertOutcomeVerifying(false);
+    try {
+      await runStudentAction(
+        {
+          url: "/api/teacher/outcomes/verify",
+          method: "POST",
+          body: { targetType: "certification", targetId: certificationId },
+          failed: "The certification was not verified.",
+          done: "Certification verified.",
+        },
+        page,
+      );
+    } finally {
+      setCertOutcomeVerifying(false);
+    }
   }
 
   /**
-   * Per-application outcome verification (P1-4). `/api/teacher/outcomes/verify`
-   * has accepted `targetType: "application"` since P1-4 shipped, but nothing
-   * called it — so every placement in the grant report stayed "self-reported".
-   * This is the missing call site, not a new endpoint.
+   * Per-application outcome verification (P1-4). Without it every placement in
+   * the grant report stayed "self-reported". A failure goes to the pinned
+   * message and the page does not reload, because nothing changed.
    */
   async function handleApplicationVerify(applicationId: string) {
     setApplicationVerifying(applicationId);
-    setApplicationVerifyError(null);
-    const res = await sendStudentAction({
-      url: "/api/teacher/outcomes/verify",
-      method: "POST",
-      body: { targetType: "application", targetId: applicationId },
-      fallback: `Could not verify that. ${TRY_AGAIN}`,
-    });
-    // A failed verify that silently reloaded left the row looking exactly as
-    // it did before, so the instructor would conclude the button did nothing
-    // and try again, or worse, assume it had worked. Say so next to the list,
-    // and do not reload: the data has not changed.
-    if (!res.ok) {
-      setApplicationVerifyError(res.message);
-    } else {
-      await loadData();
+    try {
+      await runStudentAction(
+        {
+          url: "/api/teacher/outcomes/verify",
+          method: "POST",
+          body: { targetType: "application", targetId: applicationId },
+          failed: "That job application was not verified.",
+          done: "Job application verified.",
+        },
+        page,
+      );
+    } finally {
+      setApplicationVerifying(null);
     }
-    setApplicationVerifying(null);
   }
 
   async function handleOrientationVerify(itemId: string, decision: "confirm" | "decline") {
     setOrientationVerifying(itemId);
-    setPanelMessage(null);
-    const result = await sendStudentAction({
-      url: "/api/orientation",
-      method: "POST",
-      body: { itemId, completed: decision === "confirm", studentId, verify: decision },
-      fallback:
-        decision === "confirm"
-          ? `That step was not confirmed. ${TRY_AGAIN}`
-          : `That step was not declined. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setPanelMessage(result.message);
-    } else {
-      if (decision === "confirm") {
-        // If that was the last outstanding required item, this awards the
-        // orientation-complete milestone (75 XP) through the existing
-        // completion path. While steps remain the server refuses, which is
-        // the usual answer, so this result is not shown.
+    setNotice(null);
+    try {
+      const result = await sendStudentAction({
+        url: "/api/orientation",
+        method: "POST",
+        body: { itemId, completed: decision === "confirm", studentId, verify: decision },
+        failed: decision === "confirm" ? "That step was not confirmed." : "That step was not sent back.",
+      });
+      if (result.ok && decision === "confirm") {
+        // If that was the last required item, this awards the orientation
+        // milestone. While steps remain the server refuses, which is the
+        // usual answer, so its result is not shown.
         await sendStudentAction({
           url: "/api/orientation/complete",
           method: "POST",
           body: { studentId },
-          fallback: "Orientation was not marked finished.",
+          failed: "Orientation was not marked finished.",
         });
       }
-      await loadData();
+      const outcome = actionOutcome(
+        result,
+        decision === "confirm" ? "Step confirmed." : "Step sent back to the student.",
+      );
+      if (outcome.reload) await loadData();
+      setNotice(outcome.notice);
+    } finally {
+      setOrientationVerifying(null);
     }
-    setOrientationVerifying(null);
   }
 
   /** Opening or closing the panel drops any password still in it, so it cannot linger on a shared screen. */
   function toggleResetPanel() {
     setShowResetPw((prev) => !prev);
     setNewPassword("");
+    setReset({ kind: "idle" });
+  }
+
+  /** Typing a new password clears a reset failure that no longer applies. */
+  function handlePasswordInput(value: string) {
+    setNewPassword(value);
+    setNotice((current) => (current?.origin === "reset" ? null : current));
   }
 
   async function handleResetPassword() {
@@ -285,166 +307,185 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       return;
     }
     setReset({ kind: "saving" });
-    const result = await sendStudentAction({
-      url: `/api/teacher/students/${studentId}/reset-password`,
-      method: "POST",
-      body: { newPassword: password },
-      fallback: `The password was not changed. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setReset({ kind: "error", message: result.message });
-      return;
+    setNotice(null);
+    let next: ResetState = { kind: "idle" };
+    try {
+      const result = await sendStudentAction({
+        url: `/api/teacher/students/${studentId}/reset-password`,
+        method: "POST",
+        body: { newPassword: password },
+        failed: "The password was not changed.",
+      });
+      if (result.ok) {
+        // Kept on screen until the instructor presses Close, which clears it.
+        setNewPassword(password);
+        next = { kind: "done" };
+      } else {
+        setNotice({ kind: "error", text: result.message, origin: "reset" });
+      }
+    } finally {
+      setReset(next);
     }
-    setReset({ kind: "done" });
-    setNewPassword("");
-    setTimeout(() => {
-      setReset({ kind: "idle" });
-      setShowResetPw(false);
-    }, 2000);
   }
 
   async function toggleStudentStatus() {
     if (!data) return;
+    const active = data.student.isActive;
     setDeactivating(true);
-    await runStudentAction(
-      {
-        url: `/api/teacher/students/${studentId}/status`,
-        method: "PATCH",
-        body: { isActive: !data.student.isActive },
-        fallback: data.student.isActive
-          ? `The account is still active. ${TRY_AGAIN}`
-          : `The account is still inactive. ${TRY_AGAIN}`,
-      },
-      page,
-    );
-    setDeactivating(false);
-    setConfirmDeactivate(false);
+    try {
+      await runStudentAction(
+        {
+          url: `/api/teacher/students/${studentId}/status`,
+          method: "PATCH",
+          body: { isActive: !active },
+          failed: active ? "The account is still active." : "The account is still inactive.",
+          done: active ? "Account turned off." : "Account turned back on.",
+        },
+        page,
+      );
+    } finally {
+      setDeactivating(false);
+      setConfirmDeactivate(false);
+    }
   }
 
   async function handleArchive() {
     setArchiving(true);
-    setArchiveError(null);
-    const result = await sendStudentAction({
-      url: `/api/teacher/students/${studentId}/archive`,
-      method: "POST",
-      fallback: `The archive was not made. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setArchiveError(result.message);
-    } else if (isArchiveResult(result.payload)) {
-      setArchiveResult(result.payload);
-    } else {
-      setArchiveError("The archive was made, but its download link did not arrive. Reload the page and try again.");
+    setNotice(null);
+    try {
+      const result = await sendStudentAction({
+        url: `/api/teacher/students/${studentId}/archive`,
+        method: "POST",
+        failed: "The records archive was not created.",
+      });
+      if (!result.ok) {
+        setNotice({ kind: "error", text: result.message });
+      } else if (isArchiveResult(result.payload)) {
+        setArchiveResult(result.payload);
+      } else {
+        setNotice({ kind: "error", text: ARCHIVE_LINK_MISSING });
+      }
+    } finally {
+      setArchiving(false);
     }
-    setArchiving(false);
   }
 
   async function handleCreateAppointment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSavingAppointment(true);
-    setPanelMessage(null);
-    const result = await sendStudentAction({
-      url: `/api/teacher/students/${studentId}/appointments`,
-      method: "POST",
-      body: appointmentForm,
-      fallback: `The appointment was not saved. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setPanelMessage(result.message);
-    } else {
-      setAppointmentForm(EMPTY_APPOINTMENT_FORM);
-      setPanelMessage("Appointment scheduled.");
-      await loadData();
+    try {
+      const outcome = await runStudentAction(
+        {
+          url: `/api/teacher/students/${studentId}/appointments`,
+          method: "POST",
+          body: appointmentForm,
+          failed: "The appointment was not saved.",
+          done: "Appointment scheduled.",
+        },
+        page,
+      );
+      if (outcome.resetForm) setAppointmentForm(EMPTY_APPOINTMENT_FORM);
+    } finally {
+      setSavingAppointment(false);
     }
-    setSavingAppointment(false);
   }
 
   async function handleAppointmentStatusChange(appointmentId: string, status: AppointmentStatusValue) {
     setUpdatingAppointmentId(appointmentId);
-    setPanelMessage(null);
-    const result = await sendStudentAction({
-      url: `/api/teacher/appointments/${appointmentId}`,
-      method: "PATCH",
-      body: { status },
-      fallback: `The appointment was not changed. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setPanelMessage(result.message);
-    } else {
-      setPanelMessage("Appointment updated.");
-      await loadData();
+    try {
+      await runStudentAction(
+        {
+          url: `/api/teacher/appointments/${appointmentId}`,
+          method: "PATCH",
+          body: { status },
+          failed: "The appointment was not changed.",
+          done: "Appointment updated.",
+        },
+        page,
+      );
+    } finally {
+      setUpdatingAppointmentId(null);
     }
-    setUpdatingAppointmentId(null);
   }
 
   async function handleCreateTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSavingTask(true);
-    setPanelMessage(null);
-    const result = await sendStudentAction({
-      url: `/api/teacher/students/${studentId}/tasks`,
-      method: "POST",
-      body: { ...taskForm, dueAt: toIsoDueAt(taskForm.dueAt) },
-      fallback: `The task was not saved. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setPanelMessage(result.message);
-    } else {
-      setTaskForm(EMPTY_TASK_FORM);
-      setPanelMessage("Follow-up task created.");
-      await loadData();
+    try {
+      const outcome = await runStudentAction(
+        {
+          url: `/api/teacher/students/${studentId}/tasks`,
+          method: "POST",
+          body: { ...taskForm, dueAt: toIsoDueAt(taskForm.dueAt) },
+          failed: "The task was not saved.",
+          done: "Follow-up task created.",
+        },
+        page,
+      );
+      if (outcome.resetForm) setTaskForm(EMPTY_TASK_FORM);
+    } finally {
+      setSavingTask(false);
     }
-    setSavingTask(false);
   }
 
   async function handleTaskStatusChange(taskId: string, status: "open" | "completed") {
     setUpdatingTaskId(taskId);
-    setPanelMessage(null);
-    const result = await sendStudentAction({
-      url: `/api/tasks/${taskId}`,
-      method: "PATCH",
-      body: { status },
-      fallback: `The task was not changed. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setPanelMessage(result.message);
-    } else {
-      setPanelMessage("Task updated.");
-      await loadData();
+    try {
+      await runStudentAction(
+        {
+          url: `/api/tasks/${taskId}`,
+          method: "PATCH",
+          body: { status },
+          failed: "The task was not changed.",
+          done: "Task updated.",
+        },
+        page,
+      );
+    } finally {
+      setUpdatingTaskId(null);
     }
-    setUpdatingTaskId(null);
   }
 
   async function handleCreateNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSavingNote(true);
-    setPanelMessage(null);
-    const result = await sendStudentAction({
-      url: `/api/teacher/students/${studentId}/notes`,
-      method: "POST",
-      body: noteForm,
-      fallback: `The note was not saved. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setPanelMessage(result.message);
-    } else {
-      setNoteForm(EMPTY_NOTE_FORM);
-      setPanelMessage("Case note saved.");
-      await loadData();
+    try {
+      const outcome = await runStudentAction(
+        {
+          url: `/api/teacher/students/${studentId}/notes`,
+          method: "POST",
+          body: noteForm,
+          failed: "The note was not saved.",
+          done: "Case note saved.",
+        },
+        page,
+      );
+      if (outcome.resetForm) setNoteForm(EMPTY_NOTE_FORM);
+    } finally {
+      setSavingNote(false);
     }
-    setSavingNote(false);
   }
 
-  const handleGoalAction = async (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null }) => {
-    await runStudentAction(
-      {
-        url: `/api/teacher/students/${studentId}/goals/${goalId}`,
-        method: "PATCH",
-        body: action,
-        fallback: `The goal was not changed. ${TRY_AGAIN}`,
-      },
-      page,
-    );
+  const handleGoalAction = async (goalId: string, action: GoalAction) => {
+    // A second tap lands before React re-renders the disabled button.
+    if (goalActionRef.current) return;
+    goalActionRef.current = goalId;
+    setGoalActionId(goalId);
+    try {
+      await runStudentAction(
+        {
+          url: `/api/teacher/students/${studentId}/goals/${goalId}`,
+          method: "PATCH",
+          body: action,
+          failed: "The goal was not changed.",
+          done: "Goal updated.",
+        },
+        page,
+      );
+    } finally {
+      goalActionRef.current = null;
+      setGoalActionId(null);
+    }
   };
 
   async function handleReviewForm(
@@ -464,20 +505,20 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     }
 
     setReviewingFormId(submissionId);
-    setPanelMessage(null);
-    const result = await sendStudentAction({
-      url: `/api/teacher/students/${studentId}/forms`,
-      method: "PATCH",
-      body: buildFormReviewBody(submissionId, status, notes || "", extras),
-      fallback: `The form review was not saved. ${TRY_AGAIN}`,
-    });
-    if (!result.ok) {
-      setPanelMessage(result.message);
-    } else {
-      setPanelMessage(reviewResultMessage(status, extras, result.payload));
-      await loadData();
+    try {
+      await runStudentAction(
+        {
+          url: `/api/teacher/students/${studentId}/forms`,
+          method: "PATCH",
+          body: buildFormReviewBody(submissionId, status, notes || "", extras),
+          failed: "The form review was not saved.",
+          done: (payload) => reviewResultMessage(status, extras, payload),
+        },
+        page,
+      );
+    } finally {
+      setReviewingFormId(null);
     }
-    setReviewingFormId(null);
   }
 
   if (showsLoadingLine({ loading, hasData: data !== null, hasError: error !== null })) {
@@ -503,146 +544,145 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         &larr; Back to Class Dashboard
       </Link>
 
-      {panelMessage ? (
-        <div role="alert" className="rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
-          {panelMessage}
-        </div>
-      ) : null}
-
       <StudentDetailTabs
         studentId={studentId}
         studentName={data.student.displayName}
       >
         {{
           coach: (
-            <div className="space-y-6">
-              <OverviewTab
-                data={data}
-                moodEntries={moodEntries}
-                dateFormatter={dateFormatter}
-                showResetPw={showResetPw}
-                onToggleResetPw={toggleResetPanel}
-                newPassword={newPassword}
-                onNewPasswordChange={setNewPassword}
-                resetStatus={reset.kind}
-                resetError={reset.kind === "error" ? reset.message : null}
-                onResetPassword={handleResetPassword}
-                confirmDeactivate={confirmDeactivate}
-                onSetConfirmDeactivate={setConfirmDeactivate}
-                deactivating={deactivating}
-                onToggleStudentStatus={toggleStudentStatus}
-                archiving={archiving}
-                onArchive={handleArchive}
-                archiveResult={archiveResult}
-                archiveError={archiveError}
-                hideAdminControls
-              />
-              <GoalsPlanTab
-                data={data}
-                dateFormatter={dateFormatter}
-                onChanged={loadData}
-                onGoalAction={handleGoalAction}
-              />
-              <SageInsightList
-                studentId={data.student.id}
-                title="Sage Coaching Notes"
-                limit={8}
-              />
-              <OperationsTab
-                data={data}
-                dateFormatter={dateFormatter}
-                reviewingFormId={reviewingFormId}
-                onReviewForm={handleReviewForm}
-                appointmentForm={appointmentForm}
-                onAppointmentFormChange={setAppointmentForm}
-                savingAppointment={savingAppointment}
-                onCreateAppointment={handleCreateAppointment}
-                updatingAppointmentId={updatingAppointmentId}
-                onAppointmentStatusChange={handleAppointmentStatusChange}
-                taskForm={taskForm}
-                onTaskFormChange={setTaskForm}
-                savingTask={savingTask}
-                onCreateTask={handleCreateTask}
-                updatingTaskId={updatingTaskId}
-                onTaskStatusChange={handleTaskStatusChange}
-                noteForm={noteForm}
-                onNoteFormChange={setNoteForm}
-                savingNote={savingNote}
-                onCreateNote={handleCreateNote}
-                scope="coaching"
-              />
-            </div>
+            <ShownTab key="coach" onShown={clearNotice}>
+              <div className="space-y-6">
+                <OverviewTab
+                  data={data}
+                  moodEntries={moodEntries}
+                  dateFormatter={dateFormatter}
+                  showResetPw={showResetPw}
+                  onToggleResetPw={toggleResetPanel}
+                  newPassword={newPassword}
+                  onNewPasswordChange={handlePasswordInput}
+                  resetStatus={reset.kind}
+                  onResetPassword={handleResetPassword}
+                  confirmDeactivate={confirmDeactivate}
+                  onSetConfirmDeactivate={setConfirmDeactivate}
+                  deactivating={deactivating}
+                  onToggleStudentStatus={toggleStudentStatus}
+                  archiving={archiving}
+                  onArchive={handleArchive}
+                  archiveResult={archiveResult}
+                  hideAdminControls
+                />
+                <GoalsPlanTab
+                  data={data}
+                  dateFormatter={dateFormatter}
+                  onChanged={loadData}
+                  onGoalAction={handleGoalAction}
+                  goalActionId={goalActionId}
+                />
+                <SageInsightList
+                  studentId={data.student.id}
+                  title="Sage Coaching Notes"
+                  limit={8}
+                />
+                <OperationsTab
+                  data={data}
+                  dateFormatter={dateFormatter}
+                  reviewingFormId={reviewingFormId}
+                  onReviewForm={handleReviewForm}
+                  appointmentForm={appointmentForm}
+                  onAppointmentFormChange={setAppointmentForm}
+                  savingAppointment={savingAppointment}
+                  onCreateAppointment={handleCreateAppointment}
+                  updatingAppointmentId={updatingAppointmentId}
+                  onAppointmentStatusChange={handleAppointmentStatusChange}
+                  taskForm={taskForm}
+                  onTaskFormChange={setTaskForm}
+                  savingTask={savingTask}
+                  onCreateTask={handleCreateTask}
+                  updatingTaskId={updatingTaskId}
+                  onTaskStatusChange={handleTaskStatusChange}
+                  noteForm={noteForm}
+                  onNoteFormChange={setNoteForm}
+                  savingNote={savingNote}
+                  onCreateNote={handleCreateNote}
+                  scope="coaching"
+                />
+              </div>
+            </ShownTab>
           ),
           progress: (
-            <ProgressTab
-              data={data}
-              dateFormatter={dateFormatter}
-              verifying={verifying}
-              onVerify={handleVerify}
-              certOutcomeVerifying={certOutcomeVerifying}
-              onCertOutcomeVerify={handleCertOutcomeVerify}
-              applicationVerifying={applicationVerifying}
-              applicationVerifyError={applicationVerifyError}
-              onApplicationVerify={handleApplicationVerify}
-              orientationVerifying={orientationVerifying}
-              onOrientationVerify={handleOrientationVerify}
-              showAllConversations={showAllConversations}
-              onShowAllConversations={() => setShowAllConversations(true)}
-            />
+            <ShownTab key="progress" onShown={clearNotice}>
+              <ProgressTab
+                data={data}
+                dateFormatter={dateFormatter}
+                verifying={verifying}
+                onVerify={handleVerify}
+                certOutcomeVerifying={certOutcomeVerifying}
+                onCertOutcomeVerify={handleCertOutcomeVerify}
+                applicationVerifying={applicationVerifying}
+                onApplicationVerify={handleApplicationVerify}
+                orientationVerifying={orientationVerifying}
+                onOrientationVerify={handleOrientationVerify}
+                showAllConversations={showAllConversations}
+                onShowAllConversations={() => setShowAllConversations(true)}
+              />
+            </ShownTab>
           ),
           forms: (
-            <div id="forms-documents" className="space-y-6">
-              <OperationsTab
-                data={data}
-                dateFormatter={dateFormatter}
-                reviewingFormId={reviewingFormId}
-                onReviewForm={handleReviewForm}
-                appointmentForm={appointmentForm}
-                onAppointmentFormChange={setAppointmentForm}
-                savingAppointment={savingAppointment}
-                onCreateAppointment={handleCreateAppointment}
-                updatingAppointmentId={updatingAppointmentId}
-                onAppointmentStatusChange={handleAppointmentStatusChange}
-                taskForm={taskForm}
-                onTaskFormChange={setTaskForm}
-                savingTask={savingTask}
-                onCreateTask={handleCreateTask}
-                updatingTaskId={updatingTaskId}
-                onTaskStatusChange={handleTaskStatusChange}
-                noteForm={noteForm}
-                onNoteFormChange={setNoteForm}
-                savingNote={savingNote}
-                onCreateNote={handleCreateNote}
-                scope="submittedForms"
-              />
-            </div>
+            <ShownTab key="forms" onShown={clearNotice}>
+              <div id="forms-documents" className="space-y-6">
+                <OperationsTab
+                  data={data}
+                  dateFormatter={dateFormatter}
+                  reviewingFormId={reviewingFormId}
+                  onReviewForm={handleReviewForm}
+                  appointmentForm={appointmentForm}
+                  onAppointmentFormChange={setAppointmentForm}
+                  savingAppointment={savingAppointment}
+                  onCreateAppointment={handleCreateAppointment}
+                  updatingAppointmentId={updatingAppointmentId}
+                  onAppointmentStatusChange={handleAppointmentStatusChange}
+                  taskForm={taskForm}
+                  onTaskFormChange={setTaskForm}
+                  savingTask={savingTask}
+                  onCreateTask={handleCreateTask}
+                  updatingTaskId={updatingTaskId}
+                  onTaskStatusChange={handleTaskStatusChange}
+                  noteForm={noteForm}
+                  onNoteFormChange={setNoteForm}
+                  savingNote={savingNote}
+                  onCreateNote={handleCreateNote}
+                  scope="submittedForms"
+                />
+              </div>
+            </ShownTab>
           ),
           admin: (
-            <div id="account-actions" className="space-y-6">
-              <OverviewTab
-                data={data}
-                moodEntries={moodEntries}
-                dateFormatter={dateFormatter}
-                showResetPw={showResetPw}
-                onToggleResetPw={toggleResetPanel}
-                newPassword={newPassword}
-                onNewPasswordChange={setNewPassword}
-                resetStatus={reset.kind}
-                resetError={reset.kind === "error" ? reset.message : null}
-                onResetPassword={handleResetPassword}
-                confirmDeactivate={confirmDeactivate}
-                onSetConfirmDeactivate={setConfirmDeactivate}
-                deactivating={deactivating}
-                onToggleStudentStatus={toggleStudentStatus}
-                archiving={archiving}
-                onArchive={handleArchive}
-                archiveResult={archiveResult}
-                archiveError={archiveError}
-              />
-            </div>
+            <ShownTab key="admin" onShown={clearNotice}>
+              <div id="account-actions" className="space-y-6">
+                <OverviewTab
+                  data={data}
+                  moodEntries={moodEntries}
+                  dateFormatter={dateFormatter}
+                  showResetPw={showResetPw}
+                  onToggleResetPw={toggleResetPanel}
+                  newPassword={newPassword}
+                  onNewPasswordChange={handlePasswordInput}
+                  resetStatus={reset.kind}
+                  onResetPassword={handleResetPassword}
+                  confirmDeactivate={confirmDeactivate}
+                  onSetConfirmDeactivate={setConfirmDeactivate}
+                  deactivating={deactivating}
+                  onToggleStudentStatus={toggleStudentStatus}
+                  archiving={archiving}
+                  onArchive={handleArchive}
+                  archiveResult={archiveResult}
+                />
+              </div>
+            </ShownTab>
           ),
         }}
       </StudentDetailTabs>
+      <ActionNotice notice={notice} onDismiss={clearNotice} />
       {confirmDialog}
     </div>
   );
