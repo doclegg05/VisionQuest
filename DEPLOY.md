@@ -120,6 +120,19 @@ If you want error reporting:
 - `SENTRY_DSN`
 - `NEXT_PUBLIC_SENTRY_DSN`
 
+Before you set either key, change these settings in the Sentry project. The app strips student details from its reports, and these settings are the second layer.
+
+1. **Settings, Security & Privacy**: turn on **Prevent Storing of IP Addresses**.
+2. **Settings, Security & Privacy**: turn on **Data Scrubber** and **Use Default Scrubbers**. Add `displayName`, `email`, `studentId`, `message` and `slug` to **Additional Sensitive Fields**.
+3. **Settings, Data Retention** (if your plan shows it): pick the shortest event retention.
+4. **Settings, Client Keys (DSN), Allowed Domains**: enter only `https://visionquest.onrender.com`.
+5. **Settings, Spike Protection** and the key's **Rate Limit**: turn both on so a loop of errors cannot fill the quota.
+6. Leave **Session Replay**, **User Feedback**, **Crons** and **Logs** off.
+7. Consider the Sentry SDK tunnel option, so reports leave from Render's address and not the student's browser.
+8. Sign Sentry's Data Processing Addendum under **Organization Settings, Legal & Compliance**.
+
+Even with all of this, each report's web request shows Sentry the student's IP address and browser. Item 7 is the only setting that hides them.
+
 ## 4. Deploy To Render
 
 ### Option A: Blueprint
