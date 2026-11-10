@@ -21,6 +21,9 @@ import { mockRequest } from "@/lib/test-helpers";
 // The route keys the unknown-login limiter bucket on an HMAC under JWT_SECRET.
 process.env.JWT_SECRET = "test-secret-for-login-route-limiter-keys";
 
+/** The one message every failed sign-in gets (readiness A1 replaced "Invalid email or password"). */
+const SIGN_IN_FAILED = /^We could not sign you in\./;
+
 type CookieRecord = { studentId: string; role: string; sessionVersion: number; flags: { httpOnly: true; sameSite: "strict"; path: "/" } };
 const cookieSets: CookieRecord[] = [];
 const mfaCookieSets: string[] = [];
@@ -28,6 +31,7 @@ const mfaCookieSets: string[] = [];
 const mockFindUnique = mock.fn() as any;
 const mockUpdate = mock.fn() as any;
 const mockRateLimit = mock.fn() as any;
+const mockRefundRateLimit = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
 const mockVerifyPasswordSafeWithStatus = mock.fn() as any;
 
@@ -75,6 +79,7 @@ mock.module("@/lib/db", {
 mock.module("@/lib/rate-limit", {
   namedExports: {
     rateLimit: mockRateLimit,
+    refundRateLimit: mockRefundRateLimit,
   },
 });
 
@@ -198,7 +203,7 @@ describe("POST /api/auth/login", () => {
     const body = (await res.json()) as { error: string };
 
     assert.equal(res.status, 401);
-    assert.match(body.error, /invalid email or password/i);
+    assert.match(body.error, SIGN_IN_FAILED);
     assert.equal(cookieSets.length, 0, "no cookie should be set on failure");
   });
 
@@ -219,7 +224,7 @@ describe("POST /api/auth/login", () => {
 
     assert.equal(res.status, 401);
     // Same generic error as wrong-password — confirms no enumeration leak.
-    assert.match(body.error, /invalid email or password/i);
+    assert.match(body.error, SIGN_IN_FAILED);
     assert.equal(cookieSets.length, 0);
   });
 
@@ -381,7 +386,7 @@ describe("POST /api/auth/login — per-account limit is not an existence oracle"
     const body = (await res.json()) as { error: string };
 
     assert.equal(res.status, 401, "a locked account must not answer 429 — that confirms it exists");
-    assert.match(body.error, /invalid email or password/i);
+    assert.match(body.error, SIGN_IN_FAILED);
     assert.equal(cookieSets.length, 0);
   });
 
@@ -605,5 +610,188 @@ describe("POST /api/auth/login — unknown logins do the same limiter work as re
       (c: { arguments: [{ action: string }] }) => c.arguments[0].action,
     );
     assert.deepEqual(actions, ["auth.login_failed_rate_limited", "auth.login_failed"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The per-network unit comes back only for a right password (readiness A1)
+//
+// The per-network bucket used to count every sign-in at 10 per 15 minutes, so
+// the eleventh student in a classroom was refused. It now allows 30 failed
+// attempts per 15 minutes, and a right password gives its unit back.
+//
+// The refund must never say more than the response already says. A locked
+// account, a closed account and a Google-only account all answer with the
+// generic 401 whatever the password was, so none of them may refund: a unit
+// that came back only for the right password would turn the per-network
+// count into a password check that the per-account lock cannot stop.
+// route.classroom.test.ts runs the same rules over the real limiter.
+// ---------------------------------------------------------------------------
+
+describe("POST /api/auth/login — the per-network unit comes back only for a right password", () => {
+  const ADDRESS = "203.0.113.7";
+  const NETWORK_KEY = `login:${ADDRESS}`;
+  const NETWORK_RESET_TIME = 1_900_000_000_000;
+
+  const account = (overrides: Record<string, unknown> = {}) => ({
+    id: "stu-1",
+    studentId: "alice",
+    displayName: "Alice",
+    email: "alice@example.com",
+    role: "student",
+    passwordHash: "scrypt$abc$def",
+    authProvider: "password",
+    isActive: true,
+    mfaEnabled: false,
+    sessionVersion: 1,
+    ...overrides,
+  });
+
+  /** Admits every bucket; `locked` refuses the per-account one. */
+  function seedLimiter(options: { locked?: boolean; degraded?: boolean } = {}) {
+    mockRateLimit.mock.mockImplementation(async (key: string) => ({
+      success: !(options.locked && key.startsWith("login:user:")),
+      remaining: 0,
+      resetTime: key === NETWORK_KEY ? NETWORK_RESET_TIME : NETWORK_RESET_TIME + 1,
+      degraded: options.degraded ?? false,
+    }));
+  }
+
+  function signIn(body: Record<string, unknown> = { studentId: "alice", password: "any-password" }) {
+    return loginRoute.POST(
+      mockRequest("/api/auth/login", {
+        method: "POST",
+        body,
+        headers: { "x-forwarded-for": ADDRESS },
+      }) as never,
+    );
+  }
+
+  const refunds = (): unknown[][] =>
+    mockRefundRateLimit.mock.calls.map((c: { arguments: unknown[] }) => c.arguments);
+
+  beforeEach(() => {
+    cookieSets.length = 0;
+    mfaCookieSets.length = 0;
+    mockFindUnique.mock.resetCalls();
+    mockUpdate.mock.resetCalls();
+    mockRateLimit.mock.resetCalls();
+    mockRefundRateLimit.mock.resetCalls();
+    mockLogAuditEvent.mock.resetCalls();
+    mockVerifyPasswordSafeWithStatus.mock.resetCalls();
+    seedLimiter();
+    mockRefundRateLimit.mock.mockImplementation(async () => undefined);
+    mockLogAuditEvent.mock.mockImplementation(async () => undefined);
+    mockUpdate.mock.mockImplementation(async () => ({ count: 1 }));
+    mockFindUnique.mock.mockImplementation(async () => account());
+    mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({ valid: true, needsRehash: false }));
+  });
+
+  it("allows one network address 30 failed attempts per 15 minutes", async () => {
+    await signIn();
+
+    assert.deepEqual(mockRateLimit.mock.calls[0].arguments, [NETWORK_KEY, 30, 15 * 60 * 1000]);
+  });
+
+  it("gives the unit back, in the window it was taken from, when the password is right", async () => {
+    const res = await signIn();
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(refunds(), [[NETWORK_KEY, NETWORK_RESET_TIME]]);
+  });
+
+  it("gives the unit back when the password is right and an MFA challenge follows", async () => {
+    mockFindUnique.mock.mockImplementation(async () => account({ role: "teacher", mfaEnabled: true }));
+
+    const res = await signIn();
+
+    assert.deepEqual(await res.json(), { requiresMfa: true });
+    assert.deepEqual(refunds(), [[NETWORK_KEY, NETWORK_RESET_TIME]]);
+  });
+
+  it("never gives back the per-account unit: five tries per account still count, right or wrong", async () => {
+    await signIn();
+
+    const refundedKeys = refunds().map(([key]) => key);
+    assert.deepEqual(refundedKeys, [NETWORK_KEY]);
+  });
+
+  it("keeps the unit for a wrong password", async () => {
+    mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({ valid: false, needsRehash: false }));
+
+    const res = await signIn();
+
+    assert.equal(res.status, 401);
+    assert.deepEqual(refunds(), []);
+  });
+
+  it("keeps the unit for an unknown login", async () => {
+    mockFindUnique.mock.mockImplementation(async () => null);
+    mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({ valid: false, needsRehash: false }));
+
+    const res = await signIn({ studentId: "ghost", password: "any-password" });
+
+    assert.equal(res.status, 401);
+    assert.deepEqual(refunds(), []);
+  });
+
+  it("keeps the unit for a request that fails validation", async () => {
+    const res = await signIn({ studentId: "alice" });
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(refunds(), []);
+  });
+
+  // In each case below the password verifier says the password is RIGHT, and
+  // the response is still the generic 401.
+  for (const [name, arrange] of [
+    ["a locked account", () => seedLimiter({ locked: true })],
+    ["a closed account", () => mockFindUnique.mock.mockImplementation(async () => account({ isActive: false }))],
+    [
+      "a Google-only account",
+      () => mockFindUnique.mock.mockImplementation(async () => account({ passwordHash: null, authProvider: "google" })),
+    ],
+  ] as const) {
+    it(`keeps the unit for the right password on ${name}, which the response does not reveal`, async () => {
+      arrange();
+
+      const res = await signIn();
+
+      assert.equal(res.status, 401);
+      assert.deepEqual(refunds(), []);
+    });
+  }
+
+  it("keeps the unit when a legacy-hash upgrade loses to a concurrent password reset", async () => {
+    mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({ valid: true, needsRehash: true }));
+    mockUpdate.mock.mockImplementation(async () => ({ count: 0 }));
+
+    const res = await signIn();
+
+    assert.equal(res.status, 401);
+    assert.deepEqual(refunds(), []);
+  });
+
+  it("asks the store for nothing when the limiter failed open: no unit was taken", async () => {
+    seedLimiter({ degraded: true });
+
+    const res = await signIn();
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(refunds(), []);
+  });
+
+  it("gives the unit back before the session is issued, so a slow audit write holds no unit", async () => {
+    const order: string[] = [];
+    mockRefundRateLimit.mock.mockImplementation(async () => {
+      order.push("refund");
+    });
+    mockLogAuditEvent.mock.mockImplementation(async () => {
+      order.push("audit");
+    });
+
+    await signIn();
+
+    assert.deepEqual(order, ["refund", "audit"]);
   });
 });

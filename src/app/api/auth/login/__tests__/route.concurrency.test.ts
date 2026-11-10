@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import { Prisma } from "@prisma/client";
 import { mockRequest } from "@/lib/test-helpers";
+import { FakeLimiterStore } from "./limiter-store.fake";
 
 // ---------------------------------------------------------------------------
 // Login route — concurrent requests from one IP
@@ -25,12 +26,12 @@ import { mockRequest } from "@/lib/test-helpers";
 // The route keys the unknown-login limiter bucket on an HMAC under JWT_SECRET.
 process.env.JWT_SECRET = "test-secret-for-login-route-limiter-keys";
 
-/** Mirrors the per-IP limit in ../route.ts. */
-const IP_LIMIT = 10;
+/** Mirrors the per-IP limit on failed attempts in ../route.ts. */
+const IP_LIMIT = 30;
 /** Mirrors the per-user limit in ../route.ts. */
 const USER_LIMIT = 5;
 /** Concurrent sign-in attempts — comfortably above both limits. */
-const BURST = 25;
+const BURST = 40;
 
 const STUDENT = {
   id: "stu-concurrent",
@@ -49,32 +50,16 @@ function prismaError(code: string, message: string) {
   return new Prisma.PrismaClientKnownRequestError(message, { code, clientVersion: "test" });
 }
 
-/**
- * Counter store standing in for the RateLimitEntry table. Bound values arrive
- * in the order the limiter's SQL interpolates them: key, nextReset, now.
- */
-const rows = new Map<string, { count: number; resetTime: Date }>();
-/** Errors raised before any work, shifted one per statement. */
-let queuedFailures: Error[] = [];
+/** Counter store standing in for the RateLimitEntry table. */
+const limiterStore = new FakeLimiterStore();
 
 const fakeStore = {
   student: {
     findUnique: async () => STUDENT,
     update: async () => undefined,
   },
-  $queryRaw: async (_sql: TemplateStringsArray, ...values: unknown[]) => {
-    const queued = queuedFailures.shift();
-    if (queued) throw queued;
-
-    const [key, nextReset, now] = values as [string, Date, Date];
-    const existing = rows.get(key);
-    const row =
-      !existing || existing.resetTime.getTime() <= now.getTime()
-        ? { count: 1, resetTime: nextReset }
-        : { count: existing.count + 1, resetTime: existing.resetTime };
-    rows.set(key, row);
-    return [row];
-  },
+  $queryRaw: limiterStore.$queryRaw,
+  $executeRaw: limiterStore.$executeRaw,
 };
 
 mock.module("@/lib/db", {
@@ -129,8 +114,7 @@ async function burst(count: number, ip = "203.0.113.7"): Promise<number[]> {
 
 describe("POST /api/auth/login — concurrent attempts from one IP", () => {
   beforeEach(() => {
-    rows.clear();
-    queuedFailures = [];
+    limiterStore.reset();
   });
 
   it("answers every concurrent attempt with a sign-in or a clean refusal, never a 500", async () => {
@@ -153,6 +137,8 @@ describe("POST /api/auth/login — concurrent attempts from one IP", () => {
     // The per-IP limiter admits IP_LIMIT of the burst; those then meet the
     // per-user limiter, which admits USER_LIMIT. Lost increments would let
     // more through — that is the brute-force protection this counts on.
+    // Every attempt takes its per-IP unit before any attempt gives one back,
+    // so the sign-ins that succeed here free no room for the rest of the burst.
     assert.equal(statuses.filter((s) => s === 200).length, Math.min(IP_LIMIT, USER_LIMIT));
 
     // The two refusals have different shapes on purpose (2026-09-06 hunt,
@@ -174,7 +160,7 @@ describe("POST /api/auth/login — concurrent attempts from one IP", () => {
   });
 
   it("survives a store that raises transient contention errors", async () => {
-    queuedFailures = Array.from({ length: BURST }, () =>
+    limiterStore.queuedFailures = Array.from({ length: BURST }, () =>
       prismaError("P2034", "Transaction failed due to a write conflict or a deadlock."),
     );
 
@@ -190,7 +176,7 @@ describe("POST /api/auth/login — concurrent attempts from one IP", () => {
   it("signs students in rather than 500ing when the counter store is down", async () => {
     // Fail-open, deliberately: a broken counter must not lock a classroom out
     // of the portal. See the policy note in src/lib/rate-limit.ts.
-    queuedFailures = Array.from({ length: BURST * 10 }, () =>
+    limiterStore.queuedFailures = Array.from({ length: BURST * 10 }, () =>
       prismaError("P2024", "Timed out fetching a new connection from the connection pool."),
     );
 
