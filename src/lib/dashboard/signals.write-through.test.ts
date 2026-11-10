@@ -28,6 +28,11 @@ function answer(call: EngineCall): unknown {
   if (call.action === "updateOne" && call.modelName === "Progression") return { id: "prog-1", studentId: A.id };
   if (call.action === "createOne" && call.modelName === "StudentTask") return { id: "task-1", studentId: A.id };
   if (call.action === "updateOne" && call.modelName === "OrientationItem") return { id: "item-1" };
+  if (call.action === "createOne" && call.modelName === "Certification") return { id: "cert-1", studentId: A.id };
+  // The slow signals' reads: nothing found, except the counts above (1 each),
+  // which is enough for the read to count as having seen the student's rows.
+  if (call.action === "findFirst" || call.action === "findUnique") return null;
+  if (call.action === "findMany") return [];
   return undefined;
 }
 
@@ -88,5 +93,24 @@ describe("dashboard globals, cleared by the real write-through", () => {
     let reread = false;
     await cache.cached(key, 600, async () => { reread = true; return 9; });
     assert.equal(reread, true, "the orientation total outlived an OrientationItem write");
+  });
+});
+
+describe("kept slow signals, cleared by the real write-through", () => {
+  /** Engine reads a slow-signal read makes; 0 means it was served kept. */
+  async function slowReads(session: { id: string; role: string }): Promise<number> {
+    const before = calls.length;
+    await asStudent(session, () => signals.getSlowSignals(session));
+    return calls.slice(before).filter((call) => call.action !== "executeRaw").length;
+  }
+
+  it("a Certification write through `prisma` clears the writing student's slow signals and no one else's", async () => {
+    const full = await slowReads(A);
+    assert.ok(full > 0);
+    await slowReads(B);
+    assert.equal(await slowReads(A), 0, "the second read was not served kept");
+    await asStudent(A, () => db.prisma.certification.create({ data: { studentId: A.id, certType: "ready-to-work" } }));
+    assert.equal(await slowReads(A), full, "A's slow signals outlived A's certification write");
+    assert.equal(await slowReads(B), 0, "B's slow signals were cleared by A's write");
   });
 });
