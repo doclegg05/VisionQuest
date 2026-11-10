@@ -107,7 +107,7 @@ export default function ProgressTab({
                   {pendingVerification && (
                     <>
                       <span className="text-xs bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)] px-1.5 py-0.5 rounded">
-                        Student marked done \u2014 verify
+                        Student marked done: verify
                       </span>
                       <button
                         onClick={() => onOrientationVerify(item.id, "confirm")}
@@ -129,7 +129,7 @@ export default function ProgressTab({
                   )}
                   {declined && (
                     <span className="text-xs bg-[var(--surface-interactive)] text-[var(--ink-muted)] px-1.5 py-0.5 rounded">
-                      Declined \u2014 student will redo
+                      Declined: student will redo
                     </span>
                   )}
                   {progressItem?.completed && progressItem.verificationStatus === "verified" && progressItem.verifiedAt && (

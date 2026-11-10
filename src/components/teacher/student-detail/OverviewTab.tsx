@@ -30,6 +30,8 @@ interface OverviewTabProps {
   newPassword: string;
   onNewPasswordChange: (value: string) => void;
   resetStatus: "idle" | "saving" | "done" | "error";
+  /** Why the last reset failed, in words to show the instructor. Null when it did not fail. */
+  resetError: string | null;
   onResetPassword: () => void;
   /** Deactivation */
   confirmDeactivate: boolean;
@@ -59,6 +61,7 @@ export default function OverviewTab({
   newPassword,
   onNewPasswordChange,
   resetStatus,
+  resetError,
   onResetPassword,
   confirmDeactivate,
   onSetConfirmDeactivate,
@@ -230,7 +233,7 @@ export default function OverviewTab({
                 </button>
                 <span role="alert" aria-live="polite" className="text-xs">
                   {resetStatus === "done" && <span className="text-[var(--badge-success-text)]">Done!</span>}
-                  {resetStatus === "error" && <span className="text-[var(--badge-error-text)]">Failed</span>}
+                  {resetError && <span className="text-[var(--badge-error-text)]">{resetError}</span>}
                 </span>
               </div>
             )}

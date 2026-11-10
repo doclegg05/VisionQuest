@@ -2,7 +2,6 @@
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { apiFetch } from "@/lib/api";
 import SageInsightList from "@/components/sage/SageInsightList";
 import type {
   MoodEntryData,
@@ -20,8 +19,70 @@ import {
   type FormReviewExtras,
 } from "./student-detail/form-review";
 import { useConfirm } from "@/components/ui/useConfirm";
+import {
+  runStudentAction,
+  sendStudentAction,
+  type StudentActionPage,
+} from "@/lib/teacher/student-action";
 
 type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled";
+
+/** Where a password reset stands. A failure always carries the words to show. */
+type ResetState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "done" }
+  | { kind: "error"; message: string };
+
+interface ArchiveResult {
+  storageKey: string;
+  fileCount: number;
+}
+
+/** What every failed request ends with, after the part that says what did not happen. */
+const TRY_AGAIN = "Check your connection and try again.";
+
+const EMPTY_APPOINTMENT_FORM = {
+  title: "",
+  description: "",
+  startsAt: "",
+  endsAt: "",
+  locationType: "virtual",
+  locationLabel: "",
+  meetingUrl: "",
+  notes: "",
+  followUpRequired: false,
+};
+
+const EMPTY_TASK_FORM = {
+  title: "",
+  description: "",
+  dueAt: "",
+  priority: "normal",
+  appointmentId: "",
+};
+
+const EMPTY_NOTE_FORM = { category: "general", body: "" };
+
+function isArchiveResult(payload: unknown): payload is ArchiveResult {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "storageKey" in payload &&
+    typeof payload.storageKey === "string" &&
+    "fileCount" in payload &&
+    typeof payload.fileCount === "number"
+  );
+}
+
+/**
+ * Only an empty page shows the loading line. A reload after a save keeps the
+ * student on screen, so a note or a task no longer blanks the instructor's
+ * view. Try Again after a failed load shows the line again.
+ */
+export function showsLoadingLine(state: { loading: boolean; hasData: boolean; hasError: boolean }): boolean {
+  return state.loading && (!state.hasData || state.hasError);
+}
 
 function getErrorMessage(payload: unknown, fallback: string) {
   if (
@@ -47,11 +108,11 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [orientationVerifying, setOrientationVerifying] = useState<string | null>(null);
   const [showResetPw, setShowResetPw] = useState(false);
   const [newPassword, setNewPassword] = useState("");
-  const [resetStatus, setResetStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
+  const [reset, setReset] = useState<ResetState>({ kind: "idle" });
   const [deactivating, setDeactivating] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [archiving, setArchiving] = useState(false);
-  const [archiveResult, setArchiveResult] = useState<{ storageKey: string; fileCount: number } | null>(null);
+  const [archiveResult, setArchiveResult] = useState<ArchiveResult | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [showAllConversations, setShowAllConversations] = useState(false);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
@@ -62,28 +123,9 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [updatingAppointmentId, setUpdatingAppointmentId] = useState<string | null>(null);
   const { confirm, prompt, confirmDialog } = useConfirm();
-  const [appointmentForm, setAppointmentForm] = useState({
-    title: "",
-    description: "",
-    startsAt: "",
-    endsAt: "",
-    locationType: "virtual",
-    locationLabel: "",
-    meetingUrl: "",
-    notes: "",
-    followUpRequired: false,
-  });
-  const [taskForm, setTaskForm] = useState({
-    title: "",
-    description: "",
-    dueAt: "",
-    priority: "normal",
-    appointmentId: "",
-  });
-  const [noteForm, setNoteForm] = useState({
-    category: "general",
-    body: "",
-  });
+  const [appointmentForm, setAppointmentForm] = useState(EMPTY_APPOINTMENT_FORM);
+  const [taskForm, setTaskForm] = useState(EMPTY_TASK_FORM);
+  const [noteForm, setNoteForm] = useState(EMPTY_NOTE_FORM);
   const [moodEntries, setMoodEntries] = useState<MoodEntryData[]>([]);
 
   useEffect(() => {
@@ -129,38 +171,39 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     minute: "2-digit",
   });
 
+  /** How an action reports to this page: failures go to the banner. */
+  const page: StudentActionPage = { report: setPanelMessage, reload: loadData };
+
   async function handleVerify(requirementId: string, verified: boolean) {
     setVerifying(requirementId);
-    try {
-      await fetch("/api/teacher/certifications", {
+    await runStudentAction(
+      {
+        url: "/api/teacher/certifications",
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requirementId, verified }),
-      });
-      await loadData();
-    } catch (err) {
-      console.error("Failed to verify:", err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setVerifying(null);
-    }
+        body: { requirementId, verified },
+        fallback: verified
+          ? `That step was not verified. ${TRY_AGAIN}`
+          : `That step is still verified. ${TRY_AGAIN}`,
+      },
+      page,
+    );
+    setVerifying(null);
   }
 
   // P1-4: cert-level outcome verification — stamps the Certification row
   // (verificationStatus "verified") that grant reports count.
   async function handleCertOutcomeVerify(certificationId: string) {
     setCertOutcomeVerifying(true);
-    try {
-      await fetch("/api/teacher/outcomes/verify", {
+    await runStudentAction(
+      {
+        url: "/api/teacher/outcomes/verify",
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetType: "certification", targetId: certificationId }),
-      });
-      await loadData();
-    } catch (err) {
-      console.error("Failed to verify certification:", err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setCertOutcomeVerifying(false);
-    }
+        body: { targetType: "certification", targetId: certificationId },
+        fallback: `The certification was not verified. ${TRY_AGAIN}`,
+      },
+      page,
+    );
+    setCertOutcomeVerifying(false);
   }
 
   /**
@@ -172,58 +215,54 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   async function handleApplicationVerify(applicationId: string) {
     setApplicationVerifying(applicationId);
     setApplicationVerifyError(null);
-    try {
-      const res = await fetch("/api/teacher/outcomes/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetType: "application", targetId: applicationId }),
-      });
-      // A failed verify that silently reloaded left the row looking exactly as
-      // it did before, so the instructor would conclude the button did nothing
-      // and try again — or worse, assume it had worked. Say so, and do not
-      // reload: the data has not changed.
-      if (!res.ok) {
-        setApplicationVerifyError("Could not verify that.");
-        return;
-      }
+    const res = await sendStudentAction({
+      url: "/api/teacher/outcomes/verify",
+      method: "POST",
+      body: { targetType: "application", targetId: applicationId },
+      fallback: `Could not verify that. ${TRY_AGAIN}`,
+    });
+    // A failed verify that silently reloaded left the row looking exactly as
+    // it did before, so the instructor would conclude the button did nothing
+    // and try again, or worse, assume it had worked. Say so next to the list,
+    // and do not reload: the data has not changed.
+    if (!res.ok) {
+      setApplicationVerifyError(res.message);
+    } else {
       await loadData();
-    } catch (err) {
-      console.error("Failed to verify application:", err instanceof Error ? err.message : "Unknown error");
-      setApplicationVerifyError("Could not verify that.");
-    } finally {
-      setApplicationVerifying(null);
     }
+    setApplicationVerifying(null);
   }
 
   async function handleOrientationVerify(itemId: string, decision: "confirm" | "decline") {
     setOrientationVerifying(itemId);
-    try {
-      const res = await fetch("/api/orientation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemId,
-          completed: decision === "confirm",
-          studentId,
-          verify: decision,
-        }),
-      });
-      if (res.ok && decision === "confirm") {
+    setPanelMessage(null);
+    const result = await sendStudentAction({
+      url: "/api/orientation",
+      method: "POST",
+      body: { itemId, completed: decision === "confirm", studentId, verify: decision },
+      fallback:
+        decision === "confirm"
+          ? `That step was not confirmed. ${TRY_AGAIN}`
+          : `That step was not declined. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setPanelMessage(result.message);
+    } else {
+      if (decision === "confirm") {
         // If that was the last outstanding required item, this awards the
         // orientation-complete milestone (75 XP) through the existing
-        // completion path; otherwise the server guard refuses harmlessly.
-        await fetch("/api/orientation/complete", {
+        // completion path. While steps remain the server refuses, which is
+        // the usual answer, so this result is not shown.
+        await sendStudentAction({
+          url: "/api/orientation/complete",
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ studentId }),
-        }).catch(() => undefined);
+          body: { studentId },
+          fallback: "Orientation was not marked finished.",
+        });
       }
       await loadData();
-    } catch (err) {
-      console.error("Failed to verify orientation step:", err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setOrientationVerifying(null);
     }
+    setOrientationVerifying(null);
   }
 
   async function handleResetPassword() {
@@ -237,221 +276,167 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     ) {
       return;
     }
-    setResetStatus("saving");
-    try {
-      const res = await fetch(`/api/teacher/students/${studentId}/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newPassword }),
-      });
-      if (res.ok) {
-        setResetStatus("done");
-        setNewPassword("");
-        setTimeout(() => {
-          setResetStatus("idle");
-          setShowResetPw(false);
-        }, 2000);
-      } else {
-        setResetStatus("error");
-      }
-    } catch {
-      setResetStatus("error");
+    setReset({ kind: "saving" });
+    const result = await sendStudentAction({
+      url: `/api/teacher/students/${studentId}/reset-password`,
+      method: "POST",
+      body: { newPassword },
+      fallback: `The password was not changed. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setReset({ kind: "error", message: result.message });
+      return;
     }
+    setReset({ kind: "done" });
+    setNewPassword("");
+    setTimeout(() => {
+      setReset({ kind: "idle" });
+      setShowResetPw(false);
+    }, 2000);
   }
 
   async function toggleStudentStatus() {
     if (!data) return;
     setDeactivating(true);
-    try {
-      const res = await fetch(`/api/teacher/students/${studentId}/status`, {
+    await runStudentAction(
+      {
+        url: `/api/teacher/students/${studentId}/status`,
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !data.student.isActive }),
-      });
-      if (res.ok) {
-        await loadData();
-      }
-    } catch (err) {
-      console.error("Failed to toggle student status:", err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setDeactivating(false);
-      setConfirmDeactivate(false);
-    }
+        body: { isActive: !data.student.isActive },
+        fallback: data.student.isActive
+          ? `The account is still active. ${TRY_AGAIN}`
+          : `The account is still inactive. ${TRY_AGAIN}`,
+      },
+      page,
+    );
+    setDeactivating(false);
+    setConfirmDeactivate(false);
   }
 
   async function handleArchive() {
     setArchiving(true);
     setArchiveError(null);
-    try {
-      const res = await apiFetch(`/api/teacher/students/${studentId}/archive`, { method: "POST" });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        setArchiveError((payload as { error?: string }).error || "Archive failed.");
-        return;
-      }
-      const result = await res.json();
-      setArchiveResult(result as { storageKey: string; fileCount: number });
-    } catch {
-      setArchiveError("Archive failed. Please try again.");
-    } finally {
-      setArchiving(false);
+    const result = await sendStudentAction({
+      url: `/api/teacher/students/${studentId}/archive`,
+      method: "POST",
+      fallback: `The archive was not made. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setArchiveError(result.message);
+    } else if (isArchiveResult(result.payload)) {
+      setArchiveResult(result.payload);
+    } else {
+      setArchiveError("The archive was made, but its download link did not arrive. Reload the page and try again.");
     }
+    setArchiving(false);
   }
 
   async function handleCreateAppointment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSavingAppointment(true);
     setPanelMessage(null);
-
-    try {
-      const response = await fetch(`/api/teacher/students/${studentId}/appointments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(appointmentForm),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(getErrorMessage(payload, "Could not create the appointment."));
-      }
-
-      setAppointmentForm({
-        title: "",
-        description: "",
-        startsAt: "",
-        endsAt: "",
-        locationType: "virtual",
-        locationLabel: "",
-        meetingUrl: "",
-        notes: "",
-        followUpRequired: false,
-      });
+    const result = await sendStudentAction({
+      url: `/api/teacher/students/${studentId}/appointments`,
+      method: "POST",
+      body: appointmentForm,
+      fallback: `The appointment was not saved. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setPanelMessage(result.message);
+    } else {
+      setAppointmentForm(EMPTY_APPOINTMENT_FORM);
       setPanelMessage("Appointment scheduled.");
       await loadData();
-    } catch (err) {
-      setPanelMessage(err instanceof Error ? err.message : "Could not create the appointment.");
-    } finally {
-      setSavingAppointment(false);
     }
+    setSavingAppointment(false);
   }
 
   async function handleAppointmentStatusChange(appointmentId: string, status: AppointmentStatusValue) {
     setUpdatingAppointmentId(appointmentId);
     setPanelMessage(null);
-
-    try {
-      const response = await fetch(`/api/teacher/appointments/${appointmentId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(getErrorMessage(payload, "Could not update the appointment."));
-      }
-
+    const result = await sendStudentAction({
+      url: `/api/teacher/appointments/${appointmentId}`,
+      method: "PATCH",
+      body: { status },
+      fallback: `The appointment was not changed. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setPanelMessage(result.message);
+    } else {
       setPanelMessage("Appointment updated.");
       await loadData();
-    } catch (err) {
-      setPanelMessage(err instanceof Error ? err.message : "Could not update the appointment.");
-    } finally {
-      setUpdatingAppointmentId(null);
     }
+    setUpdatingAppointmentId(null);
   }
 
   async function handleCreateTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSavingTask(true);
     setPanelMessage(null);
-
-    try {
-      const response = await fetch(`/api/teacher/students/${studentId}/tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...taskForm, dueAt: toIsoDueAt(taskForm.dueAt) }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(getErrorMessage(payload, "Could not create the task."));
-      }
-
-      setTaskForm({
-        title: "",
-        description: "",
-        dueAt: "",
-        priority: "normal",
-        appointmentId: "",
-      });
+    const result = await sendStudentAction({
+      url: `/api/teacher/students/${studentId}/tasks`,
+      method: "POST",
+      body: { ...taskForm, dueAt: toIsoDueAt(taskForm.dueAt) },
+      fallback: `The task was not saved. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setPanelMessage(result.message);
+    } else {
+      setTaskForm(EMPTY_TASK_FORM);
       setPanelMessage("Follow-up task created.");
       await loadData();
-    } catch (err) {
-      setPanelMessage(err instanceof Error ? err.message : "Could not create the task.");
-    } finally {
-      setSavingTask(false);
     }
+    setSavingTask(false);
   }
 
   async function handleTaskStatusChange(taskId: string, status: "open" | "completed") {
     setUpdatingTaskId(taskId);
     setPanelMessage(null);
-
-    try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(getErrorMessage(payload, "Could not update the task."));
-      }
-
+    const result = await sendStudentAction({
+      url: `/api/tasks/${taskId}`,
+      method: "PATCH",
+      body: { status },
+      fallback: `The task was not changed. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setPanelMessage(result.message);
+    } else {
       setPanelMessage("Task updated.");
       await loadData();
-    } catch (err) {
-      setPanelMessage(err instanceof Error ? err.message : "Could not update the task.");
-    } finally {
-      setUpdatingTaskId(null);
     }
+    setUpdatingTaskId(null);
   }
 
   async function handleCreateNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSavingNote(true);
     setPanelMessage(null);
-
-    try {
-      const response = await fetch(`/api/teacher/students/${studentId}/notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(noteForm),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(getErrorMessage(payload, "Could not save the note."));
-      }
-
-      setNoteForm({ category: "general", body: "" });
+    const result = await sendStudentAction({
+      url: `/api/teacher/students/${studentId}/notes`,
+      method: "POST",
+      body: noteForm,
+      fallback: `The note was not saved. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setPanelMessage(result.message);
+    } else {
+      setNoteForm(EMPTY_NOTE_FORM);
       setPanelMessage("Case note saved.");
       await loadData();
-    } catch (err) {
-      setPanelMessage(err instanceof Error ? err.message : "Could not save the note.");
-    } finally {
-      setSavingNote(false);
     }
+    setSavingNote(false);
   }
 
   const handleGoalAction = async (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null }) => {
-    try {
-      const res = await apiFetch(`/api/teacher/students/${studentId}/goals/${goalId}`, {
+    await runStudentAction(
+      {
+        url: `/api/teacher/students/${studentId}/goals/${goalId}`,
         method: "PATCH",
-        body: JSON.stringify(action),
-      });
-      if (res.ok) {
-        await loadData();
-      }
-    } catch (err) {
-      setPanelMessage(err instanceof Error ? err.message : "Could not update the goal.");
-    }
+        body: action,
+        fallback: `The goal was not changed. ${TRY_AGAIN}`,
+      },
+      page,
+    );
   };
 
   async function handleReviewForm(
@@ -472,28 +457,24 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
     setReviewingFormId(submissionId);
     setPanelMessage(null);
-
-    try {
-      const response = await fetch(`/api/teacher/students/${studentId}/forms`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildFormReviewBody(submissionId, status, notes || "", extras)),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(getErrorMessage(payload, "Could not update the form review."));
-      }
-
-      setPanelMessage(reviewResultMessage(status, extras, payload));
+    const result = await sendStudentAction({
+      url: `/api/teacher/students/${studentId}/forms`,
+      method: "PATCH",
+      body: buildFormReviewBody(submissionId, status, notes || "", extras),
+      fallback: `The form review was not saved. ${TRY_AGAIN}`,
+    });
+    if (!result.ok) {
+      setPanelMessage(result.message);
+    } else {
+      setPanelMessage(reviewResultMessage(status, extras, result.payload));
       await loadData();
-    } catch (err) {
-      setPanelMessage(err instanceof Error ? err.message : "Could not update the form review.");
-    } finally {
-      setReviewingFormId(null);
     }
+    setReviewingFormId(null);
   }
 
-  if (loading) return <p className="text-sm text-[var(--ink-faint)]">Loading student data...</p>;
+  if (showsLoadingLine({ loading, hasData: data !== null, hasError: error !== null })) {
+    return <p className="text-sm text-[var(--ink-faint)]">Loading student data...</p>;
+  }
 
   if (error) {
     return (
@@ -515,7 +496,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       </Link>
 
       {panelMessage ? (
-        <div className="rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
+        <div role="alert" className="rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] px-4 py-3 text-sm text-[var(--ink-strong)]">
           {panelMessage}
         </div>
       ) : null}
@@ -535,7 +516,8 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 onToggleResetPw={() => setShowResetPw((prev) => !prev)}
                 newPassword={newPassword}
                 onNewPasswordChange={setNewPassword}
-                resetStatus={resetStatus}
+                resetStatus={reset.kind}
+                resetError={reset.kind === "error" ? reset.message : null}
                 onResetPassword={handleResetPassword}
                 confirmDeactivate={confirmDeactivate}
                 onSetConfirmDeactivate={setConfirmDeactivate}
@@ -637,7 +619,8 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 onToggleResetPw={() => setShowResetPw((prev) => !prev)}
                 newPassword={newPassword}
                 onNewPasswordChange={setNewPassword}
-                resetStatus={resetStatus}
+                resetStatus={reset.kind}
+                resetError={reset.kind === "error" ? reset.message : null}
                 onResetPassword={handleResetPassword}
                 confirmDeactivate={confirmDeactivate}
                 onSetConfirmDeactivate={setConfirmDeactivate}
