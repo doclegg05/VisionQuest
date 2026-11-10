@@ -226,6 +226,29 @@ describe("what a report still says", () => {
     });
   });
 
+  it("keeps the source-map ids of its own script files, so a minified stack can be read", () => {
+    // core/build/cjs/utils/prepareEvent.js `applyDebugMeta` moves each
+    // frame's debug id here, keyed by the file the frame names.
+    const event: ErrorEvent = {
+      ...browserErrorEvent(),
+      debug_meta: {
+        images: [
+          { type: "sourcemap", code_file: "https://vq.example/_next/static/chunks/app/layout-0a1b2c3d.js?v=1", debug_id: "3f2b8c1e-9a4d-4e6f-8b2a-1c3d5e7f9a0b" },
+          { type: "sourcemap", code_file: `https://vq.example/credentials/${PLANTED.slug}`, debug_id: "3f2b8c1e-9a4d-4e6f-8b2a-1c3d5e7f9a0c" },
+          { type: "sourcemap", code_file: "https://vq.example/_next/static/chunks/x.js", debug_id: `id for ${PLANTED.name}` },
+        ],
+      },
+    };
+    const out = sent(event);
+    assert.deepEqual(out?.debug_meta, {
+      images: [
+        { type: "sourcemap", code_file: "app:///_next/static/chunks/app/layout-0a1b2c3d.js", debug_id: "3f2b8c1e-9a4d-4e6f-8b2a-1c3d5e7f9a0b" },
+        { type: "sourcemap", code_file: "/credentials/[param]", debug_id: "3f2b8c1e-9a4d-4e6f-8b2a-1c3d5e7f9a0c" },
+      ],
+    });
+    assert.deepEqual(plantedIn(out), []);
+  });
+
   it("carries only fields on the allowlist, whatever the SDK adds later", () => {
     const event = { ...serverSelfCapturedEvent(), fingerprint: [PLANTED.name], logger: PLANTED.name, somethingNew: { note: PLANTED.chat } };
     const out = sent(event);

@@ -34,6 +34,7 @@ type Frame = NonNullable<NonNullable<ExceptionEntry["stacktrace"]>["frames"]>[nu
 type EventTags = NonNullable<Event["tags"]>;
 type EventContexts = NonNullable<Event["contexts"]>;
 type Level = NonNullable<Event["level"]>;
+type DebugImage = NonNullable<NonNullable<Event["debug_meta"]>["images"]>[number];
 
 const WITHHELD = "[message withheld]";
 
@@ -94,6 +95,7 @@ export function routePattern(path: string): string {
 const SHAPE = {
   eventId: /^[0-9a-f]{32}$/i,
   spanId: /^[0-9a-f]{16}$/i,
+  debugId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   /** An environment, release, platform, runtime or package name or version. */
   label: /^[A-Za-z0-9_.@:+/-]{1,100}$/,
   /** An alarm name, as src/lib/logger.ts sends one. */
@@ -176,6 +178,20 @@ function safeFrame(frame: Frame): Frame {
     ...pick(frame, ["lineno", "colno"], isFiniteNumber),
     ...pick(frame, ["in_app"], isBoolean),
   };
+}
+
+/**
+ * Which uploaded source map belongs to which script file: a build's id and
+ * the file it is for, nothing else. Without it Sentry cannot turn a minified
+ * browser stack into source lines. The file goes through `codeLocation`, as
+ * the frames' file names do, so the two still match.
+ */
+function safeDebugImages(images: readonly DebugImage[]): DebugImage[] {
+  return images.flatMap((image) =>
+    image.type === "sourcemap" && typeof image.code_file === "string" && shaped(SHAPE.debugId)(image.debug_id)
+      ? [{ type: "sourcemap" as const, code_file: codeLocation(image.code_file), debug_id: image.debug_id }]
+      : [],
+  );
 }
 
 // --- Exceptions ------------------------------------------------------------------
@@ -303,7 +319,7 @@ function safeBody(event: Event, tags: EventTags): Pick<ErrorEvent, "message" | "
  * Errors only. A transaction, profile, replay or feedback event returns
  * null and is not sent. Not on the list, so not sent: `request` (URL, query
  * string, headers, cookies, body), `breadcrumbs`, `user`, `server_name`,
- * `modules`, `logentry`, `fingerprint`, `spans`, `debug_meta`, and
+ * `modules`, `logentry`, `fingerprint`, `spans`, and
  * `sdkProcessingMetadata`, which holds the trace header's route name.
  */
 export function scrubPii(event: Event, _hint?: EventHint): ErrorEvent | null {
@@ -311,6 +327,7 @@ export function scrubPii(event: Event, _hint?: EventHint): ErrorEvent | null {
   const tags = safeTags(event);
   const extra = numericExtra(event.extra);
   const contexts = event.contexts != null ? safeContexts(event.contexts) : {};
+  const images = Array.isArray(event.debug_meta?.images) ? safeDebugImages(event.debug_meta.images) : [];
   return {
     type: undefined,
     ...pick(event, ["event_id"], shaped(SHAPE.eventId)),
@@ -322,6 +339,7 @@ export function scrubPii(event: Event, _hint?: EventHint): ErrorEvent | null {
     ...(Object.keys(extra).length > 0 && { extra }),
     ...(Object.keys(contexts).length > 0 && { contexts }),
     ...(event.sdk != null && { sdk: safeSdk(event.sdk) }),
+    ...(images.length > 0 && { debug_meta: { images } }),
   };
 }
 
