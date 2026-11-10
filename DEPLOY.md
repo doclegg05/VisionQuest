@@ -78,7 +78,7 @@ Use the outputs for:
 
 ### Gemini (optional)
 
-Production runs Sage on a local model through the Mac relay, so it needs no Gemini key. `GEMINI_API_KEY` is optional in `src/lib/env.ts`, and no boot probe checks it. While `VQ_MAC_RELAY_ENABLED=true`, `COHORT_DEMO_MODE=true`, or `COHORT_DEMO_LOCAL_ONLY=true`, `src/lib/ai/demo-local-only.ts` refuses cloud inference for the whole service, so a Gemini key would go unused.
+Production runs Sage on a local model through the Mac relay, so it needs no Gemini key. `GEMINI_API_KEY` is optional in `src/lib/env.ts`, and no boot probe checks it. While `AI_LOCAL_ONLY=true` (or one of the older switches `VQ_MAC_RELAY_ENABLED=true`, `COHORT_DEMO_MODE=true` or `COHORT_DEMO_LOCAL_ONLY=true`), `src/lib/ai/demo-local-only.ts` refuses cloud inference for the whole service, so a Gemini key would go unused.
 
 To run Sage on Gemini instead:
 
@@ -158,6 +158,8 @@ If you do not use the blueprint:
 | `JWT_SECRET` | Hex secret, at least 32 characters (the boot probe refuses shorter) |
 | `ADMIN_DATABASE_URL` | Connection string for the RLS-bypassing `postgres` role, used by `prismaAdmin` (crisis notifications, nudges, SMS webhook). **Required since 2026-09-07: a production boot without it is refused by `src/lib/boot-probes.ts`**, so a deploy fails to start rather than running with the admin client silently demoted to `vq_app`. |
 | `RLS_CONTEXT_INJECTION` | Must be the exact string `true`. **Required since 2026-09-07 (same boot probe)**: anything else runs every query with no session context, and the staff-scoping policies enforce nothing. |
+| `AI_LOCAL_ONLY` | `true` blocks every cloud AI call for the whole service. **Required since readiness task H4: a production boot is refused by `src/lib/boot-probes.ts` unless this is `true` (or an older switch is on: `COHORT_DEMO_MODE`, `COHORT_DEMO_LOCAL_ONLY`, `VQ_MAC_RELAY_ENABLED`), or `AI_CLOUD_INFERENCE` is exactly `allowed`.** Both together, or a misspelled value, also refuse the boot. See [Cloud AI block](#cloud-ai-block-check-before-deploying) |
+| `AI_LOCAL_APPROVED_ORIGIN` | The one local AI origin Sage may call while the block is on: `http://127.0.0.1:11437`, the relay's adapter inside the service. Without it every local call is refused too. The older name `COHORT_DEMO_LOCAL_AI_ORIGIN` still works; if both are set they must name the same origin |
 | `TEACHER_KEY` | Gate for `/teacher-register` |
 | `API_KEY_ENCRYPTION_KEY` | Base64-encoded 32-byte key |
 | `APP_BASE_URL` | Public Render URL |
@@ -402,11 +404,33 @@ configured local endpoint and the pinned `gemma4:12b` model. Direct Gemini and
 OpenRouter inference is refused before network access; `preferCloud` cannot
 bypass the restriction. A local outage never falls back to a cloud model.
 
-Set `COHORT_DEMO_LOCAL_ONLY=true` alongside `COHORT_DEMO_MODE=true` and retain it
-when closing demo entry, so queued demo work remains protected. This safeguard
-also applies to non-demo accounts on this service while either flag is true.
-It does not alter the saved provider settings. Restoring ordinary cloud behavior
-requires explicitly clearing both flags after demo jobs have drained.
+Keep `AI_LOCAL_ONLY=true` set when closing demo entry. It does not depend on
+any demo variable, so removing `COHORT_DEMO_MODE` and `COHORT_DEMO_LOCAL_ONLY`
+later leaves the block on. This safeguard applies to every account on this
+service. It does not alter the saved provider settings.
+
+Cloud AI is allowed only by a written owner decision, and then by removing
+every local only switch and setting `AI_CLOUD_INFERENCE` to exactly `allowed`.
+That variable only lets production start; which prompts may then reach a cloud
+model is still decided by `AI_CLOUD_POLICY`, which reads as `permissive` when
+unset. Set `AI_CLOUD_POLICY=local_only` or `lanes` in the same change.
+
+### Cloud AI block: check before deploying
+
+Production refuses to start unless it says whether cloud AI is blocked or
+allowed. In the Render dashboard, service `visionquest`, Environment tab,
+confirm each of these before the first deploy that carries the check, and again
+after any change to these variables:
+
+1. `AI_CLOUD_INFERENCE` is not set.
+2. `AI_LOCAL_ONLY` is not set, or is exactly `true`. A value such as `yes` stops the start.
+3. `COHORT_DEMO_LOCAL_AI_ORIGIN`, if set, is exactly `http://127.0.0.1:11437`. Any other value makes every Sage call fail.
+4. `VQ_MAC_RELAY_ENABLED` is exactly `true`, and `VQ_MAC_RELAY_AGENT_TOKEN` and `VQ_MAC_RELAY_APP_TOKEN` are still present.
+5. `COHORT_DEMO_MODE` and `REAL_STUDENT_DATA` are not both on.
+
+After the deploy, check that the service is live on the new commit and that
+Sage answers one message. If the deploy did not go live, the Render log has a
+`Boot probe failure` line that names the variable.
 
 Cloud embeddings are blocked without selecting another embedding model or
 reindexing stored vectors. Document retrieval falls back to keyword search;
