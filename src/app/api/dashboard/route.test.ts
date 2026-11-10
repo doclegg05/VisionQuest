@@ -15,7 +15,7 @@ const read = async (id: string) => {
 mock.module("@/lib/auth", { namedExports: { getSession: async () => session } });
 mock.module("@/lib/db", { namedExports: { prisma: {}, withAppTransaction: async () => { throw new Error("Unexpected database access"); } } });
 mock.module("@/lib/dashboard/readers", { namedExports: { readOverview: read, readActivity: read } });
-mock.module("@/lib/dashboard/support", { namedExports: { readSupport: read } });
+mock.module("@/lib/dashboard/student-dashboard", { namedExports: { readStudentSupport: (s: { id: string }) => read(s.id) } });
 let routes: { GET: (request: Request) => Promise<Response> }[];
 before(async () => { routes = await Promise.all([import("./overview/route"), import("./activity/route"), import("./support/route")]); });
 beforeEach(() => { session = { id: "student-a", studentId: "student-a", role: "student", displayName: "Synthetic" }; calls = []; unavailable = false; });

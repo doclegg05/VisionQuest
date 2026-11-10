@@ -28,22 +28,26 @@ mock.module("next/navigation", {
   },
 });
 
+const prismaMock = {
+  goal: { count: async () => 0 },
+  progression: { findUnique: async () => null },
+  orientationProgress: { count: async () => 0 },
+  securityQuestionAnswer: {
+    findMany: async () => questionKeys.map((questionKey) => ({ questionKey })),
+  },
+  consentRecord: {
+    findFirst: async ({ where }: { where: { studentId: string; scope: string; revokedAt: null } }) =>
+      where.studentId === session?.id && where.revokedAt === null && consentScopes.includes(where.scope)
+        ? { id: "ack" }
+        : null,
+  },
+};
+
 mock.module("@/lib/db", {
   exports: {
-    prisma: {
-      goal: { count: async () => 0 },
-      progression: { findUnique: async () => null },
-      orientationProgress: { count: async () => 0 },
-      securityQuestionAnswer: {
-        findMany: async () => questionKeys.map((questionKey) => ({ questionKey })),
-      },
-      consentRecord: {
-        findFirst: async ({ where }: { where: { studentId: string; scope: string; revokedAt: null } }) =>
-          where.studentId === session?.id && where.revokedAt === null && consentScopes.includes(where.scope)
-            ? { id: "ack" }
-            : null,
-      },
-    },
+    prisma: prismaMock,
+    // The layout's nav facts are read in one transaction (getStudentShell).
+    withAppTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
   },
 });
 

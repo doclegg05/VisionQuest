@@ -48,8 +48,11 @@ import {
  * cycle 32 app calls, 3 nested relation loads and the 2 admin session
  * statements, so 37 a cycle and 74 a minute. The earlier estimate of "about
  * 64" counted app calls only (32 x 2).
+ * F2 step 2: 74 to 68.3. The advising poll reads readiness and the next step
+ * once each, grouped in transactions, where it re-ran the whole readiness
+ * fetch beside the next step's own copies of the same counts.
  */
-const IDLE_STATEMENTS_PER_MINUTE = 74;
+const IDLE_STATEMENTS_PER_MINUTE = 68.3;
 
 /** Long enough to hold whole cycles of every interval the client uses. */
 const WINDOW_MS = 10 * 60_000;
@@ -125,6 +128,9 @@ before(async () => {
 });
 after(() => { mock.timers.reset(); });
 
+/** One decimal: the window is whole minutes, so a rate is statements / 10. */
+const round = (n: number) => Math.round(n * 10) / 10;
+
 function perMinute(result: IdleResult): { app: number; admin: number; total: number } {
   const { app, admin } = estimateRoundTrips(result.queries, result.transactions);
   const minutes = WINDOW_MS / 60_000;
@@ -142,8 +148,8 @@ describe("M2: idle dashboard statements per minute", () => {
     const rate = perMinute(idle);
     t.diagnostic(
       `IDLE_RATE path=dashboard-idle windowMs=${WINDOW_MS} ticks=${idle.ticks}` +
-        ` appPerMinute=${rate.app} adminPerMinute=${rate.admin} perMinute=${rate.total}`,
+        ` appPerMinute=${round(rate.app)} adminPerMinute=${round(rate.admin)} perMinute=${round(rate.total)}`,
     );
-    assert.equal(rate.total, IDLE_STATEMENTS_PER_MINUTE);
+    assert.equal(Math.round(rate.total * 10) / 10, IDLE_STATEMENTS_PER_MINUTE);
   });
 });

@@ -27,16 +27,19 @@ mock.module("next/navigation", {
     usePathname: () => "/dashboard",
   },
 });
+const prismaMock = {
+  goal: { count: async () => 0 },
+  progression: { findUnique: async () => null },
+  orientationProgress: { count: async () => 0 },
+  securityQuestionAnswer: { findMany: async () => [{ questionKey: "stub" }] },
+  // An acknowledged notice, so the Sage notice gate lets the page render.
+  consentRecord: { findFirst: async () => ({ id: "ack" }) },
+};
 mock.module("@/lib/db", {
   exports: {
-    prisma: {
-      goal: { count: async () => 0 },
-      progression: { findUnique: async () => null },
-      orientationProgress: { count: async () => 0 },
-      securityQuestionAnswer: { findMany: async () => [{ questionKey: "stub" }] },
-      // An acknowledged notice, so the Sage notice gate lets the page render.
-      consentRecord: { findFirst: async () => ({ id: "ack" }) },
-    },
+    prisma: prismaMock,
+    // The layout's nav facts are read in one transaction (getStudentShell).
+    withAppTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
   },
 });
 mock.module("@/lib/security-questions", {

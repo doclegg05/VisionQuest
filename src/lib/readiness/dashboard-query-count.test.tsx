@@ -67,36 +67,43 @@ import { signToken } from "@/lib/session-token";
 // The 2026-11-10 review estimated about 39 app queries by reading. It missed
 // the mood check-in gate (1) and counted the reader block as 24, not 25.
 // H6 (Sage notice gate in the student layout) added 1: 40 to 41.
-const DASHBOARD_APP_QUERIES_COLD = 41;
+// F2 step 2 (2026-11-10): 41 to 34. The layout and page share one read of the
+// planning-goal count, progression and orientation count (getStudentShell),
+// and the page reads every other fact once, grouped into transactions
+// (src/lib/dashboard/student-dashboard.ts): 7 repeated reads gone, and 25
+// reads now cost 1 round trip each inside three transactions instead of 4.
+const DASHBOARD_APP_QUERIES_COLD = 34;
 /** The session lookup and its revocation check; both cached for seconds. */
 const DASHBOARD_ADMIN_QUERIES_COLD = 2;
-/** Nothing on the app client is cached today, so warm equals cold. */
-const DASHBOARD_APP_QUERIES_WARM = 41;
+/** The shell is kept per student once a Progression row exists, so warm skips its 3 reads. */
+const DASHBOARD_APP_QUERIES_WARM = 31;
 const DASHBOARD_ADMIN_QUERIES_WARM = 0;
 /** [app, admin] nested relation loads, counted only below a level that returned rows. */
 const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
 /**
  * M1: app plus admin round trips, what `node scripts/readiness/query-count.mjs dashboard` prints.
  * An admin call costs a round trip too, so both clients count.
+ * F2 step 2: 167 to 79 cold, 165 to 70 warm.
  */
-const DASHBOARD_ROUND_TRIPS_COLD = 167;
-const DASHBOARD_ROUND_TRIPS_WARM = 165;
+const DASHBOARD_ROUND_TRIPS_COLD = 79;
+const DASHBOARD_ROUND_TRIPS_WARM = 70;
 /** "file › function" -> [app, admin] for the cold render. */
 const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
   "src/lib/auth.ts › (anonymous)": [0, 1],
-  "src/app/(student)/layout.tsx › StudentLayout": [4, 0],
   "src/lib/consent.ts › hasAcknowledgedSageNotice": [1, 0],
-  "src/app/(student)/dashboard/page.tsx › DashboardPage": [2, 0],
-  "src/lib/progression/fetch-readiness-data.ts › fetchStudentReadinessData": [8, 0],
-  "src/lib/dashboard/readers.ts › readOverview": [7, 0],
-  "src/lib/dashboard/readers.ts › readActivity": [1, 0],
+  "src/app/(student)/layout.tsx › StudentLayout": [1, 0],
+  "src/lib/dashboard/signals.ts › readShell": [3, 0],
   "src/lib/dashboard/tasks.ts › (anonymous)": [2, 0],
-  "src/lib/dashboard/support.ts › readSupport": [2, 0],
-  "src/lib/progression/student-next-step.ts › getStudentNextStep": [9, 0],
-  "src/lib/student-alerts.ts › countStudentVisibleAlerts": [2, 0],
-  "src/lib/student-alerts.ts › countStudentVisibleAlertsOfType": [1, 0],
   "src/lib/sage/panel-data.ts › getLatestPanelSpec": [1, 0],
+  "src/lib/dashboard/signals.ts › readReadinessSignals": [5, 0],
+  "src/lib/dashboard/live.ts › readCounts": [4, 0],
+  "src/lib/student-alerts.ts › countStudentVisibleAlerts": [1, 0],
+  "src/lib/student-alerts.ts › countStudentVisibleAlertsOfType": [1, 0],
+  "src/lib/dashboard/globals.ts › readDashboardGlobals": [2, 0],
+  "src/lib/dashboard/live.ts › readPageOnly": [2, 0],
+  "src/lib/dashboard/signals.ts › readNextStepSignals": [6, 0],
+  "src/lib/dashboard/signals.ts › readOverviewSignals": [4, 0],
   "src/lib/mood.ts › hasMoodEntryToday": [1, 0],
 };
 /**
