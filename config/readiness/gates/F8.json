@@ -1,0 +1,10 @@
+{
+  "id": "F8",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Alert sync follow-ups from the F3 database review",
+  "doneWhen": "A CI database test runs the real sync and counts connections. Tests cover the staff path through the runner and the job on restart.",
+  "check": {
+    "type": "pending"
+  }
+}

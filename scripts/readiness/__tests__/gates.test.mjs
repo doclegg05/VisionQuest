@@ -44,6 +44,15 @@ test("the plan's task tables parse to 36 launch, 33 pilot and 1 hold task", asyn
   assert.deepEqual(counts, { launch: 36, pilot: 33, hold: 1 });
 });
 
+// A new row once reused an id that another task already had (F6, 2026-11-10).
+// The gate file already existed, so nothing else noticed.
+test("no two tasks in the plan share an id", async () => {
+  const { readPlanTasks } = await seed();
+  const ids = readPlanTasks(readFileSync(join(ROOT, PLAN), "utf8")).map((task) => task.id);
+  const repeated = ids.filter((id, index) => ids.indexOf(id) !== index);
+  assert.deepEqual(repeated, []);
+});
+
 test("every task in the plan has a gate file with the plan's set, and no gate lacks a task", async () => {
   const { readPlanTasks } = await seed();
   const planned = readPlanTasks(readFileSync(join(ROOT, PLAN), "utf8")).map((task) => [task.id, task.set]);
