@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
-import { mockRequest, mockStudentSession } from "@/lib/test-helpers";
+import { mockStudentSession } from "@/lib/test-helpers";
 
 const student = mockStudentSession();
 const mockSyncStudentAlerts = mock.fn<(studentId: string) => Promise<void>>();
@@ -47,9 +47,7 @@ async function respondsWithoutWaiting(sync: SyncMock, call: () => Promise<Respon
 
 describe("POST /api/orientation/welcome-video", () => {
   it("answers without waiting for the alert sync, and still starts it for the student", async () => {
-    const res = await respondsWithoutWaiting(mockSyncStudentAlerts, () =>
-      route.POST(mockRequest("/api/orientation/welcome-video", { method: "POST" }) as never),
-    );
+    const res = await respondsWithoutWaiting(mockSyncStudentAlerts, () => route.POST());
     assert.equal(res.status, 200);
     assert.equal(mockSyncStudentAlerts.mock.callCount(), 1);
     assert.deepEqual(mockSyncStudentAlerts.mock.calls[0].arguments, [student.id]);
