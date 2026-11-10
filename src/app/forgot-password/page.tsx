@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
+import { LOGIN_FIELD_LABEL } from "@/components/auth/login-label";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
 import { MIN_PASSWORD_LENGTH, PASSWORD_LENGTH_HINT, PASSWORD_TOO_SHORT_MESSAGE } from "@/lib/password-policy";
 
@@ -140,7 +141,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleQuestionSubmit} className="mt-6 space-y-4">
               <div>
                 <label htmlFor="question-login" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-                  Email or Student ID
+                  {LOGIN_FIELD_LABEL}
                 </label>
                 <input
                   id="question-login"
@@ -222,7 +223,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleEmailSubmit} className="mt-6 space-y-4">
               <div>
                 <label htmlFor="email-login" className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
-                  Email or Student ID
+                  {LOGIN_FIELD_LABEL}
                 </label>
                 <input
                   id="email-login"

@@ -46,9 +46,9 @@ describe("AuthPageClient with the demo switch off", () => {
     assert.equal(count(html, OR_DIVIDER), 1, "expected the or divider above the Google button");
   });
 
-  it("still explains a missing Google setup", () => {
+  it("says nothing about a missing Google setup", () => {
     const html = render({ googleAuthEnabled: false, demoEnabled: false });
-    assert.ok(html.includes(GOOGLE_OFF_NOTE));
+    assert.ok(!html.includes(GOOGLE_OFF_NOTE));
     assert.ok(html.includes(INSTRUCTOR_NOTE));
     assert.ok(html.includes("Staff? Register here"));
   });
