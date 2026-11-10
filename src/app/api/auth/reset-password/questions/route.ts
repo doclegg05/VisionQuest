@@ -62,29 +62,16 @@ function verifyEveryAnswer(
   return results.every(Boolean);
 }
 
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
-  // Every attempt takes a unit first, in one atomic statement, so a burst of
-  // guesses cannot race past the limit. A recovery that works gives it back.
-  const networkKey = `reset-password-questions:${ip}`;
-  const networkRl = await rateLimit(networkKey, NETWORK_FAILED_ATTEMPT_LIMIT, NETWORK_LIMIT_WINDOW_MS);
+/** Built fresh per request so no caller can change the shared answer. */
+function resetRefused(): NextResponse {
+  return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
+}
 
-  if (!networkRl.success) {
-    return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
-  }
-
-  const body = await parseBody(req, resetPasswordQuestionsSchema);
-  const login = body.login.trim();
-  const password = body.password.trim();
-  const securityQuestionsResult = validateSecurityQuestionAnswers(body.securityQuestions);
-
-  if (securityQuestionsResult.error) {
-    return NextResponse.json({ error: securityQuestionsResult.error }, { status: 400 });
-  }
-
+/** The account a typed login names, by student ID or email, with its stored answers. */
+function findRecoveryAccount(login: string) {
   const email = normalizeEmail(login);
   const studentId = normalizeStudentId(login);
-  const student = await prisma.student.findFirst({
+  return prisma.student.findFirst({
     where: isValidEmail(email)
       ? {
           OR: [
@@ -108,69 +95,72 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       },
     },
   });
+}
 
-  // Per-account limit, keyed on the target account. The login is not a
-  // secret, so answers get guessed from anywhere; counting here, before the
-  // answers are checked, means every guess spends the budget.
-  if (student) {
-    const accountRl = await rateLimit(
-      `reset-password-questions:user:${student.id}`,
-      ACCOUNT_LIMIT_ATTEMPTS,
-      ACCOUNT_LIMIT_WINDOW_MS,
-    );
-    // A locked account answers exactly like an unknown one or a wrong answer.
-    // This route is reachable without a session, so a distinct 429 would
-    // confirm the account exists (audit S1 on PR #196). The attempt is still
-    // counted, the lockout is recorded once per window below, and the running
-    // total stays visible in the rate-limit table.
-    if (!accountRl.success) {
-      // Same KDF work as every other refusal, so a locked account is not
-      // answered faster than an unknown one.
-      verifyEveryAnswer(securityQuestionsResult.answers, NO_STORED_ANSWERS);
-      return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
-    }
+type RecoveryAccount = NonNullable<Awaited<ReturnType<typeof findRecoveryAccount>>>;
 
-    // Recorded once, when the last admitted attempt lands: every later
-    // request is refused above and writes nothing (audit S2). A degraded
-    // limiter reports remaining 0 too, and its store is the one that just
-    // failed, so it records nothing.
-    if (accountRl.remaining === 0 && !accountRl.degraded) {
-      logger.warn("Security-question reset attempts exhausted for the window", {
-        student: studentLogKey(student.id),
-      });
-      await logAuditEvent({
-        actorId: null,
-        actorRole: null,
-        action: "auth.password.reset.security_questions_locked_out",
-        targetType: "student",
-        targetId: student.id,
-        summary:
-          "Classroom recovery used its last answer attempt for this window; further attempts are refused until the window resets.",
-        metadata: { ip, resetAt: new Date(accountRl.resetTime).toISOString() },
-      });
-    }
+/**
+ * Per-account limit, keyed on the target account. The login is not a secret,
+ * so answers get guessed from anywhere; counting here, before the answers are
+ * checked, means every guess spends the budget. Answers whether the account
+ * is locked.
+ *
+ * A locked account answers exactly like an unknown one or a wrong answer.
+ * This route is reachable without a session, so a distinct 429 would confirm
+ * the account exists (audit S1 on PR #196). The attempt is still counted, the
+ * lockout is recorded once per window below, and the running total stays
+ * visible in the rate-limit table.
+ */
+async function countAccountAttempt(student: RecoveryAccount, ip: string): Promise<boolean> {
+  const accountRl = await rateLimit(
+    `reset-password-questions:user:${student.id}`,
+    ACCOUNT_LIMIT_ATTEMPTS,
+    ACCOUNT_LIMIT_WINDOW_MS,
+  );
+  if (!accountRl.success) return true;
+
+  // Recorded once, when the last admitted attempt lands: every later
+  // request is refused above and writes nothing (audit S2). A degraded
+  // limiter reports remaining 0 too, and its store is the one that just
+  // failed, so it records nothing.
+  if (accountRl.remaining === 0 && !accountRl.degraded) {
+    logger.warn("Security-question reset attempts exhausted for the window", {
+      student: studentLogKey(student.id),
+    });
+    await logAuditEvent({
+      actorId: null,
+      actorRole: null,
+      action: "auth.password.reset.security_questions_locked_out",
+      targetType: "student",
+      targetId: student.id,
+      summary:
+        "Classroom recovery used its last answer attempt for this window; further attempts are refused until the window resets.",
+      metadata: { ip, resetAt: new Date(accountRl.resetTime).toISOString() },
+    });
   }
+  return false;
+}
 
-  // Unknown, unconfigured, and staff accounts are refused only after the same
-  // three KDF runs a real attempt costs, and with the same response as a
-  // wrong answer: a fast reply or a distinct status would confirm the login.
+/**
+ * The stored answers an attempt may be checked against, or null for an
+ * account that cannot recover: unknown, staff, or without a full question set.
+ */
+function recoverableAnswers(student: RecoveryAccount | null): ReadonlyMap<string, string> | null {
   const canRecover =
     student !== null &&
     hasConfiguredSecurityQuestionSet(student.securityQuestionAnswers.map((item) => item.questionKey)) &&
     !isStaffRole(student.role);
-  const storedAnswers = canRecover
+  return canRecover
     ? new Map(student.securityQuestionAnswers.map((item) => [item.questionKey, item.answerHash]))
-    : NO_STORED_ANSWERS;
-  const answersMatch = verifyEveryAnswer(securityQuestionsResult.answers, storedAnswers);
+    : null;
+}
 
-  if (!student || !canRecover || !answersMatch) {
-    return NextResponse.json({ error: RESET_ERROR }, { status: 400 });
-  }
-
+/** Sets the new password, ends the account's other sessions and cancels any emailed reset link. */
+async function setNewPassword(studentId: string, password: string) {
   const { hash } = hashPassword(password);
   const result = await prisma.$transaction(async (tx) => {
     const updatedStudent = await tx.student.update({
-      where: { id: student.id },
+      where: { id: studentId },
       data: {
         passwordHash: hash,
         sessionVersion: { increment: 1 },
@@ -183,12 +173,63 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     });
 
     await tx.passwordResetToken.deleteMany({
-      where: { studentId: student.id },
+      where: { studentId },
     });
 
     return updatedStudent;
   });
   invalidateSessionCache(result.id);
+  return result;
+}
+
+/** Issues the session for the account whose password was just reset, and records the reset. */
+async function signInAfterReset(account: Awaited<ReturnType<typeof setNewPassword>>, ip: string): Promise<void> {
+  await setSessionCookie(account.id, account.role, account.sessionVersion);
+  await logAuditEvent({
+    actorId: account.id,
+    actorRole: account.role,
+    action: "auth.password.reset.security_questions",
+    targetType: "student",
+    targetId: account.id,
+    summary: "Student reset their password with classroom recovery questions.",
+    metadata: { ip },
+  });
+}
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const ip = clientIpBucket(req);
+  // Every attempt takes a unit first, in one atomic statement, so a burst of
+  // guesses cannot race past the limit. A recovery that works gives it back.
+  const networkKey = `reset-password-questions:${ip}`;
+  const networkRl = await rateLimit(networkKey, NETWORK_FAILED_ATTEMPT_LIMIT, NETWORK_LIMIT_WINDOW_MS);
+  if (!networkRl.success) {
+    return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
+  }
+
+  const body = await parseBody(req, resetPasswordQuestionsSchema);
+  const securityQuestionsResult = validateSecurityQuestionAnswers(body.securityQuestions);
+  if (securityQuestionsResult.error) {
+    return NextResponse.json({ error: securityQuestionsResult.error }, { status: 400 });
+  }
+
+  const student = await findRecoveryAccount(body.login.trim());
+  if (student && (await countAccountAttempt(student, ip))) {
+    // Same KDF work as every other refusal, so a locked account is not
+    // answered faster than an unknown one.
+    verifyEveryAnswer(securityQuestionsResult.answers, NO_STORED_ANSWERS);
+    return resetRefused();
+  }
+
+  // Unknown, unconfigured, and staff accounts are refused only after the same
+  // three KDF runs a real attempt costs, and with the same response as a
+  // wrong answer: a fast reply or a distinct status would confirm the login.
+  const storedAnswers = recoverableAnswers(student);
+  const answersMatch = verifyEveryAnswer(securityQuestionsResult.answers, storedAnswers ?? NO_STORED_ANSWERS);
+  if (!student || !storedAnswers || !answersMatch) {
+    return resetRefused();
+  }
+
+  const result = await setNewPassword(student.id, body.password.trim());
 
   // The answers were right and the password is changed; the response says
   // so. Give the network unit back here and nowhere earlier: every refusal
@@ -200,17 +241,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     await refundRateLimit(networkKey, networkRl.resetTime);
   }
 
-  await setSessionCookie(result.id, result.role, result.sessionVersion);
-
-  await logAuditEvent({
-    actorId: result.id,
-    actorRole: result.role,
-    action: "auth.password.reset.security_questions",
-    targetType: "student",
-    targetId: result.id,
-    summary: "Student reset their password with classroom recovery questions.",
-    metadata: { ip },
-  });
-
+  await signInAfterReset(result, ip);
   return NextResponse.json({ ok: true });
 });
