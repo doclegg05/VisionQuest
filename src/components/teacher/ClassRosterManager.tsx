@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QrCode as QrIcon } from "@phosphor-icons/react";
 import { ClassRegionField } from "@/components/admin/ClassRegionField";
+import { CreateClassRegionSelect } from "@/components/admin/CreateClassRegionSelect";
+import { fetchClassRegions } from "@/components/admin/class-regions";
+import { useRegionsChanged } from "@/components/admin/regions-events";
 import { regionChoiceFor, regionPatchFor, type ClassRegionChoice } from "@/components/admin/class-region-choice";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
@@ -92,7 +95,8 @@ async function getResponseError(response: Response, fallback: string) {
   return payload?.error || fallback;
 }
 
-export default function ClassRosterManager() {
+/** `manageRegions`: the admin page, which has the Regions card. */
+export default function ClassRosterManager({ manageRegions = false }: { manageRegions?: boolean }) {
   const adminMode = true; // Teachers and admins have the same access level
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId")?.trim() || "";
@@ -212,6 +216,9 @@ export default function ClassRosterManager() {
   useEffect(() => {
     void loadClassDetailRef.current(selectedClassId);
   }, [selectedClassId]);
+
+  // Only the region list: a full reload would clear what was typed here.
+  useRegionsChanged(() => fetchClassRegions().then(setRegions, (err: Error) => setError(err.message)));
 
   async function createStudent() {
     if (!selectedClassId) return;
@@ -482,21 +489,7 @@ export default function ClassRosterManager() {
                 className="field px-4 py-3 text-sm"
               />
             </label>
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">Region</span>
-              <select
-                value={newRegionId}
-                onChange={(event) => setNewRegionId(event.target.value)}
-                className="field min-h-11 px-4 py-3 text-sm"
-              >
-                <option value="">Pick a region</option>
-                {regions.map((region) => (
-                  <option key={region.id} value={region.id}>
-                    {region.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <CreateClassRegionSelect regions={regions} value={newRegionId} onChange={setNewRegionId} onAdminPage={manageRegions} />
             <label className="block space-y-1.5">
               <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>
               <input

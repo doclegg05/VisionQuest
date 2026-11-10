@@ -33,6 +33,10 @@ function render(state: RegionsState): string {
     .replaceAll("&#x27;", "'");
 }
 
+function textOf(html: string): string {
+  return html.replace(/<[^>]+>/g, "");
+}
+
 function tags(html: string, name: string): string[] {
   return html.match(new RegExp(`<${name}\\b[^>]*>`, "g")) ?? [];
 }
@@ -127,10 +131,25 @@ describe("RegionsCardView with regions, open", () => {
     assert.equal(html.includes(REGIONS_COPY.empty), false);
   });
 
-  it("says how to add a new coordinator when no one is on offer", () => {
+  it("can be linked to as #regions", () => {
+    assert.match(html, /<section id="regions"/);
+  });
+
+  it("says how to add a new coordinator when no one is on offer: through an invite", () => {
     const none = render(ready({ regions: [east], people: [] }));
-    assert.ok(none.includes(REGIONS_COPY.noCoordinatorChoices));
     assert.equal(none.includes('id="add-coordinator-r2"'), false);
+    assert.ok(
+      textOf(none).includes(
+        "No one to pick yet. Go to Invite Staff at the bottom of this page. Choose Regional coordinator as the role and East as the region. They join this region when they accept.",
+      ),
+    );
+    assert.match(none, /<a href="#invite-staff"[^>]*>Invite Staff<\/a>/);
+  });
+
+  it("points to the invite under the picker when the person is not in it", () => {
+    const north = html.slice(html.indexOf('id="region-r1"'));
+    assert.ok(textOf(north).includes("Not in the list? Invite them with the role Regional coordinator."));
+    assert.match(north, /<a href="#invite-staff"[^>]*>Invite them<\/a>/);
   });
 
   it("announces the last saved change", () => {

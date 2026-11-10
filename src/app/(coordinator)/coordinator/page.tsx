@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import PageIntro from "@/components/ui/PageIntro";
@@ -6,7 +7,10 @@ import { askSageActionFor } from "@/components/coordinator/AskSageLink";
 import { getSession } from "@/lib/auth";
 import { OrgPlacementSection } from "@/components/staff/OrgPlacementSection";
 import { StaffInvitePanel } from "@/components/staff/StaffInvitePanel";
+import { seesWholeState } from "@/lib/org-roles";
 import { listRegionsForSession } from "@/lib/region";
+
+const INTRO = "See how your regions are doing. Track grant goals and instructors. Download reports for funders.";
 
 /** Regional coordinators invite instructors; program coordinators also invite regional coordinators. */
 function inviteRolesFor(role: string): readonly string[] {
@@ -25,11 +29,18 @@ export default async function CoordinatorDashboard() {
         <PageIntro
           eyebrow="Regional coordinator"
           title="Coordinator workspace"
-          description="Regional oversight — rollups, grant progress, instructor metrics, funder-ready exports."
+          description={INTRO}
           actions={askSageActionFor(session.role)}
         />
         <p className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-sm text-[var(--ink-muted)]">
-          No regions are assigned to you yet. Ask your program admin to add you to a region.
+          {seesWholeState(session.role) ? (
+            <>
+              There are no regions yet. Add one on the{" "}
+              <Link href="/admin#regions" className="font-semibold text-[var(--ink-strong)] underline">Admin page</Link>.
+            </>
+          ) : (
+            "No regions are assigned to you yet. Ask your program admin to add you to a region."
+          )}
         </p>
       </div>
     );
@@ -40,7 +51,7 @@ export default async function CoordinatorDashboard() {
       <PageIntro
         eyebrow="Regional coordinator"
         title="Coordinator workspace"
-        description="Regional rollups, grant progress, instructor metrics, and funder-ready exports."
+        description={INTRO}
         actions={askSageActionFor(session.role)}
       />
       <CoordinatorDashboardClient regions={regions} />

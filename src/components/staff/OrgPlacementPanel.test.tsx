@@ -37,6 +37,33 @@ describe("OrgPlacementPanel applicants", () => {
   });
 });
 
+describe("OrgPlacementPanel staff waiting for a region", () => {
+  const person = { id: "t1", displayName: "Tia Teacher", createdOn: "Jan 2, 2026" };
+
+  it("on an empty system shows why, in place of an empty Region select", () => {
+    const html = renderToString(
+      <OrgPlacementPanel unplacedStaff={[person]} applicants={[]} unregionedClasses={[]} regions={[]} classes={[]} canPlace={true} />,
+    ).replaceAll("<!-- -->", "");
+    assert.equal(html.includes('id="region-for-t1"'), false);
+    assert.ok(html.includes("No regions yet. Add one in the "));
+    assert.ok(html.includes('href="#regions"'));
+  });
+
+  it("picks the first region to start with", () => {
+    const html = renderToString(
+      <OrgPlacementPanel
+        unplacedStaff={[person]}
+        applicants={[]}
+        unregionedClasses={[]}
+        regions={[{ id: "r1", name: "North" }]}
+        classes={[]}
+        canPlace={true}
+      />,
+    );
+    assert.match(html, /<option value="r1" selected="">North<\/option>/);
+  });
+});
+
 describe("OrgPlacementPanel classrooms with no region", () => {
   it("lists them read-only under a plain heading", () => {
     const html = renderToString(

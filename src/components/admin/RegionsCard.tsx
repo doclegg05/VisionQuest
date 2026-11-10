@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/ui/useConfirm";
 import { api } from "@/lib/api";
 import { RegionsCardView } from "./RegionsCardView";
 import { createRegionsController } from "./regions-controller";
+import { announceRegionsChanged } from "./regions-events";
 import { INITIAL_REGIONS_STATE, regionsReducer } from "./regions-reducer";
 
 /**
@@ -26,8 +27,13 @@ export function RegionsCard() {
         http: api,
         dispatch,
         confirm,
-        // Other cards on the page take their region lists from the server.
-        onSaved: () => router.refresh(),
+        // The invite and placement cards take their lists from the server, so
+        // refresh it; the class card fetches its own list, so tell it. Neither
+        // remounts a card, so nothing typed in them is lost.
+        onSaved: () => {
+          router.refresh();
+          announceRegionsChanged();
+        },
       }),
     [confirm, router],
   );

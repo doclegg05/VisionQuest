@@ -103,7 +103,7 @@ function RegionsPanel({ state, handlers }: { state: ReadyState; handlers: Region
 
 export function RegionsCardView({ state, handlers }: RegionsCardViewProps) {
   return (
-    <section aria-labelledby="regions-heading" className="theme-card space-y-5 rounded-xl p-5">
+    <section id="regions" aria-labelledby="regions-heading" className="theme-card space-y-5 rounded-xl p-5">
       <CardHeader state={state} onToggle={handlers.onToggle} />
       {state.kind === "loading" && <p className={MUTED_TEXT}>{REGIONS_COPY.loading}</p>}
       {state.kind === "load-failed" && <LoadFailed message={state.message} onRetry={handlers.onRetry} />}

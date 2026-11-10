@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 
 import { FIELD_CLASS, LABEL_CLASS } from "@/components/staff/fieldStyles";
-import { REGIONS_COPY, classCountLabel } from "./regions-copy";
+import { INVITE_HINTS, REGIONS_COPY, classCountLabel } from "./regions-copy";
 import { coordinatorChoices, regionCountFor, type AdminRegion, type RegionPerson } from "./regions-model";
 import { ALERT_CLASS, MUTED_TEXT, SECONDARY_BUTTON, SUBHEADING } from "./regionStyles";
 
@@ -156,6 +156,17 @@ function AddCoordinatorForm({ region, choices, busy, onAssign }: AddCoordinatorF
   );
 }
 
+/** A sentence with a link to the Invite Staff card in the middle of it. */
+function InviteHint({ before, link, after }: { before: string; link: string; after: string }) {
+  return (
+    <p className={MUTED_TEXT}>
+      {before}
+      <a href="#invite-staff" className="font-semibold text-[var(--ink-strong)] underline">{link}</a>
+      {after}
+    </p>
+  );
+}
+
 function RegionCoordinators({ region, regions, people, busy, handlers }: Omit<RegionRowProps, "saving" | "error">) {
   const choices = coordinatorChoices(people, region);
   const remove = (person: RegionPerson) =>
@@ -165,9 +176,12 @@ function RegionCoordinators({ region, regions, people, busy, handlers }: Omit<Re
       <p className={SUBHEADING}>{REGIONS_COPY.coordinatorsHeading}</p>
       <CoordinatorList region={region} busy={busy} onRemove={remove} />
       {choices.length === 0 ? (
-        <p className={MUTED_TEXT}>{REGIONS_COPY.noCoordinatorChoices}</p>
+        <InviteHint {...INVITE_HINTS.noChoices(region.name)} />
       ) : (
-        <AddCoordinatorForm region={region} choices={choices} busy={busy} onAssign={(person) => handlers.onAssign(region, person)} />
+        <>
+          <AddCoordinatorForm region={region} choices={choices} busy={busy} onAssign={(person) => handlers.onAssign(region, person)} />
+          <InviteHint {...INVITE_HINTS.notInList} />
+        </>
       )}
     </div>
   );

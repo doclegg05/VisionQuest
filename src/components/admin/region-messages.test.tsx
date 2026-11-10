@@ -53,9 +53,42 @@ describe("a coordinator with no region", () => {
     assert.ok(page.includes("Ask your program admin to add you to a region."));
   });
 
+  it("is told, when they see the whole state, to add a region on the Admin page", () => {
+    assert.ok(page.includes("There are no regions yet. Add one on the"));
+    assert.match(page, /href="\/admin#regions"[^>]*>Admin page</);
+  });
+
+  it("reads an intro with no dash and no jargon", () => {
+    assert.ok(page.includes("See how your regions are doing. Track grant goals and instructors. Download reports for funders."));
+    assert.equal(page.includes("rollups"), false);
+    assert.equal(page.includes("funder-ready"), false);
+    assert.equal(page.includes("\u2014"), false);
+  });
+
   it("is not shown an API path", () => {
     assert.equal(page.includes("/api/admin/regions"), false);
     assert.equal(page.includes("once it ships"), false);
+  });
+});
+
+// A region change used to remount the cards below it and erase what was typed,
+// including a new student's one-time password. The page must not key them.
+describe("the admin page", () => {
+  const adminPage = sourceOf("../../app/(admin)/admin/page.tsx");
+  const card = sourceOf("./RegionsCard.tsx");
+  const manager = sourceOf("../teacher/ClassRosterManager.tsx");
+
+  it("does not remount its cards when a region changes", () => {
+    assert.equal(adminPage.includes("regionsKey"), false);
+    assert.equal(/<div key=/.test(adminPage), false);
+  });
+
+  it("has the Regions card announce each saved change", () => {
+    assert.ok(card.includes("announceRegionsChanged("));
+  });
+
+  it("has the class card reload its regions on that signal", () => {
+    assert.ok(manager.includes("useRegionsChanged("));
   });
 });
 

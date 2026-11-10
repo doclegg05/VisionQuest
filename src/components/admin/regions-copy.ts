@@ -35,9 +35,21 @@ export const REGIONS_COPY = {
   addCoordinatorLabel: "Add a coordinator",
   pickCoordinator: "Pick a person",
   addCoordinator: "Add",
-  noCoordinatorChoices:
-    "No one to add yet. Send an invite below. Set the role to Regional coordinator. Then pick this region.",
   remove: "Remove",
+} as const;
+
+/**
+ * The two hints that send an admin to Invite Staff. Each is split around the
+ * words that become a link to it. Accepting the invite assigns the region
+ * (src/lib/staff-invites.ts), so nobody has to come back and pick it.
+ */
+export const INVITE_HINTS = {
+  noChoices: (regionName: string) => ({
+    before: "No one to pick yet. Go to ",
+    link: "Invite Staff",
+    after: ` at the bottom of this page. Choose Regional coordinator as the role and ${regionName} as the region. They join this region when they accept.`,
+  }),
+  notInList: { before: "Not in the list? ", link: "Invite them", after: " with the role Regional coordinator." },
 } as const;
 
 function plural(count: number, one: string, many: string): string {

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { NoRegionsHint } from "@/components/admin/NoRegionsHint";
+import { pickedRegionId } from "@/components/admin/region-pick";
 import { api } from "@/lib/api";
 import { FIELD_CLASS, LABEL_CLASS } from "./fieldStyles";
 import { PlaceApplicantControl, type ClassOption } from "./PlaceApplicantControl";
@@ -42,9 +44,43 @@ interface OrgPlacementPanelProps {
   canPlace: boolean;
 }
 
+interface RegionPickerProps {
+  selectId: string;
+  regions: readonly RegionOption[];
+  regionId: string;
+  onPick: (regionId: string) => void;
+  pending: boolean;
+  onPlace: () => void;
+}
+
+function RegionPicker({ selectId, regions, regionId, onPick, pending, onPlace }: RegionPickerProps) {
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="min-w-48 flex-1">
+        <label htmlFor={selectId} className={LABEL_CLASS}>Region</label>
+        <select id={selectId} value={regionId} onChange={(e) => onPick(e.target.value)} className={FIELD_CLASS}>
+          {regions.map((region) => (
+            <option key={region.id} value={region.id}>{region.name}</option>
+          ))}
+        </select>
+      </div>
+      <button
+        type="button"
+        onClick={onPlace}
+        disabled={pending || !regionId}
+        className="primary-button min-h-11 px-6 py-3 text-sm disabled:opacity-50"
+      >
+        {pending ? "Placing…" : "Place in region"}
+      </button>
+    </div>
+  );
+}
+
 function AssignRow({ person, regions }: { person: UnplacedStaffItem; regions: readonly RegionOption[] }) {
   const router = useRouter();
-  const [regionId, setRegionId] = useState(regions[0]?.id ?? "");
+  const [picked, setPicked] = useState("");
+  // Read from the current list, so a region added on this page is offered at once.
+  const regionId = pickedRegionId(regions, picked);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const selectId = `region-for-${person.id}`;
@@ -72,24 +108,11 @@ function AssignRow({ person, regions }: { person: UnplacedStaffItem; regions: re
         {person.displayName}
         <span className="ml-2 font-normal text-[var(--ink-muted)]">Joined {person.createdOn}</span>
       </p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-48 flex-1">
-          <label htmlFor={selectId} className={LABEL_CLASS}>Region</label>
-          <select id={selectId} value={regionId} onChange={(e) => setRegionId(e.target.value)} className={FIELD_CLASS}>
-            {regions.map((region) => (
-              <option key={region.id} value={region.id}>{region.name}</option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="button"
-          onClick={assign}
-          disabled={pending || !regionId}
-          className="primary-button min-h-11 px-6 py-3 text-sm disabled:opacity-50"
-        >
-          {pending ? "Placing…" : "Place in region"}
-        </button>
-      </div>
+      {regions.length === 0 ? (
+        <NoRegionsHint />
+      ) : (
+        <RegionPicker selectId={selectId} regions={regions} regionId={regionId} onPick={setPicked} pending={pending} onPlace={assign} />
+      )}
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
     </li>
   );

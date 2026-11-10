@@ -11,10 +11,8 @@ const ADMIN_INVITE_ROLES = ["program_coordinator", "coordinator", "teacher"] as 
 export default async function AdminSettingsPage() {
   const session = await getSession();
   const regions = session ? await listRegionsForSession(session) : [];
-  // The cards below copy the region list into their own state when they mount.
-  // The Regions card refreshes this page after a change; a new key remounts
-  // them so each one picks up the new list. Unsaved input in them is lost.
-  const regionsKey = regions.map((region) => `${region.id}:${region.name}`).join("|");
+  // The Regions card refreshes this page and announces each change. The cards
+  // below read the new list without a remount, so what was typed in them stays.
   return (
     <div className="page-shell">
       <PageIntro
@@ -79,17 +77,17 @@ export default async function AdminSettingsPage() {
 
       <RegionsCard />
 
-      <div key={`classes-${regionsKey}`} className="mt-6">
-        <ClassRosterManager />
+      <div className="mt-6">
+        <ClassRosterManager manageRegions />
       </div>
 
       {session && (
-        <div key={`placement-${regionsKey}`} className="mt-6">
+        <div className="mt-6">
           <OrgPlacementSection session={session} />
         </div>
       )}
 
-      <div key={`invites-${regionsKey}`} className="mt-6">
+      <div className="mt-6">
         <StaffInvitePanel roles={ADMIN_INVITE_ROLES} regions={regions} />
       </div>
     </div>

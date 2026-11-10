@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import { PLAIN_LANGUAGE_IDEAL_GRADE, assessReadability } from "@/lib/sage/readability";
 import {
+  INVITE_HINTS,
   REGIONS_COPY,
   classCountLabel,
   regionCountLabel,
@@ -48,6 +49,7 @@ describe("regions copy reading level", () => {
   const built = [
     removeCoordinatorConfirm({ personName: "Pat Lee", regionName: "North", onlyRegion: true }).message,
     removeCoordinatorConfirm({ personName: "Pat Lee", regionName: "North", onlyRegion: false }).message,
+    ...[INVITE_HINTS.noChoices("North"), INVITE_HINTS.notInList].map((hint) => `${hint.before}${hint.link}${hint.after}`),
   ];
   const all = [...Object.values(REGIONS_COPY), ...built];
 
