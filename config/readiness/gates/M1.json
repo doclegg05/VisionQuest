@@ -7,7 +7,7 @@
   "check": {
     "type": "metric",
     "run": "node scripts/readiness/query-count.mjs dashboard",
-    "baseline": 167,
+    "baseline": 161,
     "target": 85,
     "direction": "atMost",
     "unit": "round trips"

@@ -6,8 +6,8 @@
   "doneWhen": "12 or fewer, measured from a normal chat turn",
   "check": {
     "type": "metric",
-    "run": null,
-    "baseline": 167,
+    "run": "node scripts/readiness/query-count.mjs chat-send",
+    "baseline": 188,
     "target": 12,
     "direction": "atMost",
     "unit": "round trips"
