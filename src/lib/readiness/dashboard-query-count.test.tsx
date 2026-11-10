@@ -46,11 +46,11 @@ import { signToken } from "@/lib/session-token";
 // dashboard costs, and belongs in the diff that caused it.
 // The 2026-11-10 review estimated about 39 app queries by reading. It missed
 // the mood check-in gate (1) and counted the reader block as 24, not 25.
-const DASHBOARD_APP_QUERIES_COLD = 41;
+const DASHBOARD_APP_QUERIES_COLD = 40;
 /** The session lookup and its revocation check; both cached for seconds. */
 const DASHBOARD_ADMIN_QUERIES_COLD = 2;
 /** Nothing on the app client is cached today, so warm equals cold. */
-const DASHBOARD_APP_QUERIES_WARM = 41;
+const DASHBOARD_APP_QUERIES_WARM = 40;
 const DASHBOARD_ADMIN_QUERIES_WARM = 0;
 const DASHBOARD_RELATION_LOADS = 3;
 /** "file › function" -> [app, admin] for the cold render. */
@@ -58,7 +58,7 @@ const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
   "src/lib/auth.ts › (anonymous)": [0, 1],
   "src/app/(student)/layout.tsx › StudentLayout": [4, 0],
-  "src/app/(student)/dashboard/page.tsx › DashboardPage": [3, 0],
+  "src/app/(student)/dashboard/page.tsx › DashboardPage": [2, 0],
   "src/lib/progression/fetch-readiness-data.ts › fetchStudentReadinessData": [8, 0],
   "src/lib/dashboard/readers.ts › readOverview": [7, 0],
   "src/lib/dashboard/readers.ts › readActivity": [1, 0],

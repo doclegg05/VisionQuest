@@ -51,18 +51,6 @@ export default async function DashboardPage() {
     if (shouldEnterWelcome({ welcomeCompletedAt, goalCount, conversationCount, orientationCompletedCount: orientationProgress.completed })) redirect("/welcome");
   }
 
-  const intakeSubmissionCount = await prisma.formSubmission.count({
-    where: { studentId: session.id, formId: { in: ["orientation-intake", "student-intake"] } },
-  });
-  // KNOWN GAP (owner: the intake bundle, not this page). Neither "orientation-intake"
-  // nor "student-intake" is in the SPOKES catalog (src/lib/spokes/forms.ts), and
-  // /api/forms/sign refuses any formId that is not, so the ONLY writer of these two
-  // rows is the anonymous QR-code flow (src/lib/intake/pdf-stamped-packet.ts).
-  // A teacher-enrolled student cannot clear this banner in-app. Keep the existing
-  // predicate and copy pending the intake owner's decision; never redirect an
-  // authenticated student into anonymous enrollment. /orientation owns signing.
-  const needsIntakeSignature = intakeSubmissionCount === 0;
-
   // Independent failures never erase other regions. API retries share these readers.
   const [overview, activity, taskPage, support, sagePanel] = await Promise.allSettled([
     readOverview(session.id), readActivity(session.id), readTasks(session.id, taskQuerySchema.parse({})),
@@ -77,10 +65,6 @@ export default async function DashboardPage() {
           <div><h1 className="font-display text-2xl text-[var(--ink-strong)]">Your Dashboard</h1><p className="mt-1 text-[var(--ink-muted)]">Your next action, plans, and recorded progress in one place.</p></div>
           <Link href="/chat" className="secondary-button px-4 py-3">Talk to Sage</Link>
         </header>
-        {needsIntakeSignature && <section aria-label="Student profile signature" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-5">
-          <div><h2 className="font-semibold text-[var(--ink-strong)]">Sign Your Student Profile Form</h2><p className="mt-1 text-sm text-[var(--ink-muted)]">Your class hours only count once your signed form is on file.</p></div>
-          <Link href="/orientation" className="primary-button px-5 py-3">Sign my form</Link>
-        </section>}
       </>}
       initialOverview={overview.status === "fulfilled" ? overview.value : undefined}
       initialActivity={activity.status === "fulfilled" ? activity.value : undefined}
