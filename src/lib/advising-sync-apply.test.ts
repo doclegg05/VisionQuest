@@ -30,10 +30,11 @@ interface Where {
   id?: Condition;
   studentId?: Condition;
   alertKey?: Condition;
+  type?: Condition;
   status?: Condition;
   snoozedUntil?: Condition;
 }
-const FILTERABLE = new Set(["id", "studentId", "alertKey", "status", "snoozedUntil"]);
+const FILTERABLE = new Set(["id", "studentId", "alertKey", "type", "status", "snoozedUntil"]);
 type AlertCreate = Omit<AlertRow, "id" | "resolvedAt" | "snoozedUntil" | "snoozedBy" | "dismissedAt">;
 
 function sameValue(a: AlertValue, b: AlertValue): boolean {
@@ -64,6 +65,7 @@ function matching(where: Where): AlertRow[] {
       meets(row.id, where.id) &&
       meets(row.studentId, where.studentId) &&
       meets(row.alertKey, where.alertKey) &&
+      meets(row.type, where.type) &&
       meets(row.status, where.status) &&
       meets(row.snoozedUntil, where.snoozedUntil),
   );
@@ -119,9 +121,11 @@ mock.module("@/lib/db", {
 });
 
 let sync: typeof import("@/lib/advising-sync");
+let syncAlertTypes: readonly string[];
 
 before(async () => {
   sync = await import("@/lib/advising-sync");
+  ({ SYNC_ALERT_TYPES: syncAlertTypes } = await import("@/lib/advising-sync-context"));
 });
 
 beforeEach(() => {
@@ -142,6 +146,27 @@ const STALLED: AlertDescriptor = {
   summary: "No Ready to Work progress in 14 days.",
   sourceType: "certification",
   sourceId: STUDENT,
+};
+
+const PLATFORM_STALE: AlertDescriptor = {
+  alertKey: "goal_platform_stale:link-1",
+  type: "goal_platform_stale",
+  severity: "medium",
+  title: "Platform visited but no follow-through",
+  summary: "Learning platform was visited but no follow-through evidence has appeared.",
+  sourceType: "goal_resource_link",
+  sourceId: "link-1",
+};
+
+// Written by both the sync and the daily goal-stale-detection job, under one key.
+const GOAL_STALE: AlertDescriptor = {
+  alertKey: "goal_stale:goal-1",
+  type: "goal_stale",
+  severity: "medium",
+  title: "Monthly goal needs review",
+  summary: "Monthly goal has not been updated in 15 days.",
+  sourceType: "goal",
+  sourceId: "goal-1",
 };
 
 const STALLED_LONGER: AlertDescriptor = {
@@ -171,9 +196,12 @@ function stored(alert: AlertDescriptor): AlertRow {
   return row;
 }
 
-/** What loadStudentAlertSyncContext hands the sync: open, snoozed and dismissed rows, never resolved ones. */
+/**
+ * What loadStudentAlertSyncContext hands the sync: open, snoozed and dismissed
+ * rows of the types it lists, never resolved ones.
+ */
 function readExisting() {
-  return matching({ status: { in: ["open", "snoozed", "dismissed"] } }).map(
+  return matching({ status: { in: ["open", "snoozed", "dismissed"] }, type: { in: syncAlertTypes } }).map(
     ({ id, alertKey, status, snoozedUntil }) => ({ id, alertKey, status, snoozedUntil }),
   );
 }
@@ -216,23 +244,14 @@ describe("applyStudentAlertSyncPlan detectedAt", () => {
     assert.equal(stored(STALLED).resolvedAt, null);
   });
 
-  // The context read lists alerts by type, and its list has no
-  // goal_platform_stale, so the sync never hears that such an alert is open.
+  // The context read lists alerts by type. Open-ness is read separately, so an
+  // open alert the read leaves out still keeps its age.
   it("keeps detectedAt on an open alert the context read did not list", async () => {
-    const platformStale: AlertDescriptor = {
-      alertKey: "goal_platform_stale:link-1",
-      type: "goal_platform_stale",
-      severity: "medium",
-      title: "Platform visited but no follow-through",
-      summary: "Learning platform was visited but no follow-through evidence has appeared.",
-      sourceType: "goal_resource_link",
-      sourceId: "link-1",
-    };
-    seed(platformStale);
+    seed(PLATFORM_STALE);
 
-    await runSync(THREE_WEEKS_LATER, [platformStale], []);
+    await runSync(THREE_WEEKS_LATER, [PLATFORM_STALE], []);
 
-    assert.deepEqual(stored(platformStale).detectedAt, FIRST_DAY);
+    assert.deepEqual(stored(PLATFORM_STALE).detectedAt, FIRST_DAY);
   });
 });
 
@@ -270,6 +289,33 @@ describe("applyStudentAlertSyncPlan and a teacher's hold", () => {
     assert.equal(stored(STALLED).snoozedBy, "teacher-1");
     assert.deepEqual(stored(STALLED).detectedAt, FIRST_DAY);
     assert.equal(stored(STALLED).summary, STALLED_LONGER.summary);
+  });
+
+  it("leaves a dismissed goal_platform_stale alert dismissed", async () => {
+    seed(PLATFORM_STALE, { status: "dismissed", dismissedAt: NEXT_DAY });
+
+    await runSync(THREE_WEEKS_LATER, [PLATFORM_STALE]);
+
+    assert.equal(stored(PLATFORM_STALE).status, "dismissed");
+    assert.deepEqual(stored(PLATFORM_STALE).dismissedAt, NEXT_DAY);
+  });
+
+  it("resolves an open goal_platform_stale alert whose condition has cleared", async () => {
+    seed(PLATFORM_STALE);
+
+    await runSync(THREE_WEEKS_LATER, []);
+
+    assert.equal(stored(PLATFORM_STALE).status, "resolved");
+  });
+
+  // The sync writes goal_stale too (advising-alerts.ts, buildGoalStaleAlert),
+  // so it must keep reading it, or a dismissed one would reopen.
+  it("leaves a dismissed goal_stale alert dismissed", async () => {
+    seed(GOAL_STALE, { status: "dismissed", dismissedAt: NEXT_DAY });
+
+    await runSync(THREE_WEEKS_LATER, [GOAL_STALE]);
+
+    assert.equal(stored(GOAL_STALE).status, "dismissed");
   });
 
   it("reopens an alert whose snooze has ended, as a new spell", async () => {

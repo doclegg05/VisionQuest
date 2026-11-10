@@ -7,7 +7,8 @@
   "check": {
     "type": "test",
     "files": [
-      "src/lib/advising-sync-apply.test.ts"
+      "src/lib/advising-sync-apply.test.ts",
+      "src/lib/advising-sync-alert-types.test.ts"
     ]
   }
 }
