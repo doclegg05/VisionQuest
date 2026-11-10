@@ -14,6 +14,22 @@
  * this fixture does not. Requests the browser makes after the page loads
  * (notifications, progression check-in) are a different metric, M2.
  *
+ * Caches under this renderer (proved by measurement-renderer-caches.test.tsx):
+ * - `React.cache` does NOT memoize here. The render runs `react-dom/static`
+ *   with no `react-server` export condition, so `react` resolves to its client
+ *   build, whose `cache(fn)` is a pass-through. Production server components
+ *   use the react-server build, where it memoizes per request. A loader wrapped
+ *   only in `React.cache` would therefore count every caller here, an
+ *   overcount, and a later change that dedupes reads that way would not show.
+ *   A builder adding a per-request loader must make the measurement see it:
+ *   either key the loader on a request-scoped object the code already passes
+ *   down (so its memo works under any renderer), or mock `react` in this test
+ *   with a `cache` that memoizes and is reset between the cold and warm
+ *   renders, so each render is one request. Do not run the test under
+ *   `--conditions=react-server`: `react-dom/static` is not served there.
+ * - The process cache `cached()` (src/lib/cache.ts) IS live, including its
+ *   in-flight coalescing, which is why the warm render differs from the cold.
+ *
  * Read, not executed: 0 queries. `src/proxy.ts` and the root layout
  * (`src/app/layout.tsx:45-47`) run on every request and read only cookies and
  * headers. Nothing on this path had to be counted by reading.
