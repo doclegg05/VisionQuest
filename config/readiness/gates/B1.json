@@ -5,6 +5,18 @@
   "title": "Regions screen",
   "doneWhen": "Component tests pass. A CI e2e test has an admin on an empty system create a region and then a class.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/components/admin/regions-model.test.ts",
+      "src/components/admin/regions-api.test.ts",
+      "src/components/admin/regions-reducer.test.ts",
+      "src/components/admin/regions-controller.test.ts",
+      "src/components/admin/regions-copy.test.ts",
+      "src/components/admin/class-region-choice.test.ts",
+      "src/components/admin/RegionsCardView.test.tsx",
+      "src/components/admin/RegionsCard.test.tsx",
+      "src/components/admin/ClassRegionField.test.tsx",
+      "src/components/admin/region-messages.test.tsx"
+    ]
   }
 }
