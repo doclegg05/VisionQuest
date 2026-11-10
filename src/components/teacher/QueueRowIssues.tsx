@@ -6,7 +6,8 @@ import { WellbeingCrisisCard } from "@/components/teacher/WellbeingCrisisCard";
 import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
 import type { QueueAlert } from "@/lib/teacher/intervention-queue";
 import { openForLabel, type QueueIssueGroup } from "@/lib/teacher/queue-issue-groups";
-import { doneLabel } from "./queue-undo";
+import { alertControlId, doneLabel, SNOOZE_HOURS, type AlertLineState } from "./queue-undo";
+import { QueueUndoActionContext } from "./queue-undo-action-context";
 import { QueueUndoLineContext } from "./queue-undo-context";
 
 export type QueueAlertAction = "snooze" | "resolve" | "dismiss";
@@ -14,13 +15,16 @@ export type QueueAlertAction = "snooze" | "resolve" | "dismiss";
 const PILL =
   "inline-flex min-h-11 items-center rounded-full border border-[var(--border)] px-3 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]";
 
-/** Resolved: a stronger outline than the other pills, so it reads as the main choice. */
+/** Resolved, and Undo in its place: a stronger outline than the other pills, so it reads as the main choice. */
 const RESOLVED_PILL =
   "inline-flex min-h-11 items-center rounded-full border border-[var(--border-strong)] px-3 text-xs font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-muted)]";
 
 /** Dismiss: no outline and muted text, so it reads as the quieter choice. Still 44px tall. */
 const QUIET_PILL =
-  "ml-auto inline-flex min-h-11 items-center rounded-full px-3 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] disabled:opacity-60";
+  "ml-auto inline-flex min-h-11 items-center rounded-full px-3 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink-strong)] aria-disabled:opacity-60";
+
+/** A busy control stays focusable (aria-disabled, not disabled), so focus never falls to the page while it waits. */
+const BUSY = "aria-disabled:cursor-wait aria-disabled:opacity-60";
 
 export interface QueueRowIssuesProps {
   /** Element id, referenced by the row's toggle through aria-controls. */
@@ -98,10 +102,7 @@ function AlertLine({
       )}
       <p className="mt-1 text-xs text-[var(--ink-muted)]">{openForLabel(alert.detectedAt, now)}</p>
       {lineState.kind === "done" ? (
-        // Same height as the buttons it replaces, so nothing below it moves while Undo is offered.
-        <p className="mt-1 flex min-h-11 items-center text-xs font-semibold text-success">
-          {doneLabel(lineState.action)}
-        </p>
+        <DoneLine alert={alert} studentName={studentName} lineState={lineState} />
       ) : (
         <AlertActions
           alert={alert}
@@ -111,6 +112,44 @@ function AlertLine({
         />
       )}
     </li>
+  );
+}
+
+/**
+ * A saved Resolved or Dismiss. The text says what it means, then Undo sits right after it at the start of the line,
+ * away from where Dismiss was. Earlier done lines keep only the text. Same height as the pills it replaces, so
+ * nothing below it moves.
+ */
+function DoneLine({
+  alert,
+  studentName,
+  lineState,
+}: {
+  alert: QueueAlert;
+  studentName: string;
+  lineState: Extract<AlertLineState, { kind: "done" }>;
+}) {
+  const onUndo = useContext(QueueUndoActionContext);
+  const textId = `${alertControlId(alert.id, "undo")}-text`;
+  return (
+    <div className="mt-1 flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1">
+      <p id={textId} className="text-xs font-semibold text-success">
+        {doneLabel(lineState.action)}
+      </p>
+      {lineState.undoable ? (
+        <button
+          type="button"
+          id={alertControlId(alert.id, "undo")}
+          aria-disabled={lineState.undoing}
+          aria-describedby={textId}
+          onClick={onUndo}
+          aria-label={`Undo "${alert.title}" for ${studentName}`}
+          className={`${RESOLVED_PILL} ${BUSY}`}
+        >
+          Undo
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -133,30 +172,31 @@ function AlertActions({
     <div className="mt-1 flex flex-wrap items-center gap-2">
       <button
         type="button"
-        id={`queue-alert-${alert.id}-resolve`}
-        disabled={busy}
+        id={alertControlId(alert.id, "resolve")}
+        aria-disabled={busy}
         onClick={() => onAlertAction(alert.id, "resolve")}
         aria-label={`Mark "${alert.title}" resolved for ${studentName}`}
-        className={`${RESOLVED_PILL} disabled:opacity-60`}
+        className={`${RESOLVED_PILL} ${BUSY}`}
       >
         Resolved
       </button>
       <button
         type="button"
-        disabled={busy}
+        id={alertControlId(alert.id, "snooze")}
+        aria-disabled={busy}
         onClick={() => onAlertAction(alert.id, "snooze")}
-        aria-label={`Snooze "${alert.title}" for ${studentName} for 24 hours`}
-        className={`${PILL} disabled:opacity-60`}
+        aria-label={`Snooze "${alert.title}" for ${studentName} for ${SNOOZE_HOURS} hours`}
+        className={`${PILL} ${BUSY}`}
       >
         Snooze
       </button>
       <button
         type="button"
-        id={`queue-alert-${alert.id}-dismiss`}
-        disabled={busy}
+        id={alertControlId(alert.id, "dismiss")}
+        aria-disabled={busy}
         onClick={() => onAlertAction(alert.id, "dismiss")}
         aria-label={`Dismiss "${alert.title}" for ${studentName}`}
-        className={QUIET_PILL}
+        className={`${QUIET_PILL} ${BUSY}`}
       >
         Dismiss
       </button>

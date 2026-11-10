@@ -5,6 +5,7 @@ import type { QueueAlert } from "@/lib/teacher/intervention-queue";
 import { groupQueueIssues } from "@/lib/teacher/queue-issue-groups";
 import { QueueRowIssues } from "./QueueRowIssues";
 import { QueueUndoLineContext } from "./queue-undo-context";
+import { QueueUndoActionContext } from "./queue-undo-action-context";
 import type { AlertLineState } from "./queue-undo";
 
 const NOW = Date.parse("2026-10-06T12:00:00.000Z");
@@ -34,7 +35,9 @@ function render(lineState?: AlertLineState): string {
   );
   if (!lineState) return renderToString(issues);
   return renderToString(
-    <QueueUndoLineContext.Provider value={() => lineState}>{issues}</QueueUndoLineContext.Provider>,
+    <QueueUndoActionContext.Provider value={noop}>
+      <QueueUndoLineContext.Provider value={() => lineState}>{issues}</QueueUndoLineContext.Provider>
+    </QueueUndoActionContext.Provider>,
   );
 }
 
@@ -72,8 +75,9 @@ describe("QueueRowIssues alert actions", () => {
     }
   });
 
-  it("gives Resolved and Dismiss ids so focus can come back after Undo", () => {
+  it("gives every pill an id so focus can come back after Undo or a failure", () => {
     assert.match(buttonTag(html, "Resolved"), /id="queue-alert-g1-resolve"/);
+    assert.match(buttonTag(html, "Snooze"), /id="queue-alert-g1-snooze"/);
     assert.match(buttonTag(html, "Dismiss"), /id="queue-alert-g1-dismiss"/);
   });
 
@@ -81,23 +85,55 @@ describe("QueueRowIssues alert actions", () => {
     assert.doesNotMatch(html, /\b(?:bg|text|border)-(?:red|green|blue|gray|slate|amber|emerald|rose)-\d/);
   });
 
-  it("keeps a done alert in place, marked done, with no action buttons", () => {
-    const done = render({ kind: "done", action: "resolve" });
-    assert.match(done, /Marked resolved\./);
+  it("keeps a done alert in place: the text, then Undo, and no pills", () => {
+    const done = render({ kind: "done", action: "resolve", undoable: true, undoing: false });
+    const text = "Marked resolved. It comes back if the problem is still there.";
+    assert.ok(done.includes(text));
     assert.doesNotMatch(done, />Resolved<\/button>/);
+    assert.doesNotMatch(done, />Snooze<\/button>/);
     assert.doesNotMatch(done, />Dismiss<\/button>/);
     assert.match(done, /New evidence on a goal\./, "the line keeps its text so the row keeps its height");
-    assert.match(done, /min-h-11/);
+    const undo = buttonTag(done, "Undo");
+    assert.ok(done.indexOf(text) < done.indexOf(undo), "Undo comes right after the text");
+    assert.match(undo, /\bmin-h-11\b/);
+    assert.match(undo, /id="queue-alert-g1-undo"/);
+    assert.match(undo, /aria-label="Undo &quot;Goal review&quot; for Sam Rivera"/);
   });
 
-  it("says Dismissed. for a dismissed alert", () => {
-    assert.match(render({ kind: "done", action: "dismiss" }), /Dismissed\./);
+  it("does not put Undo inside a right-pushed group where Dismiss was", () => {
+    const done = render({ kind: "done", action: "dismiss", undoable: true, undoing: false });
+    assert.doesNotMatch(done, /\bml-auto\b/);
+    assert.doesNotMatch(buttonTag(done, "Undo"), /\bml-auto\b/);
   });
 
-  it("disables the actions while the request is out", () => {
+  it("says what a dismiss means", () => {
+    assert.match(render({ kind: "done", action: "dismiss", undoable: false, undoing: false }), /Dismissed\. It will not come back\./);
+  });
+
+  it("shows an earlier done line as plain text with no Undo", () => {
+    const earlier = render({ kind: "done", action: "resolve", undoable: false, undoing: false });
+    assert.match(earlier, /Marked resolved\./);
+    assert.doesNotMatch(earlier, />Undo<\/button>/);
+  });
+
+  it("keeps Undo focusable while it is sending, so focus never falls to the page", () => {
+    const undo = buttonTag(render({ kind: "done", action: "resolve", undoable: true, undoing: true }), "Undo");
+    assert.match(undo, /aria-disabled="true"/);
+    assert.doesNotMatch(undo, /\sdisabled=""/);
+  });
+
+  it("keeps the pills focusable while the request is out, and marks them unavailable", () => {
     const busy = render({ kind: "busy" });
     for (const label of ["Resolved", "Snooze", "Dismiss"]) {
-      assert.match(buttonTag(busy, label), /disabled=""/, label);
+      assert.match(buttonTag(busy, label), /aria-disabled="true"/, label);
+      assert.doesNotMatch(buttonTag(busy, label), /\sdisabled=""/, label);
+    }
+  });
+
+  it("uses no dash characters in visible text", () => {
+    for (const state of [undefined, { kind: "done", action: "resolve", undoable: true, undoing: false } as const]) {
+      const visible = render(state).replace(/<[^>]*>/g, " ");
+      assert.doesNotMatch(visible, /[\u2010-\u2015\u2212]| - /);
     }
   });
 });

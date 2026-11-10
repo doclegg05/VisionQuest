@@ -21,6 +21,9 @@ import { buildAlertActionIntent, mainActionMode } from "./queue-actions";
 import { QueueStudentRow } from "./QueueStudentRow";
 import type { QueueAlertAction } from "./QueueRowIssues";
 import { QueueUndoLineContext } from "./queue-undo-context";
+import { QueueUndoActionContext } from "./queue-undo-action-context";
+import { QUEUE_STATUS_ID } from "./queue-undo";
+import { countUrgentStudents, findAlertTarget } from "./queue-alert-target";
 import { useQueueUndo } from "./useQueueUndo";
 import type { InterventionQueueResponse as QueueResponse } from "@/lib/teacher/dashboard";
 
@@ -482,28 +485,21 @@ export default function InterventionQueuePanel({
   const { confirm, confirmDialog } = useConfirm();
   const alertUndo = useQueueUndo({ confirm, refresh: fetchQueue });
 
-  const urgentCount = queue.filter((student) => student.signals.highSeverityAlertCount > 0).length;
+  // Any reload gives fresh rows, so done lines and the Undo offer clear.
+  const { reloaded } = alertUndo;
+  useEffect(() => reloaded(), [queue, reloaded]);
+
+  const urgentCount = countUrgentStudents(queue, alertUndo.isDone);
+  const statusText = actionMessage ?? alertUndo.status?.text ?? "";
   const inactivityStages = useMemo(() => countInactivityStages(queue), [queue]);
 
   /**
-   * Resolved and Dismiss save at once and offer Undo for 8 seconds; a critical alert asks first. Snooze already
-   * ends on its own after 24 hours, so it keeps the one tap path.
+   * Resolved and Dismiss save at once and offer Undo in the alert's line until the next action or reload. Snooze
+   * reloads the queue. A critical alert asks first for all three.
    */
-  async function handleAlertAction(alertId: string, action: QueueAlertAction) {
+  function handleAlertAction(alertId: string, action: QueueAlertAction) {
     setActionMessage(null);
-    if (action !== "snooze") {
-      // An alert not found on screen is treated as critical, so it asks before acting.
-      const alert = queue.flatMap((student) => student.openAlerts).find((open) => open.id === alertId);
-      await alertUndo.act(alert ?? { id: alertId, severity: "critical" }, action);
-      return;
-    }
-    try {
-      await api.patch(`/api/teacher/alerts/${encodeURIComponent(alertId)}`, { action, hours: 24 });
-      setActionMessage("Snoozed for 24 hours.");
-      await fetchQueue();
-    } catch {
-      setActionMessage("Could not update that issue. Try again.");
-    }
+    void alertUndo.act(findAlertTarget(queue, alertId), action);
   }
 
   /**
@@ -574,8 +570,9 @@ export default function InterventionQueuePanel({
         ) : null}
       </div>
 
-      <p role="status" className={actionMessage ? "mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-muted)]" : "sr-only"}>
-        {actionMessage ?? ""}
+      {/* Takes focus when an acted on line leaves the screen, so focus never falls to the page. */}
+      <p id={QUEUE_STATUS_ID} tabIndex={-1} role="status" className={statusText ? "mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--ink-muted)]" : "sr-only"}>
+        {statusText}
       </p>
 
       {alertUndo.failure ? (
@@ -629,33 +626,35 @@ export default function InterventionQueuePanel({
               </button>
             </div>
           ) : null}
-          <QueueUndoLineContext.Provider value={alertUndo.lineState}>
-            <ul className="space-y-2">
-              {visible.map((student) => (
-                <QueueStudentRow
-                  key={student.studentId}
-                  student={student}
-                  now={now}
-                  actionPanel={
-                    actionIntent?.student.id === student.studentId ? (
-                      <InlineActionPanel
-                        intent={actionIntent}
-                        onClose={() => setActionIntent(null)}
-                        onChanged={() => handlePanelChanged(actionIntent)}
-                      />
-                    ) : null
-                  }
-                  onMainAction={handleMainAction}
-                  onQuickAction={handleQuickAction}
-                  onAlertAction={(alertId, action) => void handleAlertAction(alertId, action)}
-                  onQuickTask={(row) => setTaskTarget(targetOf(row))}
-                  onQuickNote={(row) => setNoteTarget(targetOf(row))}
-                  onSchedule={(row) => setScheduleTarget(targetOf(row))}
-                  onAskSage={askSage}
-                />
-              ))}
-            </ul>
-          </QueueUndoLineContext.Provider>
+          <QueueUndoActionContext.Provider value={alertUndo.undo}>
+            <QueueUndoLineContext.Provider value={alertUndo.lineState}>
+              <ul className="space-y-2">
+                {visible.map((student) => (
+                  <QueueStudentRow
+                    key={student.studentId}
+                    student={student}
+                    now={now}
+                    actionPanel={
+                      actionIntent?.student.id === student.studentId ? (
+                        <InlineActionPanel
+                          intent={actionIntent}
+                          onClose={() => setActionIntent(null)}
+                          onChanged={() => handlePanelChanged(actionIntent)}
+                        />
+                      ) : null
+                    }
+                    onMainAction={handleMainAction}
+                    onQuickAction={handleQuickAction}
+                    onAlertAction={handleAlertAction}
+                    onQuickTask={(row) => setTaskTarget(targetOf(row))}
+                    onQuickNote={(row) => setNoteTarget(targetOf(row))}
+                    onSchedule={(row) => setScheduleTarget(targetOf(row))}
+                    onAskSage={askSage}
+                  />
+                ))}
+              </ul>
+            </QueueUndoLineContext.Provider>
+          </QueueUndoActionContext.Provider>
           {hiddenCount > 0 ? (
             <button
               type="button"
@@ -704,7 +703,6 @@ export default function InterventionQueuePanel({
         />
       )}
 
-      {alertUndo.undoToast}
       {confirmDialog}
     </section>
   );

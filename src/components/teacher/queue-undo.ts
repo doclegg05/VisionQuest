@@ -1,26 +1,34 @@
 /**
- * The undo flow for Resolved and Dismiss on the intervention queue.
+ * The flow behind an alert line's Resolved, Snooze and Dismiss on the intervention queue.
  *
- * The action is sent at once, then Undo is offered for QUEUE_UNDO_WINDOW_MS. Undo sends the alert route's
- * `reopen` action. Sending first means a tab closed inside the window keeps what the instructor did: the change is
- * already saved, and only the chance to undo it is lost.
+ * Resolved and Dismiss are sent at once, then Undo is offered in that alert's own line. There is no timer: the offer
+ * lasts until the instructor resolves or dismisses another alert, the queue reloads for any reason, or the panel
+ * unmounts. One offer at a time. Undo sends the alert route's `reopen` action.
  *
- * While Undo is offered the alert line stays in place, marked done, and the queue is not reloaded, so the next row
- * does not move under the instructor's finger. The reload runs once the last open window closes.
+ * Resolved and Dismiss do not reload the queue, so no row moves under the instructor's finger. The line stays as a
+ * done line until the next reload. Snooze does reload, since the alert leaves the queue.
  *
- * No DOM here, so the whole flow is unit tested; `useQueueUndo` wires it to React.
+ * A critical alert asks first for all three. Declining leaves any earlier Undo offer as it was.
+ *
+ * No DOM here, so the whole flow is unit tested; `useQueueUndo` wires it to React and moves focus where `focus` says.
  */
-import type { UndoSnapshot } from "@/lib/undo-queue";
 
 export type UndoableAlertAction = "resolve" | "dismiss";
-export type QueueUndoRequest = UndoableAlertAction | "reopen";
+export type QueueAlertRequest = UndoableAlertAction | "snooze";
+export type QueueSendRequest = QueueAlertRequest | "reopen";
 
-export const QUEUE_UNDO_WINDOW_MS = 8000;
+/** How long a snooze lasts. The panel sends it as `hours`. */
+export const SNOOZE_HOURS = 24;
 
-/** The parts of a queue alert the flow needs. */
+/** The status line that takes focus when an alert line leaves the screen. The panel renders it. */
+export const QUEUE_STATUS_ID = "intervention-queue-status";
+
+/** The parts of a queue alert the flow needs. The title and name are shown in a confirm, never logged. */
 export interface QueueUndoTarget {
   id: string;
   severity: string;
+  title: string;
+  studentName: string;
 }
 
 export interface QueueUndoQuestion {
@@ -31,12 +39,18 @@ export interface QueueUndoQuestion {
   destructive: boolean;
 }
 
+/** The one alert Undo is offered for. */
+export interface UndoOffer {
+  alertId: string;
+  action: UndoableAlertAction;
+}
+
 export type QueueUndoState =
   | { kind: "idle" }
-  | { kind: "confirming"; alertId: string; action: UndoableAlertAction }
-  | { kind: "sending"; alertId: string; action: UndoableAlertAction }
-  | { kind: "undoable"; alertId: string; action: UndoableAlertAction; noticeId: number }
-  | { kind: "undoing"; alertId: string; action: UndoableAlertAction; noticeId: number };
+  | { kind: "confirming"; alertId: string; action: QueueAlertRequest; previous: UndoOffer | null }
+  | { kind: "sending"; alertId: string; action: QueueAlertRequest; previous: UndoOffer | null }
+  | { kind: "undoable"; alertId: string; action: UndoableAlertAction }
+  | { kind: "undoing"; alertId: string; action: UndoableAlertAction };
 
 export interface QueueUndoMessage {
   id: number;
@@ -45,29 +59,37 @@ export interface QueueUndoMessage {
   text: string;
 }
 
+/** Where focus should go next. A new id means move it again, even to the same element. */
+export interface QueueFocusRequest {
+  id: number;
+  elementId: string;
+}
+
 export interface QueueUndoSnapshot {
   state: QueueUndoState;
   message: QueueUndoMessage | null;
   /** Alerts saved as resolved or dismissed that the queue has not reloaded out yet. */
   done: Readonly<Record<string, UndoableAlertAction>>;
+  focus: QueueFocusRequest | null;
 }
 
 export interface QueueUndoDeps {
-  send: (alertId: string, request: QueueUndoRequest) => Promise<void>;
+  send: (alertId: string, request: QueueSendRequest) => Promise<void>;
   confirm: (question: QueueUndoQuestion) => Promise<boolean>;
-  /** Reloads the queue. */
-  refresh: () => Promise<unknown>;
-  /** Runs `run` after `ms` and returns a function that cancels it. */
-  startTimer: (run: () => void, ms: number) => () => void;
+  /** Reloads the queue. True when the load worked. */
+  refresh: () => Promise<boolean>;
 }
 
 export interface QueueUndo {
-  act: (alert: QueueUndoTarget, action: UndoableAlertAction) => Promise<void>;
+  act: (alert: QueueUndoTarget, action: QueueAlertRequest) => Promise<void>;
   undo: () => Promise<void>;
-  /** Ends the undo window now: the timer ran out, or the instructor closed the notice. */
-  finish: () => void;
+  /** The queue reloaded with fresh rows: done lines and the offer clear. */
+  reloaded: () => void;
   clearMessage: () => void;
+  /** The panel unmounted. Nothing in flight may start anything or reload after this. */
   dispose: () => void;
+  /** The panel mounted again. React's dev mode unmounts and remounts once, so dispose must not be final there. */
+  connect: () => void;
   current: () => QueueUndoSnapshot;
   subscribe: (listener: () => void) => () => void;
 }
@@ -75,47 +97,52 @@ export interface QueueUndo {
 export type AlertLineState =
   | { kind: "actions" }
   | { kind: "busy" }
-  | { kind: "done"; action: UndoableAlertAction };
+  | { kind: "done"; action: UndoableAlertAction; undoable: boolean; undoing: boolean };
 
 const DONE_LABEL: Record<UndoableAlertAction, string> = {
-  resolve: "Marked resolved.",
-  dismiss: "Dismissed.",
+  resolve: "Marked resolved. It comes back if the problem is still there.",
+  dismiss: "Dismissed. It will not come back.",
 };
 
-const ACTION_FAILED: Record<UndoableAlertAction, string> = {
+const ACTION_FAILED: Record<QueueAlertRequest, string> = {
   resolve: "Could not mark that alert resolved. It is still in your queue. Try again.",
   dismiss: "Could not dismiss that alert. It is still in your queue. Try again.",
+  snooze: "Could not snooze that alert. It is still in your queue. Try again.",
 };
 
-const UNDO_FAILED: Record<UndoableAlertAction, string> = {
-  resolve: "Could not undo. The alert is still marked resolved. Try again from the student's page.",
-  dismiss: "Could not undo. The alert is still dismissed. Try again from the student's page.",
-};
-
+const UNDO_FAILED = "Could not undo. Tap Undo to try again.";
 export const UNDO_DONE_TEXT = "The alert is back in your queue.";
+const SNOOZED_TEXT = `Snoozed for ${SNOOZE_HOURS} hours.`;
 
-const QUESTIONS: Record<UndoableAlertAction, QueueUndoQuestion> = {
-  resolve: {
-    title: "Mark this alert as resolved?",
-    message: "It will leave your queue. You can undo it for a few seconds after.",
-    confirmLabel: "Mark resolved",
-    cancelLabel: "Keep it",
-    destructive: false,
-  },
-  dismiss: {
-    title: "Dismiss this alert?",
-    message: "It will leave your queue and will not come back on its own. You can undo it for a few seconds after.",
-    confirmLabel: "Dismiss",
-    cancelLabel: "Keep it",
-    destructive: false,
-  },
-};
-
-export function confirmQuestionFor(action: UndoableAlertAction): QueueUndoQuestion {
-  return QUESTIONS[action];
+/** The confirm for a critical alert. It names the alert and the student, so the right one is acted on. */
+export function confirmQuestionFor(alert: QueueUndoTarget, action: QueueAlertRequest): QueueUndoQuestion {
+  const what = `"${alert.title}"`;
+  const base = { cancelLabel: "Keep it", destructive: false };
+  if (action === "resolve") {
+    return {
+      ...base,
+      title: `Mark ${what} resolved for ${alert.studentName}?`,
+      message: "It leaves your queue. It comes back if the problem is still there. You can undo it right after.",
+      confirmLabel: "Mark resolved",
+    };
+  }
+  if (action === "dismiss") {
+    return {
+      ...base,
+      title: `Dismiss ${what} for ${alert.studentName}?`,
+      message: "It leaves your queue. It stays hidden even if the problem continues. You can undo it right after.",
+      confirmLabel: "Dismiss",
+    };
+  }
+  return {
+    ...base,
+    title: `Snooze ${what} for ${alert.studentName}?`,
+    message: `It leaves your queue for ${SNOOZE_HOURS} hours.`,
+    confirmLabel: "Snooze",
+  };
 }
 
-export function needsConfirm(alert: QueueUndoTarget): boolean {
+export function needsConfirm(alert: Pick<QueueUndoTarget, "severity">): boolean {
   return alert.severity === "critical";
 }
 
@@ -123,23 +150,21 @@ export function doneLabel(action: UndoableAlertAction): string {
   return DONE_LABEL[action];
 }
 
-/** How one alert line should look for this snapshot. */
-export function alertLineState(snapshot: QueueUndoSnapshot, alertId: string): AlertLineState {
-  const done = snapshot.done[alertId];
-  if (done) return { kind: "done", action: done };
-  const { state } = snapshot;
-  if (state.kind !== "idle" && state.alertId === alertId) return { kind: "busy" };
-  return { kind: "actions" };
+/** The element id of an alert line's control, so focus can be moved to it. */
+export function alertControlId(alertId: string, control: QueueAlertRequest | "undo"): string {
+  return `queue-alert-${alertId}-${control}`;
 }
 
-/** What the shared undo notice shows: Undo while the window is open, then a short confirmation. */
-export function toastSnapshot(snapshot: QueueUndoSnapshot): UndoSnapshot | null {
-  const { state, message } = snapshot;
-  if (state.kind === "undoable" || state.kind === "undoing") {
-    return { id: state.noticeId, kind: "pending", label: DONE_LABEL[state.action] };
+/** How one alert line should look for this snapshot. */
+export function alertLineState(snapshot: QueueUndoSnapshot, alertId: string): AlertLineState {
+  const { state } = snapshot;
+  const done = snapshot.done[alertId];
+  if (done) {
+    const offeredHere = (state.kind === "undoable" || state.kind === "undoing") && state.alertId === alertId;
+    return { kind: "done", action: done, undoable: offeredHere, undoing: offeredHere && state.kind === "undoing" };
   }
-  if (message?.tone === "status") return { id: message.id, kind: "restored", label: message.text };
-  return null;
+  if (state.kind !== "idle" && state.alertId === alertId) return { kind: "busy" };
+  return { kind: "actions" };
 }
 
 const IDLE: QueueUndoState = { kind: "idle" };
@@ -147,14 +172,14 @@ const IDLE: QueueUndoState = { kind: "idle" };
 /** The flow's private, changing parts. Only the functions below touch it. */
 interface FlowCore {
   deps: QueueUndoDeps;
-  windowMs: number;
   snapshot: QueueUndoSnapshot;
-  cancelTimer: (() => void) | null;
   nextId: number;
+  disposed: boolean;
   listeners: Set<() => void>;
 }
 
 function update(core: FlowCore, next: Partial<QueueUndoSnapshot>): void {
+  if (core.disposed) return;
   core.snapshot = { ...core.snapshot, ...next };
   core.listeners.forEach((listener) => listener());
 }
@@ -163,99 +188,152 @@ function note(core: FlowCore, tone: QueueUndoMessage["tone"], text: string): Que
   return { id: core.nextId++, tone, text };
 }
 
-function stopTimer(core: FlowCore): void {
-  core.cancelTimer?.();
-  core.cancelTimer = null;
+function focusOn(core: FlowCore, elementId: string): QueueFocusRequest {
+  return { id: core.nextId++, elementId };
 }
 
-/** Reloads the queue so saved alerts leave it, then forgets only the alerts this reload covered. */
-async function settle(core: FlowCore): Promise<void> {
-  const covered = Object.keys(core.snapshot.done);
-  if (covered.length === 0) return;
-  try {
-    await core.deps.refresh();
-  } finally {
-    update(core, { done: withoutKeys(core.snapshot.done, covered) });
+function offerState(offer: UndoOffer | null): QueueUndoState {
+  return offer ? { kind: "undoable", ...offer } : IDLE;
+}
+
+function reloaded(core: FlowCore): void {
+  const { state } = core.snapshot;
+  // An Undo still out keeps its line; its own answer settles it.
+  if (state.kind === "undoing") {
+    update(core, { done: { [state.alertId]: state.action } });
+    return;
   }
+  const nextState: QueueUndoState =
+    state.kind === "confirming" || state.kind === "sending" ? { ...state, previous: null } : IDLE;
+  update(core, { state: nextState, done: {} });
 }
 
-function finish(core: FlowCore): void {
-  if (core.snapshot.state.kind !== "undoable") return;
-  stopTimer(core);
-  update(core, { state: IDLE });
-  void settle(core);
+/** Reloads the queue. A failed or rejected load clears nothing. */
+async function reload(core: FlowCore): Promise<void> {
+  let loaded = false;
+  try {
+    loaded = await core.deps.refresh();
+  } catch {
+    loaded = false;
+  }
+  if (loaded && !core.disposed) reloaded(core);
 }
 
-/** Asks before acting on a critical alert. Returns false when the instructor says no. */
+/** Asks before acting on a critical alert. On a no, puts back what was there before. */
 async function confirmCritical(
   core: FlowCore,
   alert: QueueUndoTarget,
-  action: UndoableAlertAction,
+  action: QueueAlertRequest,
+  previous: UndoOffer | null,
 ): Promise<boolean> {
-  update(core, { state: { kind: "confirming", alertId: alert.id, action }, message: null });
-  if (await core.deps.confirm(confirmQuestionFor(action))) return true;
-  update(core, { state: IDLE });
-  void settle(core);
+  update(core, { state: { kind: "confirming", alertId: alert.id, action, previous }, message: null });
+  const yes = await core.deps.confirm(confirmQuestionFor(alert, action));
+  if (core.disposed) return false;
+  if (yes) return true;
+  const { state } = core.snapshot;
+  const restored = state.kind === "confirming" ? state.previous : null;
+  update(core, { state: offerState(restored), focus: focusOn(core, alertControlId(alert.id, action)) });
   return false;
 }
 
-async function act(core: FlowCore, alert: QueueUndoTarget, action: UndoableAlertAction): Promise<void> {
-  const { state } = core.snapshot;
-  if (state.kind === "confirming" || state.kind === "sending" || state.kind === "undoing") return;
-  // One window at a time. The earlier alert stays marked done, so its row still does not move yet.
-  if (state.kind === "undoable") stopTimer(core);
+/** The offer a new action would end, or null when the flow is busy and the tap is ignored. */
+function startingOffer(state: QueueUndoState): { previous: UndoOffer | null } | null {
+  if (state.kind === "idle") return { previous: null };
+  if (state.kind === "undoable") return { previous: { alertId: state.alertId, action: state.action } };
+  return null;
+}
+
+async function act(core: FlowCore, alert: QueueUndoTarget, action: QueueAlertRequest): Promise<void> {
+  if (core.disposed) return;
   // Checked before any await, so a second tap lands on the busy state and is ignored.
-  if (needsConfirm(alert) && !(await confirmCritical(core, alert, action))) return;
-  update(core, { state: { kind: "sending", alertId: alert.id, action }, message: null });
+  const start = startingOffer(core.snapshot.state);
+  if (!start) return;
+  if (needsConfirm(alert) && !(await confirmCritical(core, alert, action, start.previous))) return;
+  const before = core.snapshot.state;
+  const previous = before.kind === "confirming" ? before.previous : start.previous;
+  update(core, { state: { kind: "sending", alertId: alert.id, action, previous }, message: null });
   try {
     await core.deps.send(alert.id, action);
   } catch {
-    update(core, { state: IDLE, message: note(core, "alert", ACTION_FAILED[action]) });
-    void settle(core);
+    actionFailed(core, alert.id, action);
+    return;
+  }
+  if (core.disposed) return;
+  if (action === "snooze") {
+    await snoozed(core);
     return;
   }
   update(core, {
-    state: { kind: "undoable", alertId: alert.id, action, noticeId: core.nextId++ },
+    state: { kind: "undoable", alertId: alert.id, action },
     done: { ...core.snapshot.done, [alert.id]: action },
+    focus: focusOn(core, alertControlId(alert.id, "undo")),
   });
-  core.cancelTimer = core.deps.startTimer(() => finish(core), core.windowMs);
+}
+
+function actionFailed(core: FlowCore, alertId: string, action: QueueAlertRequest): void {
+  const { state } = core.snapshot;
+  // A second action that failed did not resolve anything, so the earlier offer comes back.
+  const previous = state.kind === "sending" ? state.previous : null;
+  update(core, {
+    state: offerState(previous),
+    message: note(core, "alert", ACTION_FAILED[action]),
+    focus: focusOn(core, alertControlId(alertId, action)),
+  });
+}
+
+async function snoozed(core: FlowCore): Promise<void> {
+  const { state } = core.snapshot;
+  const previous = state.kind === "sending" ? state.previous : null;
+  update(core, {
+    state: offerState(previous),
+    message: note(core, "status", SNOOZED_TEXT),
+    focus: focusOn(core, QUEUE_STATUS_ID),
+  });
+  await reload(core);
 }
 
 async function undo(core: FlowCore): Promise<void> {
   const { state } = core.snapshot;
-  if (state.kind !== "undoable") return;
-  stopTimer(core);
-  update(core, { state: { ...state, kind: "undoing" } });
+  if (core.disposed || state.kind !== "undoable") return;
+  update(core, { state: { ...state, kind: "undoing" }, message: null });
   try {
     await core.deps.send(state.alertId, "reopen");
   } catch {
-    update(core, { state: IDLE, message: note(core, "alert", UNDO_FAILED[state.action]) });
-    void settle(core);
+    update(core, {
+      state,
+      done: { ...core.snapshot.done, [state.alertId]: state.action },
+      message: note(core, "alert", UNDO_FAILED),
+      focus: focusOn(core, alertControlId(state.alertId, "undo")),
+    });
     return;
   }
   update(core, {
     state: IDLE,
-    done: withoutKeys(core.snapshot.done, [state.alertId]),
+    done: withoutKey(core.snapshot.done, state.alertId),
     message: note(core, "status", UNDO_DONE_TEXT),
+    focus: focusOn(core, alertControlId(state.alertId, "resolve")),
   });
-  void settle(core);
 }
 
-export function createQueueUndo(deps: QueueUndoDeps, windowMs: number = QUEUE_UNDO_WINDOW_MS): QueueUndo {
+export function createQueueUndo(deps: QueueUndoDeps): QueueUndo {
   const core: FlowCore = {
     deps,
-    windowMs,
-    snapshot: { state: IDLE, message: null, done: {} },
-    cancelTimer: null,
+    snapshot: { state: IDLE, message: null, done: {}, focus: null },
     nextId: 1,
+    disposed: false,
     listeners: new Set(),
   };
   return {
     act: (alert, action) => act(core, alert, action),
     undo: () => undo(core),
-    finish: () => finish(core),
+    reloaded: () => reloaded(core),
     clearMessage: () => update(core, { message: null }),
-    dispose: () => stopTimer(core),
+    dispose: () => {
+      core.disposed = true;
+    },
+    connect: () => {
+      core.disposed = false;
+    },
     current: () => core.snapshot,
     subscribe(listener) {
       core.listeners.add(listener);
@@ -266,6 +344,6 @@ export function createQueueUndo(deps: QueueUndoDeps, windowMs: number = QUEUE_UN
   };
 }
 
-function withoutKeys<T>(record: Readonly<Record<string, T>>, keys: readonly string[]): Record<string, T> {
-  return Object.fromEntries(Object.entries(record).filter(([key]) => !keys.includes(key)));
+function withoutKey<T>(record: Readonly<Record<string, T>>, key: string): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).filter(([entry]) => entry !== key));
 }

@@ -8,7 +8,8 @@
     "type": "test",
     "files": [
       "src/components/teacher/queue-undo.test.ts",
-      "src/components/teacher/QueueRowIssues.undo.test.tsx"
+      "src/components/teacher/QueueRowIssues.undo.test.tsx",
+      "src/components/teacher/queue-alert-target.test.ts"
     ]
   }
 }

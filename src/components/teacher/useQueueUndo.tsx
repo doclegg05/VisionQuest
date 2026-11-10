@@ -1,92 +1,90 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { api } from "@/lib/api";
-import { UndoToastView } from "@/components/ui/useUndo";
 import {
   alertLineState,
   createQueueUndo,
-  toastSnapshot,
+  QUEUE_STATUS_ID,
+  SNOOZE_HOURS,
   type AlertLineState,
+  type QueueAlertRequest,
+  type QueueSendRequest,
   type QueueUndoMessage,
   type QueueUndoQuestion,
   type QueueUndoTarget,
-  type UndoableAlertAction,
 } from "./queue-undo";
-
-/** How long "The alert is back in your queue." stays. It needs no action, so it limits nothing. */
-const RESTORED_NOTICE_MS = 4000;
 
 interface QueueUndoOptions {
   /** Must be stable across renders. */
   confirm: (question: QueueUndoQuestion) => Promise<boolean>;
-  /** Must be stable across renders. Reloads the queue once the undo window closes. */
+  /** Must be stable across renders. Reloads the queue and returns null when the load failed. */
   refresh: () => Promise<unknown>;
 }
 
 export interface QueueUndoControls {
-  act: (alert: QueueUndoTarget, action: UndoableAlertAction) => Promise<void>;
+  act: (alert: QueueUndoTarget, action: QueueAlertRequest) => Promise<void>;
+  undo: () => void;
+  /** Call whenever the queue gets fresh rows, for any reason. Done lines and the Undo offer clear. */
+  reloaded: () => void;
   lineState: (alertId: string) => AlertLineState;
+  isDone: (alertId: string) => boolean;
   /** The latest failure, shown by the caller in a role="alert" message. */
   failure: QueueUndoMessage | null;
-  /** The shared undo notice, the same one the vision board uses. */
-  undoToast: React.ReactNode;
+  /** The latest quiet confirmation, shown by the caller in its role="status" line. */
+  status: QueueUndoMessage | null;
 }
 
-async function sendAlertRequest(alertId: string, action: string): Promise<void> {
-  await api.patch(`/api/teacher/alerts/${encodeURIComponent(alertId)}`, { action });
+async function sendAlertRequest(alertId: string, action: QueueSendRequest): Promise<void> {
+  const body = action === "snooze" ? { action, hours: SNOOZE_HOURS } : { action };
+  await api.patch(`/api/teacher/alerts/${encodeURIComponent(alertId)}`, body);
 }
 
-function startTimer(run: () => void, ms: number): () => void {
-  const timer = window.setTimeout(run, ms);
-  return () => window.clearTimeout(timer);
+/** Moves focus where the flow asked. If that element is gone, the status line takes it, never the page body. */
+function moveFocus(elementId: string): void {
+  const target = document.getElementById(elementId) ?? document.getElementById(QUEUE_STATUS_ID);
+  target?.focus();
 }
 
-/** Resolve and Dismiss with an 8 second Undo for the intervention queue. The flow itself is in queue-undo.ts. */
+/** Resolved, Snooze and Dismiss for the intervention queue, with Undo in the alert's line. The flow is queue-undo.ts. */
 export function useQueueUndo({ confirm, refresh }: QueueUndoOptions): QueueUndoControls {
   // Both callbacks are stable (useConfirm's confirm and the panel's fetchQueue are useCallback), so the flow made
-  // on first render can keep them. A new flow per render would drop an open undo window.
-  const [flow] = useState(() => createQueueUndo({ send: sendAlertRequest, confirm, refresh, startTimer }));
+  // on first render can keep them. A new flow per render would drop the Undo offer.
+  const [flow] = useState(() =>
+    createQueueUndo({
+      send: sendAlertRequest,
+      confirm,
+      refresh: async () => (await refresh()) !== null,
+    }),
+  );
   const snapshot = useSyncExternalStore(flow.subscribe, flow.current, flow.current);
-  const toast = toastSnapshot(snapshot);
-  const undoRef = useRef<HTMLButtonElement>(null);
 
-  // Leaving the page ends the window. The action was already saved, so nothing is lost.
-  useEffect(() => () => flow.dispose(), [flow]);
-
+  // Unmounting ends the offer. Anything still in flight then changes nothing and reloads nothing.
   useEffect(() => {
-    if (snapshot.message?.tone !== "status") return;
-    const timer = window.setTimeout(flow.clearMessage, RESTORED_NOTICE_MS);
-    return () => window.clearTimeout(timer);
-  }, [flow, snapshot.message]);
-
-  // The pressed button was replaced by the done line, so put focus on Undo for keyboard and VoiceOver users.
-  const pendingNoticeId = toast?.kind === "pending" ? toast.id : null;
-  useEffect(() => {
-    if (pendingNoticeId === null) return;
-    const frame = requestAnimationFrame(() => {
-      const active = document.activeElement;
-      if (!active || active === document.body) undoRef.current?.focus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [pendingNoticeId]);
-
-  const undo = useCallback(async () => {
-    const { state } = flow.current();
-    await flow.undo();
-    if (state.kind !== "undoable" || flow.current().message?.tone !== "status") return;
-    // Undo worked, so the alert's buttons are back. Return focus to the one that was pressed.
-    requestAnimationFrame(() => document.getElementById(`queue-alert-${state.alertId}-${state.action}`)?.focus());
+    flow.connect();
+    return () => flow.dispose();
   }, [flow]);
 
+  const focusId = snapshot.focus?.id ?? null;
+  const focusElementId = snapshot.focus?.elementId ?? null;
+  useEffect(() => {
+    if (focusId === null || focusElementId === null) return;
+    // Wait one frame, so the line has rendered the control that should take focus.
+    const frame = requestAnimationFrame(() => moveFocus(focusElementId));
+    return () => cancelAnimationFrame(frame);
+  }, [focusId, focusElementId]);
+
   const lineState = useCallback((alertId: string) => alertLineState(snapshot, alertId), [snapshot]);
+  const isDone = useCallback((alertId: string) => alertId in snapshot.done, [snapshot]);
+  const undo = useCallback(() => void flow.undo(), [flow]);
 
   return {
     act: flow.act,
+    undo,
+    reloaded: flow.reloaded,
     lineState,
+    isDone,
     failure: snapshot.message?.tone === "alert" ? snapshot.message : null,
-    undoToast: (
-      <UndoToastView snapshot={toast} onUndo={() => void undo()} onDismiss={flow.finish} undoRef={undoRef} />
-    ),
+    status: snapshot.message?.tone === "status" ? snapshot.message : null,
   };
 }
