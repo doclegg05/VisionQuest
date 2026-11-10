@@ -84,7 +84,10 @@ async function measureAsset({ url, kind }) {
 export async function measurePage(pageUrl) {
   const page = await request(new URL(pageUrl), "identity");
   if (page.status !== 200) throw new Error(`HTTP ${page.status} for ${pageUrl}`);
-  const assets = await Promise.all(findAssets(page.body.toString("utf8"), page.url).map(measureAsset));
+  const found = findAssets(page.body.toString("utf8"), page.url);
+  // A waking-up or error page has none. Zero would read as a perfect score.
+  if (found.length === 0) throw new Error(`no /_next/static/ assets at ${page.url.href}, so there is nothing to weigh`);
+  const assets = await Promise.all(found.map(measureAsset));
   const sum = (field) => assets.reduce((total, asset) => total + asset[field], 0);
   const count = (kind) => assets.filter((asset) => asset.kind === kind).length;
   const totals = {

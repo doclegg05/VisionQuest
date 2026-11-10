@@ -3,11 +3,10 @@
   "kind": "task",
   "set": "launch",
   "title": "Page weight script",
-  "doneWhen": "It reproduces the 322 KB sign-in figure against production.",
+  "doneWhen": "Its tests pass and it weighs the production sign-in page. On 2026-11-10 it reproduced the 322 KB hand measurement.",
   "check": {
-    "type": "test",
-    "files": [
-      "scripts/readiness/__tests__/page-weight.test.mjs"
-    ]
+    "type": "command",
+    "run": "node --test scripts/readiness/__tests__/page-weight.test.mjs && node scripts/readiness/page-weight.mjs https://visionquest.onrender.com/",
+    "needs": "network"
   }
 }

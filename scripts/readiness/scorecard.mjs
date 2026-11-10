@@ -3,7 +3,7 @@
  * Readiness scorecard for docs/plans/2026-11-10-deployment-readiness.md.
  *
  *   npm run readiness -- [--set=launch|pilot|all] [--only=ID,ID] [--strict]
- *                        [--ci-green] [--with-base] [--json] [--no-write]
+ *                        [--ci-green=<CI run>] [--with-base] [--json] [--no-write]
  *
  * Reads one gate per file from config/readiness/gates/, runs each gate's
  * check, prints one row per gate and the scores, and writes
@@ -15,8 +15,11 @@
  * `verified`), unmeasured (a metric with no command, or a network check that
  * could not connect). Only `pass` adds to a score.
  *
- * --ci-green counts a `needs: "ci"` check as pass when its test files exist.
- * Use it only when CI is green on the commit; the output says it was used.
+ * --ci-green=<CI run> counts a `needs: "ci"` test check as pass when its test
+ * files exist. It names the green CI run it relies on, and each such row is
+ * marked `via: "ci"` with that run, so a pass that did not run here is never
+ * mistaken for one that did. Outside the sandbox (CI sets `CI`), the unit
+ * suite excuses nothing.
  * --with-base adds typecheck, lint and the whole unit suite (minutes).
  *
  * Exit codes: 0 normally; 1 with --strict when a Launch gate is not `pass`;
@@ -28,7 +31,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFi
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { judgeUnitSuite, parseChecklist, parseTap, plural, verdict } from "./parse.mjs";
+import { excusable, judgeUnitSuite, parseChecklist, parseTap, plural, verdict } from "./parse.mjs";
 
 const GATES_DIR = "config/readiness/gates";
 const KNOWN_FAILURES = "config/readiness/sandbox-known-failures.json";
@@ -37,7 +40,9 @@ const KINDS = ["base", "task", "metric", "owner"];
 const SETS = ["launch", "pilot", "hold"];
 const CHECK_TYPES = ["pending", "test", "command", "owner", "metric"];
 const ID_ORDER = "TABCDEFGHMO";
-const DEFAULT_FLAGS = { set: "all", only: null, strict: false, "ci-green": false, "with-base": false, json: false, "no-write": false };
+const DEFAULT_FLAGS = { set: "all", only: null, strict: false, "ci-green": null, "with-base": false, json: false, "no-write": false };
+const VALUE_FLAGS = ["set", "only", "ci-green"];
+const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/; // Number() would also take Infinity and 0x10
 const TEST_ARGS = ["--test", "--experimental-test-module-mocks", "--test-reporter=tap"];
 const UNIT_GLOBS = ["src/**/*.test.ts", "src/**/*.test.tsx"];
 const TIMEOUT_MS = 30 * 60_000;
@@ -66,7 +71,7 @@ export function parseArgs(argv) {
   for (const arg of argv) {
     const [, name, value] = arg.match(/^--([a-z-]+)(?:=(.+))?$/) ?? [];
     if (!name || !Object.hasOwn(DEFAULT_FLAGS, name)) throw new ConfigError(`unknown flag: ${arg}`);
-    const takesValue = name === "set" || name === "only";
+    const takesValue = VALUE_FLAGS.includes(name);
     if (takesValue !== (value !== undefined)) throw new ConfigError(`--${name} ${takesValue ? "needs a value" : "takes no value"}`);
     flags[name] = takesValue ? value : true;
   }
@@ -85,6 +90,7 @@ function validateGate(gate, file) {
   need(SETS.includes(gate.set), `"set" must be one of ${SETS.join(", ")}`);
   need(CHECK_TYPES.includes(check.type), `"check.type" must be one of ${CHECK_TYPES.join(", ")}`);
   need(check.needs === undefined || ["ci", "network"].includes(check.needs), `"check.needs" must be ci or network`);
+  need(check.needs !== "ci" || check.type === "test", `"needs": "ci" is only valid on a test check`);
   if (check.type === "test") need(isStringList(check.files), `a test check needs "files"`);
   if (check.type === "command") need(typeof check.run === "string", `a command check needs "run"`);
   if (check.type === "owner") need(typeof check.doc === "string" && isStringList(check.rows), `an owner check needs "doc" and "rows"`);
@@ -171,7 +177,7 @@ const RUNNERS = {
     if (check.run === null) return verdict("unmeasured", `no measuring command yet (${goal})`);
     const run = runProcess(check.run, [], { root, shell: true, network: check.needs === "network" });
     const printed = lastLine(run.stdout);
-    if (run.code !== 0 || printed === "" || Number.isNaN(Number(printed))) {
+    if (run.code !== 0 || !PLAIN_NUMBER.test(printed)) {
       return unconnected(check, run) ?? verdict("fail", `exit ${run.code}, no number on the last line`);
     }
     const met = check.direction === "atMost" ? Number(printed) <= check.target : Number(printed) >= check.target;
@@ -188,20 +194,31 @@ const RUNNERS = {
     return verdict(results.every((value) => value === "verified") ? "pass" : "owner-open", tally);
   },
   unit(check, root) {
-    const { failures } = JSON.parse(readFileSync(join(root, KNOWN_FAILURES), "utf8"));
+    const known = excusable(readKnownFailures(root), process.env);
     const { code, tap } = runTests(root, ["--test-concurrency=4", ...UNIT_GLOBS]);
-    return judgeUnitSuite(tap, code, failures);
+    return judgeUnitSuite(tap, code, known);
   },
 };
+
+function readKnownFailures(root) {
+  let failures;
+  try {
+    ({ failures } = JSON.parse(readFileSync(join(root, KNOWN_FAILURES), "utf8")));
+  } catch (error) {
+    throw new ConfigError(`${KNOWN_FAILURES}: ${error.message}`);
+  }
+  if (!Array.isArray(failures)) throw new ConfigError(`${KNOWN_FAILURES}: "failures" must be a list`);
+  return failures;
+}
 
 function evaluate(gate, root, flags) {
   const { check } = gate;
   if (check.type === "pending" || check.needs !== "ci") return RUNNERS[check.type](check, root);
   if (!flags["ci-green"]) return verdict("needs-ci", "runs only in CI");
-  const files = check.files ?? [];
-  const missing = files.filter((file) => !existsSync(join(root, file)));
+  const missing = check.files.filter((file) => !existsSync(join(root, file)));
   if (missing.length > 0) return verdict("fail", `--ci-green, but missing test file: ${missing.join(", ")}`);
-  return verdict("pass", `not run here: --ci-green says CI is green (${plural(files.length, "test file")} found)`);
+  const detail = `not run here: green in CI run ${flags["ci-green"]} (${plural(check.files.length, "test file")} found)`;
+  return { ...verdict("pass", detail), via: "ci" };
 }
 
 function selectGates(root, flags) {
@@ -238,8 +255,8 @@ function render(report, markdown) {
     const rows = report.gates.filter((row) => kindMatches(row.kind)).map((row) => [row.id, row.set, row.status, row.title, row.detail]);
     return rows.length === 0 ? [] : [heading(title, 2), (markdown ? markdownTable : textTable)(rows)];
   };
-  const viaCi = report.gates.filter((row) => row.detail.includes("--ci-green says")).map((row) => row.id);
-  const note = `Note: --ci-green was used. ${plural(viaCi.length, "gate")} count as pass on the word that CI is green, without running here: ${viaCi.join(", ") || "none"}.`;
+  const viaCi = report.gates.filter((row) => row.via === "ci").map((row) => row.id);
+  const note = `Note: --ci-green was used. ${plural(viaCi.length, "gate")} count as pass on CI run ${report.ciGreen}, without running here: ${viaCi.join(", ") || "none"}.`;
   return [
     heading("Readiness scorecard", 1),
     `Generated ${report.generatedAt} at commit ${report.commit}. Flags: ${report.flags}.`,
@@ -251,16 +268,23 @@ function render(report, markdown) {
   ].join("\n\n");
 }
 
+/** The short commit, with "-dirty" when the tree has uncommitted changes. */
+function commitLabel(root) {
+  const head = runProcess("git", ["rev-parse", "--short", "HEAD"], { root });
+  if (head.code !== 0 || !head.stdout.trim()) return "unknown";
+  const changed = runProcess("git", ["status", "--porcelain"], { root }).stdout.trim() !== "";
+  return `${head.stdout.trim()}${changed ? "-dirty" : ""}`;
+}
+
 export function main(argv, root) {
   const flags = parseArgs(argv);
   const rows = selectGates(root, flags).map((gate) => {
     const { id, kind, set, title } = gate;
     return { id, kind, set, title, ...evaluate(gate, root, flags) };
   });
-  const commit = runProcess("git", ["rev-parse", "--short", "HEAD"], { root }).stdout.trim() || "unknown";
   const report = {
     generatedAt: new Date().toISOString(),
-    commit,
+    commit: commitLabel(root),
     flags: argv.join(" ") || "none",
     ciGreen: flags["ci-green"],
     scores: scoreLines(rows),

@@ -92,9 +92,9 @@ Columns: **Set** is Launch or Pilot. **Src** is `seen` when the orchestrator re-
 
 | ID | Set | Task | Done when | Size | Extra review |
 | --- | --- | --- | --- | --- | --- |
-| T1 | Launch | Readiness scorecard. `config/readiness/gates.json` lists every gate in this plan with its check. `scripts/readiness/scorecard.mjs` runs the local checks, reads owner rows from the ops evidence checklist, writes `reports/readiness/latest.md`, and exits 1 under `--strict` when a Launch gate fails. It names the two sandbox-only unit failures so a third cannot pass unnoticed. | The script prints one row per gate, its own tests pass, and the first run is committed as the baseline. | M | none |
+| T1 | Launch | Readiness scorecard. `config/readiness/gates/` holds one file per gate in this plan, each with its check. `scripts/readiness/scorecard.mjs` runs the local checks, reads owner rows from the ops evidence checklist, writes `reports/readiness/latest.md`, and exits 1 under `--strict` when a Launch gate fails. It names the two sandbox-only unit failures so a third cannot pass unnoticed. | The script prints one row per gate, its own tests pass, and the first run is committed as the baseline. | M | none |
 | T2 | Launch | Query counter. A test helper that counts app-client queries for one call, with measured baselines for M1, M3 and M6 written into `gates.json`. | Two runs give the same counts. | M | db |
-| T3 | Launch | Page weight script. Sums the compressed bytes of the scripts and styles a URL loads, for M4. | It reproduces the 322 KB sign-in figure against production. | S | none |
+| T3 | Launch | Page weight script. Sums the compressed bytes of the scripts and styles a URL loads, for M4. | Its tests pass and it weighs the production sign-in page. On 2026-11-10 it reproduced the 322 KB hand measurement. | S | none |
 
 ### Stream A: sign-in and accounts
 

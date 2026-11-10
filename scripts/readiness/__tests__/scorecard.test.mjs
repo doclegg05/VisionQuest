@@ -190,28 +190,70 @@ test("a metric whose command prints no number fails", (t) => {
   assert.match(got.detail, /no number/);
 });
 
+test("a metric that prints Infinity fails, even against an atLeast target", (t) => {
+  const check = { run: `node -e "console.log(Infinity)"`, direction: "atLeast" };
+  const root = makeRoot(t, [metricGate("M1", check)]);
+  assert.equal(statuses(root).M1.status, "fail");
+});
+
+test("a metric that prints a hex literal fails instead of being read as a number", (t) => {
+  const root = makeRoot(t, [metricGate("M1", { run: `node -e "console.log('0x10')"` })]);
+  assert.equal(statuses(root).M1.status, "fail");
+});
+
 // --- needs: ci and needs: network ---
 
 test("a check that needs CI reports needs-ci and is not run", (t) => {
-  const command = `node -e "require('fs').writeFileSync('ran.txt', 'x')"`;
-  const root = makeRoot(t, [gate("A1", { type: "command", run: command, needs: "ci" })]);
+  const marker = `import { writeFileSync } from "node:fs";\nwriteFileSync("ran.txt", "x");\n${PASSING_TEST}`;
+  const check = { type: "test", files: ["checks/db.test.mjs"], needs: "ci" };
+  const root = makeRoot(t, [gate("A1", check)], { "checks/db.test.mjs": marker });
   assert.equal(statuses(root).A1.status, "needs-ci");
   assert.equal(existsSync(join(root, "ran.txt")), false);
+});
+
+test("needs: ci on a check that is not a test is a config error, so --ci-green cannot pass it", (t) => {
+  const root = makeRoot(t, [gate("A1", { type: "command", run: "exit 1", needs: "ci" })]);
+  const result = run(root, "--ci-green=123", "--no-write");
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /only valid on a test check/);
 });
 
 test("--ci-green passes a needs-ci check whose test files exist, and says the flag was used", (t) => {
   const check = { type: "test", files: ["checks/db.test.mjs"], needs: "ci" };
   const root = makeRoot(t, [gate("A1", check)], { "checks/db.test.mjs": FAILING_TEST });
-  const result = run(root, "--ci-green", "--no-write");
+  const result = run(root, "--ci-green=19283746", "--no-write");
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^A1\s+launch\s+pass\b/m);
+  assert.match(result.stdout, /CI run 19283746/);
   assert.match(result.stdout, /--ci-green was used/);
+});
+
+test("--ci-green without a CI run to name is a usage error", (t) => {
+  const check = { type: "test", files: ["checks/db.test.mjs"], needs: "ci" };
+  const root = makeRoot(t, [gate("A1", check)], { "checks/db.test.mjs": PASSING_TEST });
+  const result = run(root, "--ci-green", "--no-write");
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /--ci-green needs a value/);
+});
+
+test("a pass taken from CI is marked in the written report, with the run it came from", (t) => {
+  const check = { type: "test", files: ["checks/db.test.mjs"], needs: "ci" };
+  const root = makeRoot(t, [gate("A1", check), gate("A2", { type: "command", run: "exit 0" })], {
+    "checks/db.test.mjs": PASSING_TEST,
+  });
+  assert.equal(run(root, "--ci-green=19283746").status, 0);
+  const report = JSON.parse(readFileSync(join(root, "reports", "readiness", "latest.json"), "utf8"));
+  const [a1, a2] = report.gates;
+  assert.equal(report.ciGreen, "19283746");
+  assert.equal(a1.via, "ci");
+  assert.match(a1.detail, /CI run 19283746/);
+  assert.equal(a2.via, undefined);
 });
 
 test("--ci-green fails a needs-ci check whose test file is missing", (t) => {
   const check = { type: "test", files: ["checks/gone.test.mjs"], needs: "ci" };
   const root = makeRoot(t, [gate("A1", check)]);
-  const got = statuses(root, "--ci-green").A1;
+  const got = statuses(root, "--ci-green=19283746").A1;
   assert.equal(got.status, "fail");
   assert.match(got.detail, /missing test file/);
 });
@@ -503,4 +545,26 @@ test("parseTap does not count a skipped test as passed", async () => {
   const { parseTap } = await lib();
   const tap = parseTap("TAP version 13\nok 1 - later # SKIP\n  ---\n  type: 'test'\n  ...\n1..1\n", ROOT);
   assert.equal(tap.passed.length, 0);
+});
+
+test("a missing known-failures file is a config error, not a crash", (t) => {
+  const root = makeRoot(t, [gate("A1", { type: "pending" })]);
+  const result = run(root, "--with-base", "--only=BASE-unit", "--no-write");
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /sandbox-known-failures\.json/);
+});
+
+test("nothing is excused in CI, where the sandbox-only tests really run", async () => {
+  const { excusable } = await lib();
+  assert.deepEqual(excusable(KNOWN, { CI: "true" }), []);
+  assert.deepEqual(excusable(KNOWN, {}), KNOWN);
+});
+
+test("the report marks a commit with uncommitted changes as dirty", (t) => {
+  const root = makeRoot(t, [gate("A1", { type: "pending" })]);
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  git("init", "-q");
+  git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "base");
+  const report = JSON.parse(run(root, "--json", "--no-write").stdout);
+  assert.match(report.commit, /^[0-9a-f]{7,}-dirty$/);
 });

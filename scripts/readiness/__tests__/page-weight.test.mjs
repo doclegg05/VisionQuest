@@ -37,6 +37,7 @@ const ROUTES = {
   "/_next/static/chunks/a.js": { body: A_GZIP, type: "text/javascript", encoding: "gzip" },
   "/_next/static/chunks/b.js?v=1&dpl=2": { body: B_BROTLI, type: "text/javascript", encoding: "br" },
   "/_next/static/css/app.css": { body: APP_CSS, type: "text/css" },
+  "/waking-up": { body: Buffer.from("<html><body>Service starting</body></html>"), type: "text/html" },
   "/missing-asset": {
     body: Buffer.from(`<script src="/_next/static/chunks/gone.js"></script>`),
     type: "text/html",
@@ -137,6 +138,13 @@ test("an asset that does not answer 200 is an error, not a smaller total", async
   const result = await pageWeight(`${origin}/missing-asset`);
   assert.equal(result.code, 1);
   assert.match(result.stderr, /HTTP 404/);
+});
+
+test("a page with no /_next/static/ assets is an error, not a zero weight", async (t) => {
+  const { origin } = await startServer(t);
+  const result = await pageWeight(`${origin}/waking-up`);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /no \/_next\/static\/ assets/);
 });
 
 test("a refused connection exits 1 and names the error code", async () => {
