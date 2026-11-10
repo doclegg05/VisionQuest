@@ -8,6 +8,7 @@ import { CreateClassRegionSelect } from "@/components/admin/CreateClassRegionSel
 import { fetchClassRegions } from "@/components/admin/class-regions";
 import { useRegionsChanged } from "@/components/admin/regions-events";
 import { useClassRegionMove } from "@/components/admin/useClassRegionMove";
+import { CreateClassHint, createClassVisibility } from "./CreateClassGate";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
@@ -462,14 +463,12 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
         </div>
       ) : null}
 
-      {adminMode ? (
+      {adminMode && createClassVisibility({ manageRegions, regionCount: regions.length, loading }) === "form" ? (
         <div className="surface-section space-y-4 p-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Admin</p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Create a Class</h2>
-            <p className="mt-2 text-sm text-[var(--ink-muted)]">
-              Classes organize students and instructors. Create student accounts from the class roster below.
-            </p>
+            <p className="mt-2 text-sm text-[var(--ink-muted)]">Classes organize students and instructors. Create student accounts from the class roster below.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block space-y-1.5">
@@ -541,7 +540,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
             {creatingClass ? "Creating..." : "Create Class"}
           </button>
         </div>
-      ) : null}
+      ) : <CreateClassHint manageRegions={manageRegions} regionCount={regions.length} loading={loading} />}
 
       <div className="surface-section space-y-4 p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
