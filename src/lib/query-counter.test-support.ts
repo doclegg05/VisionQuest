@@ -14,6 +14,15 @@
  * no `relationJoins`) sends one more SELECT per nested relation, and only when
  * the level above it returned rows. `estimateRoundTrips` turns the record into
  * round trips; its header states each rule and where it was confirmed.
+ *
+ * What "4 per app call" assumes: BEGIN, set_config, the query and COMMIT, with
+ * both statements already prepared on that connection. A cold statement adds a
+ * prepare round trip. When the app connects through a transaction pooler with
+ * `pgbouncer=true`, Prisma turns its statement cache off, so one app call is
+ * about 7 round trips and a nested load about 2. Every number this counter
+ * gives is therefore a floor on wire round trips: good for comparing before
+ * and after, not a latency budget. `APP_CALL_ROUND_TRIPS` stays 4 until it is
+ * measured against Postgres.
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";

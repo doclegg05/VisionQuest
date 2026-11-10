@@ -12,7 +12,8 @@
 // round trips to the database, as `estimateRoundTrips` in
 // src/lib/query-counter.test-support.ts computes it and the test prints it:
 //   4 for each app-client call (BEGIN, set_config, the query, COMMIT: see the
-//     RLS wrapper in src/lib/db.ts),
+//     RLS wrapper in src/lib/db.ts), when both statements are already prepared
+//     on that connection,
 //   1 for each admin-client call, with same-tick findUnique calls of one shape
 //     counted once, as Prisma's dataloader sends them,
 //   1 for each nested relation a call loads, when the level above it returned
@@ -24,7 +25,11 @@
 // Every path counts app plus admin by default (--client=all). An admin call
 // still costs a round trip, so leaving it out would reward moving a read from
 // `prisma` to `prismaAdmin`, which also skips row-level security.
-// What the estimate cannot see is listed in the support file's header.
+// A cold statement adds a prepare round trip. Through a transaction pooler with
+// pgbouncer=true, Prisma turns its statement cache off, so an app call is about
+// 7 and a nested load about 2. Every number printed is therefore a floor on
+// wire round trips: good for comparing before and after, not a latency budget.
+// What else the estimate cannot see is listed in the support file's header.
 //
 // How it measures: it runs the path's test file under src/lib/readiness/ in a
 // child process and reads the QUERY_COUNT lines that test prints. It does not
@@ -61,6 +66,12 @@ const USAGE = [
   "  --cache=cold (the default) or --cache=warm",
   "  --client=all (the default) counts app and admin; --client=app or --client=admin counts one",
   "  --unit=round-trips (the default), --unit=statements or --unit=calls",
+  "",
+  "What the round trips assume. 4 per app call (BEGIN, set_config, the query, COMMIT) is the case",
+  "where both statements are already prepared on that connection; a cold statement adds a prepare",
+  "round trip. When the app connects through a transaction pooler with pgbouncer=true, Prisma turns",
+  "its statement cache off, so one app call is about 7 and a nested load about 2. Every number this",
+  "prints is a floor on wire round trips: good for comparing before and after, not a latency budget.",
 ].join("\n");
 
 function usage(problem) {

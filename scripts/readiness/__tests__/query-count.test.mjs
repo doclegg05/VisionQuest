@@ -47,3 +47,10 @@ test("the usage text says the default counts every client", () => {
   assert.equal(result.status, 2);
   assert.match(result.stderr, /--client=all \(the default\)/);
 });
+
+test("the usage text says what 4 per app call assumes, and that every number is a floor", () => {
+  const { stderr } = run("nowhere");
+  assert.match(stderr, /already prepared/);
+  assert.match(stderr, /pgbouncer=true/);
+  assert.match(stderr, /floor on wire round trips/);
+});
