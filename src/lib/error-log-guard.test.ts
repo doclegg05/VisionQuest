@@ -172,6 +172,9 @@ const SYNC_REJECTED: Record<string, string> = {
   "awaiting a member call to the sync": `${SYNC_PRELUDE}export async function probe() {\n  await advising.syncStudentAlerts("stu");\n}\n`,
   "awaiting a wrapper whose argument calls it": `${SYNC_PRELUDE}export async function probe() {\n  await afterWrite(() => syncStudentAlerts("stu"), {});\n}\n`,
   "awaiting Promise.all over it": `${SYNC_PRELUDE}export async function probe() {\n  await Promise.all([syncStudentAlerts("stu")]);\n}\n`,
+  // withAuth awaits what a handler returns, so returning the promise waits too.
+  "returning the sync": `${SYNC_PRELUDE}export async function probe() {\n  return syncStudentAlerts("stu");\n}\n`,
+  "returning a wrapper whose argument calls it": `${SYNC_PRELUDE}export async function probe() {\n  return afterWrite(() => syncStudentAlerts("stu"), {});\n}\n`,
 };
 const SYNC_ALLOWED: Record<string, string> = {
   "deferPerStudent": `${SYNC_PRELUDE}export function probe() {\n  deferPerStudent("stu", {}, () => syncStudentAlerts("stu"));\n}\n`,

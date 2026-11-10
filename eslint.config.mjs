@@ -85,9 +85,13 @@ const restrictedSyntaxEverywhere = [
 const AWAITED_ALERT_SYNC_MESSAGE =
   "A student's response must not wait on the instructor's alert bookkeeping. Use deferPerStudent(studentId, { surface, effect: \"syncStudentAlerts\" }, () => syncStudentAlerts(studentId)) from @/lib/after-response.";
 const SYNC_CALL = ":matches([callee.name='syncStudentAlerts'], [callee.property.name='syncStudentAlerts'])";
+// A returned promise counts as awaited: the auth wrappers await what a
+// handler returns, so the response waits on it just the same.
 const awaitedAlertSync = [
   `AwaitExpression > CallExpression${SYNC_CALL}`,
   `AwaitExpression > CallExpression:has(CallExpression${SYNC_CALL})`,
+  `ReturnStatement > CallExpression${SYNC_CALL}`,
+  `ReturnStatement > CallExpression:has(CallExpression${SYNC_CALL})`,
 ].map((selector) => ({ selector, message: AWAITED_ALERT_SYNC_MESSAGE }));
 
 // StudentAlert is the staff intervention queue, and the RLS policy admits a

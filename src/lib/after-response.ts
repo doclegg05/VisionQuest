@@ -62,11 +62,42 @@ interface PerStudentContext {
   effect: string;
 }
 
-const perStudentEffects = createKeyedSerialRunner();
+/**
+ * Most deferred effects running at once in this process, across all students.
+ *
+ * One sync holds a connection for each of its dozens of queries in turn, and
+ * one more for its interactive transaction, against a pool of 5 by default
+ * (src/lib/db.ts). Two at a time leaves room for the requests students are
+ * making; a class of 30 that signs at once then drains over about a minute
+ * instead of starving those requests. The database review that set this
+ * number had no database to measure on: size it again when the pool size is
+ * settled (readiness F1).
+ */
+export const DEFERRED_EFFECT_CONCURRENCY = 2;
+
+/**
+ * How long one deferred effect may run before its place is given up. A normal
+ * sync takes a few seconds, and the 2026-09-07 incident took 45 under
+ * contention, so two minutes is a run that will not finish. Without this, two
+ * such runs would stop every deferred effect until the next restart.
+ */
+const DEFERRED_EFFECT_DEADLINE_MS = 2 * 60 * 1000;
+
+const perStudentEffects = createKeyedSerialRunner({
+  maxConcurrent: DEFERRED_EFFECT_CONCURRENCY,
+  deadlineMs: DEFERRED_EFFECT_DEADLINE_MS,
+  // The callback is given no key, so nothing here can name a student.
+  onDeadline: () => {
+    logger.error("A deferred effect passed its deadline; its place was given up", {
+      alert: "deferred_effect_deadline",
+    });
+  },
+});
 
 /**
  * Defer a student's bookkeeping (the alert sync) past the response, with at
- * most one running and one queued per student and effect in this process.
+ * most one running and one queued per student and effect in this process,
+ * and at most DEFERRED_EFFECT_CONCURRENCY running across all students.
  *
  * A student-facing write route calls this instead of awaiting the sync. The
  * effect is wrapped in `afterWrite`, so a failure is logged with the surface

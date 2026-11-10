@@ -145,3 +145,112 @@ describe("createKeyedSerialRunner", () => {
     assert.deepEqual(seen, [actorA, actorB], "the queued run took the first run's actor");
   });
 });
+
+// Database review of readiness F3, 2026-11-10: the runner was keyed only, so
+// a class of 30 signing the same form started 30 syncs at once against a pool
+// of 5, and the deferred work starved the requests students were making. A
+// cap across keys bounds that. The cap needs a deadline with it, or two runs
+// that never settle would stop every deferred run in the process.
+describe("createKeyedSerialRunner with a cap across keys", () => {
+  it("runs no more than the cap at once, whatever the keys", async () => {
+    const runner = createKeyedSerialRunner({ maxConcurrent: 2 });
+    const work = probe();
+    const gates = Array.from({ length: 5 }, () => gate());
+    const all = gates.map((held, index) => runner.run(`student-${index}`, work.task(held.promise)));
+
+    await flush();
+    assert.equal(work.runs(), 2, "a third run started while two were still going");
+    gates[0].open();
+    await flush();
+    assert.equal(work.runs(), 3, "a finished run did not hand its place on");
+    gates.forEach((held) => held.open());
+    await Promise.all(all);
+
+    assert.equal(work.runs(), 5, "every key still got its run");
+    assert.equal(work.maxConcurrent(), 2);
+  });
+
+  it("still runs one at a time per key under the cap", async () => {
+    const runner = createKeyedSerialRunner({ maxConcurrent: 2 });
+    const sameKey = probe();
+    const first = gate();
+    const a1 = runner.run("student-a", sameKey.task(first.promise));
+    const a2 = runner.run("student-a", sameKey.task(Promise.resolve()));
+
+    await flush();
+    assert.equal(sameKey.runs(), 1, "a free place let the same key run twice at once");
+    first.open();
+    await Promise.all([a1, a2]);
+
+    assert.equal(sameKey.runs(), 2);
+    assert.equal(sameKey.maxConcurrent(), 1);
+  });
+
+  it("runs a task that waited for a place as the actor of the call that queued it", async () => {
+    const runner = createKeyedSerialRunner({ maxConcurrent: 1 });
+    const first = gate();
+    const seen: Array<ReturnType<typeof getRlsContext>> = [];
+    const record = (release: Promise<void>) => async () => {
+      seen.push(getRlsContext());
+      await release;
+    };
+    const actorA = { userId: "actor-a", role: "student", studentId: "student-a" };
+    const actorB = { userId: "actor-b", role: "student", studentId: "student-b" };
+
+    const a = withRlsContext(actorA, () => runner.run("student-a", record(first.promise)));
+    const b = withRlsContext(actorB, () => runner.run("student-b", record(Promise.resolve())));
+    assert.equal(getRlsContext(), undefined);
+    first.open();
+    await Promise.all([a, b]);
+
+    assert.deepEqual(seen, [actorA, actorB], "the waiting run took the actor of the run it waited behind");
+  });
+});
+
+describe("createKeyedSerialRunner with a deadline", () => {
+  it("lets go of a run that never settles: its key and its place are free again", async () => {
+    let told = 0;
+    const runner = createKeyedSerialRunner({ maxConcurrent: 1, deadlineMs: 20, onDeadline: () => { told += 1; } });
+    const work = probe();
+    const never = new Promise<void>(() => undefined);
+
+    const stuck = runner.run("student-a", work.task(never));
+    const other = runner.run("student-b", work.task(Promise.resolve()));
+    await Promise.all([stuck, other]);
+
+    assert.equal(told, 1, "the deadline was not reported exactly once");
+    assert.equal(work.runs(), 2, "the run waiting for a place never got one");
+    await runner.run("student-a", work.task(Promise.resolve()));
+    assert.equal(work.runs(), 3, "the stuck key never ran again");
+  });
+
+  it("says nothing about a run that finishes in time", async () => {
+    let told = 0;
+    const runner = createKeyedSerialRunner({ deadlineMs: 1000, onDeadline: () => { told += 1; } });
+
+    await runner.run("student-a", async () => undefined);
+    await flush();
+
+    assert.equal(told, 0);
+  });
+
+  it("raises no unhandled rejection when a stuck run fails after its deadline", async () => {
+    const late = gate();
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      const runner = createKeyedSerialRunner({ deadlineMs: 10 });
+      await runner.run("student-a", () => late.promise);
+      late.fail(new Error("failed after the deadline"));
+      await flush();
+      await flush();
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+
+    assert.deepEqual(unhandled, []);
+  });
+});

@@ -37,12 +37,13 @@ mock.module("./logger", {
 // Late import — must come after the mock.module calls.
 let deferAfterResponse: typeof import("./after-response").deferAfterResponse;
 let deferPerStudent: typeof import("./after-response").deferPerStudent;
+let DEFERRED_EFFECT_CONCURRENCY: number;
 
 const ACTOR = { userId: "student-a", role: "student", studentId: "student-a" };
 
 describe("deferAfterResponse", () => {
   before(async () => {
-    ({ deferAfterResponse, deferPerStudent } = await import("./after-response"));
+    ({ deferAfterResponse, deferPerStudent, DEFERRED_EFFECT_CONCURRENCY } = await import("./after-response"));
   });
 
   beforeEach(() => {
@@ -172,6 +173,28 @@ describe("deferPerStudent", () => {
     await all;
     assert.equal(runs, 2);
     assert.equal(peak, 1);
+  });
+
+  // Database review of F3: 30 students signing at once must not start 30
+  // syncs against a pool of 5.
+  it("runs no more than the cap of deferred effects at once across students", async () => {
+    let runs = 0;
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const effect = async () => {
+      runs += 1;
+      await held;
+    };
+
+    for (let i = 0; i < 6; i += 1) deferPerStudent(`cap-student-${i}`, CONTEXT, effect);
+    const all = runScheduled();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(runs, DEFERRED_EFFECT_CONCURRENCY, "more deferred effects ran at once than the cap allows");
+    release();
+    await all;
+    assert.equal(runs, 6, "every student still got their sync");
   });
 
   it("keeps each queued effect on the actor that scheduled it", async () => {
