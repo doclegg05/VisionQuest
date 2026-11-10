@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-10T18:59:57.004Z",
-  "commit": "a784dfc4",
+  "generatedAt": "2026-11-10T19:09:54.821Z",
+  "commit": "2843d655",
   "flags": "none",
-  "ciGreen": false,
+  "ciGreen": null,
   "scores": [
     {
       "label": "Launch tasks",
@@ -37,7 +37,7 @@
       "set": "launch",
       "title": "Readiness scorecard",
       "status": "pass",
-      "detail": "57 tests passed"
+      "detail": "65 tests passed"
     },
     {
       "id": "T2",
@@ -53,7 +53,7 @@
       "set": "launch",
       "title": "Page weight script",
       "status": "pass",
-      "detail": "9 tests passed"
+      "detail": "exit 0"
     },
     {
       "id": "A1",
@@ -557,7 +557,7 @@
       "set": "launch",
       "title": "Production `/api/health` `latency_ms`",
       "status": "fail",
-      "detail": "531 ms (target at most 60, baseline 530)"
+      "detail": "530 ms (target at most 60, baseline 530)"
     },
     {
       "id": "M8",

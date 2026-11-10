@@ -1,14 +1,14 @@
 # Readiness scorecard
 
-Generated 2026-11-10T18:59:57.004Z at commit a784dfc4. Flags: none.
+Generated 2026-11-10T19:09:54.821Z at commit 2843d655. Flags: none.
 
 ## Gates
 
 | ID | Set | Status | Gate | Detail |
 | --- | --- | --- | --- | --- |
-| T1 | launch | pass | Readiness scorecard | 57 tests passed |
+| T1 | launch | pass | Readiness scorecard | 65 tests passed |
 | T2 | launch | pending | Query counter | no check yet |
-| T3 | launch | pass | Page weight script | 9 tests passed |
+| T3 | launch | pass | Page weight script | exit 0 |
 | A1 | launch | pending | Classroom-safe sign-in limits | no check yet |
 | A2 | launch | pending | One password rule | no check yet |
 | A3 | launch | pending | Students can change a password, and must after staff set one | no check yet |
@@ -71,7 +71,7 @@ Generated 2026-11-10T18:59:57.004Z at commit a784dfc4. Flags: none.
 | M4 | launch | fail | Compressed scripts and styles on the sign-in page | 322.2 KB (target at most 235, baseline 322) |
 | M5 | launch | fail | Orientation video size | 34.7 MB (target at most 10, baseline 34.7) |
 | M6 | pilot | unmeasured | App queries for one teacher home render | no measuring command yet (target at most 20, baseline 44) |
-| M7 | launch | fail | Production `/api/health` `latency_ms` | 531 ms (target at most 60, baseline 530) |
+| M7 | launch | fail | Production `/api/health` `latency_ms` | 530 ms (target at most 60, baseline 530) |
 | M8 | pilot | unmeasured | Signed-in student dashboard, median server time in production | no measuring command yet (target at most 1000, baseline not measured) |
 
 ## Owner track: only Britt can close these rows
