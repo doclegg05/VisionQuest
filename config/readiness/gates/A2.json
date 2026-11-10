@@ -5,6 +5,14 @@
   "title": "One password rule",
   "doneWhen": "A test fails when any on-screen hint disagrees with the schema.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/password-policy.test.ts",
+      "src/lib/password-policy.schemas.test.ts",
+      "src/lib/password-policy.one-source.test.ts",
+      "src/app/api/teacher/students/reset-password-length.test.ts",
+      "src/components/teacher/student-detail/OverviewTab.reset-password.test.tsx",
+      "src/app/teacher-register/password-hint.test.tsx"
+    ]
   }
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { PASSWORD_LENGTH_HINT } from "@/lib/password-policy";
 import { resolveStaffRegistrationOutcome, type StaffRole } from "./staff-registration-outcome";
 
 export default function StaffRegisterPage() {
@@ -167,7 +168,7 @@ export default function StaffRegisterPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
+                placeholder={PASSWORD_LENGTH_HINT}
                 required
                 autoComplete="new-password"
                 className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"

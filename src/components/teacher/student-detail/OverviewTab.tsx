@@ -8,6 +8,7 @@ import { MoodSparkline } from "@/components/progression/MoodSparkline";
 import { WellbeingCrisisCard } from "@/components/teacher/WellbeingCrisisCard";
 import { WorkAvailabilityPanel } from "./WorkAvailabilityPanel";
 import { WELLBEING_ALERT_TYPE } from "@/lib/sage/wellbeing-card";
+import { MIN_PASSWORD_LENGTH, PASSWORD_LENGTH_HINT, generatePassword } from "@/lib/password-policy";
 import {
   DiscoveryClusterPicker,
   needsPathwayCluster,
@@ -195,17 +196,34 @@ export default function OverviewTab({
                 <label htmlFor="reset-password-input" className="text-xs text-[var(--ink-muted)]">
                   New password:
                 </label>
+                {/* Plain text, not masked: the instructor reads it to the student. */}
                 <input
                   id="reset-password-input"
-                  type="password"
+                  type="text"
                   value={newPassword}
                   onChange={(event) => onNewPasswordChange(event.target.value)}
-                  placeholder="New password (6+ chars)"
-                  className="text-sm theme-input rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
+                  aria-describedby="reset-password-hint"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  data-1p-ignore
+                  data-lpignore="true"
+                  className="font-mono text-sm theme-input rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 />
                 <button
+                  type="button"
+                  onClick={() => onNewPasswordChange(generatePassword())}
+                  className="inline-flex items-center justify-center rounded-lg border border-[var(--badge-info-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--badge-info-text)] transition-colors hover:bg-[var(--badge-info-bg)] pointer-coarse:min-h-11"
+                >
+                  Make a password
+                </button>
+                <p id="reset-password-hint" className="basis-full text-xs text-[var(--ink-muted)]">
+                  {PASSWORD_LENGTH_HINT}. Tell the student the password before you press Reset. They type the dashes too.
+                </p>
+                <button
                   onClick={onResetPassword}
-                  disabled={resetStatus === "saving" || newPassword.length < 6}
+                  disabled={resetStatus === "saving" || newPassword.length < MIN_PASSWORD_LENGTH}
                   className="primary-button text-xs px-3 py-1.5 rounded-lg pointer-coarse:min-h-11 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {resetStatus === "saving" ? "..." : resetStatus === "done" ? "Done!" : "Reset"}
