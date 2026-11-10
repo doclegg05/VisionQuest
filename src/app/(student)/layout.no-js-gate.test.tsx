@@ -43,7 +43,7 @@ mock.module("@/lib/db", {
   },
 });
 mock.module("@/lib/security-questions", {
-  exports: { needsRecoverySetup: () => false, SECURITY_QUESTIONS: [] },
+  exports: { needsRecoverySetup: () => false, hasConfiguredSecurityQuestionSet: () => true, SECURITY_QUESTIONS: [] },
 });
 // The chrome is not under test; the wrapper around the page is.
 mock.module("@/components/ui/NavBar", { exports: { default: () => null } });
