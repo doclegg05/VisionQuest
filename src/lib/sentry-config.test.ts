@@ -166,16 +166,19 @@ describe("what the SDK would send without asking beforeSend", () => {
   // and unscrubbed (@sentry/node-core build/cjs/integrations/spotlight.js).
   // SENTRY_SPOTLIGHT in the environment turns it on unless the option is
   // exactly false (node-core build/cjs/utils/spotlight.js).
+  // The option is a Node SDK option; the types this file sees do not list it.
+  const spotlightOf = (options: object): unknown => ("spotlight" in options ? options.spotlight : undefined);
+
   it("Spotlight is off in the server options whatever the environment says", () => {
     const before = process.env.SENTRY_SPOTLIGHT;
     process.env.SENTRY_SPOTLIGHT = "1";
     try {
-      assert.equal(serverSentryOptions(TEST_DSN).spotlight, false);
+      assert.equal(spotlightOf(serverSentryOptions(TEST_DSN)), false);
     } finally {
       if (before === undefined) delete process.env.SENTRY_SPOTLIGHT;
       else process.env.SENTRY_SPOTLIGHT = before;
     }
-    assert.equal(Sentry.getClient()?.getOptions().spotlight, false);
+    assert.equal(spotlightOf(Sentry.getClient()?.getOptions() ?? {}), false);
   });
 
   it("the built server client names no host to receive its trace headers", () => {
