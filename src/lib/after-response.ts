@@ -1,5 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { after } from "next/server";
+import { afterWrite } from "./after-write";
+import { createKeyedSerialRunner } from "./keyed-serial-runner";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 
@@ -51,4 +53,34 @@ export function deferAfterResponse(effect: () => Promise<void>): void {
   } catch {
     void guarded();
   }
+}
+
+interface PerStudentContext {
+  /** The route the write belongs to, e.g. "resume". */
+  surface: string;
+  /** The side effect, e.g. "syncStudentAlerts". Part of the queue key. */
+  effect: string;
+}
+
+const perStudentEffects = createKeyedSerialRunner();
+
+/**
+ * Defer a student's bookkeeping (the alert sync) past the response, with at
+ * most one running and one queued per student and effect in this process.
+ *
+ * A student-facing write route calls this instead of awaiting the sync. The
+ * effect is wrapped in `afterWrite`, so a failure is logged with the surface
+ * and `studentLogKey`, never the id. Staff routes keep awaiting the sync: an
+ * instructor's queue must be fresh on their next fetch.
+ */
+export function deferPerStudent(
+  studentId: string,
+  context: PerStudentContext,
+  effect: () => Promise<unknown>,
+): void {
+  deferAfterResponse(() =>
+    perStudentEffects.run(`${context.effect}:${studentId}`, () =>
+      afterWrite(effect, { ...context, studentId }),
+    ),
+  );
 }
