@@ -5,6 +5,9 @@
   "title": "Jobs survive a restart",
   "doneWhen": "A test strands a job and finds it claimed again.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/jobs.lease.test.ts"
+    ]
   }
 }

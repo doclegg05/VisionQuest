@@ -15,9 +15,12 @@ interface ClaimedRow {
   attempts: number;
 }
 
+// processJobs runs the lease reaper (its SQL carries a marker comment)
+// before its claim; it finds nothing to take back in these tests.
 function stubQueryRaw(rows: ClaimedRow[]) {
   const original = prisma.$queryRaw;
-  (prisma.$queryRaw as unknown as (...args: unknown[]) => Promise<ClaimedRow[]>) = async () => rows;
+  (prisma.$queryRaw as unknown as (query: { strings?: readonly string[] }) => Promise<ClaimedRow[]>) = async (query) =>
+    (query.strings ?? []).join("").includes("reap-expired-leases") ? [] : rows;
   return () => {
     prisma.$queryRaw = original;
   };

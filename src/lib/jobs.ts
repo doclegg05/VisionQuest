@@ -13,7 +13,8 @@ import { studentLogKey } from "./log-keys";
  * - Job deduplication via unique key
  * - Processing via inline execution or cron endpoint
  * - A claim is a lease: a job's result is written only while its claim
- *   still holds the row (see finishClaimedJob)
+ *   still holds the row (see finishClaimedJob), and a lease that has run
+ *   past JOB_LEASE_MS is taken back by the next pass (see reapExpiredJobs)
  *
  * Jobs are stored in the BackgroundJob table and processed in order.
  */
@@ -88,6 +89,103 @@ export async function enqueueJobWithCooldown({
   return enqueueJob({ type, payload, dedupeKey });
 }
 
+/** Tries per job, counted by the claim's increment of attempts. */
+const MAX_ATTEMPTS = 3;
+
+/**
+ * How long a claim holds its row before a later pass may take it back.
+ *
+ * No handler has an overall deadline, so this is set from what bounds them
+ * and from how a pass runs:
+ * - A pass claims up to 20 rows at once and stamps startedAt on all of them,
+ *   then runs them one after another, so the last row's age when its handler
+ *   ends is the whole pass, not one job.
+ * - The longest bounded single call a handler makes is a local model turn
+ *   (OllamaProvider.GENERATE_TIMEOUT_MS, 5 minutes; post-response retries an
+ *   extraction up to 3 times). Cloud calls give up at 30 seconds, job-board
+ *   fetches at 30 seconds, SMS at 10 seconds; nodemailer sets no deadline
+ *   here, so SMTP runs on its library defaults.
+ * - Two hours lets a full pass average 6 minutes a job before its last row
+ *   could look expired, and it is the window retireStaleScrapeRuns already
+ *   treats as a live scrape (SCRAPE_RUN_IN_PROGRESS_WINDOW_MS), so the two
+ *   clocks never disagree about a scrape job.
+ * Too short runs a job twice while its first run is still going; too long
+ * delays a crisis email stranded by a restart by up to this plus one cron
+ * interval (10 minutes).
+ */
+export const JOB_LEASE_MS = 2 * 60 * 60 * 1000;
+
+/** Rows taken back per pass; any beyond this wait for the next pass. */
+const REAP_BATCH_LIMIT = 100;
+
+const REQUEUED_REASON = "Interrupted before it finished (the server likely restarted). Queued to try again.";
+const ABANDONED_REASON = "Stopped: the server restarted during its last try. It will not run again.";
+
+interface ReapedJob {
+  type: string;
+  attempts: number;
+  status: "pending" | "failed";
+}
+
+/**
+ * Take back every claim whose lease has expired, in one statement: a row
+ * still "processing" past JOB_LEASE_MS goes back to "pending" when it has
+ * tries left and to "failed" when it does not. FOR UPDATE SKIP LOCKED means
+ * two passes at once never take the same row, and the outer status check
+ * keeps a row that changed underneath from being written twice. sage_memory
+ * rows are left to their own worker, which reclaims them on its own lease
+ * (src/lib/sage/memory/jobs.ts). The marker comment lets test fakes tell
+ * this statement from the claim. Exported for test seams.
+ */
+export async function reapExpiredJobs(): Promise<ReapedJob[]> {
+  const leaseSeconds = JOB_LEASE_MS / 1000;
+  const reaped = await prisma.$queryRaw<ReapedJob[]>(Prisma.sql`
+    /* reap-expired-leases */
+    UPDATE visionquest."BackgroundJob"
+    SET status = CASE WHEN attempts < ${MAX_ATTEMPTS} THEN 'pending' ELSE 'failed' END,
+        error = CASE WHEN attempts < ${MAX_ATTEMPTS} THEN ${REQUEUED_REASON} ELSE ${ABANDONED_REASON} END,
+        "completedAt" = CASE WHEN attempts < ${MAX_ATTEMPTS} THEN NULL ELSE NOW() END
+    WHERE status = 'processing' AND id IN (
+      SELECT id FROM visionquest."BackgroundJob"
+      WHERE status = 'processing'
+        AND type <> 'sage_memory'
+        AND "startedAt" < NOW() - make_interval(secs => ${leaseSeconds})
+      ORDER BY "startedAt" ASC
+      LIMIT ${REAP_BATCH_LIMIT}
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING type, attempts, status
+  `);
+  reaped.forEach(raiseReapAlarm);
+  return reaped;
+}
+
+/** One alarm per job taken back: its type and attempt, never its id or payload. */
+function raiseReapAlarm(job: ReapedJob): void {
+  const requeued = job.status === "pending";
+  logger.error(requeued ? "Background job lease expired; job queued again" : "Background job lease expired on its last try; job failed", {
+    alert: requeued ? "background_job_reclaimed" : "background_job_abandoned",
+    type: job.type,
+    attempt: job.attempts,
+  });
+}
+
+/**
+ * Run the reaper without letting its failure block the claim: pending work,
+ * crisis emails among it, should still go out if the reaper's statement
+ * fails. The failure is raised as its own alarm.
+ */
+async function reapBeforeClaim(): Promise<void> {
+  try {
+    await reapExpiredJobs();
+  } catch (err) {
+    logger.error("Background job reaper failed; expired leases were not taken back", {
+      alert: "background_job_reaper_failed",
+      error: errorForLog(err),
+    });
+  }
+}
+
 interface ClaimedJob {
   id: string;
   type: string;
@@ -118,7 +216,7 @@ export async function claimPendingJobs(limit: number): Promise<ClaimedJob[]> {
         attempts = attempts + 1
     WHERE id IN (
       SELECT id FROM visionquest."BackgroundJob"
-      WHERE status = 'pending' AND attempts < 3 AND type <> 'sage_memory'
+      WHERE status = 'pending' AND attempts < ${MAX_ATTEMPTS} AND type <> 'sage_memory'
       ORDER BY "createdAt" ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
@@ -136,7 +234,7 @@ export async function claimPendingJobById(jobId: string): Promise<ClaimedJob[]> 
     WHERE id = ${jobId}
       AND status = 'pending'
       AND type <> 'sage_memory'
-      AND attempts < 3
+      AND attempts < ${MAX_ATTEMPTS}
     RETURNING id, type, payload, attempts
   `);
 }
@@ -220,7 +318,7 @@ async function processClaimedJobs(claimed: ClaimedJob[]): Promise<number> {
       logger.error("Job failed", { type: job.type, jobId: job.id, attempt: job.attempts, error: errorForLog(err) });
 
       await finishClaimedJob(job, {
-        status: job.attempts >= 3 ? "failed" : "pending",
+        status: job.attempts >= MAX_ATTEMPTS ? "failed" : "pending",
         error: errorMsg,
       });
     }
@@ -247,8 +345,12 @@ async function runWorker(claim: () => Promise<ClaimedJob[]>): Promise<number> {
   }
 }
 
+/** The cron pass: take back expired leases first, then claim pending work. */
 export async function processJobs(limit = 10): Promise<number> {
-  return runWorker(() => claimPendingJobs(limit));
+  return runWorker(async () => {
+    await reapBeforeClaim();
+    return claimPendingJobs(limit);
+  });
 }
 
 export async function processJobById(jobId: string): Promise<number> {

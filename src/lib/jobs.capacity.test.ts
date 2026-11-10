@@ -3,10 +3,18 @@ import { before, mock, test } from "node:test";
 
 let claims = 0;
 let failClaim = false;
+// processJobs runs the lease reaper before its claim; it is not a claim, so
+// it finds nothing to take back here (jobs.lease.test.ts covers it).
+const isReaperQuery = (query: { strings?: readonly string[] }) =>
+  (query.strings ?? []).join("").includes("reap-expired-leases");
 mock.module("./db", { namedExports: { prismaAdmin: {
-  $queryRaw: async () => {
+  $queryRaw: async (query: { strings?: readonly string[] }) => {
+    if (failClaim) {
+      if (!isReaperQuery(query)) claims++;
+      throw new Error("claim failed");
+    }
+    if (isReaperQuery(query)) return [];
     claims++;
-    if (failClaim) throw new Error("claim failed");
     return [{ id: `job-${claims}`, type: "capacity", payload: "{}", attempts: 1 }];
   },
   backgroundJob: { updateMany: async () => ({ count: 1 }) },
