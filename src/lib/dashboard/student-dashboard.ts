@@ -13,17 +13,18 @@
  * the per-student readers.
  */
 import { readinessFromFacts, type StudentReadinessData } from "@/lib/progression/fetch-readiness-data";
-import { nextStepFromFacts } from "@/lib/progression/student-next-step";
+import { prisma } from "@/lib/db";
+import { nextStepFromFacts, nextStepQueries } from "@/lib/progression/student-next-step";
 import { readDashboardGlobals, type DashboardGlobals } from "./globals";
 import { readLiveSignals, readPageLiveSignals, type LiveSignals } from "./live";
 import { overviewFromFacts, summarizeActivity, type DashboardActivity, type DashboardOverview } from "./readers";
-import { getStudentShell, readSlowSignals, readSupportSignals, type SlowSignals, type StudentShell, type SupportSignals } from "./signals";
+import { getSlowSignals, getStudentShell, readAndKeepSlowSignals, type SlowSignals, type StudentShell } from "./signals";
 import { ownStudentId, type CacheSession } from "./student-cache";
 import { supportFromFacts, type DashboardSupport } from "./support";
 
 export interface DashboardSignals {
   readonly shell: StudentShell;
-  readonly slow: SupportSignals;
+  readonly slow: SlowSignals;
   readonly live: LiveSignals;
   readonly globals: DashboardGlobals;
 }
@@ -70,7 +71,7 @@ export function supportOf(signals: DashboardSignals, readinessData: StudentReadi
 }
 
 /** The outcome summaries. Pure. */
-export function overviewOf({ slow, globals }: { slow: SlowSignals; globals: DashboardGlobals }, applicationCount: number, now = new Date()): DashboardOverview {
+export function overviewOf({ slow, globals }: Omit<DashboardSignals, "shell" | "live">, applicationCount: number, now = new Date()): DashboardOverview {
   return overviewFromFacts({
     certs: slow.certs,
     templates: globals.readyToWorkTemplates,
@@ -86,7 +87,7 @@ export async function loadStudentDashboard(session: CacheSession, now = new Date
   const studentId = ownStudentId(session);
   const shell = await getStudentShell(session);
   const [slow, live, globals] = await Promise.all([
-    readSlowSignals(studentId),
+    readAndKeepSlowSignals(session),
     readPageLiveSignals(studentId),
     readDashboardGlobals(),
   ]);
@@ -105,15 +106,26 @@ export async function loadStudentDashboard(session: CacheSession, now = new Date
   };
 }
 
-/** The advising region alone, for its poll (`GET /api/dashboard/support`). */
+/** The advising region alone, for its poll (`GET /api/dashboard/support`). Live signals are read every time. */
 export async function readStudentSupport(session: CacheSession, now = new Date()): Promise<DashboardSupport> {
   const studentId = ownStudentId(session);
   const [shell, slow, live, globals] = await Promise.all([
     getStudentShell(session),
-    readSupportSignals(studentId),
+    getSlowSignals(session),
     readLiveSignals(studentId),
     readDashboardGlobals(),
   ]);
   const signals = { shell, slow, live, globals };
   return supportOf(signals, readinessOf(signals), now);
+}
+
+/** The outcome summaries alone, for their poll (`GET /api/dashboard/overview`). The application count is live. */
+export async function readStudentOverview(session: CacheSession, now = new Date()): Promise<DashboardOverview> {
+  const studentId = ownStudentId(session);
+  const [slow, globals, applicationCount] = await Promise.all([
+    getSlowSignals(session),
+    readDashboardGlobals(),
+    prisma.application.count(nextStepQueries(studentId).applicationCount),
+  ]);
+  return overviewOf({ slow, globals }, applicationCount, now);
 }

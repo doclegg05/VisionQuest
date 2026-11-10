@@ -18,6 +18,7 @@ import { readinessQueries } from "@/lib/progression/fetch-readiness-data";
 import { nextStepQueries } from "@/lib/progression/student-next-step";
 import { overviewQueries } from "./readers";
 import { orientationItemsQuery } from "./support";
+import { cached, invalidate } from "@/lib/cache";
 import { cachedWhen, studentCacheKey, type CacheSession } from "./student-cache";
 
 type Tx = Prisma.TransactionClient;
@@ -114,17 +115,6 @@ async function readOverviewSignals(tx: Tx, studentId: string) {
   };
 }
 
-/** The slow signals the advising region needs: readiness and the next step. */
-export type SupportSignals = Omit<SlowSignals, "certs" | "applicability" | "educationPlanStatus" | "linkedGoals">;
-
-/** The advising region's slow signals, read in one transaction. Uncached. */
-export function readSupportSignals(studentId: string): Promise<SupportSignals> {
-  return withAppTransaction(async (tx) => ({
-    ...(await readReadinessSignals(tx, studentId)),
-    ...(await readNextStepSignals(tx, studentId)),
-  }));
-}
-
 /** Every slow signal, read in one transaction. Uncached. */
 export function readSlowSignals(studentId: string): Promise<SlowSignals> {
   return withAppTransaction(async (tx) => ({
@@ -132,4 +122,48 @@ export function readSlowSignals(studentId: string): Promise<SlowSignals> {
     ...(await readNextStepSignals(tx, studentId)),
     ...(await readOverviewSignals(tx, studentId)),
   }));
+}
+
+/**
+ * How long a poll may serve slow signals the page or an earlier poll kept.
+ * Longer than the poll interval on purpose: a TTL shorter than the poll never
+ * serves a poll. What bounds staleness is invalidation, not the TTL: every
+ * input but three is cleared on write (./student-cache.ts), and the page render
+ * always reads fresh. The three that no write clears (discovery chat turns,
+ * the class's Ready-to-Work requirement, a pathway's active flag) can lag by
+ * up to this long, on a poll only.
+ */
+export const SLOW_SIGNALS_TTL_SECONDS = 600;
+
+/**
+ * True when the read saw at least one of the student's own rows. A read that
+ * lost its RLS context sees none, and keeping that would pin a blank student
+ * for the whole TTL. The orientation item list is left out: with no context
+ * its "no progress yet" filter matches every item. A student with no rows at
+ * all is simply read on every poll.
+ */
+export function sawStudentRows(slow: SlowSignals): boolean {
+  return slow.bhagCompleted || slow.hasResume || slow.portfolioShared || slow.careerDiscoveryComplete
+    || slow.certificationsEarned + slow.portfolioItemCount + slow.monthlyGoalCount + slow.sageProposedUnconfirmedGoalCount
+      + slow.discoveryAssistantTurnCount + slow.completedMilestoneCount + slow.linkedGoals + slow.certs.length > 0
+    || slow.applicability !== null || slow.educationPlanStatus !== null;
+}
+
+const slowKey = (session: CacheSession) => studentCacheKey(session, "slow");
+
+/** The slow signals for a poll: kept ones when there are any, else read and kept. */
+export function getSlowSignals(session: CacheSession): Promise<SlowSignals> {
+  return cachedWhen(slowKey(session), SLOW_SIGNALS_TTL_SECONDS, () => readSlowSignals(session.id), sawStudentRows);
+}
+
+/**
+ * The page render reads slow signals fresh (so unwatched inputs are never
+ * stale on a page load) and keeps what it read for the polls that follow.
+ */
+export async function readAndKeepSlowSignals(session: CacheSession): Promise<SlowSignals> {
+  const key = slowKey(session);
+  const slow = await readSlowSignals(session.id);
+  if (!sawStudentRows(slow)) return slow;
+  invalidate(key);
+  return cached(key, SLOW_SIGNALS_TTL_SECONDS, async () => slow);
 }

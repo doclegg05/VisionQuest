@@ -97,3 +97,72 @@ describe("loadStudentDashboard", () => {
     assert.ok(queries.some((q) => q.model === "progression"), "the empty shell was kept");
   });
 });
+
+/** Models only the slow signals read; a poll that touches none served them kept. */
+const SLOW_MODELS = new Set(["careerDiscovery", "message", "certification", "portfolioItem", "resumeData", "publicCredentialPage", "studentClassEnrollment", "formSubmission"]);
+/** Models the advising poll must read every time: nothing invalidates them. */
+const LIVE_MODELS = ["studentAlert", "appointment", "studentSavedJob", "application", "studentTask"];
+const modelsRead = async (work: () => Promise<unknown>) => new Set((await counter.section(work)).queries.map((q) => q.model));
+
+describe("the polls read slow signals kept by the page, live ones every time", () => {
+  it("the advising poll after a page render reads no slow model and every live one", async () => {
+    await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    const read = await modelsRead(() => loader.readStudentSupport(student(DASHBOARD_STUDENT_ID), NOW));
+    assert.deepEqual([...read].filter((model) => SLOW_MODELS.has(model)), []);
+    for (const model of LIVE_MODELS) assert.ok(read.has(model), `${model} was not read live`);
+  });
+
+  it("the overview poll matches readOverview and reads only the live application count", async () => {
+    await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    const read = await modelsRead(() => loader.readStudentOverview(student(DASHBOARD_STUDENT_ID), NOW));
+    assert.deepEqual([...read], ["application"]);
+    const polled = await loader.readStudentOverview(student(DASHBOARD_STUDENT_ID), NOW);
+    assert.deepEqual(polled.outcomes, (await readers.readOverview(DASHBOARD_STUDENT_ID)).outcomes);
+  });
+
+  it("a poll with nothing kept reads the slow signals and keeps them", async () => {
+    assert.ok((await modelsRead(() => loader.readStudentSupport(student(DASHBOARD_STUDENT_ID), NOW))).has("careerDiscovery"));
+    assert.ok(!(await modelsRead(() => loader.readStudentSupport(student(DASHBOARD_STUDENT_ID), NOW))).has("careerDiscovery"));
+  });
+
+  it("never keeps slow signals with no student rows, which is what a read without RLS context sees", async () => {
+    counter.useFixtures({
+      ...DASHBOARD_FIXTURES,
+      "goal.count": 0, "goal.findFirst": null, "certification.count": 0, "certification.findMany": [], "portfolioItem.count": 0,
+      "resumeData.findUnique": null, "publicCredentialPage.findUnique": null, "careerDiscovery.findUnique": null, "message.count": 0,
+      "studentClassEnrollment.findFirst": null, "formSubmission.findFirst": null,
+    });
+    await loader.readStudentSupport(student(DASHBOARD_STUDENT_ID), NOW);
+    assert.ok((await modelsRead(() => loader.readStudentSupport(student(DASHBOARD_STUDENT_ID), NOW))).has("careerDiscovery"));
+  });
+
+  it("a write that clears the student's chat context makes the next poll read again", async () => {
+    await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    cache.invalidateChatContext(DASHBOARD_STUDENT_ID);
+    assert.ok((await modelsRead(() => loader.readStudentSupport(student(DASHBOARD_STUDENT_ID), NOW))).has("careerDiscovery"));
+  });
+
+  it("kept slow signals never cross students", async () => {
+    counter.useFixtures({
+      ...DASHBOARD_FIXTURES,
+      "careerDiscovery.findUnique": perStudent({ status: "complete" }, { status: "in_progress" }),
+      "certification.findMany": perStudent(DASHBOARD_FIXTURES["certification.findMany"], []),
+      "certification.count": perStudent(0, 3),
+    });
+    await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    await loader.loadStudentDashboard(student(OTHER_ID), NOW);
+    // Each poll, served from what is kept, equals that student's own fresh read.
+    for (const id of [DASHBOARD_STUDENT_ID, OTHER_ID]) {
+      const polled = await loader.readStudentSupport(student(id), NOW);
+      assert.deepEqual(polled.nextStep, await nextStep.getStudentNextStep(id), `next step for ${id}`);
+    }
+    const [myOverview, theirOverview] = await Promise.all([
+      loader.readStudentOverview(student(DASHBOARD_STUDENT_ID), NOW),
+      loader.readStudentOverview(student(OTHER_ID), NOW),
+    ]);
+    assert.deepEqual(myOverview.outcomes, (await readers.readOverview(DASHBOARD_STUDENT_ID)).outcomes);
+    assert.deepEqual(theirOverview.outcomes, (await readers.readOverview(OTHER_ID)).outcomes);
+    assert.match(myOverview.outcomes[1].detail, /Completion: in progress/);
+    assert.match(theirOverview.outcomes[1].detail, /Completion: not started/);
+  });
+});
