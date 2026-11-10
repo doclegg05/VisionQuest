@@ -22,7 +22,7 @@ function fetchBody(body: string | Uint8Array): string | Uint8Array<ArrayBuffer> 
  * requests in a private buffer until a flush, and this one starts each
  * request when the event is captured.
  */
-export function makeEdgeFetchTransport(options: TransportOptions): Transport {
+function makeEdgeFetchTransport(options: TransportOptions): Transport {
   return Sentry.createTransport(options, (request) =>
     Sentry.suppressTracing(() =>
       fetch(options.url, { body: fetchBody(request.body), method: "POST", headers: options.headers }).then((response) => ({

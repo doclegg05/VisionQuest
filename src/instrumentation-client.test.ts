@@ -275,6 +275,37 @@ describe("the wire filter in the browser", () => {
     assert.deepEqual(plantedIn(wireText(envelopes)), []);
   });
 
+  it("an error that leaves still tells Sentry not to take the visitor's IP address from the connection", async () => {
+    await startedPage();
+    client.reportClientError(new Error("boom"));
+    await settle();
+    assert.deepEqual(sentEvents().map((event) => event.sdk?.settings), [{ infer_ip: "never" }]);
+  });
+
+  it("the name the app takes from the SDK is the browser SDK's own fetch transport", () => {
+    assert.equal(typeof Browser.makeFetchTransport, "function");
+  });
+
+  it("the SDK's own fetch transport, behind the filter, posts the rebuilt envelope and nothing else", async () => {
+    const { wireAllowlistTransport } = await import("@/lib/sentry-wire");
+    const posted: { url: string; body: string }[] = [];
+    const recordingFetch: typeof fetch = async (url, request) => {
+      posted.push({ url: String(url), body: String(request?.body) });
+      return new Response(null, { status: 200 });
+    };
+    type FetchTransportOptions = Parameters<typeof Browser.makeFetchTransport>[0];
+    const make = wireAllowlistTransport((options: FetchTransportOptions) => Browser.makeFetchTransport(options, recordingFetch));
+    const transport = make({ url: "https://browser.invalid/api/456/envelope/", recordDroppedEvent: () => {} });
+    await transport.send(envelopeOf(["session", "client_report", "attachment", "log"]));
+    await transport.send(hostileEnvelope());
+    await transport.flush(2_000);
+    assert.deepEqual(posted.map(({ url }) => url), ["https://browser.invalid/api/456/envelope/"]);
+    const lines = (posted[0]?.body ?? "").split("\n");
+    assert.deepEqual(Object.keys(JSON.parse(lines[0] ?? "{}")).sort(), HEADER_KEYS);
+    assert.deepEqual(lines.slice(1, -1), ['{"type":"event"}']);
+    assert.deepEqual(plantedIn(posted[0]?.body), []);
+  });
+
   it("an envelope that holds no event is not sent at all", async () => {
     await startedPage();
     await Browser.getClient()?.getTransport()?.send(envelopeOf(["session", "client_report", "attachment", "log"]));

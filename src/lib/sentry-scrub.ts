@@ -11,8 +11,10 @@ import { ROUTE_SEGMENTS } from "@/lib/route-segments.generated";
  * an error report.
  *
  * `scrubPii` is `beforeSend` in all three runtimes (sentry.server.config.ts,
- * sentry.edge.config.ts, src/instrumentation-client.ts). It does not edit the
- * SDK's event; it BUILDS a new one from an allowlist. A field that is not
+ * sentry.edge.config.ts, src/instrumentation-client.ts), and the wire filter
+ * (sentry-wire.ts) runs it again on every event a transport is handed,
+ * because the SDK does not call `beforeSend` for everything it sends. It
+ * does not edit the SDK's event; it BUILDS a new one from an allowlist. A field that is not
  * named here is not sent, so a field a later SDK version adds is not sent
  * either. Every string that survives is a fixed literal or matches a closed
  * shape (an id, a class name, a source file, a route pattern); no sentence
@@ -287,14 +289,23 @@ function safeContexts(contexts: EventContexts): EventContexts {
 
 type SdkInfo = NonNullable<Event["sdk"]>;
 
+/**
+ * The SDK's name, version, integrations and packages, and one fixed setting:
+ * `infer_ip: "never"`, which tells Sentry not to take an IP address from the
+ * connection the event arrived on. In the browser that address is the
+ * student's. The SDK writes its own value AFTER `beforeSend`
+ * (@sentry/core envelope.js `createEventEnvelope`), "never" unless default
+ * PII is on, so the scrub's second pass at the wire is the one that decides
+ * what is sent. It always sends "never", whatever it was handed.
+ */
 function safeSdk(sdk: SdkInfo): SdkInfo {
-  const isLabel = shaped(SHAPE.label);
   return {
     ...pick(sdk, ["name", "version"], isLabel),
     ...(Array.isArray(sdk.integrations) && { integrations: sdk.integrations.filter(isLabel) }),
     ...(Array.isArray(sdk.packages) && {
       packages: sdk.packages.filter((entry) => isLabel(entry.name) && isLabel(entry.version)).map(({ name, version }) => ({ name, version })),
     }),
+    settings: { infer_ip: "never" },
   };
 }
 

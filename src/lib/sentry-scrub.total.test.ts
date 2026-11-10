@@ -178,6 +178,23 @@ describe("scrubPii drops what it cannot read", () => {
   });
 });
 
+// `sdk.settings.infer_ip` is the SDK's instruction to Sentry about the
+// sender's IP address: "auto" takes it from the connection, "never" does not.
+describe("the sdk block always says not to infer an IP address", () => {
+  const sdk = { name: "sentry.javascript.nextjs", version: "10.76.2" };
+
+  it("writes never, whatever the event said", () => {
+    for (const settings of [undefined, { infer_ip: "auto" }, { infer_ip: "never" }, { infer_ip: PLANTED.name }, PLANTED.name, null]) {
+      const out = scrubAnything({ ...browserErrorEvent(), sdk: { ...sdk, settings } });
+      assert.deepEqual(out?.sdk, { ...sdk, settings: { infer_ip: "never" } });
+    }
+  });
+
+  it("adds no sdk block to an event that had none", () => {
+    assert.equal(scrubPii(browserErrorEvent())?.sdk, undefined);
+  });
+});
+
 // The wire filter scrubs every event a second time (src/lib/sentry-wire.ts),
 // so a second pass must not take anything more from a well-formed event.
 describe("scrubbing an event twice", () => {

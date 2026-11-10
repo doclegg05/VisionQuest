@@ -96,8 +96,20 @@ describe("server config", () => {
   });
 });
 
-/** The headers a loopback server receives from one `node:http` request made here. */
-async function headersOfOutgoingRequest(): Promise<http.IncomingHttpHeaders> {
+/** One request to `url` with `node:http`. */
+function getWithHttp(url: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    http.get(url, (reply) => reply.resume().on("end", resolve)).on("error", reject);
+  });
+}
+
+/** One request to `url` with `fetch`, which is what the app's own outgoing calls use. */
+async function getWithFetch(url: string): Promise<void> {
+  await (await fetch(url)).text();
+}
+
+/** The headers a loopback server receives from one request made here by `send`. */
+async function headersOfOutgoingRequest(send: (url: string) => Promise<void> = getWithHttp): Promise<http.IncomingHttpHeaders> {
   let received: http.IncomingHttpHeaders = {};
   const server = http.createServer((incoming, response) => {
     received = incoming.headers;
@@ -107,9 +119,7 @@ async function headersOfOutgoingRequest(): Promise<http.IncomingHttpHeaders> {
   const address = server.address();
   const port = address !== null && typeof address !== "string" ? address.port : 0;
   try {
-    await new Promise<void>((resolve, reject) => {
-      http.get(`http://127.0.0.1:${port}/api/partner/lookup`, (reply) => reply.resume().on("end", resolve)).on("error", reject);
-    });
+    await send(`http://127.0.0.1:${port}/api/partner/lookup`);
   } finally {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
@@ -169,6 +179,22 @@ describe("what the SDK would send without asking beforeSend", () => {
     });
     assert.equal(headers.host?.startsWith("127.0.0.1:"), true, "the request arrived");
     assert.deepEqual([headers["sentry-trace"], headers.baggage, headers.traceparent], [undefined, undefined, undefined]);
+  });
+
+  // Unlike the two above, this passes with or without the option today: no
+  // integration the app keeps instruments `fetch`. It is here because the
+  // app's own outgoing calls use `fetch`, so adding such an integration back
+  // would show up.
+  it("nor does an outgoing fetch, inside a request or outside one", async () => {
+    const seen: http.IncomingHttpHeaders[] = [await headersOfOutgoingRequest(getWithFetch)];
+    await insideRequest(async () => {
+      seen.push(await headersOfOutgoingRequest(getWithFetch));
+    });
+    assert.equal(seen.length, 2);
+    for (const headers of seen) {
+      assert.equal(headers.host?.startsWith("127.0.0.1:"), true, "the request arrived");
+      assert.deepEqual([headers["sentry-trace"], headers.baggage, headers.traceparent], [undefined, undefined, undefined]);
+    }
   });
 });
 

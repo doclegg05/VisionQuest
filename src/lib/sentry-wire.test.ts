@@ -98,6 +98,19 @@ describe("the wire filter", () => {
     assert.equal(eventsIn([sent])[0]?.transaction, `POST ${PLANTED_REQUEST.routePattern}`);
   });
 
+  // The SDK tells Sentry not to take an IP address from the connection with
+  // `sdk.settings.infer_ip: "never"`, and it writes that AFTER `beforeSend`
+  // (@sentry/core envelope.js `createEventEnvelope`). The second scrub is the
+  // one that decides whether it is sent. In the browser the connection's
+  // address is the student's.
+  it("always tells Sentry not to take an IP address from the connection", () => {
+    const hostile = hostileEnvelope();
+    assert.equal(eventsIn([hostile])[0]?.sdk?.settings?.infer_ip, "auto", "the fixture asks Sentry to infer one");
+    const sent = allowlistedEnvelope(hostile);
+    assert.ok(sent);
+    assert.deepEqual(eventsIn([sent])[0]?.sdk?.settings, { infer_ip: "never" });
+  });
+
   it("rebuilds the header with three keys: no trace, no DSN", () => {
     const hostile = hostileEnvelope();
     assert.deepEqual(Object.keys(hostile[0]).sort(), ["dsn", "event_id", "sdk", "sent_at", "trace"], "the fixture's header");
