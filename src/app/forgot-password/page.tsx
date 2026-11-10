@@ -152,7 +152,7 @@ export default function ForgotPasswordPage() {
                   spellCheck={false}
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
-                  placeholder="you@example.com or student ID"
+                  placeholder="Your username or email"
                   required
                   className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
@@ -234,7 +234,7 @@ export default function ForgotPasswordPage() {
                   spellCheck={false}
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
-                  placeholder="you@example.com or student ID"
+                  placeholder="Your username or email"
                   required
                   className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
