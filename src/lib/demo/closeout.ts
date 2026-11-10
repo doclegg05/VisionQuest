@@ -331,7 +331,7 @@ export const KEPT_ON_PURPOSE: Readonly<Partial<Record<Prisma.ModelName, string>>
 };
 
 /** Rows of unmarked accounts that hang off a demo class and would go, or change, with it. */
-const UNMARKED_ON_DEMO_CLASS: ReadonlyArray<{ model: Prisma.ModelName; where: (classIds: Ids) => Where }> = [
+export const UNMARKED_ON_DEMO_CLASS: ReadonlyArray<{ model: Prisma.ModelName; where: (classIds: Ids) => Where }> = [
   { model: "SpokesClassInstructor", where: (ids) => ({ classId: { in: ids }, instructor: UNMARKED }) },
   {
     model: "ResumeVersion", // L617 and L618 Cascade
@@ -635,6 +635,8 @@ async function applyPlan(run: Run, preview: CloseoutPreview): Promise<Pick<Close
       metadata: JSON.stringify({ accounts: run.plan.accountIds.length, classes: run.plan.classIds.length, rows }),
     },
   });
+  // The preview's counts are the deleted counts: the row-count check above
+  // has just proved every table shrank by exactly these numbers.
   return { deleted: preview.rowsToDelete, remaining };
 }
 

@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PrismaClient } from "@prisma/client";
-import { CLASS_COLUMNS, DELETE_STEPS, GUARDED_REFS, KEPT_ON_PURPOSE, tableOf } from "./closeout";
+import { CLASS_COLUMNS, DELETE_STEPS, GUARDED_REFS, KEPT_ON_PURPOSE, UNMARKED_ON_DEMO_CLASS, tableOf } from "./closeout";
 import { EDGES, MODELS, modelNamed } from "./closeout.fixtures";
 
 const key = (model: string, column: string) => `${model}.${column}`;
@@ -21,6 +21,19 @@ const ownedColumns = new Set(accountSteps.flatMap((step) => (step.column ? [key(
 const guardedColumns = new Set(GUARDED_REFS.map((ref) => key(ref.model, ref.column)));
 const classColumns = new Set(CLASS_COLUMNS.map((ref) => key(ref.model, ref.column)));
 const deletedModels = new Set<string>(DELETE_STEPS.map((step) => step.model));
+
+/** Field and relation names in a where clause that the schema does not have, followed through relations. */
+function unknownNames(model: string, where: unknown, path = model): string[] {
+  if (typeof where !== "object" || where === null || Array.isArray(where)) return [];
+  return Object.entries(where).flatMap(([name, condition]): string[] => {
+    if (name === "AND" || name === "OR" || name === "NOT") {
+      return (Array.isArray(condition) ? condition : [condition]).flatMap((part) => unknownNames(model, part, path));
+    }
+    const field = modelNamed(model).fields.find((candidate) => candidate.name === name);
+    if (!field) return [`${path}.${name}`];
+    return field.kind === "object" ? unknownNames(field.type, condition, `${path}.${name}`) : [];
+  });
+}
 
 describe("demo closeout inventory", () => {
   it("classifies every foreign key to Student as deleted with its owner or guarded", () => {
@@ -90,6 +103,19 @@ describe("demo closeout inventory", () => {
     });
 
     assert.deepEqual(wrong, []);
+  });
+
+  it("filters only on fields and relations the schema has, however deep the filter goes", () => {
+    const ids = ["an-id"];
+    const filters = [
+      ...DELETE_STEPS.map((step) => ({ model: step.model, where: step.where(ids) })),
+      ...UNMARKED_ON_DEMO_CLASS.map((entry) => ({ model: entry.model, where: entry.where(ids) })),
+      ...GUARDED_REFS.flatMap((ref) => (ref.survives.kind === "where" ? [{ model: ref.model, where: ref.survives.where(ids) }] : [])),
+    ];
+
+    assert.ok(filters.length >= 100);
+    assert.deepEqual(filters.flatMap((filter) => unknownNames(filter.model, filter.where)), []);
+    assert.deepEqual(unknownNames("Goal", { student: { noSuchColumn: null }, OR: [{ nope: 1 }] }), ["Goal.student.noSuchColumn", "Goal.nope"]);
   });
 
   it("gives an id column to every model that more than one step deletes from", () => {
