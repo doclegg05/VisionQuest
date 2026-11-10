@@ -1,6 +1,6 @@
 /**
- * Owner's command for the demo closeout (readiness H10). DEPLOY.md, "Close the
- * demo after Dec 18, 2026", has the steps around it.
+ * Owner's command for the demo closeout (readiness H10). DEPLOY.md, "Turn it
+ * off after Dec 18, 2026", has the steps around it.
  *
  *   node --import tsx scripts/demo-closeout.ts
  *   node --import tsx scripts/demo-closeout.ts --apply --confirm-demo-disabled

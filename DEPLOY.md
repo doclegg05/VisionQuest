@@ -356,12 +356,45 @@ Two limits are fixed in code. One network can start 10 new demo students an hour
 
 ### Turn it off after Dec 18, 2026
 
-1. Open the VisionQuest web service in the Render dashboard, then **Environment**.
-2. Delete `COHORT_DEMO_MODE`. Delete the three limit variables too if you added them.
-3. Save, and let Render deploy.
-4. Open the sign-in page and check that the demo buttons are gone and the Google block is back.
+Closing the demo has seven steps. Do them in this order. Steps 3 and 4 run a tool from this checkout. The others are done in the Render dashboard, service `visionquest`, **Environment** tab, or in Supabase.
 
-After that, the demo endpoints answer 404, and any demo session that is still open stops working on its next request. Demo accounts have no password, so nobody can sign in to one again. The demo students, the demo instructor and the "Cohort Demo Class" stay in the database until someone deletes them, which this change does not do.
+The tool deletes every account marked as demo, which means the demo students and the shared demo instructor. It deletes the "Cohort Demo Class". It deletes every row attached to them: chats, goals, upload records, forms, alerts, appointments, case notes, Sage memories, and the audit log entries that name them. All of it happens in one transaction, and the tool then writes one audit log entry that holds counts only.
+
+What the tool does not remove:
+
+* **Mock students that are not marked as demo.** An account made before demo mode, or made by hand, has no demo mark. The preview counts these under `unmarked` and the tool never deletes one. Decide what to do with them yourself before real students start.
+* **Public credential pages of those unmarked accounts.** The preview counts them as `publicCredentialPages`, and counts the ones anyone can open at `/credentials/...` as `publicCredentialPagesSwitchedOn`. An older page address is the same as the student's login name.
+* **Uploaded files in storage.** The tool deletes the database row for each demo upload. The stored file stays in the bucket named by `STORAGE_BUCKET`. The preview gives the number as `uploadedFilesLeftInStorage`.
+* **Shared program content** that a demo account only pointed at: employers, events, form templates, program documents, regions, and job listings of other classes.
+* **Counters and queued jobs** that hold no student record: rate limit rows and background jobs. A class id saved in a program setting, such as a pilot class list, also stays.
+
+1. **Take a backup and confirm it.** In the Supabase dashboard open the project, then Database, then Backups. Confirm that a backup from today exists, or that point in time recovery is on. If neither is true, make an export yourself with the `pg_dump` command under [Backups](#backups) and check that the file is not empty. Without a backup the closeout cannot be undone. `docs/runbooks/backup-restore.md` has the detail.
+2. **Turn demo mode off and let the deploy finish.** In the Render dashboard, service `visionquest`, **Environment** tab, delete `COHORT_DEMO_MODE`. Delete the three limit variables too if you added them. Save, and wait until the deploy is live. Open the page where people sign in and check that the demo buttons are gone and the Google block is back. From then on the demo endpoints answer 404, and a demo session that is still open stops working on its next request. Demo accounts have no password, so nobody can sign in to one again.
+3. **Run the preview and read the counts.** Open a terminal in this checkout. The tool needs the admin connection string in the variable `ADMIN_DATABASE_URL` of that shell. Copy its value from the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL`. Then run this line, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history:
+   ```sh
+   read -rs ADMIN_DATABASE_URL && export ADMIN_DATABASE_URL
+   ```
+   The tool reads no file for the value and never prints it. `COHORT_DEMO_MODE` must not be set in that shell. Now run the preview:
+   ```sh
+   node --import tsx scripts/demo-closeout.ts
+   ```
+   The preview prints counts only and changes nothing. Read four parts of it. `marked` is the accounts it will delete. `rowsToDelete` is the rows that go, table by table. `unmarked` is the people it leaves alone. `refusals` is the list of reasons it would stop. An empty `refusals` list means the apply will run. Each entry in a list that is not empty is one sentence and a count. Fix the cause and preview again. The tool has no option that skips a refusal.
+4. **Run the apply.**
+   ```sh
+   node --import tsx scripts/demo-closeout.ts --apply --confirm-demo-disabled
+   ```
+   `--confirm-demo-disabled` is your word that step 2 is finished. The tool can see only the shell it runs in, not Render. Exit code 0 means done, and the output lists the rows deleted in each table. Exit code 2 means it refused and nothing was deleted. Exit code 1 means it failed, the transaction was rolled back, and nothing was deleted.
+5. **Set `REAL_STUDENT_DATA` to `true`.** In the Render dashboard, service `visionquest`, **Environment** tab, add the key `REAL_STUDENT_DATA` with the value `true`. Do it only after step 4 has succeeded, and before the first real student gets an account. From then on production refuses to start if `COHORT_DEMO_MODE` is ever turned on again.
+6. **Keep `AI_LOCAL_ONLY` set to `true`.** It is on the same tab. Do not delete it along with the demo variables. It is the switch that blocks cloud AI for every account. See [Cloud AI block](#cloud-ai-block-check-before-deploying).
+7. **Check afterwards.**
+   * Run the preview again. `marked` shows 0 students, 0 instructors and 0 demo classes.
+   * The Render log of the next start has no line named `boot_probe_demo_closeout_unfinished` and none named `boot_probe_demo_rows_beside_real_data`.
+   * Sign in as a teacher. The class list has no "Cohort Demo Class", and the queue of students who need attention has no demo student.
+   * Send Sage one message and check that it answers.
+   * Decide what to do with the unmarked mock accounts the preview counted.
+   * Close the terminal you used, or run `unset ADMIN_DATABASE_URL` in it.
+
+The tool refuses, and deletes nothing, in these cases: demo mode is on in its shell; its connection is limited by row level security; an account with no demo mark is enrolled in the demo class or teaches it; a marked account teaches or coordinates a class or region that has unmarked students; a marked account is named on a row that belongs to someone else or to the program; a class has the demo class code but the demo instructor does not own it. It also checks its own work before it commits. If any row would be left pointing at a deleted account, or any table would lose a row the preview did not count, it rolls everything back and reports a refusal.
 
 ### Reset the fictional roster (owner operation)
 
@@ -375,7 +408,7 @@ The reset tool defaults to a preview and never deletes student records. It archi
    ```
 3. Re-enable demo mode in Render and wait for the restart/deployment. The restart clears the bootstrap cache. Enter as the instructor and check the four fresh starter students.
 
-The tool refuses a class not owned by the marked demo instructor, unmarked students in the demo roster, and selected students enrolled in another class. Preview reports counts only. Apply is transactional; any error rolls back all changes. Keep the switch off until the reset finishes. There is no reset endpoint available to public demo visitors. This is a roster reset, not deletion of demo history or instructor settings.
+The tool refuses a class not owned by the marked demo instructor, unmarked students in the demo roster, and selected students enrolled in another class. Preview reports counts only. Apply is transactional; any error rolls back all changes. Keep the switch off until the reset finishes. There is no reset endpoint available to public demo visitors. This is a roster reset, not deletion of demo history or instructor settings. To delete the demo data for good, follow [Turn it off after Dec 18, 2026](#turn-it-off-after-dec-18-2026).
 
 ## Chat-First Rebuild (June 2026): operational notes
 

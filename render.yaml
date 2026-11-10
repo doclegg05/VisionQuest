@@ -64,6 +64,16 @@ services:
       # must name the same origin.
       - key: AI_LOCAL_APPROVED_ORIGIN
         value: "http://127.0.0.1:11437"
+      # The owner's declaration that real students are in this database. Leave
+      # it unset while the cohort demo runs. Set it to "true" in the dashboard
+      # only after the demo closeout has deleted the demo rows (DEPLOY.md,
+      # "Turn it off after Dec 18, 2026") and before the first real student
+      # gets an account. While it is "true", a production start is refused if
+      # COHORT_DEMO_MODE is on as well, and a start logs an alarm if marked
+      # demo accounts are still in the database (src/lib/boot-probes.ts). No
+      # value here, so a Blueprint sync never sets or clears it.
+      - key: REAL_STUDENT_DATA
+        sync: false
       # Mac relay (docs/runbooks/mac-sage-connection.md). Production sets this
       # to "true": scripts/start-production.mjs then starts the relay that
       # carries Sage's prompts to the Mac's local model, and it also turns the
