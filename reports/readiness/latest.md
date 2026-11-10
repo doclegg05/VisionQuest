@@ -1,14 +1,15 @@
 # Readiness scorecard
 
-Generated 2026-11-10T19:09:54.821Z at commit 2843d655. Flags: none.
+Generated 2026-11-10T19:33:44.136Z at commit cb5e96b2. Flags: none.
 
 ## Gates
 
 | ID | Set | Status | Gate | Detail |
 | --- | --- | --- | --- | --- |
-| T1 | launch | pass | Readiness scorecard | 65 tests passed |
-| T2 | launch | pending | Query counter | no check yet |
+| T1 | launch | pass | Readiness scorecard | 66 tests passed |
+| T2 | launch | pass | Query counter | 36 tests passed |
 | T3 | launch | pass | Page weight script | exit 0 |
+| T4 | pilot | pending | Counter fidelity | no check yet |
 | A1 | launch | pending | Classroom-safe sign-in limits | no check yet |
 | A2 | launch | pending | One password rule | no check yet |
 | A3 | launch | pending | Students can change a password, and must after staff set one | no check yet |
@@ -25,13 +26,14 @@ Generated 2026-11-10T19:09:54.821Z at commit 2843d655. Flags: none.
 | C5 | pilot | pending | One class filter | no check yet |
 | C6 | pilot | pending | Program Setup is safe | no check yet |
 | C7 | pilot | pending | Staff wording and narrow screens | no check yet |
-| D1 | launch | pending | The signed-form banner tells the truth, per R5 | no check yet |
+| D1 | launch | pending | The signed-form banner is removed from the student home, per R5 | no check yet |
 | D2 | launch | pending | Orientation documents open on phones | no check yet |
 | D3 | launch | pending | Sign-in form first on phones | no check yet |
 | D4 | pilot | pending | Student home works on a phone | no check yet |
 | D5 | pilot | pending | Forms keep what was typed | no check yet |
 | D6 | pilot | pending | One error line | no check yet |
 | D7 | pilot | pending | Student wording, and the text-message setup dead end | no check yet |
+| D8 | pilot | pending | An instructor can get a missing Student Profile form signed | no check yet |
 | E0 | launch | owner-open | Measure before changing any timeout | 0 of 1 row verified |
 | E1 | launch | pending | Honest failure states | no check yet |
 | E2 | launch | pending | A wait the student can read | no check yet |
@@ -65,13 +67,13 @@ Generated 2026-11-10T19:09:54.821Z at commit 2843d655. Flags: none.
 | H8 | launch | pending | Incident basics page at `docs/runbooks/incident-basics.md` | no check yet |
 | H9 | pilot | pending | A per-user limit on uploads | no check yet |
 | H10 | launch | pending | Demo closeout kit | no check yet |
-| M1 | launch | unmeasured | App queries for one student dashboard render | no measuring command yet (target at most 20, baseline 39) |
+| M1 | launch | fail | Estimated database round trips for one student dashboard render | 167 round trips (target at most 85, baseline 167) |
 | M2 | launch | unmeasured | Statements per open dashboard per minute at idle | no measuring command yet (target at most 8, baseline 60) |
-| M3 | pilot | unmeasured | Database round trips before chat sends its first byte | no measuring command yet (target at most 10, baseline 65) |
+| M3 | pilot | unmeasured | Estimated database round trips before chat sends its first byte | no measuring command yet (target at most 12, baseline 167) |
 | M4 | launch | fail | Compressed scripts and styles on the sign-in page | 322.2 KB (target at most 235, baseline 322) |
 | M5 | launch | fail | Orientation video size | 34.7 MB (target at most 10, baseline 34.7) |
-| M6 | pilot | unmeasured | App queries for one teacher home render | no measuring command yet (target at most 20, baseline 44) |
-| M7 | launch | fail | Production `/api/health` `latency_ms` | 530 ms (target at most 60, baseline 530) |
+| M6 | pilot | fail | Estimated database round trips for one teacher home render | 111 round trips (target at most 60, baseline 111) |
+| M7 | launch | fail | Production `/api/health` `latency_ms` | 535 ms (target at most 60, baseline 530) |
 | M8 | pilot | unmeasured | Signed-in student dashboard, median server time in production | no measuring command yet (target at most 1000, baseline not measured) |
 
 ## Owner track: only Britt can close these rows
@@ -93,12 +95,12 @@ Generated 2026-11-10T19:09:54.821Z at commit 2843d655. Flags: none.
 
 ## Scores
 
-Launch tasks: 2/34
+Launch tasks: 3/34
 
 Launch metrics: 0/5
 
 Owner rows: 0/12
 
-Pilot tasks: 0/24
+Pilot tasks: 0/26
 
 Pilot metrics: 0/3

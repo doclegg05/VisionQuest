@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-11-10T19:09:54.821Z",
-  "commit": "2843d655",
+  "generatedAt": "2026-11-10T19:33:44.136Z",
+  "commit": "cb5e96b2",
   "flags": "none",
   "ciGreen": null,
   "scores": [
     {
       "label": "Launch tasks",
-      "passed": 2,
+      "passed": 3,
       "total": 34
     },
     {
@@ -22,7 +22,7 @@
     {
       "label": "Pilot tasks",
       "passed": 0,
-      "total": 24
+      "total": 26
     },
     {
       "label": "Pilot metrics",
@@ -37,15 +37,15 @@
       "set": "launch",
       "title": "Readiness scorecard",
       "status": "pass",
-      "detail": "65 tests passed"
+      "detail": "66 tests passed"
     },
     {
       "id": "T2",
       "kind": "task",
       "set": "launch",
       "title": "Query counter",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "36 tests passed"
     },
     {
       "id": "T3",
@@ -54,6 +54,14 @@
       "title": "Page weight script",
       "status": "pass",
       "detail": "exit 0"
+    },
+    {
+      "id": "T4",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Counter fidelity",
+      "status": "pending",
+      "detail": "no check yet"
     },
     {
       "id": "A1",
@@ -187,7 +195,7 @@
       "id": "D1",
       "kind": "task",
       "set": "launch",
-      "title": "The signed-form banner tells the truth, per R5",
+      "title": "The signed-form banner is removed from the student home, per R5",
       "status": "pending",
       "detail": "no check yet"
     },
@@ -236,6 +244,14 @@
       "kind": "task",
       "set": "pilot",
       "title": "Student wording, and the text-message setup dead end",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "D8",
+      "kind": "task",
+      "set": "pilot",
+      "title": "An instructor can get a missing Student Profile form signed",
       "status": "pending",
       "detail": "no check yet"
     },
@@ -507,9 +523,9 @@
       "id": "M1",
       "kind": "metric",
       "set": "launch",
-      "title": "App queries for one student dashboard render",
-      "status": "unmeasured",
-      "detail": "no measuring command yet (target at most 20, baseline 39)"
+      "title": "Estimated database round trips for one student dashboard render",
+      "status": "fail",
+      "detail": "167 round trips (target at most 85, baseline 167)"
     },
     {
       "id": "M2",
@@ -523,9 +539,9 @@
       "id": "M3",
       "kind": "metric",
       "set": "pilot",
-      "title": "Database round trips before chat sends its first byte",
+      "title": "Estimated database round trips before chat sends its first byte",
       "status": "unmeasured",
-      "detail": "no measuring command yet (target at most 10, baseline 65)"
+      "detail": "no measuring command yet (target at most 12, baseline 167)"
     },
     {
       "id": "M4",
@@ -547,9 +563,9 @@
       "id": "M6",
       "kind": "metric",
       "set": "pilot",
-      "title": "App queries for one teacher home render",
-      "status": "unmeasured",
-      "detail": "no measuring command yet (target at most 20, baseline 44)"
+      "title": "Estimated database round trips for one teacher home render",
+      "status": "fail",
+      "detail": "111 round trips (target at most 60, baseline 111)"
     },
     {
       "id": "M7",
@@ -557,7 +573,7 @@
       "set": "launch",
       "title": "Production `/api/health` `latency_ms`",
       "status": "fail",
-      "detail": "530 ms (target at most 60, baseline 530)"
+      "detail": "535 ms (target at most 60, baseline 530)"
     },
     {
       "id": "M8",
