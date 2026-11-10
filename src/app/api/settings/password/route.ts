@@ -1,11 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
-import { forbidden, withAuth } from "@/lib/api-error";
+import { forbidden, withAuth, type Session } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { setSessionCookie } from "@/lib/auth";
 import { clientIpBucket } from "@/lib/client-ip";
 import { assertNotDemoAccount } from "@/lib/demo/guards";
+import { errorForLog } from "@/lib/log-error";
+import { studentLogKey } from "@/lib/log-keys";
+import { logger } from "@/lib/logger";
 import { changeOwnPassword, passwordChangeRefusal } from "@/lib/password-change";
 import { changePasswordSchema, parseBody } from "@/lib/schemas";
+
+interface OwnPasswordAudit {
+  action: "auth.password.change" | "auth.password.change_failed";
+  summary: string;
+  ip: string;
+}
+
+/**
+ * Writes the audit row for a student's own attempt. It is written after the
+ * answer is decided, and a failed write must not change that answer: on the
+ * success path the password is already changed and the cookie reissued, so a
+ * 500 would tell the student it failed and send them back to try a current
+ * password that is no longer current. The failure is logged in its place,
+ * under the student's log key and never their id.
+ */
+async function auditOwnAttempt(session: Session, { action, summary, ip }: OwnPasswordAudit): Promise<void> {
+  try {
+    await logAuditEvent({
+      actorId: session.id,
+      actorRole: session.role,
+      action,
+      targetType: "student",
+      targetId: session.id,
+      summary,
+      metadata: { ip },
+    });
+  } catch (error: unknown) {
+    logger.error("audit write failed", {
+      alert: "audit_write_failed",
+      action,
+      student: studentLogKey(session.id),
+      error: errorForLog(error),
+    });
+  }
+}
 
 /**
  * A signed-in student changes their own password.
@@ -38,14 +76,10 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
   const ip = clientIpBucket(req);
   if (result.kind === "wrong_current_password") {
-    await logAuditEvent({
-      actorId: session.id,
-      actorRole: session.role,
+    await auditOwnAttempt(session, {
       action: "auth.password.change_failed",
-      targetType: "student",
-      targetId: session.id,
       summary: "Student tried to change their password with a wrong current password.",
-      metadata: { ip },
+      ip,
     });
   }
   if (result.kind !== "changed") {
@@ -55,14 +89,10 @@ export const POST = withAuth(async (session, req: NextRequest) => {
 
   // Not held to the change-password screen: the write cleared the flag.
   await setSessionCookie(session.id, result.role, result.sessionVersion, { mustChangePassword: false });
-  await logAuditEvent({
-    actorId: session.id,
-    actorRole: session.role,
+  await auditOwnAttempt(session, {
     action: "auth.password.change",
-    targetType: "student",
-    targetId: session.id,
     summary: "Student changed their own password. Their other sessions were signed out.",
-    metadata: { ip },
+    ip,
   });
 
   return NextResponse.json({ success: true, data: { changed: true } });

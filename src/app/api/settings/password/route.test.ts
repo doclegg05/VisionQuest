@@ -70,7 +70,21 @@ const cacheInvalidations: string[] = [];
 const updateCalls: StudentUpdate[] = [];
 const tokenDeletes: unknown[] = [];
 const auditEvents: { action: string; actorId?: string | null; targetId?: string; summary?: string; metadata?: unknown }[] = [];
+/** When set, the audit table refuses the next write, as it would if it were unreachable. */
+let auditStoreDown = false;
 const logLines: unknown[][] = [];
+
+// The real `tryLogAuditEvent` runs, over a fake audit table: what is under
+// test is that the route uses the helper that cannot fail a finished request.
+const auditDb = {
+  auditLog: {
+    create: async ({ data }: { data: (typeof auditEvents)[number] }) => {
+      if (auditStoreDown) throw new Error("audit table unreachable");
+      auditEvents.push(data);
+      return data;
+    },
+  },
+};
 
 const fakeDb = {
   $queryRaw: limiterStore.$queryRaw,
@@ -109,6 +123,7 @@ const fakeDb = {
     },
   },
   $transaction: async (run: (tx: unknown) => Promise<unknown>) => run(fakeDb),
+  auditLog: auditDb.auditLog,
 };
 
 mock.module("@/lib/db", { namedExports: { prismaAdmin: fakeDb, prisma: fakeDb } });
@@ -139,13 +154,6 @@ mock.module("@/lib/auth", {
   },
 });
 
-mock.module("@/lib/audit", {
-  namedExports: {
-    logAuditEvent: async (event: (typeof auditEvents)[number]) => {
-      auditEvents.push(event);
-    },
-  },
-});
 
 const record = (...args: unknown[]) => {
   logLines.push(args);
@@ -165,6 +173,7 @@ before(async () => {
 beforeEach(() => {
   limiterStore.reset();
   betweenReadAndWrite = null;
+  auditStoreDown = false;
   for (const list of [verifyCalls, hashCalls, cookieCalls, cacheInvalidations, updateCalls, tokenDeletes, auditEvents, logLines]) {
     list.length = 0;
   }
@@ -276,6 +285,22 @@ describe("POST /api/settings/password: a right current password", () => {
     assert.equal(written.includes(NEW_PASSWORD), false);
   });
 
+  // The password is already changed and the cookie already reissued when the
+  // audit row is written. Answering 500 then would tell the student it failed:
+  // they would try again with a current password that is no longer current,
+  // and spend their budget on it.
+  it("still answers 200 when the audit row cannot be written: the password did change", async () => {
+    auditStoreDown = true;
+
+    const res = await changeWith(OLD_PASSWORD);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(await bodyOf(res), { success: true, data: { changed: true } });
+    assert.equal(account.passwordHash, `hash:${NEW_PASSWORD}`);
+    assert.deepEqual(cookieCalls, [["stu-1", "student", 5, { mustChangePassword: false }]]);
+    assert.equal(auditEvents.length, 0);
+  });
+
   it("works the same for a student who is not held: the Settings page uses this route too", async () => {
     account = { ...account, mustChangePassword: false };
     session = { id: "stu-1", studentId: "tanesha", displayName: "Tanesha", role: "student" };
@@ -305,6 +330,15 @@ describe("POST /api/settings/password: a wrong current password", () => {
     await changeWith("not-the-password");
 
     assert.equal(limiterStore.countFor(ACCOUNT_KEY), 1);
+  });
+
+  it("still answers the wrong password as wrong when the audit row cannot be written", async () => {
+    auditStoreDown = true;
+
+    const res = await changeWith("not-the-password");
+
+    assert.equal(res.status, 400);
+    assert.equal((await bodyOf(res)).code, "WRONG_CURRENT_PASSWORD");
   });
 
   it("writes an audit row for the failed try, with no password in it", async () => {
@@ -564,6 +598,11 @@ describe("POST /api/settings/password: what it never writes down", () => {
     await changeWith("not-the-password");
     limiterStore.queuedFailures = [new Error("counter store down")];
     await changeWith(NEW_PASSWORD, "another new one");
+    // The audit table is down: the failure is logged, and names nobody.
+    auditStoreDown = true;
+    await changeWith("not-the-password");
+    await changeWith(NEW_PASSWORD, "another new one");
+    assert.ok(JSON.stringify(logLines).includes("audit_write_failed"), "the audit failure must be logged");
 
     const written = JSON.stringify(logLines);
     for (const secret of [OLD_PASSWORD, NEW_PASSWORD, "not-the-password", "another new one", "stu-1", "tanesha"]) {
