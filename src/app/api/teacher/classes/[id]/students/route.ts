@@ -49,6 +49,10 @@ export const POST = withTeacherAuth(async (
         studentId,
         displayName,
         passwordHash: hash,
+        // Staff typed this password, so staff know it. The student is held
+        // to the change-password screen until they pick their own
+        // (src/lib/password-change-gate.ts).
+        mustChangePassword: true,
         email: email || null,
         role: "student",
       },

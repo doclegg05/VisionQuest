@@ -36,6 +36,11 @@ export const POST = withTeacherAuth(async (
       where: { id, role: "student" },
       data: {
         passwordHash: hash,
+        // Staff typed this password, so staff know it. The student is held
+        // to the change-password screen until they pick their own. The
+        // version bump in the same write ends every session they have, so
+        // no token from before the reset can go on without the claim.
+        mustChangePassword: true,
         sessionVersion: { increment: 1 },
       },
     }),
