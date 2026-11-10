@@ -22,6 +22,16 @@ export interface SageFailureMessageOptions {
   audience: SageFailureAudience;
   /** True only when the student's message is already in the transcript. */
   messageSaved: boolean;
+  /** True only when a Try again button shows under this sentence. */
+  canRetry: boolean;
+}
+
+/** Off and not set up need a person to fix something; a retry cannot help. */
+const RETRYABLE: ReadonlySet<SageFailureCode> = new Set<SageFailureCode>(["busy", "slow", "unknown"]);
+
+/** Whether a Try again button shows for this cause. */
+export function offersRetry(code: SageFailureCode): boolean {
+  return RETRYABLE.has(code);
 }
 
 const WHAT_HAPPENED: Record<SageFailureCode, Record<SageFailureAudience, string>> = {
@@ -35,35 +45,67 @@ const WHAT_HAPPENED: Record<SageFailureCode, Record<SageFailureAudience, string>
   unknown: { student: "Sage could not answer this time.", staff: "Sage could not answer this time." },
 };
 
-const WHAT_TO_DO: Record<SageFailureCode, Record<SageFailureAudience, string>> = {
+const STILL_USE = "You can still use the rest of VisionQuest.";
+
+/** What to do, keyed by whether a Try again button shows. */
+type NextStep = Record<SageFailureAudience, { retry: string; noRetry: string }>;
+
+function same(text: string): { retry: string; noRetry: string } {
+  return { retry: text, noRetry: text };
+}
+
+const WHAT_TO_DO: Record<SageFailureCode, NextStep> = {
   off: {
-    student: "Tell your instructor. You can still use the rest of VisionQuest.",
-    staff: "Check that the Mac that runs Sage is on and online. You can still use the rest of VisionQuest.",
+    student: same(`Tell your instructor. ${STILL_USE}`),
+    staff: same(`The computer that runs Sage may be off or offline. Tell the person who runs it. ${STILL_USE}`),
   },
   busy: {
-    student: "Wait one minute, then tap Try again.",
-    staff: "Wait one minute, then tap Try again.",
+    student: { retry: "Wait a little, then tap Try again.", noRetry: "Wait a little, then send your message again." },
+    staff: { retry: "Wait a little, then tap Try again.", noRetry: "Wait a little, then send your message again." },
   },
-  slow: { student: "Tap Try again.", staff: "Tap Try again." },
+  slow: {
+    student: { retry: "Tap Try again.", noRetry: "Send your message again." },
+    staff: { retry: "Tap Try again.", noRetry: "Send your message again." },
+  },
   not_set_up: {
-    student: "Tell your instructor. You can still use the rest of VisionQuest.",
-    staff: "An admin can set it up in Program Setup.",
+    student: same(`Tell your instructor. ${STILL_USE}`),
+    staff: same("An admin needs to check the Sage connection settings."),
   },
   unknown: {
-    student: "Tap Try again. If it keeps happening, tell your instructor.",
-    staff: "Tap Try again. If it keeps happening, tell an admin.",
+    student: {
+      retry: "Tap Try again. If it keeps happening, tell your instructor.",
+      noRetry: "Send your message again. If it keeps happening, tell your instructor.",
+    },
+    staff: {
+      retry: "Tap Try again. If it keeps happening, tell an admin.",
+      noRetry: "Send your message again. If it keeps happening, tell an admin.",
+    },
   },
 };
 
 const NOT_LOST = "Your message was not lost.";
 
 export function sageFailureMessage(code: SageFailureCode, options: SageFailureMessageOptions): string {
+  const step = WHAT_TO_DO[code][options.audience];
   const parts = [
     WHAT_HAPPENED[code][options.audience],
     options.messageSaved ? NOT_LOST : null,
-    WHAT_TO_DO[code][options.audience],
+    options.canRetry ? step.retry : step.noRetry,
   ];
   return parts.filter((part): part is string => part !== null).join(" ");
+}
+
+/** The note under a reply that stopped partway, when Try again shows. */
+export const CUT_OFF_NOTE = "(Sage got cut off. Tap Try again for the full answer.)";
+
+/**
+ * A partial reply as the student keeps it: the text Sage sent, then what
+ * happened. The route saves this same text, so a reload reads the same.
+ */
+export function cutOffReply(partial: string, code: SageFailureCode, audience: SageFailureAudience): string {
+  if (offersRetry(code)) return `${partial}\n\n${CUT_OFF_NOTE}`;
+  const sentence = sageFailureMessage(code, { audience, messageSaved: true, canRetry: false });
+  return `${partial}\n\n(Sage got cut off.) ${sentence}`;
 }
 
 // ─── Classification ─────────────────────────────────────────────────────────

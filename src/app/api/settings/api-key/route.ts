@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
-import { forbidden, withAuth } from "@/lib/api-error";
+import { forbidden, isStaffRole, withAuth } from "@/lib/api-error";
 import { parseBody, apiKeySchema } from "@/lib/schemas";
 import { GeminiProvider } from "@/lib/ai/gemini-provider";
 
@@ -37,7 +37,11 @@ export const GET = withAuth(async (session) => {
   });
 });
 
+// Saving a key is staff only (owner decision R9: no student adds a personal
+// AI key). DELETE below stays open to every role, so a student who saved a
+// key before R9 can still remove it.
 export const POST = withAuth(async (session, req: NextRequest) => {
+  if (!isStaffRole(session.role)) throw forbidden("Only staff can save an AI key.");
   if (isDemoLocalOnlyRequired()) throw forbidden("Cloud API keys are disabled in this demo.");
   const rl = await rateLimit(`api-key:${session.id}`, 5, 15 * 60 * 1000);
   if (!rl.success) {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Command, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
+import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { CommandPalette } from "./CommandPalette";
 import { useDemoAccount } from "@/components/demo/DemoAccountContext";
 import { DemoPrivacyNotice } from "@/components/demo/DemoPrivacyNotice";
@@ -29,7 +30,8 @@ export function uploadProblemFor(file: { size: number; type: string }): string |
 
 /** The upload failed on the server or on the way there; `status` is null when no answer came back. */
 export function uploadFailureMessage(status: number | null): string {
-  if (status === 429) return "You sent a lot of files this hour. Wait a while, then try again.";
+  // The upload route allows 20 files per rolling hour (src/app/api/chat/upload/route.ts).
+  if (status === 429) return "You sent a lot of files this hour. Try again in one hour.";
   if (status !== null && status >= 400 && status < 500) {
     return `This file did not upload. ${PICK_A_FILE} Keep it under 10 MB, then try again.`;
   }
@@ -41,11 +43,17 @@ export function UploadError({ message }: { message: string }) {
   return (
     <p
       role="alert"
-      className="mb-2 min-w-0 break-words rounded-xl border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-3 py-2 text-sm text-[var(--chat-error-text)]"
+      className="mb-2 flex items-start gap-2 min-w-0 break-words rounded-xl border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-3 py-2 text-sm text-[var(--chat-error-text)]"
     >
-      {message}
+      <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
+      <span className="min-w-0">{message}</span>
     </p>
   );
+}
+
+/** What the chat may do with the message box. */
+export interface MessageBoxHandle {
+  focus(): void;
 }
 
 interface ChatInputProps {
@@ -55,9 +63,11 @@ interface ChatInputProps {
   role?: ChatRole;
   /** Text placed in the box on mount. It is only sent when the user presses Send. */
   initialMessage?: string;
+  /** Lets the chat put focus in the message box, such as after Try again. */
+  messageBoxRef?: Ref<MessageBoxHandle>;
 }
 
-export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage, messageBoxRef }: ChatInputProps) {
   const canAttachFiles = chatRoleCanAttachFiles(role);
   const [message, setMessage] = useState(initialMessage ?? "");
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -68,6 +78,8 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<{ id: string; filename: string }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Hands the same box to the chat, which focuses it after Try again.
+  useImperativeHandle(messageBoxRef, () => ({ focus: () => textareaRef.current?.focus() }), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevDisabledRef = useRef(disabled);
   const commandListboxId = useId();
@@ -334,7 +346,11 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder={role === "student" ? "Message Sage…" : "Message Sage…"}
-            disabled={disabled}
+            // Read-only rather than disabled while Sage answers: a disabled
+            // box drops focus to the page, and after Try again focus must
+            // stay in the message box.
+            readOnly={disabled}
+            aria-disabled={disabled || undefined}
             rows={1}
             role="combobox"
             aria-label="Message to Sage"
@@ -343,7 +359,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             aria-expanded={paletteOpen}
             className={[
               "custom-scrollbar relative w-full resize-none border-0 bg-transparent text-[var(--ink-strong)] placeholder:text-[var(--ink-muted)]",
-              "focus:outline-none focus:ring-0 focus-visible:outline-none disabled:cursor-not-allowed overflow-y-auto",
+              "focus:outline-none focus:ring-0 focus-visible:outline-none aria-disabled:cursor-not-allowed overflow-y-auto",
               compact ? "min-h-[40px] px-3 pb-1 pt-2.5 text-sm" : "min-h-[52px] px-4 py-3 text-[15px] leading-6",
             ].join(" ")}
           />

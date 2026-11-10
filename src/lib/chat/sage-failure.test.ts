@@ -5,6 +5,8 @@ import {
   SAGE_FAILURE_CODES,
   classifyProviderInitFailure,
   classifyStreamFailure,
+  cutOffReply,
+  offersRetry,
   parseSageFailureCode,
   sageFailureMessage,
   type SageFailureCode,
@@ -14,48 +16,92 @@ const NOT_LOST = "Your message was not lost.";
 const DASHES = /[-‐-―−]/;
 
 describe("sageFailureMessage", () => {
+  // What a student reads when the message was saved and Try again shows.
   const studentSaved: Record<SageFailureCode, string> = {
     off: "Sage is off right now. Your message was not lost. Tell your instructor. You can still use the rest of VisionQuest.",
-    busy: "Sage is helping other students right now. Your message was not lost. Wait one minute, then tap Try again.",
+    busy: "Sage is helping other students right now. Your message was not lost. Wait a little, then tap Try again.",
     slow: "Sage is taking too long to answer. Your message was not lost. Tap Try again.",
     not_set_up: "Sage is not set up yet. Your message was not lost. Tell your instructor. You can still use the rest of VisionQuest.",
     unknown: "Sage could not answer this time. Your message was not lost. Tap Try again. If it keeps happening, tell your instructor.",
   };
+  const staffUnsaved: Record<SageFailureCode, string> = {
+    off: "Sage is off right now. The computer that runs Sage may be off or offline. Tell the person who runs it. You can still use the rest of VisionQuest.",
+    busy: "Sage is helping other people right now. Wait a little, then tap Try again.",
+    slow: "Sage is taking too long to answer. Tap Try again.",
+    not_set_up: "Sage is not set up yet. An admin needs to check the Sage connection settings.",
+    unknown: "Sage could not answer this time. Tap Try again. If it keeps happening, tell an admin.",
+  };
 
   for (const code of SAGE_FAILURE_CODES) {
+    const canRetry = offersRetry(code);
+
     it(`gives a student one plain sentence set for ${code}`, () => {
-      assert.equal(sageFailureMessage(code, { audience: "student", messageSaved: true }), studentSaved[code]);
+      assert.equal(sageFailureMessage(code, { audience: "student", messageSaved: true, canRetry }), studentSaved[code]);
+    });
+
+    it(`gives staff their own sentence set for ${code}`, () => {
+      assert.equal(sageFailureMessage(code, { audience: "staff", messageSaved: false, canRetry }), staffUnsaved[code]);
     });
 
     it(`says the message was not lost for ${code} only when it was saved`, () => {
-      const unsaved = sageFailureMessage(code, { audience: "student", messageSaved: false });
+      const unsaved = sageFailureMessage(code, { audience: "student", messageSaved: false, canRetry });
       assert.ok(!unsaved.includes(NOT_LOST), unsaved);
       assert.equal(unsaved, studentSaved[code].replace(` ${NOT_LOST}`, ""));
+    });
+
+    it(`never says Try again for ${code} when no Try again button can show`, () => {
+      for (const audience of ["student", "staff"] as const) {
+        const text = sageFailureMessage(code, { audience, messageSaved: true, canRetry: false });
+        assert.doesNotMatch(text, /Try again/, text);
+      }
     });
 
     it(`uses no dash characters and names no AI key for ${code}`, () => {
       for (const audience of ["student", "staff"] as const) {
         for (const messageSaved of [true, false]) {
-          const text = sageFailureMessage(code, { audience, messageSaved });
-          assert.doesNotMatch(text, DASHES, text);
-          assert.doesNotMatch(text, /API|key|Gemini|Ollama|server|relay|local AI/i, text);
+          for (const retry of [true, false]) {
+            const text = sageFailureMessage(code, { audience, messageSaved, canRetry: retry });
+            assert.doesNotMatch(text, DASHES, text);
+            assert.doesNotMatch(text, /API|key|Gemini|Ollama|server|relay|local AI|Mac\b/i, text);
+          }
         }
       }
     });
   }
 
+  it("offers Try again only where a retry can help: busy, slow and unknown", () => {
+    assert.deepEqual(
+      SAGE_FAILURE_CODES.filter((code) => offersRetry(code)),
+      ["busy", "slow", "unknown"],
+    );
+  });
+
   it("never tells a staff member to tell their instructor", () => {
     for (const code of SAGE_FAILURE_CODES) {
-      const text = sageFailureMessage(code, { audience: "staff", messageSaved: true });
+      const text = sageFailureMessage(code, { audience: "staff", messageSaved: true, canRetry: offersRetry(code) });
       assert.doesNotMatch(text, /instructor/, text);
     }
   });
 
-  it("tells staff where to look when Sage is off", () => {
-    assert.match(
-      sageFailureMessage("off", { audience: "staff", messageSaved: false }),
-      /Check that the Mac that runs Sage is on/,
+  it("does not send staff to Program Setup for settings it does not hold", () => {
+    const text = sageFailureMessage("not_set_up", { audience: "staff", messageSaved: false, canRetry: false });
+    assert.doesNotMatch(text, /Program Setup/, text);
+  });
+});
+
+describe("cutOffReply", () => {
+  it("adds the fixed cut-off note when Try again can show", () => {
+    assert.equal(
+      cutOffReply("Here is the first part", "slow", "student"),
+      "Here is the first part\n\n(Sage got cut off. Tap Try again for the full answer.)",
     );
+  });
+
+  it("says what to do instead when no retry can help", () => {
+    const text = cutOffReply("Here is the first part", "off", "student");
+    assert.ok(text.startsWith("Here is the first part\n\n(Sage got cut off.)"), text);
+    assert.match(text, /Tell your instructor/);
+    assert.doesNotMatch(text, /Try again/);
   });
 });
 

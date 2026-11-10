@@ -1,26 +1,39 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { prepareRetry, resolveStreamOutcome, resolveSendError, SageSendError } from "./send-outcome";
-import { SAGE_FAILURE_CODES, sageFailureMessage } from "./sage-failure";
+import {
+  parseSendErrorBody,
+  prepareRetry,
+  resolveSendError,
+  resolveStreamOutcome,
+  SageSendError,
+  type SendErrorContext,
+} from "./send-outcome";
+import { CUT_OFF_NOTE, SAGE_FAILURE_CODES, cutOffReply, offersRetry, sageFailureMessage } from "./sage-failure";
+
+const CRISIS_BLOCK = "\n\nIf you are in crisis, call or text 988.";
+const STUDENT: SendErrorContext = { priorContent: "", audience: "student", isAdmin: false, savedUserMessageId: null };
+
+function serverError(code: (typeof SAGE_FAILURE_CODES)[number], crisisBlock: string | null = null) {
+  const text = sageFailureMessage(code, { audience: "student", messageSaved: true, canRetry: offersRetry(code) });
+  return new SageSendError(text + (crisisBlock ?? ""), code, { crisisBlock, userMessageId: "msg-saved-1" });
+}
 
 describe("resolveStreamOutcome", () => {
   it("offers retry and a plain-language fallback when the stream produced zero content", () => {
-    const outcome = resolveStreamOutcome(true, "");
-    assert.equal(outcome.offerRetry, true);
-    assert.equal(outcome.content, "Sage did not send an answer. Your message was not lost. Tap Try again.");
+    for (const completed of [true, false]) {
+      const outcome = resolveStreamOutcome(completed, "");
+      assert.equal(outcome.offerRetry, true);
+      assert.equal(outcome.keepOnRetry, false);
+      assert.equal(outcome.content, "Sage did not send an answer. Your message was not lost. Tap Try again.");
+    }
   });
 
-  it("offers retry on zero content even when the stream never reported done", () => {
-    const outcome = resolveStreamOutcome(false, "");
-    assert.equal(outcome.offerRetry, true);
-    assert.equal(outcome.content, "Sage did not send an answer. Your message was not lost. Tap Try again.");
-  });
-
-  it("offers retry and marks partial content as possibly incomplete when the stream did not finish", () => {
+  it("keeps partial content, marked as cut off, when the stream did not finish", () => {
     const outcome = resolveStreamOutcome(false, "Here's what I found so far");
     assert.equal(outcome.offerRetry, true);
-    assert.equal(outcome.content, "Here's what I found so far\n\n(Sage got cut off. Tap Try again for the full answer.)");
+    assert.equal(outcome.keepOnRetry, true);
+    assert.equal(outcome.content, `Here's what I found so far\n\n${CUT_OFF_NOTE}`);
   });
 
   it("does not offer retry when the stream completed with content", () => {
@@ -31,63 +44,127 @@ describe("resolveStreamOutcome", () => {
 });
 
 describe("resolveSendError", () => {
-  const CRISIS_BLOCK = "\n\nIf you are in crisis, call or text 988.";
-
   it("shows the server's sentence once and offers Try again", () => {
-    const text = sageFailureMessage("busy", { audience: "student", messageSaved: true });
-    const outcome = resolveSendError(new SageSendError(text, "busy"), "", "student");
-    assert.equal(outcome.displayContent, text);
+    const err = serverError("busy");
+    const outcome = resolveSendError(err, STUDENT);
+    assert.equal(outcome.displayContent, err.message);
     assert.equal(outcome.failure, "busy");
     assert.equal(outcome.offerRetry, true);
+    assert.equal(outcome.alert, true);
   });
 
-  it("does not offer retry when the error interrupted a reply that already had content", () => {
-    const outcome = resolveSendError(new SageSendError("Sage is off right now.", "off"), "partial reply text", "student");
-    assert.equal(outcome.offerRetry, false);
+  it("(4) offers no Try again when Sage is off or not set up", () => {
+    for (const code of ["off", "not_set_up"] as const) {
+      const outcome = resolveSendError(serverError(code), STUDENT);
+      assert.equal(outcome.offerRetry, false, code);
+      assert.doesNotMatch(outcome.displayContent, /Try again/);
+      assert.match(outcome.displayContent, /Tell your instructor\. You can still use the rest of VisionQuest\./);
+    }
+  });
+
+  it("(1) keeps a partial reply, cut off, with the 988 block after it", () => {
+    const outcome = resolveSendError(serverError("slow", CRISIS_BLOCK), { ...STUDENT, priorContent: "First part" });
+    assert.equal(outcome.displayContent, cutOffReply("First part", "slow", "student") + CRISIS_BLOCK);
+    assert.equal(outcome.offerRetry, true);
+    assert.equal(outcome.keepOnRetry, true);
+    assert.equal(outcome.alert, false);
+  });
+
+  it("(2) shows Try again whenever the words say to tap it, and never otherwise", () => {
+    const errors: unknown[] = [...SAGE_FAILURE_CODES.map((code) => serverError(code)), new TypeError("Failed to fetch")];
+    for (const err of errors) {
+      for (const priorContent of ["", "partial text"]) {
+        const outcome = resolveSendError(err, { ...STUDENT, priorContent });
+        assert.equal(/Try again/.test(outcome.displayContent), outcome.offerRetry, outcome.displayContent);
+      }
+    }
   });
 
   for (const code of SAGE_FAILURE_CODES) {
-    it(`keeps the server's 988 block for a student on ${code}`, () => {
-      const text = sageFailureMessage(code, { audience: "student", messageSaved: true }) + CRISIS_BLOCK;
-      const outcome = resolveSendError(new SageSendError(text, code), "", "student");
-      assert.equal(outcome.displayContent, text);
+    it(`(3) keeps the server's 988 block for a student on ${code}, and keeps the bubble on retry`, () => {
+      const err = serverError(code, CRISIS_BLOCK);
+      const outcome = resolveSendError(err, STUDENT);
+      assert.equal(outcome.displayContent, err.message);
+      assert.ok(outcome.displayContent.endsWith(CRISIS_BLOCK));
+      assert.equal(outcome.keepOnRetry, true);
     });
   }
 
-  it("never gives a student API-key instructions or a Settings link", () => {
-    const text = sageFailureMessage("not_set_up", { audience: "student", messageSaved: false });
-    const outcome = resolveSendError(new SageSendError(text, "not_set_up"), "", "student");
-    assert.doesNotMatch(outcome.displayContent, /API|key|Settings/i);
-    assert.equal(outcome.showSettingsLink, false);
+  it("drops a plain failure bubble on retry", () => {
+    assert.equal(resolveSendError(serverError("busy"), STUDENT).keepOnRetry, false);
   });
 
-  it("keeps the Settings link for staff when Sage is not set up", () => {
-    const text = sageFailureMessage("not_set_up", { audience: "staff", messageSaved: false });
-    const outcome = resolveSendError(new SageSendError(text, "not_set_up"), "", "staff");
-    assert.equal(outcome.showSettingsLink, true);
-    assert.equal(outcome.displayContent, text);
+  it("(6) carries the saved message's id so Try again can point at it", () => {
+    assert.equal(resolveSendError(serverError("busy"), STUDENT).retryOf, "msg-saved-1");
+    const fromStream = resolveSendError(new TypeError("network"), { ...STUDENT, savedUserMessageId: "msg-stream-2" });
+    assert.equal(fromStream.retryOf, "msg-stream-2");
+    assert.equal(resolveSendError(new TypeError("network"), STUDENT).retryOf, null);
   });
 
-  it("shows other server sentences as written, such as a rate limit", () => {
-    const outcome = resolveSendError(
-      new SageSendError("Too many messages this hour. Please wait before sending more.", null),
-      "",
-      "student",
-    );
-    assert.equal(outcome.displayContent, "Too many messages this hour. Please wait before sending more.");
-    assert.equal(outcome.showSettingsLink, false);
-  });
-
-  it("hides a browser's own error text behind the safe sentence", () => {
+  it("(5) a network drop shows the fixed sentence, and says not lost only when the stream said it was saved", () => {
     for (const err of [new TypeError("Failed to fetch"), "boom", undefined]) {
-      const outcome = resolveSendError(err, "", "student");
+      const outcome = resolveSendError(err, STUDENT);
       assert.equal(
         outcome.displayContent,
-        sageFailureMessage("unknown", { audience: "student", messageSaved: false }),
+        sageFailureMessage("unknown", { audience: "student", messageSaved: false, canRetry: true }),
       );
       assert.equal(outcome.failure, "unknown");
       assert.equal(outcome.offerRetry, true);
     }
+    const saved = resolveSendError(new TypeError("x"), { ...STUDENT, savedUserMessageId: "m1" });
+    assert.match(saved.displayContent, /Your message was not lost/);
+  });
+
+  it("never gives a student API-key instructions or a setup link", () => {
+    const outcome = resolveSendError(serverError("not_set_up"), STUDENT);
+    assert.doesNotMatch(outcome.displayContent, /API|key|Settings/i);
+    assert.equal(outcome.setupLink, false);
+  });
+
+  it("(11) links only an admin to Program Setup when Sage is not set up", () => {
+    const staff = { ...STUDENT, audience: "staff" as const };
+    assert.equal(resolveSendError(serverError("not_set_up"), { ...staff, isAdmin: true }).setupLink, true);
+    assert.equal(resolveSendError(serverError("not_set_up"), staff).setupLink, false);
+    assert.equal(resolveSendError(serverError("off"), { ...staff, isAdmin: true }).setupLink, false);
+  });
+
+  it("shows a rate limit as the server wrote it, with no Try again", () => {
+    const err = parseSendErrorBody(429, { error: "Too many messages this hour. Please wait before sending more." });
+    const outcome = resolveSendError(err, STUDENT);
+    assert.equal(outcome.displayContent, "Too many messages this hour. Please wait before sending more.");
+    assert.equal(outcome.failure, null);
+    assert.equal(outcome.offerRetry, false);
+  });
+});
+
+describe("parseSendErrorBody", () => {
+  it("(5) hides server text that carries no failure code behind the fixed sentence", () => {
+    for (const [status, body] of [
+      [500, { error: "Internal server error" }],
+      [400, { error: "Message too long. Maximum 10,000 characters." }],
+      [502, null],
+      [500, { error: 42, failure: "busy" }],
+    ] as const) {
+      const outcome = resolveSendError(parseSendErrorBody(status, body), STUDENT);
+      assert.equal(
+        outcome.displayContent,
+        sageFailureMessage("unknown", { audience: "student", messageSaved: false, canRetry: true }),
+        `${status}`,
+      );
+    }
+  });
+
+  it("keeps the server's text, code, 988 block and saved id when a code is present", () => {
+    const err = parseSendErrorBody(500, {
+      error: "Sage could not answer this time." + CRISIS_BLOCK,
+      failure: "unknown",
+      crisisBlock: CRISIS_BLOCK,
+      userMessageId: "m9",
+    });
+    assert.ok(err instanceof SageSendError);
+    assert.equal(err.failure, "unknown");
+    assert.equal(err.crisisBlock, CRISIS_BLOCK);
+    assert.equal(err.userMessageId, "m9");
   });
 });
 
@@ -96,12 +173,19 @@ describe("prepareRetry", () => {
     { id: "u0", role: "user" as const, content: "first" },
     { id: "a0", role: "assistant" as const, content: "reply" },
     { id: "u1", role: "user" as const, content: "second" },
-    { id: "err-1", role: "assistant" as const, content: "Sage is off right now." },
+    { id: "err-1", role: "assistant" as const, content: "Sage is busy.", failure: { keepOnRetry: false, retryOf: "m1" } },
   ];
 
-  it("removes the failure and the message it answered, so a retry adds each once", () => {
+  it("drops a plain failure and keeps the question, which the retry answers", () => {
     const prepared = prepareRetry(messages, "err-1");
-    assert.deepEqual(prepared, { messages: messages.slice(0, 2), text: "second" });
+    assert.deepEqual(prepared, { messages: messages.slice(0, 3), text: "second", retryOf: "m1" });
+  });
+
+  it("(3) keeps a failure that carries the 988 block or a partial reply", () => {
+    const kept = messages.map((m) => (m.id === "err-1" ? { ...m, failure: { keepOnRetry: true, retryOf: null } } : m));
+    const prepared = prepareRetry(kept, "err-1");
+    assert.deepEqual(prepared?.messages, kept);
+    assert.equal(prepared?.retryOf, null);
   });
 
   it("does not change the list it was given", () => {

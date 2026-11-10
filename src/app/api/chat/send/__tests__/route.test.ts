@@ -1,526 +1,43 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
-import { after, before, beforeEach, describe, it, mock } from "node:test";
+import { after, before, beforeEach, describe, it } from "node:test";
 import { mockAdminSession, mockStudentSession, mockTeacherSession, mockRequest } from "@/lib/test-helpers";
 import { DEMO_SAGE_LIMIT } from "@/lib/demo/copy";
-
-// ---------------------------------------------------------------------------
-// Request-level tests for POST /api/chat/send.
-//
-// The route is wrapped in `withRegistry("sage.chat", ...)`. We mock the
-// registry middleware as a passthrough that just hands a session to the
-// inner handler, then mock every external dependency the handler reaches
-// for: prisma, AI provider, rate limiter, conversation helpers, etc.
-//
-// PR-IN-FLIGHT NOTES (assertions tied to current code at 1bd69eb):
-//   * #41 (SSE error generic) — does not currently affect these tests.
-//   * #45 (Ollama rate limit) — the rate-limit test asserts CURRENT
-//     behavior: rate limits ONLY apply when the provider is cloud.
-//     When #45 merges, the test for rate-limited-with-cloud-provider
-//     stays valid, but a future test could assert local-provider also
-//     enforces limits.
-// ---------------------------------------------------------------------------
-
-let session = mockStudentSession();
-let toolCapturedBy_withRegistry: string | null = null;
-
-const mockRateLimit = mock.fn() as any;
-const mockRateLimitDaily = mock.fn() as any;
-const mockRefundRateLimit = mock.fn() as any;
-const mockRateLimitsDisabled = mock.fn() as any;
-const mockResolveAiProvider = mock.fn() as any;
-const mockGetPromptTier = mock.fn() as any;
-const mockGetProviderClass = mock.fn() as any;
-const mockLogAiAuditEvent = mock.fn() as any;
-const mockPolicyDecisionForProvider = mock.fn() as any;
-const mockLogger = {
-  error: mock.fn() as any,
-  warn: mock.fn() as any,
-  info: mock.fn() as any,
-};
-const mockBuildSystemPrompt = mock.fn() as any;
-const mockGetDocumentContext = mock.fn() as any;
-const mockGetDirectFormAnswer = mock.fn() as any;
-const mockResolveDirectFormMatch = mock.fn() as any;
-const mockGetFormContext = mock.fn() as any;
-const mockRecordChatSession = mock.fn() as any;
-const mockAwardEvent = mock.fn() as any;
-const mockGetOrCreateConversation = mock.fn() as any;
-const mockGetOrCreateTeacherConversation = mock.fn() as any;
-const mockSaveMessage = mock.fn() as any;
-const mockGetConversationContext = mock.fn() as any;
-const mockMaybeUpdateSummary = mock.fn() as any;
-const mockHandlePostResponse = mock.fn() as any;
-const mockGetStudentPromptContext = mock.fn() as any;
-const mockBuildStaffStudentContext = mock.fn() as any;
-const mockShouldAttemptStaffStudentContext = mock.fn() as any;
-const mockCheckTokenQuota = mock.fn() as any;
-const mockWithUsageLogging = mock.fn() as any;
-const mockGetStudentProgramType = mock.fn() as any;
-const mockPrismaStudentFindUnique = mock.fn() as any;
-const mockFileUploadFindMany = mock.fn() as any;
-const mockFormatClustersForPrompt = mock.fn() as any;
-const mockRunAgentTurn = mock.fn() as any;
-const mockExecuteSlashCommand = mock.fn() as any;
-const mockExecuteAgentTool = mock.fn() as any;
-const mockAssembleStudentContextBundle = mock.fn() as any;
-const mockSelfMetricLineFromBundle = mock.fn() as any;
-const mockGetSituationalSnapshot = mock.fn() as any;
-const mockRecordWellbeingConcern = mock.fn() as any;
-
-// ---------------------------------------------------------------------------
-// withRegistry passthrough — mirrors the withTeacherAuth pattern in
-// class-route-auth.test.ts. Calls the handler directly with the test
-// session unless mockGetSessionReturnsNull flips, which simulates the
-// 401 path for auth-guard test.
-// ---------------------------------------------------------------------------
-let getSessionReturnsNull = false;
-
-// withRegistry passthrough — wraps the inner handler with auth + error
-// adaptation so parseBody's thrown ApiError surfaces as a 400 response.
-mock.module("@/lib/registry/middleware", {
-  namedExports: {
-    withRegistry:
-      (toolId: string, handler: (s: typeof session, req: any, ctx: any, tool: any) => Promise<Response>) =>
-      async (req: any, ctx: any) => {
-        toolCapturedBy_withRegistry = toolId;
-        if (getSessionReturnsNull) {
-          return Response.json(
-            { error: "Unauthorized", code: "UNAUTHORIZED" },
-            { status: 401 },
-          );
-        }
-        const tool = { id: toolId, name: "Sage Chat" };
-        try {
-          return await handler(session, req, ctx, tool);
-        } catch (err) {
-          if (err && typeof err === "object" && "statusCode" in err) {
-            const statusCode = Number((err as { statusCode: number }).statusCode);
-            const message = err instanceof Error ? err.message : "Request failed";
-            return Response.json({ error: message }, { status: statusCode });
-          }
-          throw err;
-        }
-      },
-    withRegistryPublic: () => async () => Response.json({ error: "n/a" }, { status: 404 }),
-  },
-});
-
-mock.module("@/lib/api-error", {
-  namedExports: {
-    isStaffRole: (role: string) => role === "teacher" || role === "admin",
-    badRequest: (msg: string) => {
-      const e = new Error(msg) as Error & { statusCode: number };
-      e.statusCode = 400;
-      e.name = "ApiError";
-      return e;
-    },
-    ApiError: class ApiError extends Error {
-      statusCode: number;
-      code: string;
-      constructor(statusCode: number, message: string, code = "ERR") {
-        super(message);
-        this.statusCode = statusCode;
-        this.code = code;
-        this.name = "ApiError";
-      }
-    },
-    rlsContextFor: () => ({ userId: "stu-test-001", role: "student", studentId: "stu-test-001" }),
-  },
-});
-
-mock.module("@/lib/rate-limit", {
-  namedExports: {
-    rateLimit: mockRateLimit,
-    rateLimitDaily: mockRateLimitDaily,
-    refundRateLimit: mockRefundRateLimit,
-  },
-});
-
-mock.module("@/lib/rate-limit-switch", {
-  namedExports: {
-    rateLimitsDisabled: mockRateLimitsDisabled,
-  },
-});
-
-mock.module("@/lib/ai", {
-  namedExports: {
-    resolveAiProvider: mockResolveAiProvider,
-    getPromptTier: mockGetPromptTier,
-  },
-});
-
-mock.module("@/lib/ai/audit", {
-  namedExports: {
-    getProviderClass: mockGetProviderClass,
-    logAiAuditEvent: mockLogAiAuditEvent,
-    policyDecisionForProvider: mockPolicyDecisionForProvider,
-  },
-});
-
-mock.module("@/lib/logger", {
-  namedExports: {
-    logger: mockLogger,
-  },
-});
-
-mock.module("@/lib/sage/system-prompts", {
-  namedExports: {
-    buildSystemPrompt: mockBuildSystemPrompt,
-    // renderRecentActivity sanitizes alert lines through this; identity is
-    // enough here — the sanitizer has its own tests.
-    sanitizeForPrompt: (text: string) => text,
-    // ConversationStage is a type-only export — not needed at runtime.
-  },
-});
-
-mock.module("@/lib/sage/knowledge-base-server", {
-  namedExports: {
-    getDocumentContext: mockGetDocumentContext,
-  },
-});
-
-const mockFindRelevantForms = mock.fn() as any;
-
-mock.module("@/lib/sage/knowledge-base", {
-  namedExports: {
-    getDirectFormAnswer: mockGetDirectFormAnswer,
-    resolveDirectFormMatch: mockResolveDirectFormMatch,
-    getFormContext: mockGetFormContext,
-    findRelevantForms: mockFindRelevantForms,
-  },
-});
-
-mock.module("@/lib/progression/engine", {
-  namedExports: {
-    recordChatSession: mockRecordChatSession,
-  },
-});
-
-mock.module("@/lib/progression/events", {
-  namedExports: {
-    awardEvent: mockAwardEvent,
-  },
-});
-
-mock.module("@/lib/chat/conversation", {
-  namedExports: {
-    getOrCreateConversation: mockGetOrCreateConversation,
-    getOrCreateTeacherConversation: mockGetOrCreateTeacherConversation,
-    saveMessage: mockSaveMessage,
-    getConversationContext: mockGetConversationContext,
-    maybeUpdateSummary: mockMaybeUpdateSummary,
-  },
-});
-
-mock.module("@/lib/chat/post-response", {
-  namedExports: {
-    handlePostResponse: mockHandlePostResponse,
-  },
-});
-
-mock.module("@/lib/chat/context", {
-  namedExports: {
-    getStudentPromptContext: mockGetStudentPromptContext,
-  },
-});
-
-mock.module("@/lib/sage/context-bundle", {
-  namedExports: {
-    assembleStudentContextBundle: mockAssembleStudentContextBundle,
-    selfMetricLineFromBundle: mockSelfMetricLineFromBundle,
-  },
-});
-
-mock.module("@/lib/sage/situational-snapshot", {
-  namedExports: {
-    getSituationalSnapshot: mockGetSituationalSnapshot,
-  },
-});
-
-mock.module("@/lib/sage/staff-student-context", {
-  namedExports: {
-    buildStaffStudentContext: mockBuildStaffStudentContext,
-    shouldAttemptStaffStudentContext: mockShouldAttemptStaffStudentContext,
-  },
-});
-
-mock.module("@/lib/spokes/career-clusters", {
-  namedExports: {
-    formatClustersForPrompt: mockFormatClustersForPrompt,
-  },
-});
-
-mock.module("@/lib/llm-usage", {
-  namedExports: {
-    checkTokenQuota: mockCheckTokenQuota,
-    withUsageLogging: mockWithUsageLogging,
-  },
-});
-
-mock.module("@/lib/db", {
-  namedExports: {
-    prisma: {
-      student: {
-        findUnique: mockPrismaStudentFindUnique,
-      },
-      fileUpload: {
-        findMany: mockFileUploadFindMany,
-      },
-    },
-    prismaAdmin: {
-      student: {
-        findUnique: mockPrismaStudentFindUnique,
-      },
-    },
-  },
-});
-
-mock.module("@/lib/chat/open-orientation-items", {
-  namedExports: {
-    loadOpenOrientationItems: async () => [],
-  },
-});
-
-mock.module("@/lib/program-type-server", {
-  namedExports: {
-    getStudentProgramType: mockGetStudentProgramType,
-  },
-});
-
-mock.module("@/lib/sage/agent/loop", {
-  namedExports: {
-    runAgentTurn: mockRunAgentTurn,
-  },
-});
-
-mock.module("@/lib/sage/agent/executor", {
-  namedExports: {
-    executeSlashCommand: mockExecuteSlashCommand,
-    executeAgentTool: mockExecuteAgentTool,
-  },
-});
-
-// chat/sse uses pure functions; let it run for real so SSE format is real.
-// program-type is types only — no need to mock.
-
-// ---------------------------------------------------------------------------
-// Provider double — the route iterates `provider.streamResponse(...)`.
-// Build a tiny generator that yields a few chunks then completes.
-// ---------------------------------------------------------------------------
-function makeFakeProvider(name = "ollama", chunks: string[] = ["Hello, ", "world!"]) {
-  return {
-    name,
-    async generateResponse() {
-      return chunks.join("");
-    },
-    async *streamResponse() {
-      for (const chunk of chunks) {
-        yield chunk;
-      }
-    },
-    async generateStructuredResponse() {
-      return "{}";
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers: read the entire SSE response body as a string for assertions.
-// ---------------------------------------------------------------------------
-async function readSseBody(res: Response): Promise<string> {
-  if (!res.body) return "";
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let out = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) out += decoder.decode(value, { stream: true });
-  }
-  out += decoder.decode();
-  return out;
-}
-
-// ---------------------------------------------------------------------------
-// Late import — must come after all mock.module calls.
-// ---------------------------------------------------------------------------
-let route: Awaited<typeof import("../route")>;
-
-before(async () => {
-  // Crisis detection: keep the real deterministic detector (the 988
-  // safety-net and request-time scan suites prove real patterns match) and
-  // stub only the DB/notification sink. The real module is loaded here, after
-  // the prisma/logger mocks above, so nothing reaches a database.
-  const realCrisisDetection = await import("@/lib/sage/crisis-detection");
-  mock.module("@/lib/sage/crisis-detection", {
-    namedExports: {
-      ...realCrisisDetection,
-      recordWellbeingConcern: mockRecordWellbeingConcern,
-    },
-  });
-
-  route = await import("../route");
-});
-
-// ---------------------------------------------------------------------------
-// Default mock state used by most happy-path tests. Reset in beforeEach.
-// ---------------------------------------------------------------------------
-function resetMocks() {
-  for (const m of [
-    mockRateLimit,
-    mockRateLimitDaily,
-    mockRefundRateLimit,
-    mockRateLimitsDisabled,
-    mockResolveAiProvider,
-    mockGetPromptTier,
-    mockGetProviderClass,
-    mockLogAiAuditEvent,
-    mockPolicyDecisionForProvider,
-    mockBuildSystemPrompt,
-    mockGetDocumentContext,
-    mockGetDirectFormAnswer,
-    mockResolveDirectFormMatch,
-    mockFindRelevantForms,
-    mockGetFormContext,
-    mockRecordChatSession,
-    mockAwardEvent,
-    mockGetOrCreateConversation,
-    mockGetOrCreateTeacherConversation,
-    mockSaveMessage,
-    mockGetConversationContext,
-    mockMaybeUpdateSummary,
-    mockHandlePostResponse,
-    mockGetStudentPromptContext,
-    mockAssembleStudentContextBundle,
-    mockSelfMetricLineFromBundle,
-    mockGetSituationalSnapshot,
-    mockBuildStaffStudentContext,
-    mockShouldAttemptStaffStudentContext,
-    mockCheckTokenQuota,
-    mockWithUsageLogging,
-    mockGetStudentProgramType,
-    mockPrismaStudentFindUnique,
-    mockFileUploadFindMany,
-    mockFormatClustersForPrompt,
-    mockRunAgentTurn,
-    mockExecuteSlashCommand,
-    mockExecuteAgentTool,
-    mockRecordWellbeingConcern,
-    mockLogger.error,
-    mockLogger.warn,
-    mockLogger.info,
-  ]) {
-    m.mock.resetCalls();
-  }
-  mockRecordWellbeingConcern.mock.mockImplementation(async () => undefined);
-
-  session = mockStudentSession();
-  getSessionReturnsNull = false;
-  toolCapturedBy_withRegistry = null;
-
-  mockGetDirectFormAnswer.mock.mockImplementation(() => null);
-  mockResolveDirectFormMatch.mock.mockImplementation(() => null);
-  mockFindRelevantForms.mock.mockImplementation(() => []);
-  mockGetFormContext.mock.mockImplementation(() => "");
-  mockGetDocumentContext.mock.mockImplementation(async () => "");
-  mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("ollama"));
-  mockGetPromptTier.mock.mockImplementation(() => "compact");
-  mockGetProviderClass.mock.mockImplementation(() => "local");
-  mockLogAiAuditEvent.mock.mockImplementation(async () => undefined);
-  mockPolicyDecisionForProvider.mock.mockImplementation((name?: string | null) =>
-    name === "ollama" ? "local_only" : "configured_provider",
-  );
-  mockBuildSystemPrompt.mock.mockImplementation(() => "SYSTEM PROMPT");
-  mockCheckTokenQuota.mock.mockImplementation(async () => ({ allowed: true, warning: null }));
-  mockWithUsageLogging.mock.mockImplementation((provider: unknown) => provider);
-  mockRateLimit.mock.mockImplementation(async () => ({ success: true, remaining: 100, resetTime: Date.now() + 3600_000 }));
-  mockRefundRateLimit.mock.mockImplementation(async () => undefined);
-  mockRateLimitsDisabled.mock.mockImplementation(() => false);
-  mockRateLimitDaily.mock.mockImplementation(async () => ({ success: true, remaining: 200, resetTime: Date.now() + 3600_000 }));
-  mockGetOrCreateConversation.mock.mockImplementation(async () => ({
-    id: "conv-1",
-    title: "test",
-    stage: "general",
-    messages: [],
-  }));
-  mockGetOrCreateTeacherConversation.mock.mockImplementation(async () => ({
-    id: "conv-tch-1",
-    title: "test",
-    stage: "general",
-    messages: [],
-  }));
-  mockSaveMessage.mock.mockImplementation(async () => ({ id: "test-msg-id" }));
-  mockGetConversationContext.mock.mockImplementation(async () => ({ messages: [] }));
-  mockMaybeUpdateSummary.mock.mockImplementation(async () => undefined);
-  mockHandlePostResponse.mock.mockImplementation(async () => undefined);
-  mockGetStudentPromptContext.mock.mockImplementation(async () => ({
-    priorConversationContext: "",
-    goalsByLevel: {},
-    goalsSummary: "",
-    studentStatusSummary: undefined,
-    discoverySummary: undefined,
-    careerDiscovery: null,
-    skillGapContext: undefined,
-    pathwayContext: undefined,
-    coachingArcContext: undefined,
-    careerProfileContext: undefined,
-  }));
-  mockAssembleStudentContextBundle.mock.mockImplementation(async () => ({
-    chatPromptContext: {
-      priorConversationContext: "",
-      goalsByLevel: {},
-      goalsSummary: "",
-      studentStatusSummary: undefined,
-      discoverySummary: undefined,
-      careerDiscovery: null,
-      skillGapContext: undefined,
-      pathwayContext: undefined,
-      coachingArcContext: undefined,
-      careerProfileContext: undefined,
-      careerThreadContext: undefined,
-    },
-    meta: { selfMetrics: undefined },
-  }));
-  mockSelfMetricLineFromBundle.mock.mockImplementation(() => "");
-  mockGetSituationalSnapshot.mock.mockImplementation(async () => null);
-  mockBuildStaffStudentContext.mock.mockImplementation(async () => ({
-    context: null,
-    targetStudentId: null,
-    resolution: "none",
-  }));
-  mockShouldAttemptStaffStudentContext.mock.mockImplementation(() => false);
-  mockGetStudentProgramType.mock.mockImplementation(async () => null);
-  mockPrismaStudentFindUnique.mock.mockImplementation(async () => ({ classroomConfirmedAt: null }));
-  mockFileUploadFindMany.mock.mockImplementation(async () => []);
-  mockAwardEvent.mock.mockImplementation(async () => undefined);
-  mockFormatClustersForPrompt.mock.mockImplementation(() => "");
-  mockRunAgentTurn.mock.mockImplementation(async function* () {
-    /* default: no events */
-  });
-  mockExecuteSlashCommand.mock.mockImplementation(async () => null);
-  mockExecuteAgentTool.mock.mockImplementation(async () => ({
-    callId: "call-form-1",
-    tool: "present_form",
-    args: { query: "student-profile" },
-    result: {
-      status: "success",
-      summary: 'Found "SPOKES Student Profile".',
-      data: { formId: "student-profile", title: "SPOKES Student Profile" },
-      action: {
-        action: "open_form",
-        target: "/api/forms/download?formId=student-profile&mode=view",
-        label: "Open SPOKES Student Profile",
-      },
-    },
-    startedAt: new Date().toISOString(),
-    finishedAt: new Date().toISOString(),
-  }));
-}
-
-// ---------------------------------------------------------------------------
-// Test cases
-// ---------------------------------------------------------------------------
+import {
+  session,
+  setSession,
+  toolCapturedBy_withRegistry,
+  mockRateLimit,
+  mockRateLimitDaily,
+  mockRefundRateLimit,
+  mockRateLimitsDisabled,
+  mockResolveAiProvider,
+  mockGetPromptTier,
+  mockLogAiAuditEvent,
+  mockLogger,
+  mockBuildSystemPrompt,
+  mockGetDirectFormAnswer,
+  mockResolveDirectFormMatch,
+  mockAwardEvent,
+  mockGetOrCreateConversation,
+  mockGetOrCreateTeacherConversation,
+  mockSaveMessage,
+  mockGetConversationContext,
+  mockHandlePostResponse,
+  mockGetStudentPromptContext,
+  mockCheckTokenQuota,
+  mockFileUploadFindMany,
+  mockRunAgentTurn,
+  mockExecuteAgentTool,
+  mockAssembleStudentContextBundle,
+  mockSelfMetricLineFromBundle,
+  mockGetSituationalSnapshot,
+  mockRecordWellbeingConcern,
+  setSessionReturnsNull,
+  makeFakeProvider,
+  readSseBody,
+  route,
+  resetMocks,
+} from "./route-harness";
 
 describe("POST /api/chat/send — auth guard", () => {
   beforeEach(() => {
@@ -528,7 +45,7 @@ describe("POST /api/chat/send — auth guard", () => {
   });
 
   it("returns 401 when withRegistry reports no session (unauthenticated)", async () => {
-    getSessionReturnsNull = true;
+    setSessionReturnsNull(true);
 
     const req = mockRequest("/api/chat/send", {
       method: "POST",
@@ -688,7 +205,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
   const demoInstructor = () => mockTeacherSession({ demoAccount: "instructor" });
 
   it("refuses past the demo-wide cap with crisis resources", async () => {
-    session = demoStudent();
+    setSession(demoStudent());
     mockRateLimitDaily.mock.mockImplementation(async (key: string, limit: number) => {
       logCharge(key, limit);
       return key === DEMO_WIDE_KEY
@@ -707,7 +224,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
   });
 
   it("keeps the refusal plain when the message carries no crisis signal", async () => {
-    session = demoStudent();
+    setSession(demoStudent());
     mockRateLimitDaily.mock.mockImplementation(async () => ({
       success: false,
       remaining: 0,
@@ -722,7 +239,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
   });
 
   it("charges the hour, the account's day and the demo-wide day, in that order", async () => {
-    session = demoStudent();
+    setSession(demoStudent());
     useCloud();
 
     const res = await post();
@@ -736,7 +253,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
   });
 
   it("applies the demo-wide cap to a demo student on a local provider too", async () => {
-    session = demoStudent();
+    setSession(demoStudent());
 
     const res = await post();
     await readSseBody(res);
@@ -747,7 +264,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
   });
 
   it("gives the demo instructor 300 an hour and 1000 a day, even on a local provider", async () => {
-    session = demoInstructor();
+    setSession(demoInstructor());
 
     const res = await post();
     await readSseBody(res);
@@ -760,7 +277,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
   });
 
   it("reads the demo-wide cap from the environment on each request", async () => {
-    session = demoStudent();
+    setSession(demoStudent());
     process.env.COHORT_DEMO_SAGE_PER_DAY = "1234";
 
     const res = await post();
@@ -779,7 +296,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
   });
 
   it("skips the demo-wide cap when rate limits are disabled", async () => {
-    session = demoStudent();
+    setSession(demoStudent());
     mockRateLimitsDisabled.mock.mockImplementation(() => true);
 
     const res = await post();
@@ -803,7 +320,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
 
     for (const row of rows) {
       it(`${row.who}, cloud provider`, async () => {
-        session = row.make();
+        setSession(row.make());
         useCloud();
 
         await readSseBody(await post());
@@ -814,7 +331,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
       });
 
       it(`${row.who}, local provider`, async () => {
-        session = row.make();
+        setSession(row.make());
 
         await readSseBody(await post());
 
@@ -824,7 +341,7 @@ describe("POST /api/chat/send: Sage limits for demo accounts", () => {
   });
 
   it("measures the 80% daily warning against the demo instructor's own daily cap", async () => {
-    session = demoInstructor();
+    setSession(demoInstructor());
     const captured = { systemPrompt: "" };
     mockResolveAiProvider.mock.mockImplementation(async () => ({
       ...makeFakeProvider("ollama"),
@@ -956,7 +473,7 @@ describe("POST /api/chat/send — SSE happy path", () => {
   });
 
   it("does not append the crisis block for staff (teacher) chat — student-only scope guard", async () => {
-    session = mockTeacherSession();
+    setSession(mockTeacherSession());
     mockResolveAiProvider.mock.mockImplementation(async () =>
       makeFakeProvider("ollama", ["I hear you, ", "that sounds really hard."]),
     );
@@ -1281,7 +798,7 @@ describe("POST /api/chat/send — request-time crisis scan", () => {
   });
 
   it("(e) does not scan staff (teacher) chat", async () => {
-    session = mockTeacherSession();
+    setSession(mockTeacherSession());
 
     const req = mockRequest("/api/chat/send", {
       method: "POST",
@@ -1505,9 +1022,11 @@ describe("POST /api/chat/send — interrupted reply persistence (F28)", () => {
     resetMocks();
   });
 
-  // Student-facing marker on the persisted partial (grade-6 copy). Pinned
-  // here so a wording change is a deliberate test change.
-  const CUT_OFF_MARKER = "[Sage got cut off here. Send your message again to keep going.]";
+  // Student-facing note on the persisted partial: the same text the chat
+  // shows (cutOffReply). A reset connection reads as "off", where a retry
+  // cannot help, so the note says what to do instead of "Tap Try again".
+  const CUT_OFF_MARKER =
+    "\n\n(Sage got cut off.) Sage is off right now. Your message was not lost. Tell your instructor. You can still use the rest of VisionQuest.";
 
   function makeProviderFailingAfter(chunks: string[]) {
     return {
@@ -1706,7 +1225,7 @@ describe("POST /api/chat/send — 988 resources on error paths (F60)", () => {
     });
 
     it("does not add the block for staff (teacher) chat", async () => {
-      session = mockTeacherSession();
+      setSession(mockTeacherSession());
       providerDown();
       const res = await post("A student told me they want to end it all — what do I do?");
       assert.equal(res.status, 503);
@@ -1913,7 +1432,7 @@ describe("POST /api/chat/send — chat limit charged on a reply, not on a confir
   });
 
   it("refunds the demo-wide unit too when a demo account's turn ends in a confirm card", async () => {
-    session = mockStudentSession({ demoAccount: "student" });
+    setSession(mockStudentSession({ demoAccount: "student" }));
     mockResolveAiProvider.mock.mockImplementation(async () => makeFakeProvider("gemini"));
     mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
 
@@ -1928,7 +1447,7 @@ describe("POST /api/chat/send — chat limit charged on a reply, not on a confir
   });
 
   it("has nothing to refund for a demo-wide unit that came back degraded", async () => {
-    session = mockStudentSession({ demoAccount: "student" });
+    setSession(mockStudentSession({ demoAccount: "student" }));
     mockRunAgentTurn.mock.mockImplementation(confirmCardTurn);
     mockRateLimitDaily.mock.mockImplementation(async () => ({
       success: true,
@@ -1994,7 +1513,8 @@ describe("POST /api/chat/send — interrupted reply on the agent-loop path (F28,
     resetMocks();
   });
 
-  const CUT_OFF_MARKER = "[Sage got cut off here. Send your message again to keep going.]";
+  // The same note the chat shows under a cut-off reply it can retry.
+  const CUT_OFF_MARKER = "\n\n(Sage got cut off. Tap Try again for the full answer.)";
   const PARTIAL = "Here is the first step: ";
 
   function post(message: string) {
@@ -2409,7 +1929,7 @@ describe("POST /api/chat/send — the new message reaches the model once", () =>
   it("staff (teacher) chat: the provider sees the new message once", async () => {
     process.env.SAGE_AGENT_ENABLED = "false";
     delete process.env.SAGE_AGENT_MODE;
-    session = mockTeacherSession();
+    setSession(mockTeacherSession());
     backHistoryWithTranscript(PRIOR_TURNS);
     const { provider, captured } = makeMessageCapturingProvider();
     mockResolveAiProvider.mock.mockImplementation(async () => provider);
@@ -2473,7 +1993,7 @@ describe("POST /api/chat/send — coordinator roles", () => {
 
   for (const role of ["coordinator", "program_coordinator"]) {
     it(`${role} gets the coordinator_assistant stage on a staff conversation`, async () => {
-      session = mockTeacherSession({ id: `${role}-test-001`, role });
+      setSession(mockTeacherSession({ id: `${role}-test-001`, role }));
 
       const body = await send("Which forms does a new student sign?");
 
@@ -2485,7 +2005,7 @@ describe("POST /api/chat/send — coordinator roles", () => {
     });
 
     it(`${role} crisis wording is handled as for a teacher: no scan, no 988 block`, async () => {
-      session = mockTeacherSession({ id: `${role}-test-001`, role });
+      setSession(mockTeacherSession({ id: `${role}-test-001`, role }));
 
       const body = await send(CRISIS_MESSAGE);
 
@@ -2499,7 +2019,7 @@ describe("POST /api/chat/send — coordinator roles", () => {
   }
 
   it("a teacher's crisis wording gets the same treatment (control)", async () => {
-    session = mockTeacherSession();
+    setSession(mockTeacherSession());
 
     const body = await send(CRISIS_MESSAGE);
 
@@ -2508,7 +2028,7 @@ describe("POST /api/chat/send — coordinator roles", () => {
   });
 
   it("a student still gets the student stage, the scan, and the 988 block", async () => {
-    session = mockStudentSession();
+    setSession(mockStudentSession());
 
     const body = await send("I want to end it all.");
 
@@ -2517,190 +2037,5 @@ describe("POST /api/chat/send — coordinator roles", () => {
     assert.equal(mockGetOrCreateTeacherConversation.mock.callCount(), 0);
     assert.equal(mockRecordWellbeingConcern.mock.callCount(), 1);
     assert.match(body, /988/);
-  });
-});
-
-describe("POST /api/chat/send — honest failure causes (E1)", () => {
-  // The route decides why Sage could not answer and sends it as `failure`.
-  // The client never parses the text for the cause.
-  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
-  const previousAgentMode = process.env.SAGE_AGENT_MODE;
-  let sageFailure: typeof import("@/lib/chat/sage-failure");
-
-  before(async () => {
-    sageFailure = await import("@/lib/chat/sage-failure");
-  });
-
-  function useAgentLoop(mode: "off" | "readonly") {
-    if (mode === "off") {
-      process.env.SAGE_AGENT_ENABLED = "false";
-      delete process.env.SAGE_AGENT_MODE;
-    } else {
-      process.env.SAGE_AGENT_MODE = mode;
-      delete process.env.SAGE_AGENT_ENABLED;
-    }
-  }
-
-  beforeEach(() => {
-    resetMocks();
-    useAgentLoop("off");
-  });
-  after(() => {
-    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
-    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
-    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
-    else process.env.SAGE_AGENT_MODE = previousAgentMode;
-  });
-
-  const NORMAL_MESSAGE = "How do I finish my OSHA 10 certification?";
-  const CRISIS_MESSAGE = "I just want to end it all";
-  const EN_BLOCK = /call or text 988/;
-
-  function post(message: string) {
-    const req = mockRequest("/api/chat/send", { method: "POST", body: { message } });
-    return route.POST(req as never, { params: Promise.resolve({}) } as never);
-  }
-
-  function failingProvider(error: Error) {
-    return {
-      name: "ollama",
-      async generateResponse(): Promise<string> {
-        throw error;
-      },
-      async *streamResponse(): AsyncGenerator<string> {
-        throw error;
-      },
-      async *streamWithTools(): AsyncGenerator<never> {
-        throw error;
-      },
-      async generateStructuredResponse() {
-        return "{}";
-      },
-    };
-  }
-
-  /** The SSE error event's JSON, or a failed assertion. */
-  function errorEvent(body: string): { error: string; failure?: unknown } {
-    const line = body
-      .split("\n")
-      .find((l) => l.startsWith("data: ") && l.includes('"error"'));
-    assert.ok(line, `expected an SSE error event in: ${body}`);
-    return JSON.parse(line!.slice("data: ".length)) as { error: string; failure?: unknown };
-  }
-
-  function userMessageSaved(): boolean {
-    return mockSaveMessage.mock.calls.some((call) => call.arguments[2] === "user");
-  }
-
-  describe("before the stream opens (provider setup)", () => {
-    const setupCases: Array<[string, string, "off" | "not_set_up" | "unknown"]> = [
-      ["no model configured", "Local AI server URL is not configured. Set it in Program Setup > AI Provider.", "not_set_up"],
-      ["the server cannot be reached", "Local AI server unreachable", "off"],
-      ["an unknown failure", "database went away", "unknown"],
-    ];
-
-    for (const [label, message, code] of setupCases) {
-      it(`${label}: 503 with failure "${code}" and no "not lost" claim`, async () => {
-        mockResolveAiProvider.mock.mockImplementation(async () => {
-          throw new Error(message);
-        });
-        const res = await post(NORMAL_MESSAGE);
-        assert.equal(res.status, 503);
-        const body = (await res.json()) as { error: string; failure?: unknown };
-        assert.equal(body.failure, code);
-        assert.equal(
-          body.error,
-          sageFailure.sageFailureMessage(code, { audience: "student", messageSaved: false }),
-        );
-        // The claim is withheld because it would be false: nothing was saved.
-        assert.equal(userMessageSaved(), false);
-      });
-    }
-
-    it("never sends a student API-key instructions", async () => {
-      mockResolveAiProvider.mock.mockImplementation(async () => {
-        throw new Error("Sage is not configured yet (no API key).");
-      });
-      const body = (await (await post(NORMAL_MESSAGE)).json()) as { error: string };
-      assert.doesNotMatch(body.error, /API|key|Settings/i);
-    });
-
-    it("gives staff the staff wording", async () => {
-      session = mockTeacherSession();
-      mockResolveAiProvider.mock.mockImplementation(async () => {
-        throw new Error("Local AI server URL is not configured.");
-      });
-      const body = (await (await post("How is my class doing?")).json()) as { error: string; failure?: unknown };
-      assert.equal(body.failure, "not_set_up");
-      assert.equal(
-        body.error,
-        sageFailure.sageFailureMessage("not_set_up", { audience: "staff", messageSaved: false }),
-      );
-    });
-  });
-
-  describe("after the stream opens", () => {
-    const streamCases: Array<[string, Error, "off" | "busy" | "slow" | "unknown"]> = [
-      ["the relay has no Mac (502)", new Error("Local AI stream failed (502)"), "off"],
-      ["the relay is at capacity (503)", new Error("Local AI stream failed (503)"), "busy"],
-      ["no first reply in time", new Error("Local AI did not produce a first content token within 45 seconds."), "slow"],
-      ["an unknown failure", new Error("kaboom"), "unknown"],
-    ];
-
-    for (const mode of ["off", "readonly"] as const) {
-      for (const [label, error, code] of streamCases) {
-        it(`agent loop ${mode}: ${label} sends failure "${code}" and says the message was saved`, async () => {
-          useAgentLoop(mode);
-          // The real agent loop catches the provider error and reports only
-          // agent_stop { reason: "error" }; this double does the same.
-          mockRunAgentTurn.mock.mockImplementation(async function* (args: { provider: { streamWithTools: () => AsyncGenerator<unknown> } }) {
-            try {
-              for await (const event of args.provider.streamWithTools()) void event;
-            } catch {
-              yield { type: "agent_stop", reason: "error", transcript: [], finalText: "" };
-            }
-          });
-          mockResolveAiProvider.mock.mockImplementation(async () => failingProvider(error));
-
-          const event = errorEvent(await readSseBody(await post(NORMAL_MESSAGE)));
-          assert.equal(event.failure, code);
-          assert.equal(
-            event.error,
-            sageFailure.sageFailureMessage(code, { audience: "student", messageSaved: true }),
-          );
-          assert.equal(userMessageSaved(), true);
-        });
-      }
-    }
-  });
-
-  describe("the 988 block stays on every failure path that had it", () => {
-    for (const [label, message] of [
-      ["not set up", "Local AI server URL is not configured."],
-      ["off", "Local AI server unreachable"],
-      ["unknown", "database went away"],
-    ] as const) {
-      it(`provider setup, ${label}: the error carries the block for a crisis message`, async () => {
-        mockResolveAiProvider.mock.mockImplementation(async () => {
-          throw new Error(message);
-        });
-        const body = (await (await post(CRISIS_MESSAGE)).json()) as { error: string };
-        assert.match(body.error, EN_BLOCK);
-      });
-    }
-
-    for (const [label, message] of [
-      ["off", "Local AI stream failed (502)"],
-      ["busy", "Local AI stream failed (503)"],
-      ["slow", "Local AI did not produce a first content token within 45 seconds."],
-      ["unknown", "kaboom"],
-    ] as const) {
-      it(`stream, ${label}: the error event carries the block for a crisis message`, async () => {
-        mockResolveAiProvider.mock.mockImplementation(async () => failingProvider(new Error(message)));
-        const event = errorEvent(await readSseBody(await post(CRISIS_MESSAGE)));
-        assert.match(event.error, EN_BLOCK);
-        assert.ok(event.error.startsWith("Sage "), event.error);
-      });
-    }
   });
 });
