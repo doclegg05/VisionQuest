@@ -181,6 +181,28 @@ describe("what the SDK would send without asking beforeSend", () => {
     assert.equal(spotlightOf(Sentry.getClient()?.getOptions() ?? {}), false);
   });
 
+  // With debug on, the SDK prints each captured error's own text to the
+  // server log ("Captured error event `...`", @sentry/core
+  // build/cjs/client.js) and a line for every incoming request. The Node SDK
+  // turns it on from SENTRY_DEBUG unless the option is set
+  // (node-core build/cjs/sdk/index.js: `options.debug ?? process.env.SENTRY_DEBUG`).
+  it("debug is off in the options every runtime spreads", () => {
+    assert.equal(PRIVATE_REPORTING_OPTIONS.debug, false);
+    assert.equal(edgeSentryOptions(TEST_DSN).debug, false);
+  });
+
+  it("debug is off in the server options whatever the environment says", () => {
+    const before = process.env.SENTRY_DEBUG;
+    process.env.SENTRY_DEBUG = "true";
+    try {
+      assert.equal(serverSentryOptions(TEST_DSN).debug, false);
+    } finally {
+      if (before === undefined) delete process.env.SENTRY_DEBUG;
+      else process.env.SENTRY_DEBUG = before;
+    }
+    assert.equal(Sentry.getClient()?.getOptions().debug, false);
+  });
+
   it("the built server client names no host to receive its trace headers", () => {
     assert.deepEqual(serverSentryOptions(TEST_DSN).tracePropagationTargets, []);
     assert.deepEqual(Sentry.getClient()?.getOptions().tracePropagationTargets, []);

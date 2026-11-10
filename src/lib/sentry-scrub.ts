@@ -448,8 +448,14 @@ export function errorOnlyIntegrations<I extends { name: string }>(defaults: read
  * `Sentry.metrics` value would leave as written. The wire filter
  * (sentry-wire.ts) drops both item types as well; with these off, the SDK
  * does not build them.
+ *
+ * Debug is off by name. With it on, the SDK prints each captured error's own
+ * text and a line per incoming request to the server log, and the Node SDK
+ * turns it on from SENTRY_DEBUG when the option is not set
+ * (@sentry/node-core build/cjs/sdk/index.js).
  */
 export const PRIVATE_REPORTING_OPTIONS = {
+  debug: false,
   sendDefaultPii: false,
   sendClientReports: false,
   enableLogs: false,
