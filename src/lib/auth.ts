@@ -186,27 +186,37 @@ export async function setSessionCookie(
   return token;
 }
 
+/** The columns a session lookup reads. The last two only decide `mustChangePassword`. */
+const SESSION_ACCOUNT_SELECT = {
+  id: true,
+  studentId: true,
+  displayName: true,
+  role: true,
+  sessionVersion: true,
+  isActive: true,
+  demoAccount: true,
+  mustChangePassword: true,
+  passwordHash: true,
+} as const;
+
+interface SessionAccountRow {
+  id: string;
+  studentId: string;
+  displayName: string;
+  role: string;
+  sessionVersion: number;
+  isActive: boolean;
+  demoAccount: DemoAccountKind | null;
+  mustChangePassword: boolean;
+  passwordHash: string | null;
+}
+
 /**
  * The account behind a session, as the session cache holds it. The password
  * hash is read only to answer "must this account change its password" and is
  * dropped here: the answer is cached, the hash never is.
  */
-async function loadSessionAccount(id: string) {
-  const row = await prismaAdmin.student.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      studentId: true,
-      displayName: true,
-      role: true,
-      sessionVersion: true,
-      isActive: true,
-      demoAccount: true,
-      mustChangePassword: true,
-      passwordHash: true,
-    },
-  });
-  if (!row) return null;
+function sessionAccountFrom(row: SessionAccountRow) {
   return {
     id: row.id,
     studentId: row.studentId,
@@ -232,7 +242,13 @@ export async function getSession() {
 
   // Cache session lookups for 10s to reduce DB hits (keyed by user ID + session version)
   const cacheKey = `session:${claims.sub}:${claims.sv}`;
-  const student = await cached(cacheKey, 10, () => loadSessionAccount(claims.sub));
+  const student = await cached(cacheKey, 10, async () => {
+    const row = await prismaAdmin.student.findUnique({
+      where: { id: claims.sub },
+      select: SESSION_ACCOUNT_SELECT,
+    });
+    return row ? sessionAccountFrom(row) : null;
+  });
 
   if (!student || student.sessionVersion !== claims.sv || !student.isActive) return null;
   // The switch is read here, after the cache, and not inside the cached
