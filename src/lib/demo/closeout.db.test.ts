@@ -51,7 +51,7 @@ function isLocalDatabase(databaseUrl: string): boolean {
 }
 
 if (!SHOULD_RUN) {
-  describe("demo closeout against Postgres (integration) — SKIPPED", () => {
+  describe("demo closeout against Postgres (integration): SKIPPED", () => {
     it("requires DEMO_CLOSEOUT_DB_TEST_ENABLED=true and DATABASE_URL", () => {
       assert.ok(true, "Set DEMO_CLOSEOUT_DB_TEST_ENABLED=true and point DATABASE_URL at a local, migrated, empty test database.");
     });
