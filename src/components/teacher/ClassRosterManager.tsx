@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QrCode as QrIcon } from "@phosphor-icons/react";
 import { ClassRegionField, ClassRegionLine } from "@/components/admin/ClassRegionField";
-import { CreateClassRegionSelect } from "@/components/admin/CreateClassRegionSelect";
 import { fetchClassRegions } from "@/components/admin/class-regions";
 import { useRegionsChanged } from "@/components/admin/regions-events";
 import { useClassRegionMove } from "@/components/admin/useClassRegionMove";
+import { CreateClassForm, createClassBody, useCreateClassForm } from "./CreateClassForm";
 import { CreateClassHint, createClassVisibility } from "./CreateClassGate";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
@@ -113,14 +113,8 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   const [saving, setSaving] = useState(false);
   const [creatingClass, setCreatingClass] = useState(false);
   const [showFlyerModal, setShowFlyerModal] = useState(false);
-  const [newClassName, setNewClassName] = useState("");
-  const [newClassCode, setNewClassCode] = useState("");
-  const [newClassDescription, setNewClassDescription] = useState("");
-  const [newClassStartDate, setNewClassStartDate] = useState("");
-  const [newClassEndDate, setNewClassEndDate] = useState("");
-  const [newInstructorIds, setNewInstructorIds] = useState<string[]>([]);
+  const newClass = useCreateClassForm();
   const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
-  const [newRegionId, setNewRegionId] = useState("");
   const [className, setClassName] = useState("");
   const [classCode, setClassCode] = useState("");
   const [classDescription, setClassDescription] = useState("");
@@ -328,15 +322,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
       const response = await fetch("/api/teacher/classes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newClassName,
-          code: newClassCode,
-          description: newClassDescription,
-          startDate: newClassStartDate || null,
-          endDate: newClassEndDate || null,
-          instructorIds: newInstructorIds,
-          regionId: newRegionId,
-        }),
+        body: JSON.stringify(createClassBody(newClass.values)),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
@@ -344,13 +330,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
       }
 
       setMessage("Class created.");
-      setNewClassName("");
-      setNewClassCode("");
-      setNewClassDescription("");
-      setNewClassStartDate("");
-      setNewClassEndDate("");
-      setNewInstructorIds([]);
-      setNewRegionId("");
+      newClass.reset();
       await loadClasses(payload?.class?.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the class.");
@@ -438,14 +418,6 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
     );
   }
 
-  function toggleNewInstructor(instructorId: string) {
-    setNewInstructorIds((current) =>
-      current.includes(instructorId)
-        ? current.filter((id) => id !== instructorId)
-        : [...current, instructorId],
-    );
-  }
-
   if (loading) {
     return <p className="text-sm text-[var(--ink-muted)]">Loading classes...</p>;
   }
@@ -464,82 +436,14 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
       ) : null}
 
       {adminMode && createClassVisibility({ manageRegions, regionCount: regions.length, loading }) === "form" ? (
-        <div className="surface-section space-y-4 p-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Admin</p>
-            <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Create a Class</h2>
-            <p className="mt-2 text-sm text-[var(--ink-muted)]">Classes organize students and instructors. Create student accounts from the class roster below.</p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">Class name</span>
-              <input
-                value={newClassName}
-                onChange={(event) => setNewClassName(event.target.value)}
-                className="field px-4 py-3 text-sm"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">Class code</span>
-              <input
-                value={newClassCode}
-                onChange={(event) => setNewClassCode(event.target.value)}
-                className="field px-4 py-3 text-sm"
-              />
-            </label>
-            <CreateClassRegionSelect regions={regions} value={newRegionId} onChange={setNewRegionId} onAdminPage={manageRegions} />
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>
-              <input
-                type="date"
-                value={newClassStartDate}
-                onChange={(event) => setNewClassStartDate(event.target.value)}
-                className="field px-4 py-3 text-sm"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="block text-sm font-medium text-[var(--ink-strong)]">End date</span>
-              <input
-                type="date"
-                value={newClassEndDate}
-                onChange={(event) => setNewClassEndDate(event.target.value)}
-                className="field px-4 py-3 text-sm"
-              />
-            </label>
-          </div>
-          <label className="block space-y-1.5">
-            <span className="block text-sm font-medium text-[var(--ink-strong)]">Description</span>
-            <textarea
-              value={newClassDescription}
-              onChange={(event) => setNewClassDescription(event.target.value)}
-              rows={3}
-              className="field px-4 py-3 text-sm"
-            />
-          </label>
-          <div className="rounded-2xl border border-[var(--border)] p-4">
-            <p className="text-sm font-semibold text-[var(--ink-strong)]">Assign instructors</p>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {availableInstructors.map((instructor) => (
-                <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink-strong)]">
-                  <input
-                    type="checkbox"
-                    checked={newInstructorIds.includes(instructor.id)}
-                    onChange={() => toggleNewInstructor(instructor.id)}
-                  />
-                  <span>{instructor.displayName}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void createClass()}
-            disabled={creatingClass}
-            className="primary-button px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {creatingClass ? "Creating..." : "Create Class"}
-          </button>
-        </div>
+        <CreateClassForm
+          form={newClass}
+          regions={regions}
+          instructors={availableInstructors}
+          onAdminPage={manageRegions}
+          creating={creatingClass}
+          onCreate={() => void createClass()}
+        />
       ) : <CreateClassHint manageRegions={manageRegions} regionCount={regions.length} loading={loading} />}
 
       <div className="surface-section space-y-4 p-5">
