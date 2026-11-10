@@ -1,0 +1,10 @@
+{
+  "id": "H13",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Error reporting follow-ups from the two privacy audits",
+  "doneWhen": "Tests run the real SDK for the route rule and the trailing report. The owner confirms the project settings.",
+  "check": {
+    "type": "pending"
+  }
+}

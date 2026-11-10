@@ -37,11 +37,11 @@ async function realGates(kind) {
 
 // --- the committed gate files ---
 
-test("the plan's task tables parse to 36 launch, 31 pilot and 1 hold task", async () => {
+test("the plan's task tables parse to 36 launch, 32 pilot and 1 hold task", async () => {
   const { readPlanTasks } = await seed();
   const counts = { launch: 0, pilot: 0, hold: 0 };
   for (const task of readPlanTasks(readFileSync(join(ROOT, PLAN), "utf8"))) counts[task.set] += 1;
-  assert.deepEqual(counts, { launch: 36, pilot: 31, hold: 1 });
+  assert.deepEqual(counts, { launch: 36, pilot: 32, hold: 1 });
 });
 
 test("every task in the plan has a gate file with the plan's set, and no gate lacks a task", async () => {
