@@ -9,6 +9,11 @@ import { SAGE_NOTICE_SECTIONS, SAGE_NOTICE_TITLE } from "@/lib/about-sage/notice
 
 const html = renderToString(<Page />);
 
+/** How renderToString writes quote marks in text. */
+function asHtml(text: string): string {
+  return text.replace(/'/g, "&#x27;").replace(/"/g, "&quot;");
+}
+
 describe("/about-sage notice page", () => {
   it("has one page heading", () => {
     assert.equal((html.match(/<h1\b/g) ?? []).length, 1);
@@ -22,7 +27,7 @@ describe("/about-sage notice page", () => {
 
   it("shows every sentence of the notice", () => {
     const missing = SAGE_NOTICE_SECTIONS.flatMap((s) => s.sentences).filter(
-      (sentence) => !html.includes(sentence.replace(/'/g, "&#x27;")),
+      (sentence) => !html.includes(asHtml(sentence)),
     );
     assert.deepEqual(missing, []);
   });

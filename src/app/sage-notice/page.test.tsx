@@ -15,6 +15,11 @@ import {
 
 class RedirectSignal extends Error {}
 
+/** How renderToString writes quote marks in text. */
+function asHtml(text: string): string {
+  return text.replace(/'/g, "&#x27;").replace(/"/g, "&quot;");
+}
+
 let session: { id: string; studentId: string; displayName: string; role: string; demoAccount?: "student" | "instructor" } | null;
 let consentScopes: string[];
 
@@ -65,7 +70,7 @@ describe("/sage-notice acknowledgement page", () => {
     const html = renderToString(await Page());
 
     assert.match(html, new RegExp(`<h1[^>]*>${SAGE_NOTICE_ACK_HEADING}</h1>`));
-    for (const point of SAGE_NOTICE_KEY_POINTS) assert.ok(html.includes(point), point);
+    for (const point of SAGE_NOTICE_KEY_POINTS) assert.ok(html.includes(asHtml(point)), point);
     assert.match(html, new RegExp(`<a[^>]*href="${SAGE_NOTICE_PATH}"`));
     assert.match(html, new RegExp(`<button[^>]*>${SAGE_NOTICE_ACK_BUTTON}</button>`));
   });
