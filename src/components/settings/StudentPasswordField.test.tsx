@@ -295,3 +295,12 @@ describe("StudentPasswordField: the lines under the field are body size", () => 
     });
   }
 });
+
+describe("StudentPasswordField: focus", () => {
+  it("leaves the ring to the app's own focus-visible rule on the input and the Show button", () => {
+    const html = view();
+    for (const control of [tag(html, "input"), tag(html, "button")]) {
+      assert.doesNotMatch(control, /focus:outline-none|focus:ring-2|focus:ring-\[/u, control);
+    }
+  });
+});

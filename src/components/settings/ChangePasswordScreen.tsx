@@ -18,7 +18,7 @@ export const FORCED_CURRENT_HINT = "Type it just as your instructor gave it, wit
 export const SHARED_COMPUTER_TIP = "Is this a shared computer? If it asks to save your password, tap Never or Not now.";
 
 const BUTTON_CLASS =
-  "inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-[var(--ink-strong)] underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-[var(--ink-strong)] underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-60";
 
 /**
  * Ends the session. True only when the server answers that it ended it.
@@ -87,6 +87,8 @@ export function PasswordSavedConfirmation({ onContinue }: { onContinue: () => vo
 
   return (
     <div>
+      {/* Keeps its own ring: focus arrives by script after a tap on Save, which
+          does not match the app's :focus-visible rule, so that rule draws none. */}
       <div ref={boxRef} tabIndex={-1} className="rounded-2xl bg-success-soft px-4 py-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]">
         <p className="text-base leading-7 text-success">Your new password is saved. You will use it the next time you sign in.</p>
         <p className="mt-2 text-sm leading-6 text-success">{SHARED_COMPUTER_TIP}</p>

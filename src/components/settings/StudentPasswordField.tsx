@@ -62,11 +62,11 @@ export interface StudentPasswordFieldViewProps extends StudentPasswordFieldProps
 }
 
 const INPUT_CLASS =
-  "field min-w-0 flex-1 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-70";
+  "field min-w-0 flex-1 px-4 py-3 text-base disabled:cursor-not-allowed disabled:opacity-70";
 // The button's words carry its state, Show or Hide, so it needs one look only.
 // A fixed width, so the input does not resize when the word changes.
 const SHOW_BUTTON_CLASS =
-  "inline-flex min-h-11 w-20 shrink-0 items-center justify-center rounded-xl border border-[var(--border-control)] bg-[var(--surface-raised)] px-4 text-sm font-semibold text-[var(--ink-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-70";
+  "inline-flex min-h-11 w-20 shrink-0 items-center justify-center rounded-xl border border-[var(--border-control)] bg-[var(--surface-raised)] px-4 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-70";
 
 /** A hint under the field. */
 const LINE_CLASS = "mt-2 text-base leading-7 text-[var(--ink-muted)]";

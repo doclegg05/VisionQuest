@@ -366,6 +366,11 @@ describe("signing out from the forced screen", () => {
     assert.equal(await requestSignOut(), false);
   });
 
+  it("leaves the Sign out button's ring to the app's own focus-visible rule", () => {
+    const button = tags(renderToString(<SignOutButtonView signingOut={false} failed={false} onSignOut={() => undefined} />), "button")[0] ?? "";
+    assert.doesNotMatch(button, /focus:outline-none|focus:ring-2|focus:ring-\[/u, button);
+  });
+
   it("says so and stays when it fails", () => {
     const failed = renderToString(<SignOutButtonView signingOut={false} failed onSignOut={() => undefined} />);
     assert.match(failed, /<p[^>]*role="alert"[^>]*>(?:(?!<\/p>).)*Could not sign out\. Try again\.<\/p>/u);
