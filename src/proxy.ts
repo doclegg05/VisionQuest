@@ -15,6 +15,20 @@ import {
 const isProduction = process.env.NODE_ENV === "production";
 const SESSION_COOKIE_NAME = "vq-session";
 
+/**
+ * The `connect-src` entry for the browser's error reports: the exact origin
+ * the public DSN names (`https://o123.ingest.us.sentry.io`), or nothing when
+ * no DSN is set. A fixed `https://*.ingest.sentry.io` was here before; a CSP
+ * wildcard covers one label, so it never matched a regional ingest host and
+ * the browser refused every report. The DSN's key is not part of an origin.
+ */
+function sentryConnectSource(): string {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!dsn || !URL.canParse(dsn)) return "";
+  const { protocol, origin } = new URL(dsn);
+  return protocol === "https:" ? ` ${origin}` : "";
+}
+
 let warnedStyleRelaxIgnored = false;
 
 /**
@@ -166,7 +180,7 @@ export function proxy(request: NextRequest) {
     "style-src-attr 'unsafe-inline'",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://images.credly.com https://www.credly.com",
-    "connect-src 'self' https://generativelanguage.googleapis.com https://*.ingest.sentry.io",
+    `connect-src 'self' https://generativelanguage.googleapis.com${sentryConnectSource()}`,
     // frame-src 'self' so the Library's same-origin PDF preview iframe
     // (sourced from /api/documents/download?mode=view) can render. Files
     // stream through our own origin, never a cross-origin presigned URL.

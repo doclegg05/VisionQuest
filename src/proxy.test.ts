@@ -375,3 +375,49 @@ test("a cross-site POST to the demo endpoints is refused", () =>
       assert.equal(proxy(request(path, { origin: "https://evil.example" })).status, 403, path);
     }
   }));
+
+// H1 privacy follow-up, item 12 (2026-11-10). The policy allowed
+// `https://*.ingest.sentry.io`. A current DSN names a host like
+// `o123.ingest.us.sentry.io`, and a CSP wildcard covers one label, so the
+// browser would have refused every report. The policy now allows the exact
+// origin the DSN names, and nothing when there is no DSN.
+describe("proxy, connect-src and the browser's error reports", () => {
+  function connectSrc(dsn: string | undefined): string {
+    const before = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    if (dsn === undefined) delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+    else process.env.NEXT_PUBLIC_SENTRY_DSN = dsn;
+    try {
+      const policy = proxy(request("/", {}, "GET")).headers.get("Content-Security-Policy") ?? "";
+      return policy.split("; ").find((directive) => directive.startsWith("connect-src ")) ?? "";
+    } finally {
+      if (before === undefined) delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+      else process.env.NEXT_PUBLIC_SENTRY_DSN = before;
+    }
+  }
+
+  const BASE = "connect-src 'self' https://generativelanguage.googleapis.com";
+
+  it("allows the exact ingest origin of a current regional DSN", () => {
+    assert.equal(connectSrc("https://publickey@o123.ingest.us.sentry.io/456"), `${BASE} https://o123.ingest.us.sentry.io`);
+  });
+
+  it("allows the exact ingest origin of an older DSN", () => {
+    assert.equal(connectSrc("https://publickey@o123.ingest.sentry.io/456"), `${BASE} https://o123.ingest.sentry.io`);
+  });
+
+  it("adds nothing when no DSN is set", () => {
+    assert.equal(connectSrc(undefined), BASE);
+    assert.equal(connectSrc(""), BASE);
+  });
+
+  it("adds nothing for a DSN that is not an https URL", () => {
+    assert.equal(connectSrc("not a dsn"), BASE);
+    assert.equal(connectSrc("http://publickey@o123.ingest.us.sentry.io/456"), BASE);
+  });
+
+  it("never puts the DSN's key or a wildcard in the policy", () => {
+    const directive = connectSrc("https://publickey@o123.ingest.us.sentry.io/456");
+    assert.ok(!directive.includes("publickey"));
+    assert.ok(!directive.includes("*"));
+  });
+});
