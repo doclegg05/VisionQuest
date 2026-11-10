@@ -12,7 +12,7 @@ import {
   setMfaSessionCookie,
 } from "@/lib/auth";
 import { clientIpBucket } from "@/lib/client-ip";
-import { rateLimit, refundRateLimit } from "@/lib/rate-limit";
+import { rateLimit, refundRateLimit, type RateLimitResult } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody, loginSchema } from "@/lib/schemas";
@@ -40,10 +40,14 @@ const SIGN_IN_WINDOW_MS = SIGN_IN_WINDOW_MINUTES * 60 * 1000;
 const NETWORK_FAILED_SIGN_IN_LIMIT = 30;
 
 /**
- * Sign-in attempts on one account per window, right or wrong, from any
- * address. This is the brute-force control, and nothing gives its units back.
+ * FAILED sign-ins on one account per window, from any address. This is the
+ * brute-force control. A right password gives its unit back, so a student can
+ * sign in on every lab PC in turn. One unit comes back, never the wrong tries
+ * before it, and a refused attempt keeps its unit whatever the password was.
+ * An attempt holds its unit until it is answered, so wrong tries plus
+ * attempts in flight can never pass 5.
  */
-const ACCOUNT_SIGN_IN_LIMIT = 5;
+const ACCOUNT_FAILED_SIGN_IN_LIMIT = 5;
 
 /**
  * The one answer for every failed sign-in: unknown login, wrong password,
@@ -75,6 +79,28 @@ function signInFailed(): NextResponse {
   return NextResponse.json({ error: SIGN_IN_FAILED_MESSAGE }, { status: 401 });
 }
 
+/** One unit a limiter call took, kept so a right password can give it back. */
+interface TakenUnit {
+  key: string;
+  resetTime: number;
+}
+
+/** Null when the limiter failed open: a degraded limiter took no unit, so there is nothing to give back. */
+function takenUnit(key: string, result: RateLimitResult): TakenUnit | null {
+  return result.degraded ? null : { key, resetTime: result.resetTime };
+}
+
+/**
+ * Gives back the units a right password took, each in the window it was taken
+ * from. Call this only once the response is certain to say the password was
+ * right. Every refusal answers the same 401 whatever the password was, so a
+ * unit that came back for a locked, closed or Google-only account would let
+ * the caller read "right password" off a count, past the per-account lock.
+ */
+async function giveBack(units: readonly (TakenUnit | null)[]): Promise<void> {
+  await Promise.all(units.map((unit) => (unit ? refundRateLimit(unit.key, unit.resetTime) : undefined)));
+}
+
 /** The account a typed login names, and the login in the form both limiters key on. */
 async function findAccount(login: string): Promise<{ student: Student | null; normalizedLogin: string }> {
   const isEmail = login.includes("@");
@@ -83,6 +109,13 @@ async function findAccount(login: string): Promise<{ student: Student | null; no
     ? await prisma.student.findUnique({ where: { email: normalizedLogin } })
     : await prisma.student.findUnique({ where: { studentId: normalizedLogin } });
   return { student, normalizedLogin };
+}
+
+interface AccountAttempt {
+  /** True only for a real account past its limit. */
+  locked: boolean;
+  /** The per-account unit this attempt took, or null when the limiter failed open. */
+  unit: TakenUnit | null;
 }
 
 /**
@@ -105,15 +138,15 @@ async function findAccount(login: string): Promise<{ student: Student | null; no
  * unknown-login key is computed on every request so both paths do the same
  * work and fail alike. An unknown login can never sign in, so its spent
  * bucket changes nothing it is told; only a real account counts as locked.
+ *
+ * The unit this attempt took is answered too, so a right password can give
+ * it back (see `giveBack`). An unknown login never reaches that point.
  */
-async function countAccountAttempt(student: Student | null, normalizedLogin: string): Promise<boolean> {
+async function countAccountAttempt(student: Student | null, normalizedLogin: string): Promise<AccountAttempt> {
   const unknownLoginKey = unknownLoginLimiterKey(normalizedLogin);
-  const userRl = await rateLimit(
-    student ? `login:user:${student.id}` : unknownLoginKey,
-    ACCOUNT_SIGN_IN_LIMIT,
-    SIGN_IN_WINDOW_MS,
-  );
-  return student !== null && !userRl.success;
+  const accountKey = student ? `login:user:${student.id}` : unknownLoginKey;
+  const userRl = await rateLimit(accountKey, ACCOUNT_FAILED_SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
+  return { locked: student !== null && !userRl.success, unit: takenUnit(accountKey, userRl) };
 }
 
 interface FailedSignIn {
@@ -236,7 +269,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const login = body.studentId.trim();
   const password = body.password.trim();
   const { student, normalizedLogin } = await findAccount(login);
-  const accountLocked = await countAccountAttempt(student, normalizedLogin);
+  const { locked: accountLocked, unit: accountUnit } = await countAccountAttempt(student, normalizedLogin);
 
   // Consolidate all failure cases into a single generic response to prevent account enumeration.
   // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
@@ -259,14 +292,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   // The password was right, and both answers below say so. Give the network
-  // unit back here and nowhere earlier: every refusal above answers the same
-  // 401 whatever the password was, so a unit that came back for a locked or
-  // closed account would let the caller read "right password" off the
-  // network count, past the per-account lock. A degraded limiter took no
-  // unit, so there is nothing to give back.
-  if (!networkRl.degraded) {
-    await refundRateLimit(networkKey, networkRl.resetTime);
-  }
+  // and the account unit back here and nowhere earlier: every refusal above
+  // answers the same 401 whatever the password was (see `giveBack`).
+  await giveBack([takenUnit(networkKey, networkRl), accountUnit]);
 
   return student.mfaEnabled ? startMfaChallenge(student, ip) : startSession(student, ip);
 });

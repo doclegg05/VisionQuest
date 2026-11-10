@@ -28,7 +28,7 @@ process.env.JWT_SECRET = "test-secret-for-login-route-limiter-keys";
 
 /** Mirrors the per-IP limit on failed attempts in ../route.ts. */
 const IP_LIMIT = 30;
-/** Mirrors the per-user limit in ../route.ts. */
+/** Mirrors the per-user limit on failed attempts in ../route.ts. */
 const USER_LIMIT = 5;
 /** Concurrent sign-in attempts — comfortably above both limits. */
 const BURST = 40;
@@ -137,8 +137,9 @@ describe("POST /api/auth/login — concurrent attempts from one IP", () => {
     // The per-IP limiter admits IP_LIMIT of the burst; those then meet the
     // per-user limiter, which admits USER_LIMIT. Lost increments would let
     // more through — that is the brute-force protection this counts on.
-    // Every attempt takes its per-IP unit before any attempt gives one back,
-    // so the sign-ins that succeed here free no room for the rest of the burst.
+    // Every attempt takes its per-IP and its per-user unit before any attempt
+    // gives one back, so the sign-ins that succeed here free no room for the
+    // rest of the burst.
     assert.equal(statuses.filter((s) => s === 200).length, Math.min(IP_LIMIT, USER_LIMIT));
 
     // The two refusals have different shapes on purpose (2026-09-06 hunt,
