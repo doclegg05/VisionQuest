@@ -39,6 +39,7 @@ mock.module("@/lib/auth", {
     hashPassword: () => ({ hash: "scrypt$newhash$value", salt: "salt" }),
     normalizeStudentId: (raw: string) => raw.toLowerCase(),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
+    sessionCachePrimer: () => () => undefined,
     setSessionCookie: async (_id: string, _role: string, _sessionVersion: number, options: unknown) => {
       cookieOptions.push(options);
       return "fake-jwt-token";

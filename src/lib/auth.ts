@@ -2,7 +2,7 @@ import crypto from "crypto";
 import type { Prisma } from "@prisma/client";
 import { cookies } from "next/headers";
 import { prismaAdmin } from "./db";
-import { cached, invalidatePrefix } from "./cache";
+import { cached, invalidatePrefix, primeCache } from "./cache";
 import { isCohortDemoEnabled, type DemoAccountKind } from "./demo/config";
 import { runHashJob } from "./hash-queue";
 import { errorForLog } from "./log-error";
@@ -252,6 +252,47 @@ function sessionAccountFrom(row: SessionAccountRow) {
   };
 }
 
+type SessionAccount = ReturnType<typeof sessionAccountFrom>;
+
+/**
+ * How long getSession() reuses an account row it has read: 60 seconds.
+ *
+ * ONE INSTANCE, ONE PROCESS. The row is kept in this process's memory
+ * (src/lib/cache.ts). Keeping it this long is safe only because every write
+ * that changes what a session depends on runs in this same process and drops
+ * the row as soon as it has committed, with `invalidateSessionCache`: a
+ * password reset or change, a deactivation, an offboarding, a role change.
+ * Sign-out does not touch the row. It revokes the one token, and that answer
+ * has its own cache of 10 seconds per token, dropped the same way
+ * (src/lib/session-revocation.ts). So a session that should have ended is
+ * refused on the next request, not up to 60 seconds later.
+ *
+ * A write this process cannot see waits out the window: a script or a SQL
+ * console that changes an account is honored after at most 60 seconds, or at
+ * once after a restart. The same holds for the moment in a deploy when the
+ * old and the new copy of the app may both be running: each has its own
+ * memory, and the copy that did not make a write keeps its row until the
+ * window ends or it shuts down.
+ *
+ * A SECOND INSTANCE would break this. Its writes would not reach this
+ * process's memory, so a reset or deactivated session would keep working here
+ * for up to 60 seconds. Before adding one, do one of three things: move the
+ * session row and its invalidation to a store both instances share (the
+ * adapter in src/lib/cache.ts is the seam, and the revocation cache needs the
+ * same), or send every invalidation to every instance, or bring this back
+ * down to a few seconds and accept the extra reads.
+ */
+export const SESSION_CACHE_TTL_S = 60;
+
+function sessionCacheKey(id: string, sessionVersion: number): string {
+  return `session:${id}:${sessionVersion}`;
+}
+
+async function readSessionAccount(id: string): Promise<SessionAccount | null> {
+  const row = await prismaAdmin.student.findUnique({ where: { id }, select: SESSION_ACCOUNT_SELECT });
+  return row ? sessionAccountFrom(row) : null;
+}
+
 export async function getSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -259,20 +300,25 @@ export async function getSession() {
 
   const claims = verifyToken(token);
   if (!claims) return null;
-  // Logout revokes the presented token server-side. A store failure throws,
-  // like the Student lookup below: no session on an unknown answer.
-  if (await isSessionTokenRevoked(token)) return null;
 
-  // Cache session lookups for 10s to reduce DB hits (keyed by user ID + session version)
-  const cacheKey = `session:${claims.sub}:${claims.sv}`;
-  const student = await cached(cacheKey, 10, async () => {
-    const row = await prismaAdmin.student.findUnique({
-      where: { id: claims.sub },
-      select: SESSION_ACCOUNT_SELECT,
-    });
-    return row ? sessionAccountFrom(row) : null;
-  });
+  // Neither lookup needs the other's answer, so both are issued before either
+  // is awaited: a cold request waits for one round trip, not two. Logout
+  // revokes the presented token server-side. A failure of either lookup
+  // throws: no session on an unknown answer.
+  const [revoked, student] = await Promise.all([
+    isSessionTokenRevoked(token),
+    cached(sessionCacheKey(claims.sub, claims.sv), SESSION_CACHE_TTL_S, () => readSessionAccount(claims.sub)),
+  ]);
+  if (revoked) return null;
+  return sessionFrom(claims, student);
+}
 
+/**
+ * The session a verified token and its account row make together, or null
+ * when the row does not bear the token out. Every check here runs on each
+ * request, on a cached row as on a fresh one.
+ */
+function sessionFrom(claims: SessionClaims, student: SessionAccount | null) {
   if (!student || student.sessionVersion !== claims.sv || !student.isActive) return null;
   // The switch is read here, after the cache, and not inside the cached
   // lookup: turning demo mode off must end demo sessions at once, not when a
@@ -299,9 +345,39 @@ export async function getSession() {
   };
 }
 
-/** Invalidate cached session when a user's data changes (role change, deactivation, etc.) */
+/** Counts invalidations, so `sessionCachePrimer` can tell whether one landed after a row was read. */
+let sessionCacheInvalidations = 0;
+
+/**
+ * Drop an account's cached session row. Call it straight after ANY write that
+ * changes a column the session reads (SESSION_ACCOUNT_SELECT): the session
+ * version, the role, `isActive`, the password or its must-change flag, the
+ * login or the name. Call it once the write has committed, never inside its
+ * transaction: a request that read the row between an early call and the
+ * commit would put the old row back for the whole window.
+ */
 export function invalidateSessionCache(studentId: string) {
+  sessionCacheInvalidations += 1;
   invalidatePrefix(`session:${studentId}`);
+}
+
+/**
+ * For sign-in: keep the account row it has just checked, so the first request
+ * after signing in does not read the account again.
+ *
+ * Take the primer BEFORE reading the row, and call it once the session is
+ * issued. If any session row was invalidated in between, the row in hand may
+ * be older than that write (a reset or a deactivation that landed while the
+ * password was being checked), so nothing is stored and the next request reads
+ * the account as usual. The count is for all accounts, not this one: an
+ * invalidation is rare, and a skipped prime costs one read.
+ */
+export function sessionCachePrimer(): (row: SessionAccountRow) => void {
+  const invalidationsAtRead = sessionCacheInvalidations;
+  return (row) => {
+    if (invalidationsAtRead !== sessionCacheInvalidations) return;
+    primeCache(sessionCacheKey(row.id, row.sessionVersion), SESSION_CACHE_TTL_S, sessionAccountFrom(row));
+  };
 }
 
 /** Our tokens always carry `exp`; the fallback is the 7-day TOKEN_TTL. */

@@ -95,7 +95,7 @@ let getSession: typeof import("./auth").getSession;
 let clearSession: typeof import("./auth").clearSession;
 let signToken: typeof import("./auth").signToken;
 
-// Each test uses its own account so the 10 second session cache never hands
+// Each test uses its own account so the 60 second session cache never hands
 // one test another test's result.
 let nextId = 0;
 function freshStudent(overrides: Partial<StudentRow> = {}): StudentRow {

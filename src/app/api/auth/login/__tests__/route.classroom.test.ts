@@ -83,6 +83,7 @@ mock.module("@/lib/auth", {
     hashPassword: () => ({ hash: "scrypt$newhash$value", salt: "salt" }),
     normalizeStudentId: (raw: string) => raw.trim().toLowerCase(),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
+    sessionCachePrimer: () => () => undefined,
     setSessionCookie: async () => "fake-jwt-token",
     signMfaSessionToken: (id: string) => `mfa-token-for-${id}`,
     setMfaSessionCookie: async () => undefined,
