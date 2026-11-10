@@ -20,12 +20,12 @@ const seed = () => import("../seed-gates.mjs");
 
 /** Plan targets. A gate may tighten its target and may never loosen it. */
 const METRICS = {
-  M1: { target: 20, set: "launch" },
+  M1: { target: 85, set: "launch" }, // estimated round trips; see the plan's Metrics section
   M2: { target: 8, set: "launch" },
-  M3: { target: 10, set: "pilot" },
+  M3: { target: 12, set: "pilot" },
   M4: { target: 235, set: "launch" },
   M5: { target: 10, set: "launch" },
-  M6: { target: 20, set: "pilot" },
+  M6: { target: 60, set: "pilot" },
   M7: { target: 60, set: "launch" },
   M8: { target: 1000, set: "pilot" },
 };
@@ -37,11 +37,11 @@ async function realGates(kind) {
 
 // --- the committed gate files ---
 
-test("the plan's task tables parse to 34 launch, 25 pilot and 1 hold task", async () => {
+test("the plan's task tables parse to 34 launch, 26 pilot and 1 hold task", async () => {
   const { readPlanTasks } = await seed();
   const counts = { launch: 0, pilot: 0, hold: 0 };
   for (const task of readPlanTasks(readFileSync(join(ROOT, PLAN), "utf8"))) counts[task.set] += 1;
-  assert.deepEqual(counts, { launch: 34, pilot: 25, hold: 1 });
+  assert.deepEqual(counts, { launch: 34, pilot: 26, hold: 1 });
 });
 
 test("every task in the plan has a gate file with the plan's set, and no gate lacks a task", async () => {

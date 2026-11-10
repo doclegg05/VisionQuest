@@ -1,19 +1,31 @@
 #!/usr/bin/env node
 // Prints the database query count for one hot path, for the readiness scorecard.
 //
-//   node --import tsx --experimental-test-module-mocks scripts/readiness/query-count.mjs <path> [--cache=cold|warm] [--client=app|admin|all] [--unit=statements|calls]
+//   node --import tsx --experimental-test-module-mocks scripts/readiness/query-count.mjs <path> [--cache=cold|warm] [--client=app|admin|all] [--unit=round-trips|statements|calls]
 //
 //   <path>   dashboard      M1, one student dashboard render
 //            teacher-home   M6, one teacher home render
 //            chat-send      M3, POST /api/chat/send up to stream creation
 //
-// The last line of stdout is the count as a bare number. By default that is
-// the cold count the plan's metric names, in statements: client calls plus the
-// nested relation loads those calls ask for, because Prisma sends one more
-// SELECT per relation. Dashboard and teacher-home count the app client;
-// chat-send counts app plus admin. --unit=calls leaves the nested loads out.
-// The nested figure is derived from each call's select and include, not
-// observed on the wire.
+// The last line of stdout is the count as a bare number, printed only when
+// the measurement ran clean. By default it is the cold count in estimated
+// round trips to the database:
+//   4 for each app-client call (BEGIN, set_config, the query, COMMIT: see the
+//     RLS wrapper in src/lib/db.ts),
+//   1 for each admin-client call,
+//   1 for each nested relation a call loads (one more SELECT in the same
+//     transaction).
+// So turning three calls into one call with two includes reads 12 to 6, as it
+// does on the wire. --unit=statements counts calls plus nested loads with no
+// weights; --unit=calls counts calls only. Dashboard and teacher-home count
+// the app client; chat-send counts app plus admin.
+//
+// Known limits, from the 2026-11-10 database review: the nested figure is
+// derived from each call's select and include, even when the parent returns
+// nothing; two reads inside one interactive transaction are weighted as two
+// wrapped calls; same-tick findUnique calls on the admin client are counted
+// one each although Prisma batches them; and the chat-send fixture is not yet
+// a normal turn. Task T4 in the readiness plan closes these.
 //
 // How it measures: it runs the path's test file under src/lib/readiness/ in a
 // child process and reads the QUERY_COUNT lines that test prints. It does not
@@ -36,7 +48,8 @@ const PATHS = {
 };
 const CACHES = ["cold", "warm"];
 const CLIENTS = ["app", "admin", "all"];
-const UNITS = ["statements", "calls"];
+const UNITS = ["round-trips", "statements", "calls"];
+const APP_CALL_ROUND_TRIPS = 4;
 const COUNT_LINE = /QUERY_COUNT path=(\S+) cache=(cold|warm) app=(\d+) admin=(\d+) relationLoads=(\d+) read=(\d+)/;
 
 function usage(problem) {
@@ -47,7 +60,7 @@ function usage(problem) {
 function parseArguments(argv) {
   const [name, ...flags] = argv;
   if (!name || !Object.hasOwn(PATHS, name)) usage(`Unknown path "${name ?? ""}".`);
-  const options = { name, cache: "cold", client: PATHS[name].client, unit: "statements" };
+  const options = { name, cache: "cold", client: PATHS[name].client, unit: "round-trips" };
   for (const flag of flags) {
     const [key, value] = flag.split("=");
     if (key === "--cache" && CACHES.includes(value)) options.cache = value;
@@ -77,10 +90,12 @@ function parseCounts(name, output) {
   return counts;
 }
 
-function executed(count, client) {
-  if (client === "app") return count.app;
-  if (client === "admin") return count.admin;
-  return count.app + count.admin;
+function total(count, { client, unit }) {
+  const app = client === "admin" ? 0 : count.app;
+  const admin = client === "app" ? 0 : count.admin;
+  const nested = unit === "calls" ? 0 : count.relationLoads;
+  const appWeight = unit === "round-trips" ? APP_CALL_ROUND_TRIPS : 1;
+  return app * appWeight + admin + nested + count.read;
 }
 
 const options = parseArguments(process.argv.slice(2));
@@ -106,10 +121,9 @@ for (const cache of CACHES) {
   );
 }
 const clientLabel = options.client === "all" ? "app + admin" : options.client;
-const nested = options.unit === "statements" ? chosen.relationLoads : 0;
-console.log(`reporting: ${options.cache}, ${clientLabel}, executed ${executed(chosen, options.client)} + nested ${nested} + read ${chosen.read}`);
+console.log(`reporting: ${options.cache}, ${clientLabel}, in ${options.unit}`);
 if (run.status !== 0) {
-  console.error(`${target.test} failed: the measured count no longer matches the pinned value, or the path broke. Run it to see which.`);
+  console.error(`${target.test} failed: the measured count no longer matches the pinned value, or the path broke. Run it to see which. No number is reported.`);
+  process.exit(1);
 }
-console.log(String(executed(chosen, options.client) + nested + chosen.read));
-process.exit(run.status === 0 ? 0 : 1);
+console.log(String(total(chosen, options)));

@@ -2,14 +2,14 @@
   "id": "M1",
   "kind": "metric",
   "set": "launch",
-  "title": "Database statements for one student dashboard render",
-  "doneWhen": "20 or fewer",
+  "title": "Estimated database round trips for one student dashboard render",
+  "doneWhen": "85 or fewer",
   "check": {
     "type": "metric",
     "run": "node scripts/readiness/query-count.mjs dashboard",
-    "baseline": 44,
-    "target": 20,
+    "baseline": 167,
+    "target": 85,
     "direction": "atMost",
-    "unit": "statements"
+    "unit": "round trips"
   }
 }

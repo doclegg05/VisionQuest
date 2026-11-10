@@ -2,14 +2,14 @@
   "id": "M6",
   "kind": "metric",
   "set": "pilot",
-  "title": "Database statements for one teacher home render",
-  "doneWhen": "20 or fewer",
+  "title": "Estimated database round trips for one teacher home render",
+  "doneWhen": "60 or fewer",
   "check": {
     "type": "metric",
     "run": "node scripts/readiness/query-count.mjs teacher-home",
-    "baseline": 57,
-    "target": 20,
+    "baseline": 111,
+    "target": 60,
     "direction": "atMost",
-    "unit": "statements"
+    "unit": "round trips"
   }
 }

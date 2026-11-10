@@ -2,14 +2,14 @@
   "id": "M3",
   "kind": "metric",
   "set": "pilot",
-  "title": "Database statements before chat sends its first byte",
-  "doneWhen": "10 or fewer",
+  "title": "Estimated database round trips before chat sends its first byte",
+  "doneWhen": "12 or fewer, measured from a normal chat turn",
   "check": {
     "type": "metric",
-    "run": "node scripts/readiness/query-count.mjs chat-send",
-    "baseline": 62,
-    "target": 10,
+    "run": null,
+    "baseline": 167,
+    "target": 12,
     "direction": "atMost",
-    "unit": "statements"
+    "unit": "round trips"
   }
 }

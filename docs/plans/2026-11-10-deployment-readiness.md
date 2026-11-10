@@ -71,16 +71,16 @@ Rules that do not bend:
 
 ## Metrics
 
-T2 measured M1, M3 and M6 with a counting stand-in for the database client. A statement is one query plus one for each nested relation it loads. The counts are what the code issues for a fixture student, so real data can differ.
+T2 measured M1, M3 and M6 with a counting stand-in for the database client. The unit is estimated round trips: 4 for each query on the app client, because the RLS wrapper sends BEGIN, `set_config`, the query and COMMIT, and 1 for each nested relation a query loads. The counts are what the code issues for a fixture, so real data can differ. A database review trusted M1 and M6 and found that M3's fixture is not a normal chat turn. Task T4 fixes that before any work is budgeted against M3.
 
 | ID | Metric | Baseline | Target | Set |
 | --- | --- | --- | --- | --- |
-| M1 | Database statements for one student dashboard render | 44, measured: 41 queries and 3 nested loads | 20 or fewer | Launch |
+| M1 | Estimated database round trips for one student dashboard render | 167, measured: 41 queries at 4 round trips each, and 3 nested loads | 85 or fewer | Launch |
 | M2 | Statements per open dashboard per minute at idle | about 60 | 8 or fewer | Launch |
-| M3 | Database statements before chat sends its first byte | 62 cold, measured: 35 app, 22 admin and 5 nested loads | 10 or fewer | Pilot |
+| M3 | Estimated database round trips before chat sends its first byte | Not yet trusted. 167 with a fixture the database review found unrealistic; a normal turn issues more. | 12 or fewer | Pilot |
 | M4 | Compressed scripts and styles on the sign-in page | 322 KB, measured | 235 KB or less | Launch |
 | M5 | Orientation video size | 34.7 MB, measured | 10 MB or less | Launch |
-| M6 | Database statements for one teacher home render | 57, measured: 18 queries and 39 nested loads | 20 or fewer | Pilot |
+| M6 | Estimated database round trips for one teacher home render | 111, measured: 18 queries at 4 round trips each, and 39 nested loads | 60 or fewer | Pilot |
 | M7 | Production `/api/health` `latency_ms` | 530, measured | 60 or less | Launch, owner |
 | M8 | Signed-in student dashboard, median server time in production | not measured | under 1 second | Pilot |
 
@@ -95,6 +95,7 @@ Columns: **Set** is Launch or Pilot. **Src** is `seen` when the orchestrator re-
 | T1 | Launch | Readiness scorecard. `config/readiness/gates/` holds one file per gate in this plan, each with its check. `scripts/readiness/scorecard.mjs` runs the local checks, reads owner rows from the ops evidence checklist, writes `reports/readiness/latest.md`, and exits 1 under `--strict` when a Launch gate fails. It names the two sandbox-only unit failures so a third cannot pass unnoticed. | The script prints one row per gate, its own tests pass, and the first run is committed as the baseline. | M | none |
 | T2 | Launch | Query counter. A test helper that counts app-client queries for one call, with measured baselines for M1, M3 and M6 written into `gates.json`. | Two runs give the same counts. | M | db |
 | T3 | Launch | Page weight script. Sums the compressed bytes of the scripts and styles a URL loads, for M4. | Its tests pass and it weighs the production sign-in page. On 2026-11-10 it reproduced the 322 KB hand measurement. | S | none |
+| T4 | Pilot | Counter fidelity. The chat-send fixture becomes a normal turn at a stage the app stores. Same-tick admin lookups count as the one batch Prisma sends. A query that returns nothing counts no nested loads. Nested loads are split by client. A test fails when a layout or template is added above a measured page. | M3 is re-pinned from a normal turn, and the database reviewer trusts all three baselines. | M | db |
 
 ### Stream A: sign-in and accounts
 
@@ -150,7 +151,7 @@ Every task here touches authentication, so `sec-spec` reviews each one and no fi
 | E1 | Launch | Honest failure states. Separate messages for off, busy, slow and not set up, shown once with Retry. The relay returns different codes for busy and offline. Students never see API-key instructions, per R9. Upload errors wrap and are announced, and the file picker has `accept`. | `src/app/api/chat/send/route.ts:147`, `scripts/mac-relay/server.mjs:73`, `src/lib/chat/send-outcome.ts:45`, `src/components/chat/ChatInput.tsx:331` | seen | Route tests map each cause to its message. `test:relay` passes. The `error-message-audit` skill finds no technical wording. | M | A3 | ux |
 | E2 | Launch | A wait the student can read. Words under the dots after 5 seconds, a Stop button, and no canned opener when the provider is local. | `src/components/chat/TypingIndicator.tsx:9`, `src/components/chat/ChatWindow.tsx:406`, `:739` | pass | Component tests cover the 5 second message and Stop. | M | E1 | ux |
 | E3 | Pilot | Retry repeats nothing. Retry reuses the saved turn and keeps attachments, keyed by a client message id. | `src/components/chat/ChatWindow.tsx:688`, `src/app/api/chat/send/route.ts:599` | pass | A route test retries and finds one user message in history. | M | E2 | none |
-| E4 | Pilot | First byte early. The stream opens before context is built and sends a status event. Messages load once. Work that can wait is deferred. Audit rows that policy requires stay awaited. | `src/app/api/chat/send/route.ts:911`, `src/lib/chat/conversation.ts:26` | pass | M3 at target, measured by the T2 counter. | L | E3 | db, sec-aud |
+| E4 | Pilot | First byte early. The stream opens before context is built and sends a status event. Messages load once. Work that can wait is deferred. Audit rows that policy requires stay awaited. | `src/app/api/chat/send/route.ts:911`, `src/lib/chat/conversation.ts:26` | pass | M3 at target, measured by the T2 counter. | L | E3, T4 | db, sec-aud |
 | E5 | Pilot | Smooth typing on slow phones. The bubble is memoized, the streaming bubble has its own state, and the view scrolls only when the student is near the bottom. | `src/components/chat/ChatWindow.tsx:266`, `:480`, `:682` | pass | A render-count test shows earlier bubbles do not re-render per token. | S | E3 | none |
 | E6 | Launch | "Sage is an AI and can be wrong" under the message box, linked to the notice page. | No such line exists in chat. | pass | Component test. Reading level passes. | S | H6, E2 | ux |
 | E7 | Pilot | The mini chat has Retry and Help on failure. | `src/components/chat/SageMiniChat.tsx:244` | pass | Component test. | S | E1 | none |
@@ -164,7 +165,7 @@ Every task here touches authentication, so `sec-spec` reviews each one and no fi
 | F2 | Launch | Dashboard read diet. Poll every 2 minutes or on the notification event. Cache readiness and next step per student for 30 seconds behind the existing write-through. One per-request loader so the layout and page stop repeating reads. Cache global rows for 5 to 10 minutes. | `src/lib/dashboard/query.ts:6`, `src/app/(student)/dashboard/page.tsx:26`, `src/lib/progression/fetch-readiness-data.ts:31` | seen | M1 and M2 at target. A test proves a write clears the cache. | L | T2, D1, H6 | db |
 | F3 | Launch | Bookkeeping after the response. `deferAfterResponse` for `syncStudentAlerts` on the student write routes, a lint rule that forbids awaiting it there, and one pending sync per student. | `src/lib/dashboard/tasks.ts:100`, `src/app/api/orientation/welcome-video/route.ts:45`, `src/app/api/portfolio/route.ts:187` | pass | The lint rule is an error and the tree passes it. Route tests show the response does not wait. | M | T1 | db |
 | F4 | Pilot | Transactions that fit. Plain reads in place of the Serializable read. Explicit timeouts. Interactive transactions on the app client move to `withAppTransaction`. The alert sync writes one multi-row upsert. | `src/lib/dashboard/tasks.ts:24`, `src/lib/advising-sync.ts:255`, `src/lib/goal-stale-detection.ts:41` | pass | The CI RLS suites are green. A test covers a bulk change of 20 tasks. | L | C2, F3 | db, sec-aud |
-| F5 | Pilot | Teacher home in one pass. One roster fetch for queue, overview and today. A paged admin queue. An index on `Message(studentId, createdAt)`, added with the `database-migration` skill. | `src/lib/teacher/dashboard.ts:141`, `:254`, `src/lib/teacher/today.ts:45`, `prisma/schema.prisma:186` | pass | M6 at target. The migration is additive. | L | C4 | db |
+| F5 | Pilot | Teacher home in one pass. One roster fetch for queue, overview and today. A paged admin queue. An index on `Message(studentId, createdAt)`, added with the `database-migration` skill. | `src/lib/teacher/dashboard.ts:141`, `:254`, `src/lib/teacher/today.ts:45`, `prisma/schema.prisma:186` | pass | M6 at target. The migration is additive. | L | C4, T4 | db |
 | F6 | Pilot | The jobs list sends only what it shows. | `src/app/api/jobs/route.ts:132` | pass | A test finds no `description` in the response. | S | none | none |
 | F7 | Hold | A cheaper RLS wrapper. Each query is its own transaction today. Do not start unless M8 misses its target after O-8 and F1 to F5. It needs its own design first. | `src/lib/db.ts:204` | seen | Not scheduled. | L | F5 | sec-spec, db |
 
