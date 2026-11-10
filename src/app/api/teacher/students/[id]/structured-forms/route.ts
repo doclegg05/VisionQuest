@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { withTeacherAuth } from "@/lib/api-error";
+import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 
@@ -30,6 +31,13 @@ export const GET = withTeacherAuth(async (session, _req: Request, ctx: RouteCont
       },
     },
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+  });
+
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: id,
+    surface: "forms",
   });
 
   return NextResponse.json({

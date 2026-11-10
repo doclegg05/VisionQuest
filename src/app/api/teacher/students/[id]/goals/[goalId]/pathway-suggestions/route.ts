@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { notFound, withTeacherAuth } from "@/lib/api-error";
+import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { suggestPathwaysForGoal } from "@/lib/spokes/goal-matcher";
@@ -30,6 +31,13 @@ export const GET = withTeacherAuth(async (
   });
 
   const suggestions = suggestPathwaysForGoal(goal.content, pathways);
+
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: studentId,
+    surface: "pathway",
+  });
 
   return NextResponse.json({
     goalId: goal.id,

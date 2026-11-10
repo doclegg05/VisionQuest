@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withTeacherAuth } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
-import { tryLogAuditEvent } from "@/lib/audit";
+import { recordStudentView, tryLogAuditEvent } from "@/lib/audit";
 import { downloadFile, getPresignedDownloadUrl } from "@/lib/storage";
 import { generateStudentArchive } from "@/lib/student-archive";
 import { errorForLog } from "@/lib/log-error";
@@ -61,17 +61,32 @@ export const GET = withTeacherAuth(async (session, req: NextRequest, ctx: unknow
   const filename = storageKey.split("/").pop() || "archive.zip";
   const disposition = `attachment; filename="${filename}"`;
 
+  // The archive is the whole record (every chat, file and form), so each
+  // download writes its own view row: "archive" is unsampled in
+  // recordStudentView. Recorded only once the file is handed over.
+  const recordDownload = () =>
+    recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId: studentId,
+      surface: "archive",
+    });
+
   // Archives can be 50-100MB — presigned URL bypasses Node.js memory entirely.
   const presigned = await getPresignedDownloadUrl(storageKey, {
     contentType: "application/zip",
     contentDisposition: disposition,
   });
-  if (presigned) return NextResponse.redirect(presigned, 302);
+  if (presigned) {
+    await recordDownload();
+    return NextResponse.redirect(presigned, 302);
+  }
 
   const result = await downloadFile(storageKey);
   if (!result) {
     return NextResponse.json({ error: "Archive not found." }, { status: 404 });
   }
+  await recordDownload();
 
   return new Response(new Uint8Array(result.buffer), {
     headers: {
