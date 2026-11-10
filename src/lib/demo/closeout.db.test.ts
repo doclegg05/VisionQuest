@@ -23,16 +23,21 @@
  * must be this machine, and the database must hold no demo account before the
  * test seeds its own.
  *
+ * Postgres stamps every seeded row with the current time, which the closeout
+ * reads as a demo still in use. `backdate` moves the demo universe's times two
+ * hours back, so only the case that tests that refusal sees a recent row.
+ *
  * Typical usage:
  *   DEMO_CLOSEOUT_DB_TEST_ENABLED=true DATABASE_URL=postgres://...test... \
  *     node --import tsx --test src/lib/demo/closeout.db.test.ts
  */
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { after, afterEach, before, describe, it } from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import path from "node:path";
-import { runDemoCloseout, tableOf, type CloseoutClient, type CloseoutOptions, type CloseoutOutcome, type CloseoutTx, type RefusalCode } from "./closeout";
+import { REFUSALS, runDemoCloseout, tableOf, type CloseoutClient, type CloseoutOptions, type CloseoutOutcome, type CloseoutTx, type RefusalCode } from "./closeout";
 import { MODELS, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
 import { readLocalSchema } from "./closeout.local";
 
@@ -40,8 +45,10 @@ const SHOULD_RUN = process.env.DEMO_CLOSEOUT_DB_TEST_ENABLED === "true" && !!pro
 const DEMO_OFF = {};
 const ROOT = path.resolve(__dirname, "../../..");
 /** The closeout as the owner's script runs it: against this checkout's schema. */
-const closeout = (client: CloseoutClient, options: Omit<CloseoutOptions, "local" | "env"> & { env?: Record<string, string> }): Promise<CloseoutOutcome> =>
-  runDemoCloseout(client, { env: DEMO_OFF, local: readLocalSchema(ROOT), ...options });
+const closeout = (
+  client: CloseoutClient,
+  options: Omit<CloseoutOptions, "local" | "env"> & { env?: Record<string, string>; local?: CloseoutOptions["local"] },
+): Promise<CloseoutOutcome> => runDemoCloseout(client, { local: readLocalSchema(ROOT), ...options, env: options.env ?? DEMO_OFF });
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 /** Models whose row the test will not go without: the proof means little if these were not seeded. */
 const MUST_SEED = ["Conversation", "Message", "Goal", "FileUpload", "SpokesRecord", "Connection", "CaseNote", "StudentClassEnrollment", "AuditLog", "SageMemory"];
@@ -64,23 +71,40 @@ if (!SHOULD_RUN) {
   });
 } else {
   describe("demo closeout against Postgres (integration)", () => {
-    let client: PrismaClient;
+    /** Undefined until `before` connects, so `after` can tell a failed start from a finished run. */
+    let connected: PrismaClient | undefined;
+    const db = (): PrismaClient => {
+      if (!connected) throw new Error("The test database is not connected.");
+      return connected;
+    };
     let run = 0;
     let demo: SeededUniverse;
     let real: SeededUniverse;
     /** Rows a test added by hand, newest last, for cleanup. */
     let added: Array<{ model: string; id: string }> = [];
+    /** Rows with no id column that a test added, each removed by its own statement. */
+    let removals: Array<() => Promise<unknown>> = [];
 
     before(async () => {
       const url = process.env.DATABASE_URL ?? "";
       assert.ok(isLocalDatabase(url), "DATABASE_URL must point at a database on this machine. This test deletes demo accounts.");
       const { PrismaClient: Client } = await import("@prisma/client");
-      client = new Client({ datasources: { db: { url } } });
-      const existing = await client.student.count({ where: { demoAccount: { not: null } } });
+      connected = new Client({ datasources: { db: { url } } });
+      const existing = await db().student.count({ where: { demoAccount: { not: null } } });
       assert.equal(existing, 0, "This database already holds demo accounts. Point DATABASE_URL at an empty test database.");
     });
 
-    const write = async (model: string, data: Row) => void (await tableOf(client, model).create({ data }));
+    const write = async (model: string, data: Row) => void (await tableOf(db(), model).create({ data }));
+
+    /** Moves the demo universe's creation and change times two hours back. See the header. */
+    async function backdate(): Promise<void> {
+      const old = new Date(Date.now() - 2 * 60 * 60_000);
+      const ids = { in: [demo.studentId, demo.staffId] };
+      await db().student.updateMany({ where: { id: ids }, data: { createdAt: old } });
+      await db().message.updateMany({ where: { studentId: ids }, data: { createdAt: old } });
+      await db().conversation.updateMany({ where: { studentId: ids }, data: { createdAt: old, updatedAt: old } });
+      await db().auditLog.updateMany({ where: { actorId: ids }, data: { createdAt: old } });
+    }
 
     /** Seeds a marked and an unmarked universe under prefixes no other run used. */
     async function seed(): Promise<void> {
@@ -88,30 +112,36 @@ if (!SHOULD_RUN) {
       const stamp = `cdb${Date.now().toString(36)}${run}`;
       demo = await seedUniverse(write, { prefix: `${stamp}dm-`, demo: true, tolerant: true });
       real = await seedUniverse(write, { prefix: `${stamp}rl-`, demo: false, tolerant: true });
+      await backdate();
     }
 
     /** Removes whatever the test left, children before parents. Safe to run twice. */
     async function cleanup(): Promise<void> {
+      if (!connected) return;
+      for (const remove of removals) await remove();
+      removals = [];
       const rows = [...(real?.created ?? []), ...(demo?.created ?? []), ...added].reverse();
       for (const row of rows) {
-        if (row.id !== null) await tableOf(client, row.model).deleteMany({ where: { id: { in: [row.id] } } });
+        if (row.id !== null) await tableOf(db(), row.model).deleteMany({ where: { id: { in: [row.id] } } });
       }
-      await client.auditLog.deleteMany({ where: { action: "demo.closeout" } });
+      await db().auditLog.deleteMany({ where: { action: "demo.closeout" } });
       added = [];
     }
 
     afterEach(cleanup);
+    // Safe when `before` failed: nothing was connected, so there is nothing to clean or close.
     after(async () => {
+      if (!connected) return;
       await cleanup();
-      await client.$disconnect();
+      await connected.$disconnect();
     });
 
     /** Every table's row count and a checksum of every row, optionally leaving some rows out. */
-    async function fingerprint(leaveOut: (row: string) => boolean = () => false): Promise<Record<string, string>> {
+    async function fingerprint(leaveOut: (row: Row) => boolean = () => false): Promise<Record<string, string>> {
       const result: Record<string, string> = {};
       for (const model of MODELS) {
-        const rows = await tableOf(client, model.name).findMany({ where: {}, select: scalarColumns(model.name) });
-        const kept = rows.map((row) => JSON.stringify(row)).filter((row) => !leaveOut(row)).sort();
+        const rows = await tableOf(db(), model.name).findMany({ where: {}, select: scalarColumns(model.name) });
+        const kept = rows.filter((row) => !leaveOut(row)).map((row) => JSON.stringify(row)).sort();
         result[model.name] = `${kept.length}:${createHash("sha256").update(kept.join("\n")).digest("hex")}`;
       }
       return result;
@@ -127,21 +157,22 @@ if (!SHOULD_RUN) {
       const found: string[] = [];
       for (const model of MODELS) {
         const columns = model.fields.filter((field) => field.kind === "scalar" && field.type === "String" && !field.isList);
-        const count = await tableOf(client, model.name).count({ where: { OR: columns.map((field) => ({ [field.name]: { in: ids } })) } });
+        const count = await tableOf(db(), model.name).count({ where: { OR: columns.map((field) => ({ [field.name]: { in: ids } })) } });
         if (count > 0) found.push(`${model.name}:${count}`);
       }
       return found;
     }
 
-    const isDemoRow = (row: string) => row.includes(demo.prefix) || row.includes('"action":"demo.closeout"');
+    /** A row the demo universe wrote, by its own id, or the closeout's own audit row. A kept row that names a demo id still counts. */
+    const isDemoRow = (row: Row) => (typeof row.id === "string" && row.id.startsWith(demo.prefix)) || row.action === "demo.closeout";
     const refusalCodes = (outcome: CloseoutOutcome): RefusalCode[] => outcome.refusals.map((refusal) => refusal.code);
 
     /** A copy of a seeded row with some columns changed, tracked for cleanup. */
     async function copyRow(model: string, sourceId: string, changes: Row): Promise<void> {
-      const [source] = await tableOf(client, model).findMany({ where: { id: sourceId }, select: scalarColumns(model) });
+      const [source] = await tableOf(db(), model).findMany({ where: { id: sourceId }, select: scalarColumns(model) });
       assert.ok(source, `${model} was not seeded`);
       const id = `${sourceId}.copy`;
-      await tableOf(client, model).create({ data: { ...source, id, ...changes } });
+      await tableOf(db(), model).create({ data: { ...source, id, ...changes } });
       added.push({ model, id });
     }
 
@@ -160,7 +191,7 @@ if (!SHOULD_RUN) {
       await seed();
       const before = await fingerprint();
 
-      const outcome = await closeout(client, { apply: false });
+      const outcome = await closeout(db(), { apply: false });
 
       assert.deepEqual(outcome.refusals, []);
       assert.equal(outcome.kind, "preview");
@@ -170,52 +201,125 @@ if (!SHOULD_RUN) {
 
     it("applies: no marked account, nothing naming a deleted account or class, every count as previewed", async () => {
       await seed();
-      const preview = await closeout(client, { apply: false });
+      const preview = await closeout(db(), { apply: false });
 
-      const outcome = await closeout(client, { apply: true, expectAccounts: 2 });
+      const outcome = await closeout(db(), { apply: true, expectAccounts: 2 });
 
       assert.equal(outcome.kind, "applied");
       assert.deepEqual(outcome.kind === "applied" && outcome.deleted, preview.kind === "preview" && preview.preview.rowsToDelete);
       assert.deepEqual(outcome.kind === "applied" && outcome.remaining, { markedAccounts: 0, rowsPointingAtDeleted: 0 });
       assert.deepEqual(outcome.kind === "applied" && outcome.afterCommit, { markedAccounts: 0 });
-      assert.equal(await client.student.count({ where: { demoAccount: { not: null } } }), 0);
+      assert.equal(await db().student.count({ where: { demoAccount: { not: null } } }), 0);
       assert.deepEqual(await rowsNaming([demo.studentId, demo.staffId, demo.classId]), []);
-      assert.equal(await client.auditLog.count({ where: { action: "demo.closeout" } }), 1);
+      assert.equal(await db().auditLog.count({ where: { action: "demo.closeout" } }), 1);
     });
 
-    it("applies without touching a row that is not demo data", async () => {
+    it("applies without touching a row that is not demo data, even a kept row that names a demo id", async () => {
       await seed();
+      // Kept rows whose text names the demo universe: the fingerprint must compare them too.
+      await db().systemConfig.create({ data: { id: `${real.prefix}setting`, key: `${real.prefix}pilot`, value: JSON.stringify([demo.classId]) } });
+      await db().notification.create({ data: { id: `${real.prefix}notice`, studentId: real.staffId, type: "x", title: "x", body: `About ${demo.studentId}` } });
+      added.push({ model: "SystemConfig", id: `${real.prefix}setting` }, { model: "Notification", id: `${real.prefix}notice` });
       const before = await fingerprint(isDemoRow);
       const realBefore = await rowsNaming([real.studentId, real.staffId, real.classId]);
+      const previewBefore = await closeout(db(), { apply: false });
 
-      await closeout(client, { apply: true, expectAccounts: 2 });
+      await closeout(db(), { apply: true, expectAccounts: 2 });
 
       assert.deepEqual(await fingerprint(isDemoRow), before);
       assert.deepEqual(await rowsNaming([real.studentId, real.staffId, real.classId]), realBefore);
+      assert.equal(await db().systemConfig.count({ where: { value: { contains: demo.classId } } }), 1);
+      const previewAfter = await closeout(db(), { apply: false });
+      assert.ok(previewBefore.kind === "preview" && previewAfter.kind === "preview");
+      assert.deepEqual(previewAfter.preview.leftBehind.orphans, previewBefore.preview.leftBehind.orphans);
+    });
+
+    it("runs the owner's script: a preview, then an apply with the count the preview printed", async () => {
+      const env = { NODE_ENV: "test" as const, PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", ADMIN_DATABASE_URL: process.env.DATABASE_URL ?? "" };
+      const script = (args: readonly string[]) => spawnSync(process.execPath, ["--import", "tsx", "scripts/demo-closeout.ts", ...args], { cwd: ROOT, env, encoding: "utf8" });
+      await seed();
+
+      const previewed = script([]);
+      assert.equal(previewed.status, 0, previewed.stderr);
+      assert.match(previewed.stdout, /^Target: database \S+ on host \S+/);
+      const expected = /--expect-accounts=(\d+)/.exec(previewed.stdout)?.[1];
+      assert.equal(expected, "2");
+      const applied = script(["--apply", "--confirm-demo-disabled", `--expect-accounts=${expected}`]);
+
+      assert.equal(applied.status, 0, applied.stderr);
+      assert.match(applied.stdout, /Checked again after the closeout was saved: 0 accounts are marked as demo\./);
+      assert.equal(`${applied.stdout}${previewed.stdout}`.includes(env.ADMIN_DATABASE_URL), false);
+      assert.equal(await db().student.count({ where: { demoAccount: { not: null } } }), 0);
     });
 
     it("keeps the shared rows a demo account merely referenced", async () => {
       await seed();
 
-      await closeout(client, { apply: true, expectAccounts: 2 });
+      await closeout(db(), { apply: true, expectAccounts: 2 });
 
       for (const model of ["Employer", "Opportunity", "CareerEvent", "FormTemplate", "OrientationItem"]) {
-        assert.equal(await tableOf(client, model).count({ where: { id: `${demo.prefix}${model}` } }), 1, model);
+        assert.equal(await tableOf(db(), model).count({ where: { id: `${demo.prefix}${model}` } }), 1, model);
       }
     });
 
-    const refusals: ReadonlyArray<{ name: string; code: RefusalCode; env?: Record<string, string>; subset?: boolean; arrange?: () => Promise<void> }> = [
+    interface DbRefusal {
+      readonly name: string;
+      readonly code: RefusalCode;
+      readonly env?: Record<string, string>;
+      /** The accounts the plan holds instead of every marked one. */
+      readonly accounts?: () => string[];
+      readonly expectAccounts?: number;
+      readonly local?: CloseoutOptions["local"];
+      /** Runs every transaction as this role, to stand in for a connection limited by row level security. */
+      readonly asRole?: string;
+      readonly arrange?: () => Promise<void>;
+    }
+    const insertRow = async (model: string, data: Row & { id: string }) => {
+      await tableOf(db(), model).create({ data });
+      added.push({ model, id: data.id });
+    };
+    /** A teacher on a class. The table's key is the pair, so it has no id to clean up by. */
+    const teaches = async (classId: string, instructorId: string) => {
+      await db().spokesClassInstructor.create({ data: { classId, instructorId } });
+      removals.push(() => db().spokesClassInstructor.deleteMany({ where: { classId, instructorId } }));
+    };
+    const refusals: readonly DbRefusal[] = [
       { name: "demo mode is on", code: "demo_mode_on", env: { COHORT_DEMO_MODE: "true" } },
+      { name: "the role cannot see every row", code: "cannot_see_every_row", asRole: "vq_app" },
+      { name: "the checkout is at another migration", code: "schema_mismatch", local: { ...readLocalSchema(ROOT), newestMigration: "29991231000000_not_applied" } },
+      { name: "the expected count is not the plan's", code: "expected_accounts_mismatch", expectAccounts: 3 },
+      {
+        name: "a marked account sent a message in the last 30 minutes", code: "demo_recently_active",
+        arrange: () => copyRow("Message", `${demo.prefix}Message`, { createdAt: new Date() }),
+      },
+      {
+        name: "a class holds the demo code but the demo instructor does not own it", code: "demo_class_not_owned",
+        arrange: async () => void (await db().spokesClass.update({ where: { id: demo.classId }, data: { createdById: real.staffId } })),
+      },
+      { name: "the plan holds an account that is not marked", code: "plan_includes_unmarked", accounts: () => [real.studentId], expectAccounts: 1 },
       {
         name: "an unmarked student is enrolled in the demo class", code: "unmarked_student_in_demo_class",
-        arrange: async () => {
-          const row = await client.studentClassEnrollment.create({ data: { classId: demo.classId, studentId: real.studentId }, select: { id: true } });
-          added.push({ model: "StudentClassEnrollment", id: row.id });
-        },
+        arrange: () => insertRow("StudentClassEnrollment", { id: `${real.prefix}enrolled`, classId: demo.classId, studentId: real.studentId }),
+      },
+      {
+        name: "an unmarked teacher is on the demo class", code: "unmarked_rows_on_demo_class",
+        arrange: () => teaches(demo.classId, real.staffId),
+      },
+      {
+        name: "a marked account teaches a class that has unmarked students", code: "marked_staff_over_unmarked_students",
+        arrange: () => teaches(real.classId, demo.staffId),
       },
       {
         name: "a marked account wrote a case note about an unmarked student", code: "marked_account_on_kept_rows",
         arrange: () => copyRow("CaseNote", `${real.prefix}CaseNote`, { authorId: demo.staffId }),
+      },
+      {
+        name: "a marked account's audit row is about an unmarked student", code: "records_about_unmarked_people",
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "student", targetId: real.studentId, createdAt: new Date(0) }),
+      },
+      {
+        name: "an unmarked student's task links to a demo appointment", code: "kept_rows_would_be_blanked",
+        arrange: () => copyRow("StudentTask", `${real.prefix}StudentTask`, { appointmentId: `${demo.prefix}Appointment` }),
       },
       {
         // Found only after deletes have run: Postgres cascades the unmarked link when the demo goal goes.
@@ -223,22 +327,44 @@ if (!SHOULD_RUN) {
         arrange: () => copyRow("GoalResourceLink", `${real.prefix}GoalResourceLink`, { goalId: `${demo.prefix}Goal` }),
       },
       {
-        // Found only after deletes have run: the marked teacher stays and its goal names the deleted student.
-        name: "a row would be left naming a deleted account", code: "rows_left_pointing", subset: true,
-        arrange: () => copyRow("Goal", `${demo.prefix}Goal`, { studentId: demo.staffId, confirmedBy: demo.studentId, parentId: null }),
+        // Found only after deletes have run: the marked teacher stays, and a column with no foreign key names the deleted student.
+        name: "a row would be left naming a deleted account", code: "rows_left_pointing", accounts: () => [demo.studentId], expectAccounts: 1,
+        arrange: () => copyRow("SageInsight", `${demo.prefix}SageInsight`, { studentId: demo.staffId, dismissedBy: demo.studentId }),
       },
     ];
 
+    /** The test client, with every transaction run as `role` when one is given. */
+    function clientAs(role: string | undefined): CloseoutClient {
+      if (!role) return db();
+      return {
+        $transaction: (work, options) => db().$transaction(async (tx) => {
+          await tx.$executeRaw`SELECT set_config('role', ${role}, true)`;
+          return work(tx);
+        }, options),
+      };
+    }
+
+    it("has a Postgres case for every refusal", () => {
+      assert.deepEqual(Object.keys(REFUSALS).filter((code) => !refusals.some((refusal) => refusal.code === code)), []);
+    });
+
     for (const refusal of refusals) {
-      it(`refuses and changes nothing when ${refusal.name}`, async () => {
+      it(`refuses and changes nothing when ${refusal.name}`, async (t) => {
+        if (refusal.asRole) {
+          const roles = await db().$queryRaw<Array<{ found: boolean }>>`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${refusal.asRole}) AS found`;
+          if (!roles[0]?.found) return t.skip(`this database has no ${refusal.asRole} role`);
+        }
         await seed();
         await refusal.arrange?.();
         const before = await fingerprint();
-        const rule = refusal.subset ? async () => ({ accountIds: [demo.studentId], classIds: [] }) : undefined;
+        const accounts = refusal.accounts;
+        const rule = accounts ? async () => ({ accountIds: accounts(), classIds: [] }) : undefined;
 
-        const outcome = await closeout(client, { apply: true, env: refusal.env, rule, expectAccounts: refusal.subset ? 1 : 2 });
+        const outcome = await closeout(clientAs(refusal.asRole), {
+          apply: true, env: refusal.env, rule, expectAccounts: refusal.expectAccounts ?? 2, ...(refusal.local ? { local: refusal.local } : {}),
+        });
 
-        assert.equal(outcome.kind, "refused");
+        assert.ok(outcome.kind === "refused" || outcome.kind === "unreadable", outcome.kind);
         assert.ok(refusalCodes(outcome).includes(refusal.code), `refused for ${refusalCodes(outcome).join(", ")}`);
         assert.deepEqual(await fingerprint(), before);
       });
@@ -266,7 +392,7 @@ if (!SHOULD_RUN) {
           };
         },
       });
-      const breaking: CloseoutClient = { $transaction: (work, options) => client.$transaction((tx) => work(failing(tx)), options) };
+      const breaking: CloseoutClient = { $transaction: (work, options) => db().$transaction((tx) => work(failing(tx)), options) };
 
       await assert.rejects(closeout(breaking, { apply: true, expectAccounts: 2 }), /Injected failure/);
 
