@@ -92,6 +92,7 @@ function resetControls(newPassword: string): string {
       onArchive={noop}
       archiveResult={null}
       archiveError={null}
+      resetError={null}
     />,
   );
   const start = html.indexOf('<label for="reset-password-input"');
