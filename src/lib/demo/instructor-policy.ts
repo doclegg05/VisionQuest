@@ -216,6 +216,7 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
   "POST /api/settings/consent",
   "DELETE /api/settings/credly",
   "POST /api/settings/credly",
+  "POST /api/settings/password",
   "POST /api/settings/profile",
   "POST /api/settings/security-questions",
 
