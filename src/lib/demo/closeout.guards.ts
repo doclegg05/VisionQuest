@@ -1,0 +1,120 @@
+/**
+ * Demo closeout (readiness H10): the checks that look past the plan's own rows.
+ *
+ *   - Recent activity: a demo account that was created or used in the last 30
+ *     minutes means the demo may still be served, and the server would make the
+ *     demo instructor, class and starters again beside real students.
+ *   - Records about other people: an audit row, a Sage operation or a message a
+ *     demo account is on, but that is about someone the plan keeps. Deleting it
+ *     would remove the proof of what a demo account did to real data.
+ *   - SetNull links: a kept row whose link to a deleted row the database would
+ *     quietly blank. No count changes, so only this check can see it.
+ *
+ * Each returns a count. closeout.ts turns a count above 0 into a refusal.
+ */
+import { Prisma } from "@prisma/client";
+import { UNMARKED, chunksOf, idsFor, idsOf, plannedValues, tableOf, valuesWhere, type DeleteStep, type Run } from "./closeout.core";
+
+/** How far back a demo account's activity still counts as the demo being live. */
+export const RECENT_MINUTES = 30;
+
+/** Rows that show a planned account was created or used in the last 30 minutes, by the server's clock. */
+export async function recentActivity(run: Run): Promise<number> {
+  const since = { gte: new Date(run.now.getTime() - RECENT_MINUTES * 60_000) };
+  let total = 0;
+  for (const chunk of chunksOf(run.plan.accountIds, run.chunk)) {
+    const ids = { in: chunk };
+    total += await tableOf(run.tx, "Student").count({ where: { id: ids, createdAt: since } });
+    total += await tableOf(run.tx, "Message").count({ where: { studentId: ids, createdAt: since } });
+    total += await tableOf(run.tx, "Conversation").count({ where: { studentId: ids, OR: [{ createdAt: since }, { updatedAt: since }] } });
+    total += await tableOf(run.tx, "AuditLog").count({ where: { actorId: ids, createdAt: since } });
+  }
+  return total;
+}
+
+/** The audit target types that name an account or a class. Others (a conversation, a goal) are left alone. */
+const PERSON_OR_CLASS_TARGETS = ["student", "class"];
+
+/** The columns, all deleted by a step, whose rows can be about someone the plan keeps. */
+export const ABOUT_OTHERS = [
+  { model: "AuditLog", column: "actorId" },
+  { model: "SageOperation", column: "actorId" },
+  { model: "OutboundMessage", column: "toId" },
+] as const;
+
+/** Rows a planned account is on that are about an unplanned account or class. */
+export async function recordsAboutOthers(run: Run): Promise<number> {
+  const planned = new Set([...run.plan.accountIds, ...run.plan.classIds]);
+  const outside = (values: readonly string[]): number => values.filter((value) => !planned.has(value)).length;
+  let total = 0;
+  for (const chunk of chunksOf(run.plan.accountIds, run.chunk)) {
+    const audits = await tableOf(run.tx, "AuditLog").findMany({
+      where: { actorId: { in: chunk }, targetType: { in: PERSON_OR_CLASS_TARGETS }, targetId: { not: null } },
+      select: { targetId: true },
+    });
+    const operations = await tableOf(run.tx, "SageOperation").findMany({
+      where: { actorId: { in: chunk }, targetStudentId: { not: null } },
+      select: { targetStudentId: true },
+    });
+    total += outside(idsOf(audits, "targetId")) + outside(idsOf(operations, "targetStudentId"));
+    total += await tableOf(run.tx, "OutboundMessage").count({ where: { toId: { in: chunk }, connection: { student: UNMARKED } } });
+  }
+  return total;
+}
+
+/** Audit rows the plan deletes that a person outside the plan wrote, such as a real teacher opening a demo student. */
+export async function deletedAuditRowsWithUnmarkedActor(run: Run, auditSteps: readonly DeleteStep[]): Promise<number> {
+  const planned = new Set(run.plan.accountIds);
+  const actorOf = new Map<string, unknown>();
+  for (const step of auditSteps) {
+    for (const chunk of chunksOf(idsFor(run, step.scope), run.chunk)) {
+      const rows = await tableOf(run.tx, "AuditLog").findMany({ where: step.where(chunk), select: { id: true, actorId: true } });
+      for (const row of rows) actorOf.set(String(row.id), row.actorId);
+    }
+  }
+  return [...actorOf.values()].filter((actor) => typeof actor === "string" && !planned.has(actor)).length;
+}
+
+/** A foreign key whose delete rule is SetNull: the child, its column, the parent and the parent's column. */
+export interface SetNullLink {
+  readonly child: Prisma.ModelName;
+  readonly from: string;
+  readonly parent: Prisma.ModelName;
+  readonly to: string;
+}
+
+function isModelName(name: string): name is Prisma.ModelName {
+  return Object.values<string>(Prisma.ModelName).includes(name);
+}
+
+/** Prisma's rule when none is written: an optional relation is set to null. */
+function setsNull(field: Prisma.DMMF.Field): boolean {
+  return field.relationOnDelete === "SetNull" || (field.relationOnDelete === undefined && !field.isRequired);
+}
+
+/** Every single-column SetNull foreign key into one of these models, read from the generated client. */
+export function setNullLinksInto(parents: ReadonlySet<string>): SetNullLink[] {
+  return Prisma.dmmf.datamodel.models.flatMap((model) =>
+    model.fields.flatMap((field): SetNullLink[] => {
+      const from = field.relationFromFields ?? [];
+      const to = field.relationToFields ?? [];
+      if (field.kind !== "object" || from.length !== 1 || to.length !== 1 || !setsNull(field)) return [];
+      if (!parents.has(field.type) || !isModelName(field.type) || !isModelName(model.name)) return [];
+      return [{ child: model.name, from: from[0], parent: field.type, to: to[0] }];
+    }));
+}
+
+/** Kept rows that point at a row the plan deletes, through a SetNull link. The database would blank each one. */
+export async function rowsTheDatabaseWouldBlank(run: Run, steps: readonly DeleteStep[], links: readonly SetNullLink[]): Promise<number> {
+  const stepsOf = (model: string) => steps.filter((step) => step.model === model);
+  let total = 0;
+  for (const link of links) {
+    const parents = await plannedValues(run, stepsOf(link.parent), link.to);
+    if (parents.size === 0) continue;
+    const pointing = await valuesWhere(run, link.child, link.from, "id", [...parents]);
+    if (pointing.length === 0) continue;
+    const deleted = await plannedValues(run, stepsOf(link.child), "id");
+    total += pointing.filter((id) => !deleted.has(id)).length;
+  }
+  return total;
+}

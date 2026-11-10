@@ -198,6 +198,7 @@ If you do not use the blueprint:
 | `NEXT_PUBLIC_SENTRY_DSN` | Client error tracking |
 | `LOG_LEVEL` | Logging verbosity |
 | `COHORT_DEMO_MODE` | `true` opens the sign-in page to demo students and a shared demo instructor. See [Cohort demo mode](#cohort-demo-mode) |
+| `REAL_STUDENT_DATA` | `true` once real students use the database. Set it only after the demo closeout has run. With it on, production refuses to start while `COHORT_DEMO_MODE` is on. See [Turn it off after Dec 18, 2026](#turn-it-off-after-dec-18-2026) |
 
 Render dashboard note:
 
@@ -307,17 +308,39 @@ curl https://your-app.onrender.com/api/health
 
 ### Backups
 
-Supabase handles managed backups. For manual export:
+Supabase handles managed backups. To make an export yourself, follow these steps in order. The export holds every student record and this repository is public, so the file must never be inside this checkout.
 
-```bash
-pg_dump "DIRECT_URL" --schema=visionquest > backup.sql
-```
+`pg_dump` needs the session pooler or the direct connection. It does not work through the transaction pooler on port 6543. The value stored in the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL` is the right kind.
+
+1. Open a new terminal window. In the Render dashboard, service `visionquest`, **Environment** tab, copy the value of the key `ADMIN_DATABASE_URL`. Run the first line below, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history. The second line clears the clipboard.
+
+   ```sh
+   read -rs ADMIN_DATABASE_URL && export ADMIN_DATABASE_URL
+   pbcopy < /dev/null
+   ```
+
+   Never type or paste the value into a command itself. Every command below reads it from the variable.
+2. Make the export in a folder outside the checkout that only you can open.
+
+   ```sh
+   mkdir -p -m 700 "$HOME/VisionQuest-backups"
+   pg_dump "$ADMIN_DATABASE_URL" --schema=visionquest --file="$HOME/VisionQuest-backups/visionquest-$(date +%Y-%m-%d-%H%M).sql"
+   chmod 600 "$HOME/VisionQuest-backups/"*.sql
+   ls -lh "$HOME/VisionQuest-backups"
+   ```
+
+   Success looks like a file named for today with a size above zero. If `pg_dump` prints an error, stop, keep the output, and ask a developer.
+3. Close the terminal window when you are done. That removes the value from memory.
+
+Never copy the export into this checkout. As a second lock, `.gitignore` leaves out `/*.sql`, `/*.dump` and `/backups/` at the top of the checkout.
 
 Restore:
 
-```bash
-psql "DIRECT_URL" < backup.sql
+```sh
+psql "$ADMIN_DATABASE_URL" --set ON_ERROR_STOP=1 --single-transaction --file="$HOME/VisionQuest-backups/NAME_OF_THE_EXPORT.sql"
 ```
+
+Replace `NAME_OF_THE_EXPORT.sql` with the file name that `ls` showed. This puts an export into a database whose `visionquest` schema is empty, such as a new Supabase project. It stops at the first error and then changes nothing. Putting an export back over the live database removes every change made after the export was taken. Do not do that alone: ask a developer, and read `docs/runbooks/backup-restore.md` first.
 
 ### Rollback
 
@@ -356,45 +379,70 @@ Two limits are fixed in code. One network can start 10 new demo students an hour
 
 ### Turn it off after Dec 18, 2026
 
-Closing the demo has seven steps. Do them in this order. Steps 3 and 4 run a tool from this checkout. The others are done in the Render dashboard, service `visionquest`, **Environment** tab, or in Supabase.
+Closing the demo takes twelve steps over two days. Do them in order, and do not skip one. Each step says what success looks like. If a step fails and the step does not say how to fix it, stop, keep the output on screen or copy it into a note, and ask a developer. Never change the database by hand.
 
-The tool deletes every account marked as demo, which means the demo students and the shared demo instructor. It deletes the "Cohort Demo Class". It deletes every row attached to them: chats, goals, upload records, forms, alerts, appointments, case notes, Sage memories, and the audit log entries that name them. All of it happens in one transaction, and the tool then writes one audit log entry that holds counts only.
+The tool in this checkout, `scripts/demo-closeout.ts`, deletes every account marked as demo: the demo students and the shared demo instructor. It deletes the "Cohort Demo Class" and every row attached to them, such as chats, goals, upload records, forms, alerts, appointments, case notes, Sage memories, queued jobs and the audit log entries about them. It does all of it in one transaction, then writes one audit log entry that holds counts only. It prints counts, the database name and the host. It never prints a name, a login, an email, an id or the connection string.
 
 What the tool does not remove:
 
-* **Mock students that are not marked as demo.** An account made before demo mode, or made by hand, has no demo mark. The preview counts these under `unmarked` and the tool never deletes one. Decide what to do with them yourself before real students start.
-* **Public credential pages of those unmarked accounts.** The preview counts them as `publicCredentialPages`, and counts the ones anyone can open at `/credentials/...` as `publicCredentialPagesSwitchedOn`. An older page address is the same as the student's login name.
-* **Uploaded files in storage.** The tool deletes the database row for each demo upload. The stored file stays in the bucket named by `STORAGE_BUCKET`. The preview gives the number as `uploadedFilesLeftInStorage`.
-* **Shared program content** that a demo account only pointed at: employers, events, form templates, program documents, regions, and job listings of other classes.
-* **Counters and queued jobs** that hold no student record: rate limit rows and background jobs. A class id saved in a program setting, such as a pilot class list, also stays.
+* **Mock students that are not marked as demo.** An account made before demo mode, or made by hand, has no demo mark. The preview counts these under `unmarked`. A number above 0 means mock accounts may still be in the database, and they will look like real students. The tool cannot tell mock from real and never deletes an unmarked account. Decide about each one before real students start.
+* **Public credential pages of those unmarked accounts.** The preview counts them as `publicCredentialPages`, and the ones anyone can open at `/credentials/...` as `publicCredentialPagesSwitchedOn`.
+* **Uploaded files in storage.** The tool deletes the database row for each demo upload. The file itself stays in the bucket named by `STORAGE_BUCKET`, and those files may hold real visitors' documents, because anyone could use the demo. The preview gives the number of files as `uploadedFilesLeftInStorage` and the number of folders as `leftBehind.storageFoldersOfDemoAccounts`. The tool does not remove them. Removing them is a separate step that is not built yet.
+* **Text that mentions the demo.** The preview counts program settings that hold the demo class id (`leftBehind.systemConfigNamingDemoClass`), notices to staff that name a demo account (`leftBehind.staffNotificationsAboutDemoStudents`) and opportunity listings copied from a demo class job lead (`leftBehind.opportunitiesFromDemoLeads`). It changes none of them.
+* **Shared program content** that a demo account only pointed at: employers, events, form templates, program documents, regions, and job listings of other classes. Rate limit rows stay too.
 
-1. **Take a backup and confirm it.** In the Supabase dashboard open the project, then Database, then Backups. Confirm that a backup from today exists, or that point in time recovery is on. If neither is true, make an export yourself with the `pg_dump` command under [Backups](#backups) and check that the file is not empty. Without a backup the closeout cannot be undone. `docs/runbooks/backup-restore.md` has the detail.
-2. **Turn demo mode off and let the deploy finish.** In the Render dashboard, service `visionquest`, **Environment** tab, delete `COHORT_DEMO_MODE`. Delete the three limit variables too if you added them. Save, and wait until the deploy is live. Open the page where people sign in and check that the demo buttons are gone and the Google block is back. From then on the demo endpoints answer 404, and a demo session that is still open stops working on its next request. Demo accounts have no password, so nobody can sign in to one again.
-3. **Run the preview and read the counts.** Open a terminal in this checkout. The tool needs the admin connection string in the variable `ADMIN_DATABASE_URL` of that shell. Copy its value from the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL`. Then run this line, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history:
+1. **Bring the main checkout up to date.** Use the main checkout of this repository, not a copy made for one task. In a terminal opened in that folder, run:
+   ```sh
+   git switch main
+   git pull
+   npm ci
+   npx prisma generate
+   ```
+   Success looks like each command finishing with no line that starts with `error`. If `git switch main` refuses because of changed files, stop and ask a developer.
+2. **In Render, delete `COHORT_DEMO_MODE` and keep `AI_LOCAL_ONLY`.** Open the Render dashboard, service `visionquest`, **Environment** tab. Delete the key `COHORT_DEMO_MODE`. Delete `COHORT_DEMO_STUDENTS_PER_HOUR`, `COHORT_DEMO_STUDENTS_PER_DAY` and `COHORT_DEMO_SAGE_PER_DAY` too if you added them. Do not delete `AI_LOCAL_ONLY`. Its value must stay `true`, because it is the switch that blocks cloud AI for every account (see [Cloud AI block](#cloud-ai-block-check-before-deploying)). Save, and wait until the deploy shows **Live**. Success looks like the sign in page with no demo buttons and with the Google block back. From then on the demo endpoints answer 404, and a demo session that is still open stops working on its next request.
+3. **Wait 15 minutes after the deploy shows Live.** A visitor who was using the demo when it closed may still have a request in flight. Success looks like 15 minutes on the clock since the deploy went Live.
+4. **Open a new terminal window used only for this, and load the connection string.** In the new window, go to the main checkout folder. Copy the value stored in the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL`. Run the first line below, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history. The second line clears the clipboard.
    ```sh
    read -rs ADMIN_DATABASE_URL && export ADMIN_DATABASE_URL
+   pbcopy < /dev/null
    ```
-   The tool reads no file for the value and never prints it. `COHORT_DEMO_MODE` must not be set in that shell. Now run the preview:
+   Never type or paste the value into a command itself. The tool reads it from the variable and reads no file for it. Success looks like `test -n "$ADMIN_DATABASE_URL" && echo loaded` printing `loaded`.
+5. **Run the preview and read it.**
    ```sh
    node --import tsx scripts/demo-closeout.ts
    ```
-   The preview prints counts only and changes nothing. Read four parts of it. `marked` is the accounts it will delete. `rowsToDelete` is the rows that go, table by table. `unmarked` is the people it leaves alone. `refusals` is the list of reasons it would stop. An empty `refusals` list means the apply will run. Each entry in a list that is not empty is one sentence and a count. Fix the cause and preview again. The tool has no option that skips a refusal.
-4. **Run the apply.**
-   ```sh
-   node --import tsx scripts/demo-closeout.ts --apply --confirm-demo-disabled
-   ```
-   `--confirm-demo-disabled` is your word that step 2 is finished. The tool can see only the shell it runs in, not Render. Exit code 0 means done, and the output lists the rows deleted in each table. Exit code 2 means it refused and nothing was deleted. Exit code 1 means it failed, the transaction was rolled back, and nothing was deleted.
-5. **Set `REAL_STUDENT_DATA` to `true`.** In the Render dashboard, service `visionquest`, **Environment** tab, add the key `REAL_STUDENT_DATA` with the value `true`. Do it only after step 4 has succeeded, and before the first real student gets an account. From then on production refuses to start if `COHORT_DEMO_MODE` is ever turned on again.
-6. **Keep `AI_LOCAL_ONLY` set to `true`.** It is on the same tab. Do not delete it along with the demo variables. It is the switch that blocks cloud AI for every account. See [Cloud AI block](#cloud-ai-block-check-before-deploying).
-7. **Check afterwards.**
-   * Run the preview again. `marked` shows 0 students, 0 instructors and 0 demo classes.
-   * The Render log of the next start has no line named `boot_probe_demo_closeout_unfinished` and none named `boot_probe_demo_rows_beside_real_data`.
-   * Sign in as a teacher. The class list has no "Cohort Demo Class", and the queue of students who need attention has no demo student.
-   * Send Sage one message and check that it answers.
-   * Decide what to do with the unmarked mock accounts the preview counted.
-   * Close the terminal you used, or run `unset ADMIN_DATABASE_URL` in it.
+   The preview reads and changes nothing. Read it top to bottom:
+   * The first line is `Target: database ... on host ...`. The host must be the production database host shown in the Supabase dashboard, Project Settings, Database. If it is not, stop.
+   * `marked` is the accounts and classes the apply would delete, and `rowsToDelete` is the rows that would go, table by table.
+   * `unmarked` is the accounts the tool leaves. Read the sentences under the counts. A number above 0 means mock accounts may still be in the database.
+   * `leftBehind.orphans` lists rows that name an account or class that does not exist. Write down the total the tool prints.
+   * `refusals` is the list of reasons an apply would stop. Each is one sentence and a count. Fix the cause and run the preview again. The tool has no option that skips a refusal.
 
-The tool refuses, and deletes nothing, in these cases: demo mode is on in its shell; its connection is limited by row level security; an account with no demo mark is enrolled in the demo class or teaches it; a marked account teaches or coordinates a class or region that has unmarked students; a marked account is named on a row that belongs to someone else or to the program; a class has the demo class code but the demo instructor does not own it. It also checks its own work before it commits. If any row would be left pointing at a deleted account, or any table would lose a row the preview did not count, it rolls everything back and reports a refusal.
+   Success looks like exit code 0, no line that starts with `An apply would be refused`, and a last line that says `To apply, use --expect-accounts=` followed by a number. Write that number down. If the refusal says a demo account was used in the last 30 minutes, check step 2 again, wait 30 minutes and run the preview again. For any other refusal you cannot fix yourself, stop, keep the output, and ask a developer.
+6. **Confirm the backup right before the apply.** In the Supabase dashboard open the project, then Database, then Backups. Check that a backup from today exists, or that point in time recovery is on. If neither is true, make an export with the steps under [Backups](#backups), in this same window. The variable is already loaded, so skip their step 1. Restoring a backup puts the whole database back as it was when the backup was taken, so every change made after it is lost, including real work done since. That is why the backup must be from right before the apply. Success looks like today's backup in the list, or an export file in `$HOME/VisionQuest-backups` with a size above zero. Without one, do not go on.
+7. **Run the apply.** Use the number from step 5 in place of `NUMBER`:
+   ```sh
+   node --import tsx scripts/demo-closeout.ts --apply --confirm-demo-disabled --expect-accounts=NUMBER
+   ```
+   `--confirm-demo-disabled` is your word that step 2 is finished. The tool can see only this terminal, not Render. `--expect-accounts` makes it refuse if the database changed since the preview. Success looks like exit code 0 and a last line that says `Checked again after the closeout was saved: 0 accounts are marked as demo.` The other exit codes:
+   * Exit code 2: it refused and deleted nothing. Read the sentence, fix the cause, and start again from step 5.
+   * Exit code 1: it stopped. It prints: "The tool stopped. Run the preview again to see whether anything was deleted. If `marked` is 0, the closeout finished. If this keeps happening, stop and ask a developer. Do not change the database by hand." Do exactly that. A lost connection while the database was saving can leave the outcome unknown, which is why the tool does not say whether anything was deleted.
+   * Exit code 3: the closeout was saved, but a demo account was created while it ran, so demo mode is still on somewhere. Check step 2 again, wait 30 minutes and start again from step 5.
+8. **Run the preview again.**
+   ```sh
+   node --import tsx scripts/demo-closeout.ts
+   ```
+   Success looks like `marked` is 0 and `unmarked.students` is the number you expect, and the line `0 rows name an account or class that does not exist.` If `marked` is above 0, start again from step 5. If the orphan total is above 0, stop and ask a developer.
+9. **Set `REAL_STUDENT_DATA` to `true`.** In the Render dashboard, service `visionquest`, **Environment** tab, add the key `REAL_STUDENT_DATA` with the value `true`. Do it only after step 8 has succeeded, and before the first real student gets an account. From then on production refuses to start if `COHORT_DEMO_MODE` is ever turned on again. Success looks like the next deploy showing **Live**.
+10. **Check the site.** Success looks like all of these:
+    * The Render log of the start after step 9 has no line named `boot_probe_demo_closeout_unfinished` and none named `boot_probe_demo_rows_beside_real_data`.
+    * Signed in as a teacher, the class list has no "Cohort Demo Class", and the queue of students who need attention has no demo student.
+    * Sage answers one message.
+    * You have decided what to do with each unmarked mock account and each file the preview counted.
+11. **Close the terminal window.** That removes the connection string from memory. Success looks like the window gone.
+12. **The next day, run the preview once more, then close the terminal.** Open a new terminal window, do step 4 again and run the preview from step 5. Success looks like `marked` still 0. If it is above 0, demo accounts were made after the closeout. Stop and ask a developer. Then close the terminal window.
+
+The tool refuses, and deletes nothing, in these cases: demo mode is on in its terminal; its connection is limited by row level security; the checkout and the database are not at the same migration; the number given with `--expect-accounts` is not the number of marked accounts; a demo account was created or used in the last 30 minutes; a class has the demo class code but the demo instructor does not own it; an account with no demo mark is in the plan, is enrolled in the demo class or has rows attached to it; a marked account teaches or coordinates a class or region that has unmarked students; a marked account is named on a row that belongs to someone else or to the program; a marked account is on an audit record, a Sage action or a message about a person or class that is not demo; a kept row points at a row the closeout would delete and the database would blank that link. It also checks its own work before it saves. If any row would be left pointing at a deleted account or class, or any table would lose a row the preview did not count, it cancels the whole transaction and reports a refusal.
 
 ### Reset the fictional roster (owner operation)
 

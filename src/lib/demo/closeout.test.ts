@@ -8,45 +8,45 @@
  * in closeout.db.test.ts.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
 import {
   DELETE_STEPS,
   REFUSALS,
   markedDemoAccountsRule,
-  runCloseoutCommand,
   runDemoCloseout,
+  type AppliedCounts,
+  type CloseoutOptions,
   type CloseoutOutcome,
+  type CloseoutPreview,
   type RefusalCode,
   type SelectionRule,
 } from "./closeout";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN } from "./config";
-import { FakeDb, MODELS, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
+import { FakeDb, LOCAL, MODELS, copyOf, scene, seedUniverse, type Scene } from "./closeout.fixtures";
 
 const DEMO_OFF = {};
 const DEMO_ON = { COHORT_DEMO_MODE: "true" };
-/** Built from parts so no scanner reads this file as holding a credential. It is not a real one. */
-const PASSWORD = ["not", "a", "real", "password"].join("-");
-const URL = ["postgresql://owner:", PASSWORD, "@db.example.test:5432/visionquest"].join("");
 
-interface Scene {
-  db: FakeDb;
-  demo: SeededUniverse;
-  real: SeededUniverse;
+const preview = (db: FakeDb, extra: Partial<CloseoutOptions> = {}): Promise<CloseoutOutcome> =>
+  runDemoCloseout(db.client(), { apply: false, env: DEMO_OFF, local: LOCAL, ...extra });
+/** An apply that names the two marked accounts every scene starts with. */
+const apply = (db: FakeDb, extra: Partial<CloseoutOptions> = {}): Promise<CloseoutOutcome> =>
+  runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF, local: LOCAL, expectAccounts: 2, ...extra });
+
+/** The counts of an outcome that has them. */
+function countsOf(outcome: CloseoutOutcome): CloseoutPreview {
+  assert.notEqual(outcome.kind, "unreadable");
+  if (outcome.kind === "unreadable") throw new Error("unreachable");
+  return outcome.preview;
 }
 
-async function scene(): Promise<Scene> {
-  const db = new FakeDb();
-  const write = async (model: string, data: Row) => void db.insert(model, data);
-  const demo = await seedUniverse(write, { prefix: "dm-", demo: true });
-  const real = await seedUniverse(write, { prefix: "rl-", demo: false });
-  return { db, demo, real };
-}
-
-/** A copy of the universe's own row of `model`, with some columns changed. */
-function copyOf(db: FakeDb, model: string, prefix: string, changes: Row): Row {
-  const original = db.rows(model).find((row) => JSON.stringify(row).includes(prefix));
-  assert.ok(original, `the ${prefix} universe has no ${model} row`);
-  return db.insert(model, { ...original, id: `${prefix}${model}.copy`, ...changes });
+/** What an apply deleted. Fails the test when the outcome is not an apply. */
+function appliedOf(outcome: CloseoutOutcome): AppliedCounts {
+  assert.equal(outcome.kind, "applied");
+  if (outcome.kind !== "applied") throw new Error("unreachable");
+  return outcome;
 }
 
 /** Rows anywhere in the database that hold one of these ids in any column. */
@@ -61,6 +61,11 @@ function rowsOf(db: FakeDb, prefix: string): string {
   return JSON.stringify(MODELS.map((model) => [model.name, db.rows(model.name).filter((row) => JSON.stringify(row).includes(prefix))]));
 }
 
+/** A time the fake server's clock calls this many minutes ago. */
+function minutesBefore(db: FakeDb, minutes: number): Date {
+  return new Date(db.now.getTime() - minutes * 60_000);
+}
+
 function codes(outcome: CloseoutOutcome): RefusalCode[] {
   return outcome.refusals.map((refusal) => refusal.code);
 }
@@ -69,37 +74,37 @@ describe("demo closeout preview", () => {
   it("counts the marked accounts, the demo class and the people it leaves alone", async () => {
     const { db } = await scene();
 
-    const outcome = await runDemoCloseout(db.client(), { apply: false, env: DEMO_OFF });
+    const outcome = await preview(db);
 
     assert.equal(outcome.kind, "preview");
     assert.deepEqual(outcome.refusals, []);
-    assert.deepEqual(outcome.preview.marked, { students: 1, instructors: 1, demoClasses: 1 });
-    assert.equal(outcome.preview.unmarked.students, 1);
-    assert.deepEqual(outcome.preview.unmarked.staffByRole, { teacher: 1, admin: 0, coordinator: 0, other: 0 });
-    assert.equal(outcome.preview.unmarked.enrolledInDemoClass, 0);
-    assert.equal(outcome.preview.unmarked.publicCredentialPages, 1);
-    assert.equal(outcome.preview.demoModeOn, false);
-    assert.equal(outcome.preview.realStudentDataDeclared, false);
-    assert.equal(outcome.preview.rowsToDelete.Student, 2);
-    assert.equal(outcome.preview.rowsToDelete.SpokesClass, 1);
-    assert.equal(outcome.preview.rowsToDelete.AuditLog, 3);
-    assert.equal(outcome.preview.rowsToDelete.SageOperation, 3);
-    assert.equal(outcome.preview.rowsToDelete.SageMemoryEdge, 4);
+    assert.deepEqual(countsOf(outcome).marked, { students: 1, instructors: 1, demoClasses: 1 });
+    assert.equal(countsOf(outcome).unmarked.students, 1);
+    assert.deepEqual(countsOf(outcome).unmarked.staffByRole, { teacher: 1, admin: 0, coordinator: 0, other: 0 });
+    assert.equal(countsOf(outcome).unmarked.enrolledInDemoClass, 0);
+    assert.equal(countsOf(outcome).unmarked.publicCredentialPages, 1);
+    assert.equal(countsOf(outcome).demoModeOn, false);
+    assert.equal(countsOf(outcome).realStudentDataDeclared, false);
+    assert.equal(countsOf(outcome).rowsToDelete.Student, 2);
+    assert.equal(countsOf(outcome).rowsToDelete.SpokesClass, 1);
+    assert.equal(countsOf(outcome).rowsToDelete.AuditLog, 3);
+    assert.equal(countsOf(outcome).rowsToDelete.SageOperation, 3);
+    assert.equal(countsOf(outcome).rowsToDelete.SageMemoryEdge, 4);
   });
 
   it("is tested against a scene with a row to delete in every model a step names", async () => {
     const { db } = await scene();
 
-    const { preview } = await runDemoCloseout(db.client(), { apply: false, env: DEMO_OFF });
+    const { rowsToDelete } = countsOf(await preview(db));
 
-    assert.deepEqual(DELETE_STEPS.map((step) => step.model).filter((model) => !(preview.rowsToDelete[model] > 0)), []);
+    assert.deepEqual(DELETE_STEPS.map((step) => step.model).filter((model) => !(rowsToDelete[model] > 0)), []);
   });
 
   it("changes nothing", async () => {
     const { db } = await scene();
     const before = db.snapshot();
 
-    await runDemoCloseout(db.client(), { apply: false, env: DEMO_OFF });
+    await preview(db);
 
     assert.equal(db.snapshot(), before);
     assert.equal(db.writes, 0);
@@ -108,29 +113,28 @@ describe("demo closeout preview", () => {
   it("reports the two switches", async () => {
     const { db } = await scene();
 
-    const outcome = await runDemoCloseout(db.client(), { apply: false, env: { COHORT_DEMO_MODE: "true", REAL_STUDENT_DATA: "true" } });
+    const outcome = await preview(db, { env: { COHORT_DEMO_MODE: "true", REAL_STUDENT_DATA: "true" } });
 
-    assert.equal(outcome.preview.demoModeOn, true);
-    assert.equal(outcome.preview.realStudentDataDeclared, true);
+    assert.equal(countsOf(outcome).demoModeOn, true);
+    assert.equal(countsOf(outcome).realStudentDataDeclared, true);
   });
 
   it("counts every row the apply then deletes, model by model", async () => {
     const { db } = await scene();
 
-    const preview = await runDemoCloseout(db.client(), { apply: false, env: DEMO_OFF });
-    const applied = await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    const previewed = await preview(db);
+    const applied = await apply(db);
 
-    assert.equal(applied.kind, "applied");
-    assert.deepEqual(applied.deleted, preview.preview.rowsToDelete);
+    assert.deepEqual(appliedOf(applied).deleted, countsOf(previewed).rowsToDelete);
   });
 
   it("counts a row once when two accounts in different batches both name it", async () => {
     const { db } = await scene();
 
-    const whole = await runDemoCloseout(db.client(), { apply: false, env: DEMO_OFF });
-    const oneAtATime = await runDemoCloseout(db.client(), { apply: false, env: DEMO_OFF, chunkSize: 1 });
+    const whole = await preview(db);
+    const oneAtATime = await preview(db, { chunkSize: 1 });
 
-    assert.deepEqual(oneAtATime.preview.rowsToDelete, whole.preview.rowsToDelete);
+    assert.deepEqual(countsOf(oneAtATime).rowsToDelete, countsOf(whole).rowsToDelete);
   });
 
   it("holds counts and fixed sentences only: no name, login, email or id", async () => {
@@ -141,13 +145,13 @@ describe("demo closeout preview", () => {
     });
     db.insert("StudentClassEnrollment", { classId: demo.classId, studentId: real.studentId });
 
-    const outcome = await runDemoCloseout(db.client(), { apply: false, env: DEMO_OFF });
+    const outcome = await preview(db);
     const json = JSON.stringify(outcome);
 
     const leaves: unknown[] = [];
     const walk = (value: unknown, path: string): void => {
       if (typeof value === "object" && value !== null) Object.entries(value).forEach(([name, child]) => walk(child, `${path}.${name}`));
-      else if (!/\.refusals\.\d+\.(code|sentence)$|^\.kind$/.test(path)) leaves.push(value);
+      else if (!/\.refusals\.\d+\.(code|sentence)$|^\.kind$|^\.target\.(database|serverAddress)$/.test(path)) leaves.push(value);
     };
     walk(outcome, "");
     assert.ok(leaves.length > 60);
@@ -169,19 +173,19 @@ describe("demo closeout apply", () => {
     const { db, demo } = await scene();
     assert.ok(rowsNaming(db, [demo.studentId, demo.staffId, demo.classId]).length > 60);
 
-    const outcome = await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    const outcome = await apply(db);
 
     assert.equal(outcome.kind, "applied");
     assert.deepEqual(rowsNaming(db, [demo.studentId, demo.staffId, demo.classId]), []);
     assert.equal(db.rows("Student").filter((row) => row.demoAccount !== null).length, 0);
-    assert.deepEqual(outcome.remaining, { markedAccounts: 0, rowsPointingAtDeleted: 0 });
+    assert.deepEqual(appliedOf(outcome).remaining, { markedAccounts: 0, rowsPointingAtDeleted: 0 });
   });
 
   it("leaves every unmarked row exactly as it was", async () => {
     const { db } = await scene();
     const before = rowsOf(db, "rl-");
 
-    await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    await apply(db);
 
     assert.equal(rowsOf(db, "rl-"), before);
   });
@@ -189,7 +193,7 @@ describe("demo closeout apply", () => {
   it("keeps the shared program rows a demo account merely referenced", async () => {
     const { db } = await scene();
 
-    await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    await apply(db);
 
     for (const model of ["Employer", "EmployerContact", "Opportunity", "CareerEvent", "FormTemplate", "OrientationItem", "Pathway", "Region", "CertTemplate", "JobBrowseListing"]) {
       assert.equal(db.rows(model).filter((row) => row.id === `dm-${model}`).length, 1, model);
@@ -199,7 +203,7 @@ describe("demo closeout apply", () => {
   it("deletes what belonged to the demo class, and nothing of another class", async () => {
     const { db } = await scene();
 
-    await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    await apply(db);
 
     for (const model of ["SpokesClass", "JobClassConfig", "JobListing", "JobScrapeRun", "JobScrapeSourceResult", "ClassRequirement", "JobLead"]) {
       assert.deepEqual(db.rows(model).map((row) => String(row.id).slice(0, 3)), ["rl-"], model);
@@ -209,26 +213,28 @@ describe("demo closeout apply", () => {
   it("records the closeout in the audit log with counts only", async () => {
     const { db } = await scene();
 
-    const outcome = await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    const outcome = await apply(db);
 
     const [entry, ...others] = db.rows("AuditLog").filter((row) => row.action === "demo.closeout");
     assert.equal(others.length, 0);
     assert.equal(entry.actorId, null);
     assert.equal(entry.targetId, null);
-    const rows = Object.values(outcome.deleted ?? {}).reduce((sum, count) => sum + count, 0);
+    const rows = Object.values(appliedOf(outcome).deleted).reduce((sum, count) => sum + count, 0);
     assert.ok(rows > 70);
-    assert.deepEqual(JSON.parse(String(entry.metadata)), { accounts: 2, classes: 1, rows });
+    // The other keys are pinned in closeout.leftovers.test.ts.
+    const { accounts, classes, rows: written } = JSON.parse(String(entry.metadata));
+    assert.deepEqual({ accounts, classes, rows: written }, { accounts: 2, classes: 1, rows });
   });
 
   it("does nothing the second time", async () => {
     const { db } = await scene();
-    await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    await apply(db);
     const before = db.rows("AuditLog").length;
 
-    const again = await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    const again = await apply(db, { expectAccounts: 0 });
 
     assert.equal(again.kind, "applied");
-    assert.equal(Object.values(again.deleted ?? {}).reduce((sum, count) => sum + count, 0), 0);
+    assert.equal(Object.values(appliedOf(again).deleted).reduce((sum, count) => sum + count, 0), 0);
     assert.equal(db.rows("AuditLog").length, before + 1);
   });
 
@@ -236,10 +242,10 @@ describe("demo closeout apply", () => {
     const whole = await scene();
     const split = await scene();
 
-    const first = await runDemoCloseout(whole.db.client(), { apply: true, env: DEMO_OFF });
-    const second = await runDemoCloseout(split.db.client(), { apply: true, env: DEMO_OFF, chunkSize: 1 });
+    const first = await apply(whole.db);
+    const second = await apply(split.db, { chunkSize: 1 });
 
-    assert.deepEqual(second.deleted, first.deleted);
+    assert.deepEqual(appliedOf(second).deleted, appliedOf(first).deleted);
     assert.equal(rowsOf(split.db, "dm-"), rowsOf(whole.db, "dm-"));
   });
 
@@ -248,7 +254,7 @@ describe("demo closeout apply", () => {
     const before = db.snapshot();
     db.failOnDeleteOf = "Goal";
 
-    await assert.rejects(runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF }), /Injected failure/);
+    await assert.rejects(apply(db), /Injected failure/);
 
     assert.equal(db.snapshot(), before);
   });
@@ -260,15 +266,13 @@ interface RefusalCase {
   count: number;
   env?: Readonly<Record<string, string>>;
   rule?: (scene: Scene) => SelectionRule;
+  /** How many accounts the rule's plan holds, when it is not the scene's two. */
+  expectAccounts?: number;
   arrange?: (scene: Scene) => void;
 }
 
 const REFUSAL_CASES: readonly RefusalCase[] = [
   { name: "demo mode is on", code: "demo_mode_on", count: 1, env: DEMO_ON },
-  {
-    name: "the connection is limited by row level security", code: "cannot_see_every_row", count: 1,
-    arrange: ({ db }) => { db.bypassesRls = false; },
-  },
   {
     name: "an unmarked student is enrolled in the demo class", code: "unmarked_student_in_demo_class", count: 1,
     arrange: ({ db, demo, real }) => void db.insert("StudentClassEnrollment", { classId: demo.classId, studentId: real.studentId }),
@@ -318,14 +322,50 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
     },
   },
   {
-    name: "the plan holds an account that is not marked", code: "plan_includes_unmarked", count: 1,
+    name: "a marked account sent a chat message in the last 30 minutes", code: "demo_recently_active", count: 1,
+    arrange: ({ db }) => void copyOf(db, "Message", "dm-", { createdAt: minutesBefore(db, 5) }),
+  },
+  {
+    name: "a marked account's conversation changed and it acted on the audit log in the last 30 minutes", code: "demo_recently_active", count: 2,
+    arrange: ({ db, demo }) => {
+      copyOf(db, "Conversation", "dm-", { updatedAt: minutesBefore(db, 29) });
+      copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, createdAt: minutesBefore(db, 1) });
+    },
+  },
+  {
+    name: "a marked account was created in the last 30 minutes", code: "demo_recently_active", count: 1, expectAccounts: 3,
+    arrange: ({ db }) => void db.insert("Student", { id: "dm-late", studentId: "demo-dm-late", displayName: "dm late", role: "student", demoAccount: "student", createdAt: minutesBefore(db, 10) }),
+  },
+  {
+    name: "a marked account's audit row is about an unmarked student", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo, real }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "student", targetId: real.studentId }),
+  },
+  {
+    name: "a marked account's audit row is about another class", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo, real }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "class", targetId: real.classId }),
+  },
+  {
+    name: "a marked account's Sage operation is about an unmarked student", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo, real }) => void copyOf(db, "SageOperation", "dm-", { actorId: demo.staffId, targetStudentId: real.studentId }),
+  },
+  {
+    name: "a message to a marked account is on an unmarked student's connection", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo }) => void copyOf(db, "OutboundMessage", "rl-", { toId: demo.staffId, connectionId: "rl-Connection" }),
+  },
+  {
+    name: "an unmarked student's task would lose its link to a demo appointment", code: "kept_rows_would_be_blanked", count: 1,
+    arrange: ({ db }) => void copyOf(db, "StudentTask", "rl-", { appointmentId: "dm-Appointment" }),
+  },
+  {
+    name: "the plan holds an account that is not marked", code: "plan_includes_unmarked", count: 1, expectAccounts: 1,
     rule: ({ real }) => async () => ({ accountIds: [real.studentId], classIds: [] }),
   },
   {
-    name: "a row would be left naming a deleted account", code: "rows_left_pointing", count: 1,
+    name: "a row would be left naming a deleted account", code: "rows_left_pointing", count: 1, expectAccounts: 1,
     // The plan is a marked subset: the marked teacher stays, with a goal that names the deleted student.
     rule: ({ demo }) => async () => ({ accountIds: [demo.studentId], classIds: [] }),
-    arrange: ({ db, demo }) => void copyOf(db, "Goal", "dm-", { studentId: demo.staffId, confirmedBy: demo.studentId, parentId: null }),
+    // SageInsight.dismissedBy has no foreign key, so no check before the deletes sees it.
+    arrange: ({ db, demo }) => void copyOf(db, "SageInsight", "dm-", { studentId: demo.staffId, dismissedBy: demo.studentId }),
   },
   {
     name: "a cascade would remove a row the plan does not list", code: "unlisted_rows_removed", count: 1,
@@ -333,18 +373,26 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
   },
 ];
 
+/** Refusals whose "refuses and changes nothing" case lives in another test file. */
+const REFUSALS_TESTED_ELSEWHERE: Readonly<Partial<Record<RefusalCode, string>>> = {
+  cannot_see_every_row: "closeout.server.test.ts",
+  schema_mismatch: "closeout.server.test.ts",
+  expected_accounts_mismatch: "closeout.server.test.ts",
+  demo_recently_active: "closeout.server.test.ts",
+};
+
 describe("demo closeout refusals", () => {
   for (const refusal of REFUSAL_CASES) {
     it(`refuses and changes nothing when ${refusal.name}`, async () => {
       const staged = await scene();
       refusal.arrange?.(staged);
       const before = staged.db.snapshot();
-      const options = { env: refusal.env ?? DEMO_OFF, rule: refusal.rule?.(staged) };
+      const options = { env: refusal.env ?? DEMO_OFF, rule: refusal.rule?.(staged), expectAccounts: refusal.expectAccounts ?? 2 };
 
-      const outcome = await runDemoCloseout(staged.db.client(), { ...options, apply: true });
+      const outcome = await apply(staged.db, options);
 
       assert.equal(outcome.kind, "refused");
-      assert.equal(outcome.deleted, undefined);
+      assert.equal("deleted" in outcome, false);
       assert.deepEqual(outcome.refusals.filter((entry) => entry.code === refusal.code),
         [{ code: refusal.code, sentence: REFUSALS[refusal.code], count: refusal.count }]);
       assert.equal(staged.db.snapshot(), before);
@@ -357,16 +405,20 @@ describe("demo closeout refusals", () => {
     db.insert("SpokesClass", { id: "rl-lookalike", code: DEMO_CLASS_CODE, name: "Cohort Demo", createdById: real.staffId });
     const before = db.snapshot();
 
-    const outcome = await runDemoCloseout(db.client(), { apply: true, env: DEMO_OFF });
+    const outcome = await apply(db, { expectAccounts: 0 });
 
     assert.deepEqual(outcome.refusals, [{ code: "demo_class_not_owned", sentence: REFUSALS.demo_class_not_owned, count: 1 }]);
     assert.equal(db.snapshot(), before);
   });
 
-  it("has a case for every refusal", () => {
-    const covered = new Set<string>([...REFUSAL_CASES.map((refusal) => refusal.code), "demo_class_not_owned"]);
+  it("has a case that refuses and changes nothing for every refusal, here or in the file named", () => {
+    const here = new Set<string>([...REFUSAL_CASES.map((refusal) => refusal.code), "demo_class_not_owned"]);
+    const elsewhere = Object.entries(REFUSALS_TESTED_ELSEWHERE).filter(([code, file]) => {
+      const text = readFileSync(path.join(__dirname, file), "utf8");
+      return text.includes(`code: "${code}"`) && text.includes("refuses and changes nothing when");
+    }).map(([code]) => code);
 
-    assert.deepEqual(Object.keys(REFUSALS).filter((code) => !covered.has(code)), []);
+    assert.deepEqual(Object.keys(REFUSALS).filter((code) => !here.has(code) && !elsewhere.includes(code)), []);
   });
 
   it("writes every refusal as one plain sentence that says nothing was deleted", () => {
@@ -380,11 +432,11 @@ describe("demo closeout refusals", () => {
     const staged = await scene();
     staged.db.insert("StudentClassEnrollment", { classId: staged.demo.classId, studentId: staged.real.studentId });
 
-    const outcome = await runDemoCloseout(staged.db.client(), { apply: false, env: DEMO_ON });
+    const outcome = await preview(staged.db, { env: DEMO_ON });
 
     assert.equal(outcome.kind, "preview");
     assert.deepEqual(codes(outcome), ["demo_mode_on", "unmarked_student_in_demo_class"]);
-    assert.equal(outcome.preview.unmarked.enrolledInDemoClass, 1);
+    assert.equal(countsOf(outcome).unmarked.enrolledInDemoClass, 1);
   });
 
   it("selects every marked account and only the demo class its instructor owns", async () => {
@@ -395,124 +447,5 @@ describe("demo closeout refusals", () => {
     assert.deepEqual([...plan.accountIds].sort(), [demo.staffId, demo.studentId].sort());
     assert.deepEqual(plan.classIds, [demo.classId]);
     assert.equal(plan.accountIds.includes(real.studentId), false);
-  });
-});
-
-describe("demo closeout command", () => {
-  const command = (db: FakeDb, argv: string[], env: Readonly<Record<string, string>> = { ADMIN_DATABASE_URL: URL }) => {
-    const opened: string[] = [];
-    const result = runCloseoutCommand(argv, env, (url) => { opened.push(url); return db.client(); });
-    return { opened, result };
-  };
-
-  it("previews by default and exits 0", async () => {
-    const { db } = await scene();
-    const before = db.snapshot();
-
-    const { opened, result } = command(db, []);
-    const { exitCode, stdout, stderr } = await result;
-
-    assert.equal(exitCode, 0);
-    assert.deepEqual(stderr, []);
-    assert.equal(JSON.parse(stdout.join("\n")).kind, "preview");
-    assert.deepEqual(opened, [URL]);
-    assert.equal(db.snapshot(), before);
-    assert.equal(db.disconnects, 1);
-  });
-
-  it("applies with both flags and exits 0", async () => {
-    const { db } = await scene();
-
-    const { exitCode, stdout } = await command(db, ["--apply", "--confirm-demo-disabled"]).result;
-
-    assert.equal(exitCode, 0);
-    assert.equal(JSON.parse(stdout.join("\n")).kind, "applied");
-    assert.equal(db.rows("Student").filter((row) => row.demoAccount !== null).length, 0);
-  });
-
-  for (const argv of [["--apply"], ["--force"], ["--apply", "--confirm-demo-disabled", "--skip-checks"], ["apply"], [URL]]) {
-    it(`refuses the arguments ${JSON.stringify(argv).replace(URL, "<a database URL>")} with exit 2 and never connects`, async () => {
-      const { db } = await scene();
-      const before = db.snapshot();
-
-      const { opened, result } = command(db, argv);
-      const { exitCode, stdout, stderr } = await result;
-
-      assert.equal(exitCode, 2);
-      assert.deepEqual(stdout, []);
-      assert.match(stderr.join("\n"), /^Refused: /);
-      assert.equal(stderr.join("\n").includes(PASSWORD), false);
-      assert.deepEqual(opened, []);
-      assert.equal(db.transactions, 0);
-      assert.equal(db.snapshot(), before);
-    });
-  }
-
-  it("refuses with exit 2 when ADMIN_DATABASE_URL is missing", async () => {
-    const { db } = await scene();
-
-    const { opened, result } = command(db, [], {});
-
-    assert.equal((await result).exitCode, 2);
-    assert.deepEqual(opened, []);
-  });
-
-  it("refuses an apply while demo mode is on, before it connects", async () => {
-    const { db } = await scene();
-
-    const { opened, result } = command(db, ["--apply", "--confirm-demo-disabled"], { ADMIN_DATABASE_URL: URL, COHORT_DEMO_MODE: "true" });
-    const { exitCode, stderr } = await result;
-
-    assert.equal(exitCode, 2);
-    assert.deepEqual(stderr, [`Refused: ${REFUSALS.demo_mode_on}`]);
-    assert.deepEqual(opened, []);
-  });
-
-  it("exits 2 with the fixed sentence and its count when the apply is refused", async () => {
-    const { db, demo, real } = await scene();
-    db.insert("StudentClassEnrollment", { classId: demo.classId, studentId: real.studentId });
-    const before = db.snapshot();
-
-    const { exitCode, stderr } = await command(db, ["--apply", "--confirm-demo-disabled"]).result;
-
-    assert.equal(exitCode, 2);
-    assert.deepEqual(stderr, [`Refused: ${REFUSALS.unmarked_student_in_demo_class} (count: 1)`]);
-    assert.equal(db.snapshot(), before);
-  });
-
-  it("exits 1 with one fixed sentence when the database fails, and prints none of the error", async () => {
-    const { db } = await scene();
-    db.failOnDeleteOf = "Goal";
-    const before = db.snapshot();
-
-    const { exitCode, stdout, stderr } = await command(db, ["--apply", "--confirm-demo-disabled"]).result;
-
-    assert.equal(exitCode, 1);
-    assert.deepEqual(stdout, []);
-    assert.deepEqual(stderr, ["Demo closeout failed. The transaction was rolled back, so nothing was deleted. Check that the database is reachable, then run the preview again."]);
-    assert.equal(db.snapshot(), before);
-    assert.equal(db.disconnects, 1);
-  });
-
-  it("never prints the database URL, even when connecting throws an error that quotes it", async () => {
-    const result = await runCloseoutCommand([], { ADMIN_DATABASE_URL: URL }, () => {
-      throw new Error(`Can't reach database server at ${URL}`);
-    });
-
-    assert.equal(result.exitCode, 1);
-    assert.equal(JSON.stringify(result).includes(PASSWORD), false);
-    assert.equal(JSON.stringify(result).includes("db.example.test"), false);
-  });
-
-  it("prints usage for --help and connects to nothing", async () => {
-    const { db } = await scene();
-
-    const { opened, result } = command(db, ["--help"]);
-    const { exitCode, stdout } = await result;
-
-    assert.equal(exitCode, 0);
-    assert.match(stdout.join("\n"), /--apply --confirm-demo-disabled/);
-    assert.match(stdout.join("\n"), /ADMIN_DATABASE_URL/);
-    assert.deepEqual(opened, []);
   });
 });

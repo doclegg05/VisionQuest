@@ -26,60 +26,29 @@
  */
 import { Prisma } from "@prisma/client";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN, isCohortDemoEnabled, isRealStudentDataDeclared } from "./config";
+import {
+  UNMARKED, chunksOf, countIn, idsFor, idsOf, inList, tableOf, valuesWhere,
+  type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type DemoEnv, type Ids, type Run, type Where,
+} from "./closeout.core";
+import {
+  deletedAuditRowsWithUnmarkedActor, recentActivity, recordsAboutOthers, rowsTheDatabaseWouldBlank, setNullLinksInto,
+} from "./closeout.guards";
+import { leftBehind, type LeftBehind } from "./closeout.orphans";
+import type { LocalSchema } from "./closeout.local";
+import { refusal, type Refusal, type RefusalCode } from "./closeout.report";
+import { jobIdsNaming, readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type ServerFacts } from "./closeout.server";
 
-export type Where = Readonly<Record<string, unknown>>;
-type Ids = readonly string[];
-type DemoEnv = Readonly<Record<string, string | undefined>>;
+export { tableOf, type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type Where } from "./closeout.core";
+export { REFUSALS, type Refusal, type RefusalCode } from "./closeout.report";
+export type { CloseoutTarget } from "./closeout.server";
 
-/** The four calls this tool makes on a table. */
-export interface CloseoutTable {
-  count(args: { where?: Where }): Promise<number>;
-  deleteMany(args: { where: Where }): Promise<{ count: number }>;
-  findMany(args: { where: Where; select: Readonly<Record<string, true>> }): Promise<ReadonlyArray<Readonly<Record<string, unknown>>>>;
-  create(args: { data: Readonly<Record<string, unknown>> }): Promise<unknown>;
-}
+/** The accounts and classes a rule picks. The queued jobs are worked out from the accounts. */
+export type Selection = Pick<CloseoutPlan, "accountIds" | "classIds">;
 
-export interface CloseoutTx {
-  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
-  $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
-}
+export type SelectionRule = (tx: CloseoutTx) => Promise<Selection>;
 
-export interface CloseoutClient {
-  $transaction<T>(
-    run: (tx: CloseoutTx) => Promise<T>,
-    options?: { isolationLevel?: "Serializable"; maxWait?: number; timeout?: number },
-  ): Promise<T>;
-}
-
-function isCloseoutTable(value: unknown): value is CloseoutTable {
-  if (typeof value !== "object" || value === null) return false;
-  return ["count", "deleteMany", "findMany", "create"].every((name) => typeof Reflect.get(value, name) === "function");
-}
-
-/** The table for a model name, as Prisma exposes it on a client or a transaction. */
-export function tableOf(tx: object, model: string): CloseoutTable {
-  const candidate: unknown = Reflect.get(tx, model.charAt(0).toLowerCase() + model.slice(1));
-  if (!isCloseoutTable(candidate)) throw new Error(`The database client has no table for the model ${model}`);
-  return candidate;
-}
-
-/** What one run deletes: accounts (Student rows) and classes (SpokesClass rows). */
-export interface CloseoutPlan {
-  readonly accountIds: Ids;
-  readonly classIds: Ids;
-}
-export type SelectionRule = (tx: CloseoutTx) => Promise<CloseoutPlan>;
-
-const UNMARKED = { demoAccount: null } as const;
 /** The demo instructor exactly as reset.ts identifies it: this login, this role, this marker. */
 const DEMO_INSTRUCTOR = { studentId: DEMO_INSTRUCTOR_LOGIN, role: "teacher", demoAccount: "instructor" } as const;
-
-function idsOf(rows: ReadonlyArray<Readonly<Record<string, unknown>>>, column: string): string[] {
-  return rows.flatMap((row) => {
-    const value = row[column];
-    return typeof value === "string" ? [value] : [];
-  });
-}
 
 /**
  * The one rule: every Student row with a demo marker, and the class that holds
@@ -96,16 +65,6 @@ export const markedDemoAccountsRule: SelectionRule = async (tx) => {
   return { accountIds: idsOf(accounts, "id"), classIds: idsOf(classes, "id") };
 };
 
-export interface DeleteStep {
-  readonly model: Prisma.ModelName;
-  /** Which ids the step is given: the plan's accounts or its classes. */
-  readonly scope: "account" | "class";
-  /** The column that holds the id, or null for a row reached through its parent. */
-  readonly column: string | null;
-  readonly where: (ids: Ids) => Where;
-}
-
-const inList = (column: string) => (ids: Ids): Where => ({ [column]: { in: ids } });
 const own = (model: Prisma.ModelName, column: string): DeleteStep => ({ model, scope: "account", column, where: inList(column) });
 const ofClass = (model: Prisma.ModelName, column: string): DeleteStep => ({ model, scope: "class", column, where: inList(column) });
 const under = (model: Prisma.ModelName, scope: DeleteStep["scope"], where: (ids: Ids) => Where): DeleteStep => ({
@@ -207,6 +166,13 @@ const CLASS_STEPS: readonly DeleteStep[] = [
   ofClass("AuditLog", "targetId"), // no foreign key
 ];
 
+/**
+ * Queued and finished jobs whose JSON payload names a planned account
+ * (`jobIdsNaming` in closeout.server.ts). BackgroundJob has no foreign key, so
+ * the schema would leave every one behind.
+ */
+const JOB_STEPS: readonly DeleteStep[] = [{ model: "BackgroundJob", scope: "job", column: "id", where: inList("id") }];
+
 const CLASS_ROOT: DeleteStep = ofClass("SpokesClass", "id");
 /** The marker is repeated here so this statement can never remove an unmarked account. */
 const ACCOUNT_ROOT: DeleteStep = {
@@ -214,7 +180,10 @@ const ACCOUNT_ROOT: DeleteStep = {
 };
 
 /** Every removal, in the order it runs. The demo class goes just before the accounts. */
-export const DELETE_STEPS: readonly DeleteStep[] = [...ACCOUNT_STEPS, ...CLASS_STEPS, CLASS_ROOT, ACCOUNT_ROOT];
+export const DELETE_STEPS: readonly DeleteStep[] = [...ACCOUNT_STEPS, ...JOB_STEPS, ...CLASS_STEPS, CLASS_ROOT, ACCOUNT_ROOT];
+
+/** Every SetNull foreign key into a model a step deletes from. See `rowsTheDatabaseWouldBlank`. */
+export const SET_NULL_LINKS = setNullLinksInto(new Set(DELETE_STEPS.map((step) => step.model)));
 
 /** Which rows that name an account are NOT deleted by the plan, and so must not exist. */
 export type Survives =
@@ -345,28 +314,6 @@ export const UNMARKED_ON_DEMO_CLASS: ReadonlyArray<{ model: Prisma.ModelName; wh
   { model: "Connection", where: (ids) => ({ student: UNMARKED, OR: [{ classId: { in: ids } }, { jobLead: { classId: { in: ids } } }] }) }, // L1260 Restrict, L1275 SetNull
 ];
 
-export const REFUSALS = {
-  demo_mode_on: "Demo mode is on. Turn COHORT_DEMO_MODE off in Render and let the deploy finish. Nothing was deleted.",
-  cannot_see_every_row: "This database connection is limited by row level security, so it cannot see every row. Use the admin database URL. Nothing was deleted.",
-  demo_class_not_owned: "A class holds the demo class code but the marked demo instructor does not own it. Nothing was deleted.",
-  plan_includes_unmarked: "The plan would delete an account that is not marked as demo. Nothing was deleted.",
-  unmarked_student_in_demo_class: "An account that is not marked as demo is enrolled in a demo class. Nothing was deleted.",
-  unmarked_rows_on_demo_class: "Rows that belong to accounts not marked as demo are attached to a demo class. Nothing was deleted.",
-  marked_staff_over_unmarked_students: "A marked demo account teaches or coordinates a class or region that has unmarked students. Nothing was deleted.",
-  marked_account_on_kept_rows: "A marked demo account is named on rows that belong to other people or to the program. Nothing was deleted.",
-  rows_left_pointing: "Rows would be left pointing at a deleted account or class. Nothing was deleted.",
-  unlisted_rows_removed: "The deletion would remove rows the preview did not list. Nothing was deleted.",
-} as const;
-export type RefusalCode = keyof typeof REFUSALS;
-
-export interface Refusal {
-  readonly code: RefusalCode;
-  readonly sentence: string;
-  readonly count: number;
-}
-
-const refusal = (code: RefusalCode, count: number): Refusal => ({ code, sentence: REFUSALS[code], count });
-
 export interface CloseoutPreview {
   readonly demoModeOn: boolean;
   readonly realStudentDataDeclared: boolean;
@@ -383,58 +330,64 @@ export interface CloseoutPreview {
   readonly rowsToDelete: Readonly<Record<string, number>>;
   /** Uploads whose database row goes while the stored file stays in storage. */
   readonly uploadedFilesLeftInStorage: number;
+  /** What stays after an apply that a reader should know about. Counts only. */
+  readonly leftBehind: LeftBehind;
 }
 
-export interface CloseoutOutcome {
-  readonly kind: "preview" | "refused" | "applied";
-  readonly preview: CloseoutPreview;
+interface OutcomeBase {
+  /** Which database this was, as the server reported it. */
+  readonly target: CloseoutTarget;
   readonly refusals: readonly Refusal[];
-  /** Rows deleted, by model. Present only when applied. */
-  readonly deleted?: Readonly<Record<string, number>>;
-  readonly remaining?: { readonly markedAccounts: number; readonly rowsPointingAtDeleted: number };
 }
+
+/** An apply's result: the rows deleted by model, and what is left. */
+export interface AppliedCounts {
+  readonly deleted: Readonly<Record<string, number>>;
+  /** Counted inside the transaction, after the deletes and before the commit. */
+  readonly remaining: { readonly markedAccounts: number; readonly rowsPointingAtDeleted: number };
+}
+
+export type CloseoutOutcome =
+  /** Refused before any table was read, so there are no counts to show. */
+  | (OutcomeBase & { readonly kind: "unreadable" })
+  | (OutcomeBase & { readonly kind: "preview"; readonly preview: CloseoutPreview })
+  | (OutcomeBase & { readonly kind: "refused"; readonly preview: CloseoutPreview })
+  | (OutcomeBase & AppliedCounts & {
+      readonly kind: "applied";
+      readonly preview: CloseoutPreview;
+      /**
+       * Marked accounts counted again in a new transaction after the commit.
+       * Above 0 means a demo account was created while the closeout ran. Null
+       * means that last look could not be made.
+       */
+      readonly afterCommit: { readonly markedAccounts: number | null };
+    });
 
 export interface CloseoutOptions {
   readonly apply: boolean;
+  /** On an apply: the marked students plus marked instructors the preview showed. */
+  readonly expectAccounts?: number;
+  /** What this checkout says the schema is. See closeout.local.ts. */
+  readonly local: LocalSchema;
   /** Where the two switches are read from. Defaults to this process's environment. */
   readonly env?: DemoEnv;
   readonly rule?: SelectionRule;
   /** Ids sent to the database in one statement. */
   readonly chunkSize?: number;
+  /** Told which database this is as soon as the server says, before any table is read. */
+  readonly onTarget?: (target: CloseoutTarget) => void;
 }
 
 /** Postgres takes 32,767 values per statement. Two id lists of this size fit with room to spare. */
 const ID_CHUNK = 5_000;
 /** Ten minutes: thousands of demo accounts, each with rows in sixty tables, one statement per table. */
 const TRANSACTION = { isolationLevel: "Serializable", maxWait: 10_000, timeout: 600_000 } as const;
-/** DEMO_STUDENT_CREATE_LOCK in create-student.ts, also taken by reset.ts. Held, no demo student can be created. */
-const DEMO_STUDENT_CREATE_LOCK = 2_610_190_001;
 const KNOWN_STAFF_ROLES = ["teacher", "admin", "coordinator"] as const;
 
-interface Run {
-  readonly tx: CloseoutTx;
-  readonly plan: CloseoutPlan;
-  readonly chunk: number;
-}
-
 class CloseoutRefused extends Error {
-  constructor(readonly refused: Refusal, readonly preview: CloseoutPreview) {
+  constructor(readonly refused: Refusal, readonly preview: CloseoutPreview, readonly target?: CloseoutTarget) {
     super(refused.sentence);
   }
-}
-
-function chunksOf(ids: Ids, size: number): Ids[] {
-  const chunks: Ids[] = [];
-  for (let start = 0; start < ids.length; start += size) chunks.push(ids.slice(start, start + size));
-  return chunks;
-}
-
-const idsFor = (run: Run, scope: DeleteStep["scope"]): Ids => (scope === "account" ? run.plan.accountIds : run.plan.classIds);
-
-async function countIn(run: Run, model: string, where: (ids: Ids) => Where, ids: Ids): Promise<number> {
-  let total = 0;
-  for (const chunk of chunksOf(ids, run.chunk)) total += await tableOf(run.tx, model).count({ where: where(chunk) });
-  return total;
 }
 
 /** Rows several steps would delete from one model, each counted once. */
@@ -479,38 +432,22 @@ async function keptRowsNamingAccounts(run: Run): Promise<number> {
   return total;
 }
 
-async function valuesWhere(run: Run, model: string, column: string, select: string): Promise<string[]> {
-  const found: string[] = [];
-  for (const chunk of chunksOf(run.plan.accountIds, run.chunk)) {
-    found.push(...idsOf(await tableOf(run.tx, model).findMany({ where: { [column]: { in: chunk } }, select: { [select]: true } }), select));
-  }
-  return found;
-}
-
 /** Unmarked students in a class or region that a planned account teaches, created or coordinates. */
 async function unmarkedUnderPlannedStaff(run: Run): Promise<number> {
   const demoClasses = new Set(run.plan.classIds);
   const taught = [
-    ...(await valuesWhere(run, "SpokesClassInstructor", "instructorId", "classId")),
-    ...(await valuesWhere(run, "SpokesClass", "createdById", "id")),
+    ...(await valuesWhere(run, "SpokesClassInstructor", "instructorId", "classId", run.plan.accountIds)),
+    ...(await valuesWhere(run, "SpokesClass", "createdById", "id", run.plan.accountIds)),
   ];
   const classIds = [...new Set(taught)].filter((id) => !demoClasses.has(id));
   const regionIds = [...new Set([
-    ...(await valuesWhere(run, "RegionCoordinator", "coordinatorId", "regionId")),
-    ...(await valuesWhere(run, "RegionInstructor", "instructorId", "regionId")),
+    ...(await valuesWhere(run, "RegionCoordinator", "coordinatorId", "regionId", run.plan.accountIds)),
+    ...(await valuesWhere(run, "RegionInstructor", "instructorId", "regionId", run.plan.accountIds)),
   ])];
   if (classIds.length === 0 && regionIds.length === 0) return 0;
   return tableOf(run.tx, "StudentClassEnrollment").count({
     where: { student: UNMARKED, OR: [{ classId: { in: classIds } }, { class: { regionId: { in: regionIds } } }] },
   });
-}
-
-async function seesEveryRow(tx: CloseoutTx): Promise<boolean> {
-  // The same probe as scripts/dohs-spokes-report.ts. Under row level security
-  // every count below would read 0 and the preview would say there is no demo data.
-  const rows = await tx.$queryRaw`SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user`;
-  if (!Array.isArray(rows)) return false;
-  return rows.some((row: unknown) => typeof row === "object" && row !== null && Reflect.get(row, "rolbypassrls") === true);
 }
 
 async function countPeople(run: Run): Promise<Pick<CloseoutPreview, "marked" | "unmarked">> {
@@ -538,27 +475,51 @@ async function countPeople(run: Run): Promise<Pick<CloseoutPreview, "marked" | "
   };
 }
 
+/** What the run was asked to do and what it holds, for the checks that depend on it. */
+interface Gate {
+  readonly env: DemoEnv;
+  /** False when an apply could not take the demo student create lock. */
+  readonly lockFree: boolean;
+  /** True when an apply was given the wrong number of marked accounts, or none. */
+  readonly countDiffers: boolean;
+}
+
+/** Refusals that mean no count can be trusted, so none is made. */
+function unreadableRefusals(server: ServerFacts, local: LocalSchema): Refusal[] {
+  const clientModels = new Set<string>(Object.values(Prisma.ModelName));
+  const sameModels = local.schemaModels.length === clientModels.size && local.schemaModels.every((model) => clientModels.has(model));
+  const sameMigration = server.newestMigration !== null && server.newestMigration === local.newestMigration;
+  return [
+    refusal("cannot_see_every_row", server.seesEveryRow ? 0 : 1),
+    refusal("schema_mismatch", sameModels && sameMigration ? 0 : 1),
+  ].filter((entry) => entry.count > 0);
+}
+
 /** Everything that can be known to stop an apply without writing a row, in a fixed order. */
-async function prewriteRefusals(run: Run, env: DemoEnv, enrolledInDemoClass: number): Promise<Refusal[]> {
+async function prewriteRefusals(run: Run, gate: Gate, enrolledInDemoClass: number): Promise<Refusal[]> {
   const classes = tableOf(run.tx, "SpokesClass");
   const withDemoCode = await classes.count({ where: { code: DEMO_CLASS_CODE } });
   const ownedByDemoInstructor = await classes.count({ where: { code: DEMO_CLASS_CODE, createdBy: DEMO_INSTRUCTOR } });
   let attached = 0;
   for (const entry of UNMARKED_ON_DEMO_CLASS) attached += await countIn(run, entry.model, entry.where, run.plan.classIds);
   const found = [
-    refusal("demo_mode_on", isCohortDemoEnabled(env) ? 1 : 0),
-    refusal("cannot_see_every_row", (await seesEveryRow(run.tx)) ? 0 : 1),
+    refusal("demo_mode_on", isCohortDemoEnabled(gate.env) ? 1 : 0),
+    refusal("demo_recently_active", (gate.lockFree ? 0 : 1) + (await recentActivity(run))),
+    refusal("expected_accounts_mismatch", gate.countDiffers ? 1 : 0),
     refusal("demo_class_not_owned", withDemoCode - ownedByDemoInstructor),
     refusal("plan_includes_unmarked", await countIn(run, "Student", (ids) => ({ id: { in: ids }, ...UNMARKED }), run.plan.accountIds)),
     refusal("unmarked_student_in_demo_class", enrolledInDemoClass),
     refusal("unmarked_rows_on_demo_class", attached),
     refusal("marked_staff_over_unmarked_students", await unmarkedUnderPlannedStaff(run)),
     refusal("marked_account_on_kept_rows", await keptRowsNamingAccounts(run)),
+    refusal("records_about_unmarked_people", await recordsAboutOthers(run)),
+    refusal("kept_rows_would_be_blanked", await rowsTheDatabaseWouldBlank(run, DELETE_STEPS, SET_NULL_LINKS)),
   ];
   return found.filter((entry) => entry.count > 0);
 }
 
-async function survey(run: Run, env: DemoEnv): Promise<{ preview: CloseoutPreview; refusals: Refusal[] }> {
+async function survey(run: Run, gate: Gate): Promise<{ preview: CloseoutPreview; refusals: Refusal[] }> {
+  const { env } = gate;
   const people = await countPeople(run);
   const rowsToDelete = await plannedRows(run);
   const preview: CloseoutPreview = {
@@ -567,8 +528,9 @@ async function survey(run: Run, env: DemoEnv): Promise<{ preview: CloseoutPrevie
     ...people,
     rowsToDelete,
     uploadedFilesLeftInStorage: rowsToDelete.FileUpload ?? 0,
+    leftBehind: await leftBehind(run),
   };
-  return { preview, refusals: await prewriteRefusals(run, env, people.unmarked.enrolledInDemoClass) };
+  return { preview, refusals: await prewriteRefusals(run, gate, people.unmarked.enrolledInDemoClass) };
 }
 
 async function tableCounts(tx: CloseoutTx): Promise<Record<string, number>> {
@@ -608,9 +570,10 @@ function unlistedChanges(before: Record<string, number>, after: Record<string, n
  * Deletes the plan. Runs inside the caller's transaction: a refusal or any
  * other throw from here rolls every statement back.
  */
-async function applyPlan(run: Run, preview: CloseoutPreview): Promise<Pick<CloseoutOutcome, "deleted" | "remaining">> {
+async function applyPlan(run: Run, preview: CloseoutPreview, newestMigration: string): Promise<AppliedCounts> {
   const before = await tableCounts(run.tx);
-  for (const step of [...ACCOUNT_STEPS, ...CLASS_STEPS]) await deleteStep(run, step);
+  const unmarkedActors = await deletedAuditRowsWithUnmarkedActor(run, DELETE_STEPS.filter((step) => step.model === "AuditLog"));
+  for (const step of [...ACCOUNT_STEPS, ...JOB_STEPS, ...CLASS_STEPS]) await deleteStep(run, step);
   refuseIf(await rowsStillNaming(run, CLASS_COLUMNS, run.plan.classIds), "rows_left_pointing", preview);
   await deleteStep(run, CLASS_ROOT);
   refuseIf(await rowsStillNaming(run, ACCOUNT_COLUMNS, run.plan.accountIds), "rows_left_pointing", preview);
@@ -632,7 +595,10 @@ async function applyPlan(run: Run, preview: CloseoutPreview): Promise<Pick<Close
     data: {
       actorRole: "owner", action: "demo.closeout", targetType: "demo",
       summary: "Demo closeout deleted the marked demo accounts, the demo class and their rows.",
-      metadata: JSON.stringify({ accounts: run.plan.accountIds.length, classes: run.plan.classIds.length, rows }),
+      metadata: JSON.stringify({
+        accounts: run.plan.accountIds.length, classes: run.plan.classIds.length, rows, rowsByModel: preview.rowsToDelete,
+        uploadedFilesLeftInStorage: preview.uploadedFilesLeftInStorage, newestMigration, deletedAuditRowsWithUnmarkedActor: unmarkedActors,
+      }),
     },
   });
   // The preview's counts are the deleted counts: the row-count check above
@@ -640,93 +606,71 @@ async function applyPlan(run: Run, preview: CloseoutPreview): Promise<Pick<Close
   return { deleted: preview.rowsToDelete, remaining };
 }
 
-/**
- * Previews or applies the closeout in one serializable transaction. A preview
- * only reads. An apply that is refused, at any point, changes nothing: the
- * checks made before the first delete return early, and the two made after
- * deletes have run throw, which rolls the transaction back.
- */
-export async function runDemoCloseout(client: CloseoutClient, options: CloseoutOptions): Promise<CloseoutOutcome> {
-  const env = options.env ?? process.env;
+type Applied = Extract<CloseoutOutcome, { kind: "applied" }>;
+type BeforeCommit = Exclude<CloseoutOutcome, Applied> | Omit<Applied, "afterCommit">;
+
+/** The whole closeout inside one transaction. Returns before the commit, so `afterCommit` is not known yet. */
+async function inTransaction(tx: CloseoutTx, options: CloseoutOptions): Promise<BeforeCommit> {
+  await refuseFilteredReads(tx);
+  // The lock comes before every other query: see `tryCreateLock`.
+  const lockFree = options.apply ? await tryCreateLock(tx) : true;
+  const server = await readServerFacts(tx);
+  const { target } = server;
+  options.onTarget?.(target);
+  const unreadable = unreadableRefusals(server, options.local);
+  if (unreadable.length > 0) return { kind: "unreadable", target, refusals: unreadable };
+
+  const selection = await (options.rule ?? markedDemoAccountsRule)(tx);
+  const chunk = options.chunkSize ?? ID_CHUNK;
+  const jobIds = await jobIdsNaming(tx, selection.accountIds, chunk);
+  const run: Run = { tx, plan: { ...selection, jobIds }, chunk, now: server.now };
+  const countDiffers = options.apply && options.expectAccounts !== run.plan.accountIds.length;
+  const { preview, refusals } = await survey(run, { env: options.env ?? process.env, lockFree, countDiffers });
+  if (!options.apply) return { kind: "preview", target, preview, refusals };
+  if (refusals.length > 0) return { kind: "refused", target, preview, refusals };
   try {
-    return await client.$transaction(async (tx): Promise<CloseoutOutcome> => {
-      if (options.apply) await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DEMO_STUDENT_CREATE_LOCK}::bigint)`;
-      const plan = await (options.rule ?? markedDemoAccountsRule)(tx);
-      const run: Run = { tx, plan, chunk: options.chunkSize ?? ID_CHUNK };
-      const { preview, refusals } = await survey(run, env);
-      if (!options.apply) return { kind: "preview", preview, refusals };
-      if (refusals.length > 0) return { kind: "refused", preview, refusals };
-      return { kind: "applied", preview, refusals: [], ...(await applyPlan(run, preview)) };
-    }, TRANSACTION);
+    return { kind: "applied", target, preview, refusals: [], ...(await applyPlan(run, preview, server.newestMigration ?? "")) };
   } catch (error) {
-    if (error instanceof CloseoutRefused) return { kind: "refused", preview: error.preview, refusals: [error.refused] };
+    if (error instanceof CloseoutRefused) throw new CloseoutRefused(error.refused, error.preview, target);
     throw error;
   }
 }
 
-export interface CommandResult {
-  readonly exitCode: 0 | 1 | 2;
-  readonly stdout: readonly string[];
-  readonly stderr: readonly string[];
-}
-export type ConnectedClient = CloseoutClient & { $disconnect(): Promise<void> };
-
-const KNOWN_ARGUMENTS = ["--apply", "--confirm-demo-disabled", "--help"];
-const USAGE = [
-  "Usage: node --import tsx scripts/demo-closeout.ts [--apply --confirm-demo-disabled]",
-  "With no argument it previews: it prints counts and deletes nothing.",
-  "With both arguments it deletes the marked demo accounts, the demo class and their rows in one transaction.",
-  "It needs ADMIN_DATABASE_URL set in this shell and reads no file for it. Turn demo mode off on every server first.",
-  "Exit codes: 0 done, 2 refused, 1 failed.",
-];
-const FAILURE = "Demo closeout failed. The transaction was rolled back, so nothing was deleted. Check that the database is reachable, then run the preview again.";
-
-function refusedBeforeConnecting(argv: readonly string[], env: DemoEnv): string | null {
-  // The argument is not echoed: a pasted connection string would end up on screen.
-  if (argv.some((argument) => !KNOWN_ARGUMENTS.includes(argument))) return "an argument is not one this command accepts. Run it with --help.";
-  const apply = argv.includes("--apply");
-  if (apply && !argv.includes("--confirm-demo-disabled")) return "--apply also needs --confirm-demo-disabled, your word that demo mode is off on every server.";
-  if (!env.ADMIN_DATABASE_URL) return "set ADMIN_DATABASE_URL in this shell first. This command reads no file for it.";
-  if (apply && isCohortDemoEnabled(env)) return REFUSALS.demo_mode_on;
-  return null;
-}
-
-async function attempt(apply: boolean, env: DemoEnv, client: ConnectedClient): Promise<CommandResult> {
-  const outcome = await runDemoCloseout(client, { apply, env });
-  const stdout = [JSON.stringify(outcome, null, 2)];
-  if (outcome.kind !== "refused") return { exitCode: 0, stdout, stderr: [] };
-  return { exitCode: 2, stdout, stderr: outcome.refusals.map((entry) => `Refused: ${entry.sentence} (count: ${entry.count})`) };
+/**
+ * Marked accounts as a new transaction sees them, once the closeout has
+ * committed. The closeout's own transaction saw the database as it was when it
+ * began, so an account committed while it ran is invisible to it and only this
+ * look can find it.
+ */
+async function markedAfterCommit(client: CloseoutClient): Promise<number | null> {
+  try {
+    return await client.$transaction(async (tx) => {
+      await refuseFilteredReads(tx);
+      return await tableOf(tx, "Student").count({ where: { demoAccount: { not: null } } });
+    });
+  } catch {
+    // The closeout itself has committed. Only this last look failed, and the
+    // caller is told so: null is reported as "could not be checked".
+    return null;
+  }
 }
 
 /**
- * The owner's command, without the process around it: scripts/demo-closeout.ts
- * passes in the arguments, the environment and a way to connect, and prints
- * what comes back. Exit 0 done, 2 refused, 1 failed.
+ * Previews or applies the closeout in one serializable transaction. A preview
+ * only reads. An apply that is refused, at any point, changes nothing: the
+ * checks made before the first delete return early, and the ones made after
+ * deletes have run throw, which rolls the transaction back.
  */
-export async function runCloseoutCommand(
-  argv: readonly string[],
-  env: DemoEnv,
-  connect: (url: string) => ConnectedClient,
-): Promise<CommandResult> {
-  if (argv.includes("--help") && argv.every((argument) => KNOWN_ARGUMENTS.includes(argument))) return { exitCode: 0, stdout: USAGE, stderr: [] };
-  const reason = refusedBeforeConnecting(argv, env);
-  const url = env.ADMIN_DATABASE_URL;
-  if (reason !== null || !url) return { exitCode: 2, stdout: [], stderr: [`Refused: ${reason ?? "set ADMIN_DATABASE_URL."}`] };
-
-  let client: ConnectedClient | null = null;
-  let result: CommandResult;
+export async function runDemoCloseout(client: CloseoutClient, options: CloseoutOptions): Promise<CloseoutOutcome> {
+  let outcome: BeforeCommit;
   try {
-    client = connect(url);
-    result = await attempt(argv.includes("--apply"), env, client);
-  } catch {
-    // Deliberately not printed: a Prisma error can quote an identifier or the
-    // connection string. The fixed sentence is the whole report.
-    result = { exitCode: 1, stdout: [], stderr: [FAILURE] };
+    outcome = await client.$transaction((tx) => inTransaction(tx, options), TRANSACTION);
+  } catch (error) {
+    if (error instanceof CloseoutRefused && error.target) {
+      return { kind: "refused", target: error.target, preview: error.preview, refusals: [error.refused] };
+    }
+    throw error;
   }
-  try {
-    await client?.$disconnect();
-  } catch {
-    return { ...result, stderr: [...result.stderr, "Note: the database connection did not close cleanly."] };
-  }
-  return result;
+  if (outcome.kind !== "applied") return outcome;
+  return { ...outcome, afterCommit: { markedAccounts: await markedAfterCommit(client) } };
 }

@@ -11,10 +11,33 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PrismaClient } from "@prisma/client";
-import { CLASS_COLUMNS, DELETE_STEPS, GUARDED_REFS, KEPT_ON_PURPOSE, UNMARKED_ON_DEMO_CLASS, tableOf } from "./closeout";
+import { CLASS_COLUMNS, DELETE_STEPS, GUARDED_REFS, KEPT_ON_PURPOSE, SET_NULL_LINKS, UNMARKED_ON_DEMO_CLASS, tableOf } from "./closeout";
+import { ABOUT_OTHERS } from "./closeout.guards";
+import { ORPHAN_PROBES } from "./closeout.orphans";
 import { EDGES, MODELS, modelNamed } from "./closeout.fixtures";
 
 const key = (model: string, column: string) => `${model}.${column}`;
+
+/** Column names that may hold a person's id: a student, an actor, an author, an owner, a recipient. */
+const PERSON_ID_NAME = /student|(By|ById)$|^(actorId|authorId|ownerId|userId|recipientId|advisorId|subjectId|targetId|toId|fromId)$/i;
+
+/**
+ * Columns the name rule matches that never hold a person's id. Each line says
+ * what the column holds instead.
+ */
+const NOT_PERSON_IDS: Readonly<Record<string, string>> = {
+  "SageMemoryEdge.fromId": "a SageMemory id, with a foreign key; the memory's own subject is checked",
+  "SageMemoryEdge.toId": "a SageMemory id, with a foreign key; the memory's own subject is checked",
+  "ProgressionEdge.fromId": "a progression node id in the shared curriculum graph",
+  "ProgressionEdge.toId": "a progression node id in the shared curriculum graph",
+  "Wager.targetId": "the goal or task a wager is about; the wager itself is deleted with its student",
+};
+
+/**
+ * Relations into a model the tool deletes from, whose child model it neither
+ * deletes from nor guards. Empty today: every such child is guarded.
+ */
+const KEPT_LINKS: Readonly<Record<string, string>> = {};
 
 const accountSteps = DELETE_STEPS.filter((step) => step.scope === "account");
 const ownedColumns = new Set(accountSteps.flatMap((step) => (step.column ? [key(step.model, step.column)] : [])));
@@ -79,15 +102,51 @@ describe("demo closeout inventory", () => {
     assert.deepEqual(unlisted, []);
   });
 
-  it("classifies every text column with 'student' in its name", () => {
-    // A column that holds a student id with no foreign key is invisible to the
+  it("classifies every text column whose name says it may hold a person's id", () => {
+    // A column that holds an account id with no foreign key is invisible to the
     // rules above. The name is the only clue the schema gives.
     const unclassified = MODELS.filter((model) => model.name !== "Student")
-      .flatMap((model) => model.fields.filter((field) => field.kind === "scalar" && field.type === "String" && /student/i.test(field.name))
+      .flatMap((model) => model.fields.filter((field) => field.kind === "scalar" && field.type === "String" && PERSON_ID_NAME.test(field.name))
         .map((field) => key(model.name, field.name)))
-      .filter((column) => !ownedColumns.has(column) && !guardedColumns.has(column));
+      .filter((column) => !ownedColumns.has(column) && !guardedColumns.has(column) && !classColumns.has(column) && !Object.hasOwn(NOT_PERSON_IDS, column));
 
     assert.deepEqual(unclassified, []);
+    for (const column of Object.keys(NOT_PERSON_IDS)) {
+      const [model, name] = column.split(".");
+      assert.ok(modelNamed(model).fields.some((field) => field.name === name), `${column} is not in the schema`);
+    }
+  });
+
+  it("deletes, guards or names with a reason every relation into a model the tool deletes from", () => {
+    const unaccounted = EDGES.filter((edge) => deletedModels.has(edge.parent))
+      .filter((edge) => !deletedModels.has(edge.child) && !guardedColumns.has(key(edge.child, edge.from[0])))
+      .map((edge) => key(edge.child, edge.from[0]))
+      .filter((column) => !Object.hasOwn(KEPT_LINKS, column));
+
+    assert.deepEqual(unaccounted, []);
+  });
+
+  it("checks at run time every SetNull relation into a model the tool deletes from", () => {
+    const expected = EDGES.filter((edge) => deletedModels.has(edge.parent) && edge.onDelete === "SetNull")
+      .map((edge) => key(edge.child, edge.from.join(","))).sort();
+
+    assert.deepEqual(SET_NULL_LINKS.map((link) => key(link.child, link.from)).sort(), expected);
+    for (const link of SET_NULL_LINKS) assert.ok(modelNamed(link.child).fields.some((field) => field.name === "id"), `${link.child} needs an id`);
+  });
+
+  it("probes for orphans in exactly the account and class columns that have no foreign key", () => {
+    const foreignKeys = new Set(EDGES.map((edge) => key(edge.child, edge.from[0])));
+    const softColumns = new Set([...ownedColumns, ...guardedColumns, ...classColumns, ...ABOUT_OTHERS.map((ref) => key(ref.model, ref.column))]);
+    const expected = [...softColumns].filter((column) => !foreignKeys.has(column) && !column.endsWith(".id")).sort();
+
+    assert.deepEqual([...new Set(ORPHAN_PROBES.map((probe) => key(probe.model, probe.column)))].sort(), expected);
+    for (const probe of ORPHAN_PROBES) {
+      for (const column of [probe.column, ...(probe.only ? [probe.only.column] : [])]) {
+        const field = modelNamed(probe.model).fields.find((candidate) => candidate.name === column);
+        assert.ok(field && field.kind === "scalar" && field.type === "String", `${probe.model}.${column}`);
+      }
+      assert.equal(modelNamed(probe.model).dbName, null, `${probe.model} is stored under another table name`);
+    }
   });
 
   it("names only columns the schema has, each a single text column", () => {

@@ -77,6 +77,13 @@ CLAUDE.local.md
 # Root-level credential screenshots (never commit)
 /*.png
 
+# Database exports hold every student record and this repository is public.
+# Root-anchored on purpose: every Prisma migration is a .sql file and must stay
+# tracked, so there is no bare *.sql rule (src/lib/demo/closeout.docs.test.ts).
+/*.sql
+/*.dump
+/backups/
+
 # Local AI tunnel credentials and private keys
 /.cloudflared/
 /config/cloudflared/config.yml
