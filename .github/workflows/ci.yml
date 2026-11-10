@@ -217,6 +217,17 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           JOB_LISTING_UNIQUE_TEST_ENABLED: "true"
 
+      - name: Run job reaper integration test
+        # H5: the reaper that takes back jobs a restart left in "processing"
+        # is one UPDATE with FOR UPDATE SKIP LOCKED. Only a real database can
+        # show that two passes at once reclaim a row once, so it runs here
+        # against the same hermetic Postgres as the two steps above.
+        run: npm run test:jobreaper
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          JOB_REAPER_DB_TEST_ENABLED: "true"
+
       # --- Gate-tier benchmarks ------------------------------------------
       # Numbers, not pass/fail: each suite writes reports/benchmarks/latest/
       # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric
