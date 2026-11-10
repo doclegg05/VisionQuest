@@ -290,7 +290,7 @@ describe("the reset panel does not keep a password it no longer needs", () => {
     const toggles = source.match(/onToggleResetPw=\{[^\n]+/g) ?? [];
     assert.ok(toggles.length > 0, "no reset toggle found");
     for (const toggle of toggles) assert.match(toggle, /toggleResetPanel/);
-    assert.match(source, /function toggleResetPanel\(\)[^}]*setNewPassword\(""\)/s);
+    assert.match(source, /function toggleResetPanel\(\)[^}]*setNewPassword\(""\)/);
   });
 
   it("trims the password before it checks the length or sends it", () => {
