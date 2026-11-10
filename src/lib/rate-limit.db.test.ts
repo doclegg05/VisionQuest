@@ -21,6 +21,11 @@
  * the request, and short distinct keys inserted one permanent row apiece.
  * Both are database behaviors, so both belong here rather than over a fake.
  *
+ * The refund cases (readiness A1) are here for the same reason: sign-in now
+ * gives its per-network unit back when the password was right, and the
+ * refund statement matches the row by the exact `resetTime` the consuming
+ * call returned. Only a real TIMESTAMP(3) column proves that match holds.
+ *
  * Prerequisites (auto-skipped when missing):
  *   - DATABASE_URL points at a migrated, NON-PRODUCTION Postgres.
  *   - RATE_LIMIT_DB_TEST_ENABLED=true. Opt-in because the test writes real
@@ -60,11 +65,12 @@ if (!SHOULD_RUN) {
 } else {
   describe("rate limiter under concurrency (integration)", () => {
     let rateLimit: typeof import("./rate-limit").rateLimit;
+    let refundRateLimit: typeof import("./rate-limit").refundRateLimit;
     let purgeExpiredRateLimitEntries: typeof import("./rate-limit").purgeExpiredRateLimitEntries;
     let prismaAdmin: typeof import("./db").prismaAdmin;
 
     before(async () => {
-      ({ rateLimit, purgeExpiredRateLimitEntries } = await import("./rate-limit"));
+      ({ rateLimit, refundRateLimit, purgeExpiredRateLimitEntries } = await import("./rate-limit"));
       ({ prismaAdmin } = await import("./db"));
     });
 
@@ -77,6 +83,10 @@ if (!SHOULD_RUN) {
 
     const uniqueKey = (label: string) =>
       `${KEY_PREFIX}${label}:${process.pid}:${Math.random().toString(36).slice(2)}`;
+
+    /** The stored counter row for a caller key, read straight from the table. */
+    const storedRow = (key: string) =>
+      prismaAdmin.rateLimitEntry.findUnique({ where: { key: rateLimitStorageKey(key) } });
 
     it("never throws when many callers hit the same key at once", async () => {
       const key = uniqueKey("no-throw");
@@ -288,6 +298,85 @@ if (!SHOULD_RUN) {
         where: { key: rateLimitStorageKey(key) },
       });
       assert.equal(row?.count, 1, "an expired window restarts the count at 1");
+    });
+
+    // ── Refund (readiness A1) ───────────────────────────────────────────
+    //
+    // A classroom of 30 shares one network address. Sign-in takes a unit
+    // from the per-network bucket on every attempt and gives it back when
+    // the password was right, so only failed attempts stay counted. If the
+    // refund matched no row in real Postgres it would fail silently, and
+    // the class would be locked out again after 30 sign-ins.
+
+    it("gives one unit back in the window it was taken from", async () => {
+      const key = uniqueKey("refund");
+      await rateLimit(key, 30, 15 * 60 * 1000);
+      const consumed = await rateLimit(key, 30, 15 * 60 * 1000);
+
+      await refundRateLimit(key, consumed.resetTime);
+
+      const row = await storedRow(key);
+      assert.equal(row?.count, 1, "the refund must match the row the consuming call wrote");
+      assert.equal(row?.resetTime.getTime(), consumed.resetTime, "a refund must not move the window");
+    });
+
+    it("keeps only the failed attempts counted while a classroom signs in", async () => {
+      const key = uniqueKey("refund-classroom");
+      const limit = 30;
+      const windowMs = 15 * 60 * 1000;
+      const failedAttempts = 3;
+      const signIns = 45;
+
+      for (let i = 0; i < failedAttempts; i += 1) {
+        await rateLimit(key, limit, windowMs);
+      }
+      for (let i = 0; i < signIns; i += 1) {
+        const consumed = await rateLimit(key, limit, windowMs);
+        assert.equal(consumed.success, true, `sign-in ${i + 1} of ${signIns} must be admitted`);
+        await refundRateLimit(key, consumed.resetTime);
+      }
+
+      const row = await storedRow(key);
+      assert.equal(row?.count, failedAttempts);
+    });
+
+    it("gives every unit back when a burst refunds at once", async () => {
+      const key = uniqueKey("refund-burst");
+      const consumed = await Promise.all(
+        Array.from({ length: BURST }, () => rateLimit(key, BURST + 5, 15 * 60 * 1000)),
+      );
+
+      await Promise.all(consumed.map((result) => refundRateLimit(key, result.resetTime)));
+
+      const row = await storedRow(key);
+      assert.equal(row?.count, 0, "concurrent refunds must each take exactly one unit");
+    });
+
+    it("never takes the counter below zero", async () => {
+      const key = uniqueKey("refund-floor");
+      const consumed = await rateLimit(key, 5, 15 * 60 * 1000);
+
+      await refundRateLimit(key, consumed.resetTime);
+      await refundRateLimit(key, consumed.resetTime);
+
+      const row = await storedRow(key);
+      assert.equal(row?.count, 0);
+    });
+
+    it("leaves a new window alone when a refund arrives for the old one", async () => {
+      const key = uniqueKey("refund-stale");
+      // Short window, then wait past it. Sized well above the round-trip so
+      // network latency can only ever make the window MORE expired.
+      const windowMs = 250;
+      const consumed = await rateLimit(key, 5, windowMs);
+      await new Promise((resolve) => setTimeout(resolve, windowMs * 3));
+      const fresh = await rateLimit(key, 5, 15 * 60 * 1000);
+
+      await refundRateLimit(key, consumed.resetTime);
+
+      const row = await storedRow(key);
+      assert.notEqual(fresh.resetTime, consumed.resetTime);
+      assert.equal(row?.count, 1, "a late refund must not give a unit back in a window it was never taken from");
     });
   });
 }
