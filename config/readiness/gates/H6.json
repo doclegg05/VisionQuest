@@ -8,11 +8,13 @@
     "type": "test",
     "files": [
       "src/lib/about-sage/notice.test.ts",
+      "src/lib/about-sage/render-yaml.test.ts",
       "src/lib/consent.sage-notice.test.ts",
       "src/app/api/sage-notice/route.test.ts",
       "src/app/(student)/layout.test.tsx",
       "src/app/about-sage/page.test.tsx",
       "src/app/sage-notice/page.test.tsx",
+      "src/app/sage-notice/AcknowledgeButton.test.tsx",
       "src/components/auth/AuthPageClient.notice-link.test.tsx",
       "src/components/chat/ChatWindow.test.tsx"
     ]
