@@ -9,18 +9,31 @@
  * by a stub. The count stops at the moment the route constructs its stream;
  * what the turn does after that is printed and not pinned. "Cold" is the first
  * turn in a new process. "Warm" is a second turn straight after, with the
- * in-process caches (session, permissions, system configuration, memory
- * profile) the first one filled. The cache invalidation `src/lib/db.ts` runs
- * on writes is mirrored here, so a write that would drop a cache still does.
+ * in-process caches (session, permissions, system configuration, chat
+ * context, memory profile, snippets) the first one filled. The cache
+ * invalidation `src/lib/db.ts` runs on writes is mirrored here, so a write
+ * that would drop a cache still does.
  *
- * What they are not: production truth. No SQL is sent, so the count is of
- * Prisma calls, not statements or round trips. Real data can take branches
- * this fixture does not.
+ * What they are not: production truth. No SQL is sent. Calls are counted and
+ * round trips estimated from them by `estimateRoundTrips` (rules in
+ * src/lib/query-counter.test-support.ts). Real data can take branches this
+ * fixture does not.
  *
  * Read, not executed: 0 queries. `src/proxy.ts` runs before the route and
  * issues none. Nothing on this path had to be counted by reading.
  *
- * The fixture's branches:
+ * The turn it models: an ordinary mid-conversation turn from a returning
+ * student, in the stage the app most often stores for one. `Conversation.stage`
+ * is only ever written by `determineStage` (src/lib/sage/stage.ts) or the two
+ * requested stages in src/lib/chat/conversation.ts; "general", the stage the
+ * first version of this fixture used, is a per-turn prompt override that is
+ * never stored, and it skips four context loads a stored goal stage pays for.
+ * The fixture is "weekly": a BHAG and a monthly goal exist, no weekly goal yet,
+ * discovery complete, which is where a student sits for most of the goal
+ * ladder. "weekly" is in all three stage sets in src/lib/chat/context.ts, so
+ * the skill-gap, pathway and coaching-arc loads run, and the BHAG turns on the
+ * career-thread resume check. "checkin", the end of the ladder, skips the
+ * pathway load and would read cheaper.
  * - a real student (not staff, not a demo account), session not revoked
  * - `ai_provider` is "local": the local-only path production is meant to run.
  *   That means the compact prompt tier, the hourly limit only (no daily
@@ -28,14 +41,15 @@
  *   adds each of those, plus the de-identification identity read
  * - `SAGE_AGENT_MODE=readonly`, as `render.yaml` sets it; memory and
  *   retrieval enabled, as they are when their switches are unset
- * - an existing conversation in the "general" stage with two earlier
- *   messages, already past its one XP award. A new conversation adds the
- *   stage lookup and the conversation writes
- * - a message that is not small talk, names no form, carries no crisis
- *   signal and has no attachment, so retrieval and memory recall both run
- * - retrieval and memory find nothing, and most context reads find nothing
- *   (see "answered by default" in the output). A fuller record takes more
- *   branches after the reads, not more reads before the stream
+ * - an existing conversation with two earlier messages, already past its one
+ *   XP award. A new conversation adds the stage lookup and the conversation
+ *   writes
+ * - a message about planning the week: not small talk, no logistics words (so
+ *   the prompt stage stays "weekly"), no form, no crisis signal, no attachment
+ * - retrieval finds one program document and its best passage (so the passage
+ *   read runs), and memory recall finds one memory. An active coaching arc
+ *   exists, so none is created. Reads the turn does not branch on are left
+ *   empty (see "answered by default" in the output)
  */
 import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
@@ -58,17 +72,18 @@ import { signToken } from "@/lib/session-token";
 
 // Set to the measured value. A change to any of these is a change in what a
 // chat turn costs before its first byte, and belongs in the diff that caused it.
-// The 2026-11-10 review estimated 35 to 65 in total by reading. Measured for
-// this fixture: 57 cold (35 + 22) and 33 warm (27 + 6).
-const CHAT_SEND_APP_QUERIES_COLD = 35;
-/** 13 of the 22 are system configuration reads, cached after the first turn. */
+// The 2026-11-10 database review expected 39 to 44 app calls for a normal turn;
+// this fixture measures 43.
+const CHAT_SEND_APP_QUERIES_COLD = 43;
+/** 13 of the 22 are system configuration reads, cached after the first turn; Prisma batches them into 4 statements. */
 const CHAT_SEND_ADMIN_QUERIES_COLD = 22;
-/** Cached between turns: the base chat context (6), the memory profile (1), the snippet list (1). */
-const CHAT_SEND_APP_QUERIES_WARM = 27;
+/** Cached between turns: the base chat context (6), the career-thread resume check, the memory profile, the snippet list, the skill gap (2), the pathway (3). */
+const CHAT_SEND_APP_QUERIES_WARM = 29;
 /** Four audit rows, the rate limit counter and the wager read, every turn. */
 const CHAT_SEND_ADMIN_QUERIES_WARM = 6;
-const CHAT_SEND_ROUND_TRIPS_COLD = 155;
-const CHAT_SEND_ROUND_TRIPS_WARM = 116;
+/** M3: app plus admin round trips, what `node scripts/readiness/query-count.mjs chat-send` prints. */
+const CHAT_SEND_ROUND_TRIPS_COLD = 188;
+const CHAT_SEND_ROUND_TRIPS_WARM = 125;
 /** "file › function" -> [app, admin] for the cold turn. */
 const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -83,14 +98,19 @@ const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/app/api/chat/send/route.ts › (anonymous)": [1, 0],
   "src/lib/progression/fetch-readiness-data.ts › fetchStudentReadinessData": [8, 0],
   "src/lib/sage/context-bundle.ts › assembleStudentContextBundle": [9, 0],
-  "src/lib/chat/context.ts › (anonymous)": [6, 0],
+  "src/lib/chat/context.ts › (anonymous)": [7, 0],
   "src/lib/sage/wager-metrics.ts › getWagerHitRate": [0, 1],
+  "src/lib/sage/coaching-arcs.ts › getOrCreateCoachingArc": [1, 0],
+  "src/lib/sage/skill-gap.ts › analyzeSkillGaps": [2, 0],
+  "src/lib/learning-pathway.ts › getLearningPathway": [2, 0],
+  "src/lib/progression-edges.ts › loadPrerequisiteMap": [1, 0],
   "src/lib/chat/conversation.ts › getConversationContext": [2, 0],
   "src/lib/sage/memory/profile.ts › (anonymous)": [1, 0],
   "src/lib/llm-usage.ts › logLlmCall": [2, 0],
-  "src/lib/sage/memory/retrieve.ts › retrieveMemories": [1, 0],
   "src/lib/sage/hybrid-retrieval.ts › hybridSearchDocuments": [1, 0],
+  "src/lib/sage/memory/retrieve.ts › retrieveMemories": [1, 0],
   "src/lib/sage/knowledge-base-server.ts › (anonymous)": [1, 0],
+  "src/lib/sage/hybrid-retrieval.ts › getBestChunks": [1, 0],
 };
 
 const STUDENT_ID = "stu-readiness-001";
@@ -100,7 +120,7 @@ const SESSION_COOKIE = "vq-session";
 const LOCAL_AI_URL = "http://127.0.0.1:11434";
 const ROUTE_FILE = "src/app/api/chat/send/route.ts";
 /** A different message each turn, as in a real conversation: no turn reuses the other's query embedding. */
-const COLD_MESSAGE = "What should I work on this week to get ready for interviews?";
+const COLD_MESSAGE = "I want to plan my week so I keep moving toward my big goal.";
 const WARM_MESSAGE = "Which of my goals should come first before Friday?";
 const MODEL_REPLY = "Practice two answers out loud.";
 
@@ -130,12 +150,31 @@ function systemConfigRow(args: unknown): { value: string } | null {
   return value === undefined ? null : { value };
 }
 
-/** The rate limiter's upsert must return its counter row; other raw reads find nothing. */
+const DOCUMENT_ID = "doc-weekly-planning";
+
+/**
+ * Raw reads: the rate limiter's counter row, then what a returning student's
+ * turn finds: one program document, its best passage, and one memory.
+ */
 function rawRows(args: unknown): unknown[] {
   const sql = isRecord(args) && typeof args.sql === "string" ? args.sql : "";
-  return sql.includes('"RateLimitEntry"')
-    ? [{ count: 1, resetTime: new Date(NOW.getTime() + 60 * 60 * 1000) }]
-    : [];
+  if (sql.includes('"RateLimitEntry"')) return [{ count: 1, resetTime: new Date(NOW.getTime() + 60 * 60 * 1000) }];
+  if (sql.includes("sage_hybrid_search")) {
+    return [{
+      id: DOCUMENT_ID, title: "Weekly planning guide", storage_key: "docs/weekly-planning.pdf",
+      sageContextNote: "How SPOKES students plan a week of goals.", score: 0.03, semantic_rank: 1, fts_rank: 1, best_distance: 0.2,
+    }];
+  }
+  if (sql.includes('"DocumentChunk"')) {
+    return [{ documentId: DOCUMENT_ID, content: "Pick three tasks for the week.", pageNumber: 1, sectionTitle: null, distance: 0.2 }];
+  }
+  if (sql.includes('"SageMemory"')) {
+    return [{
+      id: "mem-1", kind: "fact", content: "Wants to work in an office.", category: "career",
+      confidence: 0.9, validFrom: NOW, distance: 0.2,
+    }];
+  }
+  return [];
 }
 
 /** The conversation's one XP award was made on an earlier turn. */
@@ -162,12 +201,29 @@ const counter = createQueryCounter({
   $queryRaw: rawRows,
   // Conversation.
   "conversation.findFirst": {
-    id: CONVERSATION_ID, studentId: STUDENT_ID, stage: "general", title: "Interview prep",
+    id: CONVERSATION_ID, studentId: STUDENT_ID, stage: "weekly", title: "Planning my week",
     summary: null, summaryUpToMessageId: null, createdAt: NOW, updatedAt: NOW, messages: [...history].reverse(),
   },
   "conversation.findUnique": { summary: null, summaryUpToMessageId: null },
   "message.findMany": [...history].reverse(),
-  // Student context.
+  // Student context: a returning student with a big goal and a monthly goal, discovery done.
+  "goal.findMany": [
+    { id: "goal-bhag", level: "bhag", content: "Work as an office manager", status: "active", createdAt: NOW, updatedAt: NOW },
+    { id: "goal-month", level: "monthly", content: "Earn the IC3 certification", status: "active", createdAt: NOW, updatedAt: NOW },
+  ],
+  "careerDiscovery.findUnique": {
+    status: "complete", sageSummary: "Likes organizing and helping people.", topClusters: ["office-admin"],
+    hollandCode: "CS", riasecScores: null, nationalClusters: [], workValues: [],
+    transferableSkills: JSON.stringify([{ skill: "Scheduling", category: "organization" }]),
+  },
+  "certification.findMany": [
+    { id: "cert-1", studentId: STUDENT_ID, certType: "ic3", status: "in_progress", startedAt: NOW, completedAt: null, requirements: [] },
+  ],
+  "coachingArc.findUnique": {
+    id: "arc-1", studentId: STUDENT_ID, arcType: "standard_6week", weekNumber: 3, status: "active", startedAt: NOW, milestones: [],
+  },
+  "resumeData.findUnique": { id: "resume-1" },
+  "sageMemory.findMany": [{ id: "mem-1", kind: "fact", content: "Wants to work in an office.", category: "career", confidence: 0.9 }],
   "student.findUnique": { classroomConfirmedAt: NOW },
   "student.findUniqueOrThrow": {
     id: STUDENT_ID, displayName: "Riley Fixture", role: "student", classroomConfirmedAt: NOW, createdAt: NOW,
