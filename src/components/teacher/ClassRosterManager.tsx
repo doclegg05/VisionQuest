@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QrCode as QrIcon } from "@phosphor-icons/react";
-import { ClassRegionField } from "@/components/admin/ClassRegionField";
+import { ClassRegionField, ClassRegionLine } from "@/components/admin/ClassRegionField";
 import { CreateClassRegionSelect } from "@/components/admin/CreateClassRegionSelect";
 import { fetchClassRegions } from "@/components/admin/class-regions";
 import { useRegionsChanged } from "@/components/admin/regions-events";
-import { regionChoiceFor, regionPatchFor, type ClassRegionChoice } from "@/components/admin/class-region-choice";
+import { useClassRegionMove } from "@/components/admin/useClassRegionMove";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
@@ -60,6 +60,7 @@ interface ClassDetail {
   endDate: string | null;
   instructors: InstructorOption[];
   enrollments: ClassEnrollment[];
+  region: { id: string; name: string } | null;
 }
 
 interface ClassesResponse {
@@ -125,9 +126,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   const [classStartDate, setClassStartDate] = useState("");
   const [classEndDate, setClassEndDate] = useState("");
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
-  // The class routes do not return a class's region, so settings cannot show the
-  // current one. A pick is kept with its class id and sent only for that class.
-  const [regionChoice, setRegionChoice] = useState<ClassRegionChoice | null>(null);
+  const regionMove = useClassRegionMove(classDetail, regions);
 
   // Create student form state
   const [newStudentUsername, setNewStudentUsername] = useState("");
@@ -360,7 +359,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   }
 
   async function saveClassSettings() {
-    if (!selectedClassId) return;
+    if (!selectedClassId || !(await regionMove.confirmMove())) return;
 
     setSaving(true);
     setError("");
@@ -377,7 +376,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
           startDate: classStartDate || null,
           endDate: classEndDate || null,
           instructorIds: selectedInstructorIds,
-          ...regionPatchFor(regionChoice, selectedClassId),
+          ...regionMove.patch(),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -589,6 +588,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
                     <p className="mt-2 text-sm text-[var(--ink-muted)]">
                       Starts {formatWhen(classDetail.startDate)} • Ends {formatWhen(classDetail.endDate)}
                     </p>
+                    <ClassRegionLine region={classDetail.region} />
                   </div>
                   {adminMode ? (
                     <div className="flex flex-wrap gap-2">
@@ -631,11 +631,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
                           className="field px-4 py-3 text-sm"
                         />
                       </label>
-                      <ClassRegionField
-                        regions={regions}
-                        value={regionChoiceFor(regionChoice, selectedClassId)}
-                        onChange={(regionId) => setRegionChoice({ classId: selectedClassId, regionId })}
-                      />
+                      {manageRegions ? <ClassRegionField {...regionMove.field} /> : null}
                       <label className="block space-y-1.5">
                         <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>
                         <input
@@ -885,6 +881,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
           className={classDetail.name}
         />
       ) : null}
+      {regionMove.confirmDialog}
     </div>
   );
 }

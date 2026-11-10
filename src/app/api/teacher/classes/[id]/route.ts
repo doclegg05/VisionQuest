@@ -39,6 +39,10 @@ export const GET = withTeacherAuth(async (
       description: true,
       startDate: true,
       endDate: true,
+      // Readable by any signed-in user under RLS region_read; the caller can
+      // already manage this class, so this adds only which region it is in.
+      regionId: true,
+      region: { select: { id: true, name: true } },
       instructors: {
         select: {
           instructor: {
@@ -250,6 +254,8 @@ export const PATCH = withTeacherAuth(async (
         code: nextCode,
         status: nextStatus,
         instructorCount: instructorIds?.length ?? null,
+        previousRegionId: existing.regionId,
+        regionId: nextRegionId !== undefined ? nextRegionId : existing.regionId,
       },
     });
 

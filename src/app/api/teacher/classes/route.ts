@@ -39,6 +39,10 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
       description: true,
       startDate: true,
       endDate: true,
+      // Region names are readable by every signed-in user (RLS region_read),
+      // so this adds only which region each listed class is in.
+      regionId: true,
+      region: { select: { id: true, name: true } },
       instructors: {
         select: {
           instructor: {

@@ -96,21 +96,31 @@ describe("the admin page", () => {
 // "Loading classes...". This reads its source for the wiring the e2e spec walks.
 describe("class settings", () => {
   const manager = sourceOf("../teacher/ClassRosterManager.tsx");
+  const adminPage = sourceOf("../../app/(admin)/admin/page.tsx");
+  const teacherPage = sourceOf("../../app/(teacher)/teacher/classes/page.tsx");
 
-  it("sends the picked region in the save-settings body only", () => {
-    const sends = manager.split("regionPatchFor(").length - 1;
-    assert.equal(sends, 1, "one use: saveClassSettings");
+  it("sends the region move in the save-settings body only", () => {
     const saveSettings = manager.slice(manager.indexOf("async function saveClassSettings"), manager.indexOf("async function updateClassStatus"));
-    assert.ok(saveSettings.includes("regionPatchFor("));
+    assert.ok(saveSettings.includes("regionMove.patch()"));
+    assert.equal(manager.split("regionMove.patch()").length - 1, 1, "one use: saveClassSettings");
   });
 
-  it("shows the region field in the class settings block", () => {
-    const settings = manager.slice(manager.indexOf("onChange={(event) => setClassCode("), manager.indexOf("setClassStartDate(event"));
-    assert.ok(settings.includes("<ClassRegionField"));
+  it("asks before a move, before anything is sent", () => {
+    const saveSettings = manager.slice(manager.indexOf("async function saveClassSettings"), manager.indexOf("async function updateClassStatus"));
+    assert.ok(saveSettings.indexOf("regionMove.confirmMove()") < saveSettings.indexOf("fetch("));
+    assert.ok(manager.includes("{regionMove.confirmDialog}"));
   });
 
-  it("ties a pick to the class it was made for", () => {
-    assert.ok(manager.includes("regionChoiceFor(regionChoice, selectedClassId)"));
-    assert.ok(manager.includes("setRegionChoice({ classId: selectedClassId, regionId })"));
+  it("shows the Region select only when the page manages regions", () => {
+    assert.match(manager, /\{manageRegions \? <ClassRegionField /);
+  });
+
+  it("shows the class's region in the header", () => {
+    assert.ok(manager.includes("<ClassRegionLine region={classDetail.region} />"));
+  });
+
+  it("is told it manages regions by the admin page, and only there", () => {
+    assert.ok(adminPage.includes("<ClassRosterManager manageRegions />"));
+    assert.equal(teacherPage.includes("manageRegions"), false);
   });
 });
