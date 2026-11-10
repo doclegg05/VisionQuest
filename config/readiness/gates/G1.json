@@ -5,6 +5,9 @@
   "title": "Pages show before JavaScript runs",
   "doneWhen": "A render test finds no `opacity:0` wrapper in the student layout's HTML.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/app/(student)/layout.no-js-gate.test.tsx"
+    ]
   }
 }

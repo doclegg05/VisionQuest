@@ -9,7 +9,6 @@ import { needsRecoverySetup } from "@/lib/security-questions";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
 import ProgressionProvider from "@/components/progression/ProgressionProvider";
-import { PageTransition } from "@/components/ui/PageTransition";
 import { DemoAccountProvider } from "@/components/demo/DemoAccountContext";
 
 export default async function StudentLayout({
@@ -69,9 +68,7 @@ export default async function StudentLayout({
               id="main-content"
               className="app-main min-h-screen overflow-y-auto pb-28 pt-20 md:ml-[19rem] md:pb-10 md:pr-5 md:pt-5"
             >
-              <PageTransition>
-                {children}
-              </PageTransition>
+              {children}
             </main>
           </ProgressionProvider>
         </div>
