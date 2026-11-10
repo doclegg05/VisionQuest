@@ -4,6 +4,32 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
 
+/** Ends the session and leaves for the sign-in page, the one place this session can still go. */
+function SignOutButton({ onSignedOut }: { onSignedOut: () => void }) {
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await fetch("/api/auth/session", { method: "DELETE" });
+    } finally {
+      // Whatever the server said, leave.
+      onSignedOut();
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={signOut}
+      disabled={signingOut}
+      className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-[var(--ink-strong)] underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      Sign out
+    </button>
+  );
+}
+
 /**
  * What a student sees when they must choose a new password before anything
  * else: staff set the one they signed in with, so a staff member knows it.
@@ -14,24 +40,12 @@ import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
  */
 export function ChangePasswordScreen() {
   const router = useRouter();
-  const [signingOut, setSigningOut] = useState(false);
 
-  /** The session cookie is new: leave this screen and drop whatever was rendered for the old one. */
+  /** The session cookie is new or gone: leave, and drop whatever was rendered for the old one. */
   function leaveFor(path: string) {
     // replace() so Back does not return here.
     router.replace(path);
     router.refresh();
-  }
-
-  async function signOut() {
-    setSigningOut(true);
-    try {
-      await fetch("/api/auth/session", { method: "DELETE" });
-    } finally {
-      // Whatever the server said, leave: the sign-in page is the one place
-      // this session can still go.
-      leaveFor("/");
-    }
   }
 
   return (
@@ -50,14 +64,7 @@ export function ChangePasswordScreen() {
       </div>
 
       <div className="mt-6 border-t border-[var(--border)] pt-4">
-        <button
-          type="button"
-          onClick={signOut}
-          disabled={signingOut}
-          className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-[var(--ink-strong)] underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Sign out
-        </button>
+        <SignOutButton onSignedOut={() => leaveFor("/")} />
       </div>
     </div>
   );

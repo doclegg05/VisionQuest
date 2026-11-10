@@ -78,7 +78,8 @@ function FormMessage({ status, error }: { status: FormStatus; error: string }) {
   return null;
 }
 
-export function ChangePasswordForm({ idPrefix, onChanged }: ChangePasswordFormProps) {
+/** The form's state and what sending it does. The component below is the markup. */
+function useChangePasswordForm(onChanged: (() => void) | undefined) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [status, setStatus] = useState<FormStatus>("idle");
@@ -107,28 +108,33 @@ export function ChangePasswordForm({ idPrefix, onChanged }: ChangePasswordFormPr
     setStatus("saved");
   }
 
-  const saving = status === "saving";
+  return { currentPassword, setCurrentPassword, newPassword, setNewPassword, status, error, sent, handleSubmit };
+}
+
+export function ChangePasswordForm({ idPrefix, onChanged }: ChangePasswordFormProps) {
+  const form = useChangePasswordForm(onChanged);
+  const saving = form.status === "saving";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form onSubmit={form.handleSubmit} className="space-y-5" noValidate>
       <StudentPasswordField
         id={`${idPrefix}-current`}
         label="Password you use now"
-        value={currentPassword}
-        onChange={setCurrentPassword}
+        value={form.currentPassword}
+        onChange={form.setCurrentPassword}
         autoComplete="current-password"
         disabled={saving}
       />
       <StudentPasswordField
         id={`${idPrefix}-new`}
         label="New password"
-        value={newPassword}
-        onChange={setNewPassword}
+        value={form.newPassword}
+        onChange={form.setNewPassword}
         autoComplete="new-password"
-        showError={sent}
+        showError={form.sent}
         disabled={saving}
       />
-      <FormMessage status={status} error={error} />
+      <FormMessage status={form.status} error={form.error} />
       <button
         type="submit"
         disabled={saving}
