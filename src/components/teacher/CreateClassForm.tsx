@@ -78,7 +78,7 @@ export interface CreateClassFormProps {
   /** The regions this person may put a class in. */
   regions: readonly RegionOption[];
   instructors: readonly InstructorChoice[];
-  /** The admin page has the Regions and Invite Staff cards; an instructor's page does not. */
+  /** The admin page has the Regions, Staff Waiting for a Region and Invite Staff cards; an instructor's page does not. */
   onAdminPage: boolean;
   creating: boolean;
   onCreate: () => void;
@@ -124,10 +124,20 @@ interface AssignInstructorsProps {
   onAdminPage: boolean;
 }
 
+const INSTRUCTORS_LABEL_ID = "new-class-instructors-label";
+const INSTRUCTORS_HELP_ID = "new-class-instructors-help";
+
 function AssignInstructors({ instructors, pickedIds, onToggle, onAdminPage }: AssignInstructorsProps) {
+  // The line names a panel only the admin page has, and it is about a list.
+  const showHelp = onAdminPage && instructors.length > 0;
   return (
-    <div className="rounded-2xl border border-[var(--border)] p-4">
-      <p className="text-sm font-semibold text-[var(--ink-strong)]">Assign instructors</p>
+    <div
+      role="group"
+      aria-labelledby={INSTRUCTORS_LABEL_ID}
+      aria-describedby={showHelp ? INSTRUCTORS_HELP_ID : undefined}
+      className="rounded-2xl border border-[var(--border)] p-4"
+    >
+      <p id={INSTRUCTORS_LABEL_ID} className="text-sm font-semibold text-[var(--ink-strong)]">Assign instructors</p>
       {instructors.length === 0 ? (
         <NoInstructors onAdminPage={onAdminPage} />
       ) : (
@@ -140,6 +150,11 @@ function AssignInstructors({ instructors, pickedIds, onToggle, onAdminPage }: As
           ))}
         </div>
       )}
+      {showHelp ? (
+        <p id={INSTRUCTORS_HELP_ID} className="mt-3 text-sm text-[var(--ink-muted)]">
+          Pick instructors who are in this region. To add someone to a region, use Staff Waiting for a Region below.
+        </p>
+      ) : null}
     </div>
   );
 }

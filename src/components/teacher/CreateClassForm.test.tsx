@@ -15,6 +15,7 @@ const people: readonly InstructorChoice[] = [
 ];
 
 const NO_INSTRUCTORS = "No instructors yet.";
+const WHO_TO_PICK = "Pick instructors who are in this region. To add someone to a region, use Staff Waiting for a Region below.";
 const INVITE_ONE = "No instructors yet. Invite one in Invite Staff at the bottom of this page. They show here after they accept.";
 
 interface RenderInput {
@@ -88,6 +89,48 @@ describe("Create a Class with no instructor to pick", () => {
     assert.equal(result.scorable, true);
     assert.ok(result.grade <= PLAIN_LANGUAGE_IDEAL_GRADE, `grade ${result.grade}`);
     assert.doesNotMatch(wordsOf(render({ instructors: [] })), /[–—]/);
+  });
+});
+
+describe("the line under the instructor list", () => {
+  it("on the admin page says who to pick and where to add someone to a region", () => {
+    const words = wordsOf(render());
+    assert.ok(words.includes(WHO_TO_PICK), words);
+    assert.ok(words.indexOf("Ben Ortiz") < words.indexOf(WHO_TO_PICK), "the line comes after the last instructor");
+  });
+
+  it("is read out with the list: the box is a named group described by the line", () => {
+    const html = render();
+    assert.match(html, /<div role="group" aria-labelledby="new-class-instructors-label" aria-describedby="new-class-instructors-help" /);
+    assert.match(html, /<p id="new-class-instructors-label" [^>]*>Assign instructors<\/p>/);
+    assert.ok(html.includes(`<p id="new-class-instructors-help" class="mt-3 text-sm text-[var(--ink-muted)]">${WHO_TO_PICK}</p>`), html);
+  });
+
+  it("is left off an instructor's page, which has no Staff Waiting for a Region panel", () => {
+    const html = render({ onAdminPage: false });
+    assert.equal(wordsOf(html).includes("Staff Waiting for a Region"), false);
+    assert.equal(html.includes("aria-describedby"), false, "nothing points at a line that is not there");
+    assert.match(html, /<div role="group" aria-labelledby="new-class-instructors-label" class=/);
+  });
+
+  it("is left off when there is no instructor to pick", () => {
+    const html = render({ instructors: [] });
+    assert.equal(wordsOf(html).includes("Pick instructors who are in this region."), false);
+    assert.equal(html.includes("aria-describedby"), false);
+  });
+
+  it("names the placement panel as the admin page shows it, below this card", () => {
+    assert.match(sourceOf("../staff/OrgPlacementPanel.tsx"), /<h2 [^>]*>Staff Waiting for a Region<\/h2>/);
+    const adminPage = sourceOf("../../app/(admin)/admin/page.tsx");
+    assert.ok(adminPage.indexOf("<ClassRosterManager manageRegions />") < adminPage.indexOf("<OrgPlacementSection"));
+    assert.equal(sourceOf("../../app/(teacher)/teacher/classes/page.tsx").includes("OrgPlacement"), false);
+  });
+
+  it("reads at grade 6 or lower, with no dash", () => {
+    const result = assessReadability(WHO_TO_PICK, { maxGrade: PLAIN_LANGUAGE_IDEAL_GRADE });
+    assert.equal(result.scorable, true);
+    assert.ok(result.grade <= PLAIN_LANGUAGE_IDEAL_GRADE, `grade ${result.grade}`);
+    assert.doesNotMatch(wordsOf(render()), /[\u2013\u2014]/);
   });
 });
 
