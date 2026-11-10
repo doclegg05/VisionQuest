@@ -55,8 +55,13 @@ export function useCreateClassForm(): CreateClassFormState {
   };
 }
 
-/** The body of POST /api/teacher/classes for what the form holds. */
-export function createClassBody(values: CreateClassValues) {
+/** The body of POST /api/teacher/classes: what the form holds, with a blank date sent as null. */
+export type CreateClassBody = Omit<CreateClassValues, "startDate" | "endDate"> & {
+  startDate: string | null;
+  endDate: string | null;
+};
+
+export function createClassBody(values: CreateClassValues): CreateClassBody {
   return {
     name: values.name,
     code: values.code,
