@@ -1,0 +1,10 @@
+{
+  "id": "C10",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Queue polish from the C3 reviews",
+  "doneWhen": "Component and flow tests cover each.",
+  "check": {
+    "type": "pending"
+  }
+}
