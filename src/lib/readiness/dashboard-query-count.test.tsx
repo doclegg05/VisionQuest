@@ -37,6 +37,7 @@
  * The fixture student's branches:
  * - signed in as a real student (not a demo account), session not revoked
  * - recovery questions set, so no redirect to /recovery-setup
+ * - the current Sage notice acknowledged, so no redirect to /sage-notice
  * - goals exist and orientation is started but incomplete (3 of 8), so the
  *   page skips its welcome-routing reads (2 more queries on that branch)
  * - no SMS preference row, intake form on file, no saved Sage panel
@@ -65,22 +66,24 @@ import { signToken } from "@/lib/session-token";
 // dashboard costs, and belongs in the diff that caused it.
 // The 2026-11-10 review estimated about 39 app queries by reading. It missed
 // the mood check-in gate (1) and counted the reader block as 24, not 25.
-const DASHBOARD_APP_QUERIES_COLD = 40;
+// H6 (Sage notice gate in the student layout) added 1: 40 to 41.
+const DASHBOARD_APP_QUERIES_COLD = 41;
 /** The session lookup and its revocation check; both cached for seconds. */
 const DASHBOARD_ADMIN_QUERIES_COLD = 2;
 /** Nothing on the app client is cached today, so warm equals cold. */
-const DASHBOARD_APP_QUERIES_WARM = 40;
+const DASHBOARD_APP_QUERIES_WARM = 41;
 const DASHBOARD_ADMIN_QUERIES_WARM = 0;
 /** [app, admin] nested relation loads, counted only below a level that returned rows. */
 const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
 /** M1: what `node scripts/readiness/query-count.mjs dashboard` prints. */
-const DASHBOARD_APP_ROUND_TRIPS_COLD = 161;
-const DASHBOARD_APP_ROUND_TRIPS_WARM = 161;
+const DASHBOARD_APP_ROUND_TRIPS_COLD = 165;
+const DASHBOARD_APP_ROUND_TRIPS_WARM = 165;
 /** "file › function" -> [app, admin] for the cold render. */
 const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
   "src/lib/auth.ts › (anonymous)": [0, 1],
   "src/app/(student)/layout.tsx › StudentLayout": [4, 0],
+  "src/lib/consent.ts › hasAcknowledgedSageNotice": [1, 0],
   "src/app/(student)/dashboard/page.tsx › DashboardPage": [2, 0],
   "src/lib/progression/fetch-readiness-data.ts › fetchStudentReadinessData": [8, 0],
   "src/lib/dashboard/readers.ts › readOverview": [7, 0],
@@ -120,6 +123,8 @@ const counter = createQueryCounter({
   "progression.findUnique": { state: progressionState },
   "orientationProgress.count": 3,
   "securityQuestionAnswer.findMany": SECURITY_QUESTIONS.map((question) => ({ questionKey: question.key })),
+  // The Sage notice is acknowledged, so no redirect to /sage-notice (H6).
+  "consentRecord.findFirst": { id: "consent-notice" },
   "notificationPreference.findUnique": null,
   "formSubmission.count": 1,
   // Readiness.
