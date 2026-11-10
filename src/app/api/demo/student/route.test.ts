@@ -91,7 +91,8 @@ describe("POST /api/demo/student", () => {
       redirectTo: "/dashboard",
       student: { displayName: "Jordan Rivera 5" },
     });
-    assert.deepEqual(cookieCalls, [["stu-1", "student", 3, { demo: "student" }]]);
+    // A demo account has no password, so its session is never held to the change-password screen.
+    assert.deepEqual(cookieCalls, [["stu-1", "student", 3, { demo: "student", mustChangePassword: false }]]);
     assert.deepEqual(createCalls, [["203.0.113.9"]], "the network key is the client address bucket");
   });
 

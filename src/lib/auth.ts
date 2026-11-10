@@ -5,6 +5,7 @@ import { cached, invalidatePrefix } from "./cache";
 import { isCohortDemoEnabled, type DemoAccountKind } from "./demo/config";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
+import { passwordChangeRequired } from "./password-change-gate";
 import { isSessionTokenRevoked, revokeSessionToken } from "./session-revocation";
 import {
   signToken as signSessionToken,
@@ -154,11 +155,24 @@ export const verifyToken = verifySessionToken;
 
 // --- Session helpers ---
 
+/** What every place that issues a session must say about it. */
+export interface SessionCookieOptions {
+  /**
+   * Whether this session is held to the change-password screen. Required, so
+   * the compiler finds every place that signs someone in. Pass
+   * `passwordChangeRequired(row)` for an account read from the database, and
+   * `false` only where the caller has just set the password itself or made an
+   * account that nobody else could have set one for.
+   */
+  mustChangePassword: boolean;
+  demo?: DemoAccountKind;
+}
+
 export async function setSessionCookie(
   studentId: string,
   role: string,
   sessionVersion: number,
-  options?: { demo?: DemoAccountKind },
+  options: SessionCookieOptions,
 ) {
   const token = signToken(studentId, role, sessionVersion, options);
   const cookieStore = await cookies();
@@ -170,6 +184,39 @@ export async function setSessionCookie(
     path: "/",
   });
   return token;
+}
+
+/**
+ * The account behind a session, as the session cache holds it. The password
+ * hash is read only to answer "must this account change its password" and is
+ * dropped here: the answer is cached, the hash never is.
+ */
+async function loadSessionAccount(id: string) {
+  const row = await prismaAdmin.student.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      studentId: true,
+      displayName: true,
+      role: true,
+      sessionVersion: true,
+      isActive: true,
+      demoAccount: true,
+      mustChangePassword: true,
+      passwordHash: true,
+    },
+  });
+  if (!row) return null;
+  return {
+    id: row.id,
+    studentId: row.studentId,
+    displayName: row.displayName,
+    role: row.role,
+    sessionVersion: row.sessionVersion,
+    isActive: row.isActive,
+    demoAccount: row.demoAccount,
+    mustChangePassword: passwordChangeRequired(row),
+  };
 }
 
 export async function getSession() {
@@ -185,20 +232,7 @@ export async function getSession() {
 
   // Cache session lookups for 10s to reduce DB hits (keyed by user ID + session version)
   const cacheKey = `session:${claims.sub}:${claims.sv}`;
-  const student = await cached(cacheKey, 10, () =>
-    prismaAdmin.student.findUnique({
-      where: { id: claims.sub },
-      select: {
-        id: true,
-        studentId: true,
-        displayName: true,
-        role: true,
-        sessionVersion: true,
-        isActive: true,
-        demoAccount: true,
-      },
-    }),
-  );
+  const student = await cached(cacheKey, 10, () => loadSessionAccount(claims.sub));
 
   if (!student || student.sessionVersion !== claims.sv || !student.isActive) return null;
   // The switch is read here, after the cache, and not inside the cached
@@ -208,6 +242,12 @@ export async function getSession() {
   // The proxy fences on the token's demo claim and handlers read the row, so
   // the two must agree in both directions. A real account has neither.
   if ((claims.demo ?? null) !== (student.demoAccount ?? null)) return null;
+  // The same rule for the forced password change: the proxy holds a session
+  // by its token's claim, so a token and a row that disagree are no session.
+  // This is what ends a token signed before the claim existed for an account
+  // that must change its password, and a token that still says "must change"
+  // after the account no longer does. Signing in again issues one that agrees.
+  if ((claims.mustChangePassword === true) !== student.mustChangePassword) return null;
   return {
     id: student.id,
     studentId: student.studentId,
@@ -215,6 +255,8 @@ export async function getSession() {
     role: student.role,
     // Real accounts get no demoAccount key at all.
     ...(student.demoAccount ? { demoAccount: student.demoAccount } : {}),
+    // Set only while the session is held to the change-password screen.
+    ...(student.mustChangePassword ? { mustChangePassword: true as const } : {}),
   };
 }
 

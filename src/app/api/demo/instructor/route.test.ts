@@ -135,7 +135,7 @@ describe("POST /api/demo/instructor", () => {
     assert.equal(cookieCalls.length, 1);
     assert.equal(cookieCalls[0][0], "instr-1");
     assert.equal(cookieCalls[0][1], "teacher");
-    assert.deepEqual(cookieCalls[0][3], { demo: "instructor" });
+    assert.deepEqual(cookieCalls[0][3], { demo: "instructor", mustChangePassword: false });
   });
 
   it("signs the session with the instructor's current version, not the remembered one", async () => {
@@ -182,7 +182,7 @@ describe("POST /api/demo/instructor", () => {
     assert.deepEqual(await response.json(), { redirectTo: "/teacher" });
     assert.equal(cookieCalls.length, 1, "the session cookie is set");
     assert.equal(cookieCalls[0][0], "instr-1");
-    assert.deepEqual(cookieCalls[0][3], { demo: "instructor" });
+    assert.deepEqual(cookieCalls[0][3], { demo: "instructor", mustChangePassword: false });
     assert.equal(auditRows.length, 0);
     assert.ok(
       JSON.stringify(errorLogs).includes("audit_write_failed"),

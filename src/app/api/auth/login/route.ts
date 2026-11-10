@@ -19,6 +19,7 @@ import { parseBody, loginSchema } from "@/lib/schemas";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { passwordChangeRequired } from "@/lib/password-change-gate";
 import { getJwtSecret } from "@/lib/session-token";
 
 /** One window for both sign-in limits. The failure messages name it in minutes. */
@@ -227,7 +228,12 @@ async function startMfaChallenge(student: Student, ip: string): Promise<NextResp
 }
 
 async function startSession(student: Student, ip: string): Promise<NextResponse> {
-  await setSessionCookie(student.id, student.role, student.sessionVersion);
+  // True while the account still holds a password somebody else chose: one
+  // staff typed when they made the account or reset it. The session is
+  // issued either way, and a true answer holds it to the change-password
+  // screen, enforced in src/proxy.ts for every page and API route.
+  const mustChangePassword = passwordChangeRequired(student);
+  await setSessionCookie(student.id, student.role, student.sessionVersion, { mustChangePassword });
 
   await logAuditEvent({
     actorId: student.id,
@@ -245,12 +251,9 @@ async function startSession(student: Student, ip: string): Promise<NextResponse>
       studentId: student.studentId,
       displayName: student.displayName,
       role: student.role,
-      // True while the account still holds a password somebody else chose —
-      // today, one issued by SPOKES intake. A prompt for the client, not a
-      // gate: the session above is already set, and nothing server-side
-      // refuses a request while this is true. Server-side enforcement needs a
-      // self-service change-password surface, which does not exist yet.
-      mustChangePassword: student.mustChangePassword,
+      // For a client that wants to go straight to the change screen. The
+      // gate does not depend on it: the proxy holds the session regardless.
+      mustChangePassword,
     },
   });
 }

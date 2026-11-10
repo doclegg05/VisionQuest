@@ -247,6 +247,8 @@ async function setNewPassword(studentId: string, password: string) {
       where: { id: studentId },
       data: {
         passwordHash: hash,
+        // The student chose this password, so nobody else knows it now.
+        mustChangePassword: false,
         sessionVersion: { increment: 1 },
       },
       select: {
@@ -268,7 +270,8 @@ async function setNewPassword(studentId: string, password: string) {
 
 /** Issues the session for the account whose password was just reset, and records the reset. */
 async function signInAfterReset(account: Awaited<ReturnType<typeof setNewPassword>>, ip: string): Promise<void> {
-  await setSessionCookie(account.id, account.role, account.sessionVersion);
+  // Not held to the change-password screen: `setNewPassword` cleared the flag.
+  await setSessionCookie(account.id, account.role, account.sessionVersion, { mustChangePassword: false });
   await logAuditEvent({
     actorId: account.id,
     actorRole: account.role,

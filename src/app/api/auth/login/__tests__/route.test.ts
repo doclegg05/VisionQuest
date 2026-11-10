@@ -26,6 +26,8 @@ const SIGN_IN_FAILED = /^We could not sign you in\./;
 
 type CookieRecord = { studentId: string; role: string; sessionVersion: number; flags: { httpOnly: true; sameSite: "strict"; path: "/" } };
 const cookieSets: CookieRecord[] = [];
+/** The options each session cookie was issued with, in call order. */
+const cookieOptions: unknown[] = [];
 const mfaCookieSets: string[] = [];
 
 const mockFindUnique = mock.fn() as any;
@@ -42,7 +44,8 @@ mock.module("@/lib/auth", {
     normalizeStudentId: (raw: string) =>
       raw.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9@._-]/g, ""),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
-    setSessionCookie: async (studentId: string, role: string, sessionVersion: number) => {
+    setSessionCookie: async (studentId: string, role: string, sessionVersion: number, options: unknown) => {
+      cookieOptions.push(options);
       // Mirrors the real flag set in src/lib/auth.ts setSessionCookie.
       cookieSets.push({
         studentId,
@@ -98,6 +101,7 @@ before(async () => {
 describe("POST /api/auth/login", () => {
   beforeEach(() => {
     cookieSets.length = 0;
+    cookieOptions.length = 0;
     mfaCookieSets.length = 0;
     mockFindUnique.mock.resetCalls();
     mockUpdate.mock.resetCalls();
@@ -264,10 +268,11 @@ describe("POST /api/auth/login", () => {
     assert.equal(cookieSets.length, 0);
   });
 
-  // An account provisioned through SPOKES intake holds a password staff chose,
-  // never one the student picked (Student.mustChangePassword). The session is
-  // still issued — this flag is what the client reads to send them to change
-  // it, so it has to survive the response.
+  // An account whose password staff chose (Student.mustChangePassword) still
+  // gets a session, and the session is held: the cookie is issued with the
+  // must-change claim, which src/proxy.ts enforces on every page and API
+  // route (readiness A3). The response says so too, for a client that wants
+  // to go straight to the change screen.
   it("reports that a staff-issued password has not been rotated", async () => {
     mockFindUnique.mock.mockImplementation(async () => ({
       id: "stu-1",
@@ -292,7 +297,40 @@ describe("POST /api/auth/login", () => {
 
     assert.equal(res.status, 200);
     assert.equal(body.student.mustChangePassword, true);
-    assert.equal(cookieSets.length, 1, "the flag is a prompt, not a gate on the session");
+    assert.equal(cookieSets.length, 1, "the session is issued, and held to the change screen");
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: true }]);
+  });
+
+  it("issues a session that is not held when the student chose the password", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      id: "stu-1", studentId: "alice", displayName: "Alice", role: "student",
+      passwordHash: "scrypt$abc$def", authProvider: "password", isActive: true,
+      mfaEnabled: false, sessionVersion: 1, mustChangePassword: false, demoAccount: null,
+    }));
+
+    const res = await loginRoute.POST(mockRequest("/api/auth/login", {
+      method: "POST", body: { studentId: "alice", password: "any-password" },
+    }) as never);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: false }]);
+  });
+
+  it("never holds a staff account, even one whose row carries the flag", async () => {
+    mockFindUnique.mock.mockImplementation(async () => ({
+      id: "tch-1", studentId: "tina", displayName: "Tina", role: "teacher",
+      passwordHash: "scrypt$abc$def", authProvider: "password", isActive: true,
+      mfaEnabled: false, sessionVersion: 1, mustChangePassword: true, demoAccount: null,
+    }));
+
+    const res = await loginRoute.POST(mockRequest("/api/auth/login", {
+      method: "POST", body: { studentId: "tina", password: "any-password" },
+    }) as never);
+    const body = (await res.json()) as { student: { mustChangePassword: boolean } };
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: false }]);
+    assert.equal(body.student.mustChangePassword, false);
   });
 
   it("reports false for an account whose password the student chose", async () => {

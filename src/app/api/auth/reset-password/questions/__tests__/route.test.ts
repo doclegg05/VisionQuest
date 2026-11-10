@@ -35,6 +35,8 @@ const ANSWER_ROWS = [
 type LimiterResult = { success: boolean; remaining: number; resetTime: number; degraded: boolean };
 
 const cookieSets: { studentId: string; role: string; sessionVersion: number }[] = [];
+/** The options each session cookie was issued with, in call order. */
+const cookieOptions: unknown[] = [];
 
 const mockFindFirst = mock.fn() as any;
 const mockTransaction = mock.fn() as any;
@@ -54,8 +56,9 @@ mock.module("@/lib/auth", {
     normalizeStudentId: (raw: string) =>
       raw.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9@._-]/g, ""),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
-    setSessionCookie: async (studentId: string, role: string, sessionVersion: number) => {
+    setSessionCookie: async (studentId: string, role: string, sessionVersion: number, options: unknown) => {
       cookieSets.push({ studentId, role, sessionVersion });
+      cookieOptions.push(options);
       return "fake-jwt-token";
     },
   },
@@ -166,6 +169,7 @@ function resetRequest(overrides: Record<string, unknown> = {}) {
 describe("POST /api/auth/reset-password/questions", () => {
   beforeEach(() => {
     cookieSets.length = 0;
+    cookieOptions.length = 0;
     mockFindFirst.mock.resetCalls();
     mockTransaction.mock.resetCalls();
     mockTxUpdate.mock.resetCalls();
@@ -424,6 +428,18 @@ describe("POST /api/auth/reset-password/questions", () => {
       { studentId: STUDENT.id, role: STUDENT.role, sessionVersion: STUDENT.sessionVersion + 1 },
     ]);
     assert.deepEqual(auditActions(), ["auth.password.reset.security_questions"]);
+  });
+
+  // Staff set a student's first password and every reset, and the account is
+  // then held to the change-password screen (readiness A3). A password set
+  // here is one the student chose, so the hold ends with this write, and the
+  // session issued next must agree with the row or getSession() would end it.
+  it("clears the must-change-password flag and issues a session that is not held", async () => {
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(res.status, 200);
+    assert.equal(mockTxUpdate.mock.calls[0]?.arguments[0]?.data?.mustChangePassword, false);
+    assert.deepEqual(cookieOptions, [{ mustChangePassword: false }]);
   });
 
   // --- The same limiter work for an unknown login (A1 review, item 2) -------

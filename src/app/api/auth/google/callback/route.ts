@@ -12,6 +12,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { passwordChangeRequired } from "@/lib/password-change-gate";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -310,8 +311,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Set session cookie
-    await setSessionCookie(student.id, student.role, student.sessionVersion);
+    // Set session cookie. A student whose password staff set is held to the
+    // change-password screen however they signed in (src/proxy.ts).
+    await setSessionCookie(student.id, student.role, student.sessionVersion, {
+      mustChangePassword: passwordChangeRequired(student),
+    });
 
     await logAuditEvent({
       actorId: student.id,

@@ -230,7 +230,7 @@ describe("getSession and the demo marker", () => {
 
 describe("setSessionCookie and the demo marker", () => {
   it("signs the demo kind into the cookie it sets", async () => {
-    const token = await setSessionCookie("s1", "teacher", 2, { demo: "instructor" });
+    const token = await setSessionCookie("s1", "teacher", 2, { demo: "instructor", mustChangePassword: false });
 
     const [name, value] = mockCookieSet.mock.calls[0]?.arguments as [string, string];
     assert.equal(name, "vq-session");
@@ -239,7 +239,7 @@ describe("setSessionCookie and the demo marker", () => {
   });
 
   it("signs no demo claim into the cookie of a real account", async () => {
-    const token = await setSessionCookie("s1", "student", 2);
+    const token = await setSessionCookie("s1", "student", 2, { mustChangePassword: false });
 
     const claims = verifyToken(token);
     assert.ok(claims);

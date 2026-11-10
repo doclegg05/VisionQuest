@@ -109,7 +109,7 @@ describe("POST /api/demo/student when the audit write fails", () => {
 
     assert.equal(auditAttempts, 1, "the audit write was tried");
     assert.equal(cookieCalls.length, 1, "the session cookie is set");
-    assert.deepEqual(cookieCalls[0], ["stu-1", "student", 0, { demo: "student" }]);
+    assert.deepEqual(cookieCalls[0], ["stu-1", "student", 0, { demo: "student", mustChangePassword: false }]);
     assert.ok(
       JSON.stringify(errorLogs).includes("audit_write_failed"),
       "the failed audit write is logged so an operator can see it",

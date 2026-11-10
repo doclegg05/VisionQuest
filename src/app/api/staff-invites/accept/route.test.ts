@@ -123,7 +123,8 @@ describe("POST /api/staff-invites/accept", () => {
     assert.equal(res.status, 200);
     const json = await res.json();
     assert.deepEqual(json, { success: true, data: { role: "teacher", redirectTo: "/teacher" } });
-    assert.deepEqual(cookieCalls[0], ["new1", "teacher", 3]);
+    // The new staff member typed this password, so there is nothing to change.
+    assert.deepEqual(cookieCalls[0], ["new1", "teacher", 3, { mustChangePassword: false }]);
   });
 
   it("answers an expired invite with the plain message and sets no cookie", async () => {

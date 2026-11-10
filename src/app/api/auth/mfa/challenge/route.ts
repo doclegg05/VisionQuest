@@ -15,6 +15,7 @@ import { parseBody } from "@/lib/schemas";
 import { claimBackupCode, claimTotpCounter, verifyTotp } from "@/lib/mfa";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
+import { passwordChangeRequired } from "@/lib/password-change-gate";
 
 const mfaChallengeSchema = z.object({
   token: z.string().min(6, "MFA code is required.").max(32, "MFA code is too long."),
@@ -130,7 +131,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       mfaSecret: true,
       mfaBackupCodes: true,
       mfaLastUsedCounter: true,
+      // The next three decide whether the session is held to the
+      // change-password screen (passwordChangeRequired below).
       mustChangePassword: true,
+      passwordHash: true,
+      demoAccount: true,
     },
   });
 
@@ -184,7 +189,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     ? backupClaim.remaining.length
     : student.mfaBackupCodes.length;
 
-  await setSessionCookie(student.id, student.role, student.sessionVersion);
+  // Same rule as the sign-in route: a student whose password staff set is
+  // signed in and held to the change-password screen (src/proxy.ts).
+  const mustChangePassword = passwordChangeRequired(student);
+  await setSessionCookie(student.id, student.role, student.sessionVersion, { mustChangePassword });
   // Single-use cookie — clear once the real session is issued.
   await clearMfaSessionCookie();
 
@@ -209,9 +217,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       studentId: student.studentId,
       displayName: student.studentId, // Minimal — matches login response shape
       role: student.role,
-      // Same contract as the login response: a client-side prompt to rotate a
-      // password staff chose, never a gate on the session just issued.
-      mustChangePassword: student.mustChangePassword,
+      // Same contract as the login response: for a client that wants to go
+      // straight to the change screen. The proxy holds the session regardless.
+      mustChangePassword,
     },
   });
 });

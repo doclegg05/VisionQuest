@@ -30,7 +30,8 @@ export const POST = withErrorHandler(async (req: Request) => {
     });
     if (!account) throw new Error("Accepted staff account was not found.");
 
-    await setSessionCookie(account.id, account.role, account.sessionVersion);
+    // The new staff member typed this password just now, so nobody else knows it.
+    await setSessionCookie(account.id, account.role, account.sessionVersion, { mustChangePassword: false });
     return NextResponse.json({
       success: true,
       data: { role: account.role, redirectTo: getRoleHomePath(account.role) },

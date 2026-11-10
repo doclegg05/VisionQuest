@@ -21,7 +21,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const { student } = result;
-  await setSessionCookie(student.id, "student", student.sessionVersion, { demo: "student" });
+  // A demo account has no password, so there is none to change.
+  await setSessionCookie(student.id, "student", student.sessionVersion, {
+    demo: "student",
+    mustChangePassword: false,
+  });
 
   return NextResponse.json({
     redirectTo: "/dashboard",

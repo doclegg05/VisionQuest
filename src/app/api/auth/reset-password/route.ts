@@ -74,6 +74,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       where: { id: resetRecord.student.id },
       data: {
         passwordHash: hash,
+        // The student chose this password, so nobody else knows it now.
+        mustChangePassword: false,
         sessionVersion: { increment: 1 },
       },
       select: {
@@ -122,7 +124,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ requiresMfa: true });
   }
 
-  await setSessionCookie(result.studentId, result.role, result.sessionVersion);
+  // Not held to the change-password screen: the flag was cleared just above.
+  await setSessionCookie(result.studentId, result.role, result.sessionVersion, { mustChangePassword: false });
 
   await logAuditEvent({
     actorId: result.studentId,

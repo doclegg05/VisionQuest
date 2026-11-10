@@ -222,7 +222,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     data: { studentId, displayName, passwordHash: hash, email, role },
   });
 
-  await setSessionCookie(account.id, account.role, account.sessionVersion);
+  // The new staff member typed this password just now, so nobody else knows it.
+  await setSessionCookie(account.id, account.role, account.sessionVersion, { mustChangePassword: false });
 
   await logAuditEvent({
     actorId: account.id,

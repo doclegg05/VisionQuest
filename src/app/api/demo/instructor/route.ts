@@ -36,7 +36,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // clashing login or id is never logged.
   const { instructorId } = await ensureDemoClassroom();
   const sessionVersion = await readDemoInstructorSessionVersion(instructorId);
-  await setSessionCookie(instructorId, "teacher", sessionVersion, { demo: "instructor" });
+  // A demo account has no password, so there is none to change.
+  await setSessionCookie(instructorId, "teacher", sessionVersion, {
+    demo: "instructor",
+    mustChangePassword: false,
+  });
 
   // A failed audit write is logged by `tryLogAuditEvent` and must not undo a
   // sign-in that already set its cookie, so the result is not checked.
