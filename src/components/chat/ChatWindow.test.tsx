@@ -90,3 +90,17 @@ describe("ChatWindow deep links (F19: prefill, never auto-send)", () => {
     assert.equal(inputBoxText(html), "a".repeat(1_000));
   });
 });
+
+// H6: the chat header links to the Sage notice. The header, not the input
+// area: another task adds an "AI can be wrong" line under the message box.
+describe("ChatWindow link to the Sage notice", () => {
+  it("links the chat header to the notice page", async () => {
+    const { SAGE_NOTICE_PATH, SAGE_NOTICE_LINK_LABEL } = await import("@/lib/about-sage/notice");
+    const html = renderAndWait({}, "student");
+
+    const link = new RegExp(`<a[^>]*href="${SAGE_NOTICE_PATH}"[^>]*>${SAGE_NOTICE_LINK_LABEL}</a>`);
+    assert.match(html, link);
+    const header = html.slice(0, html.indexOf('role="log"'));
+    assert.match(header, link, "the link sits in the header, above the conversation");
+  });
+});

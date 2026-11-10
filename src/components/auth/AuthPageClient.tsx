@@ -418,6 +418,12 @@ function AuthForm({ googleAuthEnabled, demoEnabled }: AuthPageClientProps) {
                   Staff? Register here
                 </a>
               )}
+              <a
+                href="/about-sage"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-success transition-colors hover:text-[var(--ink-strong)] hover:underline"
+              >
+                About Sage
+              </a>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-4 sm:mt-2 sm:gap-5">
                 <LogoPlate>
                   <Image src="/wvae-logo.png" alt="WVAE Logo" width={80} height={40} className="object-contain" />
