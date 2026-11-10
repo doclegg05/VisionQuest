@@ -126,8 +126,16 @@ describe("StudentPasswordField: a new password", () => {
     assert.match(button, /aria-controls="new-password"/u);
     assert.match(button, /aria-label="Show new password"/u);
     assert.match(button, /\bmin-h-11\b/u);
-    assert.match(button, /\bmin-w-11\b/u);
     assert.match(html, /<button[^>]*>Show<\/button>/u);
+  });
+
+  it("keeps one width for Show and Hide, so the input does not jump when the word changes", () => {
+    for (const revealed of [false, true]) {
+      const button = tag(view({ revealed }), "button");
+      assert.match(button, /\bw-20\b/u);
+      assert.doesNotMatch(button, /\bmin-w-11\b/u);
+      assert.match(button, /\bmin-h-11\b/u);
+    }
   });
 
   it("says Hide while the password shows as text, in its words and its name", () => {
@@ -173,6 +181,21 @@ describe("StudentPasswordField: a password that is too short", () => {
     const html = view({ value: "", showError: true });
 
     assert.ok(text(html).includes(STUDENT_PASSWORD_TOO_SHORT_MESSAGE));
+  });
+
+  it("is read once after sending: focus moves to the field, which describes it, so it is not an alert too", () => {
+    const html = view({ value: "blue", showError: true });
+
+    assert.doesNotMatch(tag(html.slice(html.indexOf('id="new-password-error"') - 20), "p"), /role="alert"/u);
+    assert.match(tag(html, "input"), /aria-describedby="[^"]*\bnew-password-error\b[^"]*"/u);
+  });
+
+  it("carries the warning icon and layout the refusal uses, so it does not read as plain text in dark", () => {
+    const html = view({ value: "blue", touched: true });
+    const error = html.slice(html.indexOf('id="new-password-error"') - 10);
+
+    assert.match(tag(error, "p"), /class="[^"]*\bflex items-start gap-2\b[^"]*"/u);
+    assert.match(error.slice(0, error.indexOf("</p>")), /<svg[^>]*aria-hidden="true"/u);
   });
 
   it("does not nag about an empty field the student only passed through", () => {
@@ -239,11 +262,36 @@ describe("StudentPasswordField: a refusal from the server about this field", () 
     const html = view({ value: "green apple pie", refusal: "Choose something else." });
 
     assert.match(tag(html, "input"), /aria-invalid="true"/u);
-    assert.match(tag(html, "input"), /aria-describedby="new-password-hint new-password-count new-password-refusal"/u);
+    assert.match(tag(html, "input"), /aria-describedby="new-password-refusal new-password-hint new-password-count"/u);
     assert.ok(html.indexOf('id="new-password-count"') < html.indexOf('id="new-password-refusal"'));
+  });
+
+  it("names the refusal before the hint on the current field too", () => {
+    const html = view({ id: "c", label: "Password your instructor gave you", autoComplete: "current-password", hint: "A hint.", refusal: "That is not it." });
+    assert.match(tag(html, "input"), /aria-describedby="c-refusal c-hint"/u);
   });
 
   it("is absent with no refusal", () => {
     assert.doesNotMatch(view({ value: "green apple pie" }), /-refusal"/u);
   });
+});
+
+describe("StudentPasswordField: the lines under the field are body size", () => {
+  const html = view({ value: "blue", touched: true, refusal: "Choose something else." });
+  const current = view({ id: "c", label: "Password your instructor gave you", autoComplete: "current-password", hint: "A hint." });
+
+  for (const [name, markup, id] of [
+    ["the rule", html, "new-password-hint"],
+    ["the count", html, "new-password-count"],
+    ["the too short error", html, "new-password-error"],
+    ["the refusal", html, "new-password-refusal"],
+    ["the current field's hint", current, "c-hint"],
+  ] as const) {
+    it(name, () => {
+      const line = tag(markup.slice(markup.indexOf(`id="${id}"`) - 10), "p");
+      assert.match(line, /\btext-base\b/u);
+      assert.match(line, /\bleading-7\b/u);
+      assert.doesNotMatch(line, /\btext-sm\b/u);
+    });
+  }
 });

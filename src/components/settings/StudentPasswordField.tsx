@@ -64,15 +64,21 @@ export interface StudentPasswordFieldViewProps extends StudentPasswordFieldProps
 const INPUT_CLASS =
   "field min-w-0 flex-1 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-70";
 // The button's words carry its state, Show or Hide, so it needs one look only.
+// A fixed width, so the input does not resize when the word changes.
 const SHOW_BUTTON_CLASS =
-  "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-control)] bg-[var(--surface-raised)] px-4 text-sm font-semibold text-[var(--ink-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-70";
+  "inline-flex min-h-11 w-20 shrink-0 items-center justify-center rounded-xl border border-[var(--border-control)] bg-[var(--surface-raised)] px-4 text-sm font-semibold text-[var(--ink-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-70";
+
+/** A hint under the field. */
+const LINE_CLASS = "mt-2 text-base leading-7 text-[var(--ink-muted)]";
+/** An error under the field: an icon as well as color, so it reads as an error in dark too. */
+const ERROR_CLASS = "mt-2 flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-base leading-7 text-danger";
 
 /** The count line under a new password, built from the same constant as the rule. */
 function CountLine({ id, typed }: { id: string; typed: number }) {
   const longEnough = typed >= MIN_PASSWORD_LENGTH;
   return (
     <>
-      <p id={`${id}-count`} className={`mt-1 text-sm ${longEnough ? "text-success" : "text-[var(--ink-muted)]"}`}>
+      <p id={`${id}-count`} className={`mt-1 text-base leading-7 ${longEnough ? "text-success" : "text-[var(--ink-muted)]"}`}>
         You have typed {typed}. {longEnough ? "That is long enough." : `You need ${MIN_PASSWORD_LENGTH} or more.`}
       </p>
       {/* Read out once, when the password crosses the line, and not on every key. */}
@@ -143,11 +149,12 @@ export function StudentPasswordFieldView(props: StudentPasswordFieldViewProps) {
   const isNew = autoComplete === "new-password";
   // An empty field the student only passed through is not an error yet.
   const tooShort = isNew && isPasswordTooShort(value) && (showError || (touched && value !== ""));
+  // The refusal first: it is the news, and the hint is the standing rule.
   const describedIds = [
+    ...(refusal ? [`${id}-refusal`] : []),
     ...(isNew || hint ? [`${id}-hint`] : []),
     ...(isNew ? [`${id}-count`] : []),
     ...(tooShort ? [`${id}-error`] : []),
-    ...(refusal ? [`${id}-refusal`] : []),
   ];
   const describedBy = describedIds.length > 0 ? describedIds.join(" ") : undefined;
 
@@ -158,25 +165,29 @@ export function StudentPasswordFieldView(props: StudentPasswordFieldViewProps) {
       </label>
       <PasswordInputRow {...props} describedBy={describedBy} invalid={tooShort || Boolean(refusal)} />
       {!isNew && hint && (
-        <p id={`${id}-hint`} className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
+        <p id={`${id}-hint`} className={LINE_CLASS}>
           {hint}
         </p>
       )}
       {isNew && (
         <>
-          <p id={`${id}-hint`} className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
+          <p id={`${id}-hint`} className={LINE_CLASS}>
             {STUDENT_PASSWORD_HINT}
           </p>
           <CountLine id={id} typed={typedPasswordLength(value)} />
         </>
       )}
       {tooShort && (
-        <p id={`${id}-error`} role="alert" className="mt-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+        // After sending, focus moves to this field, which describes the error,
+        // so an alert would read it twice. Shown on leaving the field, nothing
+        // moves focus, so it is an alert then.
+        <p id={`${id}-error`} role={showError ? undefined : "alert"} className={ERROR_CLASS}>
+          <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
           {STUDENT_PASSWORD_TOO_SHORT_MESSAGE}
         </p>
       )}
       {refusal && (
-        <p id={`${id}-refusal`} className="mt-2 flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+        <p id={`${id}-refusal`} className={ERROR_CLASS}>
           <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
           {refusal}
         </p>
