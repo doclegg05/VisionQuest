@@ -31,6 +31,7 @@
       "src/app/api/coordinator/reports/monthly/monthly-region-name.test.ts",
       "src/components/staff/invite-roles.test.tsx",
       "src/app/api/teacher/classes/class-route-auth.test.ts",
+      "src/app/api/teacher/classes/[id]/route.test.ts",
       "src/components/teacher/CreateClassForm.test.tsx",
       "src/components/teacher/class-refusals.test.ts"
     ]

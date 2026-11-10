@@ -149,7 +149,7 @@ export const PATCH = withTeacherAuth(async (
         // Creating a class requires a region, and a regionless class is hidden
         // from the regional coordinator. Only whole-state roles may unset it.
         if (!seesWholeState(session.role)) {
-          throw forbidden("Only an admin can remove a classroom from its region.");
+          throw forbidden("Only an admin can remove a class from its region.");
         }
         nextRegionId = null;
       } else if (body.regionId.trim()) {
@@ -159,7 +159,7 @@ export const PATCH = withTeacherAuth(async (
         // assertRegionAllowed alone would let them move a class between the
         // two. Repeating the class's current region is not a move.
         if (body.regionId !== existing.regionId && session.role !== "admin") {
-          throw forbidden("Only an admin can move a classroom to another region.");
+          throw forbidden("Only an admin can move a class to another region.");
         }
         // Still needed for the admin: the region must exist and be active.
         await assertRegionAllowed(session, body.regionId);

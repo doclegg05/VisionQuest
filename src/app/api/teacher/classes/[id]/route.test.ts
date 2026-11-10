@@ -88,7 +88,7 @@ describe("PATCH /api/teacher/classes/[id] regionId", () => {
   it("refuses an instructor who sends regionId null, with 403 and no update", async () => {
     const res = await patch({ regionId: null });
     assert.equal(res.status, 403);
-    assert.equal((await res.json()).error, "Only an admin can remove a classroom from its region.");
+    assert.equal((await res.json()).error, "Only an admin can remove a class from its region.");
     assert.equal(classUpdate.mock.callCount(), 0);
   });
 

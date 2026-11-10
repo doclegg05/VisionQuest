@@ -171,7 +171,7 @@ describe("teacher class update authorization", () => {
   it("refuses a teacher moving their class to a region they are not in", async () => {
     const { res, body } = await patchRegion(REGION_B);
     assert.equal(res.status, 403);
-    assert.equal(body.error, "Only an admin can move a classroom to another region.");
+    assert.equal(body.error, "Only an admin can move a class to another region.");
     assert.equal(mockTransaction.mock.callCount(), 0);
   });
 
@@ -190,7 +190,7 @@ describe("teacher class update authorization", () => {
     const { res, body } = await patchRegion(REGION_B);
 
     assert.equal(res.status, 403);
-    assert.equal(body.error, "Only an admin can move a classroom to another region.");
+    assert.equal(body.error, "Only an admin can move a class to another region.");
     assert.equal(mockTransaction.mock.callCount(), 0);
   });
 
@@ -310,7 +310,7 @@ describe("POST /api/teacher/classes region rules", () => {
     assert.equal(res.status, 403);
     assert.equal(
       body.error,
-      "Ask your regional coordinator to add you to a region before creating a classroom.",
+      "Ask your regional coordinator to add you to a region before creating a class.",
     );
     assert.equal(mockClassCreate.mock.callCount(), 0);
   });
@@ -318,7 +318,7 @@ describe("POST /api/teacher/classes region rules", () => {
   it("refuses a teacher creating in a region they are not in", async () => {
     const { res, body } = await post({ regionId: REGION_B });
     assert.equal(res.status, 403);
-    assert.equal(body.error, "You can put classrooms only in your own region.");
+    assert.equal(body.error, "You can put classes only in your own region.");
     assert.equal(mockClassCreate.mock.callCount(), 0);
   });
 
