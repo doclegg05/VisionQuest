@@ -74,6 +74,21 @@ describe("instructor password reset: length", () => {
     assert.equal(update.mock.callCount(), 1);
   });
 
+  it("stores the password trimmed, because sign-in trims what the student types", async () => {
+    const typed = `${"a".repeat(MIN_PASSWORD_LENGTH)} \n`;
+    const response = await resetWith(typed);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(hash.mock.calls[0]?.arguments, ["a".repeat(MIN_PASSWORD_LENGTH)]);
+  });
+
+  it("refuses a password that only reaches the rule by ending in spaces", async () => {
+    const response = await resetWith(`${"a".repeat(MIN_PASSWORD_LENGTH - 1)} `);
+
+    assert.equal(response.status, 400);
+    assert.equal(hash.mock.callCount(), 0);
+  });
+
   it("accepts a password from the Make a password button", async () => {
     assert.equal((await resetWith(generatePassword())).status, 200);
   });

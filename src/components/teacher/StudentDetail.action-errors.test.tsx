@@ -281,3 +281,20 @@ describe("password reset says why it failed", () => {
     assert.equal(SOURCE.split("resetError={").length - 1, 2);
   });
 });
+
+describe("the reset panel does not keep a password it no longer needs", () => {
+  // A source scan: no DOM library is installed, so the handlers cannot be clicked here.
+  const source = readFileSync(new URL("./StudentDetail.tsx", import.meta.url), "utf8");
+
+  it("clears the typed or generated password whenever the panel is opened or closed", () => {
+    const toggles = source.match(/onToggleResetPw=\{[^\n]+/g) ?? [];
+    assert.ok(toggles.length > 0, "no reset toggle found");
+    for (const toggle of toggles) assert.match(toggle, /toggleResetPanel/);
+    assert.match(source, /function toggleResetPanel\(\)[^}]*setNewPassword\(""\)/s);
+  });
+
+  it("trims the password before it checks the length or sends it", () => {
+    assert.match(source, /const password = newPassword\.trim\(\);/);
+    assert.match(source, /body: \{ newPassword: password \}/);
+  });
+});

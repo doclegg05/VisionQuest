@@ -266,8 +266,15 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     setOrientationVerifying(null);
   }
 
+  /** Opening or closing the panel drops any password still in it, so it cannot linger on a shared screen. */
+  function toggleResetPanel() {
+    setShowResetPw((prev) => !prev);
+    setNewPassword("");
+  }
+
   async function handleResetPassword() {
-    if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) return;
+    const password = newPassword.trim();
+    if (password.length < MIN_PASSWORD_LENGTH) return;
     if (
       !(await confirm({
         title: "Reset this student's password?",
@@ -281,7 +288,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     const result = await sendStudentAction({
       url: `/api/teacher/students/${studentId}/reset-password`,
       method: "POST",
-      body: { newPassword },
+      body: { newPassword: password },
       fallback: `The password was not changed. ${TRY_AGAIN}`,
     });
     if (!result.ok) {
@@ -514,7 +521,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 moodEntries={moodEntries}
                 dateFormatter={dateFormatter}
                 showResetPw={showResetPw}
-                onToggleResetPw={() => setShowResetPw((prev) => !prev)}
+                onToggleResetPw={toggleResetPanel}
                 newPassword={newPassword}
                 onNewPasswordChange={setNewPassword}
                 resetStatus={reset.kind}
@@ -617,7 +624,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                 moodEntries={moodEntries}
                 dateFormatter={dateFormatter}
                 showResetPw={showResetPw}
-                onToggleResetPw={() => setShowResetPw((prev) => !prev)}
+                onToggleResetPw={toggleResetPanel}
                 newPassword={newPassword}
                 onNewPasswordChange={setNewPassword}
                 resetStatus={reset.kind}

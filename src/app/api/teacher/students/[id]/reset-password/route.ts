@@ -9,7 +9,8 @@ import { MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE } from "@/lib/password-
 import { parseBody } from "@/lib/schemas";
 
 const teacherResetPasswordSchema = z.object({
-  newPassword: z.string().min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE).max(200, "Password must be 200 characters or fewer"),
+  // Trimmed, as sign-in trims what the student types: an untrimmed trailing space would lock them out.
+  newPassword: z.string().trim().min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE).max(200, "Password must be 200 characters or fewer"),
 });
 
 // POST — reset a student's password
