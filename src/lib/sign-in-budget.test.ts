@@ -93,10 +93,10 @@ describe("one source for the per-account key and numbers", () => {
     assert.doesNotMatch("cannot collide with a real `login:user:<id>`.", BUILDS_THE_KEY);
   });
 
-  it("the sign-in route reads it from here", () => {
-    for (const file of ["app/api/auth/login/route.ts"]) {
+  it("the sign-in route and the change-password helper both read it from here", () => {
+    for (const file of ["app/api/auth/login/route.ts", "lib/password-change.ts"]) {
       const text = sources.find((source) => source.file === file)?.text ?? "";
-      assert.match(text, /from "@\/lib\/sign-in-budget"/u, `${file} must import the shared budget`);
+      assert.match(text, /from "(?:@\/lib|\.)\/sign-in-budget"/u, `${file} must import the shared budget`);
       assert.match(text, /accountSignInLimiterKey\(/u, `${file} must build the key with the shared builder`);
       assert.match(text, /ACCOUNT_FAILED_SIGN_IN_LIMIT/u, `${file} must read the shared limit`);
       assert.match(text, /SIGN_IN_WINDOW_MS/u, `${file} must read the shared window`);
