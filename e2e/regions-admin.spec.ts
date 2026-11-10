@@ -120,7 +120,9 @@ test("admin on a system with no regions adds a region, places an instructor, and
     await expect(regionsCard.getByText(EMPTY_STATE)).toBeVisible({ timeout: 20_000 });
     await expect(createCard.getByText(NO_REGION_HINT)).toBeVisible({ timeout: 20_000 });
     await expect(createCard.getByRole("link", { name: "Regions card" })).toHaveAttribute("href", "#regions");
-    await expect(createCard.getByLabel("Region")).toHaveCount(0);
+    // Exact, here and below: getByLabel matches part of a label by default, and
+    // the marker instructor's checkbox is labelled "E2E Regions Instructor".
+    await expect(createCard.getByLabel("Region", { exact: true })).toHaveCount(0);
 
     // Typed before the region exists, to prove a region change does not erase it.
     await createCard.getByLabel("Class name").fill(CLASS.name);
@@ -143,16 +145,16 @@ test("admin on a system with no regions adds a region, places an instructor, and
 
     // 3. The rest of the page picks the region up without a reload: place the instructor in it.
     const waitingRow = main.getByRole("listitem").filter({ hasText: INSTRUCTOR.displayName });
-    await expect(waitingRow.getByLabel("Region")).toHaveValue(regionId, { timeout: 20_000 });
+    await expect(waitingRow.getByLabel("Region", { exact: true })).toHaveValue(regionId, { timeout: 20_000 });
     await waitingRow.getByRole("button", { name: "Place in region" }).click();
     await expect(waitingRow).toHaveCount(0, { timeout: 20_000 });
 
     // 4. Create a class in the new region. The class card reloaded only its
     // region list, so the name typed in step 1 is still there.
-    await expect(createCard.getByLabel("Region").locator("option")).toHaveCount(2, { timeout: 20_000 });
+    await expect(createCard.getByLabel("Region", { exact: true }).locator("option")).toHaveCount(2, { timeout: 20_000 });
     await expect(createCard.getByLabel("Class name")).toHaveValue(CLASS.name);
     await createCard.getByLabel("Class code").fill(CLASS.code);
-    await createCard.getByLabel("Region").selectOption(regionId);
+    await createCard.getByLabel("Region", { exact: true }).selectOption(regionId);
     await createCard.getByLabel(INSTRUCTOR.displayName).check();
     await createCard.getByRole("button", { name: "Create Class" }).click();
     await expect(main.getByText("Class created.")).toBeVisible({ timeout: 20_000 });

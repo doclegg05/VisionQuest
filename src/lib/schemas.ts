@@ -51,7 +51,7 @@ export const createClassSchema = z.object({
   programType: z
     .enum(["spokes", "adult_ed", "ietp"], { message: "programType must be one of: spokes, adult_ed, ietp." })
     .default("spokes"),
-  regionId: z.string({ message: "Pick a region for this classroom." }).cuid("Pick a region for this classroom."),
+  regionId: z.string({ message: "Pick a region for this class." }).cuid("Pick a region for this class."),
 });
 
 /**

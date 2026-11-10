@@ -5,7 +5,7 @@ import { seesWholeState } from "@/lib/org-roles";
 import { assertTeacherAssignmentLimit } from "@/lib/classroom";
 
 /**
- * Whether a session may put a classroom in this region. Whole-state roles may
+ * Whether a session may put a class in this region. Whole-state roles may
  * use any active region; anyone else only a region they instruct in. Shared by
  * class creation and the class PATCH, so moving a class follows the same rule
  * as creating one.

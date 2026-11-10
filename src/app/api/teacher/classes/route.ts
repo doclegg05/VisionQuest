@@ -103,7 +103,7 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
 
 async function assertCoTeachersInRegion(session: Session, regionId: string, instructorIds: string[]) {
   if (!seesWholeState(session.role) && !instructorIds.includes(session.id)) {
-    throw badRequest("Add yourself as an instructor of this classroom.");
+    throw badRequest("Add yourself as an instructor of this class.");
   }
   const others = instructorIds.filter((id) => id !== session.id);
   if (others.length === 0) return;
