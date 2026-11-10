@@ -236,11 +236,11 @@ describe("StudentPasswordField: a line that says how to type it", () => {
     id: "c",
     label: "Password your instructor gave you",
     autoComplete: "current-password",
-    hint: "Type it the way you signed in, with the dashes.",
+    hint: "Type it just as your instructor gave it, with the dashes.",
   });
 
   it("shows the line under the field and ties it with aria-describedby", () => {
-    assert.match(html, /<p[^>]*id="c-hint"[^>]*>Type it the way you signed in, with the dashes\.<\/p>/u);
+    assert.match(html, /<p[^>]*id="c-hint"[^>]*>Type it just as your instructor gave it, with the dashes\.<\/p>/u);
     assert.match(tag(html, "input"), /aria-describedby="c-hint"/u);
   });
 

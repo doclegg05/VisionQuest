@@ -89,7 +89,7 @@ describe("refusalView: a session that ended", () => {
   it("says so in plain words on Settings, with a way to sign in", () => {
     assert.deepEqual(refusalView(401, { error: "Unauthorized", code: "UNAUTHORIZED" }, SIGNED_OUT_SETTINGS), {
       place: "form",
-      message: "You were signed out. Sign in again.",
+      message: "You were signed out.",
       signIn: true,
     });
   });

@@ -61,6 +61,8 @@ export interface ChangePasswordFormProps {
   signedOutMessage?: string;
   /** The login name, so a password manager files the new password under it. */
   username?: string | null;
+  /** One line above the Save button, before the browser offers to save the password. */
+  tip?: string;
   /**
    * Called once the password is changed. The forced screen uses it to show
    * its confirmation; Settings leaves it out and shows a saved message.
@@ -174,6 +176,7 @@ export interface ChangePasswordFormViewProps {
   currentLabel: string;
   currentHint?: string;
   username?: string | null;
+  tip?: string;
   currentPassword: string;
   newPassword: string;
   onCurrentChange: (value: string) => void;
@@ -218,6 +221,7 @@ export function ChangePasswordFormView(props: ChangePasswordFormViewProps) {
         inputRef={props.newRef}
         disabled={saving}
       />
+      {props.tip && <p className="text-sm leading-6 text-[var(--ink-muted)]">{props.tip}</p>}
       <FormMessage status={status} refusal={refusal} />
       <button
         type="submit"
@@ -239,6 +243,7 @@ export function ChangePasswordForm(props: ChangePasswordFormProps) {
       currentLabel={props.currentLabel ?? SETTINGS_CURRENT_LABEL}
       currentHint={props.currentHint}
       username={props.username}
+      tip={props.tip}
       currentPassword={form.currentPassword}
       newPassword={form.newPassword}
       onCurrentChange={form.setCurrentPassword}

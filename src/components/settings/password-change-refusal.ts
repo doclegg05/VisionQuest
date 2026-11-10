@@ -16,7 +16,8 @@ export const FALLBACK_REFUSAL = "We could not change your password. Please try a
 export const NETWORK_REFUSAL = "We could not reach the server. Please try again.";
 /** The same words the change route's schema answers an empty current password with. */
 export const MISSING_CURRENT_PASSWORD = "Type the password you use now.";
-export const SIGNED_OUT_SETTINGS = "You were signed out. Sign in again.";
+/** The "Sign in again" link under it carries the rest. */
+export const SIGNED_OUT_SETTINGS = "You were signed out.";
 export const SIGNED_OUT_FORCED = "You were signed out. Sign in again with the password your instructor gave you.";
 
 /** Under the current field, under the new field, or above the button. */

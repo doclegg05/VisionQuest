@@ -20,6 +20,7 @@ import {
   FORCED_CURRENT_HINT,
   FORCED_CURRENT_LABEL,
   PasswordSavedConfirmation,
+  SHARED_COMPUTER_TIP,
   SignOutButtonView,
   requestSignOut,
 } from "./ChangePasswordScreen";
@@ -182,7 +183,9 @@ describe("where a refusal shows", () => {
   it("offers a way to sign in when the session ended", () => {
     const html = formView({ refusal: refusal("form", SIGNED_OUT_SETTINGS, true) });
 
-    assert.ok(text(html).includes("You were signed out. Sign in again."));
+    // The link carries "Sign in again", so the sentence does not repeat it.
+    assert.equal(SIGNED_OUT_SETTINGS, "You were signed out.");
+    assert.ok(text(html).includes("You were signed out. Sign in again"));
     const links = tags(html, "a");
     assert.equal(links.length, 1);
     assert.match(links[0] ?? "", /href="\/"/u);
@@ -279,17 +282,25 @@ describe("ChangePasswordScreen: the student is held here until they change it", 
   it("asks for the instructor's password, with a line tied to it", () => {
     assert.match(html, new RegExp(`<label[^>]*for="change-password-current"[^>]*>${FORCED_CURRENT_LABEL}</label>`, "u"));
     assert.equal(FORCED_CURRENT_LABEL, "Password your instructor gave you");
-    assert.equal(FORCED_CURRENT_HINT, "Type it the way you signed in, with the dashes.");
+    assert.equal(FORCED_CURRENT_HINT, "Type it just as your instructor gave it, with the dashes.");
     assert.match(tagWithId(html, "input", "change-password-current"), /aria-describedby="change-password-current-hint"/u);
-    assert.match(html, /<p[^>]*id="change-password-current-hint"[^>]*>Type it the way you signed in, with the dashes\.<\/p>/u);
+    assert.match(html, /<p[^>]*id="change-password-current-hint"[^>]*>Type it just as your instructor gave it, with the dashes\.<\/p>/u);
   });
 
   it("files the new password under the student's login name", () => {
     assert.match(html, /<input[^>]*autoComplete="username"[^>]*value="student1"/iu);
   });
 
-  it("tells a student on a shared computer to say Never to saving it", () => {
-    assert.ok(words.includes("On a shared computer, if it asks to save your password, choose Never."), words);
+  it("tells a student on a shared computer to say Never to saving it, above the Save button", () => {
+    assert.equal(SHARED_COMPUTER_TIP, "Is this a shared computer? If it asks to save your password, tap Never or Not now.");
+    assert.ok(words.includes(SHARED_COMPUTER_TIP), words);
+    const tip = html.indexOf("Is this a shared computer?");
+    assert.ok(tip > html.indexOf('id="change-password-new"'), "after the new password");
+    assert.ok(tip < html.indexOf('type="submit"'), "before the Save button");
+  });
+
+  it("leaves the other devices line to Settings", () => {
+    assert.ok(!words.includes("When you save it, we sign you out on any other phone or computer."), words);
   });
 
   it("gives a way out that is not the rest of the app: a Sign out button", () => {
@@ -302,11 +313,24 @@ describe("ChangePasswordScreen: the student is held here until they change it", 
 describe("after the change on the forced screen", () => {
   const html = withRouter(<PasswordSavedConfirmation onContinue={() => undefined} />);
 
-  it("says the password is saved, announced and ready to take focus", () => {
-    const status = tags(html, "div").find((tag) => /role="status"/u.test(tag));
-    assert.ok(status, "a status region");
-    assert.match(status, /tabindex="-1"/iu);
+  it("says the password is saved in a box that takes focus, with no status role to read it twice", () => {
+    const box = tags(html, "div").find((tag) => /tabindex="-1"/iu.test(tag));
+    assert.ok(box, "a box that takes focus");
+    assert.doesNotMatch(html, /role="status"/u);
     assert.ok(text(html).includes("Your new password is saved. You will use it the next time you sign in."));
+  });
+
+  it("repeats the shared computer tip inside the focused box: this is when the browser asks", () => {
+    const start = html.indexOf('tabindex="-1"');
+    const inside = html.slice(start, html.indexOf("</div>", start));
+    assert.ok(text(inside).includes(SHARED_COMPUTER_TIP), inside);
+  });
+
+  it("puts Continue outside the focused box", () => {
+    const start = html.indexOf('tabindex="-1"');
+    const inside = html.slice(start, html.indexOf("</div>", start));
+    assert.doesNotMatch(inside, /<button/u);
+    assert.match(html, /Continue<\/button>/u);
   });
 
   it("has a Continue button and no step numbers", () => {
@@ -325,11 +349,14 @@ describe("signing out from the forced screen", () => {
     });
   }
 
-  it("counts an ended or already gone session as signed out", async () => {
+  it("counts only an answer the server gave as ok as signed out", async () => {
     answerWith(Response.json({ ok: true }));
     assert.equal(await requestSignOut(), true);
+  });
+
+  it("does not trust a 401: the sign out route never sends one, so it came from something in between", async () => {
     answerWith(Response.json({ error: "Unauthorized" }, { status: 401 }));
-    assert.equal(await requestSignOut(), true);
+    assert.equal(await requestSignOut(), false);
   });
 
   it("counts a server error or a dropped connection as a failure, without throwing", async () => {
@@ -392,10 +419,9 @@ describe("the words on these screens", () => {
   it("read at a 6th-grade level, sentence by sentence", () => {
     const sentences = [
       "Your instructor set the password you just used. Choose a new one that only you know. This is a normal first step.",
-      "When you save it, we sign you out on any other phone or computer.",
       "Password your instructor gave you",
-      "Type it the way you signed in, with the dashes.",
-      "On a shared computer, if it asks to save your password, choose Never.",
+      "Type it just as your instructor gave it, with the dashes.",
+      SHARED_COMPUTER_TIP,
       "Not ready? Sign out and do this later.",
       "Your new password is saved. You will use it the next time you sign in.",
       "Could not sign out. Try again.",
