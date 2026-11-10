@@ -75,9 +75,12 @@ const DASHBOARD_APP_QUERIES_WARM = 41;
 const DASHBOARD_ADMIN_QUERIES_WARM = 0;
 /** [app, admin] nested relation loads, counted only below a level that returned rows. */
 const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
-/** M1: what `node scripts/readiness/query-count.mjs dashboard` prints. */
-const DASHBOARD_APP_ROUND_TRIPS_COLD = 165;
-const DASHBOARD_APP_ROUND_TRIPS_WARM = 165;
+/**
+ * M1: app plus admin round trips, what `node scripts/readiness/query-count.mjs dashboard` prints.
+ * An admin call costs a round trip too, so both clients count.
+ */
+const DASHBOARD_ROUND_TRIPS_COLD = 167;
+const DASHBOARD_ROUND_TRIPS_WARM = 165;
 /** "file › function" -> [app, admin] for the cold render. */
 const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -249,6 +252,13 @@ before(async () => {
   warm = await renderDashboard(StudentLayout, DashboardPage);
 });
 
+
+/** App plus admin round trips: the gate's number. */
+function allRoundTrips(queries: readonly RecordedQuery[], transactions: readonly RecordedTransaction[]): number {
+  const { app, admin } = estimateRoundTrips(queries, transactions);
+  return app.roundTrips + admin.roundTrips;
+}
+
 describe("M1: student dashboard query count", () => {
   it("renders the whole dashboard for the fixture student, so no reader's queries are missing", () => {
     assert.deepEqual(cold.errors, []);
@@ -277,7 +287,7 @@ describe("M1: student dashboard query count", () => {
     assert.equal(summary.app, DASHBOARD_APP_QUERIES_COLD);
     assert.equal(summary.admin, DASHBOARD_ADMIN_QUERIES_COLD);
     assert.deepEqual([summary.appNestedLoads, summary.adminNestedLoads], DASHBOARD_NESTED_LOADS_COLD);
-    assert.equal(estimateRoundTrips(cold.queries, cold.transactions).app.roundTrips, DASHBOARD_APP_ROUND_TRIPS_COLD);
+    assert.equal(allRoundTrips(cold.queries, cold.transactions), DASHBOARD_ROUND_TRIPS_COLD);
   });
 
   it("cold render's queries come from the pinned functions", () => {
@@ -291,6 +301,6 @@ describe("M1: student dashboard query count", () => {
 
     assert.equal(summary.app, DASHBOARD_APP_QUERIES_WARM);
     assert.equal(summary.admin, DASHBOARD_ADMIN_QUERIES_WARM);
-    assert.equal(estimateRoundTrips(warm.queries, warm.transactions).app.roundTrips, DASHBOARD_APP_ROUND_TRIPS_WARM);
+    assert.equal(allRoundTrips(warm.queries, warm.transactions), DASHBOARD_ROUND_TRIPS_WARM);
   });
 });

@@ -66,9 +66,12 @@ const TEACHER_HOME_ADMIN_QUERIES_WARM = 1;
  * counted in full.
  */
 const TEACHER_HOME_NESTED_LOADS_COLD: [number, number] = [39, 0];
-/** M6: what `node scripts/readiness/query-count.mjs teacher-home` prints. */
-const TEACHER_HOME_APP_ROUND_TRIPS_COLD = 111;
-const TEACHER_HOME_APP_ROUND_TRIPS_WARM = 111;
+/**
+ * M6: app plus admin round trips, what `node scripts/readiness/query-count.mjs teacher-home` prints.
+ * An admin call costs a round trip too, so both clients count.
+ */
+const TEACHER_HOME_ROUND_TRIPS_COLD = 114;
+const TEACHER_HOME_ROUND_TRIPS_WARM = 112;
 /** "file › function" -> [app, admin] for the cold render. */
 const TEACHER_HOME_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -237,6 +240,13 @@ before(async () => {
   warm = await renderTeacherHome(TeacherLayout, TeacherDashboard);
 });
 
+
+/** App plus admin round trips: the gate's number. */
+function allRoundTrips(queries: readonly RecordedQuery[], transactions: readonly RecordedTransaction[]): number {
+  const { app, admin } = estimateRoundTrips(queries, transactions);
+  return app.roundTrips + admin.roundTrips;
+}
+
 describe("M6: teacher home query count", () => {
   it("renders the whole teacher home for the fixture instructor, with a roster, so no loader stops early", () => {
     assert.deepEqual(cold.errors, []);
@@ -262,7 +272,7 @@ describe("M6: teacher home query count", () => {
     assert.equal(summary.app, TEACHER_HOME_APP_QUERIES_COLD);
     assert.equal(summary.admin, TEACHER_HOME_ADMIN_QUERIES_COLD);
     assert.deepEqual([summary.appNestedLoads, summary.adminNestedLoads], TEACHER_HOME_NESTED_LOADS_COLD);
-    assert.equal(estimateRoundTrips(cold.queries, cold.transactions).app.roundTrips, TEACHER_HOME_APP_ROUND_TRIPS_COLD);
+    assert.equal(allRoundTrips(cold.queries, cold.transactions), TEACHER_HOME_ROUND_TRIPS_COLD);
   });
 
   it("cold render's queries come from the pinned functions", () => {
@@ -276,6 +286,6 @@ describe("M6: teacher home query count", () => {
 
     assert.equal(summary.app, TEACHER_HOME_APP_QUERIES_WARM);
     assert.equal(summary.admin, TEACHER_HOME_ADMIN_QUERIES_WARM);
-    assert.equal(estimateRoundTrips(warm.queries, warm.transactions).app.roundTrips, TEACHER_HOME_APP_ROUND_TRIPS_WARM);
+    assert.equal(allRoundTrips(warm.queries, warm.transactions), TEACHER_HOME_ROUND_TRIPS_WARM);
   });
 });

@@ -20,8 +20,10 @@
 //   withAppTransaction as it runs: 4 around its queries, each query 1;
 //   any other $transaction: 2 around its queries.
 // --unit=statements counts the statements that carry a query (calls after
-// batching, plus nested loads); --unit=calls counts calls only. Dashboard and
-// teacher-home count the app client; chat-send counts app plus admin.
+// batching, plus nested loads); --unit=calls counts calls only.
+// Every path counts app plus admin by default (--client=all). An admin call
+// still costs a round trip, so leaving it out would reward moving a read from
+// `prisma` to `prismaAdmin`, which also skips row-level security.
 // What the estimate cannot see is listed in the support file's header.
 //
 // How it measures: it runs the path's test file under src/lib/readiness/ in a
@@ -34,15 +36,16 @@
 // error or nothing measured.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-const PATHS = {
-  dashboard: { metric: "M1", test: "src/lib/readiness/dashboard-query-count.test.tsx", client: "app" },
-  "teacher-home": { metric: "M6", test: "src/lib/readiness/teacher-home-query-count.test.tsx", client: "app" },
-  "chat-send": { metric: "M3", test: "src/lib/readiness/chat-send-query-count.test.ts", client: "all" },
+export const PATHS = {
+  dashboard: { metric: "M1", test: "src/lib/readiness/dashboard-query-count.test.tsx" },
+  "teacher-home": { metric: "M6", test: "src/lib/readiness/teacher-home-query-count.test.tsx" },
+  "chat-send": { metric: "M3", test: "src/lib/readiness/chat-send-query-count.test.ts" },
 };
+const DEFAULT_CLIENT = "all";
 const CACHES = ["cold", "warm"];
 const CLIENTS = ["app", "admin", "all"];
 const UNITS = ["round-trips", "statements", "calls"];
@@ -53,21 +56,32 @@ const COUNT_LINE = new RegExp(
   `QUERY_COUNT path=(\\S+) cache=(cold|warm) ${COUNT_FIELDS.map((field) => `${field}=(\\d+)`).join(" ")}`,
 );
 
+const USAGE = [
+  `Usage: query-count.mjs <${Object.keys(PATHS).join("|")}> [--cache=cold|warm] [--client=app|admin|all] [--unit=round-trips|statements|calls]`,
+  "  --cache=cold (the default) or --cache=warm",
+  "  --client=all (the default) counts app and admin; --client=app or --client=admin counts one",
+  "  --unit=round-trips (the default), --unit=statements or --unit=calls",
+].join("\n");
+
 function usage(problem) {
-  console.error(`${problem}\nUsage: query-count.mjs <${Object.keys(PATHS).join("|")}> [--cache=${CACHES.join("|")}] [--client=${CLIENTS.join("|")}] [--unit=${UNITS.join("|")}]`);
+  console.error(`${problem}\n${USAGE}`);
   process.exit(2);
 }
 
-function parseArguments(argv) {
+const CHOICES = { "--cache": CACHES, "--client": CLIENTS, "--unit": UNITS };
+const OPTION_KEYS = { "--cache": "cache", "--client": "client", "--unit": "unit" };
+
+export function parseArguments(argv) {
   const [name, ...flags] = argv;
   if (!name || !Object.hasOwn(PATHS, name)) usage(`Unknown path "${name ?? ""}".`);
-  const options = { name, cache: "cold", client: PATHS[name].client, unit: "round-trips" };
+  const options = { name, cache: "cold", client: DEFAULT_CLIENT, unit: "round-trips" };
   for (const flag of flags) {
     const [key, value] = flag.split("=");
-    if (key === "--cache" && CACHES.includes(value)) options.cache = value;
-    else if (key === "--client" && CLIENTS.includes(value)) options.client = value;
-    else if (key === "--unit" && UNITS.includes(value)) options.unit = value;
-    else usage(`Unknown option "${flag}".`);
+    const choices = Object.hasOwn(CHOICES, key) ? CHOICES[key] : undefined;
+    if (!choices) usage(`Unknown option "${flag}".`);
+    if (value === undefined) usage(`${key} needs a value: ${choices.map((choice) => `${key}=${choice}`).join(", ").replace(/, ([^,]*)$/, " or $1")}.`);
+    if (!choices.includes(value)) usage(`Unknown value in "${flag}".`);
+    options[OPTION_KEYS[key]] = value;
   }
   return options;
 }
@@ -97,42 +111,46 @@ const UNIT_FIELDS = {
   calls: { app: "app", admin: "admin" },
 };
 
-function total(count, { client, unit }) {
+export function total(count, { client, unit }) {
   const fields = UNIT_FIELDS[unit];
   const app = client === "admin" ? 0 : count[fields.app];
   const admin = client === "app" ? 0 : count[fields.admin];
   return app + admin + count.read;
 }
 
-const options = parseArguments(process.argv.slice(2));
-const target = PATHS[options.name];
-const run = runTest(target.test);
-const counts = parseCounts(options.name, `${run.stdout ?? ""}\n${run.stderr ?? ""}`);
-const chosen = counts[options.cache];
+function main() {
+  const options = parseArguments(process.argv.slice(2));
+  const target = PATHS[options.name];
+  const run = runTest(target.test);
+  const counts = parseCounts(options.name, `${run.stdout ?? ""}\n${run.stderr ?? ""}`);
+  const chosen = counts[options.cache];
 
-if (!chosen) {
-  console.error(run.stdout ?? "");
-  console.error(run.stderr ?? "");
-  console.error(`No ${options.cache} count was printed by ${target.test}.`);
-  process.exit(2);
+  if (!chosen) {
+    console.error(run.stdout ?? "");
+    console.error(run.stderr ?? "");
+    console.error(`No ${options.cache} count was printed by ${target.test}.`);
+    process.exit(2);
+  }
+
+  console.log(`${target.metric} ${options.name}: measured by running ${target.test}`);
+  for (const cache of CACHES) {
+    const count = counts[cache];
+    if (!count) continue;
+    console.log(
+      `  ${cache}: calls app ${count.app}, admin ${count.admin};` +
+        ` nested loads app ${count.appNested}, admin ${count.adminNested};` +
+        ` statements app ${count.appStatements}, admin ${count.adminStatements};` +
+        ` round trips app ${count.appRoundTrips}, admin ${count.adminRoundTrips}` +
+        ` (read not executed ${count.read})`,
+    );
+  }
+  const clientLabel = options.client === "all" ? "app + admin" : options.client;
+  console.log(`reporting: ${options.cache}, ${clientLabel}, in ${options.unit}`);
+  if (run.status !== 0) {
+    console.error(`${target.test} failed: the measured count no longer matches the pinned value, or the path broke. Run it to see which. No number is reported.`);
+    process.exit(1);
+  }
+  console.log(String(total(chosen, options)));
 }
 
-console.log(`${target.metric} ${options.name}: measured by running ${target.test}`);
-for (const cache of CACHES) {
-  const count = counts[cache];
-  if (!count) continue;
-  console.log(
-    `  ${cache}: calls app ${count.app}, admin ${count.admin};` +
-      ` nested loads app ${count.appNested}, admin ${count.adminNested};` +
-      ` statements app ${count.appStatements}, admin ${count.adminStatements};` +
-      ` round trips app ${count.appRoundTrips}, admin ${count.adminRoundTrips}` +
-      ` (read not executed ${count.read})`,
-  );
-}
-const clientLabel = options.client === "all" ? "app + admin" : options.client;
-console.log(`reporting: ${options.cache}, ${clientLabel}, in ${options.unit}`);
-if (run.status !== 0) {
-  console.error(`${target.test} failed: the measured count no longer matches the pinned value, or the path broke. Run it to see which. No number is reported.`);
-  process.exit(1);
-}
-console.log(String(total(chosen, options)));
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
