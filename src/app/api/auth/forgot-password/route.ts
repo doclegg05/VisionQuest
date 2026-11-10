@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { normalizeEmail, normalizeStudentId } from "@/lib/auth";
@@ -12,6 +13,40 @@ import { parseBody, forgotPasswordSchema } from "@/lib/schemas";
 import { errorForLog } from "@/lib/log-error";
 import { providerErrorText } from "@/lib/log-redaction";
 import { logger } from "@/lib/logger";
+import { getJwtSecret } from "@/lib/session-token";
+
+/**
+ * Reset requests one network address may make per window. Every caller gets
+ * the same answer, so there is no successful request to give a unit back
+ * for; 30 lets each student in a classroom of 30 ask once. A courtesy limit:
+ * the address comes from `X-Forwarded-For`, which a caller can set
+ * (src/lib/client-ip.ts).
+ */
+const NETWORK_REQUEST_LIMIT = 30;
+const NETWORK_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Reset emails one account may be sent per hour, whatever address asks. This
+ * is the real control on filling one person's inbox: before it, only the
+ * per-network bucket stood in the way. A reset link lasts one hour and each
+ * new email cancels the link before it, so three covers a mistyped or late
+ * email without leaving a student holding only dead links.
+ */
+const ACCOUNT_EMAIL_LIMIT = 3;
+const ACCOUNT_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Limiter key for a login that names no account. Same shape as sign-in's
+ * (login/route.ts): an HMAC under the server's secret, so case and whitespace
+ * variants share one bucket and the typed login never reaches the limiter
+ * table in a form that can be guessed back.
+ */
+function unknownLoginLimiterKey(normalizedLogin: string): string {
+  const digest = createHmac("sha256", getJwtSecret())
+    .update(`forgot-password-limiter:${normalizedLogin}`)
+    .digest("hex");
+  return `forgot-password:unknown:${digest}`;
+}
 
 function getAppBaseUrl(req: NextRequest): string {
   return (process.env.APP_BASE_URL || new URL("/", req.url).toString()).replace(/\/$/, "");
@@ -22,7 +57,7 @@ const GENERIC_MESSAGE =
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = clientIpBucket(req);
-  const rl = await rateLimit(`forgot-password:${ip}`, 5, 15 * 60 * 1000);
+  const rl = await rateLimit(`forgot-password:${ip}`, NETWORK_REQUEST_LIMIT, NETWORK_LIMIT_WINDOW_MS);
 
   if (!rl.success) {
     return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
@@ -58,7 +93,21 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
   });
 
-  if (!student?.email) {
+  // Counted for every login, known or not, so each path makes the same
+  // limiter round trip and response time does not show which logins have an
+  // account. A real account is keyed on its id, so its email and student-ID
+  // forms share one budget. Only a real account with an email is ever sent
+  // anything, so an unknown login's bucket changes nothing it is told.
+  const unknownLoginKey = unknownLoginLimiterKey(email);
+  const accountRl = await rateLimit(
+    student ? `forgot-password:user:${student.id}` : unknownLoginKey,
+    ACCOUNT_EMAIL_LIMIT,
+    ACCOUNT_LIMIT_WINDOW_MS,
+  );
+
+  // An account past its limit answers exactly like every other request. The
+  // link it was sent last stays live: a refused request cancels nothing.
+  if (!student?.email || !accountRl.success) {
     return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
   }
 

@@ -24,8 +24,12 @@ import { logger } from "@/lib/logger";
  * (M16/M17). Staff hand over sign-in details in person.
  */
 
-/** Per-network bucket. Generous: a whole classroom may enroll at one address. */
-const IP_LIMIT_ATTEMPTS = 15;
+/**
+ * Per-network bucket. Generous: a whole classroom may enroll at one address.
+ * 60 lets a class of 30 send the form twice each inside one window; at 15
+ * the sixteenth student was refused. Every request counts, refused ones too.
+ */
+const IP_LIMIT_ATTEMPTS = 60;
 const IP_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
 /**

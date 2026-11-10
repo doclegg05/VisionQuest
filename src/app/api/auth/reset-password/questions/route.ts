@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hashPassword, invalidateSessionCache, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { clientIpBucket } from "@/lib/client-ip";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, refundRateLimit } from "@/lib/rate-limit";
 import {
   hasConfiguredSecurityQuestionSet,
   validateSecurityQuestionAnswers,
@@ -20,11 +20,21 @@ const RESET_ERROR =
   "We could not verify those classroom recovery answers. Try again or ask your instructor for help.";
 
 /**
- * Per-account bounds: the same five attempts as the per-IP limit below, but
- * counted against the target account so guesses from many addresses share
- * one budget. Three short answers set a password and issue a session here,
- * which is why the window is the route's full hour rather than login's
- * fifteen minutes.
+ * FAILED attempts one network address may make per hour. A recovery that
+ * worked gives its unit back, so a whole classroom on one address can
+ * recover; 30 leaves each of 30 students one failed try. This bucket slows
+ * one address guessing across many accounts. It is a courtesy limit: the
+ * address comes from `X-Forwarded-For`, which a caller can set
+ * (src/lib/client-ip.ts). The per-account limit below is the real control.
+ */
+const NETWORK_FAILED_ATTEMPT_LIMIT = 30;
+const NETWORK_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Per-account bounds: five attempts, counted against the target account so
+ * guesses from many addresses share one budget, and never given back. Three
+ * short answers set a password and issue a session here, which is why the
+ * window is the route's full hour rather than login's fifteen minutes.
  */
 const ACCOUNT_LIMIT_ATTEMPTS = 5;
 const ACCOUNT_LIMIT_WINDOW_MS = 60 * 60 * 1000;
@@ -54,9 +64,12 @@ function verifyEveryAnswer(
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = clientIpBucket(req);
-  const rl = await rateLimit(`reset-password-questions:${ip}`, 5, 60 * 60 * 1000);
+  // Every attempt takes a unit first, in one atomic statement, so a burst of
+  // guesses cannot race past the limit. A recovery that works gives it back.
+  const networkKey = `reset-password-questions:${ip}`;
+  const networkRl = await rateLimit(networkKey, NETWORK_FAILED_ATTEMPT_LIMIT, NETWORK_LIMIT_WINDOW_MS);
 
-  if (!rl.success) {
+  if (!networkRl.success) {
     return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
   }
 
@@ -176,6 +189,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return updatedStudent;
   });
   invalidateSessionCache(result.id);
+
+  // The answers were right and the password is changed; the response says
+  // so. Give the network unit back here and nowhere earlier: every refusal
+  // above answers the same 400 whatever the answers were, so a unit that
+  // came back for a locked account would let the caller read "right
+  // answers" off the network count, past the per-account lock. A degraded
+  // limiter took no unit, so there is nothing to give back.
+  if (!networkRl.degraded) {
+    await refundRateLimit(networkKey, networkRl.resetTime);
+  }
 
   await setSessionCookie(result.id, result.role, result.sessionVersion);
 
