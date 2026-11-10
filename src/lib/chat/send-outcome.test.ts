@@ -8,19 +8,19 @@ describe("resolveStreamOutcome", () => {
   it("offers retry and a plain-language fallback when the stream produced zero content", () => {
     const outcome = resolveStreamOutcome(true, "");
     assert.equal(outcome.offerRetry, true);
-    assert.equal(outcome.content, "I didn't receive a complete response. Please try again.");
+    assert.equal(outcome.content, "Sage did not send an answer. Your message was not lost. Tap Try again.");
   });
 
   it("offers retry on zero content even when the stream never reported done", () => {
     const outcome = resolveStreamOutcome(false, "");
     assert.equal(outcome.offerRetry, true);
-    assert.equal(outcome.content, "I didn't receive a complete response. Please try again.");
+    assert.equal(outcome.content, "Sage did not send an answer. Your message was not lost. Tap Try again.");
   });
 
   it("offers retry and marks partial content as possibly incomplete when the stream did not finish", () => {
     const outcome = resolveStreamOutcome(false, "Here's what I found so far");
     assert.equal(outcome.offerRetry, true);
-    assert.equal(outcome.content, "Here's what I found so far (Response may be incomplete)");
+    assert.equal(outcome.content, "Here's what I found so far\n\n(Sage got cut off. Tap Try again for the full answer.)");
   });
 
   it("does not offer retry when the stream completed with content", () => {

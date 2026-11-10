@@ -24,14 +24,19 @@ export interface StreamOutcome {
   offerRetry: boolean;
 }
 
-const NO_CONTENT_MESSAGE = "I didn't receive a complete response. Please try again.";
+/**
+ * A stream that opened and then ended with nothing to show. The route saves
+ * the student's message before it opens the stream, so it was not lost.
+ */
+const NO_CONTENT_MESSAGE = "Sage did not send an answer. Your message was not lost. Tap Try again.";
+const CUT_OFF_NOTE = "\n\n(Sage got cut off. Tap Try again for the full answer.)";
 
 export function resolveStreamOutcome(streamCompleted: boolean, fullContent: string): StreamOutcome {
   if (!fullContent) {
     return { content: NO_CONTENT_MESSAGE, offerRetry: true };
   }
   if (!streamCompleted) {
-    return { content: `${fullContent} (Response may be incomplete)`, offerRetry: true };
+    return { content: fullContent + CUT_OFF_NOTE, offerRetry: true };
   }
   return { content: fullContent, offerRetry: false };
 }
