@@ -16,15 +16,17 @@ const NOT_OPENED_PROMPT =
   "You have not opened the document yet. Tap Open the document and read it before you sign.";
 const DASHES = /[‒–—―]/;
 
-function render(props: { needsRedo?: boolean } = {}): string {
+type PaneKind = Parameters<typeof OrientationDocumentPane>[0]["kind"];
+
+function render(props: { needsRedo?: boolean; kind?: PaneKind } = {}): string {
   return renderToString(
-    <OrientationDocumentPane url={URL_FOR_FORM} title={TITLE} onOpen={() => {}} {...props} />,
+    <OrientationDocumentPane url={URL_FOR_FORM} title={TITLE} kind="sign" onOpen={() => {}} {...props} />,
   );
 }
 
-function renderCheckbox(checked: boolean, openedDocument: boolean): string {
+function renderCheckbox(checked: boolean, openedDocument: boolean, kind: "sign" | "acknowledge" = "sign"): string {
   return renderToString(
-    <DocumentReadCheckbox checked={checked} openedDocument={openedDocument} onChange={() => {}} />,
+    <DocumentReadCheckbox checked={checked} openedDocument={openedDocument} kind={kind} onChange={() => {}} />,
   );
 }
 
@@ -130,6 +132,49 @@ describe("OrientationDocumentPane", () => {
   it("keeps the frame address and title so large screens still show the document", () => {
     const frame = tagContaining(render(), "iframe", "/api/forms/download");
     assert.ok(frame.includes(`title="${TITLE}"`), frame);
+  });
+});
+
+// A UX review found that steps with no signature still told the student to
+// sign: the pane and the nudge are shared by sign, acknowledge and read-only
+// steps, and on a legal form a careful student then waits for a signature
+// box that never comes.
+describe("a document step that has no signature", () => {
+  it("does not tell the student to sign on an acknowledge step", () => {
+    const text = textOf(render({ kind: "acknowledge" }));
+    assert.ok(text.includes("Then come back to this page."), text);
+    assert.doesNotMatch(text, /\bsign\b/i);
+  });
+
+  it("does not tell the student to sign on a read-only step, and does not number a single step", () => {
+    const text = textOf(render({ kind: "read-only" }));
+    assert.ok(text.includes("Open and read the document."), text);
+    assert.doesNotMatch(text, /1\. Open/);
+    assert.doesNotMatch(text, /\bsign\b/i);
+  });
+
+  it("still tells the student to come back and sign on a sign step", () => {
+    const text = textOf(render({ kind: "sign" }));
+    assert.ok(text.includes("1. Open and read the document."), text);
+    assert.ok(text.includes("Then come back to this page to sign."), text);
+  });
+
+  it("nudges with 'before you go on' when there is nothing to sign", () => {
+    const text = textOf(renderCheckbox(true, false, "acknowledge"));
+    assert.ok(
+      text.includes("You have not opened the document yet. Tap Open the document and read it before you go on."),
+      text,
+    );
+    assert.doesNotMatch(text, /\bsign\b/i);
+  });
+});
+
+describe("the embedded frame", () => {
+  // The frame is hidden below md with CSS, which hides it but does not stop a
+  // phone fetching the PDF. A lazy frame that is never laid out is not fetched.
+  it("loads lazily, so a phone that never shows it does not fetch the document", () => {
+    const frame = tagContaining(render(), "iframe", "/api/forms/download");
+    assert.equal(attr(frame, "loading"), "lazy");
   });
 });
 

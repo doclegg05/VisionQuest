@@ -154,10 +154,18 @@ export function shouldPromptToOpenDocument({ hasRead, openedDocument }: Document
   return hasRead && !openedDocument;
 }
 
+/**
+ * What a document step asks for after the reading: a signature, a ticked box,
+ * or nothing. The pane and the nudge are shared by all three, so their words
+ * must not promise a signature the step never asks for.
+ */
+type DocumentStepKind = "sign" | "acknowledge" | "read-only";
+
 interface OrientationDocumentPaneProps {
   /** Address of the document, from `buildFormDownloadUrl(form, "view")`. */
   url: string;
   title: string;
+  kind: DocumentStepKind;
   /** The instructor sent this form back to be done again. */
   needsRedo?: boolean;
   /** Called when the student presses the link, so the wizard can stop nudging. */
@@ -172,12 +180,15 @@ interface OrientationDocumentPaneProps {
  * Both are plain CSS (no script reads the screen size), which keeps the page
  * right before JavaScript runs.
  */
-export function OrientationDocumentPane({ url, title, needsRedo = false, onOpen }: OrientationDocumentPaneProps) {
+export function OrientationDocumentPane({ url, title, kind, needsRedo = false, onOpen }: OrientationDocumentPaneProps) {
   const helperId = useId();
+  // A read-only step is this one action, so it gets no number.
+  const lead = kind === "read-only" ? "Open and read the document." : "1. Open and read the document.";
+  const comeBack = kind === "sign" ? "Then come back to this page to sign." : "Then come back to this page.";
   return (
     <div className="space-y-3">
       <div className="flex flex-col items-start gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-        <p className={STEP_LEAD_CLASS}>1. Open and read the document.</p>
+        <p className={STEP_LEAD_CLASS}>{lead}</p>
         {needsRedo && (
           <p className="rounded-lg bg-warning-soft px-3 py-1.5 text-xs text-warning">
             Your instructor asked you to do this form again.
@@ -194,14 +205,15 @@ export function OrientationDocumentPane({ url, title, needsRedo = false, onOpen 
           Open the document<span className="sr-only">{`: ${title}`}</span>
         </a>
         <p id={helperId} className="text-sm text-[var(--ink-muted)]">
-          It opens on a new page. Read all of it. Then come back to this page to sign. If it
-          downloads instead, open it from your downloads.
+          {`It opens on a new page. Read all of it. ${comeBack} If it downloads instead, open it from your downloads.`}
         </p>
         <p className="hidden text-sm text-[var(--ink-muted)] md:block">You can also read it below.</p>
       </div>
+      {/* Lazy: hiding the frame below md does not stop a phone fetching the PDF; a lazy frame that is never laid out is not fetched. */}
       <iframe
         src={url}
         title={title}
+        loading="lazy"
         className="hidden h-[500px] w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] md:block"
       />
     </div>
@@ -211,6 +223,7 @@ export function OrientationDocumentPane({ url, title, needsRedo = false, onOpen 
 interface DocumentReadCheckboxProps {
   checked: boolean;
   openedDocument: boolean;
+  kind: "sign" | "acknowledge";
   onChange: (checked: boolean) => void;
 }
 
@@ -219,8 +232,9 @@ interface DocumentReadCheckboxProps {
  * readers hear the nudge when it appears; it shows only below `md`, where the
  * frame is hidden and the link is the only way to see the document.
  */
-export function DocumentReadCheckbox({ checked, openedDocument, onChange }: DocumentReadCheckboxProps) {
+export function DocumentReadCheckbox({ checked, openedDocument, kind, onChange }: DocumentReadCheckboxProps) {
   const prompt = shouldPromptToOpenDocument({ hasRead: checked, openedDocument });
+  const before = kind === "sign" ? "before you sign" : "before you go on";
   return (
     <div className="space-y-2">
       <p className={STEP_LEAD_CLASS}>2. Tick the box.</p>
@@ -234,9 +248,7 @@ export function DocumentReadCheckbox({ checked, openedDocument, onChange }: Docu
         <span className="text-sm text-[var(--ink-strong)]">I opened and read this document</span>
       </label>
       <p role="status" className="text-sm text-[var(--ink-strong)] md:hidden">
-        {prompt
-          ? "You have not opened the document yet. Tap Open the document and read it before you sign."
-          : ""}
+        {prompt ? `You have not opened the document yet. Tap Open the document and read it ${before}.` : ""}
       </p>
     </div>
   );
@@ -424,12 +436,12 @@ export default function OrientationWizard() {
       });
       if (!signRes.ok) {
         const data = await signRes.json().catch(() => ({}));
-        setError(data.error || "Signature submission failed.");
+        setError(data.error || "We couldn't save your signature. Please try again.");
         return;
       }
       await finishStep(step, { title: step.stepTitle, type: "signed" });
     } catch {
-      setError("Submission failed. Please try again.");
+      setError("We couldn't save your signature. Please try again.");
     } finally {
       signInFlightRef.current = false;
       setSubmitting(false);
@@ -620,7 +632,7 @@ export default function OrientationWizard() {
         >
           <span className="text-success" aria-hidden>✓</span>
           <p className="text-sm text-success">
-            Sent. Your instructor will check &ldquo;{justSentTitle}&rdquo;.
+            {`Sent. Your instructor will check "${justSentTitle}".`}
           </p>
         </div>
       )}
@@ -668,6 +680,7 @@ export default function OrientationWizard() {
           key={step.form!.id}
           url={pdfUrl!}
           title={step.form!.title}
+          kind={step.type}
           needsRedo={step.needsRedo}
           onOpen={() => setOpenedDocument(true)}
         />
@@ -694,6 +707,7 @@ export default function OrientationWizard() {
           <DocumentReadCheckbox
             checked={hasRead}
             openedDocument={openedDocument}
+            kind={step.type}
             onChange={setHasRead}
           />
         )}
@@ -758,7 +772,7 @@ export default function OrientationWizard() {
         )}
 
         {error && (
-          <p className="text-sm text-danger">{error}</p>
+          <p role="alert" className="text-sm text-danger">{error}</p>
         )}
       </div>
       )}
