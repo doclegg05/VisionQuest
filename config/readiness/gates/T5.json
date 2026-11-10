@@ -1,0 +1,10 @@
+{
+  "id": "T5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Check the counter against a real database",
+  "doneWhen": "The counter assumes 4 round trips for each app query, which holds only when statements are already prepared; `.env.example:8` uses the pooled form. Found by the T4 database review.",
+  "check": {
+    "type": "pending"
+  }
+}
