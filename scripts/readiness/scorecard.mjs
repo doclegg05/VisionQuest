@@ -146,6 +146,9 @@ function tsxLoader() {
   }
 }
 
+/** node --test reads file arguments as globs. Escape "[" so a route folder such as [id] is matched as written. */
+const literalPath = (file) => file.replaceAll("[", "[[]");
+
 function runTests(root, extraArgs) {
   const run = runProcess(process.execPath, ["--import", tsxLoader(), ...TEST_ARGS, ...extraArgs], { root });
   return { ...run, tap: parseTap(run.stdout, root) };
@@ -162,7 +165,7 @@ const RUNNERS = {
     const missing = check.files.filter((file) => !existsSync(join(root, file)));
     if (missing.length > 0) return verdict("fail", `missing test file: ${missing.join(", ")}`);
     const pattern = check.namePattern ? [`--test-name-pattern=${check.namePattern}`] : [];
-    const { code, tap } = runTests(root, [...pattern, ...check.files]);
+    const { code, tap } = runTests(root, [...pattern, ...check.files.map(literalPath)]);
     const failed = tap.failed.map((failure) => failure.name).slice(0, 5).join("; ");
     if (code !== 0) return verdict("fail", failed ? `failed: ${failed}` : `exit ${code} with no failing test in the output`);
     return tap.passed.length === 0 ? verdict("fail", "no test matched") : verdict("pass", `${plural(tap.passed.length, "test")} passed`);

@@ -131,6 +131,16 @@ test("a test check whose name pattern matches no test fails with 'no test matche
   assert.equal(got.detail, "no test matched");
 });
 
+test("a test file under a folder named like a route segment, [id], still runs", (t) => {
+  // node --test reads its file arguments as globs, so "[id]" is a character
+  // class: the path matched nothing, ran 0 tests and exited 0.
+  const check = { type: "test", files: ["checks/[id]/ok.test.mjs"] };
+  const root = makeRoot(t, [gate("A1", check)], { "checks/[id]/ok.test.mjs": PASSING_TEST });
+  const got = statuses(root).A1;
+  assert.equal(got.status, "pass");
+  assert.match(got.detail, /2 tests passed/);
+});
+
 test("a test check with a name pattern runs only the matching test", (t) => {
   const check = { type: "test", files: ["checks/ok.test.mjs"], namePattern: "adds up" };
   const root = makeRoot(t, [gate("A1", check)], { "checks/ok.test.mjs": PASSING_TEST });

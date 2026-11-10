@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 // Prints the database query count for one hot path, for the readiness scorecard.
 //
-//   node --import tsx --experimental-test-module-mocks scripts/readiness/query-count.mjs <path> [--cache=cold|warm] [--client=app|admin|all]
+//   node --import tsx --experimental-test-module-mocks scripts/readiness/query-count.mjs <path> [--cache=cold|warm] [--client=app|admin|all] [--unit=statements|calls]
 //
 //   <path>   dashboard      M1, one student dashboard render
 //            teacher-home   M6, one teacher home render
 //            chat-send      M3, POST /api/chat/send up to stream creation
 //
 // The last line of stdout is the count as a bare number. By default that is
-// the cold count the plan's metric names: app-client queries for dashboard and
-// teacher-home, app plus admin for chat-send.
+// the cold count the plan's metric names, in statements: client calls plus the
+// nested relation loads those calls ask for, because Prisma sends one more
+// SELECT per relation. Dashboard and teacher-home count the app client;
+// chat-send counts app plus admin. --unit=calls leaves the nested loads out.
+// The nested figure is derived from each call's select and include, not
+// observed on the wire.
 //
 // How it measures: it runs the path's test file under src/lib/readiness/ in a
 // child process and reads the QUERY_COUNT lines that test prints. It does not
@@ -32,21 +36,23 @@ const PATHS = {
 };
 const CACHES = ["cold", "warm"];
 const CLIENTS = ["app", "admin", "all"];
+const UNITS = ["statements", "calls"];
 const COUNT_LINE = /QUERY_COUNT path=(\S+) cache=(cold|warm) app=(\d+) admin=(\d+) relationLoads=(\d+) read=(\d+)/;
 
 function usage(problem) {
-  console.error(`${problem}\nUsage: query-count.mjs <${Object.keys(PATHS).join("|")}> [--cache=${CACHES.join("|")}] [--client=${CLIENTS.join("|")}]`);
+  console.error(`${problem}\nUsage: query-count.mjs <${Object.keys(PATHS).join("|")}> [--cache=${CACHES.join("|")}] [--client=${CLIENTS.join("|")}] [--unit=${UNITS.join("|")}]`);
   process.exit(2);
 }
 
 function parseArguments(argv) {
   const [name, ...flags] = argv;
   if (!name || !Object.hasOwn(PATHS, name)) usage(`Unknown path "${name ?? ""}".`);
-  const options = { name, cache: "cold", client: PATHS[name].client };
+  const options = { name, cache: "cold", client: PATHS[name].client, unit: "statements" };
   for (const flag of flags) {
     const [key, value] = flag.split("=");
     if (key === "--cache" && CACHES.includes(value)) options.cache = value;
     else if (key === "--client" && CLIENTS.includes(value)) options.client = value;
+    else if (key === "--unit" && UNITS.includes(value)) options.unit = value;
     else usage(`Unknown option "${flag}".`);
   }
   return options;
@@ -100,9 +106,10 @@ for (const cache of CACHES) {
   );
 }
 const clientLabel = options.client === "all" ? "app + admin" : options.client;
-console.log(`reporting: ${options.cache}, ${clientLabel}, executed ${executed(chosen, options.client)} + read ${chosen.read}`);
+const nested = options.unit === "statements" ? chosen.relationLoads : 0;
+console.log(`reporting: ${options.cache}, ${clientLabel}, executed ${executed(chosen, options.client)} + nested ${nested} + read ${chosen.read}`);
 if (run.status !== 0) {
   console.error(`${target.test} failed: the measured count no longer matches the pinned value, or the path broke. Run it to see which.`);
 }
-console.log(String(executed(chosen, options.client) + chosen.read));
+console.log(String(executed(chosen, options.client) + nested + chosen.read));
 process.exit(run.status === 0 ? 0 : 1);
