@@ -25,7 +25,15 @@ interface AlertRow {
 
 type AlertValue = AlertRow[keyof AlertRow];
 type Condition = AlertValue | { in?: readonly string[]; not?: string };
-type Where = Partial<Record<keyof AlertRow, Condition>>;
+/** The filters this fake table understands. `matching` throws on any other. */
+interface Where {
+  id?: Condition;
+  studentId?: Condition;
+  alertKey?: Condition;
+  status?: Condition;
+  snoozedUntil?: Condition;
+}
+const FILTERABLE = new Set(["id", "studentId", "alertKey", "status", "snoozedUntil"]);
 type AlertCreate = Omit<AlertRow, "id" | "resolvedAt" | "snoozedUntil" | "snoozedBy" | "dismissedAt">;
 
 function sameValue(a: AlertValue, b: AlertValue): boolean {
@@ -33,7 +41,8 @@ function sameValue(a: AlertValue, b: AlertValue): boolean {
   return a === b;
 }
 
-function meets(value: AlertValue, condition: Condition): boolean {
+function meets(value: AlertValue, condition: Condition | undefined): boolean {
+  if (condition === undefined) return true;
   if (condition === null || typeof condition === "string" || condition instanceof Date) {
     return sameValue(value, condition);
   }
@@ -48,10 +57,15 @@ const rows = new Map<string, AlertRow>();
 let statements = 0;
 
 function matching(where: Where): AlertRow[] {
-  return [...rows.values()].filter((row) =>
-    Object.entries(where).every(([field, condition]) =>
-      meets(row[field as keyof AlertRow], condition as Condition),
-    ),
+  const unknown = Object.keys(where).filter((field) => !FILTERABLE.has(field));
+  if (unknown.length > 0) throw new Error(`The fake alert table cannot filter on ${unknown.join(", ")}.`);
+  return [...rows.values()].filter(
+    (row) =>
+      meets(row.id, where.id) &&
+      meets(row.studentId, where.studentId) &&
+      meets(row.alertKey, where.alertKey) &&
+      meets(row.status, where.status) &&
+      meets(row.snoozedUntil, where.snoozedUntil),
   );
 }
 
@@ -62,11 +76,11 @@ function requireRow(alertKey: string): AlertRow {
 }
 
 const studentAlert = {
-  findMany: async ({ where, select }: { where: Where; select: Partial<Record<keyof AlertRow, true>> }) => {
+  // Returns whole rows: the compiler already stops the sync reading a column
+  // its `select` left out.
+  findMany: async ({ where }: { where: Where }) => {
     statements += 1;
-    return matching(where).map((row) =>
-      Object.fromEntries(Object.keys(select).map((field) => [field, row[field as keyof AlertRow]])),
-    );
+    return matching(where);
   },
   upsert: async (args: { where: { alertKey: string }; create: AlertCreate; update: Partial<AlertRow> }) => {
     statements += 1;
