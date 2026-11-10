@@ -17,6 +17,8 @@
  * gap where none existed before.
  */
 
+import { sageFailureMessage, type SageFailureAudience, type SageFailureCode } from "./sage-failure";
+
 export interface StreamOutcome {
   content: string;
   offerRetry: boolean;
@@ -34,30 +36,78 @@ export function resolveStreamOutcome(streamCompleted: boolean, fullContent: stri
   return { content: fullContent, offerRetry: false };
 }
 
+/**
+ * A failure the server described: `message` is the server's sentence for
+ * the student (with the 988 block when the message carried a crisis
+ * signal), and `failure` is the cause code it sent, when it sent one.
+ */
+export class SageSendError extends Error {
+  readonly failure: SageFailureCode | null;
+
+  constructor(message: string, failure: SageFailureCode | null) {
+    super(message);
+    this.name = "SageSendError";
+    this.failure = failure;
+  }
+}
+
 export interface SendErrorOutcome {
-  /** Raw error text — shown in the ChatErrorBanner. */
-  bannerMessage: string;
-  /** What gets appended to the transcript as the assistant's turn. */
+  /** The one assistant turn shown for this failed send. */
   displayContent: string;
+  failure: SageFailureCode;
   offerRetry: boolean;
+  /** Staff only: a link to Settings, where their own AI key lives. */
+  showSettingsLink: boolean;
 }
 
-const API_KEY_ISSUE_MESSAGE =
-  "Sage needs a Gemini API key before it can respond. Open Settings to add a personal key, or ask staff to configure the shared one.";
-
-function isApiKeyIssue(message: string): boolean {
-  return message.includes("API key") || message.includes("Sage is not configured");
-}
-
-export function resolveSendError(err: unknown, priorContent: string): SendErrorOutcome {
-  const bannerMessage =
-    err instanceof Error ? err.message : "Sorry, I had trouble responding. Please try again.";
-  const displayContent = isApiKeyIssue(bannerMessage) ? API_KEY_ISSUE_MESSAGE : bannerMessage;
+export function resolveSendError(
+  err: unknown,
+  priorContent: string,
+  audience: SageFailureAudience,
+): SendErrorOutcome {
+  // A thrown error with content already streamed in front of it kept its
+  // own recovery path before this change; don't alter that behavior here.
+  const offerRetry = !priorContent;
+  if (!(err instanceof SageSendError)) {
+    // A browser's own error text ("Failed to fetch") is not for students.
+    // The send may never have reached the server, so no "not lost" claim.
+    return {
+      displayContent: sageFailureMessage("unknown", { audience, messageSaved: false }),
+      failure: "unknown",
+      offerRetry,
+      showSettingsLink: false,
+    };
+  }
+  const failure = err.failure ?? "unknown";
   return {
-    bannerMessage,
-    displayContent,
-    // A thrown error with content already streamed in front of it kept its
-    // own recovery path before this change; don't alter that behavior here.
-    offerRetry: !priorContent,
+    displayContent: err.message,
+    failure,
+    offerRetry,
+    showSettingsLink: audience === "staff" && failure === "not_set_up",
+  };
+}
+
+interface RetryableMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * The transcript to resend from: drops the failed turn and the student
+ * message it answered, because the resend adds that message back. Without
+ * this a retry showed the student's message twice.
+ */
+export function prepareRetry<M extends RetryableMessage>(
+  messages: readonly M[],
+  failedId: string,
+): { messages: M[]; text: string } | null {
+  const failedIndex = messages.findIndex((message) => message.id === failedId);
+  if (failedIndex < 0) return null;
+  const userIndex = messages.slice(0, failedIndex).map((message) => message.role).lastIndexOf("user");
+  if (userIndex < 0) return null;
+  return {
+    messages: messages.filter((_, index) => index !== failedIndex && index !== userIndex),
+    text: messages[userIndex].content,
   };
 }

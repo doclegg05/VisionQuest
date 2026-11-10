@@ -1,23 +1,23 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowSquareOut, CheckCircle, Clock, List, WarningCircle, Wrench } from "@phosphor-icons/react";
 import { apiFetch } from "@/lib/api";
 import ChatInput from "./ChatInput";
 import { ActionCard } from "./ActionCard";
-import { ChatErrorBanner } from "./ChatErrorBanner";
 import { ConfirmToolCard } from "./ConfirmToolCard";
 import ConversationList from "./ConversationList";
 import MessageBubble from "./MessageBubble";
-import { RetryResponseButton } from "./RetryResponseButton";
 import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
 import type { ChatRole } from "@/lib/chat/commands";
 import { getRoleSettingsPath } from "@/lib/role-home";
 import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
-import { resolveSendError, resolveStreamOutcome } from "@/lib/chat/send-outcome";
+import { prepareRetry, resolveSendError, resolveStreamOutcome, SageSendError } from "@/lib/chat/send-outcome";
+import { parseSageFailureCode } from "@/lib/chat/sage-failure";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
 import { determineStage } from "@/lib/sage/stage";
@@ -43,13 +43,44 @@ interface AgentEventItem {
   meta?: Record<string, unknown>;
 }
 
-async function getErrorMessage(res: Response) {
-  try {
-    const data = await res.json();
-    return data.error || "Failed to send message.";
-  } catch {
-    return "Failed to send message.";
-  }
+/** The server's sentence and cause code from a refused send. */
+async function readSendError(res: Response): Promise<Error> {
+  const data: unknown = await res.json().catch(() => null);
+  const text =
+    typeof data === "object" && data !== null && "error" in data && typeof data.error === "string"
+      ? data.error
+      : null;
+  return text ? new SageSendError(text, parseSageFailureCode(data)) : new Error(`Send refused (${res.status})`);
+}
+
+interface FailedReplyActionsProps {
+  onRetry: () => void;
+  /** Staff only, when Sage is not set up: where their own AI key lives. */
+  settingsHref: string | null;
+}
+
+/** Shown once under a failed or cut-off reply. Replaced when the student retries. */
+export function FailedReplyActions({ onRetry, settingsHref }: FailedReplyActionsProps) {
+  return (
+    <div className="ml-11 mt-2 flex flex-wrap items-center gap-x-4">
+      <button
+        onClick={onRetry}
+        type="button"
+        className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
+      >
+        Try again
+      </button>
+      {settingsHref && (
+        <Link
+          href={settingsHref}
+          prefetch={false}
+          className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
+        >
+          Open Settings
+        </Link>
+      )}
+    </div>
+  );
 }
 
 interface ChatWindowInnerProps {
@@ -232,7 +263,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   const [showSidebar, setShowSidebar] = useState(false);
   const [goalToast, setGoalToast] = useState<string | null>(null);
   const [incompleteMessageId, setIncompleteMessageId] = useState<string | null>(null);
-  const [chatError, setChatError] = useState<string | null>(null);
+  /** Staff only: the failed reply's actions include a Settings link. */
+  const [failureShowsSettings, setFailureShowsSettings] = useState(false);
   const [conversationRefreshKey, setConversationRefreshKey] = useState(0);
   /**
    * Optimistic greeting shown immediately on a new conversation before SSE
@@ -283,7 +315,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             content: m.content,
           }))
         );
-        setChatError(null);
+        setFailureShowsSettings(false);
       }
     } catch (err) {
       console.error("Failed to load conversation:", err instanceof Error ? err.message : "Unknown error");
@@ -361,7 +393,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     setStreamingContent("");
     setStreamingEvents([]);
     setIncompleteMessageId(null);
-    setChatError(null);
+    setFailureShowsSettings(false);
     setOptimisticGreeting(null);
     setShowSidebar(false);
   };
@@ -384,7 +416,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
   const handleSend = useCallback(
     async (text: string, attachmentIds?: string[]) => {
-      setChatError(null);
+      setFailureShowsSettings(false);
 
       // B2: Hoist the loading state so the TypingIndicator renders immediately
       // on send, before the goals pre-fetch or any network call.
@@ -447,7 +479,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         });
 
         if (!res.ok) {
-          throw new Error(await getErrorMessage(res));
+          throw await readSendError(res);
         }
 
         const reader = res.body?.getReader();
@@ -465,7 +497,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         };
 
         const applyStreamEvent = (data: ChatSseEvent) => {
-          if (data.error) throw new Error(data.error);
+          if (data.error) throw new SageSendError(data.error, parseSageFailureCode(data));
           if (data.conversationId && !data.done) {
             setConversationId(data.conversationId);
             maybeRefreshConversations(data.conversationId);
@@ -521,7 +553,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         };
 
         if (!reader) {
-          throw new Error("Sage returned no response stream. Please try again.");
+          throw new Error("No response stream");
         }
 
         while (true) {
@@ -567,8 +599,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         setTimeout(() => checkProgression(), 2000);
       } catch (err) {
         console.error("Send error:", err instanceof Error ? err.message : "Unknown error");
-        const errorOutcome = resolveSendError(err, fullContent);
-        setChatError(errorOutcome.bannerMessage);
+        const errorOutcome = resolveSendError(err, fullContent, role === "student" ? "student" : "staff");
+        setFailureShowsSettings(errorOutcome.showSettingsLink);
         const errMsgId = `err-${Date.now()}`;
         setMessages((prev) => [
           ...prev,
@@ -592,7 +624,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         setOptimisticGreeting(null);
       }
     },
-    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener]
+    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener, role]
   );
 
   useEffect(() => {
@@ -690,14 +722,17 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
                 <MessageBubble role={msg.role} content={msg.content} />
                 {msg.events?.length ? <AgentEventList events={msg.events} /> : null}
                 {msg.id === incompleteMessageId && (
-                  <RetryResponseButton
+                  <FailedReplyActions
+                    settingsHref={failureShowsSettings ? getRoleSettingsPath(role) : null}
                     onRetry={() => {
-                      const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
-                      if (lastUserMsg) {
-                        setMessages((prev) => prev.filter((m) => m.id !== incompleteMessageId));
-                        setIncompleteMessageId(null);
-                        void handleSend(lastUserMsg.content);
-                      }
+                      // Drop the failure and the message it answered: the
+                      // resend adds that message back, so each shows once.
+                      const retry = prepareRetry(messages, msg.id);
+                      if (!retry) return;
+                      setMessages(retry.messages);
+                      setIncompleteMessageId(null);
+                      setFailureShowsSettings(false);
+                      void handleSend(retry.text);
                     }}
                   />
                 )}
@@ -736,10 +771,6 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
               <span>{goalToast} · +50 XP</span>
             </div>
           </div>
-        )}
-
-        {chatError && (
-          <ChatErrorBanner message={chatError} settingsHref={getRoleSettingsPath(role)} />
         )}
 
         <ChatInput onSend={handleSend} disabled={isLoading} role={role} initialMessage={deepLinkPrefill} />
