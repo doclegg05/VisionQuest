@@ -8,8 +8,14 @@
     "type": "test",
     "files": [
       "src/components/teacher/queue-undo.test.ts",
+      "src/components/teacher/queue-undo.reload.test.ts",
+      "src/components/teacher/queue-undo.unmount.test.ts",
+      "src/components/teacher/queue-reload.test.ts",
       "src/components/teacher/QueueRowIssues.undo.test.tsx",
-      "src/components/teacher/queue-alert-target.test.ts"
+      "src/components/teacher/queue-alert-target.test.ts",
+      "src/components/teacher/InterventionQueueHeader.test.tsx",
+      "src/components/teacher/InterventionQueuePanel.wiring.test.tsx",
+      "src/components/teacher/InterventionQueuePanel.test.tsx"
     ]
   }
 }

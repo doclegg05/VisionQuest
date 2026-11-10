@@ -9,26 +9,37 @@ import {
   SNOOZE_HOURS,
   type AlertLineState,
   type QueueAlertRequest,
+  type QueueReloadHooks,
   type QueueSendRequest,
   type QueueUndoMessage,
   type QueueUndoQuestion,
   type QueueUndoTarget,
 } from "./queue-undo";
 
-interface QueueUndoOptions {
+interface QueueUndoOptions<Rows> {
   /** Must be stable across renders. */
   confirm: (question: QueueUndoQuestion) => Promise<boolean>;
-  /** Must be stable across renders. Reloads the queue and returns null when the load failed. */
-  refresh: () => Promise<unknown>;
+  /**
+   * Must be stable across renders. Loads the queue through `runQueueLoad`, handing it `reload`, so the load tells
+   * the flow when it began and when its rows are on screen.
+   */
+  load: (reload: QueueReloadHooks) => Promise<Rows>;
 }
 
-export interface QueueUndoControls {
-  act: (alert: QueueUndoTarget, action: QueueAlertRequest) => Promise<void>;
+export interface QueueUndoControls<Rows> {
+  /** Starts Resolved, Snooze or Dismiss. False when a request is already out and the tap was ignored. */
+  act: (alert: QueueUndoTarget, action: QueueAlertRequest) => boolean;
   undo: () => void;
-  /** Call whenever the queue gets fresh rows, for any reason. Done lines and the Undo offer clear. */
-  reloaded: () => void;
+  /** Loads the queue with the caller's `load`. Every reload of the queue goes through this. */
+  refresh: () => Promise<Rows>;
+  /** The Refresh list button. Reloads, then moves focus to the status line if the button left the screen. */
+  refreshList: () => void;
+  /** The class changed: every done line and the Undo offer end. */
+  clear: () => void;
   lineState: (alertId: string) => AlertLineState;
   isDone: (alertId: string) => boolean;
+  /** True while any alert is held as done, so the caller can offer a reload to clear it. */
+  hasDone: boolean;
   /** The latest failure, shown by the caller in a role="alert" message. */
   failure: QueueUndoMessage | null;
   /** The latest quiet confirmation, shown by the caller in its role="status" line. */
@@ -47,16 +58,10 @@ function moveFocus(elementId: string): void {
 }
 
 /** Resolved, Snooze and Dismiss for the intervention queue, with Undo in the alert's line. The flow is queue-undo.ts. */
-export function useQueueUndo({ confirm, refresh }: QueueUndoOptions): QueueUndoControls {
+export function useQueueUndo<Rows>({ confirm, load }: QueueUndoOptions<Rows>): QueueUndoControls<Rows> {
   // Both callbacks are stable (useConfirm's confirm and the panel's fetchQueue are useCallback), so the flow made
   // on first render can keep them. A new flow per render would drop the Undo offer.
-  const [flow] = useState(() =>
-    createQueueUndo({
-      send: sendAlertRequest,
-      confirm,
-      refresh: async () => (await refresh()) !== null,
-    }),
-  );
+  const [flow] = useState(() => createQueueUndo({ send: sendAlertRequest, confirm, refresh: load }));
   const snapshot = useSyncExternalStore(flow.subscribe, flow.current, flow.current);
 
   // Unmounting ends the offer. Anything still in flight then changes nothing and reloads nothing.
@@ -77,13 +82,27 @@ export function useQueueUndo({ confirm, refresh }: QueueUndoOptions): QueueUndoC
   const lineState = useCallback((alertId: string) => alertLineState(snapshot, alertId), [snapshot]);
   const isDone = useCallback((alertId: string) => alertId in snapshot.done, [snapshot]);
   const undo = useCallback(() => void flow.undo(), [flow]);
+  const act = useCallback(
+    (alert: QueueUndoTarget, action: QueueAlertRequest) => {
+      if (!flow.canAct()) return false;
+      void flow.act(alert, action);
+      return true;
+    },
+    [flow],
+  );
+  const refresh = useCallback(() => load(flow), [load, flow]);
+  const refreshList = useCallback(() => void flow.refreshList(), [flow]);
+  const clear = useCallback(() => flow.reloaded(), [flow]);
 
   return {
-    act: flow.act,
+    act,
     undo,
-    reloaded: flow.reloaded,
+    refresh,
+    refreshList,
+    clear,
     lineState,
     isDone,
+    hasDone: Object.keys(snapshot.done).length > 0,
     failure: snapshot.message?.tone === "alert" ? snapshot.message : null,
     status: snapshot.message?.tone === "status" ? snapshot.message : null,
   };

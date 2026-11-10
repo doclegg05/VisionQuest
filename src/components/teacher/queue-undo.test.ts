@@ -9,70 +9,17 @@ import {
   doneLabel,
   QUEUE_STATUS_ID,
   SNOOZE_HOURS,
-  type QueueSendRequest,
-  type QueueUndoDeps,
-  type QueueUndoTarget,
 } from "./queue-undo";
-
-const LOW: QueueUndoTarget = { id: "a1", severity: "medium", title: "Goal review", studentName: "Sam Rivera" };
-const LOW2: QueueUndoTarget = { id: "a2", severity: "low", title: "Missing form", studentName: "Ana Lopez" };
-const CRITICAL: QueueUndoTarget = {
-  id: "w1",
-  severity: "critical",
-  title: "Wellbeing check",
-  studentName: "Jo Park",
-};
-
-interface Harness {
-  deps: QueueUndoDeps;
-  sent: Array<[string, QueueSendRequest]>;
-  confirms: Array<{ title: string; message: string }>;
-  refreshes: () => number;
-  /** Fail the next send of this request once, then let it succeed. */
-  failOnce: (request: QueueSendRequest) => void;
-}
-
-interface HarnessOptions {
-  failOn?: QueueSendRequest;
-  confirmAnswer?: boolean;
-  refreshResult?: boolean | "reject";
-}
-
-function harness(options: HarnessOptions = {}): Harness {
-  const sent: Harness["sent"] = [];
-  const confirms: Harness["confirms"] = [];
-  const failNext = new Set<QueueSendRequest>();
-  let refreshCount = 0;
-  const deps: QueueUndoDeps = {
-    send: async (alertId, request) => {
-      sent.push([alertId, request]);
-      if (options.failOn === request || failNext.delete(request)) throw new Error("network down");
-    },
-    confirm: async (question) => {
-      confirms.push({ title: question.title, message: question.message });
-      return options.confirmAnswer ?? true;
-    },
-    refresh: async () => {
-      refreshCount += 1;
-      if (options.refreshResult === "reject") throw new Error("offline");
-      return options.refreshResult ?? true;
-    },
-  };
-  return {
-    deps,
-    sent,
-    confirms,
-    refreshes: () => refreshCount,
-    failOnce: (request) => {
-      failNext.add(request);
-    },
-  };
-}
-
-function offered(flow: ReturnType<typeof createQueueUndo>, alertId: string): boolean {
-  const line = alertLineState(flow.current(), alertId);
-  return line.kind === "done" && line.undoable;
-}
+import {
+  CRITICAL,
+  harness,
+  holding,
+  landReload,
+  LOW,
+  LOW2,
+  offered,
+  withOpenConfirm,
+} from "./queue-undo.test-support";
 
 describe("createQueueUndo: Resolved and Dismiss", () => {
   it("sends the action at once, marks the line done and offers Undo, with no reload", async () => {
@@ -133,7 +80,7 @@ describe("createQueueUndo: Resolved and Dismiss", () => {
     assert.equal(flow.current().state.kind, "undoable");
     assert.equal(offered(flow, "a1"), true);
     assert.equal(flow.current().message?.tone, "alert");
-    assert.equal(flow.current().message?.text, "Could not undo. Tap Undo to try again.");
+    assert.equal(flow.current().message?.text, "Could not undo. Try Undo again.");
     await flow.undo();
     assert.deepEqual(h.sent.slice(-2), [
       ["a1", "reopen"],
@@ -215,58 +162,61 @@ describe("createQueueUndo: Resolved and Dismiss", () => {
   });
 });
 
-describe("createQueueUndo: reloads", () => {
-  it("a reload clears done lines and the offer", async () => {
+describe("createQueueUndo: lines while a request is out", () => {
+  it("marks every line that is not done busy while a Dismiss is sending", async () => {
     const h = harness();
-    const flow = createQueueUndo(h.deps);
+    const held = holding(h, "dismiss");
+    const flow = createQueueUndo(held.deps);
     await flow.act(LOW, "resolve");
-    await flow.act(LOW2, "dismiss");
-    flow.reloaded();
-    assert.deepEqual(flow.current().done, {});
-    assert.equal(flow.current().state.kind, "idle");
-    await flow.undo();
-    assert.equal(h.sent.filter(([, request]) => request === "reopen").length, 0);
+    const pending = flow.act(LOW2, "dismiss");
+    assert.deepEqual(alertLineState(flow.current(), "a2"), { kind: "busy" });
+    assert.deepEqual(alertLineState(flow.current(), "another-alert"), { kind: "busy" });
+    assert.equal(alertLineState(flow.current(), "a1").kind, "done", "a done line stays a done line");
+    held.release();
+    await pending;
+    assert.deepEqual(alertLineState(flow.current(), "another-alert"), { kind: "actions" });
   });
 
-  it("a snooze reloads the queue, and a good reload clears done lines and the offer", async () => {
+  it("marks the other lines busy while a confirm is open", async () => {
+    const { flow, answer } = withOpenConfirm(harness());
+    const pending = flow.act(CRITICAL, "resolve");
+    assert.deepEqual(alertLineState(flow.current(), "w1"), { kind: "busy" });
+    assert.deepEqual(alertLineState(flow.current(), "another-alert"), { kind: "busy" });
+    answer(false);
+    await pending;
+    assert.deepEqual(alertLineState(flow.current(), "another-alert"), { kind: "actions" });
+  });
+
+  it("marks the other lines busy while an Undo is out", async () => {
     const h = harness();
-    const flow = createQueueUndo(h.deps);
+    const held = holding(h, "reopen");
+    const flow = createQueueUndo(held.deps);
     await flow.act(LOW, "resolve");
-    await flow.act(LOW2, "snooze");
-    assert.deepEqual(h.sent.at(-1), ["a2", "snooze"]);
-    assert.equal(h.refreshes(), 1);
-    assert.deepEqual(flow.current().done, {});
-    assert.equal(flow.current().state.kind, "idle");
-    assert.equal(flow.current().message?.text, `Snoozed for ${SNOOZE_HOURS} hours.`);
+    const pending = flow.undo();
+    assert.deepEqual(alertLineState(flow.current(), "another-alert"), { kind: "busy" });
+    held.release();
+    await pending;
+    assert.deepEqual(alertLineState(flow.current(), "another-alert"), { kind: "actions" });
   });
 
-  it("a failed reload clears neither the done lines nor the offer", async () => {
-    const h = harness({ refreshResult: false });
-    const flow = createQueueUndo(h.deps);
-    await flow.act(LOW, "resolve");
-    await flow.act(LOW2, "snooze");
-    assert.deepEqual(flow.current().done, { a1: "resolve" });
-    assert.equal(offered(flow, "a1"), true);
-  });
-
-  it("a rejected reload is caught and clears nothing", async () => {
-    const h = harness({ refreshResult: "reject" });
-    const flow = createQueueUndo(h.deps);
-    await flow.act(LOW, "resolve");
-    await flow.act(LOW2, "snooze");
-    assert.deepEqual(flow.current().done, { a1: "resolve" });
-  });
-
-  it("a failed snooze says so and keeps the earlier offer", async () => {
+  it("says whether a tap would be taken, so an ignored tap clears nothing", async () => {
     const h = harness();
-    const flow = createQueueUndo(h.deps);
+    const held = holding(h, "dismiss");
+    const flow = createQueueUndo(held.deps);
+    assert.equal(flow.canAct(), true, "idle");
     await flow.act(LOW, "resolve");
-    h.failOnce("snooze");
-    await flow.act(LOW2, "snooze");
-    assert.equal(flow.current().message?.tone, "alert");
-    assert.match(flow.current().message?.text ?? "", /could not snooze/i);
-    assert.equal(offered(flow, "a1"), true);
-    assert.equal(h.refreshes(), 0);
+    assert.equal(flow.canAct(), true, "an Undo offer does not block the next action");
+    const pending = flow.act(LOW2, "dismiss");
+    assert.equal(flow.canAct(), false, "a request is out");
+    const before = flow.current();
+    await flow.act(CRITICAL, "resolve");
+    assert.equal(flow.current(), before, "the ignored tap changed nothing");
+    assert.deepEqual(h.confirms, [], "and asked nothing");
+    held.release();
+    await pending;
+    assert.equal(flow.canAct(), true);
+    flow.dispose();
+    assert.equal(flow.canAct(), false, "unmounted");
   });
 });
 
@@ -284,7 +234,10 @@ describe("createQueueUndo: critical alerts", () => {
     const flow = createQueueUndo(h.deps);
     await flow.act(CRITICAL, "dismiss");
     assert.equal(h.confirms[0].title, 'Dismiss "Wellbeing check" for Jo Park?');
-    assert.match(h.confirms[0].message, /It stays hidden even if the problem continues\. You can undo it right after\./);
+    assert.equal(
+      h.confirms[0].message,
+      "It leaves your queue. It stays hidden even if the problem continues. You can undo it until you resolve or dismiss another alert.",
+    );
   });
 
   it("asks before Snooze too", async () => {
@@ -370,65 +323,20 @@ describe("createQueueUndo: focus", () => {
   });
 });
 
-describe("createQueueUndo: unmount", () => {
-  it("a send in flight at unmount starts nothing and does not reload afterwards", async () => {
-    const h = harness();
-    let release: () => void = () => {};
-    let notified = 0;
-    const flow = createQueueUndo({
-      ...h.deps,
-      send: (alertId, action) => {
-        h.sent.push([alertId, action]);
-        return new Promise<void>((resolve) => {
-          release = resolve;
-        });
-      },
-    });
-    flow.subscribe(() => {
-      notified += 1;
-    });
-    const pending = flow.act(LOW, "snooze");
-    const before = notified;
-    flow.dispose();
-    release();
-    await pending;
-    assert.equal(h.refreshes(), 0);
-    assert.equal(notified, before);
-    await flow.act(LOW2, "resolve");
-    assert.equal(h.sent.length, 1, "a disposed flow sends nothing new");
-  });
-
-  it("connect after dispose makes the flow work again, as React's dev double mount needs", async () => {
-    const h = harness();
-    const flow = createQueueUndo(h.deps);
-    flow.dispose();
-    flow.connect();
-    await flow.act(LOW, "resolve");
-    assert.equal(offered(flow, "a1"), true);
-  });
-
-  it("a confirm answered after unmount sends nothing", async () => {
-    const h = harness();
-    let answer: (yes: boolean) => void = () => {};
-    const flow = createQueueUndo({
-      ...h.deps,
-      confirm: () =>
-        new Promise<boolean>((resolve) => {
-          answer = resolve;
-        }),
-    });
-    const pending = flow.act(CRITICAL, "dismiss");
-    flow.dispose();
-    answer(true);
-    await pending;
-    assert.deepEqual(h.sent, []);
-  });
-});
-
 describe("queue undo copy", () => {
   it("says what each done line means", () => {
     assert.equal(doneLabel("resolve"), "Marked resolved. It comes back if the problem is still there.");
     assert.equal(doneLabel("dismiss"), "Dismissed. It will not come back.");
+    assert.equal(doneLabel("snooze"), `Snoozed for ${SNOOZE_HOURS} hours.`);
+  });
+
+  it("promises Undo only until the next Resolved or Dismiss", () => {
+    for (const action of ["resolve", "dismiss"] as const) {
+      const { message } = confirmQuestionFor(CRITICAL, action);
+      assert.match(message, /You can undo it until you resolve or dismiss another alert\.$/, action);
+      assert.doesNotMatch(message, /right after/, action);
+    }
+    assert.doesNotMatch(confirmQuestionFor(CRITICAL, "snooze").message, /undo/i, "a snooze offers no Undo");
   });
 
   it("no longer sends anyone to the student's page", () => {
@@ -453,6 +361,16 @@ describe("queue undo copy", () => {
       }
       texts.push(flow.current().message?.text ?? "");
     }
+    for (const action of ["resolve", "dismiss"] as const) {
+      const h = harness({ failOn: "reopen" });
+      const flow = createQueueUndo(h.deps);
+      await flow.act(LOW, action);
+      const pending = flow.undo();
+      landReload(flow);
+      await pending;
+      texts.push(flow.current().message?.text ?? "");
+    }
+    texts.push(doneLabel("snooze"));
     const ok = harness();
     const flow = createQueueUndo(ok.deps);
     await flow.act(LOW, "snooze");

@@ -89,6 +89,26 @@ describe("InterventionQueuePanel refresh after a class switch", () => {
     assert.doesNotMatch(fetchQueueBody, /encodeURIComponent\(classId\)/);
   });
 
+  it("ends every done line and the Undo offer when the class changes", () => {
+    assert.match(source, /useLayoutEffect\(\(\) => clearUndo\(\), \[classId, clearUndo\]\);/);
+  });
+
+  it("no longer clears the Undo flow from an effect on the rows", () => {
+    // That effect could not tell a load that began before an action from one that began after it.
+    assert.doesNotMatch(source, /\[queue, reloaded\]/);
+    assert.doesNotMatch(source, /useEffect\(\(\) => reloaded\(\)/);
+  });
+
+  it("sends Refresh list through the flow, which moves focus when the button leaves", () => {
+    assert.match(source, /onRefresh=\{alertUndo\.refreshList\}/);
+  });
+
+  it("clears the status line only when the flow takes the tap", () => {
+    const handler = source.slice(source.indexOf("function handleAlertAction"), source.indexOf("async function handlePanelChanged"));
+    assert.match(handler, /if \(alertUndo\.act\([^;]*\)\) setActionMessage\(null\);/);
+    assert.equal(handler.split("setActionMessage(null)").length - 1, 1, "no clear outside that check");
+  });
+
   it("updates the current class in the same layout effect that retires in-flight requests", () => {
     assert.match(source, /useLayoutEffect\(\(\) => \{\s*classIdRef\.current = classId;\s*latestRequest\.current \+= 1;\s*\}, \[classId\]\);/);
   });

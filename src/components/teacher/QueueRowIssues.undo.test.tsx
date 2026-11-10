@@ -106,6 +106,26 @@ describe("QueueRowIssues alert actions", () => {
     assert.doesNotMatch(buttonTag(done, "Undo"), /\bml-auto\b/);
   });
 
+  it("gives the done text a line of its own, so Undo starts the next line at the left edge", () => {
+    // "Dismissed. It will not come back." is short. Without this, Undo sits beside it, about where Dismiss was.
+    for (const action of ["resolve", "dismiss"] as const) {
+      const done = render({ kind: "done", action, undoable: true, undoing: false });
+      const text = done.match(/<p[^>]*id="queue-alert-g1-undo-text"[^>]*>/)?.[0];
+      assert.ok(text, "no done text");
+      assert.match(text, /\bbasis-full\b/, action);
+      assert.doesNotMatch(buttonTag(done, "Undo"), /\bbasis-full\b/, action);
+    }
+  });
+
+  it("shows a snoozed alert as a done line: the text, no Undo and no pills", () => {
+    const snoozed = render({ kind: "done", action: "snooze", undoable: false, undoing: false });
+    assert.match(snoozed, /Snoozed for 24 hours\./);
+    for (const label of ["Resolved", "Snooze", "Dismiss", "Undo"]) {
+      assert.doesNotMatch(snoozed, new RegExp(`>${label}</button>`), label);
+    }
+    assert.match(snoozed, /New evidence on a goal\./, "the line keeps its summary");
+  });
+
   it("says what a dismiss means", () => {
     assert.match(render({ kind: "done", action: "dismiss", undoable: false, undoing: false }), /Dismissed\. It will not come back\./);
   });

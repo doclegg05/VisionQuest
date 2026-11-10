@@ -116,9 +116,10 @@ function AlertLine({
 }
 
 /**
- * A saved Resolved or Dismiss. The text says what it means, then Undo sits right after it at the start of the line,
- * away from where Dismiss was. Earlier done lines keep only the text. Same height as the pills it replaces, so
- * nothing below it moves.
+ * A saved Resolved, Dismiss or Snooze. The text says what it means and takes a whole line, so Undo always starts the
+ * next line at the left edge, away from where Dismiss was. Earlier done lines and a snoozed line keep only the text,
+ * at the height of the pills they replace. While Undo is offered the line is taller than the pills were, by the
+ * height of the text above the button, so what is below it moves down by that much.
  */
 function DoneLine({
   alert,
@@ -133,7 +134,7 @@ function DoneLine({
   const textId = `${alertControlId(alert.id, "undo")}-text`;
   return (
     <div className="mt-1 flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1">
-      <p id={textId} className="text-xs font-semibold text-success">
+      <p id={textId} className="basis-full text-xs font-semibold text-success">
         {doneLabel(lineState.action)}
       </p>
       {lineState.undoable ? (
