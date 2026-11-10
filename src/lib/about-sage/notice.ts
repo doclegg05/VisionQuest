@@ -71,7 +71,7 @@ export const SAGE_NOTICE_SECTIONS: readonly NoticeSection[] = [
       "Sage also writes short notes about you, like your goals, so it can help you next time.",
       "You can see these short notes on the Sage Memory page.",
       "Sage also keeps a career profile from your chats. It lists things like your interests, your strengths, and your needs, like rides or child care.",
-      "You can see part of your career profile on the Career page. Ask your instructor if you want to see all of it.",
+      "Later, you can see part of your career profile on the Career page. Ask your instructor if you want to see all of it.",
       "VisionQuest also keeps your goals, the moods you share, and the files you add.",
       "VisionQuest has not set how long it keeps your information yet.",
     ],
@@ -79,7 +79,7 @@ export const SAGE_NOTICE_SECTIONS: readonly NoticeSection[] = [
   {
     heading: "Who Can See It",
     sentences: [
-      "Your instructors and other SPOKES staff can see your goals and your progress.",
+      "Your instructors and other SPOKES staff can see your goals, your moods, and your progress.",
       "They can also see the notes Sage writes. They can see your career profile too.",
       "They can also see the start of the last message in each chat. It may be yours or Sage's.",
       "Staff can save a copy of your information. That copy has all of your chats.",
@@ -96,7 +96,7 @@ export const SAGE_NOTICE_SECTIONS: readonly NoticeSection[] = [
       "The alert does not have your words in it. Staff may still see what you wrote in other places, like the saved copy of your chats.",
       "Sage will also show you the 988 crisis line. You can call or text 988 at any time, day or night.",
       'If you pick "Really low" as your mood, your instructors get an alert too.',
-      "They also get one if you tell Sage your mood is a 1 or 2 out of 10.",
+      "They may also get one if you tell Sage your mood is a 1 or 2 out of 10 when Sage checks in with you.",
     ],
   },
   {
@@ -114,7 +114,7 @@ export const SAGE_NOTICE_KEY_POINTS: readonly string[] = [
   "Sage is an AI coach. That means a computer writes its answers, not a person.",
   "Sage can make mistakes.",
   "VisionQuest saves your chats with Sage.",
-  "Your instructors and other SPOKES staff can see your goals and your progress.",
+  "Your instructors and other SPOKES staff can see your goals, your moods, and your progress.",
   "They can also see the start of the last message in each chat. It may be yours or Sage's.",
   "Staff can save a copy of your information. That copy has all of your chats.",
   "If Sage has trouble saving something, staff may see part of that chat.",

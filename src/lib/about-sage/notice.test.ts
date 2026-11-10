@@ -167,6 +167,26 @@ describe("Sage notice tells the truth", () => {
     assert.ok(SAGE_NOTICE_KEY_POINTS.includes(line));
   });
 
+  // Round 2 truth check (2026-11-11).
+  it("says the Career page comes later: its nav link opens at phase 3", () => {
+    assert.ok(fullItems.includes("Later, you can see part of your career profile on the Career page. Ask your instructor if you want to see all of it."));
+    const nav = readFileSync("src/lib/nav-items.ts", "utf8");
+    assert.match(nav, /Career/);
+  });
+
+  it("says a mood told to Sage may alert, and only when Sage checks in", () => {
+    assert.ok(fullItems.includes("They may also get one if you tell Sage your mood is a 1 or 2 out of 10 when Sage checks in with you."));
+    const post = readFileSync("src/lib/chat/post-response.ts", "utf8");
+    assert.match(post, /checkin/);
+  });
+
+  it("says staff can see the moods a student shares, in the notice and on the held screen", () => {
+    const line = "Your instructors and other SPOKES staff can see your goals, your moods, and your progress.";
+    assert.ok(fullItems.includes(line));
+    assert.ok(SAGE_NOTICE_KEY_POINTS.includes(line));
+    assert.ok(readFileSync("src/app/api/teacher/students/[id]/mood/route.ts", "utf8").includes("GET"));
+  });
+
   it("says VisionQuest, not the program, turned off outside AI", () => {
     assert.ok(fullItems.includes("VisionQuest has turned off outside AI tools, like Google, for Sage."));
     assert.doesNotMatch(fullItems.join(" "), /This program|program staff/);
