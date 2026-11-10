@@ -5,6 +5,29 @@
   "title": "Students can change a password, and must after staff set one",
   "doneWhen": "Route tests cover a wrong current password, the rate limit, the flag clearing and other sessions ending. A layout test covers the gate.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/app/api/settings/password/route.test.ts",
+      "src/lib/password-change.test.ts",
+      "src/lib/password-change-gate.test.ts",
+      "src/proxy.test.ts",
+      "src/lib/session-token.password-change.test.ts",
+      "src/lib/auth.password-change.test.ts",
+      "src/lib/sign-in-budget.test.ts",
+      "src/lib/password-policy.max-and-trim.test.ts",
+      "src/app/api/teacher/classes/create-student-flag.test.ts",
+      "src/app/api/teacher/students/reset-password-flag.test.ts",
+      "src/app/api/auth/reset-password/__tests__/route.test.ts",
+      "src/app/api/auth/reset-password/questions/__tests__/route.test.ts",
+      "src/app/api/auth/login/__tests__/route.test.ts",
+      "src/app/api/auth/mfa/challenge/__tests__/route.test.ts",
+      "src/app/api/auth/google/callback/__tests__/route.test.ts",
+      "src/app/change-password/page.test.tsx",
+      "src/components/settings/StudentPasswordField.test.tsx",
+      "src/components/settings/ChangePasswordForm.test.tsx",
+      "src/components/settings/SettingsView.test.tsx",
+      "src/app/forgot-password/page.test.tsx",
+      "src/app/auth-autofill.test.ts"
+    ]
   }
 }
