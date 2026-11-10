@@ -1,3 +1,4 @@
+import type { SaveProblem } from "./regions-api";
 import {
   applyRegionChange,
   mergePeople,
@@ -6,12 +7,13 @@ import {
   type RegionPerson,
 } from "./regions-model";
 
-/** The control a request belongs to: the add form, or one region's row. */
-export type SaveTarget = { kind: "create" } | { kind: "region"; regionId: string };
+/** The control a request belongs to: the add form, one region's rename form, or its row. */
+export type SaveTarget = { kind: "create" } | { kind: "rename"; regionId: string } | { kind: "region"; regionId: string };
 
 export interface SaveFailure {
   target: SaveTarget;
   message: string;
+  problem?: SaveProblem;
 }
 
 export interface ReadyState {
@@ -35,7 +37,7 @@ export type RegionsAction =
   | { type: "toggled" }
   | { type: "save-started"; target: SaveTarget }
   | { type: "save-succeeded"; change: RegionListChange; notice: string }
-  | { type: "save-failed"; target: SaveTarget; message: string };
+  | { type: "save-failed"; target: SaveTarget; message: string; problem?: SaveProblem };
 
 export const INITIAL_REGIONS_STATE: RegionsState = { kind: "loading" };
 
@@ -80,7 +82,11 @@ export function regionsReducer(state: RegionsState, action: RegionsAction): Regi
       return whenReady(state, (ready) => ({
         ...ready,
         busy: null,
-        failure: { target: action.target, message: action.message },
+        failure: {
+          target: action.target,
+          message: action.message,
+          ...(action.problem ? { problem: action.problem } : {}),
+        },
       }));
     default: {
       const _exhaustive: never = action;
@@ -90,11 +96,16 @@ export function regionsReducer(state: RegionsState, action: RegionsAction): Regi
 }
 
 function sameTarget(a: SaveTarget, b: SaveTarget): boolean {
-  if (a.kind === "create") return b.kind === "create";
-  return b.kind === "region" && a.regionId === b.regionId;
+  if (a.kind === "create" || b.kind === "create") return a.kind === b.kind;
+  return a.kind === b.kind && a.regionId === b.regionId;
 }
 
 /** The failed save's message, for the control it belongs to and no other. */
 export function failureFor(state: ReadyState, target: SaveTarget): string | null {
   return state.failure && sameTarget(state.failure.target, target) ? state.failure.message : null;
+}
+
+/** The add form failed because its short code is taken, so it opens the code field. */
+export function codeTaken(state: ReadyState): boolean {
+  return state.failure?.target.kind === "create" && state.failure.problem === "code-taken";
 }

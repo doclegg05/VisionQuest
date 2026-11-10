@@ -2,7 +2,7 @@ import { AddRegionForm } from "./AddRegionForm";
 import { RegionRow, type RegionRowHandlers } from "./RegionRows";
 import type { NewRegionInput } from "./regions-api";
 import { REGIONS_COPY, regionCountLabel } from "./regions-copy";
-import { failureFor, type ReadyState, type RegionsState } from "./regions-reducer";
+import { codeTaken, failureFor, type ReadyState, type RegionsState } from "./regions-reducer";
 import { ALERT_CLASS, MUTED_TEXT, SECONDARY_BUTTON, SUBHEADING } from "./regionStyles";
 
 export interface RegionsHandlers extends RegionRowHandlers {
@@ -19,8 +19,8 @@ interface RegionsCardViewProps {
 
 const PANEL_ID = "regions-panel";
 
-function isSaving(state: ReadyState, regionId: string): boolean {
-  return state.busy?.kind === "region" && state.busy.regionId === regionId;
+function isRenaming(state: ReadyState, regionId: string): boolean {
+  return state.busy?.kind === "rename" && state.busy.regionId === regionId;
 }
 
 /** A card with no regions stays open: adding the first one is the only thing to do. */
@@ -73,7 +73,8 @@ function RegionList({ state, handlers }: { state: ReadyState; handlers: RegionsH
           regions={state.regions}
           people={state.people}
           busy={state.busy !== null}
-          saving={isSaving(state, region.id)}
+          renameSaving={isRenaming(state, region.id)}
+          renameError={failureFor(state, { kind: "rename", regionId: region.id })}
           error={failureFor(state, { kind: "region", regionId: region.id })}
           handlers={handlers}
         />
@@ -95,6 +96,8 @@ function RegionsPanel({ state, handlers }: { state: ReadyState; handlers: Region
         busy={state.busy !== null}
         adding={state.busy?.kind === "create"}
         error={failureFor(state, { kind: "create" })}
+        codeTaken={codeTaken(state)}
+        regions={state.regions}
         onCreate={handlers.onCreate}
       />
     </div>
@@ -105,7 +108,7 @@ export function RegionsCardView({ state, handlers }: RegionsCardViewProps) {
   return (
     <section id="regions" aria-labelledby="regions-heading" className="theme-card space-y-5 rounded-xl p-5">
       <CardHeader state={state} onToggle={handlers.onToggle} />
-      {state.kind === "loading" && <p className={MUTED_TEXT}>{REGIONS_COPY.loading}</p>}
+      {state.kind === "loading" && <p role="status" className={MUTED_TEXT}>{REGIONS_COPY.loading}</p>}
       {state.kind === "load-failed" && <LoadFailed message={state.message} onRetry={handlers.onRetry} />}
       {state.kind === "ready" && isOpen(state) && <RegionsPanel state={state} handlers={handlers} />}
     </section>

@@ -46,6 +46,7 @@ const REGION = { name: "E2E North Region", code: "e2e-north-region" } as const;
 const CLASS = { name: "E2E Regions Class", code: "e2e-regions-class" } as const;
 
 const EMPTY_STATE = "No regions yet. Add your first region. You need one before you can create a class or invite staff.";
+const NO_REGION_HINT = "No regions yet. Add one in the Regions card at the top of this page first.";
 
 let prisma: PrismaClient;
 
@@ -114,13 +115,20 @@ test("admin on a system with no regions adds a region, places an instructor, and
     const regionsCard = main.getByRole("region", { name: "Regions" });
     const createCard = main.locator(".surface-section").filter({ hasText: "Create a Class" });
 
-    // 1. The empty state says what to do, and the class form has no region to pick yet.
+    // 1. The empty state says what to do. The class form says why it has no
+    // region to pick, in place of an empty select, and links to the Regions card.
     await expect(regionsCard.getByText(EMPTY_STATE)).toBeVisible({ timeout: 20_000 });
-    await expect(createCard.getByLabel("Region").locator("option")).toHaveCount(1, { timeout: 20_000 });
+    await expect(createCard.getByText(NO_REGION_HINT)).toBeVisible({ timeout: 20_000 });
+    await expect(createCard.getByRole("link", { name: "Regions card" })).toHaveAttribute("href", "#regions");
+    await expect(createCard.getByLabel("Region")).toHaveCount(0);
 
-    // 2. Add the first region. The short code follows the name.
+    // Typed before the region exists, to prove a region change does not erase it.
+    await createCard.getByLabel("Class name").fill(CLASS.name);
+
+    // 2. Add the first region. The short code follows the name and stays out of the way.
     await regionsCard.getByLabel("Region name").fill(REGION.name);
-    await expect(regionsCard.getByLabel("Short code")).toHaveValue(REGION.code);
+    await expect(regionsCard.getByText(`Short code: ${REGION.code} (made from the name)`)).toBeVisible();
+    await expect(regionsCard.getByLabel("Short code")).toHaveCount(0);
     await regionsCard.getByRole("button", { name: "Add region" }).click();
     await expect(regionsCard.getByRole("status")).toHaveText(`${REGION.name} was added.`, { timeout: 20_000 });
     await expect(regionsCard.getByText(EMPTY_STATE)).toHaveCount(0);
@@ -139,9 +147,10 @@ test("admin on a system with no regions adds a region, places an instructor, and
     await waitingRow.getByRole("button", { name: "Place in region" }).click();
     await expect(waitingRow).toHaveCount(0, { timeout: 20_000 });
 
-    // 4. Create a class in the new region.
+    // 4. Create a class in the new region. The class card reloaded only its
+    // region list, so the name typed in step 1 is still there.
     await expect(createCard.getByLabel("Region").locator("option")).toHaveCount(2, { timeout: 20_000 });
-    await createCard.getByLabel("Class name").fill(CLASS.name);
+    await expect(createCard.getByLabel("Class name")).toHaveValue(CLASS.name);
     await createCard.getByLabel("Class code").fill(CLASS.code);
     await createCard.getByLabel("Region").selectOption(regionId);
     await createCard.getByLabel(INSTRUCTOR.displayName).check();
@@ -156,11 +165,12 @@ test("admin on a system with no regions adds a region, places an instructor, and
     expect(created?.regionId).toBe(regionId);
     expect(created?.instructors.map((entry) => entry.instructor.studentId)).toEqual([INSTRUCTOR.login]);
 
-    // 5. Class settings now has the region control the placement panel points at.
+    // 5. The class header names its region, and class settings starts on it.
+    await expect(main.getByText(`Region: ${REGION.name}`)).toBeVisible({ timeout: 20_000 });
     const settingsRegion = main.locator("#class-settings-region");
     await expect(settingsRegion).toBeVisible({ timeout: 20_000 });
-    await expect(settingsRegion).toHaveValue("");
-    await expect(settingsRegion.locator("option")).toHaveText(["Keep the current region", REGION.name]);
+    await expect(settingsRegion).toHaveValue(regionId);
+    await expect(settingsRegion.locator("option")).toHaveText([REGION.name]);
   } finally {
     await context.close();
   }

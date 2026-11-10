@@ -22,7 +22,9 @@ export const REGIONS_COPY = {
   addHeading: "Add a region",
   nameLabel: "Region name",
   codeLabel: "Short code",
-  codeHelp: "Letters, numbers and dashes. No spaces.",
+  codeHelp: "A short ID for this region, used in reports. Letters, numbers and dashes only.",
+  changeCode: "Change it",
+  codeFromNoName: "Short code: made from the name",
   add: "Add region",
   adding: "Adding…",
   rename: "Rename",
@@ -69,12 +71,20 @@ export function removeCoordinatorConfirm(input: { personName: string; regionName
   return {
     title: `Remove ${input.personName} from ${input.regionName}?`,
     message: input.onlyRegion
-      ? "This is their only region. They will not see any region after this."
+      ? "This is their only region. After this, they will not see any classes. You can add them back until you leave this page. After that, they will not show in the list."
       : "They will stop seeing this region. They keep their other regions.",
     confirmLabel: "Remove",
     destructive: true,
   };
 }
+
+/** Words for what went wrong, or might be about to. The server's own text is never shown. */
+export const REGION_MESSAGES = {
+  codeTaken: (code: string) => `Another region already uses the short code "${code}". Change the short code and try again.`,
+  changedElsewhere: "This region was changed somewhere else. Reload the page.",
+  sameName: (regionName: string) => `There is already a region called ${regionName}.`,
+  codeFromName: (code: string) => `Short code: ${code} (made from the name)`,
+} as const;
 
 /** What the card announces after a save. */
 export const REGION_NOTICES = {

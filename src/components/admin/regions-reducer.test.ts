@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import type { AdminRegion, RegionPerson } from "./regions-model";
 import {
   INITIAL_REGIONS_STATE,
+  codeTaken,
   failureFor,
   regionsReducer,
   type ReadyState,
@@ -152,5 +153,41 @@ describe("failureFor", () => {
   it("gives nothing to any other control", () => {
     assert.equal(failureFor(failed, { kind: "region", regionId: "r2" }), null);
     assert.equal(failureFor(failed, { kind: "create" }), null);
+  });
+});
+
+describe("a rename failure", () => {
+  const failed = ready(
+    run([
+      { type: "load-succeeded", regions: [region()] },
+      { type: "save-failed", target: { kind: "rename", regionId: "r1" }, message: "This region was changed somewhere else. Reload the page." },
+    ]),
+  );
+
+  it("belongs to that region's rename form, not to the row", () => {
+    assert.equal(failureFor(failed, { kind: "rename", regionId: "r1" }), "This region was changed somewhere else. Reload the page.");
+    assert.equal(failureFor(failed, { kind: "region", regionId: "r1" }), null);
+  });
+});
+
+describe("a short code that is taken", () => {
+  it("is marked, so the add form can open the code field", () => {
+    const failed = ready(
+      run([
+        { type: "load-succeeded", regions: [] },
+        { type: "save-failed", target: { kind: "create" }, message: "taken", problem: "code-taken" },
+      ]),
+    );
+    assert.equal(codeTaken(failed), true);
+  });
+
+  it("is not marked for any other failure", () => {
+    const failed = ready(
+      run([
+        { type: "load-succeeded", regions: [] },
+        { type: "save-failed", target: { kind: "create" }, message: "We could not save that. Please try again." },
+      ]),
+    );
+    assert.equal(codeTaken(failed), false);
   });
 });

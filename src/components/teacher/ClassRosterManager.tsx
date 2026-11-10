@@ -755,7 +755,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
                   ) : null}
                   {createdCredentials ? (
                     <div className="rounded-xl border border-[rgba(0,123,175,0.18)] bg-[rgba(0,123,175,0.08)] p-3 text-sm text-[var(--ink-strong)]">
-                      <p className="font-semibold">Account created — share these credentials:</p>
+                      <p className="font-semibold">Account created. Share these sign-in details:</p>
                       <div className="mt-2 space-y-1 font-mono text-sm">
                         <p>Username: <span className="font-semibold">{createdCredentials.username}</span></p>
                         <p>Password: <span className="font-semibold">{createdCredentials.password}</span></p>

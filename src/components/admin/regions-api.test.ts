@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { ApiClientError } from "@/lib/api";
 import { describe, it } from "node:test";
 
 import {
@@ -52,9 +53,9 @@ describe("loadRegions", () => {
     assert.deepEqual(await loadRegions(fakeHttp(() => ({ regions: [] }))), { ok: true, value: [] });
   });
 
-  it("passes the server's own message on when the load fails", async () => {
-    const outcome = await loadRegions(fakeHttp(failing(new Error("Admin access required."))));
-    assert.deepEqual(outcome, { ok: false, message: "Admin access required." });
+  it("shows plain words, not the server's, when the load fails", async () => {
+    const outcome = await loadRegions(fakeHttp(failing(new ApiClientError(403, "Admin access required."))));
+    assert.deepEqual(outcome, { ok: false, message: "We could not load the regions. Please try again." });
   });
 
   it("says so in plain words when the failure carries no message", async () => {
@@ -81,10 +82,20 @@ describe("createRegion", () => {
     });
   });
 
-  it("passes the server's own message on when the save fails", async () => {
-    const http = fakeHttp(failing(new Error("That region code is already in use.")));
+  it("names the short code that is taken, and marks the code as the problem", async () => {
+    const http = fakeHttp(failing(new ApiClientError(409, "That region code is already in use.")));
+    const outcome = await createRegion(http, { name: "East", code: "East" });
+    assert.deepEqual(outcome, {
+      ok: false,
+      message: 'Another region already uses the short code "east". Change the short code and try again.',
+      problem: "code-taken",
+    });
+  });
+
+  it("shows plain words, not the server's, for any other failure", async () => {
+    const http = fakeHttp(failing(new ApiClientError(400, "Code must be alphanumeric (dashes allowed).")));
     const outcome = await createRegion(http, { name: "East", code: "east" });
-    assert.deepEqual(outcome, { ok: false, message: "That region code is already in use." });
+    assert.deepEqual(outcome, { ok: false, message: "We could not save that. Please try again." });
   });
 
   it("does not send a name that is only spaces", async () => {
@@ -124,9 +135,27 @@ describe("renameRegion", () => {
     assert.deepEqual(http.calls, []);
   });
 
-  it("passes the server's own message on when the save fails", async () => {
-    const outcome = await renameRegion(fakeHttp(failing(new Error("Region not found."))), "r1", "Northern");
-    assert.deepEqual(outcome, { ok: false, message: "Region not found." });
+  it("says the region changed somewhere else when the server cannot find it", async () => {
+    const outcome = await renameRegion(fakeHttp(failing(new ApiClientError(404, "Region not found."))), "r1", "Northern");
+    assert.deepEqual(outcome, { ok: false, message: "This region was changed somewhere else. Reload the page." });
+  });
+});
+
+describe("coordinator changes made somewhere else", () => {
+  it("reads an assignment that already exists as a change made somewhere else", async () => {
+    const http = fakeHttp(failing(new ApiClientError(409, "Coordinator is already assigned to this region.")));
+    assert.deepEqual(await assignCoordinator(http, "r1", "u1"), {
+      ok: false,
+      message: "This region was changed somewhere else. Reload the page.",
+    });
+  });
+
+  it("reads an assignment that is already gone the same way", async () => {
+    const http = fakeHttp(failing(new ApiClientError(404, "Assignment not found.")));
+    assert.deepEqual(await removeCoordinator(http, "r1", "u1"), {
+      ok: false,
+      message: "This region was changed somewhere else. Reload the page.",
+    });
   });
 });
 
@@ -147,11 +176,11 @@ describe("coordinators", () => {
     assert.deepEqual(outcome, { ok: true, value: null });
   });
 
-  it("passes the server's own message on when the assignment is refused", async () => {
-    const http = fakeHttp(failing(new Error("Coordinator is already assigned to this region.")));
+  it("shows plain words when the assignment fails for another reason", async () => {
+    const http = fakeHttp(failing(new Error("connection reset")));
     assert.deepEqual(await assignCoordinator(http, "r1", "u1"), {
       ok: false,
-      message: "Coordinator is already assigned to this region.",
+      message: "We could not save that. Please try again.",
     });
   });
 
@@ -162,9 +191,9 @@ describe("coordinators", () => {
     assert.deepEqual(outcome, { ok: true, value: null });
   });
 
-  it("passes the server's own message on when the removal fails", async () => {
-    const outcome = await removeCoordinator(fakeHttp(failing(new Error("Assignment not found."))), "r1", "u1");
-    assert.deepEqual(outcome, { ok: false, message: "Assignment not found." });
+  it("shows plain words when the removal fails for another reason", async () => {
+    const outcome = await removeCoordinator(fakeHttp(failing(new ApiClientError(500, "boom"))), "r1", "u1");
+    assert.deepEqual(outcome, { ok: false, message: "We could not save that. Please try again." });
   });
 
   it("escapes ids before they go into a path", async () => {

@@ -64,7 +64,7 @@ describe("OrgPlacementPanel staff waiting for a region", () => {
   });
 });
 
-describe("OrgPlacementPanel classrooms with no region", () => {
+describe("OrgPlacementPanel classes with no region", () => {
   it("lists them read-only under a plain heading", () => {
     const html = renderToString(
       <OrgPlacementPanel
@@ -76,7 +76,7 @@ describe("OrgPlacementPanel classrooms with no region", () => {
         unregionedClasses={[{ id: "k1", name: "Night Class", instructorCount: 2, activeStudents: 7 }]}
       />,
     );
-    assert.ok(html.includes("Classrooms with No Region"));
+    assert.ok(html.includes("Classes with No Region"));
     assert.ok(html.includes("Night Class"));
     assert.ok(html.includes("2 instructors"));
     assert.ok(html.includes("7 students"));
@@ -86,7 +86,40 @@ describe("OrgPlacementPanel classrooms with no region", () => {
     const html = renderToString(
       <OrgPlacementPanel unplacedStaff={[]} applicants={[]} regions={[]} classes={[]} canPlace={true} unregionedClasses={[]} />,
     );
-    assert.ok(html.includes("Classrooms with No Region"));
-    assert.ok(html.includes("Every classroom has a region."));
+    assert.ok(html.includes("Classes with No Region"));
+    assert.ok(html.includes("Every class has a region."));
+  });
+});
+
+describe("OrgPlacementPanel words", () => {
+  const unregioned = [{ id: "k1", name: "Night Class", instructorCount: 1, activeStudents: 1 }];
+
+  it("tells an admin each step that puts a class in a region", () => {
+    const html = renderToString(
+      <OrgPlacementPanel unplacedStaff={[]} applicants={[]} regions={[]} classes={[]} canPlace={true} unregionedClasses={unregioned} />,
+    ).replaceAll("&#x27;", "'");
+    assert.ok(
+      html.includes(
+        "Regional coordinators can't see these classes. To fix one, go to Class Roster on this page. Choose the class under Select class. Choose a region, then press Save Settings.",
+      ),
+    );
+  });
+
+  it("says classes, not classrooms, in its own words", () => {
+    // With canPlace, each applicant row carries PlaceApplicantControl, whose
+    // own words are outside this panel; so applicants are listed read-only here.
+    for (const canPlace of [true, false]) {
+      const html = renderToString(
+        <OrgPlacementPanel
+          unplacedStaff={[]}
+          applicants={canPlace ? [] : applicants}
+          regions={[]}
+          classes={[]}
+          canPlace={canPlace}
+          unregionedClasses={unregioned}
+        />,
+      );
+      assert.doesNotMatch(html, /classroom/i);
+    }
   });
 });

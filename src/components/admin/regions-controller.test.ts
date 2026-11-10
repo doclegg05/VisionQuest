@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { ApiClientError } from "@/lib/api";
 import { describe, it } from "node:test";
 
 import type { RegionsHttp } from "./regions-api";
@@ -63,9 +64,9 @@ function harness(options: HarnessOptions = {}): Harness {
   return { controller, actions, requests, confirms, state: () => state, refreshes: () => refreshes };
 }
 
-function failWith(message: string): () => never {
+function failWith(status: number, message: string): () => never {
   return () => {
-    throw new Error(message);
+    throw new ApiClientError(status, message);
   };
 }
 
@@ -88,9 +89,9 @@ describe("loading", () => {
   });
 
   it("shows the server's message when the load fails", async () => {
-    const h = harness({ answer: failWith("Admin access required.") });
+    const h = harness({ answer: failWith(403, "Admin access required.") });
     await h.controller.load();
-    assert.deepEqual(h.state(), { kind: "load-failed", message: "Admin access required." });
+    assert.deepEqual(h.state(), { kind: "load-failed", message: "We could not load the regions. Please try again." });
   });
 
   it("goes back to loading, then loads, when the admin tries again", async () => {
@@ -116,14 +117,15 @@ describe("adding a region", () => {
     assert.equal(h.refreshes(), 1);
   });
 
-  it("shows the server's message and leaves the list alone when the save fails", async () => {
-    const h = harness({ regions: [north], answer: failWith("That region code is already in use.") });
+  it("says the short code is taken, marks the code, and leaves the list alone", async () => {
+    const h = harness({ regions: [north], answer: failWith(409, "That region code is already in use.") });
     const saved = await h.controller.onCreate({ name: "North", code: "north" });
     assert.equal(saved, false);
     assert.deepEqual(h.actions.at(-1), {
       type: "save-failed",
       target: { kind: "create" },
-      message: "That region code is already in use.",
+      message: 'Another region already uses the short code "north". Change the short code and try again.',
+      problem: "code-taken",
     });
     assert.deepEqual(regionsOf(h.state()), [north]);
     assert.equal(h.refreshes(), 0);
@@ -140,7 +142,7 @@ describe("adding a region", () => {
   });
 
   it("can save again after a save has finished", async () => {
-    const h = harness({ regions: [], answer: failWith("Try later.") });
+    const h = harness({ regions: [], answer: failWith(500, "Try later.") });
     await h.controller.onCreate({ name: "East", code: "east" });
     await h.controller.onCreate({ name: "East", code: "east" });
     assert.equal(h.requests.length, 2);
@@ -158,13 +160,13 @@ describe("renaming a region", () => {
     assert.deepEqual(h.requests, ['PATCH /api/admin/regions/r1 {"name":"Northern"}']);
   });
 
-  it("puts the server's message on that region when the save fails", async () => {
-    const h = harness({ regions: [north], answer: failWith("Region not found.") });
+  it("puts the failure on that region's rename form", async () => {
+    const h = harness({ regions: [north], answer: failWith(404, "Region not found.") });
     assert.equal(await h.controller.onRename(north, "Northern"), false);
     assert.deepEqual(h.actions.at(-1), {
       type: "save-failed",
-      target: { kind: "region", regionId: "r1" },
-      message: "Region not found.",
+      target: { kind: "rename", regionId: "r1" },
+      message: "This region was changed somewhere else. Reload the page.",
     });
   });
 });
@@ -198,10 +200,15 @@ describe("coordinators", () => {
     assert.doesNotMatch(h.confirms[0].message, /only region/);
   });
 
-  it("sends nothing when the admin cancels the removal", async () => {
+  it("sends nothing when the admin cancels the removal, and says nothing was removed", async () => {
     const h = harness({ regions: [north], confirmWith: false });
-    await h.controller.onRemove({ region: north, person: pat, onlyRegion: true });
+    assert.equal(await h.controller.onRemove({ region: north, person: pat, onlyRegion: true }), false);
     assert.deepEqual(h.requests, []);
+  });
+
+  it("resolves true once the coordinator is removed, so the row can move focus", async () => {
+    const h = harness({ regions: [north] });
+    assert.equal(await h.controller.onRemove({ region: north, person: pat, onlyRegion: true }), true);
   });
 
   it("removes the coordinator but keeps them on offer", async () => {

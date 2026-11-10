@@ -179,3 +179,14 @@ export function coordinatorChoices(people: readonly RegionPerson[], region: Admi
 export function regionCountFor(regions: readonly AdminRegion[], coordinatorId: string): number {
   return regions.filter((region) => region.coordinators.some((person) => person.id === coordinatorId)).length;
 }
+
+/**
+ * The name of another region called the same thing, ignoring case and outer
+ * spaces, or null. The server allows it; the screen only warns.
+ */
+export function regionWithSameName(regions: readonly AdminRegion[], name: string, exceptId?: string): string | null {
+  const wanted = name.trim().toLowerCase();
+  if (!wanted) return null;
+  const match = regions.find((region) => region.id !== exceptId && region.name.trim().toLowerCase() === wanted);
+  return match ? match.name : null;
+}

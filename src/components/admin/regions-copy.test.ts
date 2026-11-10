@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { PLAIN_LANGUAGE_IDEAL_GRADE, assessReadability } from "@/lib/sage/readability";
 import {
   INVITE_HINTS,
+  REGION_MESSAGES,
   REGIONS_COPY,
   classCountLabel,
   regionCountLabel,
@@ -24,6 +25,14 @@ describe("regions copy", () => {
     assert.equal(classCountLabel(4), "4 classes");
   });
 
+  it("says in plain words what went wrong and what to do", () => {
+    assert.equal(REGION_MESSAGES.changedElsewhere, "This region was changed somewhere else. Reload the page.");
+    assert.equal(REGION_MESSAGES.sameName("North"), "There is already a region called North.");
+    assert.equal(REGION_MESSAGES.codeFromName("north-central"), "Short code: north-central (made from the name)");
+    assert.equal(REGIONS_COPY.codeHelp, "A short ID for this region, used in reports. Letters, numbers and dashes only.");
+    assert.equal(REGIONS_COPY.changeCode, "Change it");
+  });
+
   it("counts regions in plain words", () => {
     assert.equal(regionCountLabel(0), "No regions yet");
     assert.equal(regionCountLabel(1), "1 region");
@@ -38,7 +47,10 @@ describe("regions copy", () => {
   it("warns when a coordinator is about to lose their only region", () => {
     const last = removeCoordinatorConfirm({ personName: "Pat Lee", regionName: "North", onlyRegion: true });
     assert.equal(last.title, "Remove Pat Lee from North?");
-    assert.match(last.message, /only region/);
+    assert.equal(
+      last.message,
+      "This is their only region. After this, they will not see any classes. You can add them back until you leave this page. After that, they will not show in the list.",
+    );
     assert.equal(last.destructive, true, "this takes access away, so the button is red");
     const other = removeCoordinatorConfirm({ personName: "Pat Lee", regionName: "North", onlyRegion: false });
     assert.doesNotMatch(other.message, /only region/);
@@ -47,6 +59,10 @@ describe("regions copy", () => {
 
 describe("regions copy reading level", () => {
   const built = [
+    REGION_MESSAGES.codeTaken("north"),
+    REGION_MESSAGES.changedElsewhere,
+    REGION_MESSAGES.sameName("North"),
+    REGION_MESSAGES.codeFromName("north-central"),
     removeCoordinatorConfirm({ personName: "Pat Lee", regionName: "North", onlyRegion: true }).message,
     removeCoordinatorConfirm({ personName: "Pat Lee", regionName: "North", onlyRegion: false }).message,
     ...[INVITE_HINTS.noChoices("North"), INVITE_HINTS.notInList].map((hint) => `${hint.before}${hint.link}${hint.after}`),

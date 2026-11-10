@@ -1,3 +1,5 @@
+import { ApiClientError } from "@/lib/api";
+import { REGION_MESSAGES } from "./regions-copy";
 import {
   REGION_CODE_MAX_LENGTH,
   REGION_CODE_PATTERN,
@@ -14,7 +16,16 @@ export interface RegionsHttp {
   del(url: string): Promise<unknown>;
 }
 
-export type Outcome<T> = { ok: true; value: T } | { ok: false; message: string };
+/** A failure the form can act on beyond showing words: the short code is taken. */
+export type SaveProblem = "code-taken";
+
+export interface Failure {
+  ok: false;
+  message: string;
+  problem?: SaveProblem;
+}
+
+export type Outcome<T> = { ok: true; value: T } | Failure;
 
 export interface NewRegionInput {
   name: string;
@@ -36,21 +47,30 @@ function regionUrl(regionId: string): string {
   return `${REGIONS_URL}/${encodeURIComponent(regionId)}`;
 }
 
-function failed(message: string): Outcome<never> {
+function failed(message: string): Failure {
   return { ok: false, message };
 }
 
-/** The server's own words when it sent any (the `api` client throws them), or the fallback. */
-function messageFrom(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
+function statusOf(error: unknown): number | null {
+  return error instanceof ApiClientError ? error.status : null;
 }
 
-/** Runs one request and turns a thrown error into a failed outcome carrying its message. */
-async function attempt<T>(request: () => Promise<Outcome<T>>, fallback: string): Promise<Outcome<T>> {
+/**
+ * Plain words for a failed save. The server's own text is for developers
+ * ("Region not found.", Zod messages), so it is never shown. A 404 or a 409
+ * means someone changed the region on another screen.
+ */
+function saveFailure(error: unknown): Failure {
+  const status = statusOf(error);
+  return failed(status === 404 || status === 409 ? REGION_MESSAGES.changedElsewhere : MESSAGES.saveFailed);
+}
+
+/** Runs one request and turns a thrown error into the failure `onError` picks. */
+async function attempt<T>(request: () => Promise<Outcome<T>>, onError: (error: unknown) => Failure): Promise<Outcome<T>> {
   try {
     return await request();
   } catch (error) {
-    return failed(messageFrom(error, fallback));
+    return onError(error);
   }
 }
 
@@ -58,7 +78,7 @@ export function loadRegions(http: RegionsHttp): Promise<Outcome<AdminRegion[]>> 
   return attempt(async () => {
     const regions = parseRegionList(await http.get(REGIONS_URL));
     return regions ? { ok: true, value: regions } : failed(MESSAGES.unreadableList);
-  }, MESSAGES.loadFailed);
+  }, () => failed(MESSAGES.loadFailed));
 }
 
 function isValidCode(code: string): boolean {
@@ -74,7 +94,10 @@ export async function createRegion(http: RegionsHttp, input: NewRegionInput): Pr
   return attempt(async () => {
     const region = parseRegionReply(await http.post(REGIONS_URL, { name, code }));
     return region ? { ok: true, value: region } : failed(MESSAGES.savedUnseen);
-  }, MESSAGES.saveFailed);
+  }, (error) =>
+    // The only conflict a create can meet is a short code already in use.
+    statusOf(error) === 409 ? { ...failed(REGION_MESSAGES.codeTaken(code)), problem: "code-taken" } : saveFailure(error),
+  );
 }
 
 /** Resolves to the name the server kept. */
@@ -84,19 +107,19 @@ export async function renameRegion(http: RegionsHttp, regionId: string, name: st
   return attempt(async () => {
     const region = parseRegionReply(await http.patch(regionUrl(regionId), { name: trimmed }));
     return { ok: true, value: region?.name ?? trimmed };
-  }, MESSAGES.saveFailed);
+  }, saveFailure);
 }
 
 export function assignCoordinator(http: RegionsHttp, regionId: string, coordinatorId: string): Promise<Outcome<null>> {
   return attempt(async () => {
     await http.post(`${regionUrl(regionId)}/coordinators`, { coordinatorId });
     return { ok: true, value: null };
-  }, MESSAGES.saveFailed);
+  }, saveFailure);
 }
 
 export function removeCoordinator(http: RegionsHttp, regionId: string, coordinatorId: string): Promise<Outcome<null>> {
   return attempt(async () => {
     await http.del(`${regionUrl(regionId)}/coordinators/${encodeURIComponent(coordinatorId)}`);
     return { ok: true, value: null };
-  }, MESSAGES.saveFailed);
+  }, saveFailure);
 }

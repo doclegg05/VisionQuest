@@ -7,6 +7,7 @@ import {
   mergePeople,
   parseRegionReply,
   parseRegionList,
+  regionWithSameName,
   regionCountFor,
   suggestRegionCode,
   withCoordinatorAdded,
@@ -186,5 +187,22 @@ describe("people who can be added as a coordinator", () => {
     ];
     assert.equal(regionCountFor(regions, "u1"), 2);
     assert.equal(regionCountFor(regions, "nobody"), 0);
+  });
+});
+
+describe("regionWithSameName", () => {
+  const regions = [region({ id: "r1", name: "North" }), region({ id: "r2", name: "East" })];
+
+  it("finds another region with the same name, ignoring case and spaces", () => {
+    assert.equal(regionWithSameName(regions, "  north "), "North");
+  });
+
+  it("does not count the region being renamed", () => {
+    assert.equal(regionWithSameName(regions, "North", "r1"), null);
+  });
+
+  it("finds nothing for a new name or a blank one", () => {
+    assert.equal(regionWithSameName(regions, "West"), null);
+    assert.equal(regionWithSameName(regions, "  "), null);
   });
 });

@@ -115,6 +115,11 @@ describe("class settings", () => {
     assert.match(manager, /\{manageRegions \? <ClassRegionField /);
   });
 
+  it("says a new account was made, with no dash", () => {
+    assert.ok(manager.includes("Account created. Share these sign-in details:"));
+    assert.equal(manager.includes("Account created \u2014"), false);
+  });
+
   it("shows the class's region in the header", () => {
     assert.ok(manager.includes("<ClassRegionLine region={classDetail.region} />"));
   });

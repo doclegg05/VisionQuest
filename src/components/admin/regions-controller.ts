@@ -25,7 +25,8 @@ export interface RegionsControllerDeps {
 /** The card's handlers. The ones that ask first resolve when the whole step is done. */
 export interface RegionsController extends RegionsHandlers {
   load: () => Promise<void>;
-  onRemove: (request: RemoveCoordinatorRequest) => Promise<void>;
+  /** Resolves true once the coordinator is removed, false when cancelled or failed. */
+  onRemove: (request: RemoveCoordinatorRequest) => Promise<boolean>;
 }
 
 /** What a saved change leaves behind: the change to the list and the words that announce it. */
@@ -53,7 +54,8 @@ function createSave({ dispatch, onSaved }: RegionsControllerDeps): Save {
     try {
       const outcome = await request();
       if (!outcome.ok) {
-        dispatch({ type: "save-failed", target, message: outcome.message });
+        const { message, problem } = outcome;
+        dispatch({ type: "save-failed", target, message, ...(problem ? { problem } : {}) });
         return false;
       }
       dispatch({ type: "save-succeeded", ...describe(outcome.value) });
@@ -73,7 +75,7 @@ function regionHandlers({ http }: RegionsControllerDeps, save: Save) {
         notice: REGION_NOTICES.added(region.name),
       })),
     onRename: (region: AdminRegion, name: string) =>
-      save(rowOf(region), () => renameRegion(http, region.id, name), (saved) => ({
+      save({ kind: "rename", regionId: region.id }, () => renameRegion(http, region.id, name), (saved) => ({
         change: { kind: "region-changed", regionId: region.id, change: { name: saved } },
         notice: REGION_NOTICES.renamed(saved),
       })),
@@ -89,8 +91,8 @@ function coordinatorHandlers({ http, confirm }: RegionsControllerDeps, save: Sav
       })),
     onRemove: async ({ region, person, onlyRegion }: RemoveCoordinatorRequest) => {
       const copy = removeCoordinatorConfirm({ personName: person.displayName, regionName: region.name, onlyRegion });
-      if (!(await confirm(copy))) return;
-      await save(rowOf(region), () => removeCoordinator(http, region.id, person.id), () => ({
+      if (!(await confirm(copy))) return false;
+      return save(rowOf(region), () => removeCoordinator(http, region.id, person.id), () => ({
         change: { kind: "coordinator-removed", regionId: region.id, coordinatorId: person.id },
         notice: REGION_NOTICES.coordinatorRemoved(person.displayName, region.name),
       }));

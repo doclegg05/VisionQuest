@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 
 import { FIELD_CLASS, LABEL_CLASS } from "@/components/staff/fieldStyles";
+import { focusAfterRemove } from "./focus-after-remove";
+import { RegionNameField } from "./RegionNameField";
 import { INVITE_HINTS, REGIONS_COPY, classCountLabel } from "./regions-copy";
 import { coordinatorChoices, regionCountFor, type AdminRegion, type RegionPerson } from "./regions-model";
 import { ALERT_CLASS, MUTED_TEXT, SECONDARY_BUTTON, SUBHEADING } from "./regionStyles";
@@ -17,7 +19,8 @@ export interface RemoveCoordinatorRequest {
 export interface RegionRowHandlers {
   onRename: (region: AdminRegion, name: string) => Promise<boolean>;
   onAssign: (region: AdminRegion, person: RegionPerson) => Promise<boolean>;
-  onRemove: (request: RemoveCoordinatorRequest) => void;
+  /** Resolves true once the coordinator is removed. */
+  onRemove: (request: RemoveCoordinatorRequest) => Promise<boolean>;
 }
 
 interface RegionRowProps {
@@ -28,8 +31,11 @@ interface RegionRowProps {
   people: readonly RegionPerson[];
   /** Any request is in flight, so nothing may be sent. */
   busy: boolean;
-  /** This row's own request is in flight. */
-  saving: boolean;
+  /** This region's rename is in flight. */
+  renameSaving: boolean;
+  /** A failed rename, shown in the rename form. */
+  renameError: string | null;
+  /** Any other failed save on this row. */
   error: string | null;
   handlers: RegionRowHandlers;
 }
@@ -45,40 +51,42 @@ function RegionTitle({ region }: { region: AdminRegion }) {
 
 interface RenameFormProps {
   region: AdminRegion;
+  /** Every listed region, to warn about a name another one has. */
+  regions: readonly AdminRegion[];
   busy: boolean;
   saving: boolean;
+  /** A failed rename, shown under the input. */
+  error: string | null;
   onSave: (name: string) => void;
   onCancel: () => void;
 }
 
-function RenameForm({ region, busy, saving, onSave, onCancel }: RenameFormProps) {
+export function RenameForm({ region, regions, busy, saving, error, onSave, onCancel }: RenameFormProps) {
   const [draft, setDraft] = useState(region.name);
-  const inputId = `rename-${region.id}`;
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
         onSave(draft);
       }}
-      className="flex flex-wrap items-end gap-3"
+      className="flex flex-wrap items-start gap-3"
     >
-      <div className="min-w-48 flex-1">
-        <label htmlFor={inputId} className={LABEL_CLASS}>{REGIONS_COPY.renameLabel}</label>
-        <input
-          id={inputId}
-          required
-          autoFocus
-          maxLength={200}
-          autoComplete="off"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          className={FIELD_CLASS}
-        />
+      <RegionNameField
+        id={`rename-${region.id}`}
+        label={REGIONS_COPY.renameLabel}
+        value={draft}
+        onChange={setDraft}
+        regions={regions}
+        exceptId={region.id}
+        error={error}
+        autoFocus
+      />
+      <div className="flex flex-wrap gap-3 pt-6">
+        <button type="submit" disabled={busy} className={SECONDARY_BUTTON}>
+          {saving ? REGIONS_COPY.saving : REGIONS_COPY.saveName}
+        </button>
+        <button type="button" onClick={onCancel} className={SECONDARY_BUTTON}>{REGIONS_COPY.cancel}</button>
       </div>
-      <button type="submit" disabled={busy} className={SECONDARY_BUTTON}>
-        {saving ? REGIONS_COPY.saving : REGIONS_COPY.saveName}
-      </button>
-      <button type="button" onClick={onCancel} className={SECONDARY_BUTTON}>{REGIONS_COPY.cancel}</button>
     </form>
   );
 }
@@ -167,10 +175,13 @@ function InviteHint({ before, link, after }: { before: string; link: string; aft
   );
 }
 
-function RegionCoordinators({ region, regions, people, busy, handlers }: Omit<RegionRowProps, "saving" | "error">) {
+function RegionCoordinators({ region, regions, people, busy, handlers }: Omit<RegionRowProps, "renameSaving" | "renameError" | "error">) {
   const choices = coordinatorChoices(people, region);
-  const remove = (person: RegionPerson) =>
-    handlers.onRemove({ region, person, onlyRegion: regionCountFor(regions, person.id) === 1 });
+  const remove = async (person: RegionPerson) => {
+    if (await handlers.onRemove({ region, person, onlyRegion: regionCountFor(regions, person.id) === 1 })) {
+      focusAfterRemove(region.id);
+    }
+  };
   return (
     <div className="space-y-2">
       <p className={SUBHEADING}>{REGIONS_COPY.coordinatorsHeading}</p>
@@ -187,7 +198,7 @@ function RegionCoordinators({ region, regions, people, busy, handlers }: Omit<Re
   );
 }
 
-export function RegionRow({ region, regions, people, busy, saving, error, handlers }: RegionRowProps) {
+export function RegionRow({ region, regions, people, busy, renameSaving, renameError, error, handlers }: RegionRowProps) {
   const [renaming, setRenaming] = useState(false);
   const renameButton = useRef<HTMLButtonElement>(null);
 
@@ -202,7 +213,8 @@ export function RegionRow({ region, regions, people, busy, saving, error, handle
   }
 
   return (
-    <li id={`region-${region.id}`} className="space-y-3 py-4">
+    // tabIndex -1: focus lands here after a removal when no select is shown.
+    <li id={`region-${region.id}`} tabIndex={-1} className="space-y-3 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <RegionTitle region={region} />
         <button
@@ -216,7 +228,17 @@ export function RegionRow({ region, regions, people, busy, saving, error, handle
           {REGIONS_COPY.rename}
         </button>
       </div>
-      {renaming && <RenameForm region={region} busy={busy} saving={saving} onSave={saveName} onCancel={closeRename} />}
+      {renaming && (
+        <RenameForm
+          region={region}
+          regions={regions}
+          busy={busy}
+          saving={renameSaving}
+          error={renameError}
+          onSave={saveName}
+          onCancel={closeRename}
+        />
+      )}
       <RegionCoordinators region={region} regions={regions} people={people} busy={busy} handlers={handlers} />
       {error && <p role="alert" className={ALERT_CLASS}>{error}</p>}
     </li>

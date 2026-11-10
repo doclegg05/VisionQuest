@@ -118,81 +118,112 @@ function AssignRow({ person, regions }: { person: UnplacedStaffItem; regions: re
   );
 }
 
+const HEADING = "text-sm font-semibold text-[var(--ink-strong)]";
+const NOTE = "mt-1 text-sm text-[var(--ink-muted)]";
+const EMPTY = "mt-2 text-sm text-[var(--ink-muted)]";
+const LIST = "mt-2 divide-y divide-[var(--border)]";
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+function WaitingStaff({ people, regions }: { people: readonly UnplacedStaffItem[]; regions: readonly RegionOption[] }) {
+  return (
+    <div>
+      <h2 className={HEADING}>Staff Waiting for a Region</h2>
+      <p className={NOTE}>These instructors have no region and no class. They cannot see students until you place them.</p>
+      {people.length === 0 ? (
+        <p className={EMPTY}>Everyone is placed.</p>
+      ) : (
+        <ul className={LIST}>
+          {people.map((person) => (
+            <AssignRow key={person.id} person={person} regions={regions} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ClassesWithNoRegion({ items, canPlace }: { items: readonly UnregionedClassItem[]; canPlace: boolean }) {
+  return (
+    <div>
+      <h2 className={HEADING}>Classes with No Region</h2>
+      <p className={NOTE}>
+        {canPlace
+          ? "Regional coordinators can't see these classes. To fix one, go to Class Roster on this page. Choose the class under Select class. Choose a region, then press Save Settings."
+          : "Regional coordinators can't see these classes. Each one needs a region. Ask an admin to set it."}
+      </p>
+      {items.length === 0 ? (
+        <p className={EMPTY}>Every class has a region.</p>
+      ) : (
+        <ul className={LIST}>
+          {items.map((item) => (
+            <li key={item.id} className="py-3 text-sm text-[var(--ink-strong)]">
+              <span className="font-semibold">{item.name}</span>
+              <span className="ml-2 text-[var(--ink-muted)]">
+                {`${plural(item.instructorCount, "instructor", "instructors")} · ${plural(item.activeStudents, "student", "students")}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+interface WaitingApplicantsProps {
+  applicants: readonly WaitingApplicantItem[];
+  classes: readonly ClassOption[];
+  canPlace: boolean;
+  onPlaced: (applicantId: string) => void;
+}
+
+function WaitingApplicants({ applicants, classes, canPlace, onPlaced }: WaitingApplicantsProps) {
+  return (
+    <div>
+      <h2 className={HEADING}>Applicants Waiting for a Class</h2>
+      <p className={NOTE}>
+        {canPlace
+          ? "These people signed up but are not in a class. Pick a class to place them."
+          : "These people signed up but are not in a class. An admin places them."}
+      </p>
+      {applicants.length === 0 ? (
+        <p className={EMPTY}>No one is waiting.</p>
+      ) : (
+        <ul className={LIST}>
+          {applicants.map((applicant) => (
+            <li key={applicant.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <p className="text-sm text-[var(--ink-strong)]">
+                <span className="font-semibold">{applicant.displayName}</span>
+                <span className="ml-2 text-[var(--ink-muted)]">
+                  {applicant.county ?? "County not given"} · Joined {applicant.createdOn}
+                </span>
+              </p>
+              {canPlace ? (
+                <PlaceApplicantControl applicantId={applicant.id} classes={classes} onPlaced={() => onPlaced(applicant.id)} />
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function OrgPlacementPanel({ unplacedStaff, applicants, unregionedClasses, regions, classes, canPlace }: OrgPlacementPanelProps) {
   const [placedIds, setPlacedIds] = useState<readonly string[]>([]);
   const waiting = applicants.filter((applicant) => !placedIds.includes(applicant.id));
   return (
     <section className="theme-card space-y-6 rounded-xl p-5">
-      <div>
-        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Staff Waiting for a Region</h2>
-        <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          These instructors have no region and no class. They cannot see students until you place them.
-        </p>
-        {unplacedStaff.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--ink-muted)]">Everyone is placed.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-[var(--border)]">
-            {unplacedStaff.map((person) => (
-              <AssignRow key={person.id} person={person} regions={regions} />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div>
-        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Classrooms with No Region</h2>
-        <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          {canPlace
-            ? "Regional coordinators cannot see these classrooms. To fix one, pick it under Class Roster on this page. Then pick a region and press Save Settings."
-            : "Regional coordinators cannot see these classrooms. Each one needs a region. Ask an admin to set it."}
-        </p>
-        {unregionedClasses.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--ink-muted)]">Every classroom has a region.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-[var(--border)]">
-            {unregionedClasses.map((item) => (
-              <li key={item.id} className="py-3 text-sm text-[var(--ink-strong)]">
-                <span className="font-semibold">{item.name}</span>
-                <span className="ml-2 text-[var(--ink-muted)]">
-                  {`${item.instructorCount} ${item.instructorCount === 1 ? "instructor" : "instructors"} · ${item.activeStudents} ${item.activeStudents === 1 ? "student" : "students"}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div>
-        <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Applicants Waiting for a Class</h2>
-        <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          {canPlace
-            ? "These people signed up but are not in a class. Pick a classroom to place them."
-            : "These people signed up but are not in a class. An admin places them."}
-        </p>
-        {waiting.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--ink-muted)]">No one is waiting.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-[var(--border)]">
-            {waiting.map((applicant) => (
-              <li key={applicant.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <p className="text-sm text-[var(--ink-strong)]">
-                  <span className="font-semibold">{applicant.displayName}</span>
-                  <span className="ml-2 text-[var(--ink-muted)]">
-                    {applicant.county ?? "County not given"} · Joined {applicant.createdOn}
-                  </span>
-                </p>
-                {canPlace ? (
-                  <PlaceApplicantControl
-                    applicantId={applicant.id}
-                    classes={classes}
-                    onPlaced={() => setPlacedIds((current) => [...current, applicant.id])}
-                  />
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <WaitingStaff people={unplacedStaff} regions={regions} />
+      <ClassesWithNoRegion items={unregionedClasses} canPlace={canPlace} />
+      <WaitingApplicants
+        applicants={waiting}
+        classes={classes}
+        canPlace={canPlace}
+        onPlaced={(applicantId) => setPlacedIds((current) => [...current, applicantId])}
+      />
     </section>
   );
 }

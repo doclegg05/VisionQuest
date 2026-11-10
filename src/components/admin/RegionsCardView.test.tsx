@@ -13,7 +13,7 @@ const handlers: RegionsHandlers = {
   onCreate: async () => true,
   onRename: async () => true,
   onAssign: async () => true,
-  onRemove: () => {},
+  onRemove: async () => true,
 };
 
 const pat: RegionPerson = { id: "u1", displayName: "Pat Lee", email: "pat@example.org" };
@@ -74,7 +74,8 @@ describe("RegionsCardView on a system with no regions", () => {
 
   it("shows the form that adds the first region", () => {
     assert.ok(html.includes(">Region name</label>"));
-    assert.ok(html.includes(">Short code</label>"));
+    assert.ok(html.includes("Short code: made from the name"));
+    assert.ok(html.includes(">Change it</button>"));
     assert.ok(html.includes(">Add region</button>"));
   });
 
@@ -196,6 +197,10 @@ describe("RegionsCardView accessibility floor", () => {
         assert.ok(html.includes(`for="${id}"`), `label for ${id}`);
       }
     }
+  });
+
+  it("makes the row focusable, so focus can land on it after a removal", () => {
+    assert.match(views[0], /<li id="region-r1" tabindex="-1"/);
   });
 
   it("makes every button and field at least 44px tall", () => {
