@@ -210,6 +210,7 @@ export const DEMO_INSTRUCTOR_WRITE_DENY: readonly string[] = [
 
   "POST /api/sage/panel/refresh",
   "POST /api/sage/tools/propose-goal",
+  "POST /api/sage-notice",
 
   "DELETE /api/settings/api-key",
   "POST /api/settings/api-key",
