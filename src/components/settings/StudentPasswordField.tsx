@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import {
   MIN_PASSWORD_LENGTH,
   STUDENT_PASSWORD_HINT,
   STUDENT_PASSWORD_TOO_SHORT_MESSAGE,
 } from "@/lib/password-policy";
+import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 
 /**
  * The one password field students use: on the change-password screen, in
@@ -13,7 +14,8 @@ import {
  *
  * A new password shows its rule under the field at all times, counts what has
  * been typed against the number the rule is built from, and names the problem
- * when it is too short. Every password can be looked at with the Show button.
+ * when it is too short. Every password can be looked at with the Show button,
+ * which says Hide while it is on.
  * It is a password input, so a browser can offer to save it; only Show turns
  * it into text.
  */
@@ -42,6 +44,12 @@ export interface StudentPasswordFieldProps {
   /** True once the form was sent, so a short password is named even if the field was never left. */
   showError?: boolean;
   disabled?: boolean;
+  /** One line under the field that says how to type it, tied by aria-describedby. */
+  hint?: string;
+  /** The server's refusal about this field. It marks the field invalid and is tied to it. */
+  refusal?: string;
+  /** Lets the form move focus here when this field holds the problem. */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 export interface StudentPasswordFieldViewProps extends StudentPasswordFieldProps {
@@ -55,10 +63,9 @@ export interface StudentPasswordFieldViewProps extends StudentPasswordFieldProps
 
 const INPUT_CLASS =
   "field min-w-0 flex-1 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-70";
-const SHOW_BUTTON_BASE =
-  "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border px-4 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-70";
-const SHOW_BUTTON_OFF = "border-[var(--border-control)] bg-[var(--surface-raised)] text-[var(--ink-strong)]";
-const SHOW_BUTTON_ON = "border-[var(--ink-strong)] bg-[var(--surface-muted)] text-[var(--ink-strong)]";
+// The button's words carry its state, Show or Hide, so it needs one look only.
+const SHOW_BUTTON_CLASS =
+  "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-control)] bg-[var(--surface-raised)] px-4 text-sm font-semibold text-[var(--ink-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-70";
 
 /** The count line under a new password, built from the same constant as the rule. */
 function CountLine({ id, typed }: { id: string; typed: number }) {
@@ -92,12 +99,15 @@ function PasswordInputRow({
   revealed,
   onToggleReveal,
   onBlur,
+  inputRef,
   describedBy,
   invalid,
 }: PasswordInputRowProps) {
+  const action = revealed ? "Hide" : "Show";
   return (
     <div className="flex items-stretch gap-2">
       <input
+        ref={inputRef}
         id={id}
         type={revealed ? "text" : "password"}
         autoComplete={autoComplete}
@@ -117,12 +127,11 @@ function PasswordInputRow({
         type="button"
         onClick={onToggleReveal}
         disabled={disabled}
-        aria-pressed={revealed}
         aria-controls={id}
-        aria-label={`Show ${label.toLowerCase()}`}
-        className={`${SHOW_BUTTON_BASE} ${revealed ? SHOW_BUTTON_ON : SHOW_BUTTON_OFF}`}
+        aria-label={`${action} ${label.toLowerCase()}`}
+        className={SHOW_BUTTON_CLASS}
       >
-        Show
+        {action}
       </button>
     </div>
   );
@@ -130,20 +139,29 @@ function PasswordInputRow({
 
 /** The field with its state passed in. `StudentPasswordField` below holds the state. */
 export function StudentPasswordFieldView(props: StudentPasswordFieldViewProps) {
-  const { id, label, value, autoComplete, showError = false, touched } = props;
+  const { id, label, value, autoComplete, showError = false, touched, hint, refusal } = props;
   const isNew = autoComplete === "new-password";
   // An empty field the student only passed through is not an error yet.
   const tooShort = isNew && isPasswordTooShort(value) && (showError || (touched && value !== ""));
-  const describedBy = isNew
-    ? [`${id}-hint`, `${id}-count`, ...(tooShort ? [`${id}-error`] : [])].join(" ")
-    : undefined;
+  const describedIds = [
+    ...(isNew || hint ? [`${id}-hint`] : []),
+    ...(isNew ? [`${id}-count`] : []),
+    ...(tooShort ? [`${id}-error`] : []),
+    ...(refusal ? [`${id}-refusal`] : []),
+  ];
+  const describedBy = describedIds.length > 0 ? describedIds.join(" ") : undefined;
 
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
         {label}
       </label>
-      <PasswordInputRow {...props} describedBy={describedBy} invalid={tooShort} />
+      <PasswordInputRow {...props} describedBy={describedBy} invalid={tooShort || Boolean(refusal)} />
+      {!isNew && hint && (
+        <p id={`${id}-hint`} className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
+          {hint}
+        </p>
+      )}
       {isNew && (
         <>
           <p id={`${id}-hint`} className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
@@ -155,6 +173,12 @@ export function StudentPasswordFieldView(props: StudentPasswordFieldViewProps) {
       {tooShort && (
         <p id={`${id}-error`} role="alert" className="mt-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
           {STUDENT_PASSWORD_TOO_SHORT_MESSAGE}
+        </p>
+      )}
+      {refusal && (
+        <p id={`${id}-refusal`} className="mt-2 flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+          <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
+          {refusal}
         </p>
       )}
     </div>

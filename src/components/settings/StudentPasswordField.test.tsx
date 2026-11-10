@@ -118,12 +118,11 @@ describe("StudentPasswordField: a new password", () => {
     assert.doesNotMatch(tag(enough.slice(enough.indexOf('id="new-password-count"') - 40), "p"), /aria-live/u);
   });
 
-  it("has a Show button a thumb can hit, that says whether it is on", () => {
+  it("has a Show button a thumb can hit, named for its field", () => {
     const html = view();
     const button = tag(html, "button");
 
     assert.match(button, /type="button"/u);
-    assert.match(button, /aria-pressed="false"/u);
     assert.match(button, /aria-controls="new-password"/u);
     assert.match(button, /aria-label="Show new password"/u);
     assert.match(button, /\bmin-h-11\b/u);
@@ -131,12 +130,16 @@ describe("StudentPasswordField: a new password", () => {
     assert.match(html, /<button[^>]*>Show<\/button>/u);
   });
 
-  it("shows the password as text while Show is on, and says so", () => {
+  it("says Hide while the password shows as text, in its words and its name", () => {
     const html = view({ value: "green apple pie", revealed: true });
 
     assert.match(tag(html, "input"), /type="text"/u);
-    assert.match(tag(html, "button"), /aria-pressed="true"/u);
-    assert.match(html, /<button[^>]*>Show<\/button>/u, "the name stays the same; aria-pressed carries the state");
+    assert.match(tag(html, "button"), /aria-label="Hide new password"/u);
+    assert.match(html, /<button[^>]*>Hide<\/button>/u);
+  });
+
+  it("never pairs a changing name with a pressed state", () => {
+    for (const revealed of [false, true]) assert.doesNotMatch(tag(view({ revealed }), "button"), /aria-pressed/u);
   });
 
   it("starts hidden", () => {
@@ -145,7 +148,7 @@ describe("StudentPasswordField: a new password", () => {
     );
 
     assert.match(tag(html, "input"), /type="password"/u);
-    assert.match(tag(html, "button"), /aria-pressed="false"/u);
+    assert.match(html, /<button[^>]*>Show<\/button>/u);
   });
 });
 
@@ -202,5 +205,45 @@ describe("StudentPasswordField: the password in use now", () => {
   it("still has a Show button: an instructor-made password is easy to mistype", () => {
     assert.match(tag(html, "button"), /aria-label="Show password you use now"/u);
     assert.match(tag(html, "button"), /\bmin-h-11\b/u);
+  });
+});
+
+describe("StudentPasswordField: a line that says how to type it", () => {
+  const html = view({
+    id: "c",
+    label: "Password your instructor gave you",
+    autoComplete: "current-password",
+    hint: "Type it the way you signed in, with the dashes.",
+  });
+
+  it("shows the line under the field and ties it with aria-describedby", () => {
+    assert.match(html, /<p[^>]*id="c-hint"[^>]*>Type it the way you signed in, with the dashes\.<\/p>/u);
+    assert.match(tag(html, "input"), /aria-describedby="c-hint"/u);
+  });
+
+  it("names the Show button with the field's label", () => {
+    assert.match(tag(html, "button"), /aria-label="Show password your instructor gave you"/u);
+  });
+});
+
+describe("StudentPasswordField: a refusal from the server about this field", () => {
+  it("shows under the current field, marks it invalid and describes it", () => {
+    const html = view({ id: "c", label: "Password you use now", autoComplete: "current-password", refusal: "That is not it." });
+
+    assert.match(html, /<p[^>]*id="c-refusal"[^>]*>(?:(?!<\/p>).)*That is not it\.<\/p>/u);
+    assert.match(tag(html, "input"), /aria-invalid="true"/u);
+    assert.match(tag(html, "input"), /aria-describedby="c-refusal"/u);
+  });
+
+  it("shows under the new field after its rule and count", () => {
+    const html = view({ value: "green apple pie", refusal: "Choose something else." });
+
+    assert.match(tag(html, "input"), /aria-invalid="true"/u);
+    assert.match(tag(html, "input"), /aria-describedby="new-password-hint new-password-count new-password-refusal"/u);
+    assert.ok(html.indexOf('id="new-password-count"') < html.indexOf('id="new-password-refusal"'));
+  });
+
+  it("is absent with no refusal", () => {
+    assert.doesNotMatch(view({ value: "green apple pie" }), /-refusal"/u);
   });
 });

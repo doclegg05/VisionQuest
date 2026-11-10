@@ -72,7 +72,7 @@ describe("finding the examples a hint gives", () => {
 describe("no password hint or placeholder is itself a password the server accepts", () => {
   const field = [
     view({}),
-    view({ autoComplete: "current-password", label: "Password your instructor gave you" }),
+    view({ autoComplete: "current-password", label: "Password your instructor gave you", hint: "Type it the way you signed in, with the dashes." }),
   ];
   const hints = [STUDENT_PASSWORD_HINT, PASSWORD_LENGTH_HINT];
 
