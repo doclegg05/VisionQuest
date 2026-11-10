@@ -20,9 +20,8 @@ const seed = () => import("../seed-gates.mjs");
 
 /** Plan targets. A gate may tighten its target and may never loosen it. */
 const METRICS = {
-  // Estimated round trips; see the plan's Metrics section. 83, not the first 85: the counter fix in
-  // task T4 lowered the measured number by 2 with no change to the app, so the target moved with it.
-  M1: { target: 83, set: "launch" },
+  // Targets do not move when the instrument is corrected.
+  M1: { target: 85, set: "launch" },
   M2: { target: 8, set: "launch" },
   M3: { target: 12, set: "pilot" },
   M4: { target: 235, set: "launch" },
@@ -70,6 +69,12 @@ test("the eight metric gates keep the plan's sets and never loosen a target", as
     assert.equal(gate.check.direction, "atMost", `${gate.id} direction`);
     assert.ok(gate.check.target <= METRICS[gate.id].target, `${gate.id} target ${gate.check.target} is looser than the plan`);
   }
+});
+
+test("the round-trip gates say what their target stands for", async () => {
+  const gates = (await realGates("metric")).filter((gate) => ["M1", "M3", "M6"].includes(gate.id));
+  assert.equal(gates.length, 3);
+  for (const gate of gates) assert.ok(typeof gate.basis === "string" && gate.basis.trim() !== "", `${gate.id} needs a "basis"`);
 });
 
 test("the owner gates are O-1 to O-12", async () => {

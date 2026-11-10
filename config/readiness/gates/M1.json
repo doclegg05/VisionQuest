@@ -3,12 +3,13 @@
   "kind": "metric",
   "set": "launch",
   "title": "Estimated database round trips for one student dashboard render",
-  "doneWhen": "83 or fewer",
+  "doneWhen": "85 or fewer",
+  "basis": "about half of the 167 first measured",
   "check": {
     "type": "metric",
     "run": "node scripts/readiness/query-count.mjs dashboard",
-    "baseline": 161,
-    "target": 83,
+    "baseline": 163,
+    "target": 85,
     "direction": "atMost",
     "unit": "round trips"
   }

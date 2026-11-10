@@ -4,10 +4,11 @@
   "set": "pilot",
   "title": "Estimated database round trips before chat sends its first byte",
   "doneWhen": "12 or fewer, measured from a normal chat turn",
+  "basis": "the stream opens before everything else",
   "check": {
     "type": "metric",
     "run": "node scripts/readiness/query-count.mjs chat-send",
-    "baseline": 188,
+    "baseline": 190,
     "target": 12,
     "direction": "atMost",
     "unit": "round trips"
