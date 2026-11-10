@@ -27,6 +27,7 @@ function answer(call: EngineCall): unknown {
   if (call.action === "createOne" && call.modelName === "Goal") return { id: "goal-1", studentId: A.id };
   if (call.action === "updateOne" && call.modelName === "Progression") return { id: "prog-1", studentId: A.id };
   if (call.action === "createOne" && call.modelName === "StudentTask") return { id: "task-1", studentId: A.id };
+  if (call.action === "updateOne" && call.modelName === "OrientationItem") return { id: "item-1" };
   return undefined;
 }
 
@@ -74,5 +75,18 @@ describe("dashboard shell cache, cleared by the real write-through", () => {
     await asStudent(A, () => db.withAppTransaction((tx) =>
       tx.studentTask.create({ data: { studentId: A.id, createdById: A.id, title: "Call the clinic" } })));
     assert.equal(await shellReads(A), 0);
+  });
+});
+
+describe("dashboard globals, cleared by the real write-through", () => {
+  it("an OrientationItem write through `prisma` clears the kept orientation total", async () => {
+    const { globalCacheKey } = await import("./student-cache");
+    const key = globalCacheKey("orientation-item-count");
+    await cache.cached(key, 600, async () => 8);
+    await rls.withRlsContext({ userId: "admin-1", role: "admin", studentId: "" }, () =>
+      db.prisma.orientationItem.update({ where: { id: "item-1" }, data: { label: "Sign the attendance policy" } }));
+    let reread = false;
+    await cache.cached(key, 600, async () => { reread = true; return 9; });
+    assert.equal(reread, true, "the orientation total outlived an OrientationItem write");
   });
 });

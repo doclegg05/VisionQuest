@@ -51,8 +51,10 @@ import {
  * F2 step 2: 74 to 68.3. The advising poll reads readiness and the next step
  * once each, grouped in transactions, where it re-ran the whole readiness
  * fetch beside the next step's own copies of the same counts.
+ * F2 step 4: 68.3 to 64.5. The orientation total and the Ready-to-Work
+ * templates are kept for ten minutes, so they are read once per window.
  */
-const IDLE_STATEMENTS_PER_MINUTE = 68.3;
+const IDLE_STATEMENTS_PER_MINUTE = 64.5;
 
 /** Long enough to hold whole cycles of every interval the client uses. */
 const WINDOW_MS = 10 * 60_000;

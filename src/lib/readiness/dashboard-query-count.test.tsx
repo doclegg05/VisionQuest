@@ -78,8 +78,9 @@ const DASHBOARD_ADMIN_QUERIES_COLD = 2;
 /**
  * The shell is kept per student once a Progression row exists, so warm skips its 3 reads.
  * F2 step 3: both one-time gates are satisfied for this student and kept, so warm skips 2 more.
+ * F2 step 4: the orientation total and the Ready-to-Work templates are global and kept: 2 more.
  */
-const DASHBOARD_APP_QUERIES_WARM = 29;
+const DASHBOARD_APP_QUERIES_WARM = 27;
 const DASHBOARD_ADMIN_QUERIES_WARM = 0;
 /** [app, admin] nested relation loads, counted only below a level that returned rows. */
 const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
@@ -87,9 +88,10 @@ const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
  * M1: app plus admin round trips, what `node scripts/readiness/query-count.mjs dashboard` prints.
  * An admin call costs a round trip too, so both clients count.
  * F2 step 2: 167 to 79 cold, 165 to 70 warm. Step 3 (gates kept once satisfied): warm 70 to 62.
+ * Step 4 (global rows kept): warm 62 to 54.
  */
 const DASHBOARD_ROUND_TRIPS_COLD = 79;
-const DASHBOARD_ROUND_TRIPS_WARM = 62;
+const DASHBOARD_ROUND_TRIPS_WARM = 54;
 /** "file › function" -> [app, admin] for the cold render. */
 const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -103,7 +105,8 @@ const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/dashboard/live.ts › readCounts": [4, 0],
   "src/lib/student-alerts.ts › countStudentVisibleAlerts": [1, 0],
   "src/lib/student-alerts.ts › countStudentVisibleAlertsOfType": [1, 0],
-  "src/lib/dashboard/globals.ts › readDashboardGlobals": [2, 0],
+  "src/lib/dashboard/globals.ts › readOrientationTotal": [1, 0],
+  "src/lib/dashboard/globals.ts › readReadyToWorkTemplates": [1, 0],
   "src/lib/dashboard/live.ts › readPageOnly": [2, 0],
   "src/lib/dashboard/signals.ts › readNextStepSignals": [6, 0],
   "src/lib/dashboard/signals.ts › readOverviewSignals": [4, 0],
