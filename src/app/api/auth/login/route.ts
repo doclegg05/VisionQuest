@@ -12,7 +12,7 @@ import {
   setMfaSessionCookie,
 } from "@/lib/auth";
 import { clientIpBucket } from "@/lib/client-ip";
-import { rateLimit, refundRateLimit, type RateLimitResult } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody, loginSchema } from "@/lib/schemas";
@@ -21,10 +21,19 @@ import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { passwordChangeRequired } from "@/lib/password-change-gate";
 import { getJwtSecret } from "@/lib/session-token";
+import {
+  ACCOUNT_FAILED_SIGN_IN_LIMIT,
+  SIGN_IN_WINDOW_MINUTES,
+  SIGN_IN_WINDOW_MS,
+  accountSignInLimiterKey,
+  giveBack,
+  takenUnit,
+  type TakenUnit,
+} from "@/lib/sign-in-budget";
 
-/** One window for both sign-in limits. The failure messages name it in minutes. */
-const SIGN_IN_WINDOW_MINUTES = 15;
-const SIGN_IN_WINDOW_MS = SIGN_IN_WINDOW_MINUTES * 60 * 1000;
+// The per-account limit, the window and the unit bookkeeping live in
+// src/lib/sign-in-budget.ts, shared with the change-password route. The
+// per-network limit below is this route's own.
 
 /**
  * FAILED sign-ins one network address may make per window. A right password
@@ -39,16 +48,6 @@ const SIGN_IN_WINDOW_MS = SIGN_IN_WINDOW_MINUTES * 60 * 1000;
  * refused once; trying again works.
  */
 const NETWORK_FAILED_SIGN_IN_LIMIT = 30;
-
-/**
- * FAILED sign-ins on one account per window, from any address. This is the
- * brute-force control. A right password gives its unit back, so a student can
- * sign in on every lab PC in turn. One unit comes back, never the wrong tries
- * before it, and a refused attempt keeps its unit whatever the password was.
- * An attempt holds its unit until it is answered, so wrong tries plus
- * attempts in flight can never pass 5.
- */
-const ACCOUNT_FAILED_SIGN_IN_LIMIT = 5;
 
 /**
  * The one answer for every failed sign-in: unknown login, wrong password,
@@ -78,28 +77,6 @@ function unknownLoginLimiterKey(normalizedLogin: string): string {
 /** Built fresh per request so no caller can change the shared answer. */
 function signInFailed(): NextResponse {
   return NextResponse.json({ error: SIGN_IN_FAILED_MESSAGE }, { status: 401 });
-}
-
-/** One unit a limiter call took, kept so a right password can give it back. */
-interface TakenUnit {
-  key: string;
-  resetTime: number;
-}
-
-/** Null when the limiter failed open: a degraded limiter took no unit, so there is nothing to give back. */
-function takenUnit(key: string, result: RateLimitResult): TakenUnit | null {
-  return result.degraded ? null : { key, resetTime: result.resetTime };
-}
-
-/**
- * Gives back the units a right password took, each in the window it was taken
- * from. Call this only once the response is certain to say the password was
- * right. Every refusal answers the same 401 whatever the password was, so a
- * unit that came back for a locked, closed or Google-only account would let
- * the caller read "right password" off a count, past the per-account lock.
- */
-async function giveBack(units: readonly (TakenUnit | null)[]): Promise<void> {
-  await Promise.all(units.map((unit) => (unit ? refundRateLimit(unit.key, unit.resetTime) : undefined)));
 }
 
 /** The account a typed login names, and the login in the form both limiters key on. */
@@ -145,7 +122,7 @@ interface AccountAttempt {
  */
 async function countAccountAttempt(student: Student | null, normalizedLogin: string): Promise<AccountAttempt> {
   const unknownLoginKey = unknownLoginLimiterKey(normalizedLogin);
-  const accountKey = student ? `login:user:${student.id}` : unknownLoginKey;
+  const accountKey = student ? accountSignInLimiterKey(student.id) : unknownLoginKey;
   const userRl = await rateLimit(accountKey, ACCOUNT_FAILED_SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
   return { locked: student !== null && !userRl.success, unit: takenUnit(accountKey, userRl) };
 }
@@ -296,7 +273,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   // The password was right, and both answers below say so. Give the network
   // and the account unit back here and nowhere earlier: every refusal above
-  // answers the same 401 whatever the password was (see `giveBack`).
+  // answers the same 401 whatever the password was, so a unit that came back
+  // for a locked, closed or Google-only account would let the caller read
+  // "right password" off a count, past the per-account lock (see `giveBack`).
   await giveBack([takenUnit(networkKey, networkRl), accountUnit]);
 
   return student.mfaEnabled ? startMfaChallenge(student, ip) : startSession(student, ip);
