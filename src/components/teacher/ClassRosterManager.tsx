@@ -9,6 +9,7 @@ import { useRegionsChanged } from "@/components/admin/regions-events";
 import { useClassRegionMove } from "@/components/admin/useClassRegionMove";
 import { CreateClassForm, createClassBody, useCreateClassForm } from "./CreateClassForm";
 import { CreateClassHint, createClassVisibility } from "./CreateClassGate";
+import { CLASS_NOT_SAVED, classRefusalMessage } from "./class-refusals";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
@@ -326,14 +327,15 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error || "Could not create the class.");
+        setError(classRefusalMessage({ status: response.status, serverMessage: payload?.error, onAdminPage: manageRegions }));
+        return;
       }
 
       setMessage("Class created.");
       newClass.reset();
       await loadClasses(payload?.class?.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the class.");
+    } catch {
+      setError(CLASS_NOT_SAVED);
     } finally {
       setCreatingClass(false);
     }
@@ -362,14 +364,15 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error || "Could not save the class settings.");
+        setError(classRefusalMessage({ status: response.status, serverMessage: payload?.error, onAdminPage: manageRegions }));
+        return;
       }
 
       setMessage("Class settings updated.");
       await loadClasses(selectedClassId);
       await loadClassDetail(selectedClassId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the class settings.");
+    } catch {
+      setError(CLASS_NOT_SAVED);
     } finally {
       setSaving(false);
     }
