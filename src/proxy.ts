@@ -3,6 +3,12 @@ import { isAuthorizedInternalRequest, isSignedWebhookPath, isUrlHostMatch } from
 import { isCohortDemoEnabled } from "@/lib/demo/config";
 import { DEMO_READ_ONLY_REFUSAL } from "@/lib/demo/copy";
 import { isDemoInstructorRequestAllowed } from "@/lib/demo/instructor-policy";
+import {
+  PASSWORD_CHANGE_PATH,
+  PASSWORD_CHANGE_REQUIRED_CODE,
+  PASSWORD_CHANGE_REQUIRED_MESSAGE,
+  isAllowedWhilePasswordChangeRequired,
+} from "@/lib/password-change-gate";
 import { verifyToken, type SessionClaims } from "@/lib/session-token";
 import {
   RLS_HEADER_NAMES,
@@ -58,6 +64,8 @@ function styleSrcElemRelaxed(): boolean {
 //   7. Cohort demo fence: a demo session is treated as signed out once the
 //      switch is off, and the shared demo instructor is held to
 //      src/lib/demo/instructor-policy.ts. Both checks need no database.
+//   8. Forced password change: a session whose token says its holder must
+//      choose a new password is held to src/lib/password-change-gate.ts.
 // The static CSP in next.config.ts has been removed — this proxy is the single source of truth.
 // Referrer-Policy and X-Content-Type-Options are NOT set here: next.config.ts
 // `headers()` already applies both (plus HSTS and X-Frame-Options) to `/(.*)`.
@@ -94,6 +102,24 @@ function sessionClaimsFor(request: NextRequest): SessionClaims | null {
   const claims = token ? verifyToken(token) : null;
   if (claims?.demo !== undefined && !isCohortDemoEnabled()) return null;
   return claims;
+}
+
+/**
+ * The answer for a session that must change its password and asked for
+ * anything else. An API route gets a 403 a client can read by its code. A
+ * page is sent to the change screen: 307 for a read, and 303 for anything
+ * else so the browser follows with a GET and not the same refused method.
+ */
+function passwordChangeRefusal(request: NextRequest, method: string, isApi: boolean): NextResponse {
+  if (isApi) {
+    return NextResponse.json(
+      { error: PASSWORD_CHANGE_REQUIRED_MESSAGE, code: PASSWORD_CHANGE_REQUIRED_CODE },
+      { status: 403 },
+    );
+  }
+  const url = request.nextUrl.clone();
+  url.pathname = PASSWORD_CHANGE_PATH;
+  return NextResponse.redirect(url, method === "GET" || method === "HEAD" ? 307 : 303);
 }
 
 export function proxy(request: NextRequest) {
@@ -156,6 +182,17 @@ export function proxy(request: NextRequest) {
   // route handlers alone would let it change the program's real content.
   if (claims?.demo === "instructor" && !isDemoInstructorRequestAllowed(method, pathname)) {
     return NextResponse.json({ error: DEMO_READ_ONLY_REFUSAL }, { status: 403 });
+  }
+
+  // --- Forced password change ---
+  // After the CSRF check, for the same reason as the demo fence. This runs
+  // for pages and API routes alike, before any handler: a layout redirect
+  // never runs for an API route, so it could not hold the session by itself.
+  // The claim is signed, and the proxy has no database to ask, so the claim
+  // is what it enforces; getSession() ends a session whose claim and account
+  // row disagree (src/lib/auth.ts).
+  if (claims?.mustChangePassword === true && !isAllowedWhilePasswordChangeRequired(method, pathname)) {
+    return passwordChangeRefusal(request, method, isApi);
   }
 
   // --- CSP nonce + response headers ---
