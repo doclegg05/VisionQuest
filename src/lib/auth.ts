@@ -288,11 +288,6 @@ function sessionCacheKey(id: string, sessionVersion: number): string {
   return `session:${id}:${sessionVersion}`;
 }
 
-async function readSessionAccount(id: string): Promise<SessionAccount | null> {
-  const row = await prismaAdmin.student.findUnique({ where: { id }, select: SESSION_ACCOUNT_SELECT });
-  return row ? sessionAccountFrom(row) : null;
-}
-
 export async function getSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -307,7 +302,13 @@ export async function getSession() {
   // throws: no session on an unknown answer.
   const [revoked, student] = await Promise.all([
     isSessionTokenRevoked(token),
-    cached(sessionCacheKey(claims.sub, claims.sv), SESSION_CACHE_TTL_S, () => readSessionAccount(claims.sub)),
+    cached(sessionCacheKey(claims.sub, claims.sv), SESSION_CACHE_TTL_S, async () => {
+      const row = await prismaAdmin.student.findUnique({
+        where: { id: claims.sub },
+        select: SESSION_ACCOUNT_SELECT,
+      });
+      return row ? sessionAccountFrom(row) : null;
+    }),
   ]);
   if (revoked) return null;
   return sessionFrom(claims, student);
