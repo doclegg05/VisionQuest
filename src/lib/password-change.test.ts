@@ -48,4 +48,26 @@ describe("password change refusals", async () => {
     assert.match(passwordChangeRefusal({ kind: "budget_spent" }).error, /15 minutes/u);
     assert.match(passwordChangeRefusal({ kind: "wrong_current_password" }).error, /15 minutes/u);
   });
+
+  it("tells a first-day student to type the instructor's password with its dashes, and names the budget from its constants", async () => {
+    const { ACCOUNT_FAILED_SIGN_IN_LIMIT, SIGN_IN_WINDOW_MINUTES } = await import("./sign-in-budget");
+    assert.equal(
+      passwordChangeRefusal({ kind: "wrong_current_password" }).error,
+      `That is not the password you signed in with. Check each letter and type the dashes too. After ${ACCOUNT_FAILED_SIGN_IN_LIMIT} wrong tries you must wait ${SIGN_IN_WINDOW_MINUTES} minutes.`,
+    );
+  });
+
+  it("gives a held student a next step when the limiter cannot count", () => {
+    assert.equal(
+      passwordChangeRefusal({ kind: "limiter_unavailable" }).error,
+      "We cannot change passwords right now. Try again in a few minutes, or ask your instructor for help. You can sign out and come back later.",
+    );
+  });
+
+  it("says plainly that an instructor just set a new password", () => {
+    assert.equal(
+      passwordChangeRefusal({ kind: "changed_elsewhere" }).error,
+      "Your instructor just set a new password for you. Sign in again with it.",
+    );
+  });
 });

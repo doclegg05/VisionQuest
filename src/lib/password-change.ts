@@ -64,7 +64,7 @@ const REFUSALS: Readonly<Record<PasswordChangeRefusal["kind"], PasswordChangeRef
   wrong_current_password: {
     status: 400,
     code: "WRONG_CURRENT_PASSWORD",
-    error: `That is not the password you use now. Check it and try again. After too many wrong tries you must wait ${SIGN_IN_WINDOW_MINUTES} minutes.`,
+    error: `That is not the password you signed in with. Check each letter and type the dashes too. After ${ACCOUNT_FAILED_SIGN_IN_LIMIT} wrong tries you must wait ${SIGN_IN_WINDOW_MINUTES} minutes.`,
   },
   budget_spent: {
     status: 429,
@@ -74,7 +74,7 @@ const REFUSALS: Readonly<Record<PasswordChangeRefusal["kind"], PasswordChangeRef
   limiter_unavailable: {
     status: 503,
     code: "PASSWORD_CHANGE_UNAVAILABLE",
-    error: "We cannot change passwords right now. Try again in a few minutes.",
+    error: "We cannot change passwords right now. Try again in a few minutes, or ask your instructor for help. You can sign out and come back later.",
   },
   no_password_set: {
     status: 400,
@@ -94,7 +94,7 @@ const REFUSALS: Readonly<Record<PasswordChangeRefusal["kind"], PasswordChangeRef
   changed_elsewhere: {
     status: 409,
     code: "PASSWORD_CHANGED_ELSEWHERE",
-    error: "Your password was just changed another way. Sign in again, or ask your instructor for help.",
+    error: "Your instructor just set a new password for you. Sign in again with it.",
   },
 };
 

@@ -320,7 +320,7 @@ describe("POST /api/settings/password: a wrong current password", () => {
 
     assert.equal(res.status, 400);
     assert.equal(body.code, "WRONG_CURRENT_PASSWORD");
-    assert.match(body.error ?? "", /not the password you use now/i);
+    assert.match(body.error ?? "", /not the password you signed in with/i);
     assert.equal(updateCalls.length, 0);
     assert.equal(hashCalls.length, 0);
     assertNothingChanged();
