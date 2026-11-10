@@ -18,6 +18,8 @@ export const REFUSALS = {
   unmarked_rows_on_demo_class: "Rows that belong to accounts not marked as demo are attached to a demo class. Nothing was deleted.",
   marked_staff_over_unmarked_students: "A marked demo account teaches or coordinates a class or region that has unmarked students. Nothing was deleted.",
   marked_account_on_kept_rows: "A marked demo account is named on rows that belong to other people or to the program. Nothing was deleted.",
+  records_about_unmarked_people: "A marked demo account is on an audit record, a Sage action or a message about a person or class that is not demo. Deleting it would erase the record of what the demo account did to real data. Nothing was deleted.",
+  kept_rows_would_be_blanked: "Rows that are kept point at a row the closeout would delete, and the database would quietly blank that link. Nothing was deleted.",
   rows_left_pointing: "Rows would be left pointing at a deleted account or class. Nothing was deleted.",
   unlisted_rows_removed: "The deletion would remove rows the preview did not list. Nothing was deleted.",
 } as const;
@@ -100,6 +102,14 @@ export interface ReportCounts {
     readonly publicCredentialPagesSwitchedOn: number;
   };
   readonly rowsToDelete: Readonly<Record<string, number>>;
+  readonly uploadedFilesLeftInStorage: number;
+  readonly leftBehind: {
+    readonly orphans: Readonly<Record<string, number>>;
+    readonly systemConfigNamingDemoClass: number;
+    readonly staffNotificationsAboutDemoStudents: number;
+    readonly opportunitiesFromDemoLeads: number;
+    readonly storageFoldersOfDemoAccounts: number;
+  };
 }
 
 function markedLine(counts: ReportCounts, applied: boolean): string {
@@ -108,6 +118,26 @@ function markedLine(counts: ReportCounts, applied: boolean): string {
   const rows = Object.values(counts.rowsToDelete).reduce((sum, count) => sum + count, 0);
   const what = `${many(students, "marked student account", "marked student accounts")}, ${many(instructors, "marked instructor account", "marked instructor accounts")}, ${many(demoClasses, "demo class", "demo classes")} and ${many(rows, "row", "rows")} in all`;
   return applied ? `Deleted: ${what}.` : `An apply would delete: ${what}.`;
+}
+
+/** Rows, settings, notices, listings and files the tool leaves, as sentences. Counts only. */
+function leftoverLines(counts: ReportCounts): string[] {
+  const { orphans, systemConfigNamingDemoClass: settings, staffNotificationsAboutDemoStudents: notices } = counts.leftBehind;
+  const orphaned = Object.values(orphans).reduce((sum, count) => sum + count, 0);
+  const files = counts.uploadedFilesLeftInStorage;
+  const folders = counts.leftBehind.storageFoldersOfDemoAccounts;
+  const listings = counts.leftBehind.opportunitiesFromDemoLeads;
+  const lines = [orphaned === 0
+    ? "0 rows name an account or class that does not exist."
+    : `${many(orphaned, "row names", "rows name")} an account or class that does not exist. After an apply this must be 0. If it is not, stop and ask a developer. The tool does not change these rows.`];
+  if (settings > 0) lines.push(`${many(settings, "program setting holds", "program settings hold")} the id of the demo class. Remove the class from ${settings === 1 ? "it" : "them"} in Program Setup, or ask a developer.`);
+  if (notices > 0) lines.push(`${many(notices, "notice to a staff member names", "notices to staff members name")} a demo account. ${notices === 1 ? "It stays in that staff member's list of notices." : "They stay in those staff members' lists of notices."}`);
+  if (listings > 0) lines.push(`${many(listings, "opportunity listing was", "opportunity listings were")} copied from a demo class job lead. ${listings === 1 ? "It stays." : "They stay."}`);
+  if (files > 0) {
+    const what = files === 1 ? "It may hold a real visitor's document." : "They may hold real visitors' documents.";
+    lines.push(`${many(files, "uploaded file", "uploaded files")} in ${many(folders, "storage folder", "storage folders")} ${files === 1 ? "belongs" : "belong"} to the demo accounts. ${what} This tool does not remove files from storage, and removing them is a separate step that is not built yet.`);
+  }
+  return lines;
 }
 
 /**
@@ -129,7 +159,7 @@ export function leftBehindLines(counts: ReportCounts): string[] {
   }
   if (pages === 1) lines.push("1 public credential page of an account with no demo mark is switched on. Anyone who has its address can open it. This tool does not change it.");
   if (pages > 1) lines.push(`${pages} public credential pages of accounts with no demo mark are switched on. Anyone who has an address can open that page. This tool does not change them.`);
-  return lines;
+  return [...lines, ...leftoverLines(counts)];
 }
 
 /** The sentences under a preview: what would go, what stays, and how to apply. */

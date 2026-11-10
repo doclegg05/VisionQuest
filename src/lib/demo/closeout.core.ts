@@ -4,6 +4,8 @@
  * Nothing here knows which tables the closeout deletes from: closeout.ts does.
  */
 
+import type { Prisma } from "@prisma/client";
+
 export type Where = Readonly<Record<string, unknown>>;
 export type Ids = readonly string[];
 export type DemoEnv = Readonly<Record<string, string | undefined>>;
@@ -19,7 +21,8 @@ export interface CloseoutTable {
 
 export interface CloseoutTx {
   $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
-  $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
+  /** A tagged template, or a statement built with Prisma.sql from fixed text and parameters. */
+  $queryRaw(query: TemplateStringsArray | Prisma.Sql, ...values: unknown[]): Promise<unknown>;
 }
 
 export interface CloseoutClient {
@@ -61,6 +64,33 @@ export interface Run {
 }
 
 export const UNMARKED = { demoAccount: null } as const;
+
+/** One removal: a model, the ids it is given, and how a row is matched. */
+export interface DeleteStep {
+  readonly model: Prisma.ModelName;
+  /** Which ids the step is given: the plan's accounts, its classes or its queued jobs. */
+  readonly scope: "account" | "class" | "job";
+  /** The column that holds the id, or null for a row reached through its parent. */
+  readonly column: string | null;
+  readonly where: (ids: Ids) => Where;
+}
+
+export function idsFor(run: Run, scope: DeleteStep["scope"]): Ids {
+  if (scope === "account") return run.plan.accountIds;
+  return scope === "class" ? run.plan.classIds : run.plan.jobIds;
+}
+
+/** The distinct values of `column` over every row these steps would delete. */
+export async function plannedValues(run: Run, steps: readonly DeleteStep[], column: string): Promise<Set<string>> {
+  const found = new Set<string>();
+  for (const step of steps) {
+    for (const chunk of chunksOf(idsFor(run, step.scope), run.chunk)) {
+      const rows = await tableOf(run.tx, step.model).findMany({ where: step.where(chunk), select: { [column]: true } });
+      idsOf(rows, column).forEach((value) => found.add(value));
+    }
+  }
+  return found;
+}
 
 export const inList = (column: string) => (ids: Ids): Where => ({ [column]: { in: ids } });
 

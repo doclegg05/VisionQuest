@@ -259,6 +259,33 @@ describe("demo closeout sentences about what is left", () => {
     assert.ok(stdout.includes("1 public credential page of an account with no demo mark is switched on. Anyone who has its address can open it. This tool does not change it."), stdout.join("\n"));
   });
 
+  it("says how many rows name an account or class that does not exist, and that the number must be 0", async () => {
+    const { db } = await scene();
+    const clean = await command(db, []).result;
+    db.insert("AuditLog", { action: "x", targetType: "student", targetId: "gone-student" });
+
+    const { stdout } = await command(db, []).result;
+
+    assert.ok(clean.stdout.includes("0 rows name an account or class that does not exist."), clean.stdout.join("\n"));
+    assert.ok(stdout.includes("1 row names an account or class that does not exist. After an apply this must be 0. If it is not, stop and ask a developer. The tool does not change these rows."), stdout.join("\n"));
+  });
+
+  it("says what the tool leaves in settings, staff notices, listings and storage", async () => {
+    const { db, demo, real } = await scene();
+    db.insert("SystemConfig", { key: "pilot_classes", value: JSON.stringify([demo.classId]) });
+    db.insert("Notification", { studentId: real.staffId, type: "x", title: "dm- student Name needs attention" });
+    db.insert("Opportunity", { title: "x", company: "x", sourceJobLeadId: "dm-JobLead" });
+
+    const { stdout } = await command(db, []).result;
+
+    for (const line of [
+      "1 program setting holds the id of the demo class. Remove the class from it in Program Setup, or ask a developer.",
+      "1 notice to a staff member names a demo account. It stays in that staff member's list of notices.",
+      "1 opportunity listing was copied from a demo class job lead. It stays.",
+      "1 uploaded file in 1 storage folder belongs to the demo accounts. It may hold a real visitor's document. This tool does not remove files from storage, and removing them is a separate step that is not built yet.",
+    ]) assert.ok(stdout.includes(line), `${line}\n---\n${stdout.join("\n")}`);
+  });
+
   it("gives a preview with no refusal the number to pass to the apply", async () => {
     const { db } = await scene();
 

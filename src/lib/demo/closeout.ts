@@ -27,14 +27,18 @@
 import { Prisma } from "@prisma/client";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN, isCohortDemoEnabled, isRealStudentDataDeclared } from "./config";
 import {
-  UNMARKED, chunksOf, countIn, idsOf, inList, tableOf, valuesWhere,
-  type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DemoEnv, type Ids, type Run, type Where,
+  UNMARKED, chunksOf, countIn, idsFor, idsOf, inList, tableOf, valuesWhere,
+  type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type DemoEnv, type Ids, type Run, type Where,
 } from "./closeout.core";
+import {
+  deletedAuditRowsWithUnmarkedActor, recentActivity, recordsAboutOthers, rowsTheDatabaseWouldBlank, setNullLinksInto,
+} from "./closeout.guards";
+import { leftBehind, type LeftBehind } from "./closeout.orphans";
 import type { LocalSchema } from "./closeout.local";
 import { refusal, type Refusal, type RefusalCode } from "./closeout.report";
-import { readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type ServerFacts } from "./closeout.server";
+import { jobIdsNaming, readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type ServerFacts } from "./closeout.server";
 
-export { tableOf, type CloseoutClient, type CloseoutPlan, type CloseoutTx, type Where } from "./closeout.core";
+export { tableOf, type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type Where } from "./closeout.core";
 export { REFUSALS, type Refusal, type RefusalCode } from "./closeout.report";
 export type { CloseoutTarget } from "./closeout.server";
 
@@ -60,15 +64,6 @@ export const markedDemoAccountsRule: SelectionRule = async (tx) => {
   });
   return { accountIds: idsOf(accounts, "id"), classIds: idsOf(classes, "id") };
 };
-
-export interface DeleteStep {
-  readonly model: Prisma.ModelName;
-  /** Which ids the step is given: the plan's accounts or its classes. */
-  readonly scope: "account" | "class";
-  /** The column that holds the id, or null for a row reached through its parent. */
-  readonly column: string | null;
-  readonly where: (ids: Ids) => Where;
-}
 
 const own = (model: Prisma.ModelName, column: string): DeleteStep => ({ model, scope: "account", column, where: inList(column) });
 const ofClass = (model: Prisma.ModelName, column: string): DeleteStep => ({ model, scope: "class", column, where: inList(column) });
@@ -171,6 +166,13 @@ const CLASS_STEPS: readonly DeleteStep[] = [
   ofClass("AuditLog", "targetId"), // no foreign key
 ];
 
+/**
+ * Queued and finished jobs whose JSON payload names a planned account
+ * (`jobIdsNaming` in closeout.server.ts). BackgroundJob has no foreign key, so
+ * the schema would leave every one behind.
+ */
+const JOB_STEPS: readonly DeleteStep[] = [{ model: "BackgroundJob", scope: "job", column: "id", where: inList("id") }];
+
 const CLASS_ROOT: DeleteStep = ofClass("SpokesClass", "id");
 /** The marker is repeated here so this statement can never remove an unmarked account. */
 const ACCOUNT_ROOT: DeleteStep = {
@@ -178,7 +180,10 @@ const ACCOUNT_ROOT: DeleteStep = {
 };
 
 /** Every removal, in the order it runs. The demo class goes just before the accounts. */
-export const DELETE_STEPS: readonly DeleteStep[] = [...ACCOUNT_STEPS, ...CLASS_STEPS, CLASS_ROOT, ACCOUNT_ROOT];
+export const DELETE_STEPS: readonly DeleteStep[] = [...ACCOUNT_STEPS, ...JOB_STEPS, ...CLASS_STEPS, CLASS_ROOT, ACCOUNT_ROOT];
+
+/** Every SetNull foreign key into a model a step deletes from. See `rowsTheDatabaseWouldBlank`. */
+export const SET_NULL_LINKS = setNullLinksInto(new Set(DELETE_STEPS.map((step) => step.model)));
 
 /** Which rows that name an account are NOT deleted by the plan, and so must not exist. */
 export type Survives =
@@ -325,6 +330,8 @@ export interface CloseoutPreview {
   readonly rowsToDelete: Readonly<Record<string, number>>;
   /** Uploads whose database row goes while the stored file stays in storage. */
   readonly uploadedFilesLeftInStorage: number;
+  /** What stays after an apply that a reader should know about. Counts only. */
+  readonly leftBehind: LeftBehind;
 }
 
 interface OutcomeBase {
@@ -382,8 +389,6 @@ class CloseoutRefused extends Error {
     super(refused.sentence);
   }
 }
-
-const idsFor = (run: Run, scope: DeleteStep["scope"]): Ids => (scope === "account" ? run.plan.accountIds : run.plan.classIds);
 
 /** Rows several steps would delete from one model, each counted once. */
 async function countDistinct(run: Run, model: string, steps: readonly DeleteStep[]): Promise<number> {
@@ -499,7 +504,7 @@ async function prewriteRefusals(run: Run, gate: Gate, enrolledInDemoClass: numbe
   for (const entry of UNMARKED_ON_DEMO_CLASS) attached += await countIn(run, entry.model, entry.where, run.plan.classIds);
   const found = [
     refusal("demo_mode_on", isCohortDemoEnabled(gate.env) ? 1 : 0),
-    refusal("demo_recently_active", gate.lockFree ? 0 : 1),
+    refusal("demo_recently_active", (gate.lockFree ? 0 : 1) + (await recentActivity(run))),
     refusal("expected_accounts_mismatch", gate.countDiffers ? 1 : 0),
     refusal("demo_class_not_owned", withDemoCode - ownedByDemoInstructor),
     refusal("plan_includes_unmarked", await countIn(run, "Student", (ids) => ({ id: { in: ids }, ...UNMARKED }), run.plan.accountIds)),
@@ -507,6 +512,8 @@ async function prewriteRefusals(run: Run, gate: Gate, enrolledInDemoClass: numbe
     refusal("unmarked_rows_on_demo_class", attached),
     refusal("marked_staff_over_unmarked_students", await unmarkedUnderPlannedStaff(run)),
     refusal("marked_account_on_kept_rows", await keptRowsNamingAccounts(run)),
+    refusal("records_about_unmarked_people", await recordsAboutOthers(run)),
+    refusal("kept_rows_would_be_blanked", await rowsTheDatabaseWouldBlank(run, DELETE_STEPS, SET_NULL_LINKS)),
   ];
   return found.filter((entry) => entry.count > 0);
 }
@@ -521,6 +528,7 @@ async function survey(run: Run, gate: Gate): Promise<{ preview: CloseoutPreview;
     ...people,
     rowsToDelete,
     uploadedFilesLeftInStorage: rowsToDelete.FileUpload ?? 0,
+    leftBehind: await leftBehind(run),
   };
   return { preview, refusals: await prewriteRefusals(run, gate, people.unmarked.enrolledInDemoClass) };
 }
@@ -562,9 +570,10 @@ function unlistedChanges(before: Record<string, number>, after: Record<string, n
  * Deletes the plan. Runs inside the caller's transaction: a refusal or any
  * other throw from here rolls every statement back.
  */
-async function applyPlan(run: Run, preview: CloseoutPreview): Promise<AppliedCounts> {
+async function applyPlan(run: Run, preview: CloseoutPreview, newestMigration: string): Promise<AppliedCounts> {
   const before = await tableCounts(run.tx);
-  for (const step of [...ACCOUNT_STEPS, ...CLASS_STEPS]) await deleteStep(run, step);
+  const unmarkedActors = await deletedAuditRowsWithUnmarkedActor(run, DELETE_STEPS.filter((step) => step.model === "AuditLog"));
+  for (const step of [...ACCOUNT_STEPS, ...JOB_STEPS, ...CLASS_STEPS]) await deleteStep(run, step);
   refuseIf(await rowsStillNaming(run, CLASS_COLUMNS, run.plan.classIds), "rows_left_pointing", preview);
   await deleteStep(run, CLASS_ROOT);
   refuseIf(await rowsStillNaming(run, ACCOUNT_COLUMNS, run.plan.accountIds), "rows_left_pointing", preview);
@@ -586,7 +595,10 @@ async function applyPlan(run: Run, preview: CloseoutPreview): Promise<AppliedCou
     data: {
       actorRole: "owner", action: "demo.closeout", targetType: "demo",
       summary: "Demo closeout deleted the marked demo accounts, the demo class and their rows.",
-      metadata: JSON.stringify({ accounts: run.plan.accountIds.length, classes: run.plan.classIds.length, rows }),
+      metadata: JSON.stringify({
+        accounts: run.plan.accountIds.length, classes: run.plan.classIds.length, rows, rowsByModel: preview.rowsToDelete,
+        uploadedFilesLeftInStorage: preview.uploadedFilesLeftInStorage, newestMigration, deletedAuditRowsWithUnmarkedActor: unmarkedActors,
+      }),
     },
   });
   // The preview's counts are the deleted counts: the row-count check above
@@ -609,13 +621,15 @@ async function inTransaction(tx: CloseoutTx, options: CloseoutOptions): Promise<
   if (unreadable.length > 0) return { kind: "unreadable", target, refusals: unreadable };
 
   const selection = await (options.rule ?? markedDemoAccountsRule)(tx);
-  const run: Run = { tx, plan: { ...selection, jobIds: [] }, chunk: options.chunkSize ?? ID_CHUNK, now: server.now };
+  const chunk = options.chunkSize ?? ID_CHUNK;
+  const jobIds = await jobIdsNaming(tx, selection.accountIds, chunk);
+  const run: Run = { tx, plan: { ...selection, jobIds }, chunk, now: server.now };
   const countDiffers = options.apply && options.expectAccounts !== run.plan.accountIds.length;
   const { preview, refusals } = await survey(run, { env: options.env ?? process.env, lockFree, countDiffers });
   if (!options.apply) return { kind: "preview", target, preview, refusals };
   if (refusals.length > 0) return { kind: "refused", target, preview, refusals };
   try {
-    return { kind: "applied", target, preview, refusals: [], ...(await applyPlan(run, preview)) };
+    return { kind: "applied", target, preview, refusals: [], ...(await applyPlan(run, preview, server.newestMigration ?? "")) };
   } catch (error) {
     if (error instanceof CloseoutRefused) throw new CloseoutRefused(error.refused, error.preview, target);
     throw error;

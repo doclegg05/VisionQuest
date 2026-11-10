@@ -115,7 +115,7 @@ interface Delegate {
 
 export interface FakeTx {
   $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
-  $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
+  $queryRaw(query: TemplateStringsArray | Prisma.Sql, ...values: unknown[]): Promise<unknown>;
   [delegate: string]: unknown;
 }
 
@@ -128,6 +128,14 @@ export interface FakeClient {
 export const FAKE_MIGRATION = "20261101000000_fake_newest";
 /** The demo student create lock, as the fake sees it in a statement's values. */
 const LOCK_STATEMENT = /pg_try_advisory_xact_lock/;
+
+/** An orphan probe from closeout.server.ts, with its table, column, kind column (if any) and parent. */
+const ORPHAN_STATEMENT = /^SELECT count\(\*\)::int AS orphans FROM visionquest\."(\w+)" t WHERE t\."(\w+)" IS NOT NULL AND t\."\w+" <> 'system' (?:AND t\."(\w+)" IN \([?, ]+\) )?AND NOT EXISTS \(SELECT 1 FROM visionquest\."(\w+)" p WHERE/;
+
+/** A statement built with Prisma.sql, as opposed to a tagged template's strings. */
+function isSql(query: TemplateStringsArray | Prisma.Sql): query is Prisma.Sql {
+  return !Array.isArray(query);
+}
 
 /** What a raw statement was given: plain values, and the values inside a `Prisma.join(...)`. */
 function flatValues(values: readonly unknown[]): unknown[] {
@@ -289,7 +297,7 @@ export class FakeDb {
   }
 
   /** The tool's fixed statements, answered from this fake's state. Any other statement is refused. */
-  private raw(state: { rowSecurityOff: boolean }, strings: TemplateStringsArray, values: readonly unknown[]): unknown {
+  private raw(state: { rowSecurityOff: boolean }, strings: readonly string[], values: readonly unknown[]): unknown {
     const sql = strings.join("?").replace(/\s+/g, " ").trim();
     this.statementLog.at(-1)?.push(sql);
     if (sql === "SET LOCAL row_security = off") {
@@ -305,6 +313,9 @@ export class FakeDb {
       if (schema !== this.ledgerSchema) throw new Error(`relation "${schema}._prisma_migrations" does not exist`);
       return [{ newest: [...this.appliedMigrations].sort().at(-1) ?? null }];
     }
+    const orphan = ORPHAN_STATEMENT.exec(sql);
+    if (orphan) return [{ orphans: this.orphans(orphan, flatValues(values), state.rowSecurityOff) }];
+    if (sql.includes('FROM visionquest."Notification" n')) return this.notices(new Set(flatValues(values)), state.rowSecurityOff);
     if (sql.includes('visionquest."BackgroundJob"') && sql.includes("payload::jsonb->>'studentId'")) {
       const named = new Set(flatValues(values));
       return this.readable("BackgroundJob", state.rowSecurityOff).filter((row) => named.has(studentIdIn(row.payload))).map((row) => ({ id: row.id }));
@@ -312,12 +323,34 @@ export class FakeDb {
     throw new Error(`The fake database does not know this statement: ${sql}`);
   }
 
+  /** Answers an orphan probe: rows whose id column names no row of the parent table. */
+  private orphans(match: RegExpExecArray, values: readonly unknown[], rowSecurityOff: boolean): number {
+    const [, model, column, kindColumn, parent] = match;
+    const parentIds = new Set(this.readable(parent, rowSecurityOff).map((row) => row.id));
+    return this.readable(model, rowSecurityOff).filter((row) => {
+      const value = row[column];
+      if (typeof value !== "string" || value === "system") return false;
+      if (kindColumn && !values.includes(row[kindColumn])) return false;
+      return !parentIds.has(value);
+    }).length;
+  }
+
+  /** Answers the staff notice statement: notices to unmarked staff that hold a named account's display name. */
+  private notices(accountIds: ReadonlySet<unknown>, rowSecurityOff: boolean): Row[] {
+    const people = this.readable("Student", rowSecurityOff);
+    const names = people.filter((row) => accountIds.has(row.id)).map((row) => String(row.displayName ?? "")).filter((name) => name.length > 0);
+    const staff = new Set(people.filter((row) => row.demoAccount === null && row.role !== "student").map((row) => row.id));
+    return this.readable("Notification", rowSecurityOff)
+      .filter((row) => staff.has(row.studentId) && names.some((name) => `${String(row.title)} ${String(row.body ?? "")}`.includes(name)))
+      .map((row) => ({ id: row.id }));
+  }
+
   private tx(): FakeTx {
     const state = { rowSecurityOff: false };
     this.statementLog.push([]);
     const tx: FakeTx = {
       $executeRaw: async (strings, ...values) => Number(this.raw(state, strings, values)),
-      $queryRaw: async (strings, ...values) => this.raw(state, strings, values),
+      $queryRaw: async (query, ...values) => (isSql(query) ? this.raw(state, query.strings, query.values) : this.raw(state, query, values)),
     };
     for (const model of MODELS) tx[delegateKey(model.name)] = this.delegate(model, state);
     return tx;
@@ -526,6 +559,7 @@ async function seedSoftReferences(seeder: UniverseSeeder): Promise<void> {
   await seeder.extra("FormAssignment", { assignedById: staffId, scope: "student", targetId: studentId });
   await seeder.extra("FormAssignment", { assignedById: staffId, scope: "class", targetId: classId });
   await seeder.extra("GrantKpiSnapshot", { classId });
+  await seeder.extra("BackgroundJob", { type: "extract_memory", payload: JSON.stringify({ studentId }) });
   const memory = (id: string, subjectType: string, subjectId: string) => seeder.extra("SageMemory", { id, subjectType, subjectId });
   const { prefix } = seeder.options;
   await memory(`${prefix}memory-student`, "student", studentId);

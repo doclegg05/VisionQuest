@@ -61,6 +61,11 @@ function rowsOf(db: FakeDb, prefix: string): string {
   return JSON.stringify(MODELS.map((model) => [model.name, db.rows(model.name).filter((row) => JSON.stringify(row).includes(prefix))]));
 }
 
+/** A time the fake server's clock calls this many minutes ago. */
+function minutesBefore(db: FakeDb, minutes: number): Date {
+  return new Date(db.now.getTime() - minutes * 60_000);
+}
+
 function codes(outcome: CloseoutOutcome): RefusalCode[] {
   return outcome.refusals.map((refusal) => refusal.code);
 }
@@ -216,7 +221,9 @@ describe("demo closeout apply", () => {
     assert.equal(entry.targetId, null);
     const rows = Object.values(appliedOf(outcome).deleted).reduce((sum, count) => sum + count, 0);
     assert.ok(rows > 70);
-    assert.deepEqual(JSON.parse(String(entry.metadata)), { accounts: 2, classes: 1, rows });
+    // The other keys are pinned in closeout.leftovers.test.ts.
+    const { accounts, classes, rows: written } = JSON.parse(String(entry.metadata));
+    assert.deepEqual({ accounts, classes, rows: written }, { accounts: 2, classes: 1, rows });
   });
 
   it("does nothing the second time", async () => {
@@ -315,6 +322,41 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
     },
   },
   {
+    name: "a marked account sent a chat message in the last 30 minutes", code: "demo_recently_active", count: 1,
+    arrange: ({ db }) => void copyOf(db, "Message", "dm-", { createdAt: minutesBefore(db, 5) }),
+  },
+  {
+    name: "a marked account's conversation changed and it acted on the audit log in the last 30 minutes", code: "demo_recently_active", count: 2,
+    arrange: ({ db, demo }) => {
+      copyOf(db, "Conversation", "dm-", { updatedAt: minutesBefore(db, 29) });
+      copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, createdAt: minutesBefore(db, 1) });
+    },
+  },
+  {
+    name: "a marked account was created in the last 30 minutes", code: "demo_recently_active", count: 1, expectAccounts: 3,
+    arrange: ({ db }) => void db.insert("Student", { id: "dm-late", studentId: "demo-dm-late", displayName: "dm late", role: "student", demoAccount: "student", createdAt: minutesBefore(db, 10) }),
+  },
+  {
+    name: "a marked account's audit row is about an unmarked student", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo, real }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "student", targetId: real.studentId }),
+  },
+  {
+    name: "a marked account's audit row is about another class", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo, real }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "class", targetId: real.classId }),
+  },
+  {
+    name: "a marked account's Sage operation is about an unmarked student", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo, real }) => void copyOf(db, "SageOperation", "dm-", { actorId: demo.staffId, targetStudentId: real.studentId }),
+  },
+  {
+    name: "a message to a marked account is on an unmarked student's connection", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo }) => void copyOf(db, "OutboundMessage", "rl-", { toId: demo.staffId, connectionId: "rl-Connection" }),
+  },
+  {
+    name: "an unmarked student's task would lose its link to a demo appointment", code: "kept_rows_would_be_blanked", count: 1,
+    arrange: ({ db }) => void copyOf(db, "StudentTask", "rl-", { appointmentId: "dm-Appointment" }),
+  },
+  {
     name: "the plan holds an account that is not marked", code: "plan_includes_unmarked", count: 1, expectAccounts: 1,
     rule: ({ real }) => async () => ({ accountIds: [real.studentId], classIds: [] }),
   },
@@ -322,7 +364,8 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
     name: "a row would be left naming a deleted account", code: "rows_left_pointing", count: 1, expectAccounts: 1,
     // The plan is a marked subset: the marked teacher stays, with a goal that names the deleted student.
     rule: ({ demo }) => async () => ({ accountIds: [demo.studentId], classIds: [] }),
-    arrange: ({ db, demo }) => void copyOf(db, "Goal", "dm-", { studentId: demo.staffId, confirmedBy: demo.studentId, parentId: null }),
+    // SageInsight.dismissedBy has no foreign key, so no check before the deletes sees it.
+    arrange: ({ db, demo }) => void copyOf(db, "SageInsight", "dm-", { studentId: demo.staffId, dismissedBy: demo.studentId }),
   },
   {
     name: "a cascade would remove a row the plan does not list", code: "unlisted_rows_removed", count: 1,

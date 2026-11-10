@@ -1,8 +1,10 @@
 /**
  * Demo closeout (readiness H10): what only the database server can say.
  *
- * Every raw statement the closeout sends is in this file, each one a fixed
- * string with its values passed as parameters. The connection string is never
+ * Every raw statement the closeout sends is in this file. Each is fixed text
+ * with its values passed as parameters; the orphan probes alone add a table
+ * and column name, taken from the fixed list in closeout.orphans.ts and
+ * checked to be a plain word. The connection string is never
  * read here: what the server reports is the identity, because a `?host=`
  * option in a Postgres URL overrides the host written in it.
  */
@@ -107,4 +109,55 @@ export async function jobIdsNaming(tx: CloseoutTx, accountIds: Ids, chunkSize: n
     ids.push(...idsOf(rowsOf(result), "id"));
   }
   return ids;
+}
+
+/**
+ * One account or class column with no foreign key. `only` limits the probe to
+ * rows whose kind column says the id is of the parent's kind.
+ */
+export interface OrphanProbe {
+  readonly model: Prisma.ModelName;
+  readonly column: string;
+  readonly parent: "Student" | "SpokesClass";
+  readonly only?: { readonly column: string; readonly values: readonly string[] };
+}
+
+/** Table and column names go into the statement as text, so each must be a plain word from ORPHAN_PROBES. */
+const IDENTIFIER = /^[A-Za-z]+$/;
+
+function quoted(name: string): Prisma.Sql {
+  if (!IDENTIFIER.test(name)) throw new Error("A closeout probe names a table or column that is not a plain word.");
+  return Prisma.raw(`"${name}"`);
+}
+
+function countIn(result: unknown): number {
+  const value = firstValue(result, "orphans");
+  return typeof value === "number" ? value : Number(value ?? 0);
+}
+
+/**
+ * Rows of one probe whose id names no row of its parent. The literal `system`
+ * is the actor of jobs and is not an id. Names come from ORPHAN_PROBES only;
+ * every value is a parameter.
+ */
+export async function countOrphans(tx: CloseoutTx, probe: OrphanProbe): Promise<number> {
+  const table = quoted(probe.model);
+  const column = quoted(probe.column);
+  const kind = probe.only ? Prisma.sql`AND t.${quoted(probe.only.column)} IN (${Prisma.join([...probe.only.values])})` : Prisma.empty;
+  const query = Prisma.sql`SELECT count(*)::int AS orphans FROM visionquest.${table} t WHERE t.${column} IS NOT NULL AND t.${column} <> 'system' ${kind} AND NOT EXISTS (SELECT 1 FROM visionquest.${quoted(probe.parent)} p WHERE p.id = t.${column})`;
+  return countIn(await tx.$queryRaw(query));
+}
+
+/**
+ * Notices to staff with no demo mark whose title or text holds the display
+ * name of one of these accounts. Ids are collected so a notice that names two
+ * accounts in different batches is counted once.
+ */
+export async function noticesNaming(tx: CloseoutTx, accountIds: Ids, chunkSize: number): Promise<number> {
+  const found = new Set<string>();
+  for (const chunk of chunksOf(accountIds, chunkSize)) {
+    const result = await tx.$queryRaw`SELECT n.id FROM visionquest."Notification" n JOIN visionquest."Student" r ON r.id = n."studentId" WHERE r."demoAccount" IS NULL AND r.role <> 'student' AND EXISTS (SELECT 1 FROM visionquest."Student" d WHERE d.id IN (${Prisma.join(chunk)}) AND length(d."displayName") > 0 AND (strpos(n.title, d."displayName") > 0 OR strpos(coalesce(n.body, ''), d."displayName") > 0))`;
+    idsOf(rowsOf(result), "id").forEach((id) => found.add(id));
+  }
+  return found.size;
 }
