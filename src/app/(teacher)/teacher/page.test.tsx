@@ -38,12 +38,16 @@ beforeEach(() => {
 });
 
 describe("teacher home for an unplaced instructor", () => {
-  it("shows the invite message and reads no student data", async () => {
+  // The wording changed with readiness task B2: the old line sent the
+  // instructor to a regional coordinator for an invite, and an unplaced
+  // instructor has an account already and no coordinator.
+  it("tells them to ask their program admin and reads no student data", async () => {
     unplaced = true;
     const element = await TeacherDashboard({ searchParams: Promise.resolve({}) });
     const html = renderToString(element as React.ReactElement);
 
-    assert.ok(html.includes("Ask your regional coordinator to invite you to your region."));
+    assert.ok(html.includes("Ask your program admin to add you to a region and a class."));
+    assert.ok(!html.includes("regional coordinator to invite you"));
     assert.deepEqual(dataReads, []);
   });
 
