@@ -356,6 +356,31 @@ describe("closing an account ends its sessions", () => {
   });
 });
 
+describe("the demo reset", () => {
+  // resetDemoRoster runs only from scripts/reset-demo-roster.ts, a separate
+  // process, so no invalidation can reach this one. Its runbook turns demo
+  // mode off on every server first, and getSession() reads that switch after
+  // the cache, so the switch is what ends demo sessions at once.
+  it("ends demo sessions at once once demo mode is off, though the reset itself is unseen", async () => {
+    process.env.COHORT_DEMO_MODE = "true";
+    try {
+      const visitor = freshAccount({ demoAccount: "student", passwordHash: null });
+      const token = auth.signToken(visitor.id, visitor.role, visitor.sessionVersion, { demo: "student" });
+      assert.equal((await sessionFor(token))?.demoAccount, "student", "the row is now cached");
+
+      // What the offline reset writes, done the way that script does it: with
+      // no call into this process.
+      db.addAccount({ ...db.account(visitor.id), isActive: false, sessionVersion: visitor.sessionVersion + 1 });
+      assert.ok(await sessionFor(token), "this process cannot see a write it did not make until the window ends");
+
+      delete process.env.COHORT_DEMO_MODE;
+      assert.equal(await sessionFor(token), null);
+    } finally {
+      delete process.env.COHORT_DEMO_MODE;
+    }
+  });
+});
+
 describe("a role change", () => {
   it("ends the old role's session, and a new session carries the new role", async () => {
     const teacher = freshAccount({ role: "teacher" });
