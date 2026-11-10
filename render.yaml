@@ -38,7 +38,46 @@ services:
         sync: false
       - key: APP_BASE_URL
         sync: false
+      # Optional, and unused while AI_LOCAL_ONLY below is "true": every cloud
+      # call is refused before it is sent. Production runs Sage on a local
+      # model and has no Gemini key. Adding a key here does not turn cloud AI
+      # on.
       - key: GEMINI_API_KEY
+        sync: false
+      # Cloud AI block. The owner's standing decision is that no student data
+      # goes to a cloud model. src/lib/boot-probes.ts refuses to boot
+      # production unless the deployment says which it is: local only, or
+      # cloud allowed on purpose. "true" here is the local only answer. It
+      # refuses every Gemini and OpenRouter call for the whole service,
+      # background work included (src/lib/ai/demo-local-only.ts). The older
+      # switches COHORT_DEMO_LOCAL_ONLY and COHORT_DEMO_MODE do the same but
+      # are named for the demo; this one stays when the demo variables go.
+      # Cloud AI is allowed only by AI_CLOUD_INFERENCE set to exactly
+      # "allowed", after a written owner decision. It is left out of this file
+      # on purpose, and setting it beside this switch stops the boot.
+      - key: AI_LOCAL_ONLY
+        value: "true"
+      # The one local endpoint origin Sage may call while the block is on. This
+      # is the relay's adapter inside this service, not the Mac. A saved
+      # provider URL with any other origin is refused before any network call.
+      # The older name is COHORT_DEMO_LOCAL_AI_ORIGIN; if both are set they
+      # must name the same origin.
+      - key: AI_LOCAL_APPROVED_ORIGIN
+        value: "http://127.0.0.1:11437"
+      # Mac relay (docs/runbooks/mac-sage-connection.md). Production sets this
+      # to "true": scripts/start-production.mjs then starts the relay that
+      # carries Sage's prompts to the Mac's local model, and it also turns the
+      # cloud AI block on. No value here, so turning the relay off in the
+      # dashboard stays off.
+      - key: VQ_MAC_RELAY_ENABLED
+        sync: false
+      # The Mac agent proves itself to the relay with this token. 64 lowercase
+      # hex characters. The same value goes in the Mac agent's private config.
+      - key: VQ_MAC_RELAY_AGENT_TOKEN
+        sync: false
+      # The app proves itself to the relay's adapter with this token. Its own
+      # value, same format. It is never sent to the Mac.
+      - key: VQ_MAC_RELAY_APP_TOKEN
         sync: false
       # Risk-tiered agent enablement. "off" | "readonly" | "full".
       # Stage 6a (readonly) entered 2026-07-08 per docs/runbooks/sage-agent-enablement.md:

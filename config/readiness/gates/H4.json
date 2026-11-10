@@ -5,6 +5,10 @@
   "title": "The block on cloud AI is explicit",
   "doneWhen": "Boot check tests for each flag combination.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/boot-probes.test.ts",
+      "src/lib/ai/demo-local-only.test.ts"
+    ]
   }
 }
