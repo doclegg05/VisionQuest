@@ -82,3 +82,74 @@ describe("demo closeout backup commands in DEPLOY.md", () => {
     assert.match(backups, /session|direct/i);
   });
 });
+
+describe("demo closeout procedure in DEPLOY.md", () => {
+  const steps = section(read("DEPLOY.md"), "Turn it off after Dec 18, 2026");
+  const numbered = steps.split("\n").filter((line) => /^\d+\. /.test(line));
+  /** The text of numbered step `n`, up to the next numbered step. */
+  const step = (n: number): string => {
+    const lines = steps.split("\n");
+    const start = lines.findIndex((line) => line.startsWith(`${n}. `));
+    const end = lines.findIndex((line, index) => index > start && line.startsWith(`${n + 1}. `));
+    assert.notEqual(start, -1, `no step ${n}`);
+    return lines.slice(start, end === -1 ? undefined : end).join("\n");
+  };
+  const stepWith = (text: string): number => numbered.findIndex((line) => line.includes(text)) + 1;
+
+  it("starts from an up to date main checkout in a terminal window used only for this", () => {
+    for (const command of ["git switch main", "git pull", "npm ci", "npx prisma generate"]) assert.ok(step(1).includes(command), command);
+    assert.match(steps, /new terminal window/i);
+  });
+
+  it("reads the connection string without showing it, clears the clipboard and names where the secret lives", () => {
+    assert.match(steps, /read -rs ADMIN_DATABASE_URL/);
+    assert.match(steps, /pbcopy < \/dev\/null/);
+    assert.match(steps, /Render dashboard, service `visionquest`, \*\*Environment\*\* tab, key `ADMIN_DATABASE_URL`/);
+    assert.doesNotMatch(steps, /postgres(ql)?:\/\//);
+  });
+
+  it("keeps AI_LOCAL_ONLY in the step that deletes the demo variables, and sets REAL_STUDENT_DATA only after the apply", () => {
+    const off = stepWith("delete `COHORT_DEMO_MODE`");
+    assert.ok(off > 0);
+    assert.match(step(off), /AI_LOCAL_ONLY/);
+    const apply = stepWith("Run the apply");
+    const real = stepWith("Set `REAL_STUDENT_DATA`");
+    assert.ok(apply > off && real > apply, `steps: off ${off}, apply ${apply}, real ${real}`);
+  });
+
+  it("waits 15 minutes after the deploy, confirms the backup right before the apply, and previews again the next day", () => {
+    assert.match(steps, /15 minutes/);
+    const backup = stepWith("Confirm the backup");
+    assert.equal(backup + 1, stepWith("Run the apply"));
+    assert.match(step(backup), /every change made after/i);
+    assert.match(steps, /next day/i);
+    assert.match(steps, /--expect-accounts=/);
+  });
+
+  it("says a count of unmarked accounts above 0 may be mock accounts, and gives a success test that needs both numbers", () => {
+    assert.doesNotMatch(steps, /`unmarked` is the people it leaves alone/);
+    assert.match(steps, /above 0 means mock accounts may still be in the database/);
+    assert.match(steps, /`marked` is 0 and `unmarked\.students` is the number you expect/);
+  });
+
+  it("never says a stopped run rolled back, and gives the sentence the tool prints instead", () => {
+    assert.doesNotMatch(steps, /Exit code 1 means it failed, the transaction was rolled back/);
+    assert.match(steps, /Run the preview again to see whether anything was deleted/);
+  });
+
+  it("says the uploaded files stay in storage and that removing them is not built yet", () => {
+    assert.match(steps, /real visitors' documents/);
+    assert.match(steps, /not built yet/);
+  });
+
+  it("gives every step what success looks like, ends by closing the terminal, and uses no dash characters", () => {
+    assert.ok(numbered.length >= 10, `${numbered.length} steps`);
+    for (let n = 1; n <= numbered.length; n += 1) assert.match(step(n), /Success|success/, `step ${n}`);
+    assert.match(step(numbered.length), /[Cc]lose the terminal/);
+    assert.doesNotMatch(steps, /[‒-―]| -- | - /);
+  });
+
+  it("lists REAL_STUDENT_DATA in the environment table", () => {
+    assert.match(read("DEPLOY.md"), /^\| `REAL_STUDENT_DATA` \|/m);
+  });
+});
