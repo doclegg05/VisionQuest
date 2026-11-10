@@ -97,3 +97,54 @@ export async function revokeConsent(
   });
   return { revoked: true };
 }
+
+/**
+ * The Sage notice acknowledgement (readiness task H6), stored as a
+ * ConsentRecord row so no schema change is needed.
+ *
+ * Who: `studentId` and `recordedBy` (always the student; nobody acknowledges
+ * for someone else). Which version: the scope, `sage_notice:<version>`, so a
+ * new version is a new scope and every student is asked again. When:
+ * `grantedAt`. No notice text is stored.
+ *
+ * Deliberately NOT in CONSENT_SCOPES: that list is what the self-service
+ * settings route accepts, and the notice is acknowledged only through
+ * POST /api/sage-notice, which checks the version.
+ */
+export const SAGE_NOTICE_SCOPE_PREFIX = "sage_notice:";
+
+export function sageNoticeScope(version: string): string {
+  return `${SAGE_NOTICE_SCOPE_PREFIX}${version}`;
+}
+
+export async function hasAcknowledgedSageNotice(
+  studentId: string,
+  version: string,
+): Promise<boolean> {
+  const record = await prisma.consentRecord.findFirst({
+    where: { studentId, scope: sageNoticeScope(version), revokedAt: null },
+    select: { id: true },
+  });
+  return record !== null;
+}
+
+export async function recordSageNoticeAcknowledgement(
+  studentId: string,
+  version: string,
+): Promise<{ recorded: boolean }> {
+  // Idempotent: a second tap, or a second tab, does not add a row.
+  if (await hasAcknowledgedSageNotice(studentId, version)) return { recorded: false };
+
+  await prisma.consentRecord.create({
+    data: { studentId, scope: sageNoticeScope(version), recordedBy: studentId },
+  });
+  await logAuditEvent({
+    actorId: studentId,
+    actorRole: "student",
+    action: "consent.granted",
+    targetType: "consent_record",
+    targetId: studentId,
+    summary: `Sage notice acknowledged, version ${version}`,
+  });
+  return { recorded: true };
+}
