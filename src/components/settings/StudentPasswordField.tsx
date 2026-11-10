@@ -76,20 +76,61 @@ function CountLine({ id, typed }: { id: string; typed: number }) {
   );
 }
 
-/** The field with its state passed in. `StudentPasswordField` below holds the state. */
-export function StudentPasswordFieldView({
+interface PasswordInputRowProps extends StudentPasswordFieldViewProps {
+  describedBy: string | undefined;
+  invalid: boolean;
+}
+
+/** The input and the Show button beside it. */
+function PasswordInputRow({
   id,
   label,
   value,
   onChange,
   autoComplete,
-  showError = false,
   disabled = false,
   revealed,
   onToggleReveal,
-  touched,
   onBlur,
-}: StudentPasswordFieldViewProps) {
+  describedBy,
+  invalid,
+}: PasswordInputRowProps) {
+  return (
+    <div className="flex items-stretch gap-2">
+      <input
+        id={id}
+        type={revealed ? "text" : "password"}
+        autoComplete={autoComplete}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        disabled={disabled}
+        required
+        aria-describedby={describedBy}
+        aria-invalid={invalid ? true : undefined}
+        className={INPUT_CLASS}
+      />
+      <button
+        type="button"
+        onClick={onToggleReveal}
+        disabled={disabled}
+        aria-pressed={revealed}
+        aria-controls={id}
+        aria-label={`Show ${label.toLowerCase()}`}
+        className={`${SHOW_BUTTON_BASE} ${revealed ? SHOW_BUTTON_ON : SHOW_BUTTON_OFF}`}
+      >
+        Show
+      </button>
+    </div>
+  );
+}
+
+/** The field with its state passed in. `StudentPasswordField` below holds the state. */
+export function StudentPasswordFieldView(props: StudentPasswordFieldViewProps) {
+  const { id, label, value, autoComplete, showError = false, touched } = props;
   const isNew = autoComplete === "new-password";
   // An empty field the student only passed through is not an error yet.
   const tooShort = isNew && isPasswordTooShort(value) && (showError || (touched && value !== ""));
@@ -102,35 +143,7 @@ export function StudentPasswordFieldView({
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-[var(--ink-strong)]">
         {label}
       </label>
-      <div className="flex items-stretch gap-2">
-        <input
-          id={id}
-          type={revealed ? "text" : "password"}
-          autoComplete={autoComplete}
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onBlur={onBlur}
-          disabled={disabled}
-          required
-          aria-describedby={describedBy}
-          aria-invalid={tooShort ? true : undefined}
-          className={INPUT_CLASS}
-        />
-        <button
-          type="button"
-          onClick={onToggleReveal}
-          disabled={disabled}
-          aria-pressed={revealed}
-          aria-controls={id}
-          aria-label={`Show ${label.toLowerCase()}`}
-          className={`${SHOW_BUTTON_BASE} ${revealed ? SHOW_BUTTON_ON : SHOW_BUTTON_OFF}`}
-        >
-          Show
-        </button>
-      </div>
+      <PasswordInputRow {...props} describedBy={describedBy} invalid={tooShort} />
       {isNew && (
         <>
           <p id={`${id}-hint`} className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">

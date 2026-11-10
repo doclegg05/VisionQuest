@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { afterEach, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
@@ -7,7 +7,7 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 import { DemoAccountProvider } from "@/components/demo/DemoAccountContext";
 import { STUDENT_PASSWORD_HINT } from "@/lib/password-policy";
 import { fleschKincaidGrade, PLAIN_LANGUAGE_IDEAL_GRADE } from "@/lib/sage/readability";
-import { ChangePasswordForm, changeFailureMessage } from "./ChangePasswordForm";
+import { ChangePasswordForm, changeFailureMessage, submitPasswordChange } from "./ChangePasswordForm";
 import { ChangePasswordScreen } from "./ChangePasswordScreen";
 import { ChangePasswordSection } from "./ChangePasswordSection";
 
@@ -99,6 +99,63 @@ describe("what the form says when the change is refused", () => {
     for (const body of [null, undefined, {}, { error: "" }, { error: 42 }, "text", []]) {
       assert.equal(changeFailureMessage(body), "We could not change your password. Please try again.");
     }
+  });
+});
+
+describe("sending the change", () => {
+  afterEach(() => mock.restoreAll());
+
+  /** Stands in for the network: records the one request and answers it. */
+  function answerWith(response: Response | Error): { calls: { url: string; init: RequestInit | undefined }[] } {
+    const calls: { url: string; init: RequestInit | undefined }[] = [];
+    mock.method(globalThis, "fetch", async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      if (response instanceof Error) throw response;
+      return response;
+    });
+    return { calls };
+  }
+
+  it("posts both passwords to the change route as JSON, and nowhere else", async () => {
+    const { calls } = answerWith(Response.json({ success: true, data: { changed: true } }));
+
+    const result = await submitPasswordChange("the-old-password", "a brand new one");
+
+    assert.deepEqual(result, { ok: true });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.url, "/api/settings/password");
+    assert.equal(calls[0]?.init?.method, "POST");
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), {
+      currentPassword: "the-old-password",
+      newPassword: "a brand new one",
+    });
+  });
+
+  it("answers a refusal with the server's words", async () => {
+    answerWith(Response.json({ error: "Too many wrong tries. Wait 15 minutes, then try again.", code: "TOO_MANY_WRONG_TRIES" }, { status: 429 }));
+
+    assert.deepEqual(await submitPasswordChange("x", "a brand new one"), {
+      ok: false,
+      message: "Too many wrong tries. Wait 15 minutes, then try again.",
+    });
+  });
+
+  it("answers a refusal that is not JSON with its own words", async () => {
+    answerWith(new Response("<html>Bad gateway</html>", { status: 502 }));
+
+    assert.deepEqual(await submitPasswordChange("x", "a brand new one"), {
+      ok: false,
+      message: "We could not change your password. Please try again.",
+    });
+  });
+
+  it("answers a dropped connection with words about the connection, not the password", async () => {
+    answerWith(new TypeError("fetch failed"));
+
+    assert.deepEqual(await submitPasswordChange("x", "a brand new one"), {
+      ok: false,
+      message: "We could not reach the server. Please try again.",
+    });
   });
 });
 

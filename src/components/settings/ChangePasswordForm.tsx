@@ -26,6 +26,26 @@ export function changeFailureMessage(body: unknown): string {
   return FALLBACK_ERROR;
 }
 
+export type PasswordChangeOutcome = { ok: true } | { ok: false; message: string };
+
+/** Sends the change. Never throws: every failure comes back as words to show. */
+export async function submitPasswordChange(currentPassword: string, newPassword: string): Promise<PasswordChangeOutcome> {
+  try {
+    const res = await fetch("/api/settings/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    if (res.ok) return { ok: true };
+    // A refusal that is not JSON (a gateway page, say) still gets plain words.
+    const body: unknown = await res.json().catch(() => null);
+    return { ok: false, message: changeFailureMessage(body) };
+  } catch {
+    // fetch rejects only when the request never got an answer.
+    return { ok: false, message: NETWORK_ERROR };
+  }
+}
+
 export interface ChangePasswordFormProps {
   /** Keeps the two field ids apart from any other form on the page. */
   idPrefix: string;
@@ -38,6 +58,26 @@ export interface ChangePasswordFormProps {
 
 type FormStatus = "idle" | "saving" | "saved" | "error";
 
+/** The line under the fields: what went wrong, or that the new password is saved. */
+function FormMessage({ status, error }: { status: FormStatus; error: string }) {
+  if (status === "error") {
+    return (
+      <p role="alert" className="flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+        <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
+        {error}
+      </p>
+    );
+  }
+  if (status === "saved") {
+    return (
+      <p role="status" className="rounded-2xl bg-success-soft px-4 py-3 text-sm text-success">
+        {SAVED_MESSAGE}
+      </p>
+    );
+  }
+  return null;
+}
+
 export function ChangePasswordForm({ idPrefix, onChanged }: ChangePasswordFormProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -45,45 +85,26 @@ export function ChangePasswordForm({ idPrefix, onChanged }: ChangePasswordFormPr
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
 
+  function fail(message: string) {
+    setStatus("error");
+    setError(message);
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setSent(true);
-    if (currentPassword.trim() === "") {
-      setStatus("error");
-      setError(MISSING_CURRENT_PASSWORD);
-      return;
-    }
+    if (currentPassword.trim() === "") return fail(MISSING_CURRENT_PASSWORD);
     // The field names this problem itself; there is nothing to send yet.
-    if (isPasswordTooShort(newPassword)) {
-      setStatus("idle");
-      return;
-    }
-    setStatus("saving");
-    setError("");
+    if (isPasswordTooShort(newPassword)) return setStatus("idle");
 
-    try {
-      const res = await fetch("/api/settings/password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-      if (!res.ok) {
-        setStatus("error");
-        setError(changeFailureMessage(await res.json().catch(() => null)));
-        return;
-      }
-      if (onChanged) {
-        onChanged();
-        return;
-      }
-      setCurrentPassword("");
-      setNewPassword("");
-      setSent(false);
-      setStatus("saved");
-    } catch {
-      setStatus("error");
-      setError(NETWORK_ERROR);
-    }
+    setStatus("saving");
+    const outcome = await submitPasswordChange(currentPassword, newPassword);
+    if (!outcome.ok) return fail(outcome.message);
+    if (onChanged) return onChanged();
+    setCurrentPassword("");
+    setNewPassword("");
+    setSent(false);
+    setStatus("saved");
   }
 
   const saving = status === "saving";
@@ -107,19 +128,7 @@ export function ChangePasswordForm({ idPrefix, onChanged }: ChangePasswordFormPr
         showError={sent}
         disabled={saving}
       />
-
-      {status === "error" && (
-        <p role="alert" className="flex items-start gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
-          <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
-          {error}
-        </p>
-      )}
-      {status === "saved" && (
-        <p role="status" className="rounded-2xl bg-success-soft px-4 py-3 text-sm text-success">
-          {SAVED_MESSAGE}
-        </p>
-      )}
-
+      <FormMessage status={status} error={error} />
       <button
         type="submit"
         disabled={saving}

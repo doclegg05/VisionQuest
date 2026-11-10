@@ -110,7 +110,7 @@ function sessionClaimsFor(request: NextRequest): SessionClaims | null {
  * page is sent to the change screen: 307 for a read, and 303 for anything
  * else so the browser follows with a GET and not the same refused method.
  */
-function passwordChangeRefusal(request: NextRequest, method: string, isApi: boolean): NextResponse {
+function holdForPasswordChange(request: NextRequest, method: string, isApi: boolean): NextResponse {
   if (isApi) {
     return NextResponse.json(
       { error: PASSWORD_CHANGE_REQUIRED_MESSAGE, code: PASSWORD_CHANGE_REQUIRED_CODE },
@@ -192,7 +192,7 @@ export function proxy(request: NextRequest) {
   // is what it enforces; getSession() ends a session whose claim and account
   // row disagree (src/lib/auth.ts).
   if (claims?.mustChangePassword === true && !isAllowedWhilePasswordChangeRequired(method, pathname)) {
-    return passwordChangeRefusal(request, method, isApi);
+    return holdForPasswordChange(request, method, isApi);
   }
 
   // --- CSP nonce + response headers ---

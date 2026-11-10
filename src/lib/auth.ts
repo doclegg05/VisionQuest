@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import type { Prisma } from "@prisma/client";
 import { cookies } from "next/headers";
 import { prismaAdmin } from "./db";
 import { cached, invalidatePrefix } from "./cache";
@@ -199,17 +200,7 @@ const SESSION_ACCOUNT_SELECT = {
   passwordHash: true,
 } as const;
 
-interface SessionAccountRow {
-  id: string;
-  studentId: string;
-  displayName: string;
-  role: string;
-  sessionVersion: number;
-  isActive: boolean;
-  demoAccount: DemoAccountKind | null;
-  mustChangePassword: boolean;
-  passwordHash: string | null;
-}
+type SessionAccountRow = Prisma.StudentGetPayload<{ select: typeof SESSION_ACCOUNT_SELECT }>;
 
 /**
  * The account behind a session, as the session cache holds it. The password
