@@ -32,7 +32,7 @@ mock.module("next/navigation", {
 });
 
 mock.module("@/components/settings/ChangePasswordScreen", {
-  exports: { ChangePasswordScreen: () => <p>the change password screen</p> },
+  exports: { ChangePasswordScreen: ({ username }: { username: string }) => <p>the change password screen for {username}</p> },
 });
 
 let Page: typeof import("./page").default;
@@ -61,6 +61,7 @@ describe("change password page", () => {
 
     const html = renderToString(await Page());
     assert.ok(html.includes("the change password screen"));
+    assert.ok(html.includes("for <!-- -->student1"), "the login name goes to the hidden username field");
     assert.match(html, /<main[^>]*id="main-content"/u);
   });
 

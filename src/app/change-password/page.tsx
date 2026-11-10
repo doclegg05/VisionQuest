@@ -25,7 +25,7 @@ export default async function ChangePasswordPage() {
   return (
     <main id="main-content" className="min-h-screen bg-[var(--surface-muted)] px-4 py-10">
       <div className="mx-auto max-w-lg">
-        <ChangePasswordScreen />
+        <ChangePasswordScreen username={session.studentId} />
       </div>
     </main>
   );
