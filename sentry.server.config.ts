@@ -25,6 +25,11 @@ type NodeTransportOptions = Parameters<typeof Sentry.makeNodeTransport>[0];
  * organization id) to every request this server makes, to any host, with
  * tracing off or on.
  *
+ * Spotlight is off. It is a local debugging sidecar that receives every
+ * envelope from the `beforeEnvelope` hook, before the wire filter and
+ * unscrubbed, and `SENTRY_SPOTLIGHT` in the environment turns it on unless
+ * this option is exactly `false`.
+ *
  * The transport is the SDK's own Node transport behind the wire filter
  * (src/lib/sentry-wire.ts), which rebuilds every envelope before it is sent.
  * `beforeSend` alone is not enough: the SDK skips it for the report about
@@ -40,6 +45,7 @@ export function serverSentryOptions(
     environment: process.env.NODE_ENV,
     tracesSampleRate: 0,
     tracePropagationTargets: [],
+    spotlight: false,
     ...PRIVATE_REPORTING_OPTIONS,
     transport: wireAllowlistTransport(makeTransport),
     integrations: (defaults) => [

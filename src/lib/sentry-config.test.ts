@@ -161,6 +161,23 @@ describe("what the SDK would send without asking beforeSend", () => {
     assert.deepEqual(outbox.itemTypes(), []);
   });
 
+  // Spotlight is a local debugging sidecar. When it is on, the SDK posts
+  // every envelope to it from the beforeEnvelope hook, before the wire filter
+  // and unscrubbed (@sentry/node-core build/cjs/integrations/spotlight.js).
+  // SENTRY_SPOTLIGHT in the environment turns it on unless the option is
+  // exactly false (node-core build/cjs/utils/spotlight.js).
+  it("Spotlight is off in the server options whatever the environment says", () => {
+    const before = process.env.SENTRY_SPOTLIGHT;
+    process.env.SENTRY_SPOTLIGHT = "1";
+    try {
+      assert.equal(serverSentryOptions(TEST_DSN).spotlight, false);
+    } finally {
+      if (before === undefined) delete process.env.SENTRY_SPOTLIGHT;
+      else process.env.SENTRY_SPOTLIGHT = before;
+    }
+    assert.equal(Sentry.getClient()?.getOptions().spotlight, false);
+  });
+
   it("the built server client names no host to receive its trace headers", () => {
     assert.deepEqual(serverSentryOptions(TEST_DSN).tracePropagationTargets, []);
     assert.deepEqual(Sentry.getClient()?.getOptions().tracePropagationTargets, []);
