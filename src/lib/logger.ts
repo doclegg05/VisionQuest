@@ -1,5 +1,5 @@
 import { errorForLog } from "./log-error";
-import { withheldServerEvent } from "./sentry-scrub";
+import { numericExtra, withheldServerEvent } from "./sentry-scrub";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -87,17 +87,42 @@ function alarmName(message: string, context: LogContext | undefined): string | u
 }
 
 /**
- * Only numbers and booleans travel with the alarm. Strings stay in the log
- * line: a context string can be a studentLogKey, an error name or free text,
- * and none of that is needed to know that the alarm fired.
+ * What travels with an alarm: counts and flags. The type cannot hold a
+ * string, and `numericExtra` builds it by dropping everything that is not a
+ * finite number or a boolean, so a studentLogKey, an error name or free text
+ * in the log context stays in the log line. The scrub applies the same
+ * filter again to every event (src/lib/sentry-scrub.ts).
  */
-function alarmExtra(context: LogContext | undefined): Record<string, number | boolean> {
-  return Object.fromEntries(
-    Object.entries(context ?? {}).filter(
-      (pair): pair is [string, number | boolean] =>
-        typeof pair[1] === "boolean" || (typeof pair[1] === "number" && Number.isFinite(pair[1])),
-    ),
-  );
+type AlarmExtra = Record<string, number | boolean>;
+
+/** At most one report per alarm name in this long. */
+const ALARM_WINDOW_MS = 60_000;
+
+interface AlarmWindow {
+  sentAt: number;
+  heldBack: number;
+}
+
+const alarmWindows = new Map<string, AlarmWindow>();
+
+/**
+ * Decides whether this alarm is reported. Two alarms sit on hot paths
+ * (`audit_write_failed` on every audited read while the audit table is
+ * down, `wellbeing_detection_failed` on every chat message), and an outage
+ * would otherwise send one event per request. At most one report per alarm
+ * name per process per minute: returns how many were held back since the
+ * last report, or undefined when this one is held back too. The count
+ * travels on the next report, so a flood that stops within its minute shows
+ * as one event; the log stream has every line.
+ */
+function admitAlarm(name: string, now: number): number | undefined {
+  const last = alarmWindows.get(name);
+  if (last !== undefined && now - last.sentAt < ALARM_WINDOW_MS) {
+    alarmWindows.set(name, { sentAt: last.sentAt, heldBack: last.heldBack + 1 });
+    return undefined;
+  }
+  alarmWindows.set(name, { sentAt: now, heldBack: 0 });
+  return last?.heldBack ?? 0;
 }
 
 /**
@@ -111,7 +136,9 @@ function reportAlarm(level: "warn" | "error", message: string, context: LogConte
   if (!process.env.SENTRY_DSN) return;
   const name = alarmName(message, context);
   if (name === undefined) return;
-  const extra = alarmExtra(context);
+  const heldBack = admitAlarm(name, Date.now());
+  if (heldBack === undefined) return;
+  const extra: AlarmExtra = { ...numericExtra(context), heldBack };
   import("@sentry/nextjs")
     .then((Sentry) =>
       Sentry.withScope((scope) => {

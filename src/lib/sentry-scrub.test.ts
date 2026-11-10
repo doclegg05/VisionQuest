@@ -1,630 +1,169 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
-import type { ErrorEvent, Event, EventHint } from "@sentry/nextjs";
-import { routePattern, scrubPii, withheldServerEvent } from "./sentry-scrub";
+import type { ErrorEvent, Event } from "@sentry/nextjs";
+import { errorOnlyIntegrations, PRIVATE_REPORTING_OPTIONS, scrubPii, sendNothing, withheldServerEvent } from "./sentry-scrub";
 
-// Review F14 / SEC-06 (2026-09-01). The password-reset token travels in a
-// URL (forgot-password/route.ts builds /reset-password?token=...), so any
-// client error on that page, or a traced server request to it, carries a
-// live one-hour token in request.url, query_string, and navigation
-// breadcrumbs unless the scrub strips it. These fixtures are synthetic
-// events shaped the way the SDK builds them.
-
-const TOKEN = "tok_LIVE_RESET_9f8e7d6c";
-const CODE = "otp_123456";
-const PASSWORD = "hunter2-correct-horse";
-const HINT: EventHint = {};
-
-function resetPageEvent(): ErrorEvent {
-  return {
-    type: undefined,
-    message: "boom",
-    user: { id: "u1", email: "student@example.org", username: "student", ip_address: "10.0.0.9" },
-    request: {
-      url: `https://vq.example/reset-password?token=${TOKEN}&x=1#code=${CODE}`,
-      query_string: `token=${TOKEN}&x=1`,
-      headers: {
-        cookie: "vq_session=abc",
-        Authorization: "Bearer secret",
-        "x-forwarded-for": "10.0.0.9",
-        "user-agent": "test-agent",
-      },
-      cookies: { vq_session: "abc" },
-    },
-    breadcrumbs: [
-      {
-        category: "navigation",
-        data: { from: "/login", to: `/reset-password?token=${TOKEN}` },
-      },
-      {
-        category: "fetch",
-        data: { url: `https://vq.example/api/auth/reset-password?token=${TOKEN}`, method: "POST", status_code: 500 },
-      },
-      { category: "console", message: `GET /reset-password?token=${TOKEN} for student@example.org` },
-    ],
-  };
-}
-
-function serialized(event: unknown): string {
-  return JSON.stringify(event);
-}
-
-describe("scrubPii: secret-bearing URL parameters", () => {
-  it("strips the reset token and code from request.url", () => {
-    const out = scrubPii(resetPageEvent(), HINT);
-    assert.ok(out);
-    assert.doesNotMatch(serialized(out.request?.url), new RegExp(TOKEN));
-    assert.doesNotMatch(serialized(out.request?.url), new RegExp(CODE));
-    // The rest of the URL survives so the event is still debuggable.
-    assert.match(out.request?.url ?? "", /^https:\/\/vq\.example\/reset-password\?token=\[REDACTED\]&x=1/);
-  });
-
-  it("strips the token from request.query_string in all three SDK shapes", () => {
-    const asString = scrubPii(resetPageEvent(), HINT);
-    assert.doesNotMatch(serialized(asString?.request?.query_string), new RegExp(TOKEN));
-
-    const arrayEvent = resetPageEvent();
-    arrayEvent.request!.query_string = [["token", TOKEN], ["x", "1"]];
-    const asArray = scrubPii(arrayEvent, HINT);
-    assert.doesNotMatch(serialized(asArray?.request?.query_string), new RegExp(TOKEN));
-    assert.match(serialized(asArray?.request?.query_string), /\["x","1"\]/);
-
-    const objectEvent = resetPageEvent();
-    objectEvent.request!.query_string = { token: TOKEN, x: "1" };
-    const asObject = scrubPii(objectEvent, HINT);
-    assert.doesNotMatch(serialized(asObject?.request?.query_string), new RegExp(TOKEN));
-    assert.match(serialized(asObject?.request?.query_string), /"x":"1"/);
-  });
-
-  it("strips tokens from breadcrumb URLs (data.url, data.from, data.to) and messages", () => {
-    const out = scrubPii(resetPageEvent(), HINT);
-    assert.doesNotMatch(serialized(out?.breadcrumbs), new RegExp(TOKEN));
-    // Untouched breadcrumb fields survive.
-    assert.match(serialized(out?.breadcrumbs), /"method":"POST"/);
-    assert.match(serialized(out?.breadcrumbs), /"from":"\/login"/);
-  });
-
-  it("leaves the whole event free of the token", () => {
-    const out = scrubPii(resetPageEvent(), HINT);
-    assert.doesNotMatch(serialized(out), new RegExp(TOKEN));
-  });
-});
-
-describe("scrubPii: request bodies", () => {
-  it("drops request.data entirely on auth routes", () => {
-    const event = resetPageEvent();
-    event.request!.url = "https://vq.example/api/auth/login";
-    event.request!.data = { studentId: "STU-001", password: PASSWORD };
-    const out = scrubPii(event, HINT);
-    assert.equal(out?.request?.data, undefined);
-    assert.doesNotMatch(serialized(out), new RegExp(PASSWORD));
-  });
-
-  it("redacts secret-named keys in a JSON body elsewhere and keeps the other keys", () => {
-    const event = resetPageEvent();
-    event.request!.url = "https://vq.example/api/chat/send";
-    event.request!.data = { message: "hello", nested: { token: TOKEN, password: PASSWORD, keep: "yes" } };
-    const out = scrubPii(event, HINT);
-    const text = serialized(out?.request?.data);
-    assert.doesNotMatch(text, new RegExp(TOKEN));
-    assert.doesNotMatch(text, new RegExp(PASSWORD));
-    assert.match(text, /"message":"hello"/);
-    assert.match(text, /"keep":"yes"/);
-  });
-
-  it("redacts secrets inside a raw string body", () => {
-    const event = resetPageEvent();
-    event.request!.url = "https://vq.example/api/chat/send";
-    event.request!.data = `{"token":"${TOKEN}","other":"fine"}`;
-    const out = scrubPii(event, HINT);
-    assert.doesNotMatch(serialized(out?.request?.data), new RegExp(TOKEN));
-    assert.match(serialized(out?.request?.data), /other/);
-  });
-});
-
-describe("scrubPii: existing guarantees still hold", () => {
-  it("removes user email, username, ip, and id", () => {
-    // W11 (2026-09-06): `user.id` is the student's cuid, which resolves to one
-    // student's record for anyone who can also read the database
-    // (.claude/rules/security.md). Before this it was the one user field kept.
-    const out = scrubPii(resetPageEvent(), HINT);
-    assert.deepEqual(out?.user, {});
-  });
-
-  it("removes cookies and the cookie, authorization, and x-forwarded-for headers regardless of case", () => {
-    const out = scrubPii(resetPageEvent(), HINT);
-    assert.equal(out?.request?.cookies, undefined);
-    assert.deepEqual(out?.request?.headers, { "user-agent": "test-agent" });
-  });
-
-  it("redacts email addresses in breadcrumb messages", () => {
-    const out = scrubPii(resetPageEvent(), HINT);
-    const consoleCrumb = out?.breadcrumbs?.find((b) => b.category === "console");
-    assert.match(consoleCrumb?.message ?? "", /\[EMAIL_REDACTED\]/);
-    assert.doesNotMatch(consoleCrumb?.message ?? "", /student@example\.org/);
-  });
-
-  it("returns an event without user, request, or breadcrumbs unchanged", () => {
-    const bare: ErrorEvent = { type: undefined, message: "plain" };
-    assert.deepEqual(scrubPii(bare, HINT), bare);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Employer capability tokens in the PATH (2026-09-06).
+// The guarantees earlier reviews pinned, restated for the allowlist scrub
+// (H1 privacy follow-up, 2026-11-10). Before it, each of these was a
+// redaction rule that kept the rest of the string; now the string is not sent
+// at all, so each test asserts that the secret is gone and that the event
+// still says which route broke. The per-leak tests from the 2026-11-10 audit
+// are in sentry-scrub.leaks.test.ts.
 //
-// F14's rule matches `key=value`, which covers `?token=`. PR #204 then added
-// tokens that are a path SEGMENT — `/connect/<token>` (the employer response
-// page) and `/api/connect/employer/<token>/…` (its three actions) — and those
-// URLs land in `request.url`, in the referer header, and in navigation and
-// fetch breadcrumbs. The token is a 14-day bearer capability over a student's
-// packet and résumé, so a copy of it sitting in Sentry is a copy of that
-// access. Verified before the fix: a realistic event came out of `scrubPii`
-// with the token intact everywhere, while `?token=` in the same event was
-// redacted.
-// ---------------------------------------------------------------------------
+// - F14 / SEC-06 (2026-09-01): the password-reset token travels as
+//   /reset-password?token=... and reached request.url, query_string and
+//   navigation breadcrumbs.
+// - 2026-09-06: employer capability tokens are a path SEGMENT
+//   (/connect/<token>, /api/connect/employer/<token>/...), as are staff
+//   invite tokens (/invite/<token>).
+// - W1 (2026-09-06): transactions carry the URL in six more fields.
+// - W11 (2026-09-06): phone numbers and `user.id`.
 
-/** Shaped like the real thing: 32 random bytes, base64url, 43 characters. */
-const EMPLOYER_TOKEN = "hQ7nZ2xK9vB4mL0pR6sT8wY1cD3fG5jN7qA2eU4iO6k";
-
-function employerPacketEvent(): ErrorEvent {
-  return {
-    type: undefined,
-    message: "boom",
-    request: {
-      url: `https://vq.example/connect/${EMPLOYER_TOKEN}`,
-      headers: {
-        referer: `https://vq.example/connect/${EMPLOYER_TOKEN}`,
-        "user-agent": "test-agent",
-      },
-    },
-    breadcrumbs: [
-      {
-        category: "navigation",
-        data: { from: "/", to: `/connect/${EMPLOYER_TOKEN}` },
-      },
-      {
-        category: "fetch",
-        data: {
-          url: `https://vq.example/api/connect/employer/${EMPLOYER_TOKEN}/interested`,
-          method: "POST",
-          status_code: 500,
-        },
-      },
-      {
-        category: "console",
-        message: `POST /api/connect/employer/${EMPLOYER_TOKEN}/hired failed`,
-      },
-    ],
-  };
+/** Shaped like a minted token (43 base64url characters), built here so no real one is pinned. */
+function token(seed: string): string {
+  return seed.repeat(15).slice(0, 43);
 }
 
-describe("scrubPii: employer capability tokens in the path", () => {
-  it("leaves the whole event free of the token", () => {
-    const out = scrubPii(employerPacketEvent(), HINT);
-
-    assert.doesNotMatch(
-      serialized(out),
-      new RegExp(EMPLOYER_TOKEN),
-      "a 14-day bearer capability over a student's packet must not reach Sentry anywhere in the event",
-    );
-  });
-
-  it("redacts the token in request.url", () => {
-    const out = scrubPii(employerPacketEvent(), HINT);
-    assert.equal(out.request?.url, "https://vq.example/connect/[REDACTED]");
-  });
-
-  it("redacts the token in the referer header", () => {
-    // Headers were filtered but never text-scrubbed, so the referer carried a
-    // full copy of whatever the URL carried.
-    const out = scrubPii(employerPacketEvent(), HINT);
-    assert.equal(out.request?.headers?.referer, "https://vq.example/connect/[REDACTED]");
-  });
-
-  it("redacts the token in navigation, fetch, and console breadcrumbs", () => {
-    const out = scrubPii(employerPacketEvent(), HINT);
-    const crumb = (category: string) => out.breadcrumbs?.find((b) => b.category === category);
-
-    assert.equal((crumb("navigation")?.data as { to: string }).to, "/connect/[REDACTED]");
-    assert.equal(
-      (crumb("fetch")?.data as { url: string }).url,
-      "https://vq.example/api/connect/employer/[REDACTED]/interested",
-    );
-    assert.match(crumb("console")?.message ?? "", /\/api\/connect\/employer\/\[REDACTED\]\/hired/);
-  });
-
-  it("leaves short /connect/ segments alone", () => {
-    // Only a segment long enough to be a token is redacted. A route name is
-    // not a secret, and blanking it would cost the one thing the event is
-    // for — knowing which page broke.
-    const event: ErrorEvent = {
-      type: undefined,
-      request: { url: "https://vq.example/connect/report" },
-      breadcrumbs: [{ category: "navigation", data: { to: "/connect/report" } }],
-    };
-
-    const out = scrubPii(event, HINT);
-    assert.equal(out.request?.url, "https://vq.example/connect/report");
-    assert.equal((out.breadcrumbs?.[0]?.data as { to: string }).to, "/connect/report");
-  });
-
-  it("redacts the connection id on the student approve/withdraw routes", () => {
-    // Not collateral damage — a Connection.id resolves to one student's
-    // employer disclosure, and a student identifier is PII in a log sink
-    // (.claude/rules/security.md). The route still names itself.
-    const connectionId = "clz9k2m4x0001qw8h7v3n5t2b";
-    const event: ErrorEvent = {
-      type: undefined,
-      request: { url: `https://vq.example/api/connect/${connectionId}/approve` },
-    };
-
-    const out = scrubPii(event, HINT);
-    assert.equal(out.request?.url, "https://vq.example/api/connect/[REDACTED]/approve");
-  });
-
-  it("leaves the staff Connect routes readable", () => {
-    // On these the segment after /connect/ is a literal and the id sits a
-    // level deeper, so the rule does not reach it. Pinned so a future
-    // widening of the pattern has to face this case on purpose.
-    const event: ErrorEvent = {
-      type: undefined,
-      request: {
-        url: "https://vq.example/api/teacher/connect/employers/clz9k2m4x0001qw8h7v3n5t2b/contacts",
-      },
-    };
-
-    const out = scrubPii(event, HINT);
-    assert.match(out.request?.url ?? "", /\/api\/teacher\/connect\/employers\//);
-  });
-
-  it("still redacts the reset token in a query parameter (F14 unchanged)", () => {
-    // The path rule is additive. This is the case F14 shipped, re-asserted
-    // here so a future edit to `redactText` cannot trade one for the other.
-    const out = scrubPii(resetPageEvent(), HINT);
-    assert.doesNotMatch(serialized(out), new RegExp(TOKEN));
-    assert.match(out.request?.url ?? "", /token=\[REDACTED\]/);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Review W1 (2026-09-06). `scrubPii` patched only `user`, `request`, and
-// `breadcrumbs`, but the same function is `beforeSendTransaction` as well
-// (sentry.client.config.ts:12). A transaction carries the URL in
-// `transaction`, `spans[].description`, `spans[].data["http.url"]`, and
-// `contexts.trace.data["http.url"]`; an error event carries it in `message`,
-// `exception.values[].value`, `extra`, and `tags`. Verified before the fix: a
-// token placed in each of those fields came back out of `scrubPii` intact.
-// ---------------------------------------------------------------------------
-
-/** A second minted-shaped token so a leak here cannot be masked by the first. */
-const TRANSACTION_TOKEN = "aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2yZ3aB4c";
-
-function transactionEvent(): Event {
-  return {
-    type: "transaction",
-    transaction: `GET /connect/${TRANSACTION_TOKEN}`,
-    message: `rendering /connect/${TRANSACTION_TOKEN}`,
-    exception: {
-      values: [
-        {
-          type: "Error",
-          value: `fetch failed for https://vq.example/api/connect/employer/${TRANSACTION_TOKEN}/hired`,
-        },
-      ],
-    },
-    extra: { lastUrl: `https://vq.example/connect/${TRANSACTION_TOKEN}` },
-    tags: { route: `/connect/${TRANSACTION_TOKEN}`, sampled: true },
-    contexts: {
-      trace: {
-        trace_id: "1".repeat(32),
-        span_id: "2".repeat(16),
-        data: { "http.url": `https://vq.example/connect/${TRANSACTION_TOKEN}` },
-      },
-    },
-    spans: [
-      {
-        span_id: "3".repeat(16),
-        trace_id: "1".repeat(32),
-        start_timestamp: 0,
-        description: `GET /connect/${TRANSACTION_TOKEN}`,
-        data: { "http.url": `https://vq.example/api/connect/employer/${TRANSACTION_TOKEN}/interested` },
-      },
-    ],
-  };
-}
-
-describe("scrubPii: every event field a capability URL reaches", () => {
-  it("leaves no copy of the token anywhere in a serialized transaction event", () => {
-    const out = scrubPii(transactionEvent(), HINT);
-
-    assert.doesNotMatch(
-      serialized(out),
-      new RegExp(TRANSACTION_TOKEN),
-      "beforeSendTransaction sends the whole event; every field that can carry the URL must be scrubbed",
-    );
-  });
-
-  it("redacts the token in transaction, message, extra, and tags", () => {
-    const out = scrubPii(transactionEvent(), HINT);
-
-    assert.equal(out.transaction, "GET /connect/[REDACTED]");
-    assert.equal(out.message, "rendering /connect/[REDACTED]");
-    assert.equal((out.extra as { lastUrl: string }).lastUrl, "https://vq.example/connect/[REDACTED]");
-    assert.equal(out.tags?.route, "/connect/[REDACTED]");
-    // A non-string tag survives unchanged.
-    assert.equal(out.tags?.sampled, true);
-  });
-
-  it("redacts the token in contexts.trace.data and in exception values", () => {
-    const out = scrubPii(transactionEvent(), HINT);
-
-    assert.equal(
-      (out.contexts?.trace?.data as { "http.url": string })["http.url"],
-      "https://vq.example/connect/[REDACTED]",
-    );
-    assert.equal(
-      out.exception?.values?.[0]?.value,
-      "fetch failed for https://vq.example/api/connect/employer/[REDACTED]/hired",
-    );
-    // The trace ids the event is threaded by are untouched.
-    assert.equal(out.contexts?.trace?.trace_id, "1".repeat(32));
-  });
-
-  it("redacts the token in span descriptions and span data", () => {
-    const out = scrubPii(transactionEvent(), HINT);
-    const span = out.spans?.[0];
-
-    assert.equal(span?.description, "GET /connect/[REDACTED]");
-    assert.equal(
-      (span?.data as { "http.url": string })["http.url"],
-      "https://vq.example/api/connect/employer/[REDACTED]/interested",
-    );
-    assert.equal(span?.span_id, "3".repeat(16));
-  });
-
-  it("catches the token behind an uppercased path and a doubled slash", () => {
-    // A URL is not case-normalized on its way into an event, and a doubled
-    // slash survives every layer between the browser and Sentry.
-    const event: Event = {
-      type: undefined,
-      transaction: `GET /CONNECT/${TRANSACTION_TOKEN}`,
-      message: `GET /connect//${TRANSACTION_TOKEN}`,
-      request: { url: `https://vq.example/Api/Connect/Employer/${TRANSACTION_TOKEN}/hired` },
-    };
-
-    const out = scrubPii(event, HINT);
-    assert.doesNotMatch(serialized(out), new RegExp(TRANSACTION_TOKEN));
-    assert.equal(out.transaction, "GET /CONNECT/[REDACTED]");
-    assert.equal(out.message, "GET /connect//[REDACTED]");
-  });
-
-  it("leaves an operator-useful transaction name alone", () => {
-    // The whole point of the transaction field is knowing which route broke.
-    const event: Event = { type: "transaction", transaction: "GET /teacher/connect" };
-
-    const out = scrubPii(event, HINT);
-    assert.equal(out.transaction, "GET /teacher/connect");
-  });
-});
-
-describe("Sentry configs route through the scrub", () => {
-  // H1 (2026-11-10): the browser init moved from sentry.client.config.ts,
-  // which the SDK reads only on its webpack path, to src/instrumentation-client.ts,
-  // which Next itself loads under Turbopack.
-  const configs = [
-    { name: "sentry.server.config.ts", importFrom: /import \{ scrubPii \} from "\.\/src\/lib\/sentry-scrub"/ },
-    { name: "sentry.edge.config.ts", importFrom: /import \{ scrubPii \} from "\.\/src\/lib\/sentry-scrub"/ },
-    { name: "src/instrumentation-client.ts", importFrom: /import \{ scrubPii \} from "@\/lib\/sentry-scrub"/ },
-  ];
-  for (const { name, importFrom } of configs) {
-    it(`${name} wires scrubPii into beforeSend and beforeSendTransaction`, () => {
-      const source = readFileSync(fileURLToPath(new URL(`../../${name}`, import.meta.url)), "utf8");
-      assert.match(source, importFrom);
-      assert.match(source, /beforeSend: scrubPii/, `${name} lacks beforeSend: scrubPii`);
-      assert.match(source, /beforeSendTransaction: scrubPii/, `${name} lacks beforeSendTransaction: scrubPii`);
-    });
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Review W11 (2026-09-06). Two gaps that survived the W1 field sweep above:
-// `redactText` knew emails and secrets but not PHONE NUMBERS, so a Twilio
-// error quoting a student's handset reached Sentry through every field the
-// sweep routes; and `user.id` — the student's cuid — was the one user field
-// deliberately kept. Verified before the fix: the phone came back intact in
-// `exception.values[].value`, and `user.id` came back verbatim.
-// ---------------------------------------------------------------------------
-
+const RESET_TOKEN = token("rT7-q");
+const EMPLOYER_TOKEN = token("Zk3-_");
+const INVITE_TOKEN = token("mN4_x");
 const STUDENT_EMAIL = "tanesha.rivers@example.org";
 const STUDENT_PHONE = "+13045550142";
 const STUDENT_PHONE_FORMATTED = "(304) 555-0142";
 const STUDENT_CUID = "clzstudent00000000000042";
 
-function studentContactEvent(): ErrorEvent {
+function serialized(event: unknown): string {
+  return JSON.stringify(event);
+}
+
+function resetPageEvent(): ErrorEvent {
   return {
     type: undefined,
-    message: `notification failed for ${STUDENT_EMAIL}`,
-    user: { id: STUDENT_CUID, email: STUDENT_EMAIL },
-    exception: {
-      values: [
-        {
-          type: "Error",
-          value: `The 'To' number ${STUDENT_PHONE} is not a valid phone number`,
-        },
-      ],
+    message: "boom",
+    user: { id: STUDENT_CUID, email: STUDENT_EMAIL, username: "student", ip_address: "10.0.0.9", segment: "cohort-a" },
+    request: {
+      url: `https://vq.example/reset-password?token=${RESET_TOKEN}&x=1#code=otp_123456`,
+      query_string: `token=${RESET_TOKEN}&x=1`,
+      headers: { cookie: "vq_session=abc", Authorization: "Bearer abc", "x-forwarded-for": "10.0.0.9", "user-agent": "test-agent" },
+      cookies: { vq_session: "abc" },
+      data: { studentId: "STU-001", newPassword: "correct horse" },
     },
     breadcrumbs: [
-      { category: "console", message: `sms to ${STUDENT_PHONE_FORMATTED} bounced` },
-    ],
-    extra: { lastRecipient: STUDENT_PHONE },
-  };
-}
-
-describe("scrubPii: student contact details and user.id (W11)", () => {
-  it("redacts a student email in event.message", () => {
-    const out = scrubPii(studentContactEvent(), HINT);
-    assert.doesNotMatch(out.message ?? "", new RegExp(STUDENT_EMAIL.replace(".", "\\.")));
-    assert.match(out.message ?? "", /notification failed for/);
-  });
-
-  it("redacts a phone number in exception.values[].value", () => {
-    const out = scrubPii(studentContactEvent(), HINT);
-    const value = out.exception?.values?.[0]?.value ?? "";
-    assert.ok(!value.includes(STUDENT_PHONE), `phone reached Sentry: ${value}`);
-    assert.match(value, /is not a valid phone number/, "the provider's reason survives");
-  });
-
-  it("redacts a separator-formatted phone number in a breadcrumb message", () => {
-    const out = scrubPii(studentContactEvent(), HINT);
-    const crumb = out.breadcrumbs?.[0]?.message ?? "";
-    assert.ok(!crumb.includes(STUDENT_PHONE_FORMATTED), `phone reached Sentry: ${crumb}`);
-    assert.ok(!crumb.includes("555-0142"));
-  });
-
-  it("drops user.id", () => {
-    const out = scrubPii(studentContactEvent(), HINT);
-    assert.equal(out.user?.id, undefined);
-    assert.equal(out.user?.email, undefined);
-  });
-
-  it("keeps only `segment` on user: any other field, named or not, is dropped (allowlist)", () => {
-    // 2026-09-07 audit: the old denylist let an unnamed custom field such as
-    // displayName through. Nothing sets one today; this pins that nothing can.
-    const event = studentContactEvent();
-    event.user = { ...event.user, segment: "cohort-a", displayName: "Jordan Alvarez" } as Event["user"];
-    const out = scrubPii(event, HINT);
-    assert.deepEqual(out.user, { segment: "cohort-a" });
-    assert.ok(!serialized(out).includes("Jordan Alvarez"));
-  });
-
-  it("leaves no copy of the email, the phone, or the cuid anywhere in the event", () => {
-    const out = scrubPii(studentContactEvent(), HINT);
-    const text = serialized(out);
-    assert.ok(!text.includes(STUDENT_EMAIL));
-    assert.ok(!text.includes(STUDENT_PHONE));
-    assert.ok(!text.includes("555-0142"));
-    assert.ok(!text.includes(STUDENT_CUID));
-  });
-
-  it("leaves bare digit runs alone so trace ids and timestamps survive", () => {
-    // The phone rule is the one log-redaction.ts already uses: E.164 or
-    // separator-formatted only. A 32-hex trace id and an epoch are not phones.
-    const event: Event = {
-      type: undefined,
-      message: "failed at 1755691234567 with code 21211",
-      contexts: { trace: { trace_id: "1".repeat(32), span_id: "2".repeat(16) } },
-    };
-    const out = scrubPii(event, HINT);
-    assert.equal(out.message, "failed at 1755691234567 with code 21211");
-    assert.equal(out.contexts?.trace?.trace_id, "1".repeat(32));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Staff invite tokens in the path (org tree Phase 1, Task 8). `/invite/<token>`
-// is a 14-day account-creation capability, so it is redacted like `/connect/`.
-// ---------------------------------------------------------------------------
-
-/** 32 random bytes as base64url: 43 characters, built here so no real token is pinned. */
-const INVITE_TOKEN = "Zk3-_".repeat(9).slice(0, 43);
-
-function inviteEvent(url: string): Event {
-  return {
-    type: "transaction",
-    request: { url },
-    breadcrumbs: [{ category: "navigation", data: { to: new URL(url).pathname + new URL(url).search } }],
-    spans: [
-      {
-        span_id: "3".repeat(16),
-        trace_id: "1".repeat(32),
-        start_timestamp: 0,
-        data: { "http.url": url },
-      },
+      { category: "navigation", data: { from: "/login", to: `/reset-password?token=${RESET_TOKEN}` } },
+      { category: "console", message: `GET /reset-password?token=${RESET_TOKEN} for ${STUDENT_EMAIL}` },
     ],
   };
 }
 
-describe("scrubPii: staff invite tokens in the path", () => {
-  for (const suffix of ["", "?x=1"]) {
-    it(`redacts /invite/<token>${suffix} in request url, span http.url and navigation breadcrumb`, () => {
-      const out = scrubPii(inviteEvent(`https://vq.example/invite/${INVITE_TOKEN}${suffix}`), HINT);
-      assert.equal(INVITE_TOKEN.length, 43);
-      assert.doesNotMatch(serialized(out), new RegExp(INVITE_TOKEN));
-      assert.equal(out.request?.url, `https://vq.example/invite/[REDACTED]${suffix}`);
-      assert.equal(
-        (out.spans?.[0]?.data as Record<string, string>)["http.url"],
-        `https://vq.example/invite/[REDACTED]${suffix}`,
-      );
-      assert.equal((out.breadcrumbs?.[0]?.data as { to: string }).to, `/invite/[REDACTED]${suffix}`);
+describe("scrubPii: secrets in URLs", () => {
+  it("sends no copy of the reset token, and still names the page", () => {
+    const out = scrubPii(resetPageEvent(), {});
+    assert.ok(!serialized(out).includes(RESET_TOKEN));
+    assert.ok(!serialized(out).includes("otp_123456"));
+    assert.equal(out?.tags?.route, "/reset-password");
+  });
+
+  for (const path of [`/connect/${EMPLOYER_TOKEN}`, `/api/connect/employer/${EMPLOYER_TOKEN}/hired`, `/CONNECT//${EMPLOYER_TOKEN}`, `/invite/${INVITE_TOKEN}?x=1`]) {
+    it(`sends no capability token from ${path.replace(/[A-Za-z0-9_-]{43}/, "<token>")}`, () => {
+      const event: ErrorEvent = {
+        type: undefined,
+        transaction: `GET ${path}`,
+        request: { url: `https://vq.example${path}`, headers: { referer: `https://vq.example${path}` } },
+        tags: { route: path },
+        extra: { lastUrl: `https://vq.example${path}` },
+      };
+      const out = scrubPii(event, {});
+      assert.ok(!serialized(out).includes(EMPLOYER_TOKEN) && !serialized(out).includes(INVITE_TOKEN), serialized(out));
     });
   }
 
-  it("leaves /invitee and a bare /invite alone", () => {
-    const out = scrubPii(
-      {
-        type: undefined,
-        request: { url: `https://vq.example/invitee/${INVITE_TOKEN}` },
-        breadcrumbs: [{ category: "navigation", data: { to: "/invite" } }],
-      },
-      HINT,
-    );
-    assert.equal(out.request?.url, `https://vq.example/invitee/${INVITE_TOKEN}`);
-    assert.equal((out.breadcrumbs?.[0]?.data as { to: string }).to, "/invite");
+  it("names the employer routes by pattern", () => {
+    const event: ErrorEvent = { type: undefined, request: { url: `https://vq.example/api/connect/employer/${EMPLOYER_TOKEN}/hired` } };
+    assert.equal(scrubPii(event, {})?.tags?.route, "/api/connect/employer/[param]/hired");
   });
-});
 
-// ---------------------------------------------------------------------------
-// H1 (2026-11-10): errors now reach Sentry from API routes, request errors and
-// alarm log lines. Three more gaps the earlier sweeps did not need to close:
-// a Prisma cuid in a message or path was kept (only emails, phones and
-// secrets were redacted), a server event carried the whole request and the
-// breadcrumb trail, and an exception message could quote a Prisma call's
-// arguments.
-// ---------------------------------------------------------------------------
-
-const PRISMA_CUID = "cm3x9k2qp0000ab12cd34ef56";
-
-describe("scrubPii: record ids", () => {
-  it("redacts a cuid anywhere in text", () => {
+  it("the pattern rules still catch a token in a source path, the one free string left", () => {
     const event: ErrorEvent = {
       type: undefined,
-      message: `Unique constraint failed for alertKey evidence_gap:${PRISMA_CUID}:req1`,
+      exception: { values: [{ type: "Error", value: "x", stacktrace: { frames: [{ filename: `/srv/connect/${EMPLOYER_TOKEN}/page.js` }] } }] },
     };
-    const out = scrubPii(event, HINT);
-    assert.doesNotMatch(serialized(out), new RegExp(PRISMA_CUID));
-    assert.match(out.message ?? "", /evidence_gap:\[ID\]:req1/);
-  });
-
-  it("leaves a 32-character trace id alone", () => {
-    const traceId = "c".repeat(1) + "0123456789abcdef0123456789abcde";
-    const event: ErrorEvent = { type: undefined, message: `trace ${traceId}` };
-    assert.equal(scrubPii(event, HINT).message, `trace ${traceId}`);
+    const frame = scrubPii(event, {})?.exception?.values?.[0]?.stacktrace?.frames?.[0];
+    assert.equal(frame?.filename, "/srv/connect/[REDACTED]/page.js");
   });
 });
 
-describe("routePattern", () => {
-  it("replaces id and token segments and drops the query string", () => {
-    assert.equal(
-      routePattern(`/api/teacher/students/${PRISMA_CUID}/goals?q=Tanesha#x`),
-      "/api/teacher/students/[param]/goals",
-    );
+describe("scrubPii: the request and the user", () => {
+  it("sends no request at all: no body, cookie, header or query string, on an auth route or any other", () => {
+    const out = scrubPii(resetPageEvent(), {});
+    assert.equal(out?.request, undefined);
+    assert.ok(!serialized(out).includes("correct horse"));
+    assert.ok(!serialized(out).includes("vq_session"));
+    assert.ok(!serialized(out).includes("test-agent"));
   });
 
-  it("replaces a capability token segment", () => {
-    const token = "aB3_dE6-gH9iJ2kL5mN8oP1qR4sT7uV0wX3yZ6aB9cD";
-    assert.equal(routePattern(`/api/connect/employer/${token}/hired`), "/api/connect/employer/[param]/hired");
+  it("sends no user field, `segment` included", () => {
+    // 2026-09-07 kept `segment` as the one allowlisted user field. Nothing
+    // sets it, and a cohort label is free text, so it goes too.
+    const out = scrubPii(resetPageEvent(), {});
+    assert.equal(out?.user, undefined);
+    assert.ok(!serialized(out).includes("cohort-a"));
   });
 
-  it("keeps every literal segment the API tree has, including the longest", () => {
-    assert.equal(routePattern("/api/internal/evidence-gap-detection"), "/api/internal/evidence-gap-detection");
-    assert.equal(routePattern("/api/teacher/reports/export.csv"), "/api/teacher/reports/export.csv");
+  it("sends no email, phone number or record id from any field (W11)", () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      message: `notification failed for ${STUDENT_EMAIL}`,
+      user: { id: STUDENT_CUID, email: STUDENT_EMAIL },
+      exception: { values: [{ type: "Error", value: `The 'To' number ${STUDENT_PHONE} is not a valid phone number` }] },
+      breadcrumbs: [{ category: "console", message: `sms to ${STUDENT_PHONE_FORMATTED} bounced` }],
+      extra: { lastRecipient: STUDENT_PHONE },
+    };
+    const text = serialized(scrubPii(event, {}));
+    for (const secret of [STUDENT_EMAIL, STUDENT_PHONE, "555-0142", STUDENT_CUID]) {
+      assert.ok(!text.includes(secret), `${secret} reached Sentry: ${text}`);
+    }
   });
 
-  it("replaces a numeric or mixed-case segment", () => {
-    assert.equal(routePattern("/api/items/12345/Jane"), "/api/items/[param]/[param]");
+  it("returns a bare event as it came", () => {
+    const bare: ErrorEvent = { type: undefined, event_id: "0".repeat(32), level: "error" };
+    assert.deepEqual(scrubPii(bare, {}), bare);
+  });
+});
+
+describe("scrubPii: transactions (W1)", () => {
+  it("sends none, so no span, description or http.url can carry a URL", () => {
+    const event: Event = {
+      type: "transaction",
+      transaction: `GET /connect/${EMPLOYER_TOKEN}`,
+      spans: [{ span_id: "3".repeat(16), trace_id: "1".repeat(32), start_timestamp: 0, data: { "http.url": `/connect/${EMPLOYER_TOKEN}` } }],
+    };
+    assert.equal(scrubPii(event, {}), null);
+  });
+
+  it("keeps a route name on an error event, by pattern", () => {
+    const event: ErrorEvent = { type: undefined, transaction: "GET /teacher/connect" };
+    assert.equal(scrubPii(event, {})?.transaction, "GET /teacher/connect");
+    const withId: ErrorEvent = { type: undefined, transaction: `POST /teacher/students/${STUDENT_CUID}` };
+    assert.equal(scrubPii(withId, {})?.transaction, "POST /teacher/students/[param]");
+    const freeText: ErrorEvent = { type: undefined, transaction: "rendering the page for Tanesha" };
+    assert.equal(scrubPii(freeText, {})?.transaction, undefined);
+  });
+});
+
+describe("the options every runtime spreads", () => {
+  it("record no breadcrumb, send no transaction, client report or default PII, and scrub every error", () => {
+    assert.equal(PRIVATE_REPORTING_OPTIONS.beforeSend, scrubPii);
+    assert.equal(PRIVATE_REPORTING_OPTIONS.beforeSendTransaction, sendNothing);
+    assert.equal(PRIVATE_REPORTING_OPTIONS.beforeBreadcrumb, sendNothing);
+    assert.equal(PRIVATE_REPORTING_OPTIONS.maxBreadcrumbs, 0);
+    assert.equal(PRIVATE_REPORTING_OPTIONS.sendClientReports, false);
+    assert.equal(PRIVATE_REPORTING_OPTIONS.sendDefaultPii, false);
+    assert.equal(sendNothing(), null);
+  });
+
+  it("keep an integration only when it is named", () => {
+    const names = ["GlobalHandlers", "Breadcrumbs", "BrowserSession", "HttpContext", "SomethingTheSdkAddsNextYear"];
+    assert.deepEqual(errorOnlyIntegrations(names.map((name) => ({ name }))), [{ name: "GlobalHandlers" }]);
   });
 });
 
@@ -632,43 +171,41 @@ describe("withheldServerEvent", () => {
   function serverEvent(): ErrorEvent {
     return {
       type: undefined,
-      exception: {
-        values: [{ type: "PrismaClientValidationError", value: 'where: { displayName: "Tanesha Rivers" }' }],
-      },
-      request: {
-        url: `https://vq.example/api/teacher/students/${PRISMA_CUID}?q=Tanesha`,
-        query_string: "q=Tanesha",
-        data: { displayName: "Tanesha Rivers" },
-        method: "POST",
-      },
+      exception: { values: [{ type: "PrismaClientValidationError", value: 'where: { displayName: "Tanesha Rivers" }' }] },
+      request: { url: `https://vq.example/api/teacher/students/${STUDENT_CUID}?q=Tanesha`, data: { displayName: "Tanesha Rivers" }, method: "POST" },
       breadcrumbs: [{ category: "fetch", data: { url: "https://storage.example/students/Tanesha.pdf" } }],
+      user: { ip_address: "10.0.0.9" },
+      extra: { attempts: 2, note: "Tanesha" },
       tags: { runtime: "node" },
     };
   }
 
-  it("drops the request and the breadcrumb trail", () => {
+  it("drops the request, the breadcrumbs, the user and every extra that is not a number or boolean", () => {
     const out = withheldServerEvent({ route: "/api/x", method: "POST", status: 500 })(serverEvent());
     assert.equal(out.request, undefined);
     assert.equal(out.breadcrumbs, undefined);
+    assert.equal(out.user, undefined);
+    assert.deepEqual(out.extra, { attempts: 2 });
     assert.doesNotMatch(serialized(out), /Tanesha/);
   });
 
-  it("withholds the exception message but keeps its type", () => {
+  it("withholds the exception message, keeps its type, and the scrub keeps the code", () => {
     const out = withheldServerEvent({ route: "/api/x", method: "POST", status: 500, errorCode: "P2002" })(serverEvent());
-    const [entry] = out.exception?.values ?? [];
-    assert.equal(entry?.type, "PrismaClientValidationError");
-    assert.equal(entry?.value, "[message withheld] code P2002");
+    assert.equal(out.exception?.values?.[0]?.type, "PrismaClientValidationError");
+    assert.equal(out.exception?.values?.[0]?.value, "[message withheld] code P2002");
+    assert.equal(scrubPii(out, {})?.exception?.values?.[0]?.value, "[message withheld] code P2002");
   });
 
-  it("names the route, method and status in tags and the transaction", () => {
-    const out = withheldServerEvent({ route: "/api/x/[param]", method: "POST", status: 500 })(serverEvent());
-    assert.deepEqual(out.tags, { runtime: "node", route: "/api/x/[param]", method: "POST", status: "500" });
-    assert.equal(out.transaction, "POST /api/x/[param]");
+  it("names the route, method and status, and the scrub keeps exactly those tags", () => {
+    const out = withheldServerEvent({ route: "/api/teacher/students/[param]", method: "POST", status: 500 })(serverEvent());
+    assert.equal(out.transaction, "POST /api/teacher/students/[param]");
+    const scrubbed = scrubPii(out, {});
+    assert.deepEqual(scrubbed?.tags, { route: "/api/teacher/students/[param]", method: "POST", status: "500" });
+    assert.equal(scrubbed?.transaction, "POST /api/teacher/students/[param]");
   });
 
   it("does not touch a message event's message", () => {
     const event: ErrorEvent = { type: undefined, message: "wellbeing_no_recipients" };
-    const out = withheldServerEvent({})(event);
-    assert.equal(out.message, "wellbeing_no_recipients");
+    assert.equal(withheldServerEvent({})(event).message, "wellbeing_no_recipients");
   });
 });

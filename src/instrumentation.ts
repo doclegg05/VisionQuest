@@ -55,12 +55,18 @@ export async function register() {
  * In production a failed boot probe throws rather than logging
  * boot_probe_failed (src/lib/boot-probes.ts), so the logger's alarm hook
  * never sees it. Report the throw here and flush before rethrowing, since
- * the process is about to stop. The message names the failed controls and
- * their configuration, not anyone's data.
+ * the process is about to stop. It gets the same treatment as every other
+ * server report: `withheldServerEvent` keeps the error's type and code and
+ * withholds its message, which for a database that cannot be reached names
+ * the host and the role. The host's log stream has the message.
  */
 async function reportBootFailure(error: unknown): Promise<never> {
   if (process.env.SENTRY_DSN) {
-    Sentry.captureException(error, { tags: { alert: "boot_probe_failed" } });
+    Sentry.withScope((scope) => {
+      scope.addEventProcessor(withheldServerEvent({ errorCode: errorForLog(error).code }));
+      scope.setTag("alert", "boot_probe_failed");
+      Sentry.captureException(error);
+    });
     await Sentry.flush(BOOT_FAILURE_FLUSH_MS);
   }
   throw error;
@@ -73,8 +79,8 @@ async function reportBootFailure(error: unknown): Promise<never> {
  * (`/teacher/students/[id]`) as its path and no headers, because the real
  * path carries record ids and its query string, and the headers carry the
  * cookie and a referer with the same ids. `withheldServerEvent` then drops
- * the request, the breadcrumbs and the exception message, and scrubPii
- * still runs as beforeSend.
+ * the request and the exception message, and scrubPii still builds the event
+ * that is sent (src/lib/sentry-scrub.ts).
  */
 export const onRequestError: Instrumentation.onRequestError = (error, request, context) => {
   if (!process.env.SENTRY_DSN) return;
