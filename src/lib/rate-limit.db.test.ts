@@ -22,9 +22,11 @@
  * Both are database behaviors, so both belong here rather than over a fake.
  *
  * The refund cases (readiness A1) are here for the same reason: sign-in now
- * gives its per-network unit back when the password was right, and the
- * refund statement matches the row by the exact `resetTime` the consuming
- * call returned. Only a real TIMESTAMP(3) column proves that match holds.
+ * gives its per-network and per-account units back when the password was
+ * right, and the refund statement matches the row by the exact `resetTime`
+ * the consuming call returned. Only a real TIMESTAMP(3) column proves that
+ * match holds, and only real row locks prove that refunds racing failed
+ * attempts never let more than the limit through.
  *
  * Prerequisites (auto-skipped when missing):
  *   - DATABASE_URL points at a migrated, NON-PRODUCTION Postgres.
@@ -312,6 +314,14 @@ if (!SHOULD_RUN) {
       const key = uniqueKey("refund");
       await rateLimit(key, 30, 15 * 60 * 1000);
       const consumed = await rateLimit(key, 30, 15 * 60 * 1000);
+      // The refund finds its row by this exact value. Checked on its own
+      // first, so a timestamp that does not survive the round trip fails
+      // here by name and not as a wrong count below.
+      assert.equal(
+        (await storedRow(key))?.resetTime.getTime(),
+        consumed.resetTime,
+        "the stored window end must equal the one rateLimit() returned, to the millisecond",
+      );
 
       await refundRateLimit(key, consumed.resetTime);
 
@@ -350,6 +360,59 @@ if (!SHOULD_RUN) {
 
       const row = await storedRow(key);
       assert.equal(row?.count, 0, "concurrent refunds must each take exactly one unit");
+    });
+
+    // A1 security review, item 6. Failed attempts keep their units and
+    // sign-ins give theirs back, all on one row at once. Each statement must
+    // see the others' writes: a lost increment or a refund applied twice
+    // would admit more failed attempts than the limit.
+    it("never admits more failed attempts than the limit while sign-ins give units back around them", async () => {
+      const key = uniqueKey("refund-mixed");
+      const limit = 30;
+      const windowMs = 15 * 60 * 1000;
+      const failedPerWave = BURST / 2;
+
+      /** One attempt as the sign-in route makes it: only an admitted sign-in gives its unit back. */
+      const attempt = async (kind: "failed" | "signed-in") => {
+        const taken = await rateLimit(key, limit, windowMs);
+        const refunded = kind === "signed-in" && taken.success;
+        if (refunded) await refundRateLimit(key, taken.resetTime);
+        return { kind, admitted: taken.success, refunded, degraded: taken.degraded };
+      };
+      /** BURST attempts at once, failed attempts and sign-ins in turn. */
+      const wave = () =>
+        Promise.all(Array.from({ length: BURST }, (_, i) => attempt(i % 2 === 0 ? "failed" : "signed-in")));
+
+      // Four waves stay inside the limit even with every unit in flight at
+      // once (18 counted + 12 in flight = 30), so nothing may be refused, and
+      // afterwards exactly the 24 failed attempts are counted.
+      const inside = [];
+      for (let i = 0; i < 4; i += 1) inside.push(...(await wave()));
+      assert.ok(inside.every((o) => o.admitted && !o.degraded), "no attempt inside the limit may be refused");
+      assert.equal(
+        (await storedRow(key))?.count,
+        4 * failedPerWave,
+        "every failed attempt must stay counted and every sign-in must give back exactly one unit",
+      );
+
+      // Two more waves run into the limit, with refunds freeing units as
+      // failed attempts arrive.
+      const outcomes = [...inside, ...(await wave()), ...(await wave())];
+      const admittedFailures = outcomes.filter((o) => o.kind === "failed" && o.admitted).length;
+      const refunds = outcomes.filter((o) => o.refunded).length;
+
+      assert.ok(outcomes.every((o) => !o.degraded), "a healthy store must never fail open");
+      assert.ok(
+        admittedFailures <= limit,
+        `failed attempts admitted must never pass the limit of ${limit}; got ${admittedFailures}`,
+      );
+      assert.equal(
+        (await storedRow(key))?.count,
+        outcomes.length - refunds,
+        "every attempt must be counted once and every refund must take back exactly one unit",
+      );
+      // 72 attempts and at most 36 refunds leave more than 30 counted.
+      assert.equal((await attempt("failed")).admitted, false, "a later failed attempt is refused");
     });
 
     it("never takes the counter below zero", async () => {
