@@ -41,8 +41,9 @@ export default function AboutSagePage() {
           {SAGE_NOTICE_SECTIONS.map((section) => (
             <NoticeSectionBlock key={section.heading} section={section} />
           ))}
+          {/* /dashboard, not /: a held student is sent back to /sage-notice, a signed-out visitor to sign in. */}
           <Link
-            href="/"
+            href="/dashboard"
             className="mt-10 inline-flex min-h-11 items-center text-base font-semibold text-success underline hover:text-[var(--ink-strong)]"
           >
             Back to VisionQuest

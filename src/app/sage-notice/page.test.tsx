@@ -4,6 +4,9 @@ import { renderToString } from "react-dom/server";
 import {
   SAGE_NOTICE_ACK_BUTTON,
   SAGE_NOTICE_ACK_HEADING,
+  SAGE_NOTICE_ACK_INTRO,
+  SAGE_NOTICE_SIGN_OUT_BUTTON,
+  SAGE_NOTICE_SIGN_OUT_LINE,
   SAGE_NOTICE_KEY_POINTS,
   SAGE_NOTICE_PATH,
   SAGE_NOTICE_VERSION,
@@ -44,9 +47,12 @@ mock.module("@/lib/db", {
 });
 
 let Page: typeof import("./page").default;
+let pageMetadata: typeof import("./page").metadata;
 
 before(async () => {
-  Page = (await import("./page")).default;
+  const mod = await import("./page");
+  Page = mod.default;
+  pageMetadata = mod.metadata;
 });
 
 async function redirectTarget(): Promise<string | null> {
@@ -73,6 +79,25 @@ describe("/sage-notice acknowledgement page", () => {
     for (const point of SAGE_NOTICE_KEY_POINTS) assert.ok(html.includes(asHtml(point)), point);
     assert.match(html, new RegExp(`<a[^>]*href="${SAGE_NOTICE_PATH}"`));
     assert.match(html, new RegExp(`<button[^>]*>${SAGE_NOTICE_ACK_BUTTON}</button>`));
+  });
+
+  it("tells the student what Sage is and what to do, right under the heading", async () => {
+    const html = renderToString(await Page());
+    const afterHeading = html.slice(html.indexOf("</h1>"));
+    assert.ok(afterHeading.startsWith(`</h1><p`), "the intro is the next element");
+    assert.ok(afterHeading.indexOf(SAGE_NOTICE_ACK_INTRO) < afterHeading.indexOf("<ul"));
+  });
+
+  it("offers a way out: sign out, under a divider, after the button", async () => {
+    const html = renderToString(await Page());
+    const block = html.slice(html.indexOf(`>${SAGE_NOTICE_ACK_BUTTON}</button>`));
+    assert.match(block, /class="mt-6 border-t border-\[var\(--border\)\] pt-4"/);
+    assert.ok(block.includes(SAGE_NOTICE_SIGN_OUT_LINE));
+    assert.match(block, new RegExp(`<button[^>]*>${SAGE_NOTICE_SIGN_OUT_BUTTON}</button>`));
+  });
+
+  it("names the page in the browser tab", () => {
+    assert.equal(pageMetadata.title, "Before You Talk to Sage | VisionQuest");
   });
 
   it("sends a student who already acknowledged this version to the dashboard", async () => {

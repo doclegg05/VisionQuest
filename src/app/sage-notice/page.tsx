@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
@@ -5,6 +6,7 @@ import { getRoleHomePath } from "@/lib/role-home";
 import { hasAcknowledgedSageNotice } from "@/lib/consent";
 import {
   SAGE_NOTICE_ACK_HEADING,
+  SAGE_NOTICE_ACK_INTRO,
   SAGE_NOTICE_FULL_LINK,
   SAGE_NOTICE_KEY_POINTS,
   SAGE_NOTICE_PATH,
@@ -12,11 +14,16 @@ import {
   needsSageNotice,
 } from "@/lib/about-sage/notice";
 import { AcknowledgeButton } from "./AcknowledgeButton";
+import { SignOutBlock } from "./SignOutBlock";
 
 // One-time Sage notice step (H6). The student layout sends a student here
 // until they acknowledge the current version. This page lives OUTSIDE the
 // (student) route group so the gate cannot loop, and it asks the same
 // question as the layout (needsSageNotice) so the two cannot disagree.
+export const metadata: Metadata = {
+  title: `${SAGE_NOTICE_ACK_HEADING} | VisionQuest`,
+};
+
 export default async function SageNoticePage() {
   const session = await getSession();
   if (!session) redirect("/");
@@ -35,6 +42,7 @@ export default async function SageNoticePage() {
         <div className="surface-section p-6 sm:p-8">
           <p className="page-eyebrow text-[var(--ink-muted)]">One quick step</p>
           <h1 className="mt-1 font-display text-2xl text-[var(--ink-strong)]">{SAGE_NOTICE_ACK_HEADING}</h1>
+          <p className="mt-2 text-base leading-7 text-[var(--ink-strong)]">{SAGE_NOTICE_ACK_INTRO}</p>
           <ul className="mt-4 list-disc space-y-2 pl-5">
             {SAGE_NOTICE_KEY_POINTS.map((point) => (
               <li key={point} className="text-base leading-7 text-[var(--ink-strong)]">
@@ -49,6 +57,7 @@ export default async function SageNoticePage() {
             {SAGE_NOTICE_FULL_LINK}
           </Link>
           <AcknowledgeButton />
+          <SignOutBlock />
         </div>
       </div>
     </main>

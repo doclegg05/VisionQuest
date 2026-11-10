@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToString } from "react-dom/server";
-import Page from "./page";
+import Page, { metadata } from "./page";
 import { SAGE_NOTICE_SECTIONS, SAGE_NOTICE_TITLE } from "@/lib/about-sage/notice";
 
 // The full Sage notice, public at /about-sage. It reads no session, so a
@@ -32,7 +32,14 @@ describe("/about-sage notice page", () => {
     assert.deepEqual(missing, []);
   });
 
-  it("links back to the sign-in page", () => {
-    assert.match(html, /<a[^>]*href="\/"[^>]*>/);
+  it("links back to the app, which sends a signed-out visitor to sign in", () => {
+    // /dashboard: the student layout sends a held student back to
+    // /sage-notice and src/proxy.ts sends a signed-out visitor to /.
+    assert.match(html, /<a[^>]*href="\/dashboard"[^>]*>Back to VisionQuest<\/a>/);
+    assert.doesNotMatch(html, /<a[^>]*href="\/"[^>]*>/);
+  });
+
+  it("names the page in the browser tab", () => {
+    assert.equal(metadata.title, "About Sage | VisionQuest");
   });
 });
