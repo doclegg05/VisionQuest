@@ -78,7 +78,7 @@ export interface CreateClassFormProps {
   /** The regions this person may put a class in. */
   regions: readonly RegionOption[];
   instructors: readonly InstructorChoice[];
-  /** The admin page has the Regions card; an instructor's page does not. */
+  /** The admin page has the Regions and Invite Staff cards; an instructor's page does not. */
   onAdminPage: boolean;
   creating: boolean;
   onCreate: () => void;
@@ -103,24 +103,43 @@ function TextField({ label, type, value, onChange }: TextFieldProps) {
   );
 }
 
+const EMPTY_NOTE = "mt-3 text-sm text-[var(--ink-strong)]";
+
+/** In place of an empty list. Only the admin page has the Invite Staff card to send someone to. */
+function NoInstructors({ onAdminPage }: { onAdminPage: boolean }) {
+  if (!onAdminPage) return <p className={EMPTY_NOTE}>No instructors yet.</p>;
+  return (
+    <p className={EMPTY_NOTE}>
+      No instructors yet. Invite one in{" "}
+      <a href="#invite-staff" className="inline-flex items-center pointer-coarse:min-h-11 font-semibold underline">Invite Staff</a>{" "}
+      at the bottom of this page. They show here after they accept.
+    </p>
+  );
+}
+
 interface AssignInstructorsProps {
   instructors: readonly InstructorChoice[];
   pickedIds: readonly string[];
   onToggle: (instructorId: string) => void;
+  onAdminPage: boolean;
 }
 
-function AssignInstructors({ instructors, pickedIds, onToggle }: AssignInstructorsProps) {
+function AssignInstructors({ instructors, pickedIds, onToggle, onAdminPage }: AssignInstructorsProps) {
   return (
     <div className="rounded-2xl border border-[var(--border)] p-4">
       <p className="text-sm font-semibold text-[var(--ink-strong)]">Assign instructors</p>
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
-        {instructors.map((instructor) => (
-          <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink-strong)]">
-            <input type="checkbox" checked={pickedIds.includes(instructor.id)} onChange={() => onToggle(instructor.id)} />
-            <span>{instructor.displayName}</span>
-          </label>
-        ))}
-      </div>
+      {instructors.length === 0 ? (
+        <NoInstructors onAdminPage={onAdminPage} />
+      ) : (
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {instructors.map((instructor) => (
+            <label key={instructor.id} className="flex items-center gap-3 rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink-strong)]">
+              <input type="checkbox" checked={pickedIds.includes(instructor.id)} onChange={() => onToggle(instructor.id)} />
+              <span>{instructor.displayName}</span>
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -151,7 +170,7 @@ export function CreateClassForm({ form, regions, instructors, onAdminPage, creat
           className={FIELD}
         />
       </label>
-      <AssignInstructors instructors={instructors} pickedIds={values.instructorIds} onToggle={form.toggleInstructor} />
+      <AssignInstructors instructors={instructors} pickedIds={values.instructorIds} onToggle={form.toggleInstructor} onAdminPage={onAdminPage} />
       <button
         type="button"
         onClick={onCreate}
