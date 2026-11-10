@@ -15,6 +15,8 @@
       "src/app/global-error.test.tsx",
       "src/lib/sentry-scrub.test.ts",
       "src/lib/sentry-scrub.leaks.test.ts",
+      "src/lib/sentry-scrub.total.test.ts",
+      "src/lib/sentry-wire.test.ts",
       "src/lib/sentry-config.test.ts",
       "src/lib/route-segments.test.ts",
       "src/proxy.test.ts"
