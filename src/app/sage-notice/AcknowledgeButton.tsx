@@ -31,7 +31,7 @@ export function AcknowledgeMessage({ outcome }: { outcome: AckOutcome | null }) 
         {outcome === "signed-out" && (
           <>
             {" "}
-            <Link href="/" className="font-semibold underline">
+            <Link href="/" className="inline-flex min-h-11 items-center font-semibold underline">
               {SAGE_NOTICE_SIGN_IN_AGAIN}
             </Link>
           </>
