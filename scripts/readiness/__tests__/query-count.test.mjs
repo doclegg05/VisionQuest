@@ -54,3 +54,19 @@ test("the usage text says what 4 per app call assumes, and that every number is 
   assert.match(stderr, /pgbouncer=true/);
   assert.match(stderr, /floor on wire round trips/);
 });
+
+test("reads both chat-send boundaries and says the gate takes the larger", async () => {
+  const { parseBoundaries, describeBoundary } = await queryCount();
+  const output = [
+    "# QUERY_BOUNDARY path=chat-send cache=cold beforeStream=150 beforeProvider=190",
+    "# QUERY_BOUNDARY path=chat-send cache=warm beforeStream=127 beforeProvider=127",
+    "# QUERY_BOUNDARY path=dashboard cache=cold beforeStream=1 beforeProvider=2",
+  ].join("\n");
+  const boundaries = parseBoundaries("chat-send", output);
+  assert.deepEqual(boundaries.cold, { beforeStream: 150, beforeProvider: 190 });
+  assert.equal(
+    describeBoundary("cold", boundaries.cold),
+    "  cold: before the stream 150, before the provider call 190; the gate reads the larger",
+  );
+  assert.deepEqual(parseBoundaries("dashboard", "nothing"), {});
+});

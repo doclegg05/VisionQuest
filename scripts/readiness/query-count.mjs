@@ -5,7 +5,9 @@
 //
 //   <path>   dashboard      M1, one student dashboard render
 //            teacher-home   M6, one teacher home render
-//            chat-send      M3, POST /api/chat/send up to stream creation
+//            chat-send      M3, POST /api/chat/send before its first word: the
+//                           larger of the round trips before the route builds
+//                           its stream and before it first calls the provider
 //
 // The last line of stdout is the count as a bare number, printed only when
 // the measurement ran clean. By default it is the cold count in estimated
@@ -60,6 +62,23 @@ const COUNT_FIELDS = [
 const COUNT_LINE = new RegExp(
   `QUERY_COUNT path=(\\S+) cache=(cold|warm) ${COUNT_FIELDS.map((field) => `${field}=(\\d+)`).join(" ")}`,
 );
+
+const BOUNDARY_LINE = /QUERY_BOUNDARY path=(\S+) cache=(cold|warm) beforeStream=(\d+) beforeProvider=(\d+)/;
+
+/** chat-send's two first-word boundaries, by cache, in round trips. */
+export function parseBoundaries(name, output) {
+  const boundaries = {};
+  for (const line of output.split("\n")) {
+    const match = BOUNDARY_LINE.exec(line);
+    if (!match || match[1] !== name) continue;
+    boundaries[match[2]] = { beforeStream: Number(match[3]), beforeProvider: Number(match[4]) };
+  }
+  return boundaries;
+}
+
+export function describeBoundary(cache, { beforeStream, beforeProvider }) {
+  return `  ${cache}: before the stream ${beforeStream}, before the provider call ${beforeProvider}; the gate reads the larger`;
+}
 
 const USAGE = [
   `Usage: query-count.mjs <${Object.keys(PATHS).join("|")}> [--cache=cold|warm] [--client=app|admin|all] [--unit=round-trips|statements|calls]`,
@@ -133,7 +152,8 @@ function main() {
   const options = parseArguments(process.argv.slice(2));
   const target = PATHS[options.name];
   const run = runTest(target.test);
-  const counts = parseCounts(options.name, `${run.stdout ?? ""}\n${run.stderr ?? ""}`);
+  const output = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
+  const counts = parseCounts(options.name, output);
   const chosen = counts[options.cache];
 
   if (!chosen) {
@@ -155,6 +175,9 @@ function main() {
         ` (read not executed ${count.read})`,
     );
   }
+  const boundaries = parseBoundaries(options.name, output);
+  if (Object.keys(boundaries).length > 0) console.log("first-word boundaries, app + admin round trips:");
+  for (const cache of CACHES) if (boundaries[cache]) console.log(describeBoundary(cache, boundaries[cache]));
   const clientLabel = options.client === "all" ? "app + admin" : options.client;
   console.log(`reporting: ${options.cache}, ${clientLabel}, in ${options.unit}`);
   if (run.status !== 0) {

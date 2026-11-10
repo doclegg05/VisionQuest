@@ -1,13 +1,22 @@
 /**
- * M3: database queries `POST /api/chat/send` issues before it creates the
- * response stream (`new ReadableStream` in `src/app/api/chat/send/route.ts`).
+ * M3: database queries `POST /api/chat/send` issues before the student can see
+ * a first word. Two boundaries are measured, and the gate reads the larger:
+ * - before the stream: when the route constructs its response stream
+ *   (`new ReadableStream` in `src/app/api/chat/send/route.ts`)
+ * - before the provider: when the AI provider's `streamResponse` or
+ *   `generateResponse` (or `streamWithTools`, the agent loop's form of
+ *   `streamResponse`) is first called for the turn. Today that call is inside
+ *   the stream's `start()`, so this figure is the larger one.
+ * The target of 12 can only be met by moving work after the first word. Moving
+ * context assembly inside the stream's `start()` lowers the first figure and
+ * not the second, and the student waits just as long.
  *
  * What the numbers are: the Prisma calls the real route, its registry
  * middleware, session lookup, provider resolution, rate limiter, context
  * bundle, retrieval and memory code issue for the fixture below, with
  * `@/lib/db` replaced by a counter and the local AI host's HTTP API answered
- * by a stub. The count stops at the moment the route constructs its stream;
- * what the turn does after that is printed and not pinned. "Cold" is the first
+ * by a stub. Both boundaries are pinned; what the turn does after the provider
+ * call is printed and not pinned. "Cold" is the first
  * turn in a new process. "Warm" is a second turn straight after, with the
  * in-process caches (session, permissions, system configuration, chat
  * context, memory profile, snippets) the first one filled. The cache
@@ -87,9 +96,15 @@ const CHAT_SEND_ADMIN_QUERIES_COLD = 22;
 const CHAT_SEND_APP_QUERIES_WARM = 29;
 /** Four audit rows, the rate limit counter and the wager read, every turn. */
 const CHAT_SEND_ADMIN_QUERIES_WARM = 6;
-/** M3: app plus admin round trips, what `node scripts/readiness/query-count.mjs chat-send` prints. */
+/** App plus admin round trips before the route constructs its stream. */
 const CHAT_SEND_ROUND_TRIPS_COLD = 190;
 const CHAT_SEND_ROUND_TRIPS_WARM = 127;
+/**
+ * App plus admin round trips before the provider is first called. M3 is the
+ * larger of this and the stream figure: what `query-count.mjs chat-send` prints.
+ */
+const CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_COLD = 190;
+const CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_WARM = 127;
 /** "file › function" -> [app, admin] for the cold turn. */
 const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -314,12 +329,62 @@ globalThis.ReadableStream = new Proxy(globalThis.ReadableStream, {
   },
 });
 
+/** Query and transaction counts at the turn's first call to the provider. */
+const queryCountsAtProviderCall: StreamMark[] = [];
+let providerCalledThisTurn = false;
+
+/**
+ * Marks the turn's first call to the local provider that can produce the
+ * reply: `streamResponse`, `generateResponse`, or `streamWithTools`, which the
+ * agent loop uses in place of `streamResponse`.
+ */
+async function markProviderCalls(): Promise<void> {
+  const { OllamaProvider } = await import("@/lib/ai/ollama-provider");
+  const prototype = OllamaProvider.prototype;
+  const mark = () => {
+    if (providerCalledThisTurn) return;
+    providerCalledThisTurn = true;
+    queryCountsAtProviderCall.push({ queries: counter.queries().length, transactions: counter.transactions().length });
+  };
+  const stream = prototype.streamResponse;
+  prototype.streamResponse = function (this: InstanceType<typeof OllamaProvider>, ...args: Parameters<typeof stream>) {
+    mark();
+    return stream.apply(this, args);
+  };
+  // The readonly agent loop (src/lib/sage/agent/loop.ts) replies through this one.
+  const withTools = prototype.streamWithTools;
+  prototype.streamWithTools = function (this: InstanceType<typeof OllamaProvider>, ...args: Parameters<typeof withTools>) {
+    mark();
+    return withTools.apply(this, args);
+  };
+  const generate = prototype.generateResponse;
+  prototype.generateResponse = function (this: InstanceType<typeof OllamaProvider>, ...args: Parameters<typeof generate>) {
+    mark();
+    return generate.apply(this, args);
+  };
+}
+
+interface Section {
+  readonly queries: readonly RecordedQuery[];
+  readonly transactions: readonly RecordedTransaction[];
+}
+
 interface Turn {
   status: number;
   body: string;
   beforeStream: readonly RecordedQuery[];
   transactionsBeforeStream: readonly RecordedTransaction[];
-  afterStream: readonly RecordedQuery[];
+  beforeProvider: Section;
+  afterProvider: readonly RecordedQuery[];
+}
+
+/** What the turn issued from its start up to a mark; empty when the mark never happened. */
+function upTo(start: StreamMark, mark: StreamMark | undefined): Section {
+  if (mark === undefined) return { queries: [], transactions: [] };
+  return {
+    queries: counter.queries().slice(start.queries, mark.queries),
+    transactions: counter.transactions().slice(start.transactions, mark.transactions),
+  };
 }
 
 /** Waits until the turn's follow-up work has stopped issuing queries and requests. */
@@ -335,9 +400,10 @@ async function settle(): Promise<void> {
 }
 
 async function sendTurn(post: typeof import("@/app/api/chat/send/route").POST, message: string): Promise<Turn> {
-  const start = counter.queries().length;
-  const transactionStart = counter.transactions().length;
+  const start: StreamMark = { queries: counter.queries().length, transactions: counter.transactions().length };
   const marksBefore = queryCountsAtStreamCreation.length;
+  const providerMarksBefore = queryCountsAtProviderCall.length;
+  providerCalledThisTurn = false;
   const response = await post(
     new NextRequest("http://localhost:3000/api/chat/send", {
       method: "POST",
@@ -348,29 +414,47 @@ async function sendTurn(post: typeof import("@/app/api/chat/send/route").POST, m
   );
   const body = await response.text();
   await settle();
-  const streamCreatedAt = queryCountsAtStreamCreation[marksBefore];
-  const all = counter.queries();
+  const beforeStream = upTo(start, queryCountsAtStreamCreation[marksBefore]);
+  const providerMark = queryCountsAtProviderCall[providerMarksBefore];
   return {
     status: response.status,
     body,
-    beforeStream: streamCreatedAt === undefined ? [] : all.slice(start, streamCreatedAt.queries),
-    transactionsBeforeStream: streamCreatedAt === undefined
-      ? []
-      : counter.transactions().slice(transactionStart, streamCreatedAt.transactions),
-    afterStream: streamCreatedAt === undefined ? all.slice(start) : all.slice(streamCreatedAt.queries),
+    beforeStream: beforeStream.queries,
+    transactionsBeforeStream: beforeStream.transactions,
+    beforeProvider: upTo(start, providerMark),
+    afterProvider: counter.queries().slice(providerMark?.queries ?? start.queries),
   };
 }
 
-/** M3: app plus admin, what `node scripts/readiness/query-count.mjs chat-send` prints. */
-function roundTrips(turn: Turn): number {
-  const { app, admin } = estimateRoundTrips(turn.beforeStream, turn.transactionsBeforeStream);
+/** App plus admin round trips for one section of a turn. */
+function roundTrips(section: Section): number {
+  const { app, admin } = estimateRoundTrips(section.queries, section.transactions);
   return app.roundTrips + admin.roundTrips;
+}
+
+function streamSection(turn: Turn): Section {
+  return { queries: turn.beforeStream, transactions: turn.transactionsBeforeStream };
+}
+
+/** M3's section: whichever boundary costs more, so moving work inside the stream cannot lower it. */
+function gateSection(turn: Turn): Section {
+  const stream = streamSection(turn);
+  return roundTrips(turn.beforeProvider) > roundTrips(stream) ? turn.beforeProvider : stream;
+}
+
+function reportLines(turn: Turn, cache: "cold" | "warm"): string[] {
+  const gate = gateSection(turn);
+  return [
+    `QUERY_BOUNDARY path=chat-send cache=${cache} beforeStream=${roundTrips(streamSection(turn))} beforeProvider=${roundTrips(turn.beforeProvider)}`,
+    queryCountLine({ path: "chat-send", cache, queries: gate.queries, transactions: gate.transactions, readNotExecuted: 0 }),
+  ];
 }
 
 let cold: Turn;
 let warm: Turn;
 
 before(async () => {
+  await markProviderCalls();
   const { POST } = await import("@/app/api/chat/send/route");
   cold = await sendTurn(POST, COLD_MESSAGE);
   warm = await sendTurn(POST, WARM_MESSAGE);
@@ -384,21 +468,23 @@ describe("M3: chat send query count before the response stream", () => {
       assert.match(turn.body, /"done":true/);
     }
     assert.equal(queryCountsAtStreamCreation.length, 2, "each turn must construct the route's stream once");
+    assert.equal(queryCountsAtProviderCall.length, 2, "each turn must call the provider");
     assert.ok(fetchedUrls.includes(`${LOCAL_AI_URL}/api/embed`), "retrieval did not run");
   });
 
   it("cold turn issues the pinned number of queries on each client before the stream", (t) => {
     for (const line of formatQueryBreakdown("M3 chat send, cold, before stream", cold.beforeStream).split("\n")) t.diagnostic(line);
-    const after = summarizeQueries(cold.afterStream);
-    t.diagnostic(`after the stream was created (not pinned): app ${after.app}, admin ${after.admin}`);
+    const after = summarizeQueries(cold.afterProvider);
+    t.diagnostic(`after the provider was called (not pinned): app ${after.app}, admin ${after.admin}`);
     const summary = summarizeQueries(cold.beforeStream);
-    t.diagnostic(queryCountLine({
-      path: "chat-send", cache: "cold", queries: cold.beforeStream, transactions: cold.transactionsBeforeStream, readNotExecuted: 0,
-    }));
+    for (const line of reportLines(cold, "cold")) t.diagnostic(line);
 
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_COLD);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_COLD);
-    assert.equal(roundTrips(cold), CHAT_SEND_ROUND_TRIPS_COLD);
+    assert.equal(roundTrips(streamSection(cold)), CHAT_SEND_ROUND_TRIPS_COLD);
+    assert.equal(roundTrips(cold.beforeProvider), CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_COLD);
+    // The number the script prints is the larger of the two.
+    assert.equal(roundTrips(gateSection(cold)), Math.max(CHAT_SEND_ROUND_TRIPS_COLD, CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_COLD));
   });
 
   it("cold turn's queries come from the pinned functions", () => {
@@ -408,16 +494,17 @@ describe("M3: chat send query count before the response stream", () => {
   it("warm turn issues the pinned number of queries on each client before the stream", (t) => {
     for (const line of formatQueryBreakdown("M3 chat send, warm, before stream", warm.beforeStream).split("\n")) t.diagnostic(line);
     const summary = summarizeQueries(warm.beforeStream);
-    t.diagnostic(queryCountLine({
-      path: "chat-send", cache: "warm", queries: warm.beforeStream, transactions: warm.transactionsBeforeStream, readNotExecuted: 0,
-    }));
+    for (const line of reportLines(warm, "warm")) t.diagnostic(line);
 
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_WARM);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_WARM);
-    assert.equal(roundTrips(warm), CHAT_SEND_ROUND_TRIPS_WARM);
+    assert.equal(roundTrips(streamSection(warm)), CHAT_SEND_ROUND_TRIPS_WARM);
+    assert.equal(roundTrips(warm.beforeProvider), CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_WARM);
+    // The number the script prints is the larger of the two.
+    assert.equal(roundTrips(gateSection(warm)), Math.max(CHAT_SEND_ROUND_TRIPS_WARM, CHAT_SEND_ROUND_TRIPS_BEFORE_PROVIDER_WARM));
   });
 
   it("answers every call that loads a nested relation, or names it with a reason", () => {
-    assert.deepEqual(unansweredLoadProblems([...cold.beforeStream, ...warm.beforeStream], CHAT_SEND_UNANSWERED_WITH_NESTED), []);
+    assert.deepEqual(unansweredLoadProblems([...cold.beforeProvider.queries, ...warm.beforeProvider.queries], CHAT_SEND_UNANSWERED_WITH_NESTED), []);
   });
 });
