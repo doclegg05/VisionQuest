@@ -33,6 +33,14 @@ mock.module("react", {
   defaultExport: { ...React, useEffect: runEffectNow },
 });
 
+// next/link runs effects (prefetch) that need the app router; the effect mock
+// above would run them during a server render and fail the whole page. The
+// About Sage test reads the source to prove the real component is Link.
+mock.module("next/link", {
+  defaultExport: ({ href, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) =>
+    React.createElement("a", { href, ...rest }),
+});
+
 // Imported after the mocks register: a static import is hoisted and would bind
 // the real modules.
 let ChatWindow: typeof import("./ChatWindow").default;
@@ -102,5 +110,17 @@ describe("ChatWindow link to the Sage notice", () => {
     assert.match(html, link);
     const header = html.slice(0, html.indexOf('role="log"'));
     assert.match(header, link, "the link sits in the header, above the conversation");
+  });
+
+  it("uses body-size text and a client-side Link for it", async () => {
+    const { readFileSync } = await import("node:fs");
+    const html = renderAndWait({}, "student");
+    const anchor = html.match(/<a[^>]*href="\/about-sage"[^>]*>/)?.[0] ?? "";
+    assert.match(anchor, /\btext-sm\b/);
+    assert.doesNotMatch(anchor, /\btext-xs\b/);
+    // renderToString draws Link as a plain <a>, so the source is the only place to tell them apart.
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    assert.match(source, /<Link\s+href="\/about-sage"/);
+    assert.doesNotMatch(source, /<a\s+href="\/about-sage"/);
   });
 });

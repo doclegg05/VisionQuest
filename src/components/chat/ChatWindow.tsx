@@ -687,12 +687,12 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             <p className="text-sm font-semibold text-[var(--ink-strong)]">Sage</p>
             <p className="text-xs text-[var(--ink-muted)]">Your SPOKES coach</p>
           </div>
-          <a
+          <Link
             href="/about-sage"
-            className="ml-auto inline-flex min-h-11 items-center px-2 text-xs font-semibold text-[var(--ink-muted)] underline hover:text-[var(--ink-strong)]"
+            className="ml-auto inline-flex min-h-11 items-center px-2 text-sm font-semibold text-[var(--ink-muted)] underline hover:text-[var(--ink-strong)]"
           >
             About Sage
-          </a>
+          </Link>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-5" role="log" aria-label="Conversation with Sage" aria-live="polite">
