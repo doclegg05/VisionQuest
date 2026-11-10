@@ -9,18 +9,37 @@ function json(res, status, value) {
   res.end(JSON.stringify(value));
 }
 
+/**
+ * Why the relay refused a request, as the status and code the app reads.
+ * The app tells a student "Sage is off" for 502, "Sage is busy" for 503 and
+ * "Sage is slow" for 504 (src/lib/chat/sage-failure.ts). All three stay in
+ * OllamaProvider's startup-retry list, so retry behavior is unchanged.
+ */
+const REFUSALS = {
+  offline: { status: 502, code: "relay_offline", error: "Local AI is offline" },
+  busy: { status: 503, code: "relay_busy", error: "Local AI is busy" },
+  timeout: { status: 504, code: "relay_timeout", error: "Local AI took too long to answer" },
+};
+
+function refuse(res, kind) {
+  const { status, code, error } = REFUSALS[kind];
+  json(res, status, { error, code });
+}
+
 /** One Render instance, one authenticated Mac. Disconnects cancel rather than replay work. */
 export async function startRelay({ agentToken, appToken, publicPort, nextPort, localPort = 11437, publicHost = "0.0.0.0", requestTimeout = REQUEST_TIMEOUT }) {
   if (!validToken(agentToken) || !validToken(appToken) || agentToken === appToken) throw new Error("Distinct relay credentials are required");
   let agent = null;
   const pending = new Map();
   const wss = new WebSocketServer({ noServer: true, maxPayload: 100_000, perMessageDeflate: false });
-  const fail = (id, status = 503) => {
+  /** `reason` is a REFUSALS key, or a plain status for a caller error (400, 413). */
+  const fail = (id, reason = "offline") => {
     const entry = pending.get(id);
     if (!entry) return;
     pending.delete(id);
     clearTimeout(entry.timer);
-    json(entry.res, status, { error: "Local AI connection unavailable" });
+    if (typeof reason === "number") json(entry.res, reason, { error: "Request refused" });
+    else refuse(entry.res, reason);
     if (agent) { try { sendFrame(agent, { type: "cancel", id }); } catch { /* connection is closing */ } }
   };
   const disconnect = (socket) => {
@@ -70,11 +89,11 @@ export async function startRelay({ agentToken, appToken, publicPort, nextPort, l
   const local = http.createServer(async (req, res) => {
     if (!authorized(req.headers.authorization, appToken)) return json(res, 401, { error: "Unauthorized" });
     if (req.method === "GET" && req.url === "/health") return json(res, agent ? 200 : 503, { connected: Boolean(agent) });
-    if (!agent) return json(res, 503, { error: "Local AI is offline" });
-    if (pending.size >= MAX_PENDING) return json(res, 503, { error: "Local AI is busy" });
+    if (!agent) return refuse(res, "offline");
+    if (pending.size >= MAX_PENDING) return refuse(res, "busy");
     // Reserve before reading so concurrent slow uploads cannot overbook the cap.
     const id = randomUUID();
-    const entry = { res, bytes: 0, started: false, timer: setTimeout(() => fail(id, 504), requestTimeout) };
+    const entry = { res, bytes: 0, started: false, timer: setTimeout(() => fail(id, "timeout"), requestTimeout) };
     pending.set(id, entry);
     res.on("close", () => { if (pending.has(id)) fail(id); });
     let body = "";
@@ -91,7 +110,7 @@ export async function startRelay({ agentToken, appToken, publicPort, nextPort, l
       if (!pending.has(id) || !agent) return;
       entry.background = isBackgroundRequest(req.method, req.url, body);
       if (entry.background && [...pending.values()].filter((item) => item.background).length > MAX_BACKGROUND_PENDING) {
-        return fail(id, 503);
+        return fail(id, "busy");
       }
       sendFrame(agent, { type: "request", id, method: req.method, path: req.url, body });
     } catch { fail(id); }

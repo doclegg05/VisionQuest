@@ -55,7 +55,9 @@ test("proxy preserves app routes and relay refuses unauthenticated/offline calle
   assert.match(await proxied.text(), /\/api\/health\?probe=1$/);
   assert.equal((await fetch(x.publicUrl + AGENT_PATH)).status, 404);
   assert.equal((await fetch(x.url + "/api/chat", { method: "POST", body })).status, 401);
-  assert.equal((await fetch(x.url + "/api/chat", { method: "POST", body, headers })).status, 503);
+  const offline = await fetch(x.url + "/api/chat", { method: "POST", body, headers });
+  assert.equal(offline.status, 502);
+  assert.equal((await offline.json()).code, "relay_offline");
   assert.equal(x.received.length, 0);
 });
 
@@ -96,15 +98,19 @@ test("connection loss fails pending work and never replays it", async (t) => {
   const x = await setup(t, () => {}); const agent = x.connect(); await until(x.relay.connected);
   const pending = fetch(x.url + "/api/chat", { method: "POST", body, headers });
   await until(() => x.received.length === 1); agent.stop();
-  assert.equal((await pending).status, 503);
+  const lost = await pending;
+  assert.equal(lost.status, 502, "a Mac that drops mid-request reads as offline, not busy");
+  assert.equal((await lost.json()).code, "relay_offline");
   await until(() => !x.relay.connected());
-  assert.equal((await fetch(x.url + "/api/chat", { method: "POST", body, headers })).status, 503);
+  assert.equal((await fetch(x.url + "/api/chat", { method: "POST", body, headers })).status, 502);
   assert.equal(x.received.length, 1);
 });
 
 test("request timeout cancels slow local inference", async (t) => {
   const x = await setup(t, () => {}, { requestTimeout: 80 }); x.connect(); await until(x.relay.connected);
-  assert.equal((await fetch(x.url + "/api/chat", { method: "POST", body, headers })).status, 504);
+  const slow = await fetch(x.url + "/api/chat", { method: "POST", body, headers });
+  assert.equal(slow.status, 504);
+  assert.equal((await slow.json()).code, "relay_timeout");
 });
 
 test("insecure production transport and non-loopback models are rejected", () => {
@@ -263,6 +269,7 @@ test("background fan-out leaves room for an interactive request", async (t) => {
   await until(() => agent.pending() === 8);
   const overflow = await fetch(x.url + "/api/chat", { method: "POST", headers, body: JSON.stringify({ model: "gemma4:12b", stream: false }) });
   assert.equal(overflow.status, 503);
+  assert.equal((await overflow.json()).code, "relay_busy");
   const chat = await fetch(x.url + "/api/chat", { method: "POST", headers, body });
   assert.equal(chat.status, 200);
   assert.match(await chat.text(), /local .*reply/s);
@@ -312,7 +319,9 @@ test("the total admission bound still applies to concurrent foreground requests"
   const jobs = Array.from({ length: 12 }, () => fetch(x.url + "/api/chat", { method: "POST", headers, body,
     signal: controller.signal }).catch(() => null));
   await until(() => agent.pending() === 12);
-  assert.equal((await fetch(x.url + "/api/chat", { method: "POST", headers, body })).status, 503);
+  const full = await fetch(x.url + "/api/chat", { method: "POST", headers, body });
+  assert.equal(full.status, 503, "a connected Mac at capacity reads as busy, not offline");
+  assert.equal((await full.json()).code, "relay_busy");
   assert.equal(x.received.length, 1);
   controller.abort(); await Promise.all(jobs);
 });
