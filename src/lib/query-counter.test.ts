@@ -10,6 +10,7 @@ import {
   queryCountLine,
   summarizeQueries,
 } from "./query-counter.test-support";
+import { isMergeableWhere } from "./readiness/admin-batching";
 
 // The counter is used the way every measurement test uses it: registered as
 // the `@/lib/db` module, then reached through the real import. The types the
@@ -393,6 +394,35 @@ describe("query counter: Prisma's same-tick findUnique batch on the admin client
     });
 
     assert.deepEqual(counter.queries().map((q) => q.sameTickBatch), [null, null, null, null, null, null]);
+  });
+
+  it("does not merge findUnique with findUniqueOrThrow on one model", async () => {
+    counter.useFixtures({ "admin:systemConfig.findUniqueOrThrow": { value: "x" } });
+    await Promise.all([
+      db.prismaAdmin.systemConfig.findUnique({ where: { key: "a" }, select: { value: true } }),
+      db.prismaAdmin.systemConfig.findUniqueOrThrow({ where: { key: "b" }, select: { value: true } }),
+    ]);
+
+    assert.equal(estimateRoundTrips(counter.queries(), counter.transactions()).admin.roundTrips, 2);
+  });
+
+  it("does not merge a where with a second field next to the unique one", async () => {
+    await Promise.all([
+      db.prismaAdmin.goal.findUnique({ where: { id: "g1", studentId: "s1" } }),
+      db.prismaAdmin.goal.findUnique({ where: { id: "g2", studentId: "s1" } }),
+    ]);
+
+    assert.deepEqual(counter.queries().map((q) => q.sameTickBatch), [null, null]);
+  });
+
+  it("merges only a where of one @id or @unique field with a string or number value", () => {
+    assert.equal(isMergeableWhere("systemConfig", { key: "a" }), true);
+    assert.equal(isMergeableWhere("student", { id: "s1" }), true);
+    assert.equal(isMergeableWhere("systemConfig", { key: true }), false);
+    assert.equal(isMergeableWhere("systemConfig", { value: "x" }), false);
+    assert.equal(isMergeableWhere("student", { id: "s1", isActive: true }), false);
+    assert.equal(isMergeableWhere("student", {}), false);
+    assert.equal(isMergeableWhere("student", { id: { equals: "s1" } }), false);
   });
 
   it("never merges app-client calls, which the RLS wrapper sends in one transaction each", async () => {

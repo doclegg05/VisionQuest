@@ -18,6 +18,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Prisma } from "@prisma/client";
+import { argumentShape, isCompactable } from "./readiness/admin-batching";
 
 export type QueryClient = "app" | "admin";
 
@@ -60,7 +61,7 @@ export interface RecordedQuery {
   readonly nestedLoads: number;
   /**
    * Set on admin-client findUnique calls Prisma's dataloader sends as one
-   * statement: same tick, same model, same argument shape. Equal values share
+   * statement: same tick, model, operation and argument shape. Equal values share
    * one statement. See `estimateRoundTrips`.
    */
   readonly sameTickBatch: string | null;
@@ -236,36 +237,6 @@ function loadedRelations(model: string, args: unknown, result: unknown): number 
 }
 
 const BATCHED_OPERATIONS: ReadonlySet<string> = new Set(["findUnique", "findUniqueOrThrow"]);
-const COMPACTABLE_ARGUMENTS: ReadonlySet<string> = new Set(["where", "select", "include"]);
-
-/**
- * The argument shape Prisma batches on: keys sorted and nested, values
- * ignored (runtime/library.js `Co`). `false` is kept, so a deselected field
- * never matches a selected one; that can only split a group, never merge one.
- */
-function argumentShape(value: unknown): string {
-  if (!isRecord(value) && !Array.isArray(value)) return "";
-  const entries = Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return `(${entries.map(([key, inner]) => {
-    if (typeof inner === "object" && inner !== null) return `(${key} ${argumentShape(inner)})`;
-    return inner === false ? `${key}:false` : key;
-  }).join(" ")})`;
-}
-
-/**
- * Whether a same-tick group of these calls reaches Postgres as one statement:
- * the engine compacts a findUnique batch into one `WHERE ... IN` select only
- * when each where is plain values on the same keys. A where with an operator,
- * a compound key, or a call with nested loads is counted one statement each.
- */
-function isCompactable(model: string, args: unknown): boolean {
-  if (!isRecord(args) || !isRecord(args.where)) return false;
-  if (!Object.keys(args).every((key) => COMPACTABLE_ARGUMENTS.has(key))) return false;
-  const plain = Object.values(args.where).every((value) =>
-    typeof value === "string" || typeof value === "number" || typeof value === "boolean");
-  return plain && countRelationLoads(model, args) === 0;
-}
-
 /** `at name (location:line:col)` or `at location:line:col`, source-mapped. */
 function parseFrame(line: string): QueryCaller | null {
   const body = /^\s*at (?:async )?(.*)$/.exec(line)?.[1];
@@ -439,7 +410,7 @@ class Recorder {
   /**
    * Mirrors Prisma 6's DataLoader (runtime/library.js): a findUnique outside a
    * transaction opens a window that closes on process.nextTick, and calls in
-   * one window with one model and argument shape go out as one batch.
+   * one window with one model, operation and argument shape go out as one batch.
    */
   #sameTickBatch(pending: PendingQuery): string | null {
     if (pending.transaction !== null || !BATCHED_OPERATIONS.has(pending.operation)) return null;
@@ -448,8 +419,9 @@ class Recorder {
       this.#openTick = tick;
       process.nextTick(() => { if (this.#openTick === tick) this.#openTick = null; });
     }
-    if (pending.client !== "admin" || !isCompactable(pending.model, pending.args)) return null;
-    return `${this.#openTick}|${pending.model}|${argumentShape(pending.args)}`;
+    if (pending.client !== "admin") return null;
+    if (!isCompactable(pending.model, pending.args, countRelationLoads(pending.model, pending.args))) return null;
+    return `${this.#openTick}|${pending.model}|${pending.operation}|${argumentShape(pending.args)}`;
   }
 
   /** Records the query, resolves its answer, settles its nested loads, then tells the observer. */
@@ -668,8 +640,10 @@ function costFor(
  *   for every call; each call is its own transaction, so Prisma never batches
  *   two app-client calls together.
  * - an admin-client call: 1. Admin findUnique / findUniqueOrThrow calls outside
- *   a transaction, issued before process.nextTick, with the same model and
- *   argument shape, plain-value where and no nested loads, count 1 together:
+ *   a transaction, issued before process.nextTick, with the same model,
+ *   operation and argument shape, a where of one `@id` or `@unique` field
+ *   holding a string or number, and no nested loads, count 1 together
+ *   (`isMergeableWhere` in src/lib/readiness/admin-batching.ts):
  *   Prisma 6.19's DataLoader (node_modules/@prisma/client/runtime/library.js,
  *   `batchBy` -> `Zl`, `dispatchBatches`) sends them as one `requestBatch`, and
  *   the engine compacts such a batch into one select.
