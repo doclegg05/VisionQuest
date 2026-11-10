@@ -47,6 +47,7 @@ import {
   E2E_TEACHER,
 } from "../e2e/fixtures";
 import { resetStudentToDayOne } from "../e2e/helpers/db";
+import { acknowledgeSageNoticeForFixture } from "../src/lib/about-sage/notice-fixture";
 import { assertSafeE2eSeedTarget } from "../src/lib/e2e-seed-guard";
 
 // Already-set process env always wins over .env.local — @next/env never
@@ -256,6 +257,12 @@ async function main() {
           },
         });
       }
+    }
+
+    // The student layout sends a student to /sage-notice until the current
+    // notice is acknowledged. Staff never see that gate.
+    for (const user of [student, journeyStudent]) {
+      await acknowledgeSageNoticeForFixture(prisma, user.id);
     }
 
     // ── Class + instructor + enrollments ─────────────────────────────────

@@ -20,6 +20,17 @@ export const SAGE_NOTICE_PATH = "/about-sage";
 /** Where the student layout sends a student who has not acknowledged yet. */
 export const SAGE_NOTICE_ACK_PATH = "/sage-notice";
 
+/**
+ * How an acknowledgement is keyed in ConsentRecord: `sage_notice:<version>`.
+ * It lives here, with no imports, so a seed can build the key without loading
+ * the database client. src/lib/consent.ts re-exports both names.
+ */
+export const SAGE_NOTICE_SCOPE_PREFIX = "sage_notice:";
+
+export function sageNoticeScope(version: string): string {
+  return `${SAGE_NOTICE_SCOPE_PREFIX}${version}`;
+}
+
 export interface NoticeSection {
   readonly heading: string;
   readonly sentences: readonly string[];

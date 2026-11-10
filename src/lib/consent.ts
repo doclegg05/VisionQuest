@@ -13,6 +13,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { SAGE_NOTICE_SCOPE_PREFIX, sageNoticeScope } from "@/lib/about-sage/notice";
 
 export const CONSENT_SCOPES = [
   "cloud_file_processing",
@@ -111,11 +112,7 @@ export async function revokeConsent(
  * settings route accepts, and the notice is acknowledged only through
  * POST /api/sage-notice, which checks the version.
  */
-export const SAGE_NOTICE_SCOPE_PREFIX = "sage_notice:";
-
-export function sageNoticeScope(version: string): string {
-  return `${SAGE_NOTICE_SCOPE_PREFIX}${version}`;
-}
+export { SAGE_NOTICE_SCOPE_PREFIX, sageNoticeScope };
 
 export async function hasAcknowledgedSageNotice(
   studentId: string,

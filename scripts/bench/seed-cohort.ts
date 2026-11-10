@@ -41,6 +41,7 @@ import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 
 import { BENCH_INSTRUCTOR_PASSWORD, BENCH_STUDENT_PASSWORD } from "../../e2e/bench-fixtures";
+import { acknowledgeSageNoticeForFixture } from "../../src/lib/about-sage/notice-fixture";
 import { assertSafeE2eSeedTarget } from "../../src/lib/e2e-seed-guard";
 import { BENCH_ID_PREFIX } from "./generate-cohort.mjs";
 import { loadCohort } from "./lib/cohort.mjs";
@@ -336,6 +337,14 @@ async function main(): Promise<void> {
           },
         });
       }
+    }
+
+    // The student layout sends a student to /sage-notice until the current
+    // notice is acknowledged. The browser collectors sign in as these
+    // students, so each one carries the acknowledgement. Deleting a student
+    // removes the row with it (ConsentRecord cascades).
+    for (const student of cohort.students) {
+      await acknowledgeSageNoticeForFixture(prisma, student.id as string);
     }
 
     // Weekly advising availability for each instructor.

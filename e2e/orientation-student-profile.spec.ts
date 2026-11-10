@@ -4,6 +4,8 @@ import { randomBytes, scryptSync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { acknowledgeSageNoticeForFixture } from "../src/lib/about-sage/notice-fixture";
+
 /**
  * E2E: a logged-in student completes the "Complete SPOKES Student Profile"
  * orientation step entirely in the browser — an HTML form, not a PDF iframe.
@@ -82,6 +84,10 @@ test.beforeAll(async () => {
       create: { studentId, questionKey, answerHash: "e2e-fixture-not-a-real-hash" },
     });
   }
+
+  // The layout checks the Sage notice before the recovery questions; without
+  // this row the student lands on /sage-notice and never reaches orientation.
+  await acknowledgeSageNoticeForFixture(prisma, studentId);
 
   // Reset leftovers from earlier runs, then pre-complete every step EXCEPT
   // the profile item so the wizard opens directly on the profile step.
