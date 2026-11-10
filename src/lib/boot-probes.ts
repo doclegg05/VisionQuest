@@ -1,3 +1,5 @@
+import { prismaAdmin } from "@/lib/db";
+import { isCohortDemoEnabled, isRealStudentDataDeclared } from "@/lib/demo/config";
 import { adminClientIsPrivileged } from "@/lib/nudges/admin-guard";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
@@ -60,11 +62,27 @@ export function jwtSecretProbe(): BootProbeResult {
   return `JWT_SECRET is missing or shorter than ${MIN_JWT_SECRET_LENGTH} characters.`;
 }
 
+/**
+ * H2: cohort demo mode lets anyone with the link sign in with no password.
+ * Once the owner has set REAL_STUDENT_DATA=true, real students with benefit
+ * records are in the database, and demo mode would open them to that link.
+ * The two can never be on together. Reads the environment only.
+ */
+export function demoAgainstRealDataProbe(): BootProbeResult {
+  if (!isCohortDemoEnabled() || !isRealStudentDataDeclared()) return null;
+  return (
+    "COHORT_DEMO_MODE is on while REAL_STUDENT_DATA is \"true\". Demo mode lets anyone " +
+    "with the link sign in without a password, so real student records would be open. " +
+    "Turn COHORT_DEMO_MODE off. Unset REAL_STUDENT_DATA only if no real student has an account."
+  );
+}
+
 /** Every check that can be decided from configuration alone, in boot order. */
 const CONFIG_PROBES: ReadonlyArray<{ name: string; run: () => BootProbeResult }> = [
   { name: "RLS_CONTEXT_INJECTION", run: rlsContextInjectionProbe },
   { name: "ADMIN_DATABASE_URL", run: adminDatabaseUrlProbe },
   { name: "JWT_SECRET", run: jwtSecretProbe },
+  { name: "COHORT_DEMO_MODE+REAL_STUDENT_DATA", run: demoAgainstRealDataProbe },
 ];
 
 /**
@@ -102,6 +120,49 @@ function startAdminClientProbe(): void {
   })();
 }
 
+const DEMO_ROWS = { demoAccount: { not: null } } as const;
+const UNMARKED_STUDENTS = { role: "student", demoAccount: null } as const;
+
+/**
+ * H2's database half: does the data match the two switches? Alarms only, with
+ * counts and never a name or id. It must never stop a start: the live demo
+ * database holds mock students that may not all carry the `demoAccount` mark,
+ * so a fatal version would take the demo down at the next deploy. Only the
+ * environment (`demoAgainstRealDataProbe`) may stop the boot. A failed query
+ * is logged and nothing else happens.
+ */
+export async function demoDataSeparationProbe(): Promise<void> {
+  try {
+    const demoOn = isCohortDemoEnabled();
+    const realOn = isRealStudentDataDeclared();
+    const demoAccounts = await prismaAdmin.student.count({ where: DEMO_ROWS });
+
+    if (!demoOn && demoAccounts > 0) {
+      logger.error("boot_probe_demo_closeout_unfinished", {
+        demoAccounts,
+        reason: "Demo mode is off but demo accounts remain. Finish the demo closeout: delete them.",
+      });
+    }
+    if (realOn && demoAccounts > 0) {
+      logger.error("boot_probe_demo_rows_beside_real_data", {
+        demoAccounts,
+        reason: "REAL_STUDENT_DATA is on but demo accounts remain beside real ones.",
+      });
+    }
+    if (demoOn) {
+      const unmarkedStudents = await prismaAdmin.student.count({ where: UNMARKED_STUDENTS });
+      if (unmarkedStudents > 0) {
+        logger.error("boot_probe_demo_open_with_unmarked_students", {
+          unmarkedStudents,
+          reason: "Demo mode is open while student accounts without the demo mark exist.",
+        });
+      }
+    }
+  } catch (error) {
+    logger.error("boot_probe_demo_data_failed", { error: errorForLog(error) });
+  }
+}
+
 /**
  * Runs every probe once. In production a failed CONFIG probe throws, which
  * propagates out of `register()` and stops the boot — a misconfigured instance
@@ -122,6 +183,8 @@ export async function runBootProbes(
   }
 
   startAdminClientProbe();
+  // Not awaited, for the same reasons as the admin-client probe; it never throws.
+  void demoDataSeparationProbe();
 
   if (failures.length === 0) return;
 

@@ -5,6 +5,9 @@
   "title": "Demo and real students can never coexist",
   "doneWhen": "Boot check tests for each combination.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/boot-probes.test.ts"
+    ]
   }
 }
