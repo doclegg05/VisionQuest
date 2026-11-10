@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/api-error";
@@ -74,7 +75,9 @@ export const POST = withAuth(async (
     },
   });
 
-  await syncStudentAlerts(session.id);
+  deferPerStudent(session.id, { surface: "events/[id]/register", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
 
   return NextResponse.json({ registration });
 });
@@ -118,7 +121,9 @@ export const DELETE = withAuth(async (
     summary: `Cancelled registration for "${registration.event.title}".`,
   });
 
-  await syncStudentAlerts(session.id);
+  deferPerStudent(session.id, { surface: "events/[id]/register", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
 
   return NextResponse.json({ ok: true });
 });

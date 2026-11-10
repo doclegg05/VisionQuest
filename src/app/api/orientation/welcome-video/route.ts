@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { forbidden, withAuth } from "@/lib/api-error";
 import { recordOrientationWelcomeVideo } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
@@ -42,6 +43,8 @@ export const POST = withAuth(async (session) => {
     mutate: recordOrientationWelcomeVideo,
   });
 
-  await syncStudentAlerts(session.id);
+  deferPerStudent(session.id, { surface: "orientation/welcome-video", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
   return NextResponse.json({ ok: true, awarded, xp: awarded ? WELCOME_VIDEO_XP : 0 });
 });

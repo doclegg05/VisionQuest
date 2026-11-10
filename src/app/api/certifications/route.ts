@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { prisma } from "@/lib/db";
 import {
   getCertificationProgress,
@@ -265,7 +266,9 @@ export const POST = withAuth(async (session, req: Request) => {
     }
   }
 
-  await syncStudentAlerts(session.id);
+  deferPerStudent(session.id, { surface: "certifications", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
 
   return NextResponse.json({ ok: true });
 });
