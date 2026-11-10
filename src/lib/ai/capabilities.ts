@@ -10,6 +10,7 @@
  * string instead of blowing up the whole /test route.
  */
 
+import { isDemoLocalOnlyRequired } from "./demo-local-only";
 import { checkOllamaHealth } from "./health";
 import { buildLocalAiHeaders } from "./local-auth";
 import { OllamaEmbeddingProvider } from "./ollama-embedding-provider";
@@ -81,7 +82,13 @@ async function fetchWithTimeout(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      // As in health.ts: with the cloud AI block on, no redirect may carry
+      // the saved credentials to another host.
+      ...(isDemoLocalOnlyRequired() ? { redirect: "error" as const } : {}),
+    });
   } finally {
     clearTimeout(timer);
   }

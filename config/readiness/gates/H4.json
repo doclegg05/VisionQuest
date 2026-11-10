@@ -8,7 +8,8 @@
     "type": "test",
     "files": [
       "src/lib/boot-probes.test.ts",
-      "src/lib/ai/demo-local-only.test.ts"
+      "src/lib/ai/demo-local-only.test.ts",
+      "src/lib/ai/__tests__/health.test.ts"
     ]
   }
 }

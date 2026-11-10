@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, mock } from "node:test";
+import { afterEach, describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { checkOllamaHealth } from "../health";
 
@@ -245,5 +245,94 @@ describe("checkOllamaHealth", () => {
       assert.equal(result.healthy, false);
       assert.equal(result.error, "Server returned 500");
     });
+  });
+});
+
+// Security review of readiness H4: the admin "test local AI" button sends the
+// saved bearer or Cloudflare Access credentials to the saved URL. With the
+// cloud AI block on, that URL must be the approved origin, and a redirect
+// from it must not carry the credentials on to another host.
+describe("checkOllamaHealth with the cloud AI block on", () => {
+  const ENV_NAMES = [
+    "AI_LOCAL_ONLY",
+    "AI_LOCAL_APPROVED_ORIGIN",
+    "COHORT_DEMO_LOCAL_AI_ORIGIN",
+    "COHORT_DEMO_LOCAL_ONLY",
+    "COHORT_DEMO_MODE",
+    "VQ_MAC_RELAY_ENABLED",
+  ] as const;
+  const APPROVED = "http://127.0.0.1:11437";
+  const saved = new Map<string, string | undefined>();
+
+  function answerHealthy(): void {
+    mockFetch.mock.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/api/tags")) return Response.json({ models: [{ name: "gemma4:12b" }] });
+      if (url.endsWith("/v1/models")) return Response.json({ data: [{ id: "gemma4:12b" }] });
+      if (url.endsWith("/v1/chat/completions")) return Response.json({ choices: [{ message: { content: "OK" } }] });
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+  }
+
+  beforeEach(() => {
+    mockFetch.mock.resetCalls();
+    for (const name of ENV_NAMES) {
+      saved.set(name, process.env[name]);
+      delete process.env[name];
+    }
+    answerHealthy();
+  });
+
+  afterEach(() => {
+    for (const name of ENV_NAMES) {
+      const value = saved.get(name);
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+
+  it("sends nothing to a server that is not the approved one", async () => {
+    process.env.AI_LOCAL_ONLY = "true";
+    process.env.AI_LOCAL_APPROVED_ORIGIN = APPROVED;
+
+    const result = await checkOllamaHealth("https://collector.example", {
+      model: "gemma4:12b",
+      authConfig: { authMode: "bearer", apiKey: "test-only-not-a-real-key" },
+    });
+
+    assert.equal(result.healthy, false);
+    assert.match(String(result.error), /approved/);
+    assert.equal(mockFetch.mock.callCount(), 0, "the saved credentials must not leave for another host");
+  });
+
+  it("sends nothing when the block is on and no origin is approved", async () => {
+    process.env.AI_LOCAL_ONLY = "true";
+
+    const result = await checkOllamaHealth(APPROVED, { model: "gemma4:12b" });
+
+    assert.equal(result.healthy, false);
+    assert.equal(mockFetch.mock.callCount(), 0);
+  });
+
+  it("tests the approved server, and refuses to follow a redirect from it", async () => {
+    process.env.AI_LOCAL_ONLY = "true";
+    process.env.AI_LOCAL_APPROVED_ORIGIN = APPROVED;
+
+    const result = await checkOllamaHealth(APPROVED, { model: "gemma4:12b" });
+
+    assert.equal(result.healthy, true);
+    assert.ok(mockFetch.mock.callCount() > 0);
+    for (const call of mockFetch.mock.calls) {
+      assert.equal(call.arguments[1]?.redirect, "error", String(call.arguments[0]));
+    }
+  });
+
+  it("leaves requests as they were while the block is off", async () => {
+    const result = await checkOllamaHealth("http://localhost:11434", { model: "gemma4:12b" });
+
+    assert.equal(result.healthy, true);
+    for (const call of mockFetch.mock.calls) {
+      assert.equal(call.arguments[1]?.redirect, undefined, String(call.arguments[0]));
+    }
   });
 });
