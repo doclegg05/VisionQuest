@@ -26,9 +26,9 @@ const RECOVERY_UNAVAILABLE_ERROR =
   "We cannot reset passwords this way right now. Try again in a few minutes, or ask your instructor for help.";
 
 /**
- * FAILED attempts one network address may make per hour: 20, because a
- * recovery that worked gives its unit back, so the count is only mistyped
- * answers, and this route sets a password from three short answers. This
+ * FAILED attempts one network address may make per hour. 20 is room for a
+ * classroom's mistyped answers and no more: a recovery that worked gives its
+ * unit back, and this route sets a password from three short answers. This
  * bucket slows one address guessing across many accounts. It is a courtesy
  * limit: the address comes from `X-Forwarded-For`, which a caller can set
  * (src/lib/client-ip.ts). The per-account limit below is the real control.

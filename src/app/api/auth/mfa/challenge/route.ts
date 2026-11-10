@@ -24,6 +24,14 @@ const mfaChallengeSchema = z.object({
 });
 
 /**
+ * Challenges per network address per window, passed or failed. 30 fits an
+ * office of staff on one address: at 5 the sixth to sign in was refused.
+ * The per-account limit below is the control.
+ */
+const NETWORK_LIMIT_ATTEMPTS = 30;
+const NETWORK_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+
+/**
  * Per-account bounds, matching login's per-user limit (login/route.ts). The
  * window outlives the five-minute challenge cookie on purpose: a re-login
  * mints a fresh cookie and must not mint a fresh budget of code guesses.
@@ -45,8 +53,7 @@ const ACCOUNT_LOCKED_MESSAGE =
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = clientIpBucket(req);
 
-  // Rate limit MFA challenge attempts (5 attempts per 5 minutes per IP)
-  const rl = await rateLimit(`mfa-challenge:${ip}`, 5, 5 * 60 * 1000);
+  const rl = await rateLimit(`mfa-challenge:${ip}`, NETWORK_LIMIT_ATTEMPTS, NETWORK_LIMIT_WINDOW_MS);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many MFA attempts. Please try again later." },
