@@ -36,6 +36,7 @@ const mockTransaction = mock.fn() as any;
 const mockTxUpdate = mock.fn() as any;
 const mockTxDeleteMany = mock.fn() as any;
 const mockRateLimit = mock.fn() as any;
+const mockRefundRateLimit = mock.fn() as any;
 const mockLogAuditEvent = mock.fn() as any;
 const mockVerifySecurityAnswer = mock.fn() as any;
 const mockLoggerWarn = mock.fn() as any;
@@ -63,7 +64,7 @@ mock.module("@/lib/db", {
 });
 
 mock.module("@/lib/rate-limit", {
-  namedExports: { rateLimit: mockRateLimit },
+  namedExports: { rateLimit: mockRateLimit, refundRateLimit: mockRefundRateLimit },
 });
 
 mock.module("@/lib/audit", {
@@ -165,11 +166,13 @@ describe("POST /api/auth/reset-password/questions", () => {
     mockTxUpdate.mock.resetCalls();
     mockTxDeleteMany.mock.resetCalls();
     mockRateLimit.mock.resetCalls();
+    mockRefundRateLimit.mock.resetCalls();
     mockLogAuditEvent.mock.resetCalls();
     mockVerifySecurityAnswer.mock.resetCalls();
     mockLoggerWarn.mock.resetCalls();
 
     mockRateLimit.mock.mockImplementation(async () => okLimit());
+    mockRefundRateLimit.mock.mockImplementation(async () => undefined);
     mockLogAuditEvent.mock.mockImplementation(async () => undefined);
     mockVerifySecurityAnswer.mock.mockImplementation(() => true);
     mockFindFirst.mock.mockImplementation(async () => studentRecord());
@@ -407,5 +410,94 @@ describe("POST /api/auth/reset-password/questions", () => {
       { studentId: STUDENT.id, role: STUDENT.role, sessionVersion: STUDENT.sessionVersion + 1 },
     ]);
     assert.deepEqual(auditActions(), ["auth.password.reset.security_questions"]);
+  });
+
+  // --- Per-network limit sized for a classroom (readiness A1) ---------------
+  //
+  // The per-network bucket counted every request at 5 an hour, so the sixth
+  // student recovering a password in one classroom was refused. It now allows
+  // 30 FAILED attempts an hour, and a recovery that worked gives its unit
+  // back. The refund follows the rule sign-in follows: it happens only when
+  // the response already says the answers were right. Every refusal answers
+  // the same 400, so none of them may give a unit back.
+
+  const NETWORK_KEY = `reset-password-questions:${IP}`;
+  const NETWORK_RESET_TIME = 1_900_000_000_000;
+
+  /** Gives the per-network window a known end, so a refund can be matched to it. */
+  function fixNetworkWindow(options: { degraded?: boolean } = {}) {
+    mockRateLimit.mock.mockImplementation(async (key: string) => ({
+      ...okLimit(),
+      resetTime: key === NETWORK_KEY ? NETWORK_RESET_TIME : NETWORK_RESET_TIME + 1,
+      degraded: options.degraded ?? false,
+    }));
+  }
+
+  function refunds(): unknown[][] {
+    return mockRefundRateLimit.mock.calls.map((call: { arguments: unknown[] }) => call.arguments);
+  }
+
+  it("allows one network address 30 failed recovery attempts per hour", async () => {
+    await questionsRoute.POST(resetRequest() as never);
+
+    assert.deepEqual(mockRateLimit.mock.calls[0].arguments, [NETWORK_KEY, 30, 60 * 60 * 1000]);
+  });
+
+  it("gives the network unit back, and only that unit, when the answers were right", async () => {
+    fixNetworkWindow();
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(refunds(), [[NETWORK_KEY, NETWORK_RESET_TIME]]);
+  });
+
+  it("keeps the network unit for wrong answers", async () => {
+    mockVerifySecurityAnswer.mock.mockImplementation(() => false);
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(refunds(), []);
+  });
+
+  it("keeps the network unit for a request that fails validation", async () => {
+    const res = await questionsRoute.POST(resetRequest({ password: "short" }) as never);
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(refunds(), []);
+  });
+
+  // The verifier answers "match" in each case below, and the response is
+  // still the generic refusal.
+  for (const { name, arrange } of refusedAccounts) {
+    it(`keeps the network unit for ${name}, which the response does not tell apart`, async () => {
+      arrange();
+
+      const res = await questionsRoute.POST(resetRequest() as never);
+
+      assert.equal(res.status, 400);
+      assert.deepEqual(refunds(), []);
+    });
+  }
+
+  it("keeps the network unit when the password write fails", async () => {
+    mockTransaction.mock.mockImplementation(async () => {
+      throw new Error("connection refused");
+    });
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(res.status, 500);
+    assert.deepEqual(refunds(), []);
+  });
+
+  it("asks the store for nothing when the limiter failed open: no unit was taken", async () => {
+    fixNetworkWindow({ degraded: true });
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(refunds(), []);
   });
 });

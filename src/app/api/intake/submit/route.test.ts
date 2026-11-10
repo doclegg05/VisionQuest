@@ -412,6 +412,20 @@ describe("POST /api/intake/submit — caller-supplied class and error text", () 
     assert.equal(prosePayload, isoKey);
   });
 
+  // Readiness A1: the per-network bucket was 15 per 15 minutes, so the
+  // sixteenth student enrolling in one classroom was refused. 60 lets a class
+  // of 30 send the form twice each. The per-applicant bucket is unchanged.
+  it("lets a classroom of 30 on one network address send the form twice each in 15 minutes", async () => {
+    await route.POST(postIntake(BASE_PAYLOAD) as never);
+
+    const calls = rateLimitMock.mock.calls.map((c) => c.arguments);
+    const network = calls.find(([key]) => key.startsWith("intake:submit:ip:"));
+    const applicant = calls.find(([key]) => key.startsWith("intake:submit:person:"));
+
+    assert.deepEqual(network?.slice(1), [60, 15 * 60 * 1000]);
+    assert.deepEqual(applicant?.slice(1), [3, 60 * 60 * 1000], "one person still enrolls at most 3 times an hour");
+  });
+
   it("bounds submissions per applicant identity, not only per network address", async () => {
     await route.POST(postIntake(BASE_PAYLOAD) as never);
 
