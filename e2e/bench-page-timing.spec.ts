@@ -27,7 +27,8 @@ import { loginContext } from "./helpers/auth";
  *
  * PR review round 2/3, correcting the original BENCH_JOURNEY_STUDENT/
  * BENCH_INSTRUCTOR choice: `/api/auth/login` binds on `login:user:<studentId>`
- * at 5 attempts (tighter than the per-IP cap), and this spec's original
+ * at 5 attempts (tighter than the per-IP cap; since readiness task A1 only
+ * failed attempts count against either), and this spec's original
  * cbench login also 401ed unless ci.yml's cohort-seed step had already run
  * — a dependency this spec never needed. ci.yml's "Collect browser
  * benchmark data" step now runs each collector in its own `playwright test`

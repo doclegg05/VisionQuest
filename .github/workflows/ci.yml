@@ -525,16 +525,21 @@ jobs:
         # actually broke. When a watch-tier suite here is promoted to gate (see
         # docs/runbooks/benchmarks.md), drop continue-on-error here entirely.
         #
-        # --workers=1: the login limiter counts every attempt, and parallel
-        # specs sharing one IP and one fixture account exhaust it (10 per IP
-        # and 5 per USER per 15 minutes — see the re-seed step above for which
-        # one actually binds). playwright.config.ts already sets it under CI;
-        # named here because these specs would be the first to notice.
+        # --workers=1: written when the login limiter counted every attempt
+        # (10 per IP and 5 per USER per 15 minutes), so parallel specs sharing
+        # one IP and one fixture account exhausted it. Since readiness task A1
+        # it counts failed attempts only (30 per address, 5 per account) and a
+        # correct sign-in gives both units back. playwright.config.ts already
+        # sets it under CI; kept because these specs would be the first to
+        # notice a limiter that stopped refunding.
         continue-on-error: true
         # ONE COLLECTOR PER INVOCATION, login rate limits cleared between.
         #
-        # THE PROBLEM. `/api/auth/login` applies two limiters: `login:<ip>` at
-        # 10 attempts per 15 minutes, and `login:user:<studentId>` at **5**.
+        # THE PROBLEM, as it stood before readiness task A1 (failed attempts
+        # only are counted now: 30 per address and 5 per account, and a correct
+        # sign-in gives both units back). `/api/auth/login` applied two
+        # limiters: `login:<ip>` at 10 attempts per 15 minutes, and
+        # `login:user:<studentId>` at **5**.
         # Their buckets are `RateLimitEntry` ROWS, so they outlive the webServer
         # that each `playwright test` invocation boots and are shared by every
         # step running against this job's one database. Every spec here signs in

@@ -34,8 +34,8 @@ import { createPrisma } from "./helpers/db";
  * a wording change there cannot leave a check passing on text nobody renders.
  *
  * No test here signs in through /api/auth/login. A demo session is a cookie the
- * demo endpoints set, so this step spends none of the 10-per-IP or 5-per-user
- * login budget the other e2e steps share.
+ * demo endpoints set, so this step spends none of the failed-attempt budget
+ * (30 per address, 5 per account) the other e2e steps share.
  *
  * Fixtures: the e2e seed (scripts/seed-e2e-users.ts) and the bench cohort seed
  * (scripts/bench/seed-cohort.ts), both run earlier in the job. They are the

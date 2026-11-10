@@ -9,7 +9,11 @@
     "files": [
       "src/app/api/auth/login/__tests__/route.classroom.test.ts",
       "src/app/api/auth/login/__tests__/route.test.ts",
-      "src/app/api/auth/login/__tests__/route.concurrency.test.ts"
+      "src/app/api/auth/login/__tests__/route.concurrency.test.ts",
+      "src/app/api/auth/reset-password/questions/__tests__/route.test.ts",
+      "src/app/api/auth/reset-password/__tests__/route.test.ts",
+      "src/app/api/auth/mfa/challenge/__tests__/route.test.ts",
+      "src/app/api/intake/submit/route.test.ts"
     ]
   }
 }
