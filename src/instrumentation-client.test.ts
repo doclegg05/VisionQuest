@@ -166,6 +166,14 @@ describe("what the browser init passes the SDK", () => {
     assert.equal(options.replaysOnErrorSampleRate, undefined);
   });
 
+  it("turns logs and metrics off, in the options and on the built client", async () => {
+    await startedPage();
+    assert.equal(initOptions().enableLogs, false);
+    assert.equal(initOptions().enableMetrics, false);
+    assert.equal(Browser.getClient()?.getOptions().enableLogs, false);
+    assert.equal(Browser.getClient()?.getOptions().enableMetrics, false);
+  });
+
   it("keeps no breadcrumbs, session, page-context or tracing integration from the SDK's real defaults", async () => {
     await startedPage();
     const { integrations } = initOptions();

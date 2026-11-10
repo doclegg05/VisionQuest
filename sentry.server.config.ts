@@ -20,6 +20,11 @@ type NodeTransportOptions = Parameters<typeof Sentry.makeNodeTransport>[0];
  * request its own scope, which is what keeps one request's route from being
  * tagged on another's error. Requests are not counted as sessions.
  *
+ * `tracePropagationTargets` is empty. Left unset, the HTTP integration adds
+ * `sentry-trace` and `baggage` headers (a trace id, the DSN's public key and
+ * organization id) to every request this server makes, to any host, with
+ * tracing off or on.
+ *
  * The transport is the SDK's own Node transport behind the wire filter
  * (src/lib/sentry-wire.ts), which rebuilds every envelope before it is sent.
  * `beforeSend` alone is not enough: the SDK skips it for the report about
@@ -34,6 +39,7 @@ export function serverSentryOptions(
     dsn,
     environment: process.env.NODE_ENV,
     tracesSampleRate: 0,
+    tracePropagationTargets: [],
     ...PRIVATE_REPORTING_OPTIONS,
     transport: wireAllowlistTransport(makeTransport),
     integrations: (defaults) => [

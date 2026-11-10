@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import http from "node:http";
 import { before, beforeEach, describe, it } from "node:test";
 import * as Sentry from "@sentry/nextjs";
 import { edgeSentryOptions } from "../../sentry.edge.config";
 import { serverSentryOptions } from "../../sentry.server.config";
-import { scrubPii, sendNothing } from "./sentry-scrub";
-import { insideRequest, type Outbox, PLANTED_REQUEST, plantedIn, settleSdk, startServerSdk, TEST_DSN } from "./sentry.test-support";
+import { PRIVATE_REPORTING_OPTIONS, scrubPii, sendNothing } from "./sentry-scrub";
+import { insideRequest, type Outbox, PLANTED, PLANTED_REQUEST, plantedIn, settleSdk, startServerSdk, TEST_DSN } from "./sentry.test-support";
 
 // H1 privacy follow-up, item 3 (2026-11-10). The server sampled one request
 // in ten as a transaction, and the SDK's HTTP integration read every incoming
@@ -95,7 +96,90 @@ describe("server config", () => {
   });
 });
 
+/** The headers a loopback server receives from one `node:http` request made here. */
+async function headersOfOutgoingRequest(): Promise<http.IncomingHttpHeaders> {
+  let received: http.IncomingHttpHeaders = {};
+  const server = http.createServer((incoming, response) => {
+    received = incoming.headers;
+    response.end("ok");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const port = address !== null && typeof address !== "string" ? address.port : 0;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      http.get(`http://127.0.0.1:${port}/api/partner/lookup`, (reply) => reply.resume().on("end", resolve)).on("error", reject);
+    });
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+  return received;
+}
+
+// Third pass, item 2 (2026-11-10). Two things the SDK sends without asking
+// `beforeSend`, both on unless they are turned off
+// (@sentry/core build/cjs/client.js, the constructor: `enableLogs ... ?? true`
+// and `enableMetrics ... ?? true`), and the trace headers its HTTP integration
+// adds to the server's own outgoing requests
+// (core/build/cjs/integrations/http/inject-trace-propagation-headers.js, which
+// attaches them to every URL when `tracePropagationTargets` is not set).
+describe("what the SDK would send without asking beforeSend", () => {
+  beforeEach(() => outbox.clear());
+
+  it("logs and metrics are off in the options every runtime spreads", () => {
+    assert.equal(PRIVATE_REPORTING_OPTIONS.enableLogs, false);
+    assert.equal(PRIVATE_REPORTING_OPTIONS.enableMetrics, false);
+  });
+
+  it("logs and metrics are off on the built server client", () => {
+    const options = Sentry.getClient()?.getOptions();
+    assert.equal(options?.enableLogs, false);
+    assert.equal(options?.enableMetrics, false);
+  });
+
+  it("a log line and a metric build no envelope at all", async () => {
+    const built: string[] = [];
+    const stop = Sentry.getClient()?.on("beforeEnvelope", (envelope) => {
+      built.push(...envelope[1].map((item) => item[0].type));
+    });
+    Sentry.logger.info(`looked up ${PLANTED.email}`);
+    Sentry.metrics.count(`notes_saved_${PLANTED.loginId}`, 1);
+    await settleSdk();
+    stop?.();
+    assert.deepEqual(built, []);
+    assert.deepEqual(outbox.itemTypes(), []);
+  });
+
+  it("the built server client names no host to receive its trace headers", () => {
+    assert.deepEqual(serverSentryOptions(TEST_DSN).tracePropagationTargets, []);
+    assert.deepEqual(Sentry.getClient()?.getOptions().tracePropagationTargets, []);
+  });
+
+  it("an outgoing node:http request carries no sentry-trace, baggage or traceparent header", async () => {
+    const headers = await headersOfOutgoingRequest();
+    assert.equal(headers.host?.startsWith("127.0.0.1:"), true, "the request arrived");
+    assert.deepEqual([headers["sentry-trace"], headers.baggage, headers.traceparent], [undefined, undefined, undefined]);
+  });
+
+  it("nor does one made while the server is handling a request", async () => {
+    let headers: http.IncomingHttpHeaders = {};
+    await insideRequest(async () => {
+      headers = await headersOfOutgoingRequest();
+    });
+    assert.equal(headers.host?.startsWith("127.0.0.1:"), true, "the request arrived");
+    assert.deepEqual([headers["sentry-trace"], headers.baggage, headers.traceparent], [undefined, undefined, undefined]);
+  });
+});
+
 describe("edge config", () => {
+  it("turns logs and metrics off and names no host to receive trace headers", () => {
+    const options = edgeSentryOptions(TEST_DSN);
+    assert.equal(options.enableLogs, false);
+    assert.equal(options.enableMetrics, false);
+    assert.deepEqual(options.tracePropagationTargets, []);
+  });
+
   it("sets tracing to zero and spreads the same private options", () => {
     const options = edgeSentryOptions(TEST_DSN);
     assert.equal(options.tracesSampleRate, 0);

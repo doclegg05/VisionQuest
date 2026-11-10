@@ -39,14 +39,16 @@ export function makeEdgeFetchTransport(options: TransportOptions): Transport {
 /**
  * Edge error reporting: the same rules as the server
  * (sentry.server.config.ts). Errors only, built by the scrub, tracing off,
- * only the named integrations, and every envelope rebuilt by the wire filter
- * (src/lib/sentry-wire.ts) before the transport is handed it.
+ * no trace headers on outgoing requests, only the named integrations, and
+ * every envelope rebuilt by the wire filter (src/lib/sentry-wire.ts) before
+ * the transport is handed it.
  */
 export function edgeSentryOptions(dsn: string, makeTransport: (options: TransportOptions) => Transport = makeEdgeFetchTransport): EdgeOptions {
   return {
     dsn,
     environment: process.env.NODE_ENV,
     tracesSampleRate: 0,
+    tracePropagationTargets: [],
     ...PRIVATE_REPORTING_OPTIONS,
     transport: wireAllowlistTransport(makeTransport),
     integrations: errorOnlyIntegrations,

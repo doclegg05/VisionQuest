@@ -430,10 +430,19 @@ export function errorOnlyIntegrations<I extends { name: string }>(defaults: read
  * none can ride on an event that skips `beforeSend` (an SDK-internal error
  * does). No client report and no default PII. Transactions are refused here
  * as well as by `tracesSampleRate: 0`.
+ *
+ * Logs and metrics are off. Both are ON unless they are turned off
+ * (@sentry/core build/cjs/client.js, the constructor: `?? true`), and
+ * neither passes through `beforeSend`: a `Sentry.logger` line or a
+ * `Sentry.metrics` value would leave as written. The wire filter
+ * (sentry-wire.ts) drops both item types as well; with these off, the SDK
+ * does not build them.
  */
 export const PRIVATE_REPORTING_OPTIONS = {
   sendDefaultPii: false,
   sendClientReports: false,
+  enableLogs: false,
+  enableMetrics: false,
   maxBreadcrumbs: 0,
   beforeBreadcrumb: sendNothing,
   beforeSend: scrubPii,
