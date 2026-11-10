@@ -107,9 +107,8 @@ describe("alarm log lines become Sentry messages", () => {
   });
 });
 
-// Item 9: two alarms fire on hot paths. `audit_write_failed` fires on every
-// audited read while the audit table is unreachable, and
-// `wellbeing_detection_failed` on every chat message while detection is down.
+// Item 9: an alarm can fire on a hot path. `audit_write_failed` fires on
+// every audited read while the audit table is unreachable.
 describe("an alarm that fires in a flood", () => {
   beforeEach(() => {
     now += 5 * MINUTE_MS;
@@ -131,11 +130,11 @@ describe("an alarm that fires in a flood", () => {
   });
 
   it("the next event after the minute carries the count held back, as a number", async () => {
-    for (let i = 0; i < 50; i += 1) logger.error("Detection failed", { alert: "wellbeing_detection_failed" });
+    for (let i = 0; i < 50; i += 1) logger.error("Reaper failed", { alert: "background_job_reaper_failed" });
     mock.timers.setTime(now + MINUTE_MS - 1);
-    logger.error("Detection failed", { alert: "wellbeing_detection_failed" });
+    logger.error("Reaper failed", { alert: "background_job_reaper_failed" });
     mock.timers.setTime(now + MINUTE_MS);
-    logger.error("Detection failed", { alert: "wellbeing_detection_failed" });
+    logger.error("Reaper failed", { alert: "background_job_reaper_failed" });
     await settle();
     assert.deepEqual(
       outbox.events().map((event) => event.extra),
@@ -149,6 +148,78 @@ describe("an alarm that fires in a flood", () => {
     logger.error("Email is not set up", { alert: "email_delivery_unconfigured" });
     await settle();
     assert.deepEqual(outbox.events().map((event) => event.message).sort(), ["audit_write_failed", "email_delivery_unconfigured"]);
+  });
+});
+
+// Third pass, item 4 (2026-11-10). The limit above held back a second
+// `wellbeing_no_recipients` in the same minute, and the count of what was
+// held back travels only on the NEXT report of that name. If no third one
+// came, the second student's crisis alert reached nobody and Sentry never
+// heard of it. An alarm on the crisis path is reported every time.
+describe("a crisis-path alarm is never held back", () => {
+  /** Every `wellbeing_` alarm the app raises (src/lib/sage/crisis-detection.ts, src/lib/chat/crisis-scan.ts). */
+  const CRISIS_ALARMS = [
+    "wellbeing_no_recipients",
+    "wellbeing_notify_failed",
+    "wellbeing_alert_failed",
+    "wellbeing_detection_failed",
+    "wellbeing_instructor_resolution_failed",
+    "wellbeing_demo_check_failed",
+    "wellbeing_mood_lookup_failed",
+  ];
+
+  beforeEach(() => {
+    now += 5 * MINUTE_MS;
+    mock.timers.enable({ apis: ["Date"], now });
+    outbox.clear();
+    consoleError.mock.resetCalls();
+    process.env.SENTRY_DSN = TEST_DSN;
+  });
+  afterEach(() => {
+    mock.timers.reset();
+    delete process.env.SENTRY_DSN;
+  });
+
+  it("two wellbeing_no_recipients in one minute give two reports", async () => {
+    logger.error("Wellbeing alert reached no instructor", { alert: "wellbeing_no_recipients", recipientCount: 0 });
+    mock.timers.setTime(now + 1_000);
+    logger.error("Wellbeing alert reached no instructor", { alert: "wellbeing_no_recipients", recipientCount: 0 });
+    await settle();
+    assert.deepEqual(
+      outbox.events().map((event) => [event.message, event.extra]),
+      [
+        ["wellbeing_no_recipients", { recipientCount: 0, heldBack: 0 }],
+        ["wellbeing_no_recipients", { recipientCount: 0, heldBack: 0 }],
+      ],
+    );
+  });
+
+  it("two of another alarm name in one minute give one report", async () => {
+    logger.error("Packet missing", { alert: "packet_missing_from_storage" });
+    mock.timers.setTime(now + 1_000);
+    logger.error("Packet missing", { alert: "packet_missing_from_storage" });
+    await settle();
+    assert.deepEqual(outbox.events().map((event) => event.message), ["packet_missing_from_storage"]);
+    assert.equal(consoleError.mock.callCount(), 2, "both lines are still logged");
+  });
+
+  it("every wellbeing_ alarm is reported each time it fires", async () => {
+    for (const alert of CRISIS_ALARMS) {
+      logger.error("crisis path", { alert });
+      logger.error("crisis path", { alert });
+      logger.warn("crisis path", { alert });
+    }
+    await settle();
+    const counts = new Map<string, number>();
+    for (const event of outbox.events()) counts.set(event.message ?? "", (counts.get(event.message ?? "") ?? 0) + 1);
+    assert.deepEqual([...counts.entries()].sort(), CRISIS_ALARMS.map((alert): [string, number] => [alert, 3]).sort());
+  });
+
+  it("a name that only contains the word is still limited", async () => {
+    logger.error("odd", { alert: "not_wellbeing_related" });
+    logger.error("odd", { alert: "not_wellbeing_related" });
+    await settle();
+    assert.equal(outbox.events().length, 1);
   });
 });
 

@@ -106,16 +106,31 @@ interface AlarmWindow {
 const alarmWindows = new Map<string, AlarmWindow>();
 
 /**
- * Decides whether this alarm is reported. Two alarms sit on hot paths
- * (`audit_write_failed` on every audited read while the audit table is
- * down, `wellbeing_detection_failed` on every chat message), and an outage
- * would otherwise send one event per request. At most one report per alarm
- * name per process per minute: returns how many were held back since the
- * last report, or undefined when this one is held back too. The count
- * travels on the next report, so a flood that stops within its minute shows
- * as one event; the log stream has every line.
+ * The alarms of the crisis path (src/lib/sage/crisis-detection.ts,
+ * src/lib/chat/crisis-scan.ts): a crisis alert that reached nobody, or was
+ * never raised. These are never held back.
+ */
+const NEVER_HELD_BACK_PREFIX = "wellbeing_";
+
+/**
+ * Decides whether this alarm is reported. An alarm can sit on a hot path
+ * (`audit_write_failed` fires on every audited read while the audit table
+ * is down), and an outage would otherwise send one event per request. At
+ * most one report per alarm name per process per minute: returns how many
+ * were held back since the last report, or undefined when this one is held
+ * back too. The count travels on the next report, so a flood that stops
+ * within its minute shows as one event; the log stream has every line.
+ *
+ * A `wellbeing_` alarm is outside the limit and is reported every time. A
+ * held-back report is only ever seen as a count on the NEXT report of the
+ * same name, and a second `wellbeing_no_recipients` in one minute is a
+ * second student whose crisis alert reached nobody: if no third followed,
+ * nobody would be told. The cost is that `wellbeing_detection_failed`,
+ * which fires on every chat message while detection is down, sends one
+ * event per message for as long as that lasts.
  */
 function admitAlarm(name: string, now: number): number | undefined {
+  if (name.startsWith(NEVER_HELD_BACK_PREFIX)) return 0;
   const last = alarmWindows.get(name);
   if (last !== undefined && now - last.sentAt < ALARM_WINDOW_MS) {
     alarmWindows.set(name, { sentAt: last.sentAt, heldBack: last.heldBack + 1 });
