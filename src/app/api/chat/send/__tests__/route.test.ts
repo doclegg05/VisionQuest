@@ -1022,9 +1022,11 @@ describe("POST /api/chat/send — interrupted reply persistence (F28)", () => {
     resetMocks();
   });
 
-  // Student-facing marker on the persisted partial (grade-6 copy). Pinned
-  // here so a wording change is a deliberate test change.
-  const CUT_OFF_MARKER = "[Sage got cut off here. Send your message again to keep going.]";
+  // Student-facing note on the persisted partial: the same text the chat
+  // shows (cutOffReply). A reset connection reads as "off", where a retry
+  // cannot help, so the note says what to do instead of "Tap Try again".
+  const CUT_OFF_MARKER =
+    "\n\n(Sage got cut off.) Sage is off right now. Your message was not lost. Tell your instructor. You can still use the rest of VisionQuest.";
 
   function makeProviderFailingAfter(chunks: string[]) {
     return {
@@ -1511,7 +1513,8 @@ describe("POST /api/chat/send — interrupted reply on the agent-loop path (F28,
     resetMocks();
   });
 
-  const CUT_OFF_MARKER = "[Sage got cut off here. Send your message again to keep going.]";
+  // The same note the chat shows under a cut-off reply it can retry.
+  const CUT_OFF_MARKER = "\n\n(Sage got cut off. Tap Try again for the full answer.)";
   const PARTIAL = "Here is the first step: ";
 
   function post(message: string) {

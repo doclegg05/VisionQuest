@@ -23,15 +23,17 @@ import {
   formCommitmentReply,
   resolveFormCommitment,
 } from "@/lib/sage/form-commitment";
-import type { ChatSseEvent } from "@/lib/chat/sse";
-import type { AgentToolCallRecord } from "@/lib/sage/agent/types";
 import { recordChatSession } from "@/lib/progression/engine";
 import { awardEvent } from "@/lib/progression/events";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { isStaffRole } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
-import { parseBody, chatSendSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/schemas";
+import { chatSendBodySchema, createUserTurn, findRetriedUserMessage, type ChatSendBody, type UserTurn } from "@/lib/chat/retry-turn";
+import { answerPreStreamFailures, failureBody, failureResponse } from "@/lib/chat/failure-response";
+import { createSseResponse, presentFormSseExtras } from "@/lib/chat/direct-reply";
+import type { Session } from "@/lib/api-error";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
 import { transcriptWindowFor } from "@/lib/chat/transcript-window";
 import { handlePostResponse } from "@/lib/chat/post-response";
@@ -39,7 +41,7 @@ import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
 import {
   classifyProviderInitFailure,
   classifyStreamFailure,
-  sageFailureMessage,
+  cutOffReply,
   withFailureCapture,
   type FailureCapture,
 } from "@/lib/chat/sage-failure";
@@ -82,12 +84,6 @@ const CHAT_SSE_HEARTBEAT_MS = 15_000;
  */
 const MAX_ASSISTANT_CHARS = 40_000;
 const TRUNCATED_REPLY_SUFFIX = "\n[…truncated by server — response exceeded length cap]";
-/**
- * Appended to a partial reply persisted after a mid-stream failure, so the
- * transcript stays two-sided and the student can see why it stops short.
- * Student-facing copy: keep it plain (grade-6 reading level).
- */
-const INTERRUPTED_REPLY_SUFFIX = "\n\n[Sage got cut off here. Send your message again to keep going.]";
 
 /** Prisma's `code` on a known-request error, when present; nothing else is read. */
 function prismaErrorCode(error: unknown): string | undefined {
@@ -158,76 +154,59 @@ class ChatSseClientClosedError extends Error {
   }
 }
 
-function createSseResponse(
-  conversationId: string,
-  text: string,
-  extras: ChatSseEvent[] = [],
-): Response {
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    start(controller) {
-      controller.enqueue(
-        encoder.encode(formatChatSseEvent({ conversationId })),
-      );
-      for (const event of extras) {
-        controller.enqueue(encoder.encode(formatChatSseEvent(event)));
-      }
-      controller.enqueue(
-        encoder.encode(formatChatSseEvent({ text })),
-      );
-      controller.enqueue(
-        encoder.encode(formatChatSseEvent({ done: true, conversationId })),
-      );
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    },
-  });
-}
-
-/** SSE extras for a present_form tool result (action card + tool events). */
-function presentFormSseExtras(record: AgentToolCallRecord): ChatSseEvent[] {
-  const extras: ChatSseEvent[] = [
-    {
-      type: "tool_call",
-      callId: record.callId,
-      tool: record.tool,
-      args: record.args,
-      status: "pending",
-    },
-    {
-      type: "tool_result",
-      callId: record.callId,
-      status: record.result.status,
-      summary: record.result.summary,
-      data: record.result.data,
-    },
-  ];
-  if (record.result.action) {
-    extras.push({
-      type: "action",
-      action: record.result.action.action,
-      target: record.result.action.target,
-      label: record.result.action.label,
-      meta: record.result.action.meta,
-    });
-  }
-  return extras;
-}
-
 /** The one daily counter every demo account's Sage messages are charged to. */
 const DEMO_WIDE_CHAT_KEY = "chat-daily:demo-all";
 
 export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) => {
-  const body = await parseBody(req, chatSendSchema);
+  const body = await parseBody(req, chatSendBodySchema);
   const userMessage = body.message.trim();
+  const isStaffChat = staffChatStageFor(session.role) !== null;
+  // A Try again of a message already saved reuses it (src/lib/chat/retry-turn.ts).
+  const retried = await findRetriedUserMessage({
+    studentId: session.id,
+    conversationId: body.conversationId || null,
+    retryOf: body.retryOf,
+    content: userMessage,
+  });
+
+  // Crisis scan — request-time, student-only, never throws. Runs before the
+  // direct-answer branches, provider resolution, and rate limits so every
+  // exit below still raises the staff alert (VQ-R-001). Single call site:
+  // handlePostResponse does not scan again. Notification fan-out is bounded
+  // by the helper's own per-student record cap, not by the hourly chat
+  // limiter below. The exemption covers teacher, admin, and coordinator; a
+  // `cdc` role exists (src/lib/role-home.ts) and would be scanned as a
+  // student if it were ever granted sage.chat (it is not: scripts/seed-rbac.ts).
+  // A Try again of a saved message skips it: the first send already scanned.
+  if (!isStaffChat && !retried) {
+    await scanStudentMessageForCrisis({
+      studentId: session.id,
+      userMessage,
+    });
+  }
+  // The student-facing 988 block for every exit below. The scan above keeps
+  // its detection to itself (it only raises the staff alert), so this is the
+  // one extra detection per request; no path detects again. Staff: null.
+  const crisisSignal = isStaffChat ? null : detectCrisisSignal(userMessage);
+  const crisisBlock = crisisResourceBlockFor(crisisSignal, "") ?? "";
+  const userTurn = createUserTurn(session.id, userMessage, retried);
+  return answerPreStreamFailures(
+    () => sendTurn({ session, body, userMessage, crisisSignal, crisisBlock, userTurn }),
+    { audience: isStaffChat ? "staff" : "student", crisisBlock, userTurn, studentId: session.id },
+  );
+});
+
+interface SendTurnInput {
+  session: Session;
+  body: ChatSendBody;
+  userMessage: string;
+  crisisSignal: ReturnType<typeof detectCrisisSignal> | null;
+  crisisBlock: string;
+  userTurn: UserTurn;
+}
+
+/** Everything after the crisis scan; a throw before the stream opens is answered by the caller. */
+async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock, userTurn }: SendTurnInput): Promise<Response> {
   const conversationId = body.conversationId || null;
   const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
@@ -239,28 +218,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const isStaffChat = staffChatStage !== null;
   const chatTask = isTeacher ? "sage_staff_chat" : "sage_student_chat";
   const chatSensitivity = isTeacher ? "staff_entered" : "student_record";
-
-  // Crisis scan — request-time, student-only, never throws. Runs before the
-  // direct-answer branches, provider resolution, and rate limits so every
-  // exit below still raises the staff alert (VQ-R-001). Single call site:
-  // handlePostResponse does not scan again. Notification fan-out is bounded
-  // by the helper's own per-student record cap, not by the hourly chat
-  // limiter below. The exemption covers teacher, admin, and coordinator; a
-  // `cdc` role exists (src/lib/role-home.ts) and would be scanned as a
-  // student if it were ever granted sage.chat (it is not: scripts/seed-rbac.ts).
-  if (!isStaffChat) {
-    await scanStudentMessageForCrisis({
-      studentId: session.id,
-      userMessage,
-    });
-  }
-  // The student-facing 988 block for every exit below. The scan above keeps
-  // its detection to itself (it only raises the staff alert), so this is the
-  // one extra detection per request; no path detects again. Staff: null.
-  const crisisSignal = isStaffChat ? null : detectCrisisSignal(userMessage);
   /** `text` plus the 988 block when the message carried a crisis signal. */
-  const withCrisisResources = (text: string): string =>
-    text + (crisisResourceBlockFor(crisisSignal, "") ?? "");
+  const withCrisisResources = (text: string): string => text + crisisBlock;
 
   // Deterministic form lookup — bypasses discovery/goal stage prompts so a
   // student who asks for a form gets it even mid-onboarding.
@@ -280,7 +239,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       ? await getOrCreateTeacherConversation(session.id, conversationId)
       : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
-    await saveMessage(conversation.id, session.id, "user", userMessage);
+    await userTurn.save(conversation.id);
     await saveMessage(conversation.id, session.id, "assistant", reply);
     await logAiAuditEvent({
       actorId: session.id,
@@ -309,7 +268,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       ? await getOrCreateTeacherConversation(session.id, conversationId)
       : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
-    await saveMessage(conversation.id, session.id, "user", userMessage);
+    await userTurn.save(conversation.id);
 
     const top = directFormMatches[0];
     const record = await executeAgentTool({
@@ -357,7 +316,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       ? await getOrCreateTeacherConversation(session.id, conversationId)
       : await getOrCreateConversation(session.id, conversationId, requestedStage);
 
-    await saveMessage(conversation.id, session.id, "user", userMessage);
+    await userTurn.save(conversation.id);
     await saveMessage(conversation.id, session.id, "assistant", directSmallTalkAnswer);
     await logAiAuditEvent({
       actorId: session.id,
@@ -432,15 +391,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
     // Nothing is saved yet on this path, so the sentence makes no claim
     // that the student's message was kept.
     const failure = classifyProviderInitFailure(err);
-    return new Response(
-      JSON.stringify({
-        error: withCrisisResources(
-          sageFailureMessage(failure, { audience: isStaffChat ? "staff" : "student", messageSaved: false }),
-        ),
-        failure,
-      }),
-      { status: 503, headers: { "Content-Type": "application/json" } },
-    );
+    const audience = isStaffChat ? "staff" : "student";
+    return failureResponse({ failure, audience, crisisBlock, userMessageId: null }, 503);
   }
   const promptTier = getPromptTier(provider);
   const providerClass = getProviderClass(provider.name);
@@ -593,7 +545,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       : false;
 
   // Save user message
-  await saveMessage(conversation.id, session.id, "user", userMessage);
+  await userTurn.save(conversation.id);
 
   let staffStudentContext: string | null = null;
   let staffStudentTargetId: string | null = null;
@@ -971,7 +923,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       }, CHAT_SSE_HEARTBEAT_MS);
 
       try {
-        sendEvent({ conversationId: conversation.id }, "conversationId");
+        // The saved message's id lets a Try again reuse it (retry-turn.ts).
+        sendEvent({ conversationId: conversation.id, userMessageId: userTurn.savedId() ?? undefined }, "conversationId");
 
         // Send soft-cap warning as an SSE event before the AI response
         if (quota.warning) {
@@ -1320,7 +1273,9 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         // 988 for the student in the moment, on the error event and in the
         // persisted partial alike; skipped when the streamed text already
         // carries it. Decided once here for both uses.
-        const crisisBlock = crisisResourceBlockFor(crisisSignal, fullResponse) ?? "";
+        const streamCrisisBlock = crisisResourceBlockFor(crisisSignal, fullResponse) ?? "";
+        const failure = classifyStreamFailure(failureCapture?.lastError() ?? error);
+        const audience = isStaffChat ? "staff" : "student";
         // Keep the transcript two-sided: persist whatever Sage streamed
         // before the failure, marked so the student knows it was cut off.
         // A failed persist is logged and never hides the original error
@@ -1331,7 +1286,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
               conversation.id,
               session.id,
               "assistant",
-              capForPersist(fullResponse) + INTERRUPTED_REPLY_SUFFIX + crisisBlock,
+              cutOffReply(capForPersist(fullResponse), failure, audience) + streamCrisisBlock,
             );
           } catch (persistError) {
             // Name and Prisma code only: a Prisma validation error quotes the
@@ -1368,13 +1323,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
         });
         if (!clientClosed) {
           // The student's message was saved before the stream opened.
-          const failure = classifyStreamFailure(failureCapture?.lastError() ?? error);
-          const errorEvent = {
-            error:
-              sageFailureMessage(failure, { audience: isStaffChat ? "staff" : "student", messageSaved: true }) +
-              crisisBlock,
-            failure,
-          };
+          const userMessageId = userTurn.savedId();
+          const errorEvent = failureBody({ failure, audience, crisisBlock: streamCrisisBlock, userMessageId });
           try {
             sendEvent(errorEvent, "error");
           } catch {
@@ -1394,4 +1344,4 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
       "X-Accel-Buffering": "no",
     },
   });
-});
+}

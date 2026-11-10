@@ -73,12 +73,35 @@ describe("uploadFailureMessage", () => {
   });
 });
 
+describe("uploadFailureMessage for a rate limit", () => {
+  it("names the real window: the upload route allows 20 files an hour", () => {
+    assert.equal(uploadFailureMessage(429), "You sent a lot of files this hour. Try again in one hour.");
+  });
+});
+
 describe("UploadError", () => {
+  it("uses the house error pattern: an icon beside the words", () => {
+    const html = renderToString(<UploadError message={uploadFailureMessage(400)} />);
+    assert.match(html, /flex items-start gap-2/);
+    assert.match(html, /<svg[^>]*aria-hidden="true"[^>]*class="shrink-0"/);
+  });
+
   it("is announced, wraps a long message, and stays inside a phone screen", () => {
     const html = renderToString(<UploadError message={uploadFailureMessage(400)} />);
     assert.match(html, /role="alert"/);
     assert.match(html, /break-words/);
     assert.match(html, /min-w-0/);
     assert.doesNotMatch(html, /truncate|whitespace-nowrap/);
+  });
+});
+
+describe("ChatInput while Sage answers", () => {
+  it("keeps the message box focusable, so focus after Try again never falls to the page", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} disabled />);
+    const textarea = html.match(/<textarea[^>]*>/)?.[0] ?? "";
+    assert.ok(textarea, html);
+    assert.doesNotMatch(textarea, / disabled=""/);
+    assert.match(textarea, /readOnly=""|readonly=""/);
+    assert.match(textarea, /aria-disabled="true"/);
   });
 });

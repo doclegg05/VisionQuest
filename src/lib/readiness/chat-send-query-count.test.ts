@@ -116,7 +116,7 @@ const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/chat/conversation.ts › getOrCreateConversation": [1, 0],
   "src/lib/chat/conversation.ts › saveMessage": [1, 0],
   "src/lib/program-type-server.ts › getStudentProgramType": [1, 0],
-  "src/app/api/chat/send/route.ts › (anonymous)": [1, 0],
+  "src/app/api/chat/send/route.ts › sendTurn": [1, 0],
   "src/lib/progression/fetch-readiness-data.ts › fetchStudentReadinessData": [8, 0],
   "src/lib/sage/context-bundle.ts › assembleStudentContextBundle": [9, 0],
   "src/lib/chat/context.ts › (anonymous)": [7, 0],

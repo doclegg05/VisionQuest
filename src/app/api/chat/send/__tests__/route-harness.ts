@@ -60,6 +60,7 @@ export const mockWithUsageLogging = mock.fn() as any;
 export const mockGetStudentProgramType = mock.fn() as any;
 export const mockPrismaStudentFindUnique = mock.fn() as any;
 export const mockFileUploadFindMany = mock.fn() as any;
+export const mockMessageFindFirst = mock.fn() as any;
 export const mockFormatClustersForPrompt = mock.fn() as any;
 export const mockRunAgentTurn = mock.fn() as any;
 export const mockExecuteSlashCommand = mock.fn() as any;
@@ -271,6 +272,9 @@ mock.module("@/lib/db", {
       fileUpload: {
         findMany: mockFileUploadFindMany,
       },
+      message: {
+        findFirst: mockMessageFindFirst,
+      },
     },
     prismaAdmin: {
       student: {
@@ -406,6 +410,7 @@ export function resetMocks() {
     mockGetStudentProgramType,
     mockPrismaStudentFindUnique,
     mockFileUploadFindMany,
+    mockMessageFindFirst,
     mockFormatClustersForPrompt,
     mockRunAgentTurn,
     mockExecuteSlashCommand,
@@ -497,6 +502,7 @@ export function resetMocks() {
   mockGetStudentProgramType.mock.mockImplementation(async () => null);
   mockPrismaStudentFindUnique.mock.mockImplementation(async () => ({ classroomConfirmedAt: null }));
   mockFileUploadFindMany.mock.mockImplementation(async () => []);
+  mockMessageFindFirst.mock.mockImplementation(async () => null);
   mockAwardEvent.mock.mockImplementation(async () => undefined);
   mockFormatClustersForPrompt.mock.mockImplementation(() => "");
   mockRunAgentTurn.mock.mockImplementation(async function* () {
