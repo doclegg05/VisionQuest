@@ -307,17 +307,39 @@ curl https://your-app.onrender.com/api/health
 
 ### Backups
 
-Supabase handles managed backups. For manual export:
+Supabase handles managed backups. To make an export yourself, follow these steps in order. The export holds every student record and this repository is public, so the file must never be inside this checkout.
 
-```bash
-pg_dump "DIRECT_URL" --schema=visionquest > backup.sql
-```
+`pg_dump` needs the session pooler or the direct connection. It does not work through the transaction pooler on port 6543. The value stored in the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL` is the right kind.
+
+1. Open a new terminal window. In the Render dashboard, service `visionquest`, **Environment** tab, copy the value of the key `ADMIN_DATABASE_URL`. Run the first line below, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history. The second line clears the clipboard.
+
+   ```sh
+   read -rs ADMIN_DATABASE_URL && export ADMIN_DATABASE_URL
+   pbcopy < /dev/null
+   ```
+
+   Never type or paste the value into a command itself. Every command below reads it from the variable.
+2. Make the export in a folder outside the checkout that only you can open.
+
+   ```sh
+   mkdir -p -m 700 "$HOME/VisionQuest-backups"
+   pg_dump "$ADMIN_DATABASE_URL" --schema=visionquest --file="$HOME/VisionQuest-backups/visionquest-$(date +%Y-%m-%d-%H%M).sql"
+   chmod 600 "$HOME/VisionQuest-backups/"*.sql
+   ls -lh "$HOME/VisionQuest-backups"
+   ```
+
+   Success looks like a file named for today with a size above zero. If `pg_dump` prints an error, stop, keep the output, and ask a developer.
+3. Close the terminal window when you are done. That removes the value from memory.
+
+Never copy the export into this checkout. As a second lock, `.gitignore` leaves out `/*.sql`, `/*.dump` and `/backups/` at the top of the checkout.
 
 Restore:
 
-```bash
-psql "DIRECT_URL" < backup.sql
+```sh
+psql "$ADMIN_DATABASE_URL" --set ON_ERROR_STOP=1 --single-transaction --file="$HOME/VisionQuest-backups/NAME_OF_THE_EXPORT.sql"
 ```
+
+Replace `NAME_OF_THE_EXPORT.sql` with the file name that `ls` showed. This puts an export into a database whose `visionquest` schema is empty, such as a new Supabase project. It stops at the first error and then changes nothing. Putting an export back over the live database removes every change made after the export was taken. Do not do that alone: ask a developer, and read `docs/runbooks/backup-restore.md` first.
 
 ### Rollback
 
