@@ -1,11 +1,30 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { badRequest, conflict, withAdminAuth } from "@/lib/api-error";
+import { conflict, withAdminAuth } from "@/lib/api-error";
+import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { parseBody } from "@/lib/schemas";
+
+/** Line breaks, tabs and other control or separator characters. */
+function hasHiddenCharacter(text: string): boolean {
+  for (const char of text) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029) return true;
+  }
+  return false;
+}
+
+// Checked before the trim, so a line break at either end is refused too; the
+// length check runs on the trimmed name, so a name of only spaces is refused.
+const regionNameSchema = z
+  .string()
+  .refine((name) => !hasHiddenCharacter(name), "A region name cannot have line breaks or hidden characters.")
+  .transform((name) => name.trim())
+  .pipe(z.string().min(1, "Type a name for the region.").max(200, "Use 200 characters or fewer for the region name."));
 
 const createSchema = z.object({
-  name: z.string().min(1).max(200),
+  name: regionNameSchema,
   code: z.string().min(1).max(40).regex(/^[a-z0-9-]+$/i, "Code must be alphanumeric (dashes allowed)."),
   description: z.string().max(2000).optional(),
 });
@@ -44,29 +63,25 @@ export const GET = withAdminAuth(async () => {
   });
 });
 
-export const POST = withAdminAuth(async (_session, req: Request) => {
-  const body = await req.json().catch(() => null);
-  if (!body || typeof body !== "object") {
-    throw badRequest("Body must be a JSON object.");
-  }
+export const POST = withAdminAuth(async (session, req: Request) => {
+  const body = await parseBody(req, createSchema);
+  const code = body.code.toLowerCase();
 
-  const parsed = createSchema.safeParse(body);
-  if (!parsed.success) {
-    throw badRequest(parsed.error.issues[0]?.message ?? "Invalid region payload.");
-  }
-
-  const existing = await prisma.region.findUnique({
-    where: { code: parsed.data.code.toLowerCase() },
-    select: { id: true },
-  });
+  const existing = await prisma.region.findUnique({ where: { code }, select: { id: true } });
   if (existing) throw conflict("That region code is already in use.");
 
   const created = await prisma.region.create({
-    data: {
-      name: parsed.data.name.trim(),
-      code: parsed.data.code.toLowerCase(),
-      description: parsed.data.description?.trim() || null,
-    },
+    data: { name: body.name, code, description: body.description?.trim() || null },
+  });
+
+  // Ids only: the region's name stays out of the audit row.
+  await logAuditEvent({
+    actorId: session.id,
+    actorRole: session.role,
+    action: "admin.region.create",
+    targetType: "region",
+    targetId: created.id,
+    summary: "Created a region.",
   });
 
   return NextResponse.json(
