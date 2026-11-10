@@ -197,6 +197,9 @@ async function main() {
         passwordHash: hashPassword(E2E_STUDENT.password).hash,
         role: "student",
         isActive: true,
+        // A long-lived database where staff once reset this account would
+        // otherwise keep it held to the change-password screen (readiness A3).
+        mustChangePassword: false,
       },
       create: {
         studentId: E2E_STUDENT.login,
@@ -214,6 +217,9 @@ async function main() {
         passwordHash: hashPassword(E2E_JOURNEY_STUDENT.password).hash,
         role: "student",
         isActive: true,
+        // A long-lived database where staff once reset this account would
+        // otherwise keep it held to the change-password screen (readiness A3).
+        mustChangePassword: false,
       },
       create: {
         studentId: E2E_JOURNEY_STUDENT.login,

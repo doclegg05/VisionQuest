@@ -228,6 +228,21 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           JOB_REAPER_DB_TEST_ENABLED: "true"
 
+      - name: Run demo closeout integration test
+        # H10: the closeout deletes the marked demo accounts and everything
+        # attached to them in one transaction. Only a real database can show
+        # that every explicit delete runs in an order the foreign keys accept,
+        # that no cascade takes a row the plan did not list, and that a refusal
+        # or failure after deletes have run rolls them back. Same hermetic
+        # Postgres as the steps above. The test refuses to run unless the host
+        # is this machine and the database holds no demo account before it
+        # seeds its own.
+        run: npm run test:democloseout
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DEMO_CLOSEOUT_DB_TEST_ENABLED: "true"
+
       # --- Gate-tier benchmarks ------------------------------------------
       # Numbers, not pass/fail: each suite writes reports/benchmarks/latest/
       # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric
