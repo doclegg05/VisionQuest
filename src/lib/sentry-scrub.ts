@@ -157,9 +157,20 @@ function pick<K extends string, V>(source: object, keys: readonly K[], keep: (va
  */
 function codeLocation(file: string): string {
   const bare = file.split(/[?#]/, 1)[0] ?? "";
-  if (!/^https?:\/\//i.test(bare)) return sourceFile(bare);
+  if (!/^https?:\/\//i.test(bare)) return isRoutePattern(bare) ? bare : sourceFile(bare);
   const assets = bare.indexOf("/_next/");
   return assets === -1 ? routePattern(bare) : sourceFile(`app://${bare.slice(assets)}`);
+}
+
+/**
+ * What `routePattern` returns for a page: every segment is a route directory
+ * or `[param]`, so it holds nothing a visitor typed. It is kept as it is,
+ * because every event is scrubbed twice (`beforeSend`, then the wire filter
+ * in sentry-wire.ts) and the second pass must not turn the first pass's
+ * route pattern into `[file]`.
+ */
+function isRoutePattern(path: string): boolean {
+  return path.startsWith("/") && routePattern(path) === path;
 }
 
 function sourceFile(file: string): string {
@@ -313,16 +324,46 @@ function safeBody(event: Event, tags: EventTags): Pick<ErrorEvent, "message" | "
   };
 }
 
+/** Printed when the scrub drops an event it could not read. A literal: nothing from the event. */
+const SCRUB_FAILED_LINE = JSON.stringify({ level: "error", message: "sentry_scrub_dropped_event" });
+
+/** A plain object. Not null, text, a number, a list, bytes or a Date: none of those is an event. */
+function isPlainObject(value: unknown): boolean {
+  return Object.prototype.toString.call(value) === "[object Object]";
+}
+
 /**
- * `beforeSend`: the event that is sent, built from the SDK's event.
+ * `beforeSend`, and the wire filter's rule for an event (sentry-wire.ts):
+ * the event that is sent, built from the SDK's event.
  *
  * Errors only. A transaction, profile, replay or feedback event returns
  * null and is not sent. Not on the list, so not sent: `request` (URL, query
  * string, headers, cookies, body), `breadcrumbs`, `user`, `server_name`,
  * `modules`, `logentry`, `fingerprint`, `spans`, and
  * `sdkProcessingMetadata`, which holds the trace header's route name.
+ *
+ * Total: no input makes it throw. Whatever it is given, it returns an event
+ * built from the allowlist, or null.
  */
 export function scrubPii(event: Event, _hint?: EventHint): ErrorEvent | null {
+  try {
+    return isPlainObject(event) ? builtEvent(event) : null;
+  } catch {
+    // The one error this module swallows, and it does so on purpose. If
+    // building the event throws (a null in `exception.values`, a getter that
+    // throws, a shape a later SDK invents), no event exists that is known to
+    // be safe. Dropping is the safe direction: one error report is lost. The
+    // other direction is a leak, because the SDK reports a throw from
+    // `beforeSend` as a NEW event that skips `beforeSend`
+    // (@sentry/core client.js `_processEvent`, the `isInternalException`
+    // branch). The caught error is not logged: its text is whatever the
+    // event that caused it chose. The fixed line below is the only trace.
+    console.error(SCRUB_FAILED_LINE);
+    return null;
+  }
+}
+
+function builtEvent(event: Event): ErrorEvent | null {
   if (event.type !== undefined) return null;
   const tags = safeTags(event);
   const extra = numericExtra(event.extra);
