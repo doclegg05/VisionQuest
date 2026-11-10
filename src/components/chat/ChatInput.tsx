@@ -8,6 +8,46 @@ import { useDemoAccount } from "@/components/demo/DemoAccountContext";
 import { DemoPrivacyNotice } from "@/components/demo/DemoPrivacyNotice";
 import { chatRoleCanAttachFiles, type ChatRole, type SlashCommand } from "@/lib/chat/commands";
 
+/**
+ * What the chat upload route accepts (`validateFile` in src/lib/storage.ts,
+ * which cannot be imported into a client bundle). ChatInput.test.tsx fails
+ * if the two lists drift apart.
+ */
+const CHAT_UPLOAD_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/gif"];
+const CHAT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+export const CHAT_UPLOAD_ACCEPT = CHAT_UPLOAD_TYPES.join(",");
+
+const PICK_A_FILE = "Pick a PDF, JPG, PNG or GIF file.";
+
+/** Why the server would refuse this file, in words a student can act on; null if it would not. */
+export function uploadProblemFor(file: { size: number; type: string }): string | null {
+  if (!Number.isFinite(file.size) || file.size <= 0) return `This file is empty. ${PICK_A_FILE}`;
+  if (file.size > CHAT_UPLOAD_MAX_BYTES) return "This file is too big. Pick a file smaller than 10 MB.";
+  if (!CHAT_UPLOAD_TYPES.includes(file.type)) return `Sage cannot open this kind of file. ${PICK_A_FILE}`;
+  return null;
+}
+
+/** The upload failed on the server or on the way there; `status` is null when no answer came back. */
+export function uploadFailureMessage(status: number | null): string {
+  if (status === 429) return "You sent a lot of files this hour. Wait a while, then try again.";
+  if (status !== null && status >= 400 && status < 500) {
+    return `This file did not upload. ${PICK_A_FILE} Keep it under 10 MB, then try again.`;
+  }
+  return "This file did not upload. Check that you are online, then try again.";
+}
+
+/** A failed upload, read out by screen readers and wrapped to fit a 375px screen. */
+export function UploadError({ message }: { message: string }) {
+  return (
+    <p
+      role="alert"
+      className="mb-2 min-w-0 break-words rounded-xl border border-[var(--chat-error-border)] bg-[var(--chat-error-bg)] px-3 py-2 text-sm text-[var(--chat-error-text)]"
+    >
+      {message}
+    </p>
+  );
+}
+
 interface ChatInputProps {
   onSend: (message: string, attachmentIds?: string[]) => void;
   disabled?: boolean;
@@ -25,6 +65,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
   const [focused, setFocused] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<{ id: string; filename: string }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -179,6 +220,13 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
       event.target.value = "";
       if (!file || disabled) return;
 
+      setUploadError(null);
+      const problem = uploadProblemFor(file);
+      if (problem) {
+        setUploadStatus(null);
+        setUploadError(problem);
+        return;
+      }
       setUploading(true);
       setUploadStatus(`Uploading ${file.name}...`);
       try {
@@ -191,7 +239,9 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-          throw new Error(data?.error || "Could not upload that file.");
+          setUploadStatus(null);
+          setUploadError(uploadFailureMessage(res.status));
+          return;
         }
 
         const filename = data?.data?.filename || file.name;
@@ -199,10 +249,12 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
           ...current,
           { id: data.data.fileUploadId as string, filename },
         ]);
-        setUploadStatus(`${filename} attached — send your message and Sage will see it.`);
+        setUploadStatus(`${filename} is attached. Send your message and Sage will see it.`);
         requestAnimationFrame(() => textareaRef.current?.focus());
       } catch (error) {
-        setUploadStatus(error instanceof Error ? error.message : "Could not upload that file.");
+        console.error("Chat upload failed:", error instanceof Error ? error.name : "Unknown error");
+        setUploadStatus(null);
+        setUploadError(uploadFailureMessage(null));
       } finally {
         setUploading(false);
       }
@@ -239,9 +291,11 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             ))}
           </div>
         )}
+        {uploadError && <UploadError message={uploadError} />}
         <input
           ref={fileInputRef}
           type="file"
+          accept={CHAT_UPLOAD_ACCEPT}
           className="hidden"
           onChange={handleFileChange}
           aria-label="Upload file"
