@@ -18,13 +18,13 @@ import {
 // never does.
 
 const SERVER = {
-  wrong: "That is not the password you signed in with. Check each letter and type the dashes too. After 5 wrong tries you must wait 15 minutes.",
+  wrong: "That password is not right. Check each letter and number. Too many wrong tries means a 15 minute wait.",
   spent: "Too many wrong tries. Wait 15 minutes, then try again. Or ask your instructor for help.",
-  down: "We cannot change passwords right now. Try again in a few minutes, or ask your instructor for help. You can sign out and come back later.",
+  down: "We cannot change passwords right now. Try again in a few minutes, or ask your instructor for help.",
   none: "This account has no password yet. Sign out, then use Forgot your password to set one.",
   same: "Your new password must be different from the one you use now.",
   login: "Do not put your username in your password. Choose something else.",
-  elsewhere: "Your instructor just set a new password for you. Sign in again with it.",
+  elsewhere: "Your password was just changed. Sign in again with the new one. If you do not know it, ask your instructor.",
 };
 
 describe("refusalView: every code the change route sends", () => {

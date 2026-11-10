@@ -46,28 +46,32 @@ describe("password change refusals", async () => {
 
   it("names the wait in minutes where there is one, and names no password", () => {
     assert.match(passwordChangeRefusal({ kind: "budget_spent" }).error, /15 minutes/u);
-    assert.match(passwordChangeRefusal({ kind: "wrong_current_password" }).error, /15 minutes/u);
+    assert.match(passwordChangeRefusal({ kind: "wrong_current_password" }).error, /15 minute wait/u);
   });
 
-  it("tells a first-day student to type the instructor's password with its dashes, and names the budget from its constants", async () => {
+  it("says a wrong password plainly for both screens, with the wait from its constant and no try count", async () => {
     const { ACCOUNT_FAILED_SIGN_IN_LIMIT, SIGN_IN_WINDOW_MINUTES } = await import("./sign-in-budget");
+    const error = passwordChangeRefusal({ kind: "wrong_current_password" }).error;
     assert.equal(
-      passwordChangeRefusal({ kind: "wrong_current_password" }).error,
-      `That is not the password you signed in with. Check each letter and type the dashes too. After ${ACCOUNT_FAILED_SIGN_IN_LIMIT} wrong tries you must wait ${SIGN_IN_WINDOW_MINUTES} minutes.`,
+      error,
+      `That password is not right. Check each letter and number. Too many wrong tries means a ${SIGN_IN_WINDOW_MINUTES} minute wait.`,
     );
+    // The count is shared with sign-in, so a number of tries left would be false.
+    assert.doesNotMatch(error, new RegExp(`\\b${ACCOUNT_FAILED_SIGN_IN_LIMIT}\\b`, "u"));
+    assert.doesNotMatch(error, /dashes/u, "Settings passwords have no dashes");
   });
 
   it("gives a held student a next step when the limiter cannot count", () => {
     assert.equal(
       passwordChangeRefusal({ kind: "limiter_unavailable" }).error,
-      "We cannot change passwords right now. Try again in a few minutes, or ask your instructor for help. You can sign out and come back later.",
+      "We cannot change passwords right now. Try again in a few minutes, or ask your instructor for help.",
     );
   });
 
-  it("says plainly that an instructor just set a new password", () => {
+  it("says the password was just changed, without blaming the instructor", () => {
     assert.equal(
       passwordChangeRefusal({ kind: "changed_elsewhere" }).error,
-      "Your instructor just set a new password for you. Sign in again with it.",
+      "Your password was just changed. Sign in again with the new one. If you do not know it, ask your instructor.",
     );
   });
 });
