@@ -31,11 +31,14 @@ describe("global-error page", () => {
 
   it("is a client component that reports the error", () => {
     assert.match(SOURCE, /^"use client";/);
-    assert.match(SOURCE, /captureException\(error\)/);
+    assert.match(SOURCE, /reportClientError\(error\)/);
   });
 
-  it("loads the SDK only when a DSN is set, so the page adds nothing without one", () => {
-    assert.match(SOURCE, /if \(!process\.env\.NEXT_PUBLIC_SENTRY_DSN\) return;/);
-    assert.doesNotMatch(SOURCE, /^import .* from "@sentry\/nextjs";$/m);
+  it("reports through the lazy path, so the page never loads the SDK itself", () => {
+    // Item 13 (2026-11-10): the reporter in src/instrumentation-client.ts
+    // fetches the SDK after the page has loaded, holds an error reported
+    // before then, and does nothing when no DSN is set.
+    assert.match(SOURCE, /^import \{ reportClientError \} from "@\/instrumentation-client";$/m);
+    assert.doesNotMatch(SOURCE, /@sentry\/nextjs/);
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportClientError } from "@/instrumentation-client";
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -13,23 +14,15 @@ interface GlobalErrorProps {
  * stylesheet may be missing: the page has to read as plain HTML too. The
  * words match src/app/error.tsx.
  *
- * The SDK is fetched only when a DSN is set, so without one this page loads
- * nothing extra. If it renders before src/instrumentation-client.ts has
- * started the browser SDK, the capture has no client and is dropped; the
- * server reports a failure during server rendering (onRequestError).
+ * The error goes to the reporter that src/instrumentation-client.ts starts
+ * after the page has loaded. If this page renders before the SDK has
+ * arrived, the error is held and sent once it has; with no DSN nothing was
+ * started and nothing is loaded. The server reports a failure during server
+ * rendering itself (onRequestError).
  */
-function reportError(error: Error): void {
-  if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return;
-  import("@sentry/nextjs")
-    .then(({ captureException }) => captureException(error))
-    .catch((loadError: unknown) => {
-      console.error("Error reporting could not start", loadError instanceof Error ? loadError.name : typeof loadError);
-    });
-}
-
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   useEffect(() => {
-    reportError(error);
+    reportClientError(error);
   }, [error]);
 
   return (
