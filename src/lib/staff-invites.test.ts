@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import type { Session } from "@/lib/api-error";
+import { MAX_PASSWORD_LENGTH } from "@/lib/password-policy";
 import { createFakeDb, type Row, type TableName } from "@/lib/staff-invite-test-db";
 
 // Staff invites against an in-memory stand-in for Postgres
@@ -432,7 +433,7 @@ describe("acceptStaffInvite", () => {
       lib.acceptStaffInvite({ token: invite.token, email: "pat@example.org", displayName: "Pat", password: "short" }),
     );
     await assert.rejects(
-      lib.acceptStaffInvite({ token: invite.token, email: "pat@example.org", displayName: "Pat", password: "x".repeat(129) }),
+      lib.acceptStaffInvite({ token: invite.token, email: "pat@example.org", displayName: "Pat", password: "x".repeat(MAX_PASSWORD_LENGTH + 1) }),
     );
     assert.equal(accountRows().length, 0);
     assert.equal(inviteRow(invite.inviteId).acceptedAt, null);

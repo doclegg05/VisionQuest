@@ -15,6 +15,26 @@ export const PASSWORD_LENGTH_HINT = `At least ${MIN_PASSWORD_LENGTH} characters`
 export const PASSWORD_TOO_SHORT_MESSAGE = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
 
 /**
+ * The longest password the server accepts. One number for every schema: when
+ * some stopped at 128 and some at 200, a password one screen accepted another
+ * refused. 200 is the larger of the two, so nobody who already has a long
+ * password is locked out.
+ */
+export const MAX_PASSWORD_LENGTH = 200;
+
+/** The server's answer to a password that is too long. */
+export const PASSWORD_TOO_LONG_MESSAGE = `Password must be ${MAX_PASSWORD_LENGTH} characters or fewer.`;
+
+/**
+ * Shown under a student's new-password field, always visible. It says what
+ * counts and gives a way to reach the length that is easy to remember.
+ */
+export const STUDENT_PASSWORD_HINT = `Use ${MIN_PASSWORD_LENGTH} or more letters, numbers or symbols. Three short words work, like blue river lamp.`;
+
+/** What a student reads when a new password is too short, on the screen and from the server. */
+export const STUDENT_PASSWORD_TOO_SHORT_MESSAGE = `Your password is too short. Use ${MIN_PASSWORD_LENGTH} or more letters, numbers or symbols.`;
+
+/**
  * Lowercase letters and digits that a person can read aloud and copy by hand.
  * Left out because they look alike: 0 and o (and O), 1 and l (and I). There
  * are no capitals, so nobody has to say "capital".

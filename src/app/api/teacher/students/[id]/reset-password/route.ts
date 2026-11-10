@@ -5,12 +5,21 @@ import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prismaAdmin } from "@/lib/db";
 import { hashPassword, invalidateSessionCache } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
-import { MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE } from "@/lib/password-policy";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_TOO_LONG_MESSAGE,
+  PASSWORD_TOO_SHORT_MESSAGE,
+} from "@/lib/password-policy";
 import { parseBody } from "@/lib/schemas";
 
 const teacherResetPasswordSchema = z.object({
   // Trimmed, as sign-in trims what the student types: an untrimmed trailing space would lock them out.
-  newPassword: z.string().trim().min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE).max(200, "Password must be 200 characters or fewer"),
+  newPassword: z
+    .string()
+    .trim()
+    .min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE)
+    .max(MAX_PASSWORD_LENGTH, PASSWORD_TOO_LONG_MESSAGE),
 });
 
 // POST — reset a student's password

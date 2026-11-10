@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { badRequest } from "./api-error";
-import { MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE } from "./password-policy";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_TOO_LONG_MESSAGE,
+  PASSWORD_TOO_SHORT_MESSAGE,
+  STUDENT_PASSWORD_TOO_SHORT_MESSAGE,
+} from "./password-policy";
 
 /**
  * Parse and validate a request body against a Zod schema.
@@ -76,16 +82,30 @@ export const updateClassSchema = z.object({
 
 // ─── Auth Schemas ───────────────────────────────────────────────────────────
 
+/**
+ * A password being set, on every route that sets one. It is trimmed first, as
+ * sign-in trims what is typed, so the length rule measures the password that
+ * will be stored and typed again: eleven characters and a space is eleven.
+ * Spaces inside a password stay. The route receives the trimmed value.
+ */
+function newPassword(tooShortMessage: string = PASSWORD_TOO_SHORT_MESSAGE) {
+  return z
+    .string()
+    .trim()
+    .min(MIN_PASSWORD_LENGTH, tooShortMessage)
+    .max(MAX_PASSWORD_LENGTH, PASSWORD_TOO_LONG_MESSAGE);
+}
+
 export const loginSchema = z.object({
   studentId: z.string().min(1, "Student ID is required.").max(50, "Student ID is too long."),
-  password: z.string().min(1, "Password is required.").max(200, "Password is too long."),
+  password: z.string().min(1, "Password is required.").max(MAX_PASSWORD_LENGTH, "Password is too long."),
 });
 
 export const createStudentSchema = z.object({
   studentId: z.string().min(3, "Username must be at least 3 characters.").max(50, "Username must be 50 characters or fewer."),
   displayName: z.string().min(1, "Name is required.").max(100, "Name must be 100 characters or fewer."),
   email: z.string().email("A valid email address is required.").max(200, "Email is too long.").optional().or(z.literal("")),
-  password: z.string().min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE).max(200, "Password must be 200 characters or fewer."),
+  password: newPassword(),
 });
 
 // ─── Teacher Registration Schema ────────────────────────────────────────────
@@ -94,7 +114,7 @@ export const registerTeacherSchema = z.object({
   teacherKey: z.string().min(1, "Teacher key is required."),
   displayName: z.string().min(1, "Display name is required.").max(100, "Display name must be 100 characters or fewer."),
   email: z.string().email("A valid email address is required.").max(200, "Email is too long."),
-  password: z.string().min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE).max(128, "Password must be 128 characters or fewer."),
+  password: newPassword(),
 });
 
 // ─── Staff Registration Schema ──────────────────────────────────────────────
@@ -104,14 +124,27 @@ export const registerStaffSchema = z.object({
   role: z.enum(["teacher", "admin"], { message: "Role must be teacher or admin." }),
   displayName: z.string().min(1, "Display name is required.").max(100, "Display name must be 100 characters or fewer."),
   email: z.string().email("A valid email address is required.").max(200, "Email is too long."),
-  password: z.string().min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE).max(128, "Password must be 128 characters or fewer."),
+  password: newPassword(),
 });
 
 // ─── Password Reset Schema ─────────────────────────────────────────────────
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required."),
-  password: z.string().min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE).max(128, "Password must be 128 characters or fewer."),
+  password: newPassword(),
+});
+
+// ─── Change Password Schema (a signed-in student) ───────────────────────────
+
+export const changePasswordSchema = z.object({
+  // Trimmed as sign-in trims it. Checked against the stored hash, so the only
+  // rules here are "not empty" and the one maximum.
+  currentPassword: z
+    .string()
+    .trim()
+    .min(1, "Type the password you use now.")
+    .max(MAX_PASSWORD_LENGTH, PASSWORD_TOO_LONG_MESSAGE),
+  newPassword: newPassword(STUDENT_PASSWORD_TOO_SHORT_MESSAGE),
 });
 
 // ─── Forgot Password Schema ───────────────────────────────────────────────
@@ -124,7 +157,7 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordQuestionsSchema = z.object({
   login: z.string().min(1, "Enter the email address or student ID for your account.").max(200, "Login is too long."),
-  password: z.string().min(MIN_PASSWORD_LENGTH, PASSWORD_TOO_SHORT_MESSAGE).max(200, "Password must be 200 characters or fewer."),
+  password: newPassword(),
   securityQuestions: z.record(z.string(), z.string()),
 });
 
