@@ -110,3 +110,24 @@ describe("the Text Messages switch", () => {
     );
   });
 });
+
+describe("SettingsView personal AI key section (owner decision R9)", () => {
+  const KEY_TEXT = /API Key|API key|Gemini|aistudio|AIza/;
+
+  it("never shows a student how to add or manage an AI key", () => {
+    // `null` is the student route before the session fetch resolves.
+    for (const role of ["student", null]) {
+      const html = renderToString(<SettingsView initialRole={role} />);
+      assert.doesNotMatch(html, KEY_TEXT, String(role));
+      assert.ok(!html.includes('id="api-key"'), String(role));
+    }
+  });
+
+  it("keeps the key section for staff and admins", () => {
+    for (const role of ["teacher", "admin", "coordinator"]) {
+      const html = renderToString(<SettingsView initialRole={role} />);
+      assert.ok(html.includes("How to Get Your API Key"), role);
+      assert.ok(html.includes('id="api-key"'), role);
+    }
+  });
+});
