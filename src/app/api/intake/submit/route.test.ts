@@ -159,12 +159,25 @@ const BASE_PAYLOAD = {
   policyAcknowledgmentSigned: true,
 };
 
-function postIntake(payload: Record<string, unknown>): Request {
+/** `forwardedFor: null` sends no `x-forwarded-for` header at all. */
+function postIntake(payload: Record<string, unknown>, forwardedFor: string | null = "203.0.113.7"): Request {
   return new Request("http://localhost:3000/api/intake/submit", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.7" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(forwardedFor === null ? {} : { "x-forwarded-for": forwardedFor }),
+    },
     body: JSON.stringify(payload),
   });
+}
+
+/** The per-network limiter key one intake request was counted under. */
+async function networkKeyFor(forwardedFor: string | null): Promise<string | undefined> {
+  rateLimitMock.mock.resetCalls();
+  await route.POST(postIntake(BASE_PAYLOAD, forwardedFor) as never);
+  return rateLimitMock.mock.calls
+    .map((c) => String(c.arguments[0]))
+    .find((key) => key.startsWith("intake:submit:ip:"));
 }
 
 /** Every string value anywhere in the JSON body, for leak assertions. */
@@ -413,18 +426,36 @@ describe("POST /api/intake/submit — caller-supplied class and error text", () 
   });
 
   // Readiness A1: the per-network bucket was 15 per 15 minutes, so the
-  // sixteenth student enrolling in one classroom was refused. 60 lets a class
-  // of 30 send the form twice each. The per-applicant bucket is unchanged.
-  it("lets a classroom of 30 on one network address send the form twice each in 15 minutes", async () => {
+  // sixteenth student enrolling in one classroom was refused. 40 lets a class
+  // of 30 send the form with ten resubmits to spare. The per-applicant bucket
+  // is unchanged.
+  it("lets a classroom of 30 on one network address send the form, with ten resubmits, in 15 minutes", async () => {
     await route.POST(postIntake(BASE_PAYLOAD) as never);
 
     const calls = rateLimitMock.mock.calls.map((c) => c.arguments);
     const network = calls.find(([key]) => key.startsWith("intake:submit:ip:"));
     const applicant = calls.find(([key]) => key.startsWith("intake:submit:person:"));
 
-    assert.deepEqual(network?.slice(1), [60, 15 * 60 * 1000]);
+    assert.deepEqual(network?.slice(1), [40, 15 * 60 * 1000]);
     assert.deepEqual(applicant?.slice(1), [3, 60 * 60 * 1000], "one person still enrolls at most 3 times an hour");
   });
+
+  // A1 security review, item 5: the route read `x-forwarded-for` itself, with
+  // neither guard the shared helper has (src/lib/client-ip.ts), so a caller
+  // could mint a fresh per-network bucket with any text it liked.
+  it("counts a well-formed address under its own bucket", async () => {
+    assert.equal(await networkKeyFor("203.0.113.7, 10.0.0.1"), "intake:submit:ip:203.0.113.7");
+  });
+
+  for (const [name, forwardedFor] of [
+    ["text that is not an address", "not-an-address; drop table"],
+    ["an address longer than any real one", `1${"0".repeat(60)}`],
+    ["no header at all", null],
+  ] as const) {
+    it(`puts ${name} in the one shared bucket`, async () => {
+      assert.equal(await networkKeyFor(forwardedFor), "intake:submit:ip:unknown");
+    });
+  }
 
   it("bounds submissions per applicant identity, not only per network address", async () => {
     await route.POST(postIntake(BASE_PAYLOAD) as never);

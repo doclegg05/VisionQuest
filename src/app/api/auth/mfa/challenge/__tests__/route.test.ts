@@ -305,6 +305,15 @@ describe("POST /api/auth/mfa/challenge", () => {
     assert.equal(mockFindUnique.mock.callCount(), 0);
   });
 
+  // The per-address bucket counted every challenge, passed or failed, at 5
+  // per 5 minutes, so the sixth member of staff signing in from one office
+  // was refused. 30 fits an office; the per-account limit below is the control.
+  it("allows one network address 30 challenge attempts per 5 minutes", async () => {
+    await challengeRoute.POST(challengeRequest("123456") as never);
+
+    assert.deepEqual(mockRateLimit.mock.calls[0].arguments, [`mfa-challenge:${IP}`, 30, 5 * 60 * 1000]);
+  });
+
   it("returns 429 in plain language once the account has used its TOTP attempts", async () => {
     blockLimiterWhen((key) => key === `mfa-challenge:user:${STUDENT.id}`);
 

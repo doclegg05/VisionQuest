@@ -331,4 +331,43 @@ describe("POST /api/auth/reset-password", () => {
     assert.equal(studentUpdateCalls.length, 0);
     assert.equal(setCookieHeader(), "", "no cookie of any kind on refusal");
   });
+
+  // --- Per-network limit sized for a classroom (A1 security review) ---------
+  //
+  // The bucket counted every request at 10 an hour, so the eleventh student
+  // in one classroom to open an emailed link was refused. The link's token is
+  // 32 random bytes, so this limit stops no guessing; it only blocked
+  // classmates. 30 lets a class of 30 on one address each use a link.
+
+  function linkReset(address: string) {
+    return resetPasswordRoute.POST(
+      mockRequest("/api/auth/reset-password", {
+        method: "POST",
+        body: { token: "good-token", password: "a-long-new-password" },
+        headers: { "x-forwarded-for": address },
+      }) as never,
+    );
+  }
+
+  it("allows one network address 30 link resets per hour", async () => {
+    mockFindUnique.mock.mockImplementation(async () => validResetRecord({ id: "stu-1", role: "student" }));
+
+    await linkReset("203.0.113.30");
+
+    assert.deepEqual(mockRateLimit.mock.calls[0].arguments, ["reset-password:203.0.113.30", 30, 60 * 60 * 1000]);
+  });
+
+  it("returns 429 once the address has used its link resets, before the token is read", async () => {
+    mockRateLimit.mock.mockImplementation(async () => ({
+      success: false,
+      remaining: 0,
+      resetTime: Date.now() + 60_000,
+    }));
+
+    const res = await linkReset("203.0.113.30");
+
+    assert.equal(res.status, 429);
+    assert.equal(mockFindUnique.mock.callCount(), 0);
+    assert.equal(studentUpdateCalls.length, 0);
+  });
 });
