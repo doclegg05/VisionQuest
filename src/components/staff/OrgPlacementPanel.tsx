@@ -119,7 +119,9 @@ export function OrgPlacementPanel({ unplacedStaff, applicants, unregionedClasses
       <div>
         <h2 className="text-sm font-semibold text-[var(--ink-strong)]">Classrooms with No Region</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          Regional coordinators cannot see these classrooms. To fix one, open it on the class edit screen and pick a region.
+          {canPlace
+            ? "Regional coordinators cannot see these classrooms. To fix one, pick it under Class Roster on this page. Then pick a region and press Save Settings."
+            : "Regional coordinators cannot see these classrooms. Each one needs a region. Ask an admin to set it."}
         </p>
         {unregionedClasses.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--ink-muted)]">Every classroom has a region.</p>

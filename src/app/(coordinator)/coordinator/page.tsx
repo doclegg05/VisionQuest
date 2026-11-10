@@ -29,11 +29,7 @@ export default async function CoordinatorDashboard() {
           actions={askSageActionFor(session.role)}
         />
         <p className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-sm text-[var(--ink-muted)]">
-          No regions are assigned to you yet. Ask an admin to add you to one via
-          <code className="mx-1 rounded bg-[var(--surface-muted)] px-1 py-0.5 text-xs">
-            /api/admin/regions/[id]/coordinators
-          </code>
-          (or the admin UI once it ships).
+          No regions are assigned to you yet. Ask your program admin to add you to a region.
         </p>
       </div>
     );
