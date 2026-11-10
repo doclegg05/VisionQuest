@@ -5,6 +5,18 @@
   "title": "Pool and session",
   "doneWhen": "Tests for the cache, its invalidation and the hash.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/auth.session-cache.test.ts",
+      "src/lib/auth.session-events.test.ts",
+      "src/app/api/auth/login/__tests__/route.session-prime.test.ts",
+      "src/lib/auth.hashing.test.ts",
+      "src/lib/hash-queue.test.ts",
+      "src/lib/security-questions.test.ts",
+      "src/lib/auth.test.ts",
+      "src/lib/auth.logout-revocation.test.ts",
+      "src/lib/auth.demo-session.test.ts",
+      "src/lib/boot-probes.test.ts"
+    ]
   }
 }
