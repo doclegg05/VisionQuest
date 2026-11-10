@@ -532,7 +532,7 @@ export default function OrientationWizard() {
       className="mx-auto mb-6 flex max-w-xl flex-wrap items-center justify-center gap-3 rounded-2xl border border-warning bg-warning-soft px-4 py-3"
     >
       <p className="text-sm text-warning">
-        We couldn&apos;t save your completion — your progress is safe.
+        We couldn&apos;t save your completion. Your progress is safe.
       </p>
       <button
         type="button"
@@ -566,7 +566,7 @@ export default function OrientationWizard() {
           Almost there!
         </h2>
         <p className="mt-3 text-sm text-[var(--ink-muted)]">
-          You&apos;ve done your part — your instructor is verifying{" "}
+          You&apos;ve done your part. Your instructor is checking{" "}
           <span className="font-semibold text-[var(--ink-strong)]">
             {awaitingCount} {awaitingCount === 1 ? "step" : "steps"}
           </span>
@@ -589,7 +589,7 @@ export default function OrientationWizard() {
           </div>
         </div>
         <p className="mt-4 text-xs text-[var(--ink-faint)]">
-          No need to wait here — keep exploring VisionQuest and check back later.
+          No need to wait here. Keep exploring VisionQuest and check back later.
         </p>
       </div>
     );
