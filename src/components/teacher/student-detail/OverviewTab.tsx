@@ -107,7 +107,7 @@ function ResetControls({ newPassword, onNewPasswordChange, saving, onResetPasswo
         {madePassword ? "A new password is in the box." : ""}
       </p>
       <p id="reset-password-hint" className="basis-full text-xs text-[var(--ink-muted)]">
-        {PASSWORD_LENGTH_HINT}. All small letters and numbers. Tell the student the password before you press Reset. They type the dashes too.
+        {PASSWORD_LENGTH_HINT}. Small letters and numbers only. Press Reset password, then give the student the new password. They type the dashes too.
       </p>
       <button
         type="button"
@@ -126,15 +126,21 @@ interface ResetDonePanelProps {
   onClose: () => void;
 }
 
-/** Shown after a reset worked. The password stays until Close, which clears it from the page. */
+/**
+ * Shown after a reset worked. The password stays until Close, which clears it
+ * from the page, and is large enough for a student across a desk to read.
+ * Keyboard focus moves to Close when the panel appears: the Reset password
+ * button that had it is gone.
+ */
 function ResetDonePanel({ password, onClose }: ResetDonePanelProps) {
   return (
     <div role="status" className="rounded-xl border-2 border-success bg-success-soft p-3 text-sm text-[var(--ink-strong)]">
       <p className="font-semibold">Password changed. Give the student this password:</p>
-      <p className="mt-1 font-mono text-base tracking-wide">{password}</p>
-      <p className="mt-1">They are now signed out everywhere else.</p>
+      <p className="mt-1 font-mono text-xl tracking-wide">{password}</p>
+      <p className="mt-1">They are now signed out on every other device. They sign in with this new password.</p>
       <button
         type="button"
+        autoFocus
         className="primary-button mt-2 inline-flex min-h-11 items-center rounded-lg px-4 text-sm"
         onClick={onClose}
       >

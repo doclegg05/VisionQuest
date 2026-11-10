@@ -130,7 +130,18 @@ describe("instructor password reset: what the screen says", () => {
   });
 
   it("says the generated password uses only small letters and numbers", () => {
-    assert.ok(resetControls("").includes("All small letters and numbers."));
+    assert.ok(resetControls("").includes("Small letters and numbers only."));
+  });
+
+  it("gives one order of steps: press Reset password, then give the student the password", () => {
+    const hint = resetControls("").replace(/<[^>]+>/gu, " ").replace(/\s+/gu, " ");
+    assert.ok(
+      hint.includes(
+        "Small letters and numbers only. Press Reset password, then give the student the new password. They type the dashes too.",
+      ),
+      hint,
+    );
+    assert.ok(!hint.includes("before you press Reset"), hint);
   });
 
   for (const length of [6, MIN_PASSWORD_LENGTH - 1]) {
@@ -202,10 +213,20 @@ describe("instructor password reset: after it works", () => {
 
   it("keeps the password on screen in a monospace line until Close", () => {
     assert.ok(
-      words.includes("Password changed. Give the student this password: k7mq-x2vd-p9rt They are now signed out everywhere else. Close"),
+      words.includes("Password changed. Give the student this password: k7mq-x2vd-p9rt They are now signed out on every other device. They sign in with this new password. Close"),
       words,
     );
     assert.match(html, /<p\b[^>]*class="[^"]*\bfont-mono\b[^"]*"[^>]*>k7mq-x2vd-p9rt<\/p>/u);
+  });
+
+  it("shows the password large enough to read across a desk", () => {
+    const line = tag(html, /<p\b[^>]*class="[^"]*\bfont-mono\b[^"]*"[^>]*>/u, "password line");
+    assert.match(line, /\btext-xl\b/u);
+    assert.doesNotMatch(line, /\btext-base\b/u);
+  });
+
+  it("moves keyboard focus to Close when the panel appears", () => {
+    assert.match(tag(html, /<button\b[^>]*>Close<\/button>/u, "Close button"), /\sautofocus=""/u);
   });
 
   it("replaces the controls and says it worked only once", () => {

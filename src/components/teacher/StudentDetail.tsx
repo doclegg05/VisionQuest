@@ -9,7 +9,7 @@ import type {
 } from "./student-detail/types";
 import StudentDetailTabs from "./student-detail/StudentDetailTabs";
 import OverviewTab from "./student-detail/OverviewTab";
-import GoalsPlanTab from "./student-detail/GoalsPlanTab";
+import GoalsPlanTab, { goalButtonFor, type GoalButton } from "./student-detail/GoalsPlanTab";
 import ProgressTab from "./student-detail/ProgressTab";
 import OperationsTab from "./student-detail/OperationsTab";
 import { toIsoDueAt } from "@/lib/dashboard/due-date";
@@ -21,13 +21,16 @@ import {
 import { useConfirm } from "@/components/ui/useConfirm";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
 import {
-  actionOutcome,
+  nextNotice,
+  orientationOutcome,
+  releaseFlag,
   runStudentAction,
   sendStudentAction,
   type Notice,
   type StudentActionPage,
+  type StudentActionResult,
 } from "@/lib/teacher/student-action";
-import { ActionNotice, ShownTab } from "./student-detail/ActionNotice";
+import { ActionNotice, ShownTab, isTabChange } from "./student-detail/ActionNotice";
 
 type AppointmentStatusValue = "scheduled" | "completed" | "missed" | "cancelled";
 
@@ -41,9 +44,14 @@ interface ArchiveResult {
   fileCount: number;
 }
 
-/** The archive was made on the server, but the answer had no link to it. */
-const ARCHIVE_LINK_MISSING =
-  "The records archive was created, but its download link did not come back. Reload the page, then try again.";
+/**
+ * The archive was made on the server, but the answer had no link to it. A
+ * reload does not bring the link back: the page keeps it only from the answer
+ * to this request. Archiving again does, and writes over the same day's
+ * archive instead of adding a second one.
+ */
+export const ARCHIVE_LINK_MISSING =
+  "The archive was made, but we could not show its download link. Press Archive Student Records again to get the link.";
 
 const EMPTY_APPOINTMENT_FORM = {
   title: "",
@@ -100,6 +108,31 @@ function getErrorMessage(payload: unknown, fallback: string) {
   return fallback;
 }
 
+interface LoadFailedProps {
+  error: string;
+  onRetry: () => void;
+  notice: Notice | null;
+  onDismiss: () => void;
+}
+
+/**
+ * The page when the student could not be loaded. A save can work and the
+ * reload after it fail, so the message from that action still shows here.
+ */
+export function LoadFailed({ error, onRetry, notice, onDismiss }: LoadFailedProps) {
+  return (
+    <>
+      <div className="text-center py-12">
+        <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
+        <button onClick={onRetry} className="primary-button px-4 py-2 pointer-coarse:min-h-11">
+          Try Again
+        </button>
+      </div>
+      <ActionNotice notice={notice} onDismiss={onDismiss} />
+    </>
+  );
+}
+
 export default function StudentDetail({ studentId }: { studentId: string }) {
   const [data, setData] = useState<StudentData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,7 +150,9 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   const [archiveResult, setArchiveResult] = useState<ArchiveResult | null>(null);
   const [showAllConversations, setShowAllConversations] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const shownTab = useRef<string | null>(null);
   const [goalActionId, setGoalActionId] = useState<string | null>(null);
+  const [goalActionButton, setGoalActionButton] = useState<GoalButton | null>(null);
   const goalActionRef = useRef<string | null>(null);
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
@@ -174,9 +209,39 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     minute: "2-digit",
   });
 
-  /** How an action reports to this page: one pinned message, then a reload on success. */
-  const page: StudentActionPage = { notify: setNotice, reload: loadData };
+  /**
+   * How an action reports to this page: one pinned message, then a reload on
+   * success. Two actions can overlap, so `nextNotice` decides what shows: a
+   * failure stays until Dismiss, a tab change or a newer failure.
+   */
+  const notify = useCallback((incoming: Notice | null) => setNotice((showing) => nextNotice(showing, incoming)), []);
+  const page: StudentActionPage = { notify, reload: loadData };
+  /** Dismiss. It clears a failure too, which `notify` never does. */
   const clearNotice = useCallback(() => setNotice(null), []);
+
+  /**
+   * A tab change drops the message and everything the reset panel holds, so a
+   * new password cannot come back when the instructor returns to the tab.
+   */
+  function handleTabShown(tab: string) {
+    const changed = isTabChange(shownTab.current, tab);
+    shownTab.current = tab;
+    if (!changed) return;
+    setNotice(null);
+    setShowResetPw(false);
+    setNewPassword("");
+    setReset({ kind: "idle" });
+  }
+
+  /**
+   * Try Again after a failed load. The tabs were taken down and come back on
+   * the first tab. That is not the instructor changing tab, so the old tab is
+   * forgotten and a message that outlived the failed load stays.
+   */
+  function retryLoad() {
+    shownTab.current = null;
+    void loadData();
+  }
 
   async function handleVerify(requirementId: string, verified: boolean, label: string) {
     if (
@@ -202,7 +267,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         page,
       );
     } finally {
-      setVerifying(null);
+      setVerifying((current) => releaseFlag(current, requirementId));
     }
   }
 
@@ -245,13 +310,13 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         page,
       );
     } finally {
-      setApplicationVerifying(null);
+      setApplicationVerifying((current) => releaseFlag(current, applicationId));
     }
   }
 
   async function handleOrientationVerify(itemId: string, decision: "confirm" | "decline") {
     setOrientationVerifying(itemId);
-    setNotice(null);
+    notify(null);
     try {
       const result = await sendStudentAction({
         url: "/api/orientation",
@@ -259,25 +324,27 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         body: { itemId, completed: decision === "confirm", studentId, verify: decision },
         failed: decision === "confirm" ? "That step was not confirmed." : "That step was not sent back.",
       });
+      // If that was the last required item, this awards the orientation
+      // milestone. `orientationOutcome` reads the answer: the usual refusal
+      // while steps remain is not shown, and any other failure is.
+      let finish: StudentActionResult | null = null;
       if (result.ok && decision === "confirm") {
-        // If that was the last required item, this awards the orientation
-        // milestone. While steps remain the server refuses, which is the
-        // usual answer, so its result is not shown.
-        await sendStudentAction({
+        finish = await sendStudentAction({
           url: "/api/orientation/complete",
           method: "POST",
           body: { studentId },
           failed: "Orientation was not marked finished.",
         });
       }
-      const outcome = actionOutcome(
+      const outcome = orientationOutcome(
         result,
+        finish,
         decision === "confirm" ? "Step confirmed." : "Step sent back to the student.",
       );
       if (outcome.reload) await loadData();
-      setNotice(outcome.notice);
+      notify(outcome.notice);
     } finally {
-      setOrientationVerifying(null);
+      setOrientationVerifying((current) => releaseFlag(current, itemId));
     }
   }
 
@@ -307,7 +374,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       return;
     }
     setReset({ kind: "saving" });
-    setNotice(null);
+    notify(null);
     let next: ResetState = { kind: "idle" };
     try {
       const result = await sendStudentAction({
@@ -316,12 +383,12 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         body: { newPassword: password },
         failed: "The password was not changed.",
       });
-      if (result.ok) {
-        // Kept on screen until the instructor presses Close, which clears it.
+      if (!result.ok) {
+        notify({ kind: "error", text: result.message, origin: "reset" });
+      } else {
+        // Kept on screen until the instructor presses Close or changes tab, which clears it.
         setNewPassword(password);
         next = { kind: "done" };
-      } else {
-        setNotice({ kind: "error", text: result.message, origin: "reset" });
       }
     } finally {
       setReset(next);
@@ -351,7 +418,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
 
   async function handleArchive() {
     setArchiving(true);
-    setNotice(null);
+    notify(null);
     try {
       const result = await sendStudentAction({
         url: `/api/teacher/students/${studentId}/archive`,
@@ -359,11 +426,11 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         failed: "The records archive was not created.",
       });
       if (!result.ok) {
-        setNotice({ kind: "error", text: result.message });
+        notify({ kind: "error", text: result.message });
       } else if (isArchiveResult(result.payload)) {
         setArchiveResult(result.payload);
       } else {
-        setNotice({ kind: "error", text: ARCHIVE_LINK_MISSING });
+        notify({ kind: "error", text: ARCHIVE_LINK_MISSING });
       }
     } finally {
       setArchiving(false);
@@ -404,7 +471,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         page,
       );
     } finally {
-      setUpdatingAppointmentId(null);
+      setUpdatingAppointmentId((current) => releaseFlag(current, appointmentId));
     }
   }
 
@@ -442,7 +509,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         page,
       );
     } finally {
-      setUpdatingTaskId(null);
+      setUpdatingTaskId((current) => releaseFlag(current, taskId));
     }
   }
 
@@ -471,6 +538,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     if (goalActionRef.current) return;
     goalActionRef.current = goalId;
     setGoalActionId(goalId);
+    setGoalActionButton(goalButtonFor(action));
     try {
       await runStudentAction(
         {
@@ -485,6 +553,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
     } finally {
       goalActionRef.current = null;
       setGoalActionId(null);
+      setGoalActionButton(null);
     }
   };
 
@@ -517,7 +586,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
         page,
       );
     } finally {
-      setReviewingFormId(null);
+      setReviewingFormId((current) => releaseFlag(current, submissionId));
     }
   }
 
@@ -526,14 +595,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   }
 
   if (error) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-[var(--badge-error-text)] mb-4">{error}</p>
-        <button onClick={loadData} className="primary-button px-4 py-2 pointer-coarse:min-h-11">
-          Try Again
-        </button>
-      </div>
-    );
+    return <LoadFailed error={error} onRetry={retryLoad} notice={notice} onDismiss={clearNotice} />;
   }
 
   if (!data) return <p className="text-sm text-[var(--badge-error-text)]">Student not found.</p>;
@@ -550,7 +612,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
       >
         {{
           coach: (
-            <ShownTab key="coach" onShown={clearNotice}>
+            <ShownTab key="coach" onShown={() => handleTabShown("coach")}>
               <div className="space-y-6">
                 <OverviewTab
                   data={data}
@@ -577,6 +639,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
                   onChanged={loadData}
                   onGoalAction={handleGoalAction}
                   goalActionId={goalActionId}
+                  goalActionButton={goalActionButton}
                 />
                 <SageInsightList
                   studentId={data.student.id}
@@ -610,7 +673,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
             </ShownTab>
           ),
           progress: (
-            <ShownTab key="progress" onShown={clearNotice}>
+            <ShownTab key="progress" onShown={() => handleTabShown("progress")}>
               <ProgressTab
                 data={data}
                 dateFormatter={dateFormatter}
@@ -628,7 +691,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
             </ShownTab>
           ),
           forms: (
-            <ShownTab key="forms" onShown={clearNotice}>
+            <ShownTab key="forms" onShown={() => handleTabShown("forms")}>
               <div id="forms-documents" className="space-y-6">
                 <OperationsTab
                   data={data}
@@ -657,7 +720,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
             </ShownTab>
           ),
           admin: (
-            <ShownTab key="admin" onShown={clearNotice}>
+            <ShownTab key="admin" onShown={() => handleTabShown("admin")}>
               <div id="account-actions" className="space-y-6">
                 <OverviewTab
                   data={data}

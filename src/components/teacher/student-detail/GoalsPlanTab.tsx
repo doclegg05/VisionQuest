@@ -32,8 +32,24 @@ interface GoalsPlanTabProps {
   dateFormatter: Intl.DateTimeFormat;
   onChanged: () => Promise<void>;
   onGoalAction: (goalId: string, action: { status?: string; content?: string; confirm?: boolean; reviewed?: boolean; pathwayId?: string | null }) => Promise<void>;
-  /** The goal whose Confirm or Mark Reviewed is in flight. Both its buttons are off until it ends. */
+  /**
+   * The goal whose action is in flight. The page sends one goal action at a
+   * time, so every goal's buttons are off until it ends: a tap that would be
+   * ignored has to look disabled.
+   */
   goalActionId?: string | null;
+  /** The button that sent it, which reads "Saving...". Null for a change made elsewhere, such as a pathway. */
+  goalActionButton?: GoalButton | null;
+}
+
+/** The two buttons on a goal row that send a goal action. */
+export type GoalButton = "confirm" | "reviewed";
+
+/** Which goal button an action came from, or null when neither sent it. */
+export function goalButtonFor(action: Parameters<GoalsPlanTabProps["onGoalAction"]>[1]): GoalButton | null {
+  if (action.confirm) return "confirm";
+  if (action.reviewed) return "reviewed";
+  return null;
 }
 
 export default function GoalsPlanTab({
@@ -42,6 +58,7 @@ export default function GoalsPlanTab({
   onChanged,
   onGoalAction,
   goalActionId = null,
+  goalActionButton = null,
 }: GoalsPlanTabProps) {
   const {
     goals,
@@ -254,18 +271,18 @@ export default function GoalsPlanTab({
                       <button
                         type="button"
                         onClick={() => void onGoalAction(goal.id, { confirm: true })}
-                        disabled={goalActionId === goal.id}
+                        disabled={goalActionId !== null}
                         className="min-h-11 disabled:opacity-50 rounded-lg bg-[var(--badge-success-bg)] px-3 py-2 text-sm font-medium text-[var(--badge-success-text)] hover:ring-1 hover:ring-current"
                       >
-                        Confirm
+                        {goalActionId === goal.id && goalActionButton === "confirm" ? "Saving..." : "Confirm"}
                       </button>
                       <button
                         type="button"
                         onClick={() => void onGoalAction(goal.id, { reviewed: true })}
-                        disabled={goalActionId === goal.id}
+                        disabled={goalActionId !== null}
                         className="min-h-11 disabled:opacity-50 rounded-lg bg-[var(--surface-interactive)] px-3 py-2 text-sm font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-strong)]"
                       >
-                        Mark Reviewed
+                        {goalActionId === goal.id && goalActionButton === "reviewed" ? "Saving..." : "Mark Reviewed"}
                       </button>
                     </div>
                   </li>

@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { renderToString } from "react-dom/server";
 
-import StudentDetail, { showsLoadingLine } from "./StudentDetail";
+import StudentDetail, { ARCHIVE_LINK_MISSING, LoadFailed, showsLoadingLine } from "./StudentDetail";
 import ProgressTab from "./student-detail/ProgressTab";
 import type { StudentData } from "./student-detail/types";
 
@@ -16,8 +16,9 @@ import type { StudentData } from "./student-detail/types";
  *   1. SOURCE SCANS of StudentDetail.tsx. No DOM library is installed, so a
  *      click cannot be simulated. These read the file as text and fail when a
  *      write is sent without the shared helper. They prove wiring, not
- *      behaviour. The helper's behaviour is unit tested in
- *      src/lib/teacher/student-action.test.ts.
+ *      behaviour. Every rule the handlers follow (which message wins, which
+ *      ending a status gets, when a flag is released) is a pure function,
+ *      unit tested in src/lib/teacher/student-action.test.ts.
  *   2. RENDERS with renderToString, for what an instructor reads: the badge
  *      text, the password reset error and the first-load line.
  */
@@ -91,27 +92,59 @@ describe("StudentDetail writes go through the shared helper (source scan)", () =
     });
   }
 
-  it("every sendStudentAction result is branched on .ok", () => {
-    // A result that is never read is a failure nobody sees.
+  it("every sendStudentAction answer has a failure branch that shows a message", () => {
+    // Reading `.ok` is not enough: a handler that acts only on success hides the failure.
     for (const name of ACTION_HANDLERS) {
       const source = handlerSource(name);
-      const names = [...source.matchAll(/const (\w+) = await sendStudentAction\(/gu)].map((match) => match[1]);
+      const names = [...source.matchAll(/\b(\w+) = await sendStudentAction\(/gu)].map((match) => match[1]);
       for (const result of names) {
-        assert.match(source, new RegExp(`\\b${result}\\.ok\\b`, "u"), `${name} never checks ${result}.ok`);
+        assert.ok(showsFailure(source, result), `${name} shows nothing when ${result} is not ok`);
       }
       const unread = (source.match(/(?<!= )await sendStudentAction\(/gu) ?? []).length;
-      const allowed = source.includes('"/api/orientation/complete"') ? 1 : 0;
-      assert.equal(unread, allowed, `${name} sends a request and ignores the answer`);
+      assert.equal(unread, 0, `${name} sends a request and ignores the answer`);
     }
   });
 
-  it("every in-flight flag is cleared in a finally block", () => {
+  it("the orientation finished call is one of the answers that is read", () => {
+    const source = handlerSource("handleOrientationVerify");
+    assert.match(source, /\bfinish = await sendStudentAction\(\{\s*url: "\/api\/orientation\/complete"/u);
+    assert.ok(showsFailure(source, "finish"), "the finished call's failure is not shown");
+  });
+
+  it("every in-flight flag is cleared in a finally block, by the request that set it", () => {
     // Without finally, a thrown error leaves a button saying "..." for good.
-    const SETS_IN_FLIGHT = /\bset\w+\((?:true|\w+Id|\{ kind: "saving" \})\)/u;
+    // A finally that does not clear the flag does the same.
+    const SETS_IN_FLIGHT = /\b(set\w+)\((true|\w+Id|\{ kind: "saving" \})\)/gu;
     for (const name of ACTION_HANDLERS) {
       const source = handlerSource(name);
-      if (!SETS_IN_FLIGHT.test(source)) continue;
-      assert.match(source, /\} finally \{/u, `${name} clears its in-flight flag outside finally`);
+      const flags = [...source.matchAll(SETS_IN_FLIGHT)];
+      if (flags.length === 0) continue;
+      const cleanup = source.split("} finally {")[1];
+      assert.ok(cleanup, `${name} clears its in-flight flag outside finally`);
+      for (const [, setter, value] of flags) {
+        const cleared = `${setter}(${clearedBy(setter, value)})`;
+        assert.ok(cleanup.includes(cleared), `${name} must end with ${cleared} in its finally block`);
+      }
+    }
+  });
+
+  it("a single-id flag is released only by the request that still holds it", () => {
+    // Two rows can be in flight at once. The first to finish must not turn the second one's button back on.
+    for (const [setter, id] of Object.entries(SINGLE_ID_FLAGS)) {
+      assert.ok(
+        SOURCE.includes(`${setter}((current) => releaseFlag(current, ${id}))`),
+        `${setter} is not released with releaseFlag(current, ${id})`,
+      );
+      assert.ok(!SOURCE.includes(`${setter}(null)`), `${setter}(null) clears a flag another request may hold`);
+    }
+  });
+
+  it("handlers report through notify, which applies the nextNotice rule", () => {
+    // The rule itself (a success never hides an error) is unit tested with nextNotice.
+    assert.ok(SOURCE.includes("setNotice((showing) => nextNotice(showing, incoming))"), "notify does not apply the rule");
+    assert.ok(SOURCE.includes("const page: StudentActionPage = { notify, reload: loadData };"));
+    for (const name of ACTION_HANDLERS) {
+      assert.ok(!handlerSource(name).includes("setNotice("), `${name} sets the message without the rule`);
     }
   });
 
@@ -122,9 +155,24 @@ describe("StudentDetail writes go through the shared helper (source scan)", () =
     assert.ok(!SOURCE.includes("archiveError"), "a second error line is still there");
   });
 
-  it("clears the message when the instructor changes tab", () => {
-    const tabs = SOURCE.match(/<ShownTab key="(?:coach|progress|forms|admin)" onShown=\{clearNotice\}>/gu) ?? [];
+  it("a tab change drops the message, the new password, the reset state and the open panel", () => {
+    const source = handlerSource("handleTabShown");
+    assert.ok(source.includes("isTabChange("), "a remount of the same tab must not count as a change");
+    for (const call of ["setNotice(null)", 'setNewPassword("")', 'setReset({ kind: "idle" })', "setShowResetPw(false)"]) {
+      assert.ok(source.includes(call), `a tab change does not call ${call}`);
+    }
+    const tabs = SOURCE.match(/<ShownTab key="(coach|progress|forms|admin)" onShown=\{\(\) => handleTabShown\("\1"\)\}>/gu) ?? [];
     assert.equal(tabs.length, 4);
+  });
+
+  it("says the archive was made when only its link is missing, and how to get the link", () => {
+    assert.equal(
+      ARCHIVE_LINK_MISSING,
+      "The archive was made, but we could not show its download link. Press Archive Student Records again to get the link.",
+    );
+    // The message names a button, so the button must carry those words.
+    const overview = readFileSync(path.join(process.cwd(), "src/components/teacher/student-detail/OverviewTab.tsx"), "utf8");
+    assert.ok(overview.includes('"Archive Student Records"'), "the archive button is no longer called Archive Student Records");
   });
 
   it("uses the plain fallbacks the review asked for", () => {
@@ -136,6 +184,36 @@ describe("StudentDetail writes go through the shared helper (source scan)", () =
   });
 });
 
+/**
+ * True when the handler shows a message if `result` came back not ok: either
+ * its own `if (!result.ok)` branch that notifies an error, or an outcome
+ * function that turns the failure into the message the handler then shows.
+ */
+function showsFailure(source: string, result: string): boolean {
+  const ownBranch = new RegExp(`if \\(!${result}\\.ok\\) \\{\\s*notify\\(\\{ kind: "error"`, "u");
+  const outcome = new RegExp(`\\b(?:action|orientation)Outcome\\((?:[^()]|\\([^()]*\\))*\\b${result}\\b`, "u");
+  return ownBranch.test(source) || (outcome.test(source) && source.includes("notify(outcome.notice)"));
+}
+
+/** The six flags that hold the id of one row, and the id each handler holds. */
+const SINGLE_ID_FLAGS: Record<string, string> = {
+  setVerifying: "requirementId",
+  setApplicationVerifying: "applicationId",
+  setOrientationVerifying: "itemId",
+  setUpdatingAppointmentId: "appointmentId",
+  setUpdatingTaskId: "taskId",
+  setReviewingFormId: "submissionId",
+};
+
+/** What a finally block must pass to the setter that marked a request in flight. */
+function clearedBy(setter: string, value: string): string {
+  if (value === "true") return "false";
+  if (value === '{ kind: "saving" }') return "next";
+  // One goal action runs at a time (the re-entry guard), so its flag has one holder.
+  if (setter === "setGoalActionId") return "null";
+  return `(current) => releaseFlag(current, ${value})`;
+}
+
 describe("StudentDetail guards against a double tap and an unwanted un-verify (source scan)", () => {
   it("a goal action already in flight does not send another", () => {
     const source = handlerSource("handleGoalAction");
@@ -144,6 +222,8 @@ describe("StudentDetail guards against a double tap and an unwanted un-verify (s
     assert.ok(guard < source.indexOf("runStudentAction("), "the guard must come before the request");
     assert.match(source, /setGoalActionId\(goalId\)/u);
     assert.ok(SOURCE.includes("goalActionId={goalActionId}"), "GoalsPlanTab is not told which goal is busy");
+    assert.match(source, /setGoalActionButton\(goalButtonFor\(action\)\)/u);
+    assert.ok(SOURCE.includes("goalActionButton={goalActionButton}"), "GoalsPlanTab is not told which button was pressed");
   });
 
   it("asks before it removes a verification", () => {
@@ -202,6 +282,45 @@ describe("StudentDetail keeps the page on screen during a reload", () => {
     // Source scan: `if (loading)` alone is what blanked the page on every save.
     assert.ok(!/if \(loading\)/u.test(SOURCE), "the page still blanks on every reload");
     assert.ok(SOURCE.includes("showsLoadingLine({"), "the loading rule is not used");
+  });
+});
+
+describe("a failed reload still shows the message from the action before it", () => {
+  const LOAD_ERROR = "Failed to load. Please try again.";
+
+  function render(notice: { kind: "error" | "success"; text: string } | null): string {
+    return renderToString(<LoadFailed error={LOAD_ERROR} onRetry={() => {}} notice={notice} onDismiss={() => {}} />);
+  }
+
+  it("shows the load failure and Try Again", () => {
+    assert.equal(stripTags(render(null)), `${LOAD_ERROR} Try Again`);
+  });
+
+  it("shows the saved line of the action that worked just before the reload failed", () => {
+    const html = render({ kind: "success", text: "Case note saved." });
+    assert.ok(stripTags(html).includes("Case note saved."), stripTags(html));
+    assert.match(html, /role="status"/u);
+  });
+
+  it("shows a failure that was on screen when the reload failed", () => {
+    const html = render({ kind: "error", text: "That step was not verified. Try again." });
+    assert.match(html, /role="alert"/u);
+    assert.ok(stripTags(html).includes("That step was not verified. Try again."), stripTags(html));
+  });
+
+  it("the page draws its load-error branch with it (wiring)", () => {
+    assert.ok(
+      SOURCE.includes("<LoadFailed error={error} onRetry={retryLoad} notice={notice} onDismiss={clearNotice} />"),
+      "the load-error branch does not pass the message on",
+    );
+  });
+
+  it("Try Again is not a tab change, so the message is still there when the tabs come back (wiring)", () => {
+    // The tabs are taken down while the load error shows and come back on the first tab.
+    // isTabChange(null, tab) is false, so forgetting the old tab keeps the message.
+    const source = handlerSource("retryLoad");
+    assert.ok(source.includes("shownTab.current = null;"), source);
+    assert.ok(source.includes("loadData()"), source);
   });
 });
 

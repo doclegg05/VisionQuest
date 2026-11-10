@@ -3,7 +3,7 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { CheckCircle, WarningCircle, X } from "@phosphor-icons/react";
 
-import type { Notice } from "@/lib/teacher/student-action";
+import { leadSentence, type Notice } from "@/lib/teacher/student-action";
 
 /** A success line goes away on its own after this long. A failure stays until dismissed. */
 export const SUCCESS_CLEARS_AFTER_MS = 6000;
@@ -26,10 +26,30 @@ const LOOK = {
   },
 } as const;
 
+/** A failure says what did not happen, then why. The first sentence is the one to read, so it is bold. */
+function NoticeText({ notice }: { notice: Notice }) {
+  if (notice.kind !== "error") return <>{notice.text}</>;
+  const { lead, rest } = leadSentence(notice.text);
+  return (
+    <>
+      <strong className="font-semibold">{lead}</strong>
+      {rest ? ` ${rest}` : null}
+    </>
+  );
+}
+
 /**
  * The one message an action leaves on the instructor's student page, pinned
  * to the bottom of the viewport so it shows wherever the instructor is on a
  * long tab. The page does not scroll to it.
+ *
+ * It sits at the height the undo toast uses (`UndoToastView` in
+ * `src/components/ui/useUndo.tsx`), which is above the phone tab bar. On
+ * desktop it is centred in the content area: `md:left-[19rem]` is where the
+ * staff layout starts its content, so the sidebar is not covered, and
+ * `md:right-24` keeps it off the Sage button in the corner. The spacer is in
+ * the page flow, so the last button can be scrolled out from under it. Its
+ * height covers a failure that wraps to seven lines on a 320px phone.
  */
 export function ActionNotice({ notice, onDismiss }: ActionNoticeProps) {
   useEffect(() => {
@@ -41,24 +61,38 @@ export function ActionNotice({ notice, onDismiss }: ActionNoticeProps) {
   if (!notice) return null;
   const look = LOOK[notice.kind];
   return (
-    <div className="fixed inset-x-4 bottom-4 z-50 rounded-xl bg-[var(--surface-raised)] shadow-lg sm:left-auto sm:right-6 sm:max-w-md">
-      <div role={look.role} className={`flex items-start gap-3 rounded-xl border-2 p-3 text-sm text-[var(--ink-strong)] ${look.tone}`}>
-        {look.icon}
-        <p className="flex-1 self-center">
-          {notice.kind === "error" ? <strong className="font-semibold">Not saved: </strong> : null}
-          {notice.text}
-        </p>
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
-        >
-          <X size={16} aria-hidden="true" />
-          Dismiss
-        </button>
+    <>
+      <div aria-hidden="true" className="h-48 md:h-36" />
+      <div className="pointer-events-none fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] z-50 flex justify-center md:left-[19rem] md:right-24 md:bottom-6">
+        <div className="pointer-events-auto w-full max-w-md rounded-xl bg-[var(--surface-raised)] shadow-lg">
+          <div role={look.role} className={`flex items-start gap-3 rounded-xl border-2 p-3 text-sm text-[var(--ink-strong)] ${look.tone}`}>
+            {look.icon}
+            <p className="flex-1 self-center">
+              <NoticeText notice={notice} />
+            </p>
+            <button
+              type="button"
+              onClick={onDismiss}
+              aria-label="Dismiss message"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--ink-strong)] hover:bg-[var(--surface-interactive)]"
+            >
+              <X size={16} aria-hidden="true" />
+              <span className="hidden sm:inline">Dismiss</span>
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
+}
+
+/**
+ * True when the tab now on screen is not the one shown before it. The first
+ * tab is not a change. Neither is the same tab put back: the page takes its
+ * tabs down while a failed reload shows, and a failure must outlive that.
+ */
+export function isTabChange(previous: string | null, shown: string): boolean {
+  return previous !== null && previous !== shown;
 }
 
 interface ShownTabProps {
