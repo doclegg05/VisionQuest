@@ -19,6 +19,7 @@ import {
   type FormReviewExtras,
 } from "./student-detail/form-review";
 import { useConfirm } from "@/components/ui/useConfirm";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
 import {
   runStudentAction,
   sendStudentAction,
@@ -266,7 +267,7 @@ export default function StudentDetail({ studentId }: { studentId: string }) {
   }
 
   async function handleResetPassword() {
-    if (!newPassword || newPassword.length < 6) return;
+    if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) return;
     if (
       !(await confirm({
         title: "Reset this student's password?",

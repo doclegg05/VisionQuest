@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
+import { MIN_PASSWORD_LENGTH, PASSWORD_LENGTH_HINT, PASSWORD_TOO_SHORT_MESSAGE } from "@/lib/password-policy";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -23,9 +24,9 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       setStatus("error");
-      setMessage("Password must be at least 6 characters.");
+      setMessage(PASSWORD_TOO_SHORT_MESSAGE);
       return;
     }
 
@@ -88,7 +89,7 @@ function ResetPasswordForm() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 6 characters"
+            placeholder={PASSWORD_LENGTH_HINT}
             required
             className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
           />

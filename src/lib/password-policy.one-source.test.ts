@@ -25,11 +25,8 @@ const ABOUT_PASSWORD = /passw/iu;
  * readiness tasks own them. Delete an entry when its file reads the constant.
  */
 const NOT_YET_ON_THE_CONSTANT = new Set([
-  "app/forgot-password/page.tsx",
-  "app/reset-password/page.tsx",
   "components/staff/AcceptInviteForm.tsx",
   "components/teacher/ClassRosterManager.tsx",
-  "components/teacher/StudentDetail.tsx",
 ]);
 
 /**

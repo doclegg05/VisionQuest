@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import BrandLockup from "@/components/ui/BrandLockup";
 import SecurityQuestionAnswerFields from "@/components/auth/SecurityQuestionAnswerFields";
 import { createEmptySecurityQuestionAnswers } from "@/lib/security-questions";
+import { MIN_PASSWORD_LENGTH, PASSWORD_LENGTH_HINT, PASSWORD_TOO_SHORT_MESSAGE } from "@/lib/password-policy";
 
 type RecoveryMode = "questions" | "email";
 type RecoveryStatus = "idle" | "submitting" | "success" | "error";
@@ -50,9 +51,9 @@ export default function ForgotPasswordPage() {
   async function handleQuestionSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       setStatus("error");
-      setMessage("Password must be at least 6 characters.");
+      setMessage(PASSWORD_TOO_SHORT_MESSAGE);
       return;
     }
 
@@ -174,7 +175,7 @@ export default function ForgotPasswordPage() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder={PASSWORD_LENGTH_HINT}
                   required
                   className="field px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)]"
                 />
