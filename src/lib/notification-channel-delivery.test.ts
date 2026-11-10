@@ -34,7 +34,13 @@ mock.module("./db", { namedExports: { prismaAdmin: {
       return { id: `queued-${created.length}` };
     },
     // The processor writes a job's result with updateMany guarded by its claim; count 1 = the claim held.
-    updateMany: async (args: { data: { status: string; error?: string } }) => { updates.push(args); return { count: 1 }; },
+    // It also renews its lease with updateMany as each job starts, a write with no status
+    // (jobs.lease.test.ts covers that); `updates` keeps the result writes only.
+    updateMany: async (args: { data: { status?: string; error?: string } }) => {
+      const { status } = args.data;
+      if (status !== undefined) updates.push({ data: { ...args.data, status } });
+      return { count: 1 };
+    },
   },
 } } });
 mock.module("./email", { namedExports: { isEmailDeliveryConfigured: () => true, sendEmail: async () => { emailSends++; await deliveryGate; } } });
