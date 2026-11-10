@@ -14,7 +14,7 @@ import { FakeLimiterStore } from "./limiter-store.fake";
 //
 // Decision R3: a successful sign-in does not count against the network
 // address. Failed attempts are limited to 30 per address per 15 minutes. The
-// per-account limit of 5 stays as the brute-force control.
+// per-account limit of 5 failed attempts stays as the brute-force control.
 //
 // Like route.concurrency.test.ts, this file leaves `@/lib/rate-limit`
 // unmocked: the limiter is part of what is under test, over a fake counter
@@ -319,6 +319,117 @@ describe("POST /api/auth/login — the per-account limit beside a classroom", ()
 
     assert.deepEqual(lockedTries, repeat(401, NETWORK_FAILED_LIMIT - ACCOUNT_LIMIT));
     assert.equal(next.status, 429, "a refunded locked try would have left room for this sign-in");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// One student, several lab PCs (A1 security review, required item 1)
+//
+// The per-account bucket counted every sign-in, right or wrong, at 5 per 15
+// minutes and gave nothing back. A student who signed in on a sixth lab PC
+// was refused with the wrong-password message. A right password now gives
+// its per-account unit back, at the same point as the per-network unit: only
+// after the response is certain to say the password was right. One unit
+// comes back, never the failed tries before it.
+// ---------------------------------------------------------------------------
+
+describe("POST /api/auth/login — one student signing in on several lab PCs", () => {
+  /** The per-account bucket of the account `enroll(studentId)` creates. */
+  const accountKey = (studentId: string) => `login:user:id-${studentId}`;
+
+  beforeEach(() => {
+    limiterStore.reset();
+    roster.clear();
+  });
+
+  it("admits six correct sign-ins in a row on one account, and then a seventh", async () => {
+    enroll("alice");
+
+    const firstSix = await statusesInTurn(repeat("alice", ACCOUNT_LIMIT + 1), RIGHT_PASSWORD);
+    const seventh = await signIn("alice", RIGHT_PASSWORD);
+
+    assert.deepEqual(firstSix, repeat(200, ACCOUNT_LIMIT + 1));
+    assert.equal(seventh.status, 200);
+  });
+
+  it("holds no account unit once a correct sign-in has been answered", async () => {
+    enroll("alice");
+
+    await signIn("alice", RIGHT_PASSWORD);
+
+    assert.equal(limiterStore.countFor(accountKey("alice")), 0);
+  });
+
+  it("gives the account unit back when the password was right and an MFA challenge follows", async () => {
+    enroll("teacher", { role: "teacher", mfaEnabled: true });
+
+    const responses = [];
+    for (let i = 0; i < ACCOUNT_LIMIT + 2; i += 1) responses.push(await signIn("teacher", RIGHT_PASSWORD));
+
+    assert.deepEqual(responses.map((res) => res.status), repeat(200, ACCOUNT_LIMIT + 2));
+    assert.deepEqual(await responses[responses.length - 1].json(), { requiresMfa: true });
+  });
+
+  it("still refuses the right password after five wrong ones", async () => {
+    enroll("alice");
+
+    const wrongTries = await statusesInTurn(repeat("alice", ACCOUNT_LIMIT), WRONG_PASSWORD);
+    const rightPassword = await signIn("alice", RIGHT_PASSWORD);
+
+    assert.deepEqual(wrongTries, repeat(401, ACCOUNT_LIMIT));
+    assert.equal(rightPassword.status, 401);
+    assert.equal(await errorOf(rightPassword), SIGN_IN_FAILED);
+  });
+
+  it("gives back one unit for a correct sign-in, never the wrong tries before it", async () => {
+    enroll("alice");
+
+    // Four wrong tries stay counted through two correct sign-ins, so the
+    // fifth wrong try is the last one admitted.
+    const wrongTries = await statusesInTurn(repeat("alice", ACCOUNT_LIMIT - 1), WRONG_PASSWORD);
+    const signIns = await statusesInTurn(repeat("alice", 2), RIGHT_PASSWORD);
+    const fifthWrongTry = await signIn("alice", WRONG_PASSWORD);
+    const rightPasswordWhileLocked = await signIn("alice", RIGHT_PASSWORD);
+
+    assert.deepEqual(wrongTries, repeat(401, ACCOUNT_LIMIT - 1));
+    assert.deepEqual(signIns, [200, 200]);
+    assert.equal(fifthWrongTry.status, 401);
+    assert.equal(rightPasswordWhileLocked.status, 401, "two correct sign-ins must not have cleared the four wrong tries");
+  });
+
+  it("gives a locked account nothing back, even for the right password", async () => {
+    enroll("alice");
+    await statusesInTurn(repeat("alice", ACCOUNT_LIMIT), WRONG_PASSWORD);
+
+    const lockedTries = await statusesInTurn(repeat("alice", 3), RIGHT_PASSWORD);
+
+    assert.deepEqual(lockedTries, repeat(401, 3));
+    assert.equal(limiterStore.countFor(accountKey("alice")), ACCOUNT_LIMIT + 3, "every locked try stays counted");
+  });
+
+  for (const [name, overrides] of [
+    ["a closed account", { isActive: false }],
+    ["a Google-only account", { passwordHash: null, authProvider: "google" }],
+  ] as const) {
+    it(`gives ${name} nothing back`, async () => {
+      enroll("alice", overrides);
+
+      const tries = await statusesInTurn(repeat("alice", 2), RIGHT_PASSWORD);
+
+      assert.deepEqual(tries, [401, 401]);
+      assert.equal(limiterStore.countFor(accountKey("alice")), 2, "both tries stay counted");
+    });
+  }
+
+  it("counts a wrong password on one account while a classmate's correct sign-ins come back", async () => {
+    enroll("alice");
+    enroll("ben");
+
+    await signIn("alice", WRONG_PASSWORD);
+    await statusesInTurn(repeat("ben", ACCOUNT_LIMIT + 1), RIGHT_PASSWORD);
+
+    assert.equal(limiterStore.countFor(accountKey("alice")), 1);
+    assert.equal(limiterStore.countFor(accountKey("ben")), 0);
   });
 });
 

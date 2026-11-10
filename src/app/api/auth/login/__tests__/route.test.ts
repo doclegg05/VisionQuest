@@ -618,20 +618,20 @@ describe("POST /api/auth/login — unknown logins do the same limiter work as re
 //
 // The per-network bucket used to count every sign-in at 10 per 15 minutes, so
 // the eleventh student in a classroom was refused. It now allows 30 failed
-// attempts per 15 minutes, and a right password gives its unit back.
-//
-// The refund must never say more than the response already says. A locked
-// account, a closed account and a Google-only account all answer with the
-// generic 401 whatever the password was, so none of them may refund: a unit
-// that came back only for the right password would turn the per-network
-// count into a password check that the per-account lock cannot stop.
-// route.classroom.test.ts runs the same rules over the real limiter.
+// attempts per 15 minutes. A right password gives that unit back, and its
+// per-account unit with it. A refund must never say more than the response
+// already says: a locked, a closed and a Google-only account all answer the
+// generic 401 whatever the password was, so none may refund. A unit that came
+// back only for the right password would turn either count into a password
+// check. route.classroom.test.ts runs the same rules over the real limiter.
 // ---------------------------------------------------------------------------
 
-describe("POST /api/auth/login — the per-network unit comes back only for a right password", () => {
+describe("POST /api/auth/login — both units come back only for a right password", () => {
   const ADDRESS = "203.0.113.7";
   const NETWORK_KEY = `login:${ADDRESS}`;
   const NETWORK_RESET_TIME = 1_900_000_000_000;
+  const NETWORK_UNIT = [NETWORK_KEY, NETWORK_RESET_TIME];
+  const ACCOUNT_UNIT = ["login:user:stu-1", NETWORK_RESET_TIME + 1];
 
   const account = (overrides: Record<string, unknown> = {}) => ({
     id: "stu-1",
@@ -647,13 +647,13 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
     ...overrides,
   });
 
-  /** Admits every bucket; `locked` refuses the per-account one. */
-  function seedLimiter(options: { locked?: boolean; degraded?: boolean } = {}) {
+  /** Admits every bucket; `locked` refuses the per-account one; `degraded` picks the buckets that failed open. */
+  function seedLimiter(options: { locked?: boolean; degraded?: (key: string) => boolean } = {}) {
     mockRateLimit.mock.mockImplementation(async (key: string) => ({
       success: !(options.locked && key.startsWith("login:user:")),
       remaining: 0,
       resetTime: key === NETWORK_KEY ? NETWORK_RESET_TIME : NETWORK_RESET_TIME + 1,
-      degraded: options.degraded ?? false,
+      degraded: options.degraded?.(key) ?? false,
     }));
   }
 
@@ -693,30 +693,30 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
     assert.deepEqual(mockRateLimit.mock.calls[0].arguments, [NETWORK_KEY, 30, 15 * 60 * 1000]);
   });
 
-  it("gives the unit back, in the window it was taken from, when the password is right", async () => {
+  it("gives both units back, each in the window it was taken from, when the password is right", async () => {
     const res = await signIn();
 
     assert.equal(res.status, 200);
-    assert.deepEqual(refunds(), [[NETWORK_KEY, NETWORK_RESET_TIME]]);
+    assert.deepEqual(refunds(), [NETWORK_UNIT, ACCOUNT_UNIT]);
   });
 
-  it("gives the unit back when the password is right and an MFA challenge follows", async () => {
+  it("gives both units back when the password is right and an MFA challenge follows", async () => {
     mockFindUnique.mock.mockImplementation(async () => account({ role: "teacher", mfaEnabled: true }));
 
     const res = await signIn();
 
     assert.deepEqual(await res.json(), { requiresMfa: true });
-    assert.deepEqual(refunds(), [[NETWORK_KEY, NETWORK_RESET_TIME]]);
+    assert.deepEqual(refunds(), [NETWORK_UNIT, ACCOUNT_UNIT]);
   });
 
-  it("never gives back the per-account unit: five tries per account still count, right or wrong", async () => {
+  it("gives back only the unit a working limiter took when the other failed open", async () => {
+    seedLimiter({ degraded: (key) => key === NETWORK_KEY });
     await signIn();
 
-    const refundedKeys = refunds().map(([key]) => key);
-    assert.deepEqual(refundedKeys, [NETWORK_KEY]);
+    assert.deepEqual(refunds(), [ACCOUNT_UNIT]);
   });
 
-  it("keeps the unit for a wrong password", async () => {
+  it("keeps both units for a wrong password", async () => {
     mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({ valid: false, needsRehash: false }));
 
     const res = await signIn();
@@ -725,7 +725,7 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
     assert.deepEqual(refunds(), []);
   });
 
-  it("keeps the unit for an unknown login", async () => {
+  it("keeps both units for an unknown login", async () => {
     mockFindUnique.mock.mockImplementation(async () => null);
     mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({ valid: false, needsRehash: false }));
 
@@ -735,7 +735,7 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
     assert.deepEqual(refunds(), []);
   });
 
-  it("keeps the unit for a request that fails validation", async () => {
+  it("keeps the network unit for a request that fails validation", async () => {
     const res = await signIn({ studentId: "alice" });
 
     assert.equal(res.status, 400);
@@ -752,7 +752,7 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
       () => mockFindUnique.mock.mockImplementation(async () => account({ passwordHash: null, authProvider: "google" })),
     ],
   ] as const) {
-    it(`keeps the unit for the right password on ${name}, which the response does not reveal`, async () => {
+    it(`keeps both units for the right password on ${name}, which the response does not reveal`, async () => {
       arrange();
 
       const res = await signIn();
@@ -762,7 +762,7 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
     });
   }
 
-  it("keeps the unit when a legacy-hash upgrade loses to a concurrent password reset", async () => {
+  it("keeps both units when a legacy-hash upgrade loses to a concurrent password reset", async () => {
     mockVerifyPasswordSafeWithStatus.mock.mockImplementation(() => ({ valid: true, needsRehash: true }));
     mockUpdate.mock.mockImplementation(async () => ({ count: 0 }));
 
@@ -773,7 +773,7 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
   });
 
   it("asks the store for nothing when the limiter failed open: no unit was taken", async () => {
-    seedLimiter({ degraded: true });
+    seedLimiter({ degraded: () => true });
 
     const res = await signIn();
 
@@ -781,7 +781,7 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
     assert.deepEqual(refunds(), []);
   });
 
-  it("gives the unit back before the session is issued, so a slow audit write holds no unit", async () => {
+  it("gives both units back before the session is issued, so a slow audit write holds no unit", async () => {
     const order: string[] = [];
     mockRefundRateLimit.mock.mockImplementation(async () => {
       order.push("refund");
@@ -792,6 +792,6 @@ describe("POST /api/auth/login — the per-network unit comes back only for a ri
 
     await signIn();
 
-    assert.deepEqual(order, ["refund", "audit"]);
+    assert.deepEqual(order, ["refund", "refund", "audit"]);
   });
 });
