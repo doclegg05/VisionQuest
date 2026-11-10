@@ -31,6 +31,11 @@ const SIGN_IN_WINDOW_MS = SIGN_IN_WINDOW_MINUTES * 60 * 1000;
  * 30 leaves each of them one mistyped try. This bucket slows one address
  * guessing across many accounts. It is a courtesy limit: the address comes
  * from `X-Forwarded-For`, which a caller can set (src/lib/client-ip.ts).
+ *
+ * An attempt holds its unit until it is answered, so failed attempts plus
+ * attempts in flight can never pass 30. More than 30 sign-ins from one
+ * address inside the same fraction of a second would see the extra ones
+ * refused once; trying again works.
  */
 const NETWORK_FAILED_SIGN_IN_LIMIT = 30;
 

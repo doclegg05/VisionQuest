@@ -26,6 +26,8 @@ const RESET_ERROR =
  * one address guessing across many accounts. It is a courtesy limit: the
  * address comes from `X-Forwarded-For`, which a caller can set
  * (src/lib/client-ip.ts). The per-account limit below is the real control.
+ * An attempt holds its unit until it is answered, so failed attempts plus
+ * attempts in flight can never pass 30.
  */
 const NETWORK_FAILED_ATTEMPT_LIMIT = 30;
 const NETWORK_LIMIT_WINDOW_MS = 60 * 60 * 1000;
