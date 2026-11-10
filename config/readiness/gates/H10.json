@@ -5,6 +5,10 @@
   "title": "Demo closeout kit",
   "doneWhen": "CI database tests: the preview changes nothing, apply leaves zero marked rows and no orphans, and unmarked rows are untouched. The `offboarding-completeness` benchmark's model list is covered.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/demo/closeout.test.ts",
+      "src/lib/demo/closeout.inventory.test.ts"
+    ]
   }
 }
