@@ -118,7 +118,7 @@ describe("the words a student reads about the rule", () => {
   it("are the hint and the error this task was given, built from the constant", () => {
     assert.equal(
       STUDENT_PASSWORD_HINT,
-      `Use ${MIN_PASSWORD_LENGTH} or more letters, numbers or symbols. Three short words work, like blue river lamp.`,
+      `Use ${MIN_PASSWORD_LENGTH} or more letters, numbers or symbols. Spaces count. Try three words that mean something to you, like a pet's name, a food and a place.`,
     );
     assert.equal(
       STUDENT_PASSWORD_TOO_SHORT_MESSAGE,
@@ -138,7 +138,7 @@ describe("the words a student reads about the rule", () => {
     assert.deepEqual(messages(result), [STUDENT_PASSWORD_TOO_SHORT_MESSAGE]);
   });
 
-  it("gives an example long enough to pass the rule it explains", () => {
-    assert.ok("blue river lamp".length >= MIN_PASSWORD_LENGTH);
-  });
+  // The hint gives a recipe and no example: an example that passed would be
+  // typed by a whole class. src/components/settings/password-hint-safety.test.tsx
+  // runs every hint's examples through the server's rule.
 });

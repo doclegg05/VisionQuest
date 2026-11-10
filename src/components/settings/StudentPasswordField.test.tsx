@@ -45,14 +45,14 @@ function tag(html: string, name: string): string {
   return match[0];
 }
 
-/** React writes `&#x27;` and friends; the copy under test has none of those. */
+/** The visible words, with React's `&#x27;` read back as an apostrophe. */
 function text(html: string): string {
-  return html.replace(/<!-- -->/gu, "").replace(/<[^>]+>/gu, " ").replace(/\s+/gu, " ");
+  return html.replace(/<!-- -->/gu, "").replace(/<[^>]+>/gu, " ").replace(/&#x27;/gu, "'").replace(/\s+/gu, " ");
 }
 
 describe("counting what the server will count", () => {
   it("counts the password trimmed, as sign-in and the schemas trim it", () => {
-    assert.equal(typedPasswordLength("  blue river  "), "blue river".length);
+    assert.equal(typedPasswordLength("  green apple  "), "green apple".length);
     assert.equal(typedPasswordLength(""), 0);
     assert.equal(typedPasswordLength("   "), 0);
   });
@@ -61,7 +61,7 @@ describe("counting what the server will count", () => {
     assert.equal(isPasswordTooShort("a".repeat(MIN_PASSWORD_LENGTH - 1)), true);
     assert.equal(isPasswordTooShort(`${"a".repeat(MIN_PASSWORD_LENGTH - 1)}   `), true);
     assert.equal(isPasswordTooShort("a".repeat(MIN_PASSWORD_LENGTH)), false);
-    assert.equal(isPasswordTooShort("blue river lamp"), false);
+    assert.equal(isPasswordTooShort("green apple pie"), false);
   });
 });
 
@@ -100,7 +100,7 @@ describe("StudentPasswordField: a new password", () => {
     const none = text(view({ value: "" }));
     assert.ok(none.includes(`You have typed 0. You need ${MIN_PASSWORD_LENGTH} or more.`), none);
 
-    const enough = text(view({ value: "blue river lamp" }));
+    const enough = text(view({ value: "green apple pie" }));
     assert.ok(enough.includes("You have typed 15. That is long enough."), enough);
   });
 
@@ -111,7 +111,7 @@ describe("StudentPasswordField: a new password", () => {
 
   it("tells a screen reader once when the password becomes long enough, not on every key", () => {
     const short = view({ value: "blue" });
-    const enough = view({ value: "blue river lamp" });
+    const enough = view({ value: "green apple pie" });
 
     assert.match(short, /<span[^>]*aria-live="polite"[^>]*><\/span>/u);
     assert.match(enough, /<span[^>]*aria-live="polite"[^>]*>Your password is long enough\.<\/span>/u);
@@ -132,7 +132,7 @@ describe("StudentPasswordField: a new password", () => {
   });
 
   it("shows the password as text while Show is on, and says so", () => {
-    const html = view({ value: "blue river lamp", revealed: true });
+    const html = view({ value: "green apple pie", revealed: true });
 
     assert.match(tag(html, "input"), /type="text"/u);
     assert.match(tag(html, "button"), /aria-pressed="true"/u);
@@ -177,7 +177,7 @@ describe("StudentPasswordField: a password that is too short", () => {
   });
 
   it("clears the error once the password is long enough", () => {
-    const html = view({ value: "blue river lamp", touched: true, showError: true });
+    const html = view({ value: "green apple pie", touched: true, showError: true });
 
     assert.ok(!text(html).includes(STUDENT_PASSWORD_TOO_SHORT_MESSAGE));
     assert.doesNotMatch(tag(html, "input"), /aria-invalid="true"/u);

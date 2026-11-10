@@ -39,7 +39,7 @@ describe("ForgotPasswordPage: the new password field", () => {
   const html = renderToString(withAppRouter(<ForgotPasswordPage />));
 
   it("shows the length rule under the field, where it stays while the student types", () => {
-    assert.ok(html.includes(STUDENT_PASSWORD_HINT));
+    assert.ok(html.replace(/&#x27;/gu, "'").includes(STUDENT_PASSWORD_HINT));
     assert.match(html, /<p[^>]*id="new-password-hint"/);
   });
 

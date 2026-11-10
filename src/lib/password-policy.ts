@@ -29,7 +29,7 @@ export const PASSWORD_TOO_LONG_MESSAGE = `Password must be ${MAX_PASSWORD_LENGTH
  * Shown under a student's new-password field, always visible. It says what
  * counts and gives a way to reach the length that is easy to remember.
  */
-export const STUDENT_PASSWORD_HINT = `Use ${MIN_PASSWORD_LENGTH} or more letters, numbers or symbols. Three short words work, like blue river lamp.`;
+export const STUDENT_PASSWORD_HINT = `Use ${MIN_PASSWORD_LENGTH} or more letters, numbers or symbols. Spaces count. Try three words that mean something to you, like a pet's name, a food and a place.`;
 
 /** What a student reads when a new password is too short, on the screen and from the server. */
 export const STUDENT_PASSWORD_TOO_SHORT_MESSAGE = `Your password is too short. Use ${MIN_PASSWORD_LENGTH} or more letters, numbers or symbols.`;
