@@ -38,11 +38,11 @@ async function realGates(kind) {
 
 // --- the committed gate files ---
 
-test("the plan's task tables parse to 37 launch, 35 pilot and 1 hold task", async () => {
+test("the plan's task tables parse to 38 launch, 35 pilot and 1 hold task", async () => {
   const { readPlanTasks } = await seed();
   const counts = { launch: 0, pilot: 0, hold: 0 };
   for (const task of readPlanTasks(readFileSync(join(ROOT, PLAN), "utf8"))) counts[task.set] += 1;
-  assert.deepEqual(counts, { launch: 37, pilot: 35, hold: 1 });
+  assert.deepEqual(counts, { launch: 38, pilot: 35, hold: 1 });
 });
 
 // A new row once reused an id that another task already had (F6, 2026-11-10).

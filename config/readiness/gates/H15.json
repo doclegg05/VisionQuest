@@ -1,0 +1,10 @@
+{
+  "id": "H15",
+  "kind": "task",
+  "set": "launch",
+  "title": "Every staff read of one student's record is written down",
+  "doneWhen": "The route walk passes with an empty exemption list or a reason beside each entry. A test for each route finds its view row.",
+  "check": {
+    "type": "pending"
+  }
+}

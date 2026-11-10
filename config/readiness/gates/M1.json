@@ -4,7 +4,7 @@
   "set": "launch",
   "title": "Estimated database round trips for one student dashboard render",
   "doneWhen": "85 or fewer",
-  "basis": "about half of the 167 first measured",
+  "basis": "about half of 167, the first measurement on 2026-11-10, taken before the dead banner was removed and without admin reads",
   "check": {
     "type": "metric",
     "run": "node scripts/readiness/query-count.mjs dashboard",
