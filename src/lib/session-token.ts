@@ -15,6 +15,15 @@ export interface SessionClaims {
    */
   demo?: DemoAccountKind;
   /**
+   * Set only while the holder must choose a new password, because staff set
+   * the one they have. src/proxy.ts reads it to hold the session to the change
+   * screen without a database lookup. Every other token has no such key, so a
+   * token signed before the claim existed reads the same as one with nothing
+   * to change; getSession() ends any session whose claim and account row
+   * disagree.
+   */
+  mustChangePassword?: true;
+  /**
    * Random per-token id, so two tokens minted in the same second for one
    * account (the shared demo instructor) differ and logout can revoke just
    * one of them. Tokens issued before it was added have none.
@@ -42,18 +51,27 @@ export function getJwtSecret(): string {
   return secret;
 }
 
+/** What a session token may say beyond who it is for. */
+export interface SessionTokenOptions {
+  demo?: DemoAccountKind;
+  /** True writes the `mustChangePassword` claim; false or absent writes no key. */
+  mustChangePassword?: boolean;
+}
+
 export function signToken(
   studentId: string,
   role: string,
   sessionVersion: number,
-  options: { demo?: DemoAccountKind } = {},
+  options: SessionTokenOptions = {},
 ): string {
-  // A real account's claims stay {sub, role, sv}, plus the jti below: no `demo` key.
+  // A real account's claims stay {sub, role, sv}, plus the jti below: no
+  // `demo` key, and no `mustChangePassword` key unless there is one to change.
   const claims: SessionClaims = {
     sub: studentId,
     role,
     sv: sessionVersion,
     ...(options.demo === undefined ? {} : { demo: options.demo }),
+    ...(options.mustChangePassword === true ? { mustChangePassword: true } : {}),
   };
   return jwt.sign(claims, getJwtSecret(), {
     expiresIn: TOKEN_TTL,
@@ -93,6 +111,11 @@ function isDemoAccountKind(value: unknown): value is DemoAccountKind {
  * not recognize is not one it can safely ignore. Tokens with no `demo` key
  * (every real account, and every token issued before demo mode) verify as
  * before.
+ *
+ * A `mustChangePassword` claim, when present, must be exactly `true`, by the
+ * same rule. A token with no such key verifies as before: this function cannot
+ * tell an old token from one with nothing to change, and does not need to (see
+ * the claim's own comment).
  */
 export function verifyToken(token: string): SessionClaims | null {
   try {
@@ -109,6 +132,9 @@ export function verifyToken(token: string): SessionClaims | null {
       return null;
     }
     if ("demo" in payload && !isDemoAccountKind(payload.demo)) {
+      return null;
+    }
+    if ("mustChangePassword" in payload && payload.mustChangePassword !== true) {
       return null;
     }
     return payload as SessionClaims;
