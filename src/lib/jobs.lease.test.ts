@@ -16,6 +16,13 @@
  * only pending rows, so without the reaper (reapExpiredJobs) that job, a
  * crisis email among them, never runs again (readiness H5).
  *
+ * The reaper makes a second claim of a live row possible, so the processor
+ * renews its lease as each job starts and skips a job whose claim is gone.
+ * A pass claims up to 20 rows and runs them one after another; without the
+ * renewal a row late in a slow pass outlives the lease stamped at claim
+ * time, a later pass takes it back and runs it, and the first pass then runs
+ * it too (database review of H5, 2026-11-10).
+ *
  * The fake below keeps BackgroundJob rows in memory with Prisma's semantics:
  * update() writes whatever row has the id, updateMany() writes only rows that
  * match every field of its where. $queryRaw plays the claim, or the reaper
@@ -35,6 +42,7 @@ interface JobRow {
   error: string | null;
   completedAt: Date | null;
   startedAt: Date | null;
+  createdAt: Date;
 }
 
 let rows: JobRow[] = [];
@@ -42,8 +50,11 @@ let rows: JobRow[] = [];
 let afterClaim: () => void = () => undefined;
 const warnings: Array<{ message: string; context: Record<string, unknown> | undefined }> = [];
 const errors: Array<{ message: string; context: Record<string, unknown> | undefined }> = [];
-/** Set in before(); the fake reaper needs it only once jobs.ts exports it. */
+/** Set in before(): the reaper's rule, read from what jobs.ts exports. */
 let leaseMs = 0;
+let deliveryLeaseMs = 0;
+let deliveryTypes: readonly string[] = [];
+let maxAgeMs = 0;
 /** When true the fake reaper's statement throws, as a broken query would. */
 let reaperFails = false;
 
@@ -72,17 +83,26 @@ function isReaperQuery(query: unknown): boolean {
   return strings.join("").includes("reap-expired-leases");
 }
 
-/** The reaper's rule: past the lease, back to pending with tries left, else failed. */
+function leaseExpired(row: JobRow, now: number): boolean {
+  const lease = deliveryTypes.includes(row.type) ? deliveryLeaseMs : leaseMs;
+  return row.startedAt !== null && row.startedAt.getTime() < now - lease;
+}
+
+/** What the reaper writes: queued again with tries left and inside a day, else failed. */
+function reapOutcome(row: JobRow, now: number): Partial<JobRow> {
+  const tooOld = row.createdAt.getTime() < now - maxAgeMs;
+  if (row.attempts < 3 && !tooOld) return { status: "pending", error: "requeued" };
+  const error = row.attempts >= 3 ? "Stopped: the server restarted during its last try." : "Stopped: too late to send.";
+  return { status: "failed", error, completedAt: new Date(now) };
+}
+
+/** The reaper's rule over the fake rows; the SQL that states it is proved in jobs.reaper.db.test.ts. */
 function fakeReap() {
-  const cutoff = Date.now() - leaseMs;
+  const now = Date.now();
   return rows
     .filter((row) => row.status === "processing" && row.type !== "sage_memory")
-    .filter((row) => row.startedAt !== null && row.startedAt.getTime() < cutoff)
-    .map((row) =>
-      applyData(row, row.attempts < 3
-        ? { status: "pending", error: "requeued" }
-        : { status: "failed", error: "Stopped: the server restarted during its last try.", completedAt: new Date() }),
-    )
+    .filter((row) => leaseExpired(row, now))
+    .map((row) => applyData(row, reapOutcome(row, now)))
     .map(({ type, attempts, status }) => ({ type, attempts, status }));
 }
 
@@ -134,9 +154,15 @@ let processJobs: typeof import("./jobs").processJobs;
 let registerJobHandler: typeof import("./jobs").registerJobHandler;
 let reapExpiredJobs: typeof import("./jobs").reapExpiredJobs;
 let JOB_LEASE_MS: typeof import("./jobs").JOB_LEASE_MS;
+let DELIVERY_JOB_LEASE_MS: typeof import("./jobs").DELIVERY_JOB_LEASE_MS;
+let JOB_MAX_AGE_MS: typeof import("./jobs").JOB_MAX_AGE_MS;
 before(async () => {
-  ({ processJobs, registerJobHandler, reapExpiredJobs, JOB_LEASE_MS } = await import("./jobs"));
+  const jobs = await import("./jobs");
+  ({ processJobs, registerJobHandler, reapExpiredJobs, JOB_LEASE_MS, DELIVERY_JOB_LEASE_MS, JOB_MAX_AGE_MS } = jobs);
   leaseMs = JOB_LEASE_MS;
+  deliveryLeaseMs = DELIVERY_JOB_LEASE_MS;
+  deliveryTypes = jobs.DELIVERY_JOB_TYPES;
+  maxAgeMs = JOB_MAX_AGE_MS;
 });
 
 const RETIRED_ERROR = "Stopped: no result after two hours. A new refresh replaces it.";
@@ -149,19 +175,25 @@ function retire(id: string): void {
 function pendingJob(id: string, type: string, attempts = 0): JobRow {
   return {
     id, type, payload: JSON.stringify({ configId: "cfg-1" }),
-    status: "pending", attempts, error: null, completedAt: null, startedAt: null,
+    status: "pending", attempts, error: null, completedAt: null, startedAt: null, createdAt: new Date(),
   };
 }
 
-const HOUR_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
 
-/** A job a restart left "processing", claimed `ageMs` ago under attempt `attempts`. */
-function strandedJob(id: string, type: string, attempts: number, ageMs: number): JobRow {
+/**
+ * A job a restart left "processing", claimed `ageMs` ago under attempt
+ * `attempts`. It was enqueued just before that claim unless `queuedMs` says
+ * it had already waited longer.
+ */
+function strandedJob(id: string, type: string, attempts: number, ageMs: number, queuedMs = ageMs): JobRow {
   return {
     ...pendingJob(id, type, attempts),
     payload: JSON.stringify({ studentId: "cmf9x1y2z0000abcdefghijkl", to: "teacher@example.org" }),
     status: "processing",
     startedAt: new Date(Date.now() - ageMs),
+    createdAt: new Date(Date.now() - queuedMs),
   };
 }
 
@@ -267,6 +299,71 @@ describe("processJobs, the claim that owns the row", () => {
   });
 });
 
+describe("processJobs, a pass slow enough to outlive its leases", () => {
+  // The first handler stands in for the hours a slow pass takes: while it
+  // runs, something else acts on the row the pass has claimed but not started.
+  function slowPass(whileFirstRuns: () => void): { secondRuns: () => number } {
+    let runs = 0;
+    rows = [pendingJob("job-16", "slow_first"), pendingJob("job-17", "slow_second")];
+    registerJobHandler("slow_first", async () => whileFirstRuns());
+    registerJobHandler("slow_second", async () => {
+      runs++;
+    });
+    return { secondRuns: () => runs };
+  }
+
+  it("does not run a job a later pass took back and claimed", async () => {
+    const pass = slowPass(() => applyData(findRow("job-17"), { status: "processing", attempts: 2 }));
+
+    const processed = await processJobs(2);
+
+    assert.equal(pass.secondRuns(), 0, "the later claim runs it; this pass must not run it too");
+    assert.equal(processed, 1);
+    assert.equal(findRow("job-17").status, "processing");
+    assert.equal(findRow("job-17").attempts, 2);
+  });
+
+  it("does not run a job the reaper put back in the queue", async () => {
+    const pass = slowPass(() => applyData(findRow("job-17"), { status: "pending" }));
+
+    await processJobs(2);
+
+    assert.equal(pass.secondRuns(), 0);
+    assert.equal(findRow("job-17").status, "pending", "it waits for the next claim");
+  });
+
+  it("logs the skipped job by id and type only", async () => {
+    slowPass(() => applyData(findRow("job-17"), { status: "pending" }));
+
+    await processJobs(2);
+
+    assert.deepEqual(
+      warnings.map((entry) => entry.context),
+      [{ type: "slow_second", jobId: "job-17", attempt: 1 }],
+    );
+    assert.match(warnings[0].message, /skipped before it ran/);
+  });
+
+  it("renews the lease as each job starts, so it covers one job and not the pass", async () => {
+    let startedAtWhenRun: Date | null = null;
+    rows = [pendingJob("job-18", "renew_first"), pendingJob("job-19", "renew_second")];
+    registerJobHandler("renew_first", async () => {
+      applyData(findRow("job-19"), { startedAt: new Date(Date.now() - 90 * MINUTE_MS) });
+    });
+    registerJobHandler("renew_second", async () => {
+      startedAtWhenRun = findRow("job-19").startedAt;
+    });
+
+    await processJobs(2);
+
+    assert.ok(startedAtWhenRun, "the second job ran");
+    assert.ok(
+      Date.now() - (startedAtWhenRun as Date).getTime() < MINUTE_MS,
+      "its lease counts from when its handler started, not from the claim",
+    );
+  });
+});
+
 describe("processJobs, a job a restart left processing", () => {
   it("claims it again once its lease has expired", async () => {
     rows = [strandedJob("job-8", "stranded_runs", 1, 3 * HOUR_MS)];
@@ -281,6 +378,7 @@ describe("processJobs, a job a restart left processing", () => {
     assert.equal(processed, 1);
     assert.equal(findRow("job-8").status, "completed");
     assert.equal(findRow("job-8").attempts, 2, "the new run is its second attempt");
+    assert.equal(findRow("job-8").error, null, "a job that finished keeps no note about the restart");
   });
 
   it("leaves a job alone while its lease still holds", async () => {
@@ -310,6 +408,40 @@ describe("processJobs, a job a restart left processing", () => {
     assert.equal(runs, 0);
     assert.equal(findRow("job-10").status, "failed");
     assert.match(String(findRow("job-10").error), /restart/i);
+  });
+
+  it("takes back an email after its shorter lease", async () => {
+    rows = [
+      strandedJob("job-20", "send_email", 1, 45 * MINUTE_MS),
+      strandedJob("job-21", "stranded_not_email", 1, 45 * MINUTE_MS),
+    ];
+    let emails = 0;
+    registerJobHandler("send_email", async () => {
+      emails++;
+    });
+
+    await processJobs(2);
+
+    assert.equal(emails, 1, "a crisis email does not wait two hours");
+    assert.equal(findRow("job-20").status, "completed");
+    assert.equal(findRow("job-21").status, "processing", "other work keeps the long lease");
+  });
+
+  it("fails a job that has waited more than a day, without running it", async () => {
+    rows = [strandedJob("job-22", "stranded_old", 1, 3 * HOUR_MS, 26 * HOUR_MS)];
+    let runs = 0;
+    registerJobHandler("stranded_old", async () => {
+      runs++;
+    });
+
+    await processJobs(1);
+
+    assert.equal(runs, 0, "an email this late is noise, not help");
+    assert.equal(findRow("job-22").status, "failed");
+    assert.deepEqual(
+      errors.map((entry) => entry.context),
+      [{ alert: "background_job_expired", type: "stranded_old", attempt: 1 }],
+    );
   });
 
   it("leaves sage_memory rows to their own worker", async () => {
@@ -375,8 +507,17 @@ describe("reapExpiredJobs, two passes at once", () => {
   });
 });
 
-describe("JOB_LEASE_MS", () => {
-  it("is two hours, the window the scrape retirer already treats as live", () => {
+describe("the reaper's clocks", () => {
+  it("holds most work for two hours, the window the scrape retirer already treats as live", () => {
     assert.equal(JOB_LEASE_MS, 2 * HOUR_MS);
+  });
+
+  it("holds an email or notification delivery for 30 minutes", () => {
+    assert.equal(DELIVERY_JOB_LEASE_MS, 30 * MINUTE_MS);
+    assert.deepEqual([...deliveryTypes].sort(), ["notification_channel_delivery", "send_email"]);
+  });
+
+  it("stops retrying a job a day after it was queued", () => {
+    assert.equal(JOB_MAX_AGE_MS, 24 * HOUR_MS);
   });
 });

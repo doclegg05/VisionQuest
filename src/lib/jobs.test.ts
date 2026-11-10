@@ -27,14 +27,16 @@ function stubQueryRaw(rows: ClaimedRow[]) {
 }
 
 // The processor writes a job's result with updateMany, guarded by its claim
-// (jobs.lease.test.ts); count 1 means the claim still held the row.
+// (jobs.lease.test.ts); count 1 means the claim still held the row. It also
+// renews the lease with updateMany as each job starts, a write with no
+// status; `calls` keeps the result writes only.
 function stubBackgroundJobUpdateMany() {
   const calls: UpdateManyArgs[] = [];
   const original = prisma.backgroundJob.updateMany;
   (prisma.backgroundJob.updateMany as unknown as (args: UpdateManyArgs) => Promise<unknown>) = async (
     args: UpdateManyArgs,
   ) => {
-    calls.push(args);
+    if ("status" in args.data) calls.push(args);
     return { count: 1 };
   };
   return {
