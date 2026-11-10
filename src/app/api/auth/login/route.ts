@@ -11,7 +11,7 @@ import {
   setMfaSessionCookie,
 } from "@/lib/auth";
 import { clientIpBucket } from "@/lib/client-ip";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, refundRateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
 import { parseBody, loginSchema } from "@/lib/schemas";
@@ -19,6 +19,36 @@ import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { studentLogKey } from "@/lib/log-keys";
 import { getJwtSecret } from "@/lib/session-token";
+
+/** One window for both sign-in limits. The failure messages name it in minutes. */
+const SIGN_IN_WINDOW_MINUTES = 15;
+const SIGN_IN_WINDOW_MS = SIGN_IN_WINDOW_MINUTES * 60 * 1000;
+
+/**
+ * FAILED sign-ins one network address may make per window. A right password
+ * gives its unit back, so a classroom of 30 on one address can all sign in;
+ * 30 leaves each of them one mistyped try. This bucket slows one address
+ * guessing across many accounts. It is a courtesy limit: the address comes
+ * from `X-Forwarded-For`, which a caller can set (src/lib/client-ip.ts).
+ */
+const NETWORK_FAILED_SIGN_IN_LIMIT = 30;
+
+/**
+ * Sign-in attempts on one account per window, right or wrong, from any
+ * address. This is the brute-force control, and nothing gives its units back.
+ */
+const ACCOUNT_SIGN_IN_LIMIT = 5;
+
+/**
+ * The one answer for every failed sign-in: unknown login, wrong password,
+ * locked, closed or Google-only account. One text, so the response never
+ * says which it was.
+ */
+const SIGN_IN_FAILED_MESSAGE =
+  "We could not sign you in. Check your username or email and your password, then try again. " +
+  `After too many tries, wait ${SIGN_IN_WINDOW_MINUTES} minutes or ask your instructor for help.`;
+
+const NETWORK_LIMIT_MESSAGE = `Too many sign-in tries from this location. Wait ${SIGN_IN_WINDOW_MINUTES} minutes, then try again, or ask your instructor for help.`;
 
 /**
  * Per-login limiter key for a login that names no account. An HMAC of the
@@ -36,9 +66,12 @@ function unknownLoginLimiterKey(normalizedLogin: string): string {
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const ip = clientIpBucket(req);
-  const rl = await rateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
-  if (!rl.success) {
-    return NextResponse.json({ error: "Too many login attempts. Please try again later." }, { status: 429 });
+  // Every attempt takes a unit first, in one atomic statement, so a burst of
+  // guesses cannot race past the limit. A right password gives it back below.
+  const networkKey = `login:${ip}`;
+  const networkRl = await rateLimit(networkKey, NETWORK_FAILED_SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
+  if (!networkRl.success) {
+    return NextResponse.json({ error: NETWORK_LIMIT_MESSAGE }, { status: 429 });
   }
 
   const body = await parseBody(req, loginSchema);
@@ -53,8 +86,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   // Per-user rate limit — prevents distributed brute force against a single
   // account. The refusal is deliberately NOT a 429: this route is reachable
-  // without a session, the login is not a secret, and the per-IP bucket is 10
-  // while this one is 5 — so a distinct status on the sixth attempt told an
+  // without a session, the login is not a secret, and the per-IP bucket is
+  // larger than this one — so a distinct status on the sixth attempt told an
   // anonymous caller whether the account exists, for six cheap requests per
   // address (2026-09-06 hunt, follow-up 1). A locked account now answers
   // exactly like a wrong password and exactly like an unknown login, the
@@ -71,8 +104,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const unknownLoginKey = unknownLoginLimiterKey(normalizedLogin);
   const userRl = await rateLimit(
     student ? `login:user:${student.id}` : unknownLoginKey,
-    5,
-    15 * 60 * 1000,
+    ACCOUNT_SIGN_IN_LIMIT,
+    SIGN_IN_WINDOW_MS,
   );
   const accountLocked = student !== null && !userRl.success;
 
@@ -107,7 +140,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         : `Failed login attempt for "${login}".`,
       metadata: { ip },
     });
-    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    return NextResponse.json({ error: SIGN_IN_FAILED_MESSAGE }, { status: 401 });
   }
 
   // Silent migration: if the stored hash used the legacy PBKDF2 format,
@@ -122,11 +155,21 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         data: { passwordHash: newHash },
       });
       if (migrated.count !== 1) {
-        return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+        return NextResponse.json({ error: SIGN_IN_FAILED_MESSAGE }, { status: 401 });
       }
     } catch (err) {
       logger.warn("Password rehash failed", { student: studentLogKey(student.id), error: errorForLog(err) });
     }
+  }
+
+  // The password was right, and both answers below say so. Give the network
+  // unit back here and nowhere earlier: every refusal above answers the same
+  // 401 whatever the password was, so a unit that came back for a locked or
+  // closed account would let the caller read "right password" off the
+  // network count, past the per-account lock. A degraded limiter took no
+  // unit, so there is nothing to give back.
+  if (!networkRl.degraded) {
+    await refundRateLimit(networkKey, networkRl.resetTime);
   }
 
   // If MFA is enabled, set the short-lived MFA challenge cookie and return a
