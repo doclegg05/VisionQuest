@@ -28,7 +28,9 @@
       "src/components/staff/OrgPlacementPanel.test.tsx",
       "src/app/api/admin/regions/regions-routes.test.ts",
       "src/app/api/teacher/classes/class-region-fields.test.ts",
-      "src/app/api/coordinator/reports/monthly/monthly-region-name.test.ts"
+      "src/app/api/coordinator/reports/monthly/monthly-region-name.test.ts",
+      "src/components/staff/invite-roles.test.tsx",
+      "src/app/api/teacher/classes/class-route-auth.test.ts"
     ]
   }
 }

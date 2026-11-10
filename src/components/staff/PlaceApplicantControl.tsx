@@ -68,14 +68,14 @@ export function PlaceApplicantControl({ applicantId, classes, onPlaced }: PlaceA
   }
 
   if (classes.length === 0) {
-    return <p className="text-sm text-[var(--ink-muted)]">There is no open classroom yet.</p>;
+    return <p className="text-sm text-[var(--ink-muted)]">There is no open class yet.</p>;
   }
 
   return (
     <div className="w-full space-y-2">
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-48 flex-1">
-          <label htmlFor={selectId} className={LABEL_CLASS}>Classroom</label>
+          <label htmlFor={selectId} className={LABEL_CLASS}>Class</label>
           <select id={selectId} value={classId} onChange={(e) => setClassId(e.target.value)} className={FIELD_CLASS}>
             {classes.map((option) => (
               <option key={option.id} value={option.id}>{option.name}</option>
@@ -88,7 +88,7 @@ export function PlaceApplicantControl({ applicantId, classes, onPlaced }: PlaceA
           disabled={pending}
           className="primary-button min-h-11 px-6 py-3 text-sm disabled:opacity-50"
         >
-          {pending ? "Placing…" : "Place in a classroom"}
+          {pending ? "Placing…" : "Place in a class"}
         </button>
       </div>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}

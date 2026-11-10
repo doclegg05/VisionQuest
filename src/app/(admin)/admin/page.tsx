@@ -1,12 +1,11 @@
 import { RegionsCard } from "@/components/admin/RegionsCard";
 import ClassRosterManager from "@/components/teacher/ClassRosterManager";
 import PageIntro from "@/components/ui/PageIntro";
+import { ADMIN_INVITE_ROLES } from "@/components/staff/invite-roles";
 import { OrgPlacementSection } from "@/components/staff/OrgPlacementSection";
 import { StaffInvitePanel } from "@/components/staff/StaffInvitePanel";
 import { getSession } from "@/lib/auth";
 import { listRegionsForSession } from "@/lib/region";
-
-const ADMIN_INVITE_ROLES = ["program_coordinator", "coordinator", "teacher"] as const;
 
 export default async function AdminSettingsPage() {
   const session = await getSession();

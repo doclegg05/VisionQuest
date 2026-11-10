@@ -53,9 +53,16 @@ describe("a coordinator with no region", () => {
     assert.ok(page.includes("Ask your program admin to add you to a region."));
   });
 
-  it("is told, when they see the whole state, to add a region on the Admin page", () => {
+  it("is sent to the Admin page only when they are an admin", () => {
     assert.ok(page.includes("There are no regions yet. Add one on the"));
     assert.match(page, /href="\/admin#regions"[^>]*>Admin page</);
+    // The admin layout turns anyone else back to their own home page, so the
+    // link would bring a program coordinator straight back here.
+    assert.match(page, /session\.role === "admin" \? \(/);
+  });
+
+  it("is told, as a program coordinator, to ask their program admin for a region", () => {
+    assert.ok(page.includes("There are no regions yet. Ask your program admin to add one."));
   });
 
   it("reads an intro with no dash and no jargon", () => {

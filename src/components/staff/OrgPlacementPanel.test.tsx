@@ -23,16 +23,20 @@ function render(canPlace: boolean): string {
 }
 
 describe("OrgPlacementPanel applicants", () => {
-  it("shows the Place in a classroom control to an admin", () => {
+  it("shows the Place in a class control to an admin", () => {
     const html = render(true);
-    assert.ok(html.includes("Place in a classroom"));
+    assert.ok(html.includes("Place in a class"));
     assert.ok(html.includes("Morning Class"));
+  });
+
+  it("says class, never classroom, like the panel around it", () => {
+    assert.doesNotMatch(render(true), /classroom/i);
   });
 
   it("shows the list read-only, with no control, to anyone else", () => {
     const html = render(false);
     assert.ok(html.includes("Sam Applicant"));
-    assert.ok(!html.includes("Place in a classroom"));
+    assert.ok(!html.includes("Place in a class"));
     assert.ok(!html.includes("Morning Class"));
   });
 });

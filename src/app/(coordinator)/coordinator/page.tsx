@@ -33,11 +33,15 @@ export default async function CoordinatorDashboard() {
           actions={askSageActionFor(session.role)}
         />
         <p className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-sm text-[var(--ink-muted)]">
-          {seesWholeState(session.role) ? (
+          {session.role === "admin" ? (
             <>
               There are no regions yet. Add one on the{" "}
               <Link href="/admin#regions" className="inline-flex items-center pointer-coarse:min-h-11 font-semibold text-[var(--ink-strong)] underline">Admin page</Link>.
             </>
+          ) : seesWholeState(session.role) ? (
+            // Only an admin can open the Admin page; its layout turns anyone
+            // else back here, so a program coordinator gets no link.
+            "There are no regions yet. Ask your program admin to add one."
           ) : (
             "No regions are assigned to you yet. Ask your program admin to add you to a region."
           )}
