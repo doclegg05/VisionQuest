@@ -13,12 +13,12 @@ import {
   DELETE_STEPS,
   REFUSALS,
   markedDemoAccountsRule,
-  runCloseoutCommand,
   runDemoCloseout,
   type CloseoutOutcome,
   type RefusalCode,
   type SelectionRule,
 } from "./closeout";
+import { runCloseoutCommand } from "./closeout.command";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN } from "./config";
 import { FakeDb, MODELS, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
 

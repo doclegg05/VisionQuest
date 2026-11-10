@@ -8,11 +8,11 @@
  * With no argument it previews. It takes the admin database URL from
  * ADMIN_DATABASE_URL in the shell that runs it, never loads .env.local, and
  * never prints the URL. Everything it does and every word it prints comes from
- * `runCloseoutCommand` in src/lib/demo/closeout.ts, which the unit tests cover;
+ * `runCloseoutCommand` in src/lib/demo/closeout.command.ts, which the unit tests cover;
  * this file only supplies the real database client and the process.
  */
 import { PrismaClient } from "@prisma/client";
-import { runCloseoutCommand } from "../src/lib/demo/closeout";
+import { runCloseoutCommand } from "../src/lib/demo/closeout.command";
 
 async function main(): Promise<void> {
   const result = await runCloseoutCommand(
