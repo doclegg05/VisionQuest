@@ -81,7 +81,7 @@ export default function OrientationWelcomeVideo() {
         <source src="/media/sage-welcome-orientation-720p-v2.mp4" type="video/mp4" />
         <track
           kind="captions"
-          src="/media/sage-welcome-orientation.vtt"
+          src="/media/sage-welcome-orientation-captions-v1.vtt"
           srcLang="en"
           label="English"
           default
