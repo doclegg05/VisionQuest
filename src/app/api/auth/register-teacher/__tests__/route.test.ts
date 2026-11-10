@@ -24,7 +24,6 @@ import { fleschKincaidGrade, PLAIN_LANGUAGE_IDEAL_GRADE } from "@/lib/sage/reada
 
 type CookieRecord = { studentId: string; role: string; sessionVersion: number };
 const cookieSets: CookieRecord[] = [];
-/** The options each session cookie was issued with, in call order. */
 const cookieOptions: unknown[] = [];
 
 /** Order of the DB update and the session-cache invalidation on the promotion path. */
@@ -413,8 +412,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       assert.equal(mockCreate.mock.calls[0].arguments[0].data.passwordHash, "scrypt$salt$hashed-fresh-password-123");
       assert.equal(cookieSets.length, 1, "expected session cookie to be set");
       assert.deepEqual(cookieSets[0], { studentId: "tch-1", role: "teacher", sessionVersion: 1 });
-      // The new staff member typed this password, so there is nothing to change.
-      assert.deepEqual(cookieOptions, [{ mustChangePassword: false }]);
+      assert.deepEqual(cookieOptions, [{ mustChangePassword: false }], "a password the new staff member typed");
       assert.equal(mockLogAuditEvent.mock.callCount(), 1);
       const creationEvent = mockLogAuditEvent.mock.calls[0].arguments[0];
       assert.equal(creationEvent.action, "auth.register_teacher");

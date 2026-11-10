@@ -19,7 +19,7 @@
       "src/app/api/teacher/students/reset-password-flag.test.ts",
       "src/app/api/auth/reset-password/__tests__/route.test.ts",
       "src/app/api/auth/reset-password/questions/__tests__/route.test.ts",
-      "src/app/api/auth/login/__tests__/route.test.ts",
+      "src/app/api/auth/login/__tests__/route.password-change.test.ts",
       "src/app/api/auth/mfa/challenge/__tests__/route.test.ts",
       "src/app/api/auth/google/callback/__tests__/route.test.ts",
       "src/app/change-password/page.test.tsx",
