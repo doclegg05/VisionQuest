@@ -31,9 +31,11 @@ Set these server-only environment values:
 - `VQ_MAC_RELAY_ENABLED=true`
 - `VQ_MAC_RELAY_AGENT_TOKEN`: 32 random bytes encoded as 64 lowercase hex characters.
 - `VQ_MAC_RELAY_APP_TOKEN`: an independent token in the same format.
-- `COHORT_DEMO_MODE=true`
-- `COHORT_DEMO_LOCAL_ONLY=true`
-- `COHORT_DEMO_LOCAL_AI_ORIGIN=http://127.0.0.1:11437`
+- `AI_LOCAL_ONLY=true` (the older `COHORT_DEMO_LOCAL_ONLY=true` still works)
+- `AI_LOCAL_APPROVED_ORIGIN=http://127.0.0.1:11437` (the older `COHORT_DEMO_LOCAL_AI_ORIGIN` still works)
+
+In production the app will not start unless a local only switch is on (one of the settings above) or `AI_CLOUD_INFERENCE` is exactly `allowed`, which needs a written owner decision first.
+Setting both, setting neither, or a misspelled value stops the start. The relay does not need `COHORT_DEMO_MODE`, so closing the demo leaves this block in place.
 
 The dedicated local adapter overrides the old provider URL and authentication
 settings without reading or modifying them. The approved loopback origin refers
