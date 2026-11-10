@@ -6,7 +6,7 @@
   "doneWhen": "8 or fewer",
   "check": {
     "type": "metric",
-    "run": null,
+    "run": "node scripts/readiness/query-count.mjs dashboard-idle",
     "baseline": 60,
     "target": 8,
     "direction": "atMost",

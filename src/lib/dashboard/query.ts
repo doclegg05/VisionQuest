@@ -4,6 +4,13 @@ import type { TaskDto, TaskPage } from "./tasks";
 export const dashboardKey = (sessionId: string) => ["dashboard", sessionId] as const;
 export const taskKey = (sessionId: string) => [...dashboardKey(sessionId), "tasks"] as const;
 export const freshness = { staleTime: 30_000, refetchOnWindowFocus: true, refetchOnReconnect: true, refetchInterval: 30_000, refetchIntervalInBackground: false, retry: 1 } as const;
+/** The dashboard regions the client polls, each with the endpoint it reads. The idle measurement (M2) reads this. */
+export const DASHBOARD_REGIONS = ["overview", "activity", "tasks", "support"] as const;
+export type DashboardRegion = (typeof DASHBOARD_REGIONS)[number];
+/** How often each region polls while the tab is visible, in milliseconds. */
+export const regionPollMs: Readonly<Record<DashboardRegion, number>> = {
+  overview: freshness.refetchInterval, activity: freshness.refetchInterval, tasks: freshness.refetchInterval, support: freshness.refetchInterval,
+};
 export class DashboardFetchError extends Error {
   constructor(message: string, readonly status: number) { super(message); this.name = "DashboardFetchError"; }
 }

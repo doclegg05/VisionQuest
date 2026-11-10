@@ -70,3 +70,18 @@ test("reads both chat-send boundaries and says the gate takes the larger", async
   );
   assert.deepEqual(parseBoundaries("dashboard", "nothing"), {});
 });
+
+test("reads the idle rate a rate path prints and totals it by client", async () => {
+  const { PATHS, parseRate, rateTotal } = await queryCount();
+  assert.equal(PATHS["dashboard-idle"].metric, "M2");
+  const output = [
+    "# IDLE_RATE path=dashboard-idle windowMs=600000 ticks=20 appPerMinute=70 adminPerMinute=4 perMinute=74",
+    "# IDLE_RATE path=elsewhere windowMs=1 ticks=1 appPerMinute=1 adminPerMinute=1 perMinute=2",
+  ].join("\n");
+  const rate = parseRate("dashboard-idle", output);
+  assert.deepEqual(rate, { windowMs: 600000, ticks: 20, app: 70, admin: 4 });
+  assert.equal(rateTotal(rate, { client: "all" }), 74);
+  assert.equal(rateTotal(rate, { client: "app" }), 70);
+  assert.equal(rateTotal(rate, { client: "admin" }), 4);
+  assert.equal(parseRate("dashboard-idle", "nothing"), null);
+});

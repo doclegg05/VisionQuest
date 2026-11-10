@@ -48,7 +48,6 @@ import { readFileSync } from "node:fs";
 import { before, describe, it, mock } from "node:test";
 import type { ReactNode } from "react";
 import { prerenderToNodeStream } from "react-dom/static";
-import { createInitialState } from "@/lib/progression/engine";
 import {
   countsByFunction,
   createQueryCounter,
@@ -60,7 +59,7 @@ import {
   type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
 import { unansweredLoadProblems, type UnansweredAllowances } from "./unanswered-loads";
-import { SECURITY_QUESTIONS } from "@/lib/security-questions";
+import { DASHBOARD_FIXTURES, DASHBOARD_JWT_SECRET, DASHBOARD_STUDENT_ID } from "./dashboard-fixtures.test-support";
 import { signToken } from "@/lib/session-token";
 
 // Set to the measured value. A change to any of these is a change in what the
@@ -107,65 +106,13 @@ const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
  */
 const DASHBOARD_UNANSWERED_WITH_NESTED: UnansweredAllowances = {};
 
-const STUDENT_ID = "stu-readiness-001";
-const NOW = new Date("2026-11-10T15:00:00.000Z");
+const STUDENT_ID = DASHBOARD_STUDENT_ID;
 const SESSION_COOKIE = "vq-session";
 
-process.env.JWT_SECRET = "readiness-query-count-jwt-secret-for-tests-only";
+process.env.JWT_SECRET = DASHBOARD_JWT_SECRET;
 const sessionToken = signToken(STUDENT_ID, "student", 0);
-const progressionState = JSON.stringify(createInitialState());
 
-const taskRow = {
-  id: "task-1", studentId: STUDENT_ID, createdById: "tch-1", appointmentId: null,
-  title: "Finish your resume", description: null, status: "open", priority: "normal",
-  dueAt: null, completedAt: null, createdAt: NOW, updatedAt: NOW,
-};
-
-const counter = createQueryCounter({
-  // Session (admin client).
-  "admin:sageConfirmationUse.findUnique": null,
-  "admin:student.findUnique": {
-    id: STUDENT_ID, studentId: "readiness-student", displayName: "Riley Fixture",
-    role: "student", sessionVersion: 0, isActive: true, demoAccount: null,
-  },
-  // Layout and page.
-  "goal.count": 2,
-  "progression.findUnique": { state: progressionState },
-  "orientationProgress.count": 3,
-  "securityQuestionAnswer.findMany": SECURITY_QUESTIONS.map((question) => ({ questionKey: question.key })),
-  // The Sage notice is acknowledged, so no redirect to /sage-notice (H6).
-  "consentRecord.findFirst": { id: "consent-notice" },
-  "notificationPreference.findUnique": null,
-  "formSubmission.count": 1,
-  // Readiness.
-  "orientationItem.count": 8,
-  "goal.findFirst": null,
-  "certification.count": 0,
-  "portfolioItem.count": 1,
-  "resumeData.findUnique": { id: "resume-1" },
-  "publicCredentialPage.findUnique": null,
-  // Overview, activity, tasks.
-  "certification.findMany": [{
-    id: "cert-1", studentId: STUDENT_ID, certType: "ready-to-work", status: "in_progress",
-    verificationStatus: null,
-    requirements: [{ id: "req-1", templateId: "tpl-1", completed: true, verifiedBy: null }],
-  }],
-  "certTemplate.findMany": [{ id: "tpl-1", certType: "ready-to-work", required: true, needsFile: false, needsVerify: true }],
-  "studentClassEnrollment.findFirst": { class: { requirements: [{ status: "required" }] } },
-  "application.count": 1,
-  "formSubmission.findFirst": { status: "approved" },
-  "studentTask.findMany": [taskRow],
-  "studentTask.count": 1,
-  // Support and next step.
-  "careerDiscovery.findUnique": { status: "complete" },
-  "message.count": 6,
-  "studentSavedJob.count": 1,
-  "studentAlert.count": 1,
-  "appointment.findFirst": { id: "appt-1", title: "Advising check-in", startsAt: NOW, locationLabel: "Room 2" },
-  "orientationItem.findMany": [{ id: "item-1", label: "Sign the attendance policy" }],
-  "sagePanel.findFirst": null,
-  "moodEntry.findFirst": null,
-});
+const counter = createQueryCounter(DASHBOARD_FIXTURES);
 
 mock.module("@/lib/db", { exports: counter.dbModule });
 mock.module("next/headers", {
