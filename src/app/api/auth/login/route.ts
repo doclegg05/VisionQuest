@@ -168,7 +168,7 @@ async function auditFailedSignIn({ login, ip, student, accountLocked, isOAuthOnl
  */
 async function upgradeLegacyHash(student: Student, password: string): Promise<boolean> {
   try {
-    const { hash: newHash } = hashPassword(password);
+    const { hash: newHash } = await hashPassword(password);
     const migrated = await prisma.student.updateMany({
       where: { id: student.id, passwordHash: student.passwordHash },
       data: { passwordHash: newHash },
@@ -255,7 +255,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
   const isOAuthOnly = student !== null && !student.passwordHash && student.authProvider === "google";
   // Always run the KDF to equalize timing and avoid an account-enumeration oracle.
-  const { valid: passwordMatches, needsRehash } = verifyPasswordSafeWithStatus(
+  const { valid: passwordMatches, needsRehash } = await verifyPasswordSafeWithStatus(
     password,
     student?.passwordHash ?? null,
   );

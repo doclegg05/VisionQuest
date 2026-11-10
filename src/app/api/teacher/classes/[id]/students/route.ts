@@ -41,7 +41,7 @@ export const POST = withTeacherAuth(async (
     throw badRequest("That email is already registered.");
   }
 
-  const { hash } = hashPassword(password);
+  const { hash } = await hashPassword(password);
 
   const student = await prisma.$transaction(async (tx) => {
     const created = await tx.student.create({

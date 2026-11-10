@@ -177,7 +177,7 @@ async function main() {
       update: {
         email: E2E_TEACHER.email,
         displayName: E2E_TEACHER.displayName,
-        passwordHash: hashPassword(E2E_TEACHER.password).hash,
+        passwordHash: (await hashPassword(E2E_TEACHER.password)).hash,
         role: "teacher",
         isActive: true,
       },
@@ -185,7 +185,7 @@ async function main() {
         studentId: E2E_TEACHER.login,
         email: E2E_TEACHER.email,
         displayName: E2E_TEACHER.displayName,
-        passwordHash: hashPassword(E2E_TEACHER.password).hash,
+        passwordHash: (await hashPassword(E2E_TEACHER.password)).hash,
         role: "teacher",
       },
     });
@@ -195,7 +195,7 @@ async function main() {
       update: {
         email: E2E_STUDENT.email,
         displayName: E2E_STUDENT.displayName,
-        passwordHash: hashPassword(E2E_STUDENT.password).hash,
+        passwordHash: (await hashPassword(E2E_STUDENT.password)).hash,
         role: "student",
         isActive: true,
         // A long-lived database where staff once reset this account would
@@ -206,7 +206,7 @@ async function main() {
         studentId: E2E_STUDENT.login,
         email: E2E_STUDENT.email,
         displayName: E2E_STUDENT.displayName,
-        passwordHash: hashPassword(E2E_STUDENT.password).hash,
+        passwordHash: (await hashPassword(E2E_STUDENT.password)).hash,
       },
     });
 
@@ -215,7 +215,7 @@ async function main() {
       update: {
         email: E2E_JOURNEY_STUDENT.email,
         displayName: E2E_JOURNEY_STUDENT.displayName,
-        passwordHash: hashPassword(E2E_JOURNEY_STUDENT.password).hash,
+        passwordHash: (await hashPassword(E2E_JOURNEY_STUDENT.password)).hash,
         role: "student",
         isActive: true,
         // A long-lived database where staff once reset this account would
@@ -226,7 +226,7 @@ async function main() {
         studentId: E2E_JOURNEY_STUDENT.login,
         email: E2E_JOURNEY_STUDENT.email,
         displayName: E2E_JOURNEY_STUDENT.displayName,
-        passwordHash: hashPassword(E2E_JOURNEY_STUDENT.password).hash,
+        passwordHash: (await hashPassword(E2E_JOURNEY_STUDENT.password)).hash,
       },
     });
 
@@ -235,7 +235,7 @@ async function main() {
     // when the 3-question recovery set is missing, so seeded users need a
     // configured set or every authenticated spec bounces there. Hashed with
     // the real helper (scrypt over the normalized answer).
-    const recoveryAnswers = hashSecurityAnswers({
+    const recoveryAnswers = await hashSecurityAnswers({
       birth_city: "Testville",
       elementary_school: "Test Elementary",
       favorite_teacher: "Testy",

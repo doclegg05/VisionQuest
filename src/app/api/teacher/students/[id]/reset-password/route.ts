@@ -37,7 +37,7 @@ export const POST = withTeacherAuth(async (
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
-  const { hash } = hashPassword(newPassword);
+  const { hash } = await hashPassword(newPassword);
   // Reset tokens are own-only under RLS. After student authorization, use
   // one privileged transaction so a teacher reset actually revokes them.
   await prismaAdmin.$transaction([

@@ -62,13 +62,17 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     return Response.json({ error: securityQuestionsResult.error }, { status: 400 });
   }
 
+  // Hashed before the transaction opens: the hashes wait their turn in the
+  // hash queue, and a transaction must not hold a connection while they do.
+  const hashedAnswers = await hashSecurityAnswers(securityQuestionsResult.answers);
+
   await prisma.$transaction(async (tx) => {
     await tx.securityQuestionAnswer.deleteMany({
       where: { studentId: session.id },
     });
 
     await tx.securityQuestionAnswer.createMany({
-      data: hashSecurityAnswers(securityQuestionsResult.answers).map((item) => ({
+      data: hashedAnswers.map((item) => ({
         studentId: session.id,
         questionKey: item.questionKey,
         answerHash: item.answerHash,

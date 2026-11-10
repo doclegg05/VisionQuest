@@ -246,7 +246,7 @@ async function main(): Promise<void> {
         studentId: instructor.login as string,
         email: instructor.email as string,
         displayName: instructor.displayName as string,
-        passwordHash: hashPassword(BENCH_INSTRUCTOR_PASSWORD).hash,
+        passwordHash: (await hashPassword(BENCH_INSTRUCTOR_PASSWORD)).hash,
         role: "teacher",
         isActive: true,
       };
@@ -262,7 +262,7 @@ async function main(): Promise<void> {
         studentId: student.login as string,
         email: student.email as string,
         displayName: student.displayName as string,
-        passwordHash: hashPassword(BENCH_STUDENT_PASSWORD).hash,
+        passwordHash: (await hashPassword(BENCH_STUDENT_PASSWORD)).hash,
         role: "student",
         isActive: true,
       };
@@ -315,7 +315,7 @@ async function main(): Promise<void> {
     // "Keep your account safe" instead of Career, and read as a missing
     // approval card. Every browser-driven benchmark over this cohort needs
     // these, so they are seeded for staff and students alike.
-    const recoveryAnswers = hashSecurityAnswers({
+    const recoveryAnswers = await hashSecurityAnswers({
       birth_city: "Benchville",
       elementary_school: "Bench Elementary",
       favorite_teacher: "Benchy",

@@ -54,7 +54,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "This reset link has expired or has already been used." }, { status: 400 });
   }
 
-  const { hash } = hashPassword(password);
+  const { hash } = await hashPassword(password);
 
   const result = await prisma.$transaction(async (tx) => {
     const markedUsed = await tx.passwordResetToken.updateMany({

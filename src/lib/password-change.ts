@@ -128,7 +128,7 @@ async function writeNewPassword(
   account: { id: string; passwordHash: string; sessionVersion: number },
   newPassword: string,
 ): Promise<number | null> {
-  const { hash } = hashPassword(newPassword);
+  const { hash } = await hashPassword(newPassword);
   const written = await prismaAdmin.$transaction(async (tx) => {
     const updated = await tx.student.updateMany({
       where: { id: account.id, passwordHash: account.passwordHash, sessionVersion: account.sessionVersion },
@@ -163,7 +163,7 @@ export async function changeOwnPassword({
   }
   if (!attempt.success) return { kind: "budget_spent" };
 
-  if (!verifyPasswordSafeWithStatus(currentPassword, passwordHash).valid) {
+  if (!(await verifyPasswordSafeWithStatus(currentPassword, passwordHash)).valid) {
     return { kind: "wrong_current_password" };
   }
   // The current password was right, and every answer from here on says so.

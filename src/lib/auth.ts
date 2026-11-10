@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { prismaAdmin } from "./db";
 import { cached, invalidatePrefix } from "./cache";
 import { isCohortDemoEnabled, type DemoAccountKind } from "./demo/config";
+import { runHashJob } from "./hash-queue";
 import { errorForLog } from "./log-error";
 import { logger } from "./logger";
 import { passwordChangeRequired } from "./password-change-gate";
@@ -33,6 +34,13 @@ export type { SessionClaims, MfaSessionClaims };
 // PBKDF2 hash, the login route rehashes transparently to migrate the
 // user to scrypt without prompting them. Over time the PBKDF2 population
 // decays to zero.
+//
+// Both run on Node's thread pool, never on the event loop: one sign-in used
+// to stop every other request for the tens of milliseconds its hash took, and
+// a classroom signing in together stalled the site for seconds. They also go
+// through the hash queue (src/lib/hash-queue.ts), a few at a time, so that
+// classroom does not start 30 hashes of about 32 MB each at once. Every
+// function below that hashes therefore answers a promise.
 
 const SCRYPT_PARAMS = {
   // N=2^15 (32768) balances ~50-80ms login latency with memory-hard
@@ -48,20 +56,44 @@ const SCRYPT_PARAMS = {
   maxmem: 64 * 1024 * 1024,
 } as const;
 
-function scryptHash(password: string, salt: string): string {
-  return crypto
-    .scryptSync(password, salt, SCRYPT_PARAMS.keylen, {
-      N: SCRYPT_PARAMS.N,
-      r: SCRYPT_PARAMS.r,
-      p: SCRYPT_PARAMS.p,
-      maxmem: SCRYPT_PARAMS.maxmem,
-    })
-    .toString("hex");
+/** Settles a promise with the derived key as hex, from a Node crypto callback. */
+function hexFromCallback(resolve: (hex: string) => void, reject: (error: Error) => void) {
+  return (error: Error | null, derived: Buffer): void => {
+    if (error) reject(error);
+    else resolve(derived.toString("hex"));
+  };
 }
 
-export function hashPassword(password: string): { hash: string; salt: string } {
+// `crypto.scrypt` and `crypto.pbkdf2` are read when called, not captured when
+// this module loads, so a test can count the calls.
+function scryptHash(password: string, salt: string): Promise<string> {
+  return runHashJob(
+    () =>
+      new Promise<string>((resolve, reject) => {
+        const options = {
+          N: SCRYPT_PARAMS.N,
+          r: SCRYPT_PARAMS.r,
+          p: SCRYPT_PARAMS.p,
+          maxmem: SCRYPT_PARAMS.maxmem,
+        };
+        crypto.scrypt(password, salt, SCRYPT_PARAMS.keylen, options, hexFromCallback(resolve, reject));
+      }),
+  );
+}
+
+/** The legacy KDF, kept only to check hashes made before scrypt. */
+function legacyPbkdf2Hash(password: string, salt: string): Promise<string> {
+  return runHashJob(
+    () =>
+      new Promise<string>((resolve, reject) => {
+        crypto.pbkdf2(password, salt, 100000, 64, "sha512", hexFromCallback(resolve, reject));
+      }),
+  );
+}
+
+export async function hashPassword(password: string): Promise<{ hash: string; salt: string }> {
   const salt = crypto.randomBytes(32).toString("hex");
-  const derived = scryptHash(password, salt);
+  const derived = await scryptHash(password, salt);
   return { hash: `scrypt$${salt}$${derived}`, salt };
 }
 
@@ -70,7 +102,7 @@ export interface PasswordVerifyResult {
   needsRehash: boolean;
 }
 
-export function verifyPasswordWithStatus(password: string, stored: string): PasswordVerifyResult {
+export async function verifyPasswordWithStatus(password: string, stored: string): Promise<PasswordVerifyResult> {
   // Current format: scrypt$<salt>$<hash>
   if (stored.startsWith("scrypt$")) {
     const parts = stored.split("$");
@@ -78,7 +110,7 @@ export function verifyPasswordWithStatus(password: string, stored: string): Pass
     const [, salt, hash] = parts;
     if (!salt || !hash) return { valid: false, needsRehash: false };
     try {
-      const candidate = scryptHash(password, salt);
+      const candidate = await scryptHash(password, salt);
       const expected = Buffer.from(hash, "hex");
       const actual = Buffer.from(candidate, "hex");
       if (expected.length !== actual.length) return { valid: false, needsRehash: false };
@@ -93,9 +125,7 @@ export function verifyPasswordWithStatus(password: string, stored: string): Pass
   const [salt, hash] = stored.split(":");
   if (!salt || !hash) return { valid: false, needsRehash: false };
   try {
-    const candidate = crypto
-      .pbkdf2Sync(password, salt, 100000, 64, "sha512")
-      .toString("hex");
+    const candidate = await legacyPbkdf2Hash(password, salt);
     const expected = Buffer.from(hash, "hex");
     const actual = Buffer.from(candidate, "hex");
     if (expected.length !== actual.length) return { valid: false, needsRehash: false };
@@ -111,15 +141,17 @@ export function verifyPasswordWithStatus(password: string, stored: string): Pass
  * Boolean-only wrapper for callers that don't care about rehashing
  * (e.g. security-question answer verification).
  */
-export function verifyPassword(password: string, stored: string): boolean {
-  return verifyPasswordWithStatus(password, stored).valid;
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  return (await verifyPasswordWithStatus(password, stored)).valid;
 }
 
 // Precomputed dummy hash used to equalize timing when the account doesn't exist.
 // Uses the current (scrypt) format so its CPU cost matches the fast path.
-const DUMMY_HASH = (() => {
+// Started when this module loads, as before, so it is ready long before the
+// first sign-in. A check that needs it waits for it.
+const DUMMY_HASH: Promise<string> = (async () => {
   const salt = crypto.randomBytes(32).toString("hex");
-  const derived = scryptHash("dummy-password-never-matches", salt);
+  const derived = await scryptHash("dummy-password-never-matches", salt);
   return `scrypt$${salt}$${derived}`;
 })();
 
@@ -132,20 +164,20 @@ function isKnownHashFormat(stored: string): boolean {
  * Prevents timing-based account enumeration by ensuring the request spends
  * roughly the same CPU time whether or not the account exists.
  */
-export function verifyPasswordSafeWithStatus(
+export async function verifyPasswordSafeWithStatus(
   password: string,
   stored: string | null | undefined,
-): PasswordVerifyResult {
+): Promise<PasswordVerifyResult> {
   const hasStoredHash = Boolean(stored && isKnownHashFormat(stored));
-  const target = hasStoredHash ? stored! : DUMMY_HASH;
-  const result = verifyPasswordWithStatus(password, target);
+  const target = hasStoredHash ? stored! : await DUMMY_HASH;
+  const result = await verifyPasswordWithStatus(password, target);
   // Dummy work equalizes timing; it must never authenticate a malformed hash.
   return hasStoredHash ? result : { valid: false, needsRehash: false };
 }
 
 /** Boolean-only wrapper preserved for existing callers. */
-export function verifyPasswordSafe(password: string, stored: string | null | undefined): boolean {
-  return verifyPasswordSafeWithStatus(password, stored).valid;
+export async function verifyPasswordSafe(password: string, stored: string | null | undefined): Promise<boolean> {
+  return (await verifyPasswordSafeWithStatus(password, stored)).valid;
 }
 
 // --- JWT (re-exported from ./session-token so middleware can import the

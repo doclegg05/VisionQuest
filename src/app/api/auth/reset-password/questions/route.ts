@@ -60,12 +60,16 @@ const NO_STORED_ANSWERS: ReadonlyMap<string, string> = new Map();
  * account that cannot recover, lets response time show which answers were
  * right and whether the login exists.
  */
-function verifyEveryAnswer(
+async function verifyEveryAnswer(
   answers: SecurityQuestionAnswers,
   storedAnswers: ReadonlyMap<string, string>,
-): boolean {
-  const results = Object.entries(answers).map(([questionKey, answer]) =>
-    verifySecurityAnswer(answer, storedAnswers.get(questionKey)),
+): Promise<boolean> {
+  // Awaited before they are combined: an unawaited promise is always truthy,
+  // and `every(Boolean)` over promises would accept any answers at all.
+  const results = await Promise.all(
+    Object.entries(answers).map(([questionKey, answer]) =>
+      verifySecurityAnswer(answer, storedAnswers.get(questionKey)),
+    ),
   );
   return results.every(Boolean);
 }
@@ -202,14 +206,14 @@ async function countAccountAttempt(
 }
 
 /** The refusal a closed gate answers with, or null when the answers may be checked. */
-function gateRefusal(gate: AccountGate, answers: SecurityQuestionAnswers): NextResponse | null {
+async function gateRefusal(gate: AccountGate, answers: SecurityQuestionAnswers): Promise<NextResponse | null> {
   switch (gate) {
     case "open":
       return null;
     case "locked":
       // Same KDF work as every other refusal, so a locked account is not
       // answered faster than an unknown one.
-      verifyEveryAnswer(answers, NO_STORED_ANSWERS);
+      await verifyEveryAnswer(answers, NO_STORED_ANSWERS);
       return resetRefused();
     case "unavailable":
       // Every login reads this, real or unknown, and no answer was checked,
@@ -241,7 +245,7 @@ function recoverableAnswers(student: RecoveryAccount | null): ReadonlyMap<string
 
 /** Sets the new password, ends the account's other sessions and cancels any emailed reset link. */
 async function setNewPassword(studentId: string, password: string) {
-  const { hash } = hashPassword(password);
+  const { hash } = await hashPassword(password);
   const result = await prisma.$transaction(async (tx) => {
     const updatedStudent = await tx.student.update({
       where: { id: studentId },
@@ -301,14 +305,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const login = normalizeRecoveryLogin(body.login.trim());
   const student = await findRecoveryAccount(login);
-  const refusal = gateRefusal(await countAccountAttempt(student, login, ip), securityQuestionsResult.answers);
+  const refusal = await gateRefusal(await countAccountAttempt(student, login, ip), securityQuestionsResult.answers);
   if (refusal) return refusal;
 
   // Unknown, unconfigured, and staff accounts are refused only after the same
   // three KDF runs a real attempt costs, and with the same response as a
   // wrong answer: a fast reply or a distinct status would confirm the login.
   const storedAnswers = recoverableAnswers(student);
-  const answersMatch = verifyEveryAnswer(securityQuestionsResult.answers, storedAnswers ?? NO_STORED_ANSWERS);
+  const answersMatch = await verifyEveryAnswer(securityQuestionsResult.answers, storedAnswers ?? NO_STORED_ANSWERS);
   if (!student || !storedAnswers || !answersMatch) {
     return resetRefused();
   }
