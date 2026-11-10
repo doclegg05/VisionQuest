@@ -1,0 +1,667 @@
+{
+  "generatedAt": "2026-11-10T18:59:57.004Z",
+  "commit": "a784dfc4",
+  "flags": "none",
+  "ciGreen": false,
+  "scores": [
+    {
+      "label": "Launch tasks",
+      "passed": 2,
+      "total": 34
+    },
+    {
+      "label": "Launch metrics",
+      "passed": 0,
+      "total": 5
+    },
+    {
+      "label": "Owner rows",
+      "passed": 0,
+      "total": 12
+    },
+    {
+      "label": "Pilot tasks",
+      "passed": 0,
+      "total": 24
+    },
+    {
+      "label": "Pilot metrics",
+      "passed": 0,
+      "total": 3
+    }
+  ],
+  "gates": [
+    {
+      "id": "T1",
+      "kind": "task",
+      "set": "launch",
+      "title": "Readiness scorecard",
+      "status": "pass",
+      "detail": "57 tests passed"
+    },
+    {
+      "id": "T2",
+      "kind": "task",
+      "set": "launch",
+      "title": "Query counter",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "T3",
+      "kind": "task",
+      "set": "launch",
+      "title": "Page weight script",
+      "status": "pass",
+      "detail": "9 tests passed"
+    },
+    {
+      "id": "A1",
+      "kind": "task",
+      "set": "launch",
+      "title": "Classroom-safe sign-in limits",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "A2",
+      "kind": "task",
+      "set": "launch",
+      "title": "One password rule",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "A3",
+      "kind": "task",
+      "set": "launch",
+      "title": "Students can change a password, and must after staff set one",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "A4",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Staff can finish MFA setup",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "A5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "A signed-out student is told why",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "B1",
+      "kind": "task",
+      "set": "launch",
+      "title": "Regions screen",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "B2",
+      "kind": "task",
+      "set": "launch",
+      "title": "An unplaced instructor is not stranded",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "B3",
+      "kind": "task",
+      "set": "launch",
+      "title": "First-day guidance",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "B4",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Class actions that cannot hurt by accident",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C1",
+      "kind": "task",
+      "set": "launch",
+      "title": "Verify buttons report failure",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C2",
+      "kind": "task",
+      "set": "launch",
+      "title": "Alert age is real",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C3",
+      "kind": "task",
+      "set": "launch",
+      "title": "Queue actions can be undone",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C4",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Teacher home leads with the queue",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "One class filter",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C6",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Program Setup is safe",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C7",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Staff wording and narrow screens",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "D1",
+      "kind": "task",
+      "set": "launch",
+      "title": "The signed-form banner tells the truth, per R5",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "D2",
+      "kind": "task",
+      "set": "launch",
+      "title": "Orientation documents open on phones",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "D3",
+      "kind": "task",
+      "set": "launch",
+      "title": "Sign-in form first on phones",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "D4",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Student home works on a phone",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "D5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Forms keep what was typed",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "D6",
+      "kind": "task",
+      "set": "pilot",
+      "title": "One error line",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "D7",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Student wording, and the text-message setup dead end",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "E0",
+      "kind": "task",
+      "set": "launch",
+      "title": "Measure before changing any timeout",
+      "status": "owner-open",
+      "detail": "0 of 1 row verified"
+    },
+    {
+      "id": "E1",
+      "kind": "task",
+      "set": "launch",
+      "title": "Honest failure states",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "E2",
+      "kind": "task",
+      "set": "launch",
+      "title": "A wait the student can read",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "E3",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Retry repeats nothing",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "E4",
+      "kind": "task",
+      "set": "pilot",
+      "title": "First byte early",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "E5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Smooth typing on slow phones",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "E6",
+      "kind": "task",
+      "set": "launch",
+      "title": "\"Sage is an AI and can be wrong\" under the message box, linked to the notice page",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "E7",
+      "kind": "task",
+      "set": "pilot",
+      "title": "The mini chat has Retry and Help on failure",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "E8",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Chat opens with its history",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "F1",
+      "kind": "task",
+      "set": "launch",
+      "title": "Pool and session",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "F2",
+      "kind": "task",
+      "set": "launch",
+      "title": "Dashboard read diet",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "F3",
+      "kind": "task",
+      "set": "launch",
+      "title": "Bookkeeping after the response",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "F4",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Transactions that fit",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "F5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Teacher home in one pass",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "F6",
+      "kind": "task",
+      "set": "pilot",
+      "title": "The jobs list sends only what it shows",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "F7",
+      "kind": "task",
+      "set": "hold",
+      "title": "A cheaper RLS wrapper",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "G1",
+      "kind": "task",
+      "set": "launch",
+      "title": "Pages show before JavaScript runs",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "G2",
+      "kind": "task",
+      "set": "launch",
+      "title": "Lighter sign-in",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "G3",
+      "kind": "task",
+      "set": "launch",
+      "title": "Smaller orientation video",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "G4",
+      "kind": "task",
+      "set": "pilot",
+      "title": "File downloads cache privately",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "G5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Load less up front",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "G6",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Loading and error coverage",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "G7",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Tailwind scans `src` only",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H1",
+      "kind": "task",
+      "set": "launch",
+      "title": "Errors reach a person",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H2",
+      "kind": "task",
+      "set": "launch",
+      "title": "Demo and real students can never coexist",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H3",
+      "kind": "task",
+      "set": "launch",
+      "title": "Sage's state is visible",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H4",
+      "kind": "task",
+      "set": "launch",
+      "title": "The block on cloud AI is explicit",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H5",
+      "kind": "task",
+      "set": "launch",
+      "title": "Jobs survive a restart",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H6",
+      "kind": "task",
+      "set": "launch",
+      "title": "Notice and acknowledgement",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H7",
+      "kind": "task",
+      "set": "launch",
+      "title": "Release hygiene",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H8",
+      "kind": "task",
+      "set": "launch",
+      "title": "Incident basics page at `docs/runbooks/incident-basics.md`",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H9",
+      "kind": "task",
+      "set": "pilot",
+      "title": "A per-user limit on uploads",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H10",
+      "kind": "task",
+      "set": "launch",
+      "title": "Demo closeout kit",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "M1",
+      "kind": "metric",
+      "set": "launch",
+      "title": "App queries for one student dashboard render",
+      "status": "unmeasured",
+      "detail": "no measuring command yet (target at most 20, baseline 39)"
+    },
+    {
+      "id": "M2",
+      "kind": "metric",
+      "set": "launch",
+      "title": "Statements per open dashboard per minute at idle",
+      "status": "unmeasured",
+      "detail": "no measuring command yet (target at most 8, baseline 60)"
+    },
+    {
+      "id": "M3",
+      "kind": "metric",
+      "set": "pilot",
+      "title": "Database round trips before chat sends its first byte",
+      "status": "unmeasured",
+      "detail": "no measuring command yet (target at most 10, baseline 65)"
+    },
+    {
+      "id": "M4",
+      "kind": "metric",
+      "set": "launch",
+      "title": "Compressed scripts and styles on the sign-in page",
+      "status": "fail",
+      "detail": "322.2 KB (target at most 235, baseline 322)"
+    },
+    {
+      "id": "M5",
+      "kind": "metric",
+      "set": "launch",
+      "title": "Orientation video size",
+      "status": "fail",
+      "detail": "34.7 MB (target at most 10, baseline 34.7)"
+    },
+    {
+      "id": "M6",
+      "kind": "metric",
+      "set": "pilot",
+      "title": "App queries for one teacher home render",
+      "status": "unmeasured",
+      "detail": "no measuring command yet (target at most 20, baseline 44)"
+    },
+    {
+      "id": "M7",
+      "kind": "metric",
+      "set": "launch",
+      "title": "Production `/api/health` `latency_ms`",
+      "status": "fail",
+      "detail": "531 ms (target at most 60, baseline 530)"
+    },
+    {
+      "id": "M8",
+      "kind": "metric",
+      "set": "pilot",
+      "title": "Signed-in student dashboard, median server time in production",
+      "status": "unmeasured",
+      "detail": "no measuring command yet (target at most 1000, baseline not measured)"
+    },
+    {
+      "id": "O-1",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Regions, connection string mode and deploy-on-merge recorded",
+      "status": "owner-open",
+      "detail": "0 of 4 rows verified"
+    },
+    {
+      "id": "O-2",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Legal basis and FERPA decisions",
+      "status": "owner-open",
+      "detail": "0 of 6 rows verified"
+    },
+    {
+      "id": "O-3",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Backups",
+      "status": "owner-open",
+      "detail": "0 of 4 rows verified"
+    },
+    {
+      "id": "O-4",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Model acceptance at the host",
+      "status": "owner-open",
+      "detail": "0 of 6 rows verified"
+    },
+    {
+      "id": "O-5",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Cron health",
+      "status": "owner-open",
+      "detail": "0 of 1 row verified"
+    },
+    {
+      "id": "O-6",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Render in line with render.yaml",
+      "status": "owner-open",
+      "detail": "0 of 5 rows verified"
+    },
+    {
+      "id": "O-7",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Demo closeout",
+      "status": "owner-open",
+      "detail": "0 of 9 rows verified"
+    },
+    {
+      "id": "O-8",
+      "kind": "owner",
+      "set": "launch",
+      "title": "App and database in one region",
+      "status": "owner-open",
+      "detail": "0 of 2 rows verified"
+    },
+    {
+      "id": "O-9",
+      "kind": "owner",
+      "set": "pilot",
+      "title": "Notice wording, retention numbers and staff MFA policy approved",
+      "status": "owner-open",
+      "detail": "0 of 3 rows verified"
+    },
+    {
+      "id": "O-10",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Real phones",
+      "status": "owner-open",
+      "detail": "0 of 2 rows verified"
+    },
+    {
+      "id": "O-11",
+      "kind": "owner",
+      "set": "pilot",
+      "title": "Cold-queue triage timed",
+      "status": "owner-open",
+      "detail": "0 of 1 row verified"
+    },
+    {
+      "id": "O-12",
+      "kind": "owner",
+      "set": "launch",
+      "title": "Classroom rehearsal",
+      "status": "owner-open",
+      "detail": "0 of 1 row verified"
+    }
+  ]
+}
