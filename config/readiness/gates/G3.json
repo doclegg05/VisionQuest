@@ -5,6 +5,7 @@
   "title": "Smaller orientation video",
   "doneWhen": "M5 at target. Captions still line up.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": ["src/components/orientation/orientation-welcome-video-assets.test.ts"]
   }
 }

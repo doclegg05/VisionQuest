@@ -75,9 +75,10 @@ export default function OrientationWelcomeVideo() {
         controls
         playsInline
         preload="metadata"
+        poster="/media/sage-welcome-orientation-poster-v2.jpg"
         onEnded={markVideoComplete}
       >
-        <source src="/media/sage-welcome-orientation.mp4" type="video/mp4" />
+        <source src="/media/sage-welcome-orientation-720p-v2.mp4" type="video/mp4" />
         <track
           kind="captions"
           src="/media/sage-welcome-orientation.vtt"
@@ -101,7 +102,7 @@ export default function OrientationWelcomeVideo() {
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <a
-          href="/media/sage-welcome-orientation.mp4"
+          href="/media/sage-welcome-orientation-720p-v2.mp4"
           download
           className="inline-flex min-h-11 items-center font-semibold text-info hover:underline"
         >

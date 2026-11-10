@@ -75,6 +75,14 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Versioned file names (-v2) make a year-long cache safe: a new
+        // video ships under a new name.
+        source: "/media/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
     ];
   },
 };
