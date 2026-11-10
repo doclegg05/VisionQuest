@@ -426,6 +426,7 @@ jobs:
           e2e/student-journey.spec.ts
           e2e/jobs-journey.spec.ts
           e2e/teacher-loop.spec.ts
+          e2e/regions-admin.spec.ts
           e2e/theme-variant.spec.ts
           e2e/cohort-demo-off.spec.ts
           --reporter=line --timeout=120000
