@@ -5,6 +5,10 @@
   "title": "Orientation documents open on phones",
   "doneWhen": "Component test for the link. Owner row O-10 for real phones.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/components/orientation/OrientationDocumentPane.test.tsx",
+      "src/components/orientation/OrientationItemsRequest.test.ts"
+    ]
   }
 }

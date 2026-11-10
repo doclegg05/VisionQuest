@@ -14,7 +14,7 @@ import WizardStepIndicator from "./WizardStepIndicator";
 import WizardCompletion from "./WizardCompletion";
 import { WELCOME_VIDEO_ORIENTATION_ITEM_ID } from "@/lib/orientation-welcome-video";
 
-interface OrientationItem {
+export interface OrientationItem {
   id: string;
   label: string;
   description: string | null;
@@ -48,11 +48,30 @@ function classifyStep(form: SpokesForm): StepType {
   return "read-only";
 }
 
-async function fetchOrientationWizardItems(): Promise<OrientationItem[]> {
-  const res = await fetch("/api/orientation");
+async function requestOrientationItems(fetchFn: typeof fetch): Promise<OrientationItem[]> {
+  const res = await fetchFn("/api/orientation");
   if (!res.ok) throw new Error("Failed to load");
   const data = await res.json();
   return data.items || [];
+}
+
+// The orientation page mounts the wizard and the welcome video together and
+// both need this list. Callers that ask while a request is still running share
+// it; once it settles the slot clears, so a later call (a retry, a refresh)
+// always reads fresh data.
+let inFlightItems: Promise<OrientationItem[]> | null = null;
+
+export function fetchOrientationWizardItems(
+  fetchFn: typeof fetch = fetch
+): Promise<OrientationItem[]> {
+  if (inFlightItems) return inFlightItems;
+  const request = requestOrientationItems(fetchFn);
+  inFlightItems = request;
+  const release = () => {
+    if (inFlightItems === request) inFlightItems = null;
+  };
+  request.then(release, release);
+  return request;
 }
 
 /**
@@ -116,6 +135,45 @@ function deriveSteps(items: OrientationItem[]): WizardStep[] {
     steps.push(...formSteps);
   }
   return steps;
+}
+
+interface OrientationDocumentPaneProps {
+  /** Address of the document, from `buildFormDownloadUrl(form, "view")`. */
+  url: string;
+  title: string;
+}
+
+/**
+ * The document a student reads before they tick "I have read this document".
+ *
+ * Phones usually show an embedded PDF as its first page or not at all, so the
+ * link is always there and the frame appears only from the `md` breakpoint up.
+ * Both are plain CSS (no script reads the screen size), which keeps the page
+ * right before JavaScript runs.
+ */
+export function OrientationDocumentPane({ url, title }: OrientationDocumentPaneProps) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col items-start gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-info px-4 py-2 text-sm font-semibold text-on-info hover:bg-brand-dark"
+        >
+          Open the document
+        </a>
+        <p className="text-sm text-[var(--ink-muted)]">
+          It opens in a new tab. Come back here to sign.
+        </p>
+      </div>
+      <iframe
+        src={url}
+        title={title}
+        className="hidden h-[500px] w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] md:block"
+      />
+    </div>
+  );
 }
 
 interface CompletedForm {
@@ -520,14 +578,11 @@ export default function OrientationWizard() {
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-          <iframe
-            key={step.form!.id}
-            src={pdfUrl!}
-            title={step.form!.title}
-            className="h-[500px] w-full border-0 bg-[var(--surface-raised)]"
-          />
-        </div>
+        <OrientationDocumentPane
+          key={step.form!.id}
+          url={pdfUrl!}
+          title={step.form!.title}
+        />
       )}
 
       {/* Action area (the profile form carries its own submit button) */}

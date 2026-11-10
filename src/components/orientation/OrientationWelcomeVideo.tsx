@@ -6,6 +6,7 @@ import {
   WELCOME_VIDEO_ORIENTATION_ITEM_ID,
   WELCOME_VIDEO_XP,
 } from "@/lib/orientation-welcome-video";
+import { fetchOrientationWizardItems } from "./OrientationWizard";
 
 export default function OrientationWelcomeVideo() {
   const { checkProgression } = useProgression();
@@ -16,11 +17,11 @@ export default function OrientationWelcomeVideo() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/orientation")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+    // Shares one request with the wizard rendered beside this video.
+    fetchOrientationWizardItems()
+      .then((items) => {
         if (cancelled) return;
-        const item = data?.items?.find((candidate: { id: string }) => candidate.id === WELCOME_VIDEO_ORIENTATION_ITEM_ID);
+        const item = items.find((candidate) => candidate.id === WELCOME_VIDEO_ORIENTATION_ITEM_ID);
         setCompleted(Boolean(item?.completed));
       })
       .catch(() => {});
