@@ -299,6 +299,10 @@ jobs:
         run: npm run test:smoke
         env:
           SMOKE_SERVER_SCRIPT: start
+          # The boot probes also refuse a production-mode boot that does not
+          # say whether cloud AI is blocked or allowed (readiness H4). Blocked
+          # is production's answer, and no smoke test calls a model.
+          AI_LOCAL_ONLY: "true"
           # Boot probes (src/lib/boot-probes.ts) stop a production-mode boot
           # when ADMIN_DATABASE_URL is unset, and `start` is production mode.
           # Presence is all the config probe checks (the privilege probe is
@@ -355,6 +359,12 @@ jobs:
       # is production parity (the verify job already runs the RLS suite with it).
       RLS_CONTEXT_INJECTION: "true"
       ADMIN_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_e2e"
+      # The boot probes also refuse a production-mode boot that does not say
+      # whether cloud AI is blocked or allowed (readiness H4). Blocked is
+      # production's answer; the e2e specs stub chat and call no model. Never
+      # set AI_CLOUD_INFERENCE here: the cohort demo step below turns
+      # COHORT_DEMO_MODE on, and the two together refuse the boot.
+      AI_LOCAL_ONLY: "true"
       # playwright.config.ts webServer honors this: boot the built standalone
       # server (scripts/start-production.mjs), matching the smoke-test boot
       # path, instead of `next dev`.
