@@ -36,7 +36,7 @@ export default async function CoordinatorDashboard() {
           {seesWholeState(session.role) ? (
             <>
               There are no regions yet. Add one on the{" "}
-              <Link href="/admin#regions" className="font-semibold text-[var(--ink-strong)] underline">Admin page</Link>.
+              <Link href="/admin#regions" className="inline-flex items-center pointer-coarse:min-h-11 font-semibold text-[var(--ink-strong)] underline">Admin page</Link>.
             </>
           ) : (
             "No regions are assigned to you yet. Ask your program admin to add you to a region."

@@ -3,7 +3,7 @@ export function NoRegionsHint() {
   return (
     <p className="text-sm text-[var(--ink-strong)]">
       No regions yet. Add one in the{" "}
-      <a href="#regions" className="font-semibold underline">Regions card</a> at the top of this page first.
+      <a href="#regions" className="inline-flex items-center pointer-coarse:min-h-11 font-semibold underline">Regions card</a> at the top of this page first.
     </p>
   );
 }

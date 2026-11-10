@@ -169,7 +169,7 @@ function InviteHint({ before, link, after }: { before: string; link: string; aft
   return (
     <p className={MUTED_TEXT}>
       {before}
-      <a href="#invite-staff" className="font-semibold text-[var(--ink-strong)] underline">{link}</a>
+      <a href="#invite-staff" className="inline-flex items-center pointer-coarse:min-h-11 font-semibold text-[var(--ink-strong)] underline">{link}</a>
       {after}
     </p>
   );
