@@ -7,7 +7,7 @@ import { redactContactInfo } from "@/lib/log-redaction";
  * or one-time secret, may reach Sentry.
  *
  * Wired as both `beforeSend` (errors) and `beforeSendTransaction` (traces) in
- * sentry.server.config.ts, sentry.edge.config.ts, and sentry.client.config.ts;
+ * sentry.server.config.ts, sentry.edge.config.ts, and src/instrumentation-client.ts;
  * src/lib/sentry-scrub.test.ts checks that wiring.
  *
  * Review F14 / SEC-06 (2026-09-01): the password-reset token travels as
@@ -95,6 +95,16 @@ const EMAIL = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
  */
 const CAPABILITY_PATH_SEGMENT = /(\/+(?:api\/+connect\/+employer|connect|invite)\/+)[A-Za-z0-9_-]{20,}/gi;
 
+/**
+ * A Prisma `cuid()` id: `c` plus 24 lowercase base36 characters (H1,
+ * 2026-11-10). Every Student, Connection and alert row key has this shape,
+ * and a Prisma message quotes them (`evidence_gap:<studentId>:...`). Word
+ * boundaries keep a 32-character trace or event id intact. 23 is allowed
+ * as well as 24 because the older fixtures in this repo use a 24-character
+ * id; widening only ever redacts more.
+ */
+const RECORD_ID = /\bc[a-z0-9]{23,24}\b/g;
+
 const REDACTED = "[REDACTED]";
 /** On an auth route the body is a credential by definition; drop it whole. */
 const AUTH_ROUTE = /\/api\/auth(?:[/?#]|$)/;
@@ -111,7 +121,8 @@ function redactText(text: string): string {
       .replace(SECRET_PARAM, `$1$2=${REDACTED}`)
       .replace(CAPABILITY_PATH_SEGMENT, `$1${REDACTED}`)
       .replace(SECRET_JSON_FIELD, `$1${REDACTED}"`)
-      .replace(EMAIL, "[EMAIL_REDACTED]"),
+      .replace(EMAIL, "[EMAIL_REDACTED]")
+      .replace(RECORD_ID, "[ID]"),
   );
 }
 
@@ -271,4 +282,79 @@ export function scrubPii<E extends Event>(event: E, _hint?: EventHint): E {
     ...(event.exception !== undefined && { exception: scrubException(event.exception) }),
   };
   return { ...event, ...patch };
+}
+
+/**
+ * A path segment kept as written: lowercase words, dots, dashes and
+ * underscores only, and no longer than any literal in the route tree (the
+ * longest API segment is 22 characters). Ids, capability tokens, numbers and
+ * anything with a capital letter become `[param]`. The cuid test is separate
+ * because a cuid can, rarely, contain no digit.
+ */
+const LITERAL_SEGMENT = /^[a-z_][a-z._-]{0,31}$/;
+const CUID_SEGMENT = /^c[a-z0-9]{23,24}$/;
+
+/**
+ * The route pattern for a request path (H1, 2026-11-10). A route handler is
+ * not told its own pattern, and its real path carries record ids and
+ * capability tokens, so an error report names the path with every
+ * non-literal segment replaced. The query string and fragment are dropped.
+ */
+export function routePattern(path: string): string {
+  const pathname = path.split(/[?#]/, 1)[0] ?? "";
+  return pathname
+    .split("/")
+    .map((segment) =>
+      segment === "" || (LITERAL_SEGMENT.test(segment) && !CUID_SEGMENT.test(segment)) ? segment : "[param]",
+    )
+    .join("/");
+}
+
+/** What a server error report may say about where it happened. */
+export interface ServerEventMeta {
+  route?: string;
+  method?: string;
+  status?: number;
+  /** A Prisma, Node or SQLSTATE code from `errorForLog`, never a message. */
+  errorCode?: string;
+}
+
+const WITHHELD = "[message withheld]";
+
+function serverTags(meta: ServerEventMeta): Record<string, string> {
+  return {
+    ...(meta.route !== undefined && { route: meta.route }),
+    ...(meta.method !== undefined && { method: meta.method }),
+    ...(meta.status !== undefined && { status: String(meta.status) }),
+  };
+}
+
+function withholdMessages(exception: EventException, errorCode: string | undefined): EventException {
+  const value = errorCode === undefined ? WITHHELD : `${WITHHELD} code ${errorCode}`;
+  return { ...exception, values: exception.values?.map((entry) => ({ ...entry, value })) };
+}
+
+/**
+ * An event processor for every report the server sends (H1, 2026-11-10):
+ * route errors, request errors and alarm lines. Added to the capture's own
+ * scope, it runs after the SDK has attached the request and the breadcrumb
+ * trail, and `scrubPii` still runs after it as `beforeSend`.
+ *
+ * - `request` goes: its URL, query string, headers and body are the
+ *   request's own data, and the route pattern in the tags says where.
+ * - `breadcrumbs` go: on the server they are console lines and outgoing
+ *   calls from every request the process handled, not only this one.
+ * - An exception's message goes, its type stays: a Prisma message quotes
+ *   the failed call's arguments, names and emails included
+ *   (src/lib/log-error.ts). The stack still says where it failed.
+ */
+export function withheldServerEvent(meta: ServerEventMeta): <E extends Event>(event: E) => E {
+  return <E extends Event>(event: E): E => ({
+    ...event,
+    request: undefined,
+    breadcrumbs: undefined,
+    tags: { ...event.tags, ...serverTags(meta) },
+    ...(meta.route !== undefined && { transaction: `${meta.method ?? ""} ${meta.route}`.trim() }),
+    ...(event.exception !== undefined && { exception: withholdMessages(event.exception, meta.errorCode) }),
+  });
 }

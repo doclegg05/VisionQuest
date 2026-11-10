@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ErrorEvent, Event, EventHint } from "@sentry/nextjs";
-import { scrubPii } from "./sentry-scrub";
+import { routePattern, scrubPii, withheldServerEvent } from "./sentry-scrub";
 
 // Review F14 / SEC-06 (2026-09-01). The password-reset token travels in a
 // URL (forgot-password/route.ts builds /reset-password?token=...), so any
@@ -411,11 +411,18 @@ describe("scrubPii: every event field a capability URL reaches", () => {
 });
 
 describe("Sentry configs route through the scrub", () => {
-  const configs = ["sentry.server.config.ts", "sentry.edge.config.ts", "sentry.client.config.ts"];
-  for (const name of configs) {
+  // H1 (2026-11-10): the browser init moved from sentry.client.config.ts,
+  // which the SDK reads only on its webpack path, to src/instrumentation-client.ts,
+  // which Next itself loads under Turbopack.
+  const configs = [
+    { name: "sentry.server.config.ts", importFrom: /import \{ scrubPii \} from "\.\/src\/lib\/sentry-scrub"/ },
+    { name: "sentry.edge.config.ts", importFrom: /import \{ scrubPii \} from "\.\/src\/lib\/sentry-scrub"/ },
+    { name: "src/instrumentation-client.ts", importFrom: /import \{ scrubPii \} from "@\/lib\/sentry-scrub"/ },
+  ];
+  for (const { name, importFrom } of configs) {
     it(`${name} wires scrubPii into beforeSend and beforeSendTransaction`, () => {
       const source = readFileSync(fileURLToPath(new URL(`../../${name}`, import.meta.url)), "utf8");
-      assert.match(source, /import \{ scrubPii \} from "\.\/src\/lib\/sentry-scrub"/);
+      assert.match(source, importFrom);
       assert.match(source, /beforeSend: scrubPii/, `${name} lacks beforeSend: scrubPii`);
       assert.match(source, /beforeSendTransaction: scrubPii/, `${name} lacks beforeSendTransaction: scrubPii`);
     });
@@ -566,5 +573,102 @@ describe("scrubPii: staff invite tokens in the path", () => {
     );
     assert.equal(out.request?.url, `https://vq.example/invitee/${INVITE_TOKEN}`);
     assert.equal((out.breadcrumbs?.[0]?.data as { to: string }).to, "/invite");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H1 (2026-11-10): errors now reach Sentry from API routes, request errors and
+// alarm log lines. Three more gaps the earlier sweeps did not need to close:
+// a Prisma cuid in a message or path was kept (only emails, phones and
+// secrets were redacted), a server event carried the whole request and the
+// breadcrumb trail, and an exception message could quote a Prisma call's
+// arguments.
+// ---------------------------------------------------------------------------
+
+const PRISMA_CUID = "cm3x9k2qp0000ab12cd34ef56";
+
+describe("scrubPii: record ids", () => {
+  it("redacts a cuid anywhere in text", () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      message: `Unique constraint failed for alertKey evidence_gap:${PRISMA_CUID}:req1`,
+    };
+    const out = scrubPii(event, HINT);
+    assert.doesNotMatch(serialized(out), new RegExp(PRISMA_CUID));
+    assert.match(out.message ?? "", /evidence_gap:\[ID\]:req1/);
+  });
+
+  it("leaves a 32-character trace id alone", () => {
+    const traceId = "c".repeat(1) + "0123456789abcdef0123456789abcde";
+    const event: ErrorEvent = { type: undefined, message: `trace ${traceId}` };
+    assert.equal(scrubPii(event, HINT).message, `trace ${traceId}`);
+  });
+});
+
+describe("routePattern", () => {
+  it("replaces id and token segments and drops the query string", () => {
+    assert.equal(
+      routePattern(`/api/teacher/students/${PRISMA_CUID}/goals?q=Tanesha#x`),
+      "/api/teacher/students/[param]/goals",
+    );
+  });
+
+  it("replaces a capability token segment", () => {
+    const token = "aB3_dE6-gH9iJ2kL5mN8oP1qR4sT7uV0wX3yZ6aB9cD";
+    assert.equal(routePattern(`/api/connect/employer/${token}/hired`), "/api/connect/employer/[param]/hired");
+  });
+
+  it("keeps every literal segment the API tree has, including the longest", () => {
+    assert.equal(routePattern("/api/internal/evidence-gap-detection"), "/api/internal/evidence-gap-detection");
+    assert.equal(routePattern("/api/teacher/reports/export.csv"), "/api/teacher/reports/export.csv");
+  });
+
+  it("replaces a numeric or mixed-case segment", () => {
+    assert.equal(routePattern("/api/items/12345/Jane"), "/api/items/[param]/[param]");
+  });
+});
+
+describe("withheldServerEvent", () => {
+  function serverEvent(): ErrorEvent {
+    return {
+      type: undefined,
+      exception: {
+        values: [{ type: "PrismaClientValidationError", value: 'where: { displayName: "Tanesha Rivers" }' }],
+      },
+      request: {
+        url: `https://vq.example/api/teacher/students/${PRISMA_CUID}?q=Tanesha`,
+        query_string: "q=Tanesha",
+        data: { displayName: "Tanesha Rivers" },
+        method: "POST",
+      },
+      breadcrumbs: [{ category: "fetch", data: { url: "https://storage.example/students/Tanesha.pdf" } }],
+      tags: { runtime: "node" },
+    };
+  }
+
+  it("drops the request and the breadcrumb trail", () => {
+    const out = withheldServerEvent({ route: "/api/x", method: "POST", status: 500 })(serverEvent());
+    assert.equal(out.request, undefined);
+    assert.equal(out.breadcrumbs, undefined);
+    assert.doesNotMatch(serialized(out), /Tanesha/);
+  });
+
+  it("withholds the exception message but keeps its type", () => {
+    const out = withheldServerEvent({ route: "/api/x", method: "POST", status: 500, errorCode: "P2002" })(serverEvent());
+    const [entry] = out.exception?.values ?? [];
+    assert.equal(entry?.type, "PrismaClientValidationError");
+    assert.equal(entry?.value, "[message withheld] code P2002");
+  });
+
+  it("names the route, method and status in tags and the transaction", () => {
+    const out = withheldServerEvent({ route: "/api/x/[param]", method: "POST", status: 500 })(serverEvent());
+    assert.deepEqual(out.tags, { runtime: "node", route: "/api/x/[param]", method: "POST", status: "500" });
+    assert.equal(out.transaction, "POST /api/x/[param]");
+  });
+
+  it("does not touch a message event's message", () => {
+    const event: ErrorEvent = { type: undefined, message: "wellbeing_no_recipients" };
+    const out = withheldServerEvent({})(event);
+    assert.equal(out.message, "wellbeing_no_recipients");
   });
 });

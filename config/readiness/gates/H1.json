@@ -5,6 +5,14 @@
   "title": "Errors reach a person",
   "doneWhen": "Unit tests find a captured, scrubbed event for a thrown route error and for an alert line.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/api-error.sentry.test.ts",
+      "src/lib/logger.alert.test.ts",
+      "src/instrumentation.on-request-error.test.ts",
+      "src/instrumentation-client.test.ts",
+      "src/app/global-error.test.tsx",
+      "src/lib/sentry-scrub.test.ts"
+    ]
   }
 }
