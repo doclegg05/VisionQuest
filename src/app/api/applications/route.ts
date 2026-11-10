@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncStudentAlerts } from "@/lib/advising";
+import { deferPerStudent } from "@/lib/after-response";
 import { afterWrite } from "@/lib/after-write";
 import { logAuditEvent } from "@/lib/audit";
 import { prisma } from "@/lib/db";
@@ -179,11 +180,10 @@ export const POST = withAuth(async (session, req: Request) => {
     { surface: "applications", effect: "logAuditEvent", studentId: session.id, level: "error" },
   );
 
-  await afterWrite(() => syncStudentAlerts(session.id), {
-    surface: "applications",
-    effect: "syncStudentAlerts",
-    studentId: session.id,
-  });
+  // Queue bookkeeping runs after the response (src/lib/after-response.ts).
+  deferPerStudent(session.id, { surface: "applications", effect: "syncStudentAlerts" }, () =>
+    syncStudentAlerts(session.id),
+  );
 
   return NextResponse.json({ application });
 });
