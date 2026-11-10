@@ -5,6 +5,10 @@
   "title": "Lighter sign-in",
   "doneWhen": "M4 at target after a build.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/app/page.client-imports.test.ts",
+      "src/components/auth/demo-entry.test.ts"
+    ]
   }
 }

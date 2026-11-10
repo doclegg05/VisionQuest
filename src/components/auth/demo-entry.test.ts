@@ -9,6 +9,9 @@ import {
   entryButtonViewFor,
   entryOutcomeFor,
   offlineOutcome,
+  parseEntryRefusal,
+  parseEntrySuccess,
+  parseSessionBody,
 } from "./demo-entry";
 
 /** What GET /api/auth/session answers for a live session. */
@@ -237,5 +240,95 @@ describe("announcementFor", () => {
     assert.equal(announcementFor("/api/demo/instructor"), DEMO_ENTRY_PENDING);
     assert.equal(announcementFor(null), "");
     assert.equal(DEMO_ENTRY_PENDING, "Starting the demo...");
+  });
+});
+
+/**
+ * The three guards replaced Zod schemas (G2, to keep Zod out of the sign-in
+ * page's browser code). Each accepts what its schema accepted and refuses the rest.
+ */
+describe("parseSessionBody", () => {
+  it("accepts every demoAccount the schema accepted: each kind, null and absent", () => {
+    for (const kind of DEMO_ACCOUNT_KINDS) {
+      assert.deepEqual(parseSessionBody(sessionBody({ demoAccount: kind })), {
+        ok: true,
+        value: { student: { displayName: "Maya R.", demoAccount: kind } },
+      });
+    }
+    assert.deepEqual(parseSessionBody(sessionBody({ demoAccount: null })), {
+      ok: true,
+      value: { student: { displayName: "Maya R.", demoAccount: null } },
+    });
+    assert.deepEqual(parseSessionBody(sessionBody({})), {
+      ok: true,
+      value: { student: { displayName: "Maya R.", demoAccount: undefined } },
+    });
+  });
+
+  it("trims the display name, as the schema's trim did", () => {
+    const parsed = parseSessionBody({ student: { displayName: "\t Maya R. \n", demoAccount: "student" } });
+    assert.deepEqual(parsed, { ok: true, value: { student: { displayName: "Maya R.", demoAccount: "student" } } });
+  });
+
+  it("refuses a body that is not an object holding a student object", () => {
+    const bad: unknown[] = [null, undefined, 0, "x", true, [], [{ student: {} }], {}, { student: null }, { student: [] }, { student: "Maya" }];
+    for (const body of bad) assert.deepEqual(parseSessionBody(body), { ok: false }, JSON.stringify(body));
+  });
+
+  it("refuses a missing, empty, blank or non-string display name", () => {
+    for (const displayName of [undefined, null, "", "   ", 7, {}, ["Maya"]]) {
+      assert.deepEqual(parseSessionBody({ student: { displayName } }), { ok: false }, JSON.stringify(displayName));
+    }
+  });
+
+  it("refuses a demoAccount that is not a known kind", () => {
+    for (const demoAccount of ["admin", "", "Student", 1, false, {}, ["student"]]) {
+      assert.deepEqual(
+        parseSessionBody({ student: { displayName: "Maya R.", demoAccount } }),
+        { ok: false },
+        JSON.stringify(demoAccount),
+      );
+    }
+  });
+});
+
+describe("parseEntrySuccess", () => {
+  it("accepts each landing page exactly, ignoring other fields", () => {
+    for (const redirectTo of ["/dashboard", "/teacher"]) {
+      assert.deepEqual(parseEntrySuccess({ redirectTo, student: { displayName: "Maya R." } }), {
+        ok: true,
+        value: { redirectTo },
+      });
+    }
+  });
+
+  it("refuses a body that is not an object", () => {
+    for (const body of [null, undefined, "/dashboard", 1, [], ["/dashboard"]]) {
+      assert.deepEqual(parseEntrySuccess(body), { ok: false }, JSON.stringify(body));
+    }
+  });
+
+  it("refuses any redirectTo that is not exactly a landing page", () => {
+    for (const redirectTo of [undefined, null, 7, "", "/dashboard ", " /teacher", "/Dashboard", "/dashboard/", "/settings", "//evil.example"]) {
+      assert.deepEqual(parseEntrySuccess({ redirectTo }), { ok: false }, JSON.stringify(redirectTo));
+    }
+  });
+});
+
+describe("parseEntryRefusal", () => {
+  it("accepts a non-blank error and trims it, as the schema did", () => {
+    assert.deepEqual(parseEntryRefusal({ error: "  The demo is full.  " }), { ok: true, value: { error: "The demo is full." } });
+  });
+
+  it("refuses a body that is not an object, and a missing, blank or non-string error", () => {
+    const bad: unknown[] = [null, undefined, "oops", 500, [], {}, { error: "" }, { error: " \n " }, { error: 5 }, { error: null }, { error: ["x"] }];
+    for (const body of bad) assert.deepEqual(parseEntryRefusal(body), { ok: false }, JSON.stringify(body));
+  });
+
+  it("shows the trimmed refusal message to the visitor", () => {
+    assert.deepEqual(entryOutcomeFor(false, { error: "  Try again tomorrow.  " }), {
+      kind: "refused",
+      message: "Try again tomorrow.",
+    });
   });
 });
