@@ -3,13 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { SAGE_NOTICE_SECTIONS } from "./notice";
 
-// The notice says "VisionQuest has turned off outside AI services, like
+// The notice says "VisionQuest has turned off outside AI tools, like
 // Google, for Sage." That is true only while render.yaml deploys with
 // AI_LOCAL_ONLY set to the literal "true" (src/lib/boot-probes.ts refuses to
 // start without an explicit choice). If this test fails, change that notice
 // sentence and SAGE_NOTICE_VERSION in src/lib/about-sage/notice.ts first.
 
-const NOTICE_LINE = "VisionQuest has turned off outside AI services, like Google, for Sage.";
+const NOTICE_LINE = "VisionQuest has turned off outside AI tools, like Google, for Sage.";
 
 function aiLocalOnlyValue(yaml: string): string | null {
   const match = yaml.match(/-\s*key:\s*AI_LOCAL_ONLY\s*\n\s*value:\s*(\S+)/);

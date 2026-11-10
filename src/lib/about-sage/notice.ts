@@ -61,7 +61,7 @@ export const SAGE_NOTICE_SECTIONS: readonly NoticeSection[] = [
     heading: "Where Your Words Go",
     sentences: [
       "When you type to Sage, your words go to a computer that runs the AI.",
-      "VisionQuest has turned off outside AI services, like Google, for Sage.",
+      "VisionQuest has turned off outside AI tools, like Google, for Sage.",
     ],
   },
   {
@@ -80,7 +80,7 @@ export const SAGE_NOTICE_SECTIONS: readonly NoticeSection[] = [
     heading: "Who Can See It",
     sentences: [
       "Your instructors and other SPOKES staff can see your goals and your progress.",
-      "They can also see the short notes and the career profile Sage keeps about you.",
+      "They can also see the notes Sage writes. They can see your career profile too.",
       "They can also see the start of the last message in each chat. It may be yours or Sage's.",
       "Staff can save a copy of your information. That copy has all of your chats.",
       "If Sage has trouble saving something, staff may see part of that chat.",
@@ -90,7 +90,7 @@ export const SAGE_NOTICE_SECTIONS: readonly NoticeSection[] = [
   {
     heading: "If You Write About Hurting Someone",
     sentences: [
-      "VisionQuest looks for words about hurting yourself or someone else.",
+      "VisionQuest checks your words for talk of hurting yourself or someone else.",
       "It also looks for words about someone hurting you.",
       "If it finds them, it sends your instructors an alert right away.",
       "The alert does not have your words in it. Staff may still see what you wrote in other places, like the saved copy of your chats.",
@@ -118,7 +118,7 @@ export const SAGE_NOTICE_KEY_POINTS: readonly string[] = [
   "They can also see the start of the last message in each chat. It may be yours or Sage's.",
   "Staff can save a copy of your information. That copy has all of your chats.",
   "If Sage has trouble saving something, staff may see part of that chat.",
-  "VisionQuest looks for words about hurting yourself or someone else.",
+  "VisionQuest checks your words for talk of hurting yourself or someone else.",
   "If it finds them, it sends your instructors an alert right away.",
   "The alert does not have your words in it. Staff may still see what you wrote in other places, like the saved copy of your chats.",
   "Sage will also show you the 988 crisis line. You can call or text 988 at any time, day or night.",

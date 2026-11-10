@@ -68,10 +68,10 @@ describe("Sage notice wording", () => {
     }
   });
 
-  it("keeps every sentence at grade 8 or below, so no single line is hard", () => {
+  it("keeps every line at grade 6 or below, so no single line is hard", () => {
     const hard = allSentences
       .map((text) => ({ text, grade: assessReadability(text).grade }))
-      .filter(({ grade }) => grade > 8);
+      .filter(({ grade }) => grade > NOTICE_MAX_GRADE);
     assert.deepEqual(hard, []);
   });
 
@@ -168,7 +168,7 @@ describe("Sage notice tells the truth", () => {
   });
 
   it("says VisionQuest, not the program, turned off outside AI", () => {
-    assert.ok(fullItems.includes("VisionQuest has turned off outside AI services, like Google, for Sage."));
+    assert.ok(fullItems.includes("VisionQuest has turned off outside AI tools, like Google, for Sage."));
     assert.doesNotMatch(fullItems.join(" "), /This program|program staff/);
   });
 });
