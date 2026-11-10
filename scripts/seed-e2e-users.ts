@@ -387,16 +387,18 @@ async function main() {
     await resetStudentToDayOne(prisma, journeyStudent.id);
 
     // ── Login rate limits ────────────────────────────────────────────────
-    // /api/auth/login allows 10 attempts per IP per 15 min; repeated local
-    // suite runs from one machine would trip it. This seed only ever targets
-    // e2e databases (hermetic CI Postgres / dev), so reset login buckets.
+    // /api/auth/login allows 30 failed sign-ins per address and 5 per account
+    // per 15 min, and a sign-in that works gives its units back. Failed
+    // sign-ins left by earlier local suite runs from one machine would still
+    // trip it. This seed only ever targets e2e databases (hermetic CI
+    // Postgres / dev), so reset login buckets.
     //
     // `RateLimitEntry.key` holds a DERIVED key since 2026-09-06 —
     // `<family>:<digest>`, see src/lib/rate-limit-key.ts — but the family is
     // kept verbatim in front precisely so this prefix delete keeps working.
-    // It still clears both login families: `login:<ip>` and
-    // `login:user:<id>` (the per-account bucket, which is the binding one for
-    // the e2e collectors) both live under `login:`.
+    // It still clears every login bucket: `login:<ip>`, `login:user:<id>`
+    // (the per-account bucket) and `login:unknown:<digest>` all live under
+    // `login:`.
     const rl = await prisma.rateLimitEntry.deleteMany({
       where: { key: { startsWith: "login:" } },
     });

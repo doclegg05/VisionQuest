@@ -47,11 +47,11 @@ test.describe("Day-1 student journey", () => {
 
   /**
    * One signed-in context for the established student, shared by every test
-   * that needs them. /api/auth/login rate-limits to 10 attempts per IP per 15
-   * minutes, so a login per test burns the budget across repeated local runs
-   * and the whole file starts failing on HTTP 429 rather than on anything
-   * real. Viewport is per-page, not per-context, so the 375px tests still get
-   * a phone-sized page out of this same context.
+   * that needs them, which saves a sign-in per test. /api/auth/login allows
+   * 30 failed sign-ins per address and 5 per account per 15 minutes. A
+   * sign-in that works gives its units back, so only failed ones add up to
+   * an HTTP 429. Viewport is per-page, not per-context, so the 375px tests
+   * still get a phone-sized page out of this same context.
    */
   test.beforeAll(async ({ browser }) => {
     prisma = createPrisma();

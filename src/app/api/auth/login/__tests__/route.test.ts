@@ -324,7 +324,7 @@ describe("POST /api/auth/login", () => {
 // ---------------------------------------------------------------------------
 // Per-account limiter: no account-existence oracle
 //
-// 2026-09-06 hunt, follow-up (1). The per-IP bucket is 10 and the per-account
+// 2026-09-06 hunt, follow-up (1). The per-IP bucket was 10 and the per-account
 // bucket (`login:user:<id>`) is 5, so the sixth guess against a REAL account
 // answered 429 while the sixth guess against an unknown login answered 401 —
 // the status code alone told an unauthenticated caller whether the account
