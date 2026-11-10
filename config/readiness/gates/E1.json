@@ -5,6 +5,15 @@
   "title": "Honest failure states",
   "doneWhen": "Route tests map each cause to its message. `test:relay` passes. The `error-message-audit` skill finds no technical wording.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/chat/sage-failure.test.ts",
+      "src/lib/chat/send-outcome.test.ts",
+      "src/app/api/chat/send/__tests__/route.test.ts",
+      "src/components/chat/ChatWindow.failure.test.tsx",
+      "src/components/chat/ChatInput.test.tsx",
+      "src/components/settings/SettingsView.test.tsx",
+      "scripts/mac-relay/relay.test.mjs"
+    ]
   }
 }
