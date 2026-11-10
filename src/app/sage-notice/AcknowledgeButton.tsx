@@ -42,7 +42,7 @@ export function AcknowledgeMessage({ outcome }: { outcome: AckOutcome | null }) 
 }
 
 /** Records the acknowledgement, then goes on to the app (the layout may ask for recovery questions next). */
-export function AcknowledgeButton() {
+export function AcknowledgeButton({ version }: { version: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [outcome, setOutcome] = useState<AckOutcome | null>(null);
@@ -54,7 +54,7 @@ export function AcknowledgeButton() {
     inFlight.current = true;
     setPending(true);
     setOutcome(null);
-    const result = await postAcknowledgement();
+    const result = await postAcknowledgement(version);
     followOutcome(result, router);
     if (result === "saved") return;
     inFlight.current = false;

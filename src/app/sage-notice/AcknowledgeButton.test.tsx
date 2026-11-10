@@ -33,9 +33,21 @@ describe("outcomeForStatus", () => {
 });
 
 describe("postAcknowledgement", () => {
+  // The version comes from the server's render of the page, not from the
+  // copy of the code in the browser, so a refresh after a stale answer sends
+  // the version the student is now reading.
+  it("posts the version the page was rendered with", async () => {
+    let body = "";
+    await postAcknowledgement("2099-01-01", async (_url, init) => {
+      body = String(init?.body);
+      return new Response(null, { status: 200 });
+    });
+    assert.equal(body, JSON.stringify({ version: "2099-01-01" }));
+  });
+
   it("posts the current version and reads the status", async () => {
     let sent: { url: string; body: string } | null = null;
-    const outcome = await postAcknowledgement(async (url, init) => {
+    const outcome = await postAcknowledgement(SAGE_NOTICE_VERSION, async (url, init) => {
       sent = { url: String(url), body: String(init?.body) };
       return new Response(null, { status: 400 });
     });
@@ -44,7 +56,7 @@ describe("postAcknowledgement", () => {
   });
 
   it("treats a network failure as a failed save the student can retry", async () => {
-    const outcome = await postAcknowledgement(async () => {
+    const outcome = await postAcknowledgement(SAGE_NOTICE_VERSION, async () => {
       throw new TypeError("network down");
     });
     assert.equal(outcome, "failed");
@@ -103,16 +115,37 @@ describe("AcknowledgeMessage", () => {
 describe("signOutThen", () => {
   it("ends the session, then leaves", async () => {
     const calls: string[] = [];
-    await signOutThen(async (url, init) => {
+    const left = await signOutThen(async (url, init) => {
       calls.push(`${init?.method} ${String(url)}`);
       return new Response(null, { status: 200 });
     }, () => calls.push("leave"));
+    assert.equal(left, true);
     assert.deepEqual(calls, ["DELETE /api/auth/session", "leave"]);
   });
 
-  it("leaves whatever the server said", async () => {
+  // A shared classroom computer: if the server did not end the session, the
+  // cookie is still good, so leaving for the sign-in page would hand the
+  // next person this student's account.
+  it("stays when the server did not end the session", async () => {
     const calls: string[] = [];
-    await signOutThen(async () => new Response(null, { status: 500 }), () => calls.push("leave"));
-    assert.deepEqual(calls, ["leave"]);
+    const left = await signOutThen(async () => new Response(null, { status: 500 }), () => calls.push("leave"));
+    assert.equal(left, false);
+    assert.deepEqual(calls, []);
+  });
+
+  it("stays when the request never got an answer, and does not throw", async () => {
+    const calls: string[] = [];
+    const left = await signOutThen(async () => {
+      throw new TypeError("Failed to fetch");
+    }, () => calls.push("leave"));
+    assert.equal(left, false);
+    assert.deepEqual(calls, []);
+  });
+
+  it("does not count a 401 from something in between as signed out", async () => {
+    const calls: string[] = [];
+    const left = await signOutThen(async () => new Response(null, { status: 401 }), () => calls.push("leave"));
+    assert.equal(left, false);
+    assert.deepEqual(calls, []);
   });
 });

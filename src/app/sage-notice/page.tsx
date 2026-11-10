@@ -56,7 +56,7 @@ export default async function SageNoticePage() {
           >
             {SAGE_NOTICE_FULL_LINK}
           </Link>
-          <AcknowledgeButton />
+          <AcknowledgeButton version={SAGE_NOTICE_VERSION} />
           <SignOutBlock />
         </div>
       </div>

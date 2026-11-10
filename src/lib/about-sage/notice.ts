@@ -137,6 +137,7 @@ export const SAGE_NOTICE_ACK_SIGNED_OUT = "You were signed out.";
 export const SAGE_NOTICE_SIGN_IN_AGAIN = "Sign in again";
 export const SAGE_NOTICE_SIGN_OUT_LINE = "Not sure? You can sign out and ask your instructor first.";
 export const SAGE_NOTICE_SIGN_OUT_BUTTON = "Sign out";
+export const SAGE_NOTICE_SIGN_OUT_FAILED = "Could not sign out. Try again.";
 export const SAGE_NOTICE_FULL_LINK = "Read the full notice";
 export const SAGE_NOTICE_LINK_LABEL = "About Sage";
 

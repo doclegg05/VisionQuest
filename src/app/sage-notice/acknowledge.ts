@@ -1,5 +1,3 @@
-import { SAGE_NOTICE_VERSION } from "@/lib/about-sage/notice";
-
 /**
  * What the tap on "I Understand" came to. POST /api/sage-notice answers 400
  * when the version in the body is not the current one (the notice changed
@@ -22,12 +20,16 @@ export function outcomeForStatus(status: number): AckOutcome {
   return "failed";
 }
 
-export async function postAcknowledgement(fetchImpl: FetchLike = fetch): Promise<AckOutcome> {
+/**
+ * `version` is the one the server rendered this page with, passed down as a
+ * prop, so a refresh after a stale answer sends what the student now reads.
+ */
+export async function postAcknowledgement(version: string, fetchImpl: FetchLike = fetch): Promise<AckOutcome> {
   try {
     const res = await fetchImpl("/api/sage-notice", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version: SAGE_NOTICE_VERSION }),
+      body: JSON.stringify({ version }),
     });
     return outcomeForStatus(res.status);
   } catch {
