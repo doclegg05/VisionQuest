@@ -13,6 +13,27 @@ services:
         sync: false
       - key: DIRECT_URL
         sync: false
+      # How many database connections the app's main pool may hold.
+      # src/lib/db.ts adds it to DATABASE_URL as `connection_limit`. Unset,
+      # the pool is 5. A request that finds no free connection waits for one,
+      # and under row-level security each query holds its connection for two
+      # round trips, so 5 is tight for a class of 30 while the database is a
+      # region away. The admin pool is separate and is 10
+      # (ADMIN_DB_POOL_SIZE).
+      #
+      # Stay under the Supabase connection limit for the project: this pool
+      # and the admin pool together, with room left for migrations, pg_cron
+      # and the moment in a deploy when the old and the new copy of the app
+      # may both be running. src/lib/db.ts records 50 as the free tier's
+      # limit. Read the project's own figure in the Supabase dashboard before
+      # choosing.
+      #
+      # The owner sets the value in the Render dashboard once the app and the
+      # database are in one region (readiness O-8). No value here, so a
+      # Blueprint sync never sets or clears it, and the default in code is
+      # unchanged.
+      - key: DB_POOL_SIZE
+        sync: false
       # Both of these were set in the Render dashboard only, so this file did
       # not show that production depends on them and a fresh service created
       # from it would have started with RLS unenforced and prismaAdmin
