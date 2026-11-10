@@ -426,6 +426,43 @@ describe("proxy, connect-src and the browser's error reports", () => {
     assert.ok(!directive.includes("publickey"));
     assert.ok(!directive.includes("*"));
   });
+
+  // H1 third pass, item 3 (2026-11-10). `new URL` accepts `*`, `,`, `;` and
+  // `'` in a host name, and the origin went into the policy as it was parsed.
+  // A mistyped or tampered DSN could widen `connect-src` to every https host,
+  // or end the directive and start another.
+  const HOSTILE_DSNS: readonly [what: string, dsn: string][] = [
+    ["a wildcard, which would allow every https host", "https://k@*/1"],
+    ["a semicolon, which would end connect-src and start script-src", "https://k@a.com;script-src/1"],
+    ["a comma, which would start a second policy", "https://k@a.com,evil.example/1"],
+    ["a quote, which is how a CSP keyword is written", "https://k@'unsafe-inline'/1"],
+  ];
+  for (const [what, dsn] of HOSTILE_DSNS) {
+    it(`adds nothing for a DSN whose host holds ${what}`, () => {
+      assert.equal(connectSrc(dsn), BASE);
+    });
+  }
+
+  it("adds nothing for a wildcard subdomain, a host with one label, an IPv6 host or a trailing dot", () => {
+    for (const dsn of ["https://k@*.ingest.sentry.io/1", "https://k@localhost/1", "https://k@[::1]/1", "https://k@o123.ingest.us.sentry.io./456"]) {
+      assert.equal(connectSrc(dsn), BASE, dsn);
+    }
+  });
+
+  it("adds nothing for a data: URL", () => {
+    assert.equal(connectSrc("data:text/plain,https://o123.ingest.us.sentry.io"), BASE);
+  });
+
+  it("keeps a numeric port, and writes the host in lower case", () => {
+    assert.equal(connectSrc("https://publickey@O123.Ingest.US.sentry.io:8443/456"), `${BASE} https://o123.ingest.us.sentry.io:8443`);
+  });
+
+  it("whatever the DSN, the directive holds only its own two sources and at most one https origin", () => {
+    const dsns = [...HOSTILE_DSNS.map(([, dsn]) => dsn), "https://publickey@o123.ingest.us.sentry.io/456", "https://k@a.com;script-src%20*/1", "not a dsn"];
+    for (const dsn of dsns) {
+      assert.match(connectSrc(dsn), /^connect-src 'self' https:\/\/generativelanguage\.googleapis\.com(?: https:\/\/[a-z0-9.-]+(?::\d+)?)?$/, dsn);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

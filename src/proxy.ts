@@ -27,12 +27,20 @@ const SESSION_COOKIE_NAME = "vq-session";
  * no DSN is set. A fixed `https://*.ingest.sentry.io` was here before; a CSP
  * wildcard covers one label, so it never matched a regional ingest host and
  * the browser refused every report. The DSN's key is not part of an origin.
+ *
+ * The origin is added only when it is an `https:` URL whose host is plain
+ * labels (letters, digits and hyphens, with dots between) and whose port is
+ * empty or digits. `new URL` accepts `*`, `,`, `;` and `'` in a host, so a
+ * DSN whose host is `*` would otherwise allow every https host, and a host
+ * of `a.com;script-src` would end this directive and start another.
+ * Anything else adds nothing, and the browser then refuses the reports.
  */
 function sentryConnectSource(): string {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
   if (!dsn || !URL.canParse(dsn)) return "";
-  const { protocol, origin } = new URL(dsn);
-  return protocol === "https:" ? ` ${origin}` : "";
+  const { protocol, hostname, port, origin } = new URL(dsn);
+  const plainOrigin = protocol === "https:" && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(hostname) && /^\d*$/.test(port);
+  return plainOrigin ? ` ${origin}` : "";
 }
 
 let warnedStyleRelaxIgnored = false;
