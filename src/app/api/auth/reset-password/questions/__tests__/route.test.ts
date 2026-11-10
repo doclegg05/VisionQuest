@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- mock.fn() scaffolding is assigned to many different real function signatures; a shared "accept any implementation" escape hatch is intentional for test setup only. */
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import { mockRequest } from "@/lib/test-helpers";
 import { studentLogKey } from "@/lib/log-keys";
@@ -13,6 +14,10 @@ import { studentLogKey } from "@/lib/log-keys";
 // `@/lib/security-questions`, `@/lib/schemas`, and `@/lib/api-error` are
 // real.
 // ---------------------------------------------------------------------------
+
+// The route keys the unknown-login limiter bucket on an HMAC under JWT_SECRET.
+const JWT_SECRET = "test-secret-for-recovery-route-limiter-keys";
+process.env.JWT_SECRET = JWT_SECRET;
 
 const IP = "203.0.113.9";
 const STUDENT = { id: "stu-1", role: "student", sessionVersion: 2 };
@@ -208,7 +213,7 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.equal(mockFindFirst.mock.callCount(), 0);
   });
 
-  it("returns the generic error for an unknown account and makes no per-account limiter call", async () => {
+  it("returns the generic error for an unknown account, after one per-login limiter call", async () => {
     mockFindFirst.mock.mockImplementation(async () => null);
 
     const res = await questionsRoute.POST(resetRequest() as never);
@@ -216,7 +221,9 @@ describe("POST /api/auth/reset-password/questions", () => {
 
     assert.equal(res.status, 400);
     assert.match(body.error, /could not verify/i);
-    assert.deepEqual(limiterKeys(), [`reset-password-questions:${IP}`]);
+    assert.equal(limiterKeys().length, 2);
+    assert.equal(limiterKeys()[0], `reset-password-questions:${IP}`);
+    assert.match(limiterKeys()[1], /^reset-password-questions:unknown:[0-9a-f]{64}$/);
     assert.deepEqual(storedHashesChecked(), DUMMY_WORK, "an unknown account costs the same three checks");
     assert.equal(mockTransaction.mock.callCount(), 0);
     assert.equal(cookieSets.length, 0);
@@ -366,6 +373,13 @@ describe("POST /api/auth/reset-password/questions", () => {
       name: "a locked account",
       arrange: () => blockLimiterWhen((key) => key === `reset-password-questions:user:${STUDENT.id}`),
     },
+    {
+      name: "an unknown login past its limit",
+      arrange: () => {
+        mockFindFirst.mock.mockImplementation(async () => null);
+        blockLimiterWhen((key) => key.startsWith("reset-password-questions:unknown:"));
+      },
+    },
   ];
 
   for (const { name, arrange } of refusedAccounts) {
@@ -412,11 +426,68 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.deepEqual(auditActions(), ["auth.password.reset.security_questions"]);
   });
 
+  // --- The same limiter work for an unknown login (A1 review, item 2) -------
+  //
+  // The per-account limiter ran only for real accounts, so a real login was
+  // answered one database round trip slower than an unknown one, and the
+  // dummy KDF could not hide that. An unknown login now makes the same call,
+  // keyed on an HMAC of the normalized login under the server's secret.
+
+  /** The per-login limiter calls one request makes, after the per-network one. */
+  async function perLoginLimiterCalls(login: string): Promise<[string, number, number][]> {
+    mockRateLimit.mock.resetCalls();
+    await questionsRoute.POST(resetRequest({ login }) as never);
+    const calls: [string, number, number][] = mockRateLimit.mock.calls.map(
+      (call: { arguments: [string, number, number] }) => call.arguments,
+    );
+    assert.equal(calls[0]?.[0], `reset-password-questions:${IP}`, "the per-network bucket is checked first");
+    return calls.slice(1);
+  }
+
+  it("makes the same number of limiter calls for a real login and an unknown one", async () => {
+    const real = await perLoginLimiterCalls("alice");
+
+    mockFindFirst.mock.mockImplementation(async () => null);
+    const unknown = await perLoginLimiterCalls("ghost");
+
+    assert.deepEqual(real, [[`reset-password-questions:user:${STUDENT.id}`, 5, 60 * 60 * 1000]]);
+    assert.equal(unknown.length, real.length, "an unknown login must cost the limiter round trip a real one does");
+    assert.deepEqual(unknown.map(([, limit, windowMs]) => [limit, windowMs]), [[5, 60 * 60 * 1000]]);
+  });
+
+  it("keys an unknown login on an HMAC of the normalized login, under this route's own label", async () => {
+    mockFindFirst.mock.mockImplementation(async () => null);
+
+    const [[first]] = await perLoginLimiterCalls("Ghost@Example.com");
+    const [[variant]] = await perLoginLimiterCalls("  ghost@example.COM ");
+    const [[other]] = await perLoginLimiterCalls("ghost2@example.com");
+    const digest = (label: string) =>
+      createHmac("sha256", JWT_SECRET).update(`${label}:ghost@example.com`).digest("hex");
+
+    assert.equal(first, `reset-password-questions:unknown:${digest("reset-password-questions-limiter")}`);
+    assert.equal(first, variant, "case and whitespace variants of one login share one bucket");
+    assert.notEqual(first, other);
+    assert.ok(!first.endsWith(digest("login-limiter")), "the sign-in route's digest for the same login is a different one");
+    assert.ok(!first.startsWith("reset-password-questions:user:"), "cannot collide with a real account's bucket");
+    assert.ok(!first.toLowerCase().includes("ghost"), "the typed login does not reach the limiter key");
+  });
+
+  it("writes no lockout record for an unknown login on its last admitted attempt: there is no account to name", async () => {
+    mockFindFirst.mock.mockImplementation(async () => null);
+    mockRateLimit.mock.mockImplementation(async () => ({ ...okLimit(), remaining: 0 }));
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(auditActions(), []);
+    assert.equal(mockLoggerWarn.mock.callCount(), 0);
+  });
+
   // --- Per-network limit sized for a classroom (readiness A1) ---------------
   //
   // The per-network bucket counted every request at 5 an hour, so the sixth
   // student recovering a password in one classroom was refused. It now allows
-  // 30 FAILED attempts an hour, and a recovery that worked gives its unit
+  // 20 FAILED attempts an hour, and a recovery that worked gives its unit
   // back. The refund follows the rule sign-in follows: it happens only when
   // the response already says the answers were right. Every refusal answers
   // the same 400, so none of them may give a unit back.
@@ -424,12 +495,12 @@ describe("POST /api/auth/reset-password/questions", () => {
   const NETWORK_KEY = `reset-password-questions:${IP}`;
   const NETWORK_RESET_TIME = 1_900_000_000_000;
 
-  /** Gives the per-network window a known end, so a refund can be matched to it. */
-  function fixNetworkWindow(options: { degraded?: boolean } = {}) {
+  /** Gives the per-network window a known end, so a refund can be matched to it. `degraded` picks the buckets that failed open. */
+  function fixNetworkWindow(options: { degraded?: (key: string) => boolean } = {}) {
     mockRateLimit.mock.mockImplementation(async (key: string) => ({
       ...okLimit(),
       resetTime: key === NETWORK_KEY ? NETWORK_RESET_TIME : NETWORK_RESET_TIME + 1,
-      degraded: options.degraded ?? false,
+      degraded: options.degraded?.(key) ?? false,
     }));
   }
 
@@ -437,10 +508,10 @@ describe("POST /api/auth/reset-password/questions", () => {
     return mockRefundRateLimit.mock.calls.map((call: { arguments: unknown[] }) => call.arguments);
   }
 
-  it("allows one network address 30 failed recovery attempts per hour", async () => {
+  it("allows one network address 20 failed recovery attempts per hour", async () => {
     await questionsRoute.POST(resetRequest() as never);
 
-    assert.deepEqual(mockRateLimit.mock.calls[0].arguments, [NETWORK_KEY, 30, 60 * 60 * 1000]);
+    assert.deepEqual(mockRateLimit.mock.calls[0].arguments, [NETWORK_KEY, 20, 60 * 60 * 1000]);
   });
 
   it("gives the network unit back, and only that unit, when the answers were right", async () => {
@@ -492,12 +563,77 @@ describe("POST /api/auth/reset-password/questions", () => {
     assert.deepEqual(refunds(), []);
   });
 
-  it("asks the store for nothing when the limiter failed open: no unit was taken", async () => {
-    fixNetworkWindow({ degraded: true });
+  it("asks the store for nothing when the per-network limiter failed open: no unit was taken", async () => {
+    fixNetworkWindow({ degraded: (key) => key === NETWORK_KEY });
 
     const res = await questionsRoute.POST(resetRequest() as never);
 
     assert.equal(res.status, 200);
     assert.deepEqual(refunds(), []);
+  });
+
+  // --- A limiter outage refuses recovery (A1 review, item 3) ----------------
+  //
+  // The limiter fails open when its store is down. Sign-in accepts that. This
+  // route sets a password and issues a session from three short answers, so
+  // here an outage of the per-account limiter must refuse: with no count kept,
+  // every guess would be free. No answer is checked while it is down.
+
+  const UNAVAILABLE =
+    "We cannot reset passwords this way right now. Try again in a few minutes, or ask your instructor for help.";
+
+  /** The per-account and per-login buckets failed open; the per-network bucket still counts. */
+  function failAccountLimiterOpen() {
+    fixNetworkWindow({ degraded: (key) => key !== NETWORK_KEY });
+  }
+
+  it("refuses right answers when the per-account limiter is down: no password is set and no session issued", async () => {
+    failAccountLimiterOpen();
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+    const body = (await res.json()) as { error: string };
+
+    assert.equal(res.status, 503);
+    assert.equal(body.error, UNAVAILABLE);
+    assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(cookieSets.length, 0);
+    assert.deepEqual(storedHashesChecked(), [], "no answer is checked while guesses cannot be counted");
+    assert.deepEqual(refunds(), [], "a refused attempt keeps its per-network unit");
+    assert.deepEqual(auditActions(), []);
+  });
+
+  it("refuses when every limiter is down, not only the per-account one", async () => {
+    fixNetworkWindow({ degraded: () => true });
+
+    const res = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(res.status, 503);
+    assert.equal(mockTransaction.mock.callCount(), 0);
+    assert.equal(cookieSets.length, 0);
+  });
+
+  it("answers an unknown login the same way during the outage, so the refusal names no account", async () => {
+    failAccountLimiterOpen();
+    const realRes = await questionsRoute.POST(resetRequest() as never);
+    const realBody = await realRes.json();
+    const realLimiterCalls = mockRateLimit.mock.callCount();
+
+    mockRateLimit.mock.resetCalls();
+    mockFindFirst.mock.mockImplementation(async () => null);
+    const unknownRes = await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(unknownRes.status, realRes.status);
+    assert.deepEqual(await unknownRes.json(), realBody);
+    assert.equal(mockRateLimit.mock.callCount(), realLimiterCalls);
+    assert.deepEqual(storedHashesChecked(), [], "neither request checks an answer");
+  });
+
+  it("logs the refusal without naming the student", async () => {
+    failAccountLimiterOpen();
+
+    await questionsRoute.POST(resetRequest() as never);
+
+    assert.equal(mockLoggerWarn.mock.callCount(), 1);
+    assert.doesNotMatch(JSON.stringify(mockLoggerWarn.mock.calls[0]!.arguments), /stu-1|alice/i);
   });
 });
