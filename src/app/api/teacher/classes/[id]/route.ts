@@ -153,8 +153,15 @@ export const PATCH = withTeacherAuth(async (
         }
         nextRegionId = null;
       } else if (body.regionId.trim()) {
-        // The same rule as creating a class: an instructor may use only a
-        // region they belong to; whole-state roles may use any active region.
+        // Moving a class takes it from one region's coordinators and shows
+        // every enrolled student's records to another's, so only an admin may
+        // change the region. An instructor may be placed in two regions, and
+        // assertRegionAllowed alone would let them move a class between the
+        // two. Repeating the class's current region is not a move.
+        if (body.regionId !== existing.regionId && session.role !== "admin") {
+          throw forbidden("Only an admin can move a classroom to another region.");
+        }
+        // Still needed for the admin: the region must exist and be active.
         await assertRegionAllowed(session, body.regionId);
         nextRegionId = body.regionId;
       } else {
