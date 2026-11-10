@@ -155,7 +155,6 @@ const CLIENT_COMPONENT_SOURCES = [
   "src/components/ui/NavBar.tsx",
   "src/components/ui/NotificationProvider.tsx",
   "src/components/progression/ProgressionProvider.tsx",
-  "src/components/ui/PageTransition.tsx",
   "src/app/(student)/dashboard/DashboardClient.tsx",
   "src/components/student/SmsReconsentNotice.tsx",
   "src/components/dashboard/MoodCheckInCard.tsx",
@@ -173,7 +172,6 @@ const dashboardClientRenders: DashboardClientProps[] = [];
 mock.module("@/components/ui/NavBar", { exports: { default: () => null } });
 mock.module("@/components/ui/NotificationProvider", { exports: { default: passThrough } });
 mock.module("@/components/progression/ProgressionProvider", { exports: { default: passThrough } });
-mock.module("@/components/ui/PageTransition", { exports: { PageTransition: passThrough } });
 mock.module("@/app/(student)/dashboard/DashboardClient", {
   exports: {
     default: (props: DashboardClientProps) => {

@@ -45,9 +45,6 @@ mock.module("@/components/ui/NotificationProvider", {
 mock.module("@/components/progression/ProgressionProvider", {
   exports: { default: ({ children }: { children: unknown }) => children },
 });
-mock.module("@/components/ui/PageTransition", {
-  exports: { PageTransition: ({ children }: { children: unknown }) => children },
-});
 
 let Layout: typeof import("./layout").default;
 
