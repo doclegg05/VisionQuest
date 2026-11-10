@@ -30,10 +30,13 @@ import {
   UNMARKED, chunksOf, countIn, idsOf, inList, tableOf, valuesWhere,
   type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DemoEnv, type Ids, type Run, type Where,
 } from "./closeout.core";
+import type { LocalSchema } from "./closeout.local";
 import { refusal, type Refusal, type RefusalCode } from "./closeout.report";
+import { readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type ServerFacts } from "./closeout.server";
 
 export { tableOf, type CloseoutClient, type CloseoutPlan, type CloseoutTx, type Where } from "./closeout.core";
 export { REFUSALS, type Refusal, type RefusalCode } from "./closeout.report";
+export type { CloseoutTarget } from "./closeout.server";
 
 /** The accounts and classes a rule picks. The queued jobs are worked out from the accounts. */
 export type Selection = Pick<CloseoutPlan, "accountIds" | "classIds">;
@@ -324,34 +327,58 @@ export interface CloseoutPreview {
   readonly uploadedFilesLeftInStorage: number;
 }
 
-export interface CloseoutOutcome {
-  readonly kind: "preview" | "refused" | "applied";
-  readonly preview: CloseoutPreview;
+interface OutcomeBase {
+  /** Which database this was, as the server reported it. */
+  readonly target: CloseoutTarget;
   readonly refusals: readonly Refusal[];
-  /** Rows deleted, by model. Present only when applied. */
-  readonly deleted?: Readonly<Record<string, number>>;
-  readonly remaining?: { readonly markedAccounts: number; readonly rowsPointingAtDeleted: number };
 }
+
+/** An apply's result: the rows deleted by model, and what is left. */
+export interface AppliedCounts {
+  readonly deleted: Readonly<Record<string, number>>;
+  /** Counted inside the transaction, after the deletes and before the commit. */
+  readonly remaining: { readonly markedAccounts: number; readonly rowsPointingAtDeleted: number };
+}
+
+export type CloseoutOutcome =
+  /** Refused before any table was read, so there are no counts to show. */
+  | (OutcomeBase & { readonly kind: "unreadable" })
+  | (OutcomeBase & { readonly kind: "preview"; readonly preview: CloseoutPreview })
+  | (OutcomeBase & { readonly kind: "refused"; readonly preview: CloseoutPreview })
+  | (OutcomeBase & AppliedCounts & {
+      readonly kind: "applied";
+      readonly preview: CloseoutPreview;
+      /**
+       * Marked accounts counted again in a new transaction after the commit.
+       * Above 0 means a demo account was created while the closeout ran. Null
+       * means that last look could not be made.
+       */
+      readonly afterCommit: { readonly markedAccounts: number | null };
+    });
 
 export interface CloseoutOptions {
   readonly apply: boolean;
+  /** On an apply: the marked students plus marked instructors the preview showed. */
+  readonly expectAccounts?: number;
+  /** What this checkout says the schema is. See closeout.local.ts. */
+  readonly local: LocalSchema;
   /** Where the two switches are read from. Defaults to this process's environment. */
   readonly env?: DemoEnv;
   readonly rule?: SelectionRule;
   /** Ids sent to the database in one statement. */
   readonly chunkSize?: number;
+  /** Told which database this is as soon as the server says, before any table is read. */
+  readonly onTarget?: (target: CloseoutTarget) => void;
 }
 
 /** Postgres takes 32,767 values per statement. Two id lists of this size fit with room to spare. */
 const ID_CHUNK = 5_000;
 /** Ten minutes: thousands of demo accounts, each with rows in sixty tables, one statement per table. */
 const TRANSACTION = { isolationLevel: "Serializable", maxWait: 10_000, timeout: 600_000 } as const;
-/** DEMO_STUDENT_CREATE_LOCK in create-student.ts, also taken by reset.ts. Held, no demo student can be created. */
-const DEMO_STUDENT_CREATE_LOCK = 2_610_190_001;
 const KNOWN_STAFF_ROLES = ["teacher", "admin", "coordinator"] as const;
 
 class CloseoutRefused extends Error {
-  constructor(readonly refused: Refusal, readonly preview: CloseoutPreview) {
+  constructor(readonly refused: Refusal, readonly preview: CloseoutPreview, readonly target?: CloseoutTarget) {
     super(refused.sentence);
   }
 }
@@ -418,14 +445,6 @@ async function unmarkedUnderPlannedStaff(run: Run): Promise<number> {
   });
 }
 
-async function seesEveryRow(tx: CloseoutTx): Promise<boolean> {
-  // The same probe as scripts/dohs-spokes-report.ts. Under row level security
-  // every count below would read 0 and the preview would say there is no demo data.
-  const rows = await tx.$queryRaw`SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user`;
-  if (!Array.isArray(rows)) return false;
-  return rows.some((row: unknown) => typeof row === "object" && row !== null && Reflect.get(row, "rolbypassrls") === true);
-}
-
 async function countPeople(run: Run): Promise<Pick<CloseoutPreview, "marked" | "unmarked">> {
   const students = tableOf(run.tx, "Student");
   const pages = tableOf(run.tx, "PublicCredentialPage");
@@ -451,16 +470,37 @@ async function countPeople(run: Run): Promise<Pick<CloseoutPreview, "marked" | "
   };
 }
 
+/** What the run was asked to do and what it holds, for the checks that depend on it. */
+interface Gate {
+  readonly env: DemoEnv;
+  /** False when an apply could not take the demo student create lock. */
+  readonly lockFree: boolean;
+  /** True when an apply was given the wrong number of marked accounts, or none. */
+  readonly countDiffers: boolean;
+}
+
+/** Refusals that mean no count can be trusted, so none is made. */
+function unreadableRefusals(server: ServerFacts, local: LocalSchema): Refusal[] {
+  const clientModels = new Set<string>(Object.values(Prisma.ModelName));
+  const sameModels = local.schemaModels.length === clientModels.size && local.schemaModels.every((model) => clientModels.has(model));
+  const sameMigration = server.newestMigration !== null && server.newestMigration === local.newestMigration;
+  return [
+    refusal("cannot_see_every_row", server.seesEveryRow ? 0 : 1),
+    refusal("schema_mismatch", sameModels && sameMigration ? 0 : 1),
+  ].filter((entry) => entry.count > 0);
+}
+
 /** Everything that can be known to stop an apply without writing a row, in a fixed order. */
-async function prewriteRefusals(run: Run, env: DemoEnv, enrolledInDemoClass: number): Promise<Refusal[]> {
+async function prewriteRefusals(run: Run, gate: Gate, enrolledInDemoClass: number): Promise<Refusal[]> {
   const classes = tableOf(run.tx, "SpokesClass");
   const withDemoCode = await classes.count({ where: { code: DEMO_CLASS_CODE } });
   const ownedByDemoInstructor = await classes.count({ where: { code: DEMO_CLASS_CODE, createdBy: DEMO_INSTRUCTOR } });
   let attached = 0;
   for (const entry of UNMARKED_ON_DEMO_CLASS) attached += await countIn(run, entry.model, entry.where, run.plan.classIds);
   const found = [
-    refusal("demo_mode_on", isCohortDemoEnabled(env) ? 1 : 0),
-    refusal("cannot_see_every_row", (await seesEveryRow(run.tx)) ? 0 : 1),
+    refusal("demo_mode_on", isCohortDemoEnabled(gate.env) ? 1 : 0),
+    refusal("demo_recently_active", gate.lockFree ? 0 : 1),
+    refusal("expected_accounts_mismatch", gate.countDiffers ? 1 : 0),
     refusal("demo_class_not_owned", withDemoCode - ownedByDemoInstructor),
     refusal("plan_includes_unmarked", await countIn(run, "Student", (ids) => ({ id: { in: ids }, ...UNMARKED }), run.plan.accountIds)),
     refusal("unmarked_student_in_demo_class", enrolledInDemoClass),
@@ -471,7 +511,8 @@ async function prewriteRefusals(run: Run, env: DemoEnv, enrolledInDemoClass: num
   return found.filter((entry) => entry.count > 0);
 }
 
-async function survey(run: Run, env: DemoEnv): Promise<{ preview: CloseoutPreview; refusals: Refusal[] }> {
+async function survey(run: Run, gate: Gate): Promise<{ preview: CloseoutPreview; refusals: Refusal[] }> {
+  const { env } = gate;
   const people = await countPeople(run);
   const rowsToDelete = await plannedRows(run);
   const preview: CloseoutPreview = {
@@ -481,7 +522,7 @@ async function survey(run: Run, env: DemoEnv): Promise<{ preview: CloseoutPrevie
     rowsToDelete,
     uploadedFilesLeftInStorage: rowsToDelete.FileUpload ?? 0,
   };
-  return { preview, refusals: await prewriteRefusals(run, env, people.unmarked.enrolledInDemoClass) };
+  return { preview, refusals: await prewriteRefusals(run, gate, people.unmarked.enrolledInDemoClass) };
 }
 
 async function tableCounts(tx: CloseoutTx): Promise<Record<string, number>> {
@@ -521,7 +562,7 @@ function unlistedChanges(before: Record<string, number>, after: Record<string, n
  * Deletes the plan. Runs inside the caller's transaction: a refusal or any
  * other throw from here rolls every statement back.
  */
-async function applyPlan(run: Run, preview: CloseoutPreview): Promise<Pick<CloseoutOutcome, "deleted" | "remaining">> {
+async function applyPlan(run: Run, preview: CloseoutPreview): Promise<AppliedCounts> {
   const before = await tableCounts(run.tx);
   for (const step of [...ACCOUNT_STEPS, ...CLASS_STEPS]) await deleteStep(run, step);
   refuseIf(await rowsStillNaming(run, CLASS_COLUMNS, run.plan.classIds), "rows_left_pointing", preview);
@@ -553,26 +594,69 @@ async function applyPlan(run: Run, preview: CloseoutPreview): Promise<Pick<Close
   return { deleted: preview.rowsToDelete, remaining };
 }
 
+type Applied = Extract<CloseoutOutcome, { kind: "applied" }>;
+type BeforeCommit = Exclude<CloseoutOutcome, Applied> | Omit<Applied, "afterCommit">;
+
+/** The whole closeout inside one transaction. Returns before the commit, so `afterCommit` is not known yet. */
+async function inTransaction(tx: CloseoutTx, options: CloseoutOptions): Promise<BeforeCommit> {
+  await refuseFilteredReads(tx);
+  // The lock comes before every other query: see `tryCreateLock`.
+  const lockFree = options.apply ? await tryCreateLock(tx) : true;
+  const server = await readServerFacts(tx);
+  const { target } = server;
+  options.onTarget?.(target);
+  const unreadable = unreadableRefusals(server, options.local);
+  if (unreadable.length > 0) return { kind: "unreadable", target, refusals: unreadable };
+
+  const selection = await (options.rule ?? markedDemoAccountsRule)(tx);
+  const run: Run = { tx, plan: { ...selection, jobIds: [] }, chunk: options.chunkSize ?? ID_CHUNK, now: server.now };
+  const countDiffers = options.apply && options.expectAccounts !== run.plan.accountIds.length;
+  const { preview, refusals } = await survey(run, { env: options.env ?? process.env, lockFree, countDiffers });
+  if (!options.apply) return { kind: "preview", target, preview, refusals };
+  if (refusals.length > 0) return { kind: "refused", target, preview, refusals };
+  try {
+    return { kind: "applied", target, preview, refusals: [], ...(await applyPlan(run, preview)) };
+  } catch (error) {
+    if (error instanceof CloseoutRefused) throw new CloseoutRefused(error.refused, error.preview, target);
+    throw error;
+  }
+}
+
+/**
+ * Marked accounts as a new transaction sees them, once the closeout has
+ * committed. The closeout's own transaction saw the database as it was when it
+ * began, so an account committed while it ran is invisible to it and only this
+ * look can find it.
+ */
+async function markedAfterCommit(client: CloseoutClient): Promise<number | null> {
+  try {
+    return await client.$transaction(async (tx) => {
+      await refuseFilteredReads(tx);
+      return await tableOf(tx, "Student").count({ where: { demoAccount: { not: null } } });
+    });
+  } catch {
+    // The closeout itself has committed. Only this last look failed, and the
+    // caller is told so: null is reported as "could not be checked".
+    return null;
+  }
+}
+
 /**
  * Previews or applies the closeout in one serializable transaction. A preview
  * only reads. An apply that is refused, at any point, changes nothing: the
- * checks made before the first delete return early, and the two made after
+ * checks made before the first delete return early, and the ones made after
  * deletes have run throw, which rolls the transaction back.
  */
 export async function runDemoCloseout(client: CloseoutClient, options: CloseoutOptions): Promise<CloseoutOutcome> {
-  const env = options.env ?? process.env;
+  let outcome: BeforeCommit;
   try {
-    return await client.$transaction(async (tx): Promise<CloseoutOutcome> => {
-      if (options.apply) await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DEMO_STUDENT_CREATE_LOCK}::bigint)`;
-      const selection = await (options.rule ?? markedDemoAccountsRule)(tx);
-      const run: Run = { tx, plan: { ...selection, jobIds: [] }, chunk: options.chunkSize ?? ID_CHUNK, now: new Date() };
-      const { preview, refusals } = await survey(run, env);
-      if (!options.apply) return { kind: "preview", preview, refusals };
-      if (refusals.length > 0) return { kind: "refused", preview, refusals };
-      return { kind: "applied", preview, refusals: [], ...(await applyPlan(run, preview)) };
-    }, TRANSACTION);
+    outcome = await client.$transaction((tx) => inTransaction(tx, options), TRANSACTION);
   } catch (error) {
-    if (error instanceof CloseoutRefused) return { kind: "refused", preview: error.preview, refusals: [error.refused] };
+    if (error instanceof CloseoutRefused && error.target) {
+      return { kind: "refused", target: error.target, preview: error.preview, refusals: [error.refused] };
+    }
     throw error;
   }
+  if (outcome.kind !== "applied") return outcome;
+  return { ...outcome, afterCommit: { markedAccounts: await markedAfterCommit(client) } };
 }

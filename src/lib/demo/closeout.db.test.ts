@@ -31,11 +31,17 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, afterEach, before, describe, it } from "node:test";
 import type { PrismaClient } from "@prisma/client";
-import { runDemoCloseout, tableOf, type CloseoutClient, type CloseoutOutcome, type CloseoutTx, type RefusalCode } from "./closeout";
+import path from "node:path";
+import { runDemoCloseout, tableOf, type CloseoutClient, type CloseoutOptions, type CloseoutOutcome, type CloseoutTx, type RefusalCode } from "./closeout";
 import { MODELS, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
+import { readLocalSchema } from "./closeout.local";
 
 const SHOULD_RUN = process.env.DEMO_CLOSEOUT_DB_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
 const DEMO_OFF = {};
+const ROOT = path.resolve(__dirname, "../../..");
+/** The closeout as the owner's script runs it: against this checkout's schema. */
+const closeout = (client: CloseoutClient, options: Omit<CloseoutOptions, "local" | "env"> & { env?: Record<string, string> }): Promise<CloseoutOutcome> =>
+  runDemoCloseout(client, { env: DEMO_OFF, local: readLocalSchema(ROOT), ...options });
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 /** Models whose row the test will not go without: the proof means little if these were not seeded. */
 const MUST_SEED = ["Conversation", "Message", "Goal", "FileUpload", "SpokesRecord", "Connection", "CaseNote", "StudentClassEnrollment", "AuditLog", "SageMemory"];
@@ -154,23 +160,24 @@ if (!SHOULD_RUN) {
       await seed();
       const before = await fingerprint();
 
-      const outcome = await runDemoCloseout(client, { apply: false, env: DEMO_OFF });
+      const outcome = await closeout(client, { apply: false });
 
-      assert.equal(outcome.kind, "preview");
       assert.deepEqual(outcome.refusals, []);
-      assert.deepEqual(outcome.preview.marked, { students: 1, instructors: 1, demoClasses: 1 });
+      assert.equal(outcome.kind, "preview");
+      assert.deepEqual(outcome.kind === "preview" && outcome.preview.marked, { students: 1, instructors: 1, demoClasses: 1 });
       assert.deepEqual(await fingerprint(), before);
     });
 
     it("applies: no marked account, nothing naming a deleted account or class, every count as previewed", async () => {
       await seed();
-      const preview = await runDemoCloseout(client, { apply: false, env: DEMO_OFF });
+      const preview = await closeout(client, { apply: false });
 
-      const outcome = await runDemoCloseout(client, { apply: true, env: DEMO_OFF });
+      const outcome = await closeout(client, { apply: true, expectAccounts: 2 });
 
       assert.equal(outcome.kind, "applied");
-      assert.deepEqual(outcome.deleted, preview.preview.rowsToDelete);
-      assert.deepEqual(outcome.remaining, { markedAccounts: 0, rowsPointingAtDeleted: 0 });
+      assert.deepEqual(outcome.kind === "applied" && outcome.deleted, preview.kind === "preview" && preview.preview.rowsToDelete);
+      assert.deepEqual(outcome.kind === "applied" && outcome.remaining, { markedAccounts: 0, rowsPointingAtDeleted: 0 });
+      assert.deepEqual(outcome.kind === "applied" && outcome.afterCommit, { markedAccounts: 0 });
       assert.equal(await client.student.count({ where: { demoAccount: { not: null } } }), 0);
       assert.deepEqual(await rowsNaming([demo.studentId, demo.staffId, demo.classId]), []);
       assert.equal(await client.auditLog.count({ where: { action: "demo.closeout" } }), 1);
@@ -181,7 +188,7 @@ if (!SHOULD_RUN) {
       const before = await fingerprint(isDemoRow);
       const realBefore = await rowsNaming([real.studentId, real.staffId, real.classId]);
 
-      await runDemoCloseout(client, { apply: true, env: DEMO_OFF });
+      await closeout(client, { apply: true, expectAccounts: 2 });
 
       assert.deepEqual(await fingerprint(isDemoRow), before);
       assert.deepEqual(await rowsNaming([real.studentId, real.staffId, real.classId]), realBefore);
@@ -190,7 +197,7 @@ if (!SHOULD_RUN) {
     it("keeps the shared rows a demo account merely referenced", async () => {
       await seed();
 
-      await runDemoCloseout(client, { apply: true, env: DEMO_OFF });
+      await closeout(client, { apply: true, expectAccounts: 2 });
 
       for (const model of ["Employer", "Opportunity", "CareerEvent", "FormTemplate", "OrientationItem"]) {
         assert.equal(await tableOf(client, model).count({ where: { id: `${demo.prefix}${model}` } }), 1, model);
@@ -229,7 +236,7 @@ if (!SHOULD_RUN) {
         const before = await fingerprint();
         const rule = refusal.subset ? async () => ({ accountIds: [demo.studentId], classIds: [] }) : undefined;
 
-        const outcome = await runDemoCloseout(client, { apply: true, env: refusal.env ?? DEMO_OFF, rule });
+        const outcome = await closeout(client, { apply: true, env: refusal.env, rule, expectAccounts: refusal.subset ? 1 : 2 });
 
         assert.equal(outcome.kind, "refused");
         assert.ok(refusalCodes(outcome).includes(refusal.code), `refused for ${refusalCodes(outcome).join(", ")}`);
@@ -261,7 +268,7 @@ if (!SHOULD_RUN) {
       });
       const breaking: CloseoutClient = { $transaction: (work, options) => client.$transaction((tx) => work(failing(tx)), options) };
 
-      await assert.rejects(runDemoCloseout(breaking, { apply: true, env: DEMO_OFF }), /Injected failure/);
+      await assert.rejects(closeout(breaking, { apply: true, expectAccounts: 2 }), /Injected failure/);
 
       assert.ok(deletesBeforeFailure > 0, "the failure must come after real deletes");
       assert.deepEqual(await fingerprint(), before);

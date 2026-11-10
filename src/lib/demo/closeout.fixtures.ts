@@ -96,6 +96,8 @@ function scalarMatches(value: unknown, condition: unknown): boolean {
     if (operator === "notIn") return known && Array.isArray(operand) && !operand.includes(value);
     if (operator === "not") return operand === null ? known : known && !scalarMatches(value, operand);
     if (operator === "startsWith") return typeof value === "string" && typeof operand === "string" && value.startsWith(operand);
+    if (operator === "contains") return typeof value === "string" && typeof operand === "string" && value.includes(operand);
+    if (operator === "gte") return value instanceof Date && operand instanceof Date && value.getTime() >= operand.getTime();
     throw new Error(`The fake database does not support the operator ${operator}`);
   });
 }
@@ -122,13 +124,51 @@ export interface FakeClient {
   $disconnect(): Promise<void>;
 }
 
+/** The newest migration the fake database says it has applied, unless a test changes it. */
+export const FAKE_MIGRATION = "20261101000000_fake_newest";
+/** The demo student create lock, as the fake sees it in a statement's values. */
+const LOCK_STATEMENT = /pg_try_advisory_xact_lock/;
+
+/** What a raw statement was given: plain values, and the values inside a `Prisma.join(...)`. */
+function flatValues(values: readonly unknown[]): unknown[] {
+  return values.flatMap((value) => {
+    const inner: unknown = typeof value === "object" && value !== null ? Reflect.get(value, "values") : undefined;
+    return Array.isArray(inner) ? inner : [value];
+  });
+}
+
+function studentIdIn(payload: unknown): string | null {
+  if (typeof payload !== "string" || !payload.startsWith("{")) return null;
+  const parsed: unknown = JSON.parse(payload);
+  const id: unknown = isRecord(parsed) ? parsed.studentId : undefined;
+  return typeof id === "string" ? id : null;
+}
+
 export class FakeDb {
   private tables = new Map<string, readonly Row[]>();
   private sequence = 0;
-  /** False makes the connection look like one that row level security limits. */
+  /** The server this fake stands in for: its name, its address and its clock. */
+  database = "closeout_fake";
+  serverAddress: string | null = "10.0.0.7";
+  now = new Date("2026-12-19T15:00:00.000Z");
+  /** A role sees every row when it is a superuser or has BYPASSRLS. Both false: row level security limits it. */
+  superuser = false;
   bypassesRls = true;
+  /** The schema that holds Prisma's migration ledger, and the migrations it lists as applied. */
+  ledgerSchema: "visionquest" | "public" | null = "visionquest";
+  appliedMigrations: readonly string[] = [FAKE_MIGRATION];
+  /** True while some other transaction holds the demo student create lock. */
+  createLockHeld = false;
   /** Name a model to make the next delete from it throw, as a lost connection would. */
   failOnDeleteOf: string | null = null;
+  /** What that delete throws. An object with a `code` stands in for a Prisma error. */
+  failure: unknown = null;
+  /** Thrown after the callback has finished and its changes are kept: a connection lost during COMMIT. */
+  failOnCommit: unknown = null;
+  /** Runs once, right after the next transaction commits: a write that landed while the tool ran. */
+  afterNextCommit: (() => void) | null = null;
+  /** Every raw statement, in order, with its values left out: one list per transaction. */
+  statementLog: string[][] = [];
   /** How many transactions were opened and how many statements changed rows. */
   transactions = 0;
   writes = 0;
@@ -216,8 +256,18 @@ export class FakeDb {
     }
   }
 
-  private delegate(model: Model): Delegate {
-    const select = (where: unknown) => this.rows(model.name).filter((row) => this.matches(model, row, where));
+  /**
+   * What a limited role may read. With row security on, Postgres quietly
+   * filters the rows out. With it off, Postgres refuses the statement instead.
+   */
+  private readable(model: string, rowSecurityOff: boolean): readonly Row[] {
+    if (this.superuser || this.bypassesRls) return this.rows(model);
+    if (rowSecurityOff) throw new Error(`query would be affected by row-level security policy for table "${model}"`);
+    return [];
+  }
+
+  private delegate(model: Model, state: { rowSecurityOff: boolean }): Delegate {
+    const select = (where: unknown) => this.readable(model.name, state.rowSecurityOff).filter((row) => this.matches(model, row, where));
     return {
       count: async (args) => select(args?.where).length,
       findMany: async (args) => {
@@ -225,7 +275,7 @@ export class FakeDb {
         return select(args.where).map((row) => (columns.length === 0 ? row : Object.fromEntries(columns.map((column) => [column, row[column]]))));
       },
       deleteMany: async (args) => {
-        if (this.failOnDeleteOf === model.name) throw new Error(`Injected failure while deleting ${model.name}`);
+        if (this.failOnDeleteOf === model.name) throw this.failure ?? new Error(`Injected failure while deleting ${model.name}`);
         const doomed = select(args.where);
         if (doomed.length > 0) this.writes += 1;
         this.remove(model.name, doomed);
@@ -238,12 +288,38 @@ export class FakeDb {
     };
   }
 
+  /** The tool's fixed statements, answered from this fake's state. Any other statement is refused. */
+  private raw(state: { rowSecurityOff: boolean }, strings: TemplateStringsArray, values: readonly unknown[]): unknown {
+    const sql = strings.join("?").replace(/\s+/g, " ").trim();
+    this.statementLog.at(-1)?.push(sql);
+    if (sql === "SET LOCAL row_security = off") {
+      state.rowSecurityOff = true;
+      return 0;
+    }
+    if (LOCK_STATEMENT.test(sql)) return [{ locked: !this.createLockHeld }];
+    if (sql.includes("current_database()")) return [{ database: this.database, address: this.serverAddress, now: this.now }];
+    if (sql.includes("pg_roles")) return [{ rolsuper: this.superuser, rolbypassrls: this.bypassesRls }];
+    if (sql.includes("to_regclass")) return [{ in_app_schema: this.ledgerSchema === "visionquest", in_public: this.ledgerSchema === "public" }];
+    if (sql.includes('"_prisma_migrations"')) {
+      const schema = sql.includes('visionquest."_prisma_migrations"') ? "visionquest" : "public";
+      if (schema !== this.ledgerSchema) throw new Error(`relation "${schema}._prisma_migrations" does not exist`);
+      return [{ newest: [...this.appliedMigrations].sort().at(-1) ?? null }];
+    }
+    if (sql.includes('visionquest."BackgroundJob"') && sql.includes("payload::jsonb->>'studentId'")) {
+      const named = new Set(flatValues(values));
+      return this.readable("BackgroundJob", state.rowSecurityOff).filter((row) => named.has(studentIdIn(row.payload))).map((row) => ({ id: row.id }));
+    }
+    throw new Error(`The fake database does not know this statement: ${sql}`);
+  }
+
   private tx(): FakeTx {
+    const state = { rowSecurityOff: false };
+    this.statementLog.push([]);
     const tx: FakeTx = {
-      $executeRaw: async () => 1,
-      $queryRaw: async () => [{ rolbypassrls: this.bypassesRls }],
+      $executeRaw: async (strings, ...values) => Number(this.raw(state, strings, values)),
+      $queryRaw: async (strings, ...values) => this.raw(state, strings, values),
     };
-    for (const model of MODELS) tx[delegateKey(model.name)] = this.delegate(model);
+    for (const model of MODELS) tx[delegateKey(model.name)] = this.delegate(model, state);
     return tx;
   }
 
@@ -253,12 +329,18 @@ export class FakeDb {
       $transaction: async (run) => {
         this.transactions += 1;
         const before = new Map(this.tables);
+        let result;
         try {
-          return await run(this.tx());
+          result = await run(this.tx());
         } catch (error) {
           this.tables = before;
           throw error;
         }
+        if (this.failOnCommit !== null) throw this.failOnCommit;
+        const landed = this.afterNextCommit;
+        this.afterNextCommit = null;
+        landed?.();
+        return result;
       },
       $disconnect: async () => {
         this.disconnects += 1;
@@ -473,4 +555,31 @@ export async function seedUniverse(write: SeedWriter, options: SeedOptions): Pro
   await seedSoftReferences(seeder);
   const { prefix } = options;
   return { prefix, studentId: seeder.studentId, staffId: seeder.staffId, classId: seeder.classId, created: seeder.created, skipped: seeder.skipped };
+}
+
+/** What the tests tell the closeout about this checkout: it matches the fake database. */
+export const LOCAL = { newestMigration: FAKE_MIGRATION, schemaModels: MODELS.map((model) => model.name) } as const;
+
+export interface Scene {
+  readonly db: FakeDb;
+  /** The universe marked as demo, under the prefix `dm-`. */
+  readonly demo: SeededUniverse;
+  /** The universe of people with no demo mark, under the prefix `rl-`. */
+  readonly real: SeededUniverse;
+}
+
+/** A fake database holding one marked and one unmarked universe. */
+export async function scene(): Promise<Scene> {
+  const db = new FakeDb();
+  const write = async (model: string, data: Row) => void db.insert(model, data);
+  const demo = await seedUniverse(write, { prefix: "dm-", demo: true });
+  const real = await seedUniverse(write, { prefix: "rl-", demo: false });
+  return { db, demo, real };
+}
+
+/** A copy of the universe's own row of `model`, with some columns changed. */
+export function copyOf(db: FakeDb, model: string, prefix: string, changes: Row): Row {
+  const original = db.rows(model).find((row) => JSON.stringify(row).includes(prefix));
+  if (!original) throw new Error(`the ${prefix} universe has no ${model} row`);
+  return db.insert(model, { ...original, id: `${prefix}${model}.copy${db.rows(model).length}`, ...changes });
 }
