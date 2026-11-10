@@ -20,7 +20,9 @@ const seed = () => import("../seed-gates.mjs");
 
 /** Plan targets. A gate may tighten its target and may never loosen it. */
 const METRICS = {
-  M1: { target: 85, set: "launch" }, // estimated round trips; see the plan's Metrics section
+  // Estimated round trips; see the plan's Metrics section. 83, not the first 85: the counter fix in
+  // task T4 lowered the measured number by 2 with no change to the app, so the target moved with it.
+  M1: { target: 83, set: "launch" },
   M2: { target: 8, set: "launch" },
   M3: { target: 12, set: "pilot" },
   M4: { target: 235, set: "launch" },

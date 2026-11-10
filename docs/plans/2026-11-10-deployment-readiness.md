@@ -75,9 +75,9 @@ T2 measured M1, M3 and M6 with a counting stand-in for the database client. The 
 
 | ID | Metric | Baseline | Target | Set |
 | --- | --- | --- | --- | --- |
-| M1 | Estimated database round trips for one student dashboard render | 167, measured: 41 queries at 4 round trips each, and 3 nested loads | 85 or fewer | Launch |
+| M1 | Estimated database round trips for one student dashboard render | 161 on the corrected counter (T4, 2026-11-10): 40 app queries, 2 of them inside one shared transaction, 2 admin queries and 3 nested loads. First measured at 167; removing the dead banner (D1) took 4, and the counter fix took 2 with no change to the app. | 83 or fewer. Was 85; lowered by the 2 the counter fix took, so the work needed is the same. | Launch |
 | M2 | Statements per open dashboard per minute at idle | about 60 | 8 or fewer | Launch |
-| M3 | Estimated database round trips before chat sends its first byte | Not yet trusted. 167 with a fixture the database review found unrealistic; a normal turn issues more. | 12 or fewer | Pilot |
+| M3 | Estimated database round trips before chat sends its first byte | 188, measured from an ordinary mid-conversation turn at the weekly stage (T4, 2026-11-10): 43 app queries and 22 admin lookups sent as 13 statements. The first fixture read 167 from a stage the app never stores. | 12 or fewer | Pilot |
 | M4 | Compressed scripts and styles on the sign-in page | 322 KB, measured | 235 KB or less | Launch |
 | M5 | Orientation video size | 34.7 MB, measured | 10 MB or less | Launch |
 | M6 | Estimated database round trips for one teacher home render | 111, measured: 18 queries at 4 round trips each, and 39 nested loads | 60 or fewer | Pilot |
