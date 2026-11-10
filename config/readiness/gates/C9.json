@@ -1,0 +1,10 @@
+{
+  "id": "C9",
+  "kind": "task",
+  "set": "launch",
+  "title": "Alert actions leave a record and cannot undo someone else's work",
+  "doneWhen": "Route tests: an audit row per action, and 409 when the status has changed.",
+  "check": {
+    "type": "pending"
+  }
+}

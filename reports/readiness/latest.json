@@ -1,17 +1,17 @@
 {
-  "generatedAt": "2026-11-10T19:33:44.136Z",
-  "commit": "cb5e96b2",
+  "generatedAt": "2026-11-10T20:23:32.532Z",
+  "commit": "97f9c3e8-dirty",
   "flags": "none",
   "ciGreen": null,
   "scores": [
     {
       "label": "Launch tasks",
-      "passed": 3,
-      "total": 34
+      "passed": 19,
+      "total": 36
     },
     {
       "label": "Launch metrics",
-      "passed": 0,
+      "passed": 1,
       "total": 5
     },
     {
@@ -22,7 +22,7 @@
     {
       "label": "Pilot tasks",
       "passed": 0,
-      "total": 26
+      "total": 30
     },
     {
       "label": "Pilot metrics",
@@ -68,16 +68,16 @@
       "kind": "task",
       "set": "launch",
       "title": "Classroom-safe sign-in limits",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "49 tests passed"
     },
     {
       "id": "A2",
       "kind": "task",
       "set": "launch",
       "title": "One password rule",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "62 tests passed"
     },
     {
       "id": "A3",
@@ -104,12 +104,20 @@
       "detail": "no check yet"
     },
     {
+      "id": "A6",
+      "kind": "task",
+      "set": "launch",
+      "title": "The sign-in limits count the real client address",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
       "id": "B1",
       "kind": "task",
       "set": "launch",
       "title": "Regions screen",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "133 tests passed"
     },
     {
       "id": "B2",
@@ -136,28 +144,36 @@
       "detail": "no check yet"
     },
     {
+      "id": "B5",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Archiving a region ends its coordinators' access",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
       "id": "C1",
       "kind": "task",
       "set": "launch",
       "title": "Verify buttons report failure",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "85 tests passed"
     },
     {
       "id": "C2",
       "kind": "task",
       "set": "launch",
       "title": "Alert age is real",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "16 tests passed"
     },
     {
       "id": "C3",
       "kind": "task",
       "set": "launch",
       "title": "Queue actions can be undone",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "23 tests passed"
     },
     {
       "id": "C4",
@@ -192,28 +208,44 @@
       "detail": "no check yet"
     },
     {
+      "id": "C8",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Student page polish from the C1 reviews",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "C9",
+      "kind": "task",
+      "set": "launch",
+      "title": "Alert actions leave a record and cannot undo someone else's work",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
       "id": "D1",
       "kind": "task",
       "set": "launch",
       "title": "The signed-form banner is removed from the student home, per R5",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "3 tests passed"
     },
     {
       "id": "D2",
       "kind": "task",
       "set": "launch",
       "title": "Orientation documents open on phones",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "9 tests passed"
     },
     {
       "id": "D3",
       "kind": "task",
       "set": "launch",
       "title": "Sign-in form first on phones",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "20 tests passed"
     },
     {
       "id": "D4",
@@ -388,24 +420,24 @@
       "kind": "task",
       "set": "launch",
       "title": "Pages show before JavaScript runs",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "4 tests passed"
     },
     {
       "id": "G2",
       "kind": "task",
       "set": "launch",
       "title": "Lighter sign-in",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "34 tests passed"
     },
     {
       "id": "G3",
       "kind": "task",
       "set": "launch",
       "title": "Smaller orientation video",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "7 tests passed"
     },
     {
       "id": "G4",
@@ -444,16 +476,16 @@
       "kind": "task",
       "set": "launch",
       "title": "Errors reach a person",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "80 tests passed"
     },
     {
       "id": "H2",
       "kind": "task",
       "set": "launch",
       "title": "Demo and real students can never coexist",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "29 tests passed"
     },
     {
       "id": "H3",
@@ -476,8 +508,8 @@
       "kind": "task",
       "set": "launch",
       "title": "Jobs survive a restart",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "23 tests passed"
     },
     {
       "id": "H6",
@@ -492,8 +524,8 @@
       "kind": "task",
       "set": "launch",
       "title": "Release hygiene",
-      "status": "pending",
-      "detail": "no check yet"
+      "status": "pass",
+      "detail": "4 tests passed"
     },
     {
       "id": "H8",
@@ -520,12 +552,28 @@
       "detail": "no check yet"
     },
     {
+      "id": "H11",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Delivery jobs have known bounds",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
+      "id": "H12",
+      "kind": "task",
+      "set": "pilot",
+      "title": "Error reporting stays small in the browser",
+      "status": "pending",
+      "detail": "no check yet"
+    },
+    {
       "id": "M1",
       "kind": "metric",
       "set": "launch",
       "title": "Estimated database round trips for one student dashboard render",
       "status": "fail",
-      "detail": "167 round trips (target at most 85, baseline 167)"
+      "detail": "163 round trips (target at most 85, baseline 167)"
     },
     {
       "id": "M2",
@@ -556,8 +604,8 @@
       "kind": "metric",
       "set": "launch",
       "title": "Orientation video size",
-      "status": "fail",
-      "detail": "34.7 MB (target at most 10, baseline 34.7)"
+      "status": "pass",
+      "detail": "9.5 MB (target at most 10, baseline 34.7)"
     },
     {
       "id": "M6",
@@ -573,7 +621,7 @@
       "set": "launch",
       "title": "Production `/api/health` `latency_ms`",
       "status": "fail",
-      "detail": "535 ms (target at most 60, baseline 530)"
+      "detail": "543 ms (target at most 60, baseline 530)"
     },
     {
       "id": "M8",

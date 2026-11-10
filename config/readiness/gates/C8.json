@@ -1,0 +1,10 @@
+{
+  "id": "C8",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Student page polish from the C1 reviews",
+  "doneWhen": "Component tests cover each. `ui-copy:readability` passes on the staff roots.",
+  "check": {
+    "type": "pending"
+  }
+}

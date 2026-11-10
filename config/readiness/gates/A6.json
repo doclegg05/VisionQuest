@@ -1,0 +1,10 @@
+{
+  "id": "A6",
+  "kind": "task",
+  "set": "launch",
+  "title": "The sign-in limits count the real client address",
+  "doneWhen": "A test sends a forged first hop and the limiter still counts one address. A test covers a request with no proxy header.",
+  "check": {
+    "type": "pending"
+  }
+}

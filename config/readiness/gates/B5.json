@@ -1,0 +1,10 @@
+{
+  "id": "B5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Archiving a region ends its coordinators' access",
+  "doneWhen": "An RLS test archives a region and its coordinator reads nothing from it.",
+  "check": {
+    "type": "pending"
+  }
+}
