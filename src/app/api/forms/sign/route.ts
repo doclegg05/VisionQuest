@@ -8,8 +8,7 @@ import { logger } from "@/lib/logger";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { syncStudentAlerts } from "@/lib/advising";
-import { afterWrite } from "@/lib/after-write";
-import { deferAfterResponse } from "@/lib/after-response";
+import { deferPerStudent } from "@/lib/after-response";
 import { parseBody } from "@/lib/schemas";
 import { decodeSignaturePng, SIGNATURE_DATA_URL_PREFIX } from "@/lib/signature-png";
 import { fileBelongsToStudent } from "@/lib/forms/signature-files";
@@ -131,12 +130,8 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     // student's "Submitting..." for ~45 s on 2026-09-07 (see
     // src/lib/after-response.ts); the teacher queue can catch up a moment
     // later.
-    deferAfterResponse(() =>
-      afterWrite(() => syncStudentAlerts(targetStudentId), {
-        surface: "forms/sign",
-        effect: "syncStudentAlerts",
-        studentId: targetStudentId,
-      }),
+    deferPerStudent(targetStudentId, { surface: "forms/sign", effect: "syncStudentAlerts" }, () =>
+      syncStudentAlerts(targetStudentId),
     );
 
     return NextResponse.json({

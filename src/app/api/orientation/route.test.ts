@@ -361,4 +361,29 @@ describe("POST /api/orientation (verification flow)", () => {
     assert.equal(call.update.verificationStatus, null);
     assert.equal(call.update.verifiedBy, null);
   });
+
+  // Un-checking is a student write too: it must not wait on the queue.
+  it("answers a student unchecking without waiting for the alert sync", async () => {
+    let releaseSync: () => void = () => undefined;
+    mockSyncStudentAlerts.mock.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        releaseSync = resolve;
+      }),
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<"timed out">((resolve) => {
+      timer = setTimeout(() => resolve("timed out"), 2000);
+    });
+    const outcome = await Promise.race([
+      route.POST(toggleRequest({ itemId: ITEM_ID, completed: false })),
+      timeout,
+    ]);
+    clearTimeout(timer);
+    releaseSync();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    if (outcome === "timed out") assert.fail("the response waited on the alert sync");
+    assert.equal(outcome.status, 200);
+    assert.equal(mockSyncStudentAlerts.mock.callCount(), 1, "the sync is still started");
+  });
 });
