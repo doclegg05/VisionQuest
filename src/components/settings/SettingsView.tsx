@@ -411,7 +411,7 @@ export function SettingsView({ initialRole = null }: SettingsViewProps = {}) {
               Recovery Questions
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">
-              This reset option is only for your classroom account. If you forget your password, answer these questions to choose a new one — no email needed.
+              This reset option is only for your classroom account. If you forget your password, answer these questions to choose a new one. No email needed.
             </p>
           </div>
           <span
