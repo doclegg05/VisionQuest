@@ -12,10 +12,11 @@
  * page's route pattern. No breadcrumbs (a click breadcrumb quotes the
  * button's aria-label, which names a student on about 21 controls), no page
  * URL or referrer, no session pings, no client reports, no tracing, no
- * replay. The SDK's integrations are an allowlist (`errorOnlyIntegrations`).
+ * replay. The SDK's integrations are an allowlist (`errorOnlyIntegrations`),
+ * and the transport is behind the wire filter (src/lib/sentry-wire.ts).
  *
- * Neither the SDK nor the scrub is imported here. Both are fetched as their
- * own chunks once the page has loaded and the browser is idle, so they add
+ * Neither the SDK, the scrub nor the wire filter is imported here. They are
+ * fetched as their own chunks once the page has loaded and the browser is idle, so they add
  * nothing to the scripts a page needs before it is interactive; students
  * are on low-end phones and the sign-in page has a weight budget. Errors
  * thrown before they arrive are held (up to MAX_HELD_ERRORS) and sent once
@@ -121,14 +122,16 @@ function pageRouteIntegration(page: ReportingPage, routePattern: (path: string) 
 async function loadAndInit(page: ReportingPage, dsn: string, early: EarlyErrors): Promise<Report> {
   // Destructured, so a bundler that tree-shakes dynamic imports keeps only
   // these exports in each chunk.
-  const [{ init, captureException }, { errorOnlyIntegrations, PRIVATE_REPORTING_OPTIONS, routePattern }] = await Promise.all([
-    import("@sentry/nextjs"),
-    import("@/lib/sentry-scrub"),
-  ]);
+  const [{ init, captureException, makeFetchTransport }, { errorOnlyIntegrations, PRIVATE_REPORTING_OPTIONS, routePattern }, { wireAllowlistTransport }] =
+    await Promise.all([import("@sentry/nextjs"), import("@/lib/sentry-scrub"), import("@/lib/sentry-wire")]);
   init({
     dsn,
     environment: process.env.NODE_ENV,
     ...PRIVATE_REPORTING_OPTIONS,
+    // The SDK's own browser transport, behind the wire filter: every
+    // envelope is rebuilt before it is sent, the ones `beforeSend` never
+    // sees included (src/lib/sentry-wire.ts).
+    transport: wireAllowlistTransport(makeFetchTransport),
     integrations: (defaults) => [...errorOnlyIntegrations(defaults), pageRouteIntegration(page, routePattern)],
   });
   early.release();

@@ -11,6 +11,7 @@
  *    app's `beforeSend`, and the envelope exactly as it would go on the wire.
  */
 import http from "node:http";
+import { addItemToEnvelope, createAttachmentEnvelopeItem, createEventEnvelope, makeDsn, parseEnvelope, serializeEnvelope } from "@sentry/core";
 import * as Sentry from "@sentry/nextjs";
 import type { Breadcrumb, ErrorEvent, Event } from "@sentry/nextjs";
 import { serverSentryOptions } from "../../sentry.server.config";
@@ -266,6 +267,97 @@ export type Envelope = Parameters<Transport["send"]>[0];
 /** A well-formed DSN on a current ingest host. Nothing is ever sent to it. */
 export const TEST_DSN = "https://public@o123.ingest.us.sentry.io/456";
 
+// ---------------------------------------------------------------------------
+// Envelopes as they are on the wire (H1 third pass, 2026-11-10).
+// ---------------------------------------------------------------------------
+
+/**
+ * The bytes the SDK would send for these envelopes, as text, from the SDK's
+ * own serializer (@sentry/core utils/envelope.js `serializeEnvelope`). Search
+ * this, not `JSON.stringify(envelope)`: an attachment's payload is bytes, and
+ * JSON writes bytes as a list of numbers that no search for a name can match.
+ */
+export function wireText(envelopes: readonly Envelope[]): string {
+  return envelopes
+    .map((envelope) => {
+      const body = serializeEnvelope(envelope);
+      return typeof body === "string" ? body : new TextDecoder().decode(body);
+    })
+    .join("\n");
+}
+
+/** One envelope item as it is written on the wire: its header line, then its payload line. */
+function wireItem(header: object, payload: unknown): string {
+  return `\n${JSON.stringify(header)}\n${JSON.stringify(payload)}`;
+}
+
+/** A header and one item of each given type, read back by the SDK's own parser. */
+export function envelopeOf(types: readonly string[], header: object = { sent_at: "2026-11-10T21:00:00.000Z" }): Envelope {
+  const items = types.map((type) => wireItem({ type }, { note: `${PLANTED.name} ${PLANTED.recordId}` }));
+  return parseEnvelope(`${JSON.stringify(header)}${items.join("")}`);
+}
+
+const TRANSACTION_NAME = `POST /api/teacher/students/${PLANTED.recordId}/notes`;
+
+/**
+ * What must never be sent as it is: an event nobody scrubbed (the SDK skips
+ * `beforeSend` for a report about its own failure), under a header that names
+ * the real path and the DSN, next to one item of each kind that is not an
+ * event. The event and its attachment are built by the SDK's helpers
+ * (`createEventEnvelope`, `createAttachmentEnvelopeItem`). The SDK's types
+ * allow no envelope to hold a session, a client report or a log beside an
+ * event, so those three are appended as wire text and the whole is read back
+ * with the SDK's parser: a transport takes whatever it is handed.
+ */
+export function hostileEnvelope(): Envelope {
+  const event: Event = {
+    ...serverSelfCapturedEvent(),
+    transaction: TRANSACTION_NAME,
+    sdkProcessingMetadata: {
+      dynamicSamplingContext: { trace_id: "ab9477294c1144fba2f9b0df674298c2", public_key: "public", transaction: TRANSACTION_NAME },
+    },
+  };
+  const metadata = { sdk: { name: "sentry.javascript.nextjs", version: "10.76.2", settings: { infer_ip: "auto" as const } } };
+  const withEvent = createEventEnvelope(event, makeDsn(TEST_DSN), metadata, "https://vq.example/monitoring");
+  const withAttachment = addItemToEnvelope(
+    withEvent,
+    createAttachmentEnvelopeItem({ filename: `${PLANTED.slug}-resume.pdf`, data: `resume of ${PLANTED.name}` }),
+  );
+  const session = wireItem({ type: "session" }, { sid: "0f8b3c0e9d2a4f6b8c1d2e3f4a5b6c7d", did: PLANTED.loginId, status: "ok" });
+  const report = wireItem({ type: "client_report" }, { timestamp: 1794341325, discarded_events: [{ reason: "before_send", category: "error", quantity: 1 }] });
+  const log = wireItem(
+    { type: "log", item_count: 1, content_type: "application/vnd.sentry.items.log+json" },
+    { items: [{ timestamp: 1794341325.1, level: "info", body: `looked up ${PLANTED.email}`, trace_id: "ab9477294c1144fba2f9b0df674298c2" }] },
+  );
+  return parseEnvelope(`${wireText([withAttachment])}${session}${report}${log}`);
+}
+
+/** A transport that records what it is handed and sends nothing. */
+export interface RecordingTransport {
+  envelopes: Envelope[];
+  /** For the SDK's `transport` option, or for the app's options to wrap. */
+  make: () => Transport;
+  itemTypes(): string[];
+  events(): Event[];
+}
+
+export function recordingTransport(): RecordingTransport {
+  const envelopes: Envelope[] = [];
+  const transport: Transport = {
+    send: async (envelope: Envelope) => {
+      envelopes.push(envelope);
+      return {};
+    },
+    flush: async () => true,
+  };
+  return {
+    envelopes,
+    make: () => transport,
+    itemTypes: () => envelopes.flatMap(envelopeItems).map(([type]) => type),
+    events: () => eventsIn(envelopes),
+  };
+}
+
 /** Everything the SDK handed to its transport: all that would leave the process. */
 export interface Outbox {
   envelopes: Envelope[];
@@ -309,22 +401,23 @@ function createOutbox(): Outbox {
 }
 
 /**
- * Starts the real server SDK with `serverSentryOptions`. Only the transport
- * differs from production. Call it once per test file: the SDK ignores a
- * second `init` in the same process.
+ * Starts the real server SDK with `serverSentryOptions`. Only the last step
+ * differs from production: where the SDK's Node transport would make a
+ * request, this records. The app's wire filter (src/lib/sentry-wire.ts) is
+ * in front of it, as it is in front of the real one, so the outbox holds
+ * exactly what would be posted. Call it once per test file: the SDK ignores
+ * a second `init` in the same process.
  */
 export function startServerSdk(): Outbox {
   const outbox = createOutbox();
-  Sentry.init({
-    ...serverSentryOptions(TEST_DSN),
-    transport: () => ({
-      send: async (envelope: Envelope) => {
-        outbox.envelopes.push(envelope);
-        return {};
-      },
-      flush: async () => true,
-    }),
-  });
+  const record: Transport = {
+    send: async (envelope: Envelope) => {
+      outbox.envelopes.push(envelope);
+      return {};
+    },
+    flush: async () => true,
+  };
+  Sentry.init(serverSentryOptions(TEST_DSN, () => record));
   return outbox;
 }
 

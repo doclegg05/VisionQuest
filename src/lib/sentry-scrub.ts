@@ -135,6 +135,10 @@ function shaped(shape: RegExp): (value: unknown) => value is string {
   return (value: unknown): value is string => typeof value === "string" && shape.test(value);
 }
 
+/** For the wire filter (sentry-wire.ts): the two closed shapes an envelope header's values must match. */
+export const isEventId = shaped(SHAPE.eventId);
+export const isLabel = shaped(SHAPE.label);
+
 /** The named keys of `source` whose values pass `keep`; every other key is left behind. */
 function pick<K extends string, V>(source: object, keys: readonly K[], keep: (value: unknown) => value is V): Partial<Record<K, V>> {
   const record: Record<string, unknown> = { ...source };

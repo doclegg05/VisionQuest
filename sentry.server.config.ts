@@ -1,7 +1,9 @@
 import * as Sentry from "@sentry/nextjs";
 import { errorOnlyIntegrations, PRIVATE_REPORTING_OPTIONS } from "./src/lib/sentry-scrub";
+import { type Transport, wireAllowlistTransport } from "./src/lib/sentry-wire";
 
 type ServerOptions = NonNullable<Parameters<typeof Sentry.init>[0]>;
+type NodeTransportOptions = Parameters<typeof Sentry.makeNodeTransport>[0];
 
 /**
  * Server error reporting: errors only, built by the scrub
@@ -17,13 +19,23 @@ type ServerOptions = NonNullable<Parameters<typeof Sentry.init>[0]>;
  * switches are set, so either one alone is enough. It still gives each
  * request its own scope, which is what keeps one request's route from being
  * tagged on another's error. Requests are not counted as sessions.
+ *
+ * The transport is the SDK's own Node transport behind the wire filter
+ * (src/lib/sentry-wire.ts), which rebuilds every envelope before it is sent.
+ * `beforeSend` alone is not enough: the SDK skips it for the report about
+ * its own failure. A test passes a transport that records in place of the
+ * SDK's; the filter is in front of it either way.
  */
-export function serverSentryOptions(dsn: string): ServerOptions {
+export function serverSentryOptions(
+  dsn: string,
+  makeTransport: (options: NodeTransportOptions) => Transport = Sentry.makeNodeTransport,
+): ServerOptions {
   return {
     dsn,
     environment: process.env.NODE_ENV,
     tracesSampleRate: 0,
     ...PRIVATE_REPORTING_OPTIONS,
+    transport: wireAllowlistTransport(makeTransport),
     integrations: (defaults) => [
       ...errorOnlyIntegrations(defaults),
       Sentry.httpIntegration({

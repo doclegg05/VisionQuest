@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it, mock } from "node:test";
 import * as Browser from "@sentry/browser";
-import { PRIVATE_REPORTING_OPTIONS } from "@/lib/sentry-scrub";
-import { type Envelope, envelopeItems, eventsIn, PLANTED, plantedIn, sdkBreadcrumbs, TEST_DSN } from "@/lib/sentry.test-support";
+import { PRIVATE_REPORTING_OPTIONS, scrubPii } from "@/lib/sentry-scrub";
+import {
+  type Envelope,
+  envelopeItems,
+  envelopeOf,
+  eventsIn,
+  hostileEnvelope,
+  PLANTED,
+  plantedIn,
+  sdkBreadcrumbs,
+  TEST_DSN,
+  wireText,
+} from "@/lib/sentry.test-support";
 
 // H1 (2026-11-10): the browser had no Sentry client at all. The SDK reads
 // sentry.client.config.ts only on its webpack path
@@ -17,6 +28,12 @@ import { type Envelope, envelopeItems, eventsIn, PLANTED, plantedIn, sdkBreadcru
 // REAL browser client (@sentry/browser, which the Next SDK's browser `init`
 // wraps) with the options the app passes and a transport that records, and
 // assert on what was handed to that transport.
+//
+// Third pass: the recording transport stands where the SDK's fetch transport
+// does (`makeFetchTransport`), so the app's wire filter
+// (src/lib/sentry-wire.ts) is in front of it and `envelopes` holds what the
+// browser would post. The app's `transport` option is passed to the SDK as
+// it is.
 
 type BrowserOptions = NonNullable<Parameters<typeof Browser.init>[0]>;
 type Transport = ReturnType<NonNullable<BrowserOptions["transport"]>>;
@@ -30,9 +47,11 @@ const recordingTransport = (): Transport => ({
   flush: async () => true,
 });
 
-const init = mock.fn((options: BrowserOptions) => Browser.init({ ...options, transport: recordingTransport }));
+// The fallback is there so that a test run can never reach the network: if
+// the app passed no transport, the SDK would use its real one.
+const init = mock.fn((options: BrowserOptions) => Browser.init({ ...options, transport: options.transport ?? recordingTransport }));
 const captureException = mock.fn((error: unknown) => Browser.captureException(error));
-mock.module("@sentry/nextjs", { namedExports: { init, captureException } });
+mock.module("@sentry/nextjs", { namedExports: { init, captureException, makeFetchTransport: recordingTransport } });
 mock.method(console, "error", () => {});
 
 let client: typeof import("./instrumentation-client");
@@ -223,6 +242,54 @@ describe("what leaves the browser", () => {
     await settle();
     assert.deepEqual(plantedIn(envelopes), []);
     assert.equal(sentEvents()[0]?.exception?.values?.[0]?.type, "NonError_object");
+  });
+});
+
+// Third pass: `beforeSend` is not the last word. The SDK skips it for the
+// report about its own failure, and never calls it for a session, a client
+// report, a log or an attachment. The browser's transport is behind the wire
+// filter, which rebuilds every envelope.
+describe("the wire filter in the browser", () => {
+  const HEADER_KEYS = ["event_id", "sdk", "sent_at"];
+
+  it("the app passes the SDK a transport of its own", async () => {
+    await startedPage();
+    assert.equal(typeof initOptions().transport, "function");
+  });
+
+  it("the built client's transport sends only the scrubbed event of a mixed envelope, under a three-key header", async () => {
+    await startedPage();
+    const hostile = hostileEnvelope();
+    await Browser.getClient()?.getTransport()?.send(hostile);
+    assert.deepEqual(itemTypes(), ["event"]);
+    assert.deepEqual(envelopes.map((envelope) => Object.keys(envelope[0]).sort()), [HEADER_KEYS]);
+    assert.deepEqual(sentEvents(), eventsIn([hostile]).map((event) => scrubPii(event)));
+    assert.deepEqual(plantedIn(wireText(envelopes)), []);
+  });
+
+  it("an envelope that holds no event is not sent at all", async () => {
+    await startedPage();
+    await Browser.getClient()?.getTransport()?.send(envelopeOf(["session", "client_report", "attachment", "log"]));
+    assert.equal(envelopes.length, 0);
+  });
+
+  it("an event processor that throws leaves a scrubbed report of the SDK's own failure", async () => {
+    await startedPage(`/credentials/${PLANTED.slug}`);
+    Browser.withScope((scope) => {
+      scope.addEventProcessor(() => {
+        throw new Error(`processor failed for ${PLANTED.name}`);
+      });
+      client.reportClientError(new Error(`could not save ${PLANTED.name}`));
+    });
+    await settle();
+    const wire = wireText(envelopes);
+    assert.deepEqual(plantedIn(wire), []);
+    assert.ok(!wire.includes("processor failed") && !wire.includes("could not save"));
+    assert.deepEqual(envelopes.map((envelope) => Object.keys(envelope[0]).sort()), [HEADER_KEYS]);
+    assert.deepEqual(
+      sentEvents().map((event) => event.exception?.values?.map((entry) => [entry.value, entry.mechanism?.type])),
+      [[["[message withheld]", "internal"]]],
+    );
   });
 });
 
