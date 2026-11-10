@@ -1,4 +1,4 @@
-# Deployment Runbook — VisionQuest
+# Deployment Runbook for VisionQuest
 
 This runbook covers the supported production path: Render for app hosting plus Supabase for PostgreSQL and file storage.
 
@@ -7,7 +7,8 @@ This runbook covers the supported production path: Render for app hosting plus S
 - GitHub repo: `https://github.com/doclegg05/VisionQuest.git`
 - Supabase project
 - Render account
-- Google AI Studio account for Gemini
+- A Mac or other host that runs the local Sage model through the relay. See the [Mac Sage connection runbook](docs/runbooks/mac-sage-connection.md)
+- Optional Google AI Studio account for Gemini, only if Sage uses the cloud model
 - Optional Google Cloud project for OAuth
 - Optional SMTP provider for password reset mail
 - Optional Sentry project
@@ -75,7 +76,11 @@ Use the outputs for:
 
 ## 3. Get Third-Party Credentials
 
-### Gemini
+### Gemini (optional)
+
+Production runs Sage on a local model through the Mac relay, so it needs no Gemini key. `GEMINI_API_KEY` is optional in `src/lib/env.ts`, and no boot probe checks it. While `VQ_MAC_RELAY_ENABLED=true`, `COHORT_DEMO_MODE=true`, or `COHORT_DEMO_LOCAL_ONLY=true`, `src/lib/ai/demo-local-only.ts` refuses cloud inference for the whole service, so a Gemini key would go unused.
+
+To run Sage on Gemini instead:
 
 1. Go to `https://aistudio.google.com/app/apikey`
 2. Create an API key
@@ -157,7 +162,6 @@ If you do not use the blueprint:
 | `API_KEY_ENCRYPTION_KEY` | Base64-encoded 32-byte key |
 | `APP_BASE_URL` | Public Render URL |
 | `CRON_SECRET` | Shared secret for internal scheduled routes |
-| `GEMINI_API_KEY` | Gemini credential |
 | `STORAGE_ENDPOINT` | Supabase S3 endpoint |
 | `STORAGE_REGION` | Usually `us-east-1` |
 | `STORAGE_BUCKET` | `Uploads` (existing private bucket; case-sensitive) |
@@ -171,7 +175,10 @@ If you do not use the blueprint:
 | `GOOGLE_CLIENT_ID` | Google OAuth |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth |
 | `GOOGLE_REDIRECT_URI` | Google OAuth callback URL |
+| `GEMINI_API_KEY` | Gemini credential. Needed only when Sage runs on the cloud model |
 | `GEMINI_MODEL` | Override default Gemini model |
+| `VQ_MAC_RELAY_ENABLED` | `true` turns on the Mac relay for local Sage and blocks cloud inference. Its other variables are in the [Mac Sage connection runbook](docs/runbooks/mac-sage-connection.md) |
+| `ADMIN_KEY` | Registration key for the first admin account. See [Create the first admin](#8-create-the-first-admin) |
 | `SAGE_AGENT_ENABLED` | Enable Sage tool calls and server-driven slash commands |
 | `CF_ACCESS_CLIENT_ID` | Cloudflare Access service-token client id for the local Sage AI endpoint |
 | `CF_ACCESS_CLIENT_SECRET` | Cloudflare Access service-token client secret for the local Sage AI endpoint |
@@ -225,17 +232,40 @@ Fallback path:
 DATABASE_URL="..." node scripts/promote-teacher.mjs <email-or-student-id>
 ```
 
-## 8. Verification Checklist
+## 8. Create The First Admin
+
+Admin accounts come from the same `/teacher-register` page as teachers, with a different key.
+
+Preferred path:
+
+1. Generate a key locally: `openssl rand -base64 32 | tr -d '\n'`
+2. In the Render dashboard, open the web service, then **Environment**. Add `ADMIN_KEY` with that value and no quotes. Save, and let Render deploy. Without `ADMIN_KEY`, the page answers "Admin registration is not configured."
+3. Open `/teacher-register`, choose **Administrator**, and enter the key, your name, your email and a password.
+4. The page creates the admin account and signs you in.
+
+If an active teacher account already uses that email, the page promotes it to admin instead. It keeps the password and MFA, signs out every open session, and issues no new session. Sign in again with the current password.
+
+The route allows 5 attempts per key and 20 attempts across all callers in 15 minutes. After that it answers "Too many attempts" until the window ends.
+
+Fallback path, for an account that already exists. Use the `ADMIN_DATABASE_URL` connection string, because `Student` has row-level security and `DATABASE_URL` connects as `vq_app`:
+
+```bash
+DATABASE_URL="..." npm run users:promote-admin -- <email-or-student-id>
+```
+
+The script sets the role to `admin`, signs out the account's open sessions, and writes an audit row.
+
+## 9. Verification Checklist
 
 ### Service health
 
 - `GET /api/health` returns 200
 - Web service boots without migration failure
-- All three cron jobs show successful runs
+- Every pg_cron job shows a recent successful run. Run `npm run cron:health`. It checks the jobs listed in `EXPECTED_CRON_JOBS` in `scripts/lib/cron-health.mjs`, which are the 12 that the migrations register. To recount: `grep -rh -A1 "PERFORM cron.schedule(" prisma/migrations | grep -oE "'[a-z0-9-]+'" | sort -u | wc -l`
 
 ### Student flow
 
-- Student can register and sign in
+- An instructor can create a student account, and the student can sign in. Students cannot register themselves: `/signup` redirects to the sign-in page
 - Student can open Sage and receive a streamed response
 - Admin `Program Setup -> AI Provider -> Test Connection` succeeds if Sage is using local AI
 - Goal extraction runs after chat
@@ -258,7 +288,7 @@ DATABASE_URL="..." node scripts/promote-teacher.mjs <email-or-student-id>
 - Google OAuth callback works if enabled
 - Sentry receives test errors if configured
 
-## 9. Monitoring And Recovery
+## 10. Monitoring And Recovery
 
 ### Health check
 
@@ -268,7 +298,8 @@ curl https://your-app.onrender.com/api/health
 
 ### Logs
 
-- Use the Render dashboard for web and cron service logs
+- Use the Render dashboard for web service logs
+- Use Supabase `cron.job_run_details` and `net._http_response` for scheduled jobs. The [cron runbook](./docs/plans/pg-cron-setup-runbook.md) has the queries
 - Use Supabase logs for database and storage issues
 - Use Sentry for client and server exception tracking if enabled
 
@@ -344,7 +375,7 @@ The reset tool defaults to a preview and never deletes student records. It archi
 
 The tool refuses a class not owned by the marked demo instructor, unmarked students in the demo roster, and selected students enrolled in another class. Preview reports counts only. Apply is transactional; any error rolls back all changes. Keep the switch off until the reset finishes. There is no reset endpoint available to public demo visitors. This is a roster reset, not deletion of demo history or instructor settings.
 
-## Chat-First Rebuild (June 2026) — operational notes
+## Chat-First Rebuild (June 2026): operational notes
 
 - **Kill switches** (env vars, all default ON): `SAGE_AGENT_ENABLED=false` (agent tools),
   `SAGE_MEMORY_ENABLED=false` (memory extraction/retrieval), `SAGE_RAG_MODE=keyword`
