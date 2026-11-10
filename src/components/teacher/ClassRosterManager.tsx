@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QrCode as QrIcon } from "@phosphor-icons/react";
+import { ClassRegionField } from "@/components/admin/ClassRegionField";
+import { regionChoiceFor, regionPatchFor, type ClassRegionChoice } from "@/components/admin/class-region-choice";
 import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
@@ -119,6 +121,9 @@ export default function ClassRosterManager() {
   const [classStartDate, setClassStartDate] = useState("");
   const [classEndDate, setClassEndDate] = useState("");
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+  // The class routes do not return a class's region, so settings cannot show the
+  // current one. A pick is kept with its class id and sent only for that class.
+  const [regionChoice, setRegionChoice] = useState<ClassRegionChoice | null>(null);
 
   // Create student form state
   const [newStudentUsername, setNewStudentUsername] = useState("");
@@ -365,6 +370,7 @@ export default function ClassRosterManager() {
           startDate: classStartDate || null,
           endDate: classEndDate || null,
           instructorIds: selectedInstructorIds,
+          ...regionPatchFor(regionChoice, selectedClassId),
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -632,6 +638,11 @@ export default function ClassRosterManager() {
                           className="field px-4 py-3 text-sm"
                         />
                       </label>
+                      <ClassRegionField
+                        regions={regions}
+                        value={regionChoiceFor(regionChoice, selectedClassId)}
+                        onChange={(regionId) => setRegionChoice({ classId: selectedClassId, regionId })}
+                      />
                       <label className="block space-y-1.5">
                         <span className="block text-sm font-medium text-[var(--ink-strong)]">Start date</span>
                         <input
