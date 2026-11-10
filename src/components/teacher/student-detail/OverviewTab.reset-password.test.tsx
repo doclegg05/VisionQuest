@@ -213,7 +213,7 @@ describe("instructor password reset: after it works", () => {
 
   it("keeps the password on screen in a monospace line until Close", () => {
     assert.ok(
-      words.includes("Password changed. Give the student this password: k7mq-x2vd-p9rt They are now signed out on every other device. They sign in with this new password. Close"),
+      words.includes("Password changed. Give the student this password: k7mq-x2vd-p9rt They are now signed out on every other device. When they sign in with this password, VisionQuest asks them to choose their own. Stay with them for that step. Close"),
       words,
     );
     assert.match(html, /<p\b[^>]*class="[^"]*\bfont-mono\b[^"]*"[^>]*>k7mq-x2vd-p9rt<\/p>/u);

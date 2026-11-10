@@ -137,7 +137,7 @@ function ResetDonePanel({ password, onClose }: ResetDonePanelProps) {
     <div role="status" className="rounded-xl border-2 border-success bg-success-soft p-3 text-sm text-[var(--ink-strong)]">
       <p className="font-semibold">Password changed. Give the student this password:</p>
       <p className="mt-1 font-mono text-xl tracking-wide">{password}</p>
-      <p className="mt-1">They are now signed out on every other device. They sign in with this new password.</p>
+      <p className="mt-1">They are now signed out on every other device. When they sign in with this password, VisionQuest asks them to choose their own. Stay with them for that step.</p>
       <button
         type="button"
         autoFocus
