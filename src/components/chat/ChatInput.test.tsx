@@ -4,6 +4,7 @@ import { renderToString } from "react-dom/server";
 
 import ChatInput, {
   CHAT_UPLOAD_ACCEPT,
+  StopButton,
   UploadError,
   uploadFailureMessage,
   uploadProblemFor,
@@ -103,5 +104,46 @@ describe("ChatInput while Sage answers", () => {
     assert.doesNotMatch(textarea, / disabled=""/);
     assert.match(textarea, /readOnly=""|readonly=""/);
     assert.match(textarea, /aria-disabled="true"/);
+  });
+});
+
+describe("Stop while Sage answers (E2.2)", () => {
+  function stopButton(html: string): string {
+    return html.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Stop(?:(?!<\/button>)[\s\S])*<\/button>/)?.[0] ?? "";
+  }
+
+  it("shows a Stop button in place of Send while Sage answers", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} disabled />);
+    const button = stopButton(html);
+    assert.ok(button, html);
+    assert.doesNotMatch(button, / disabled=""/);
+    assert.match(button, /type="button"/);
+    assert.doesNotMatch(html, /aria-label="Send message"/);
+  });
+
+  it("is a 44px target labelled Stop, with no failure colors", () => {
+    const button = stopButton(renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} disabled />));
+    assert.match(button, /min-h-11/);
+    assert.match(button, /min-w-11/);
+    assert.match(button, />Stop</);
+    assert.doesNotMatch(button, /aria-label=/);
+    assert.doesNotMatch(button, /error|danger/);
+  });
+
+  it("is gone once Sage is done, and Send is back", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} />);
+    assert.equal(stopButton(html), "");
+    assert.match(html, /aria-label="Send message"/);
+  });
+
+  it("never shows without an onStop (the mini chat has none)", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} disabled />);
+    assert.equal(stopButton(html), "");
+  });
+
+  it("calls onStop when pressed", () => {
+    const onStop = () => undefined;
+    const element = StopButton({ onStop });
+    assert.equal(element.props.onClick, onStop);
   });
 });

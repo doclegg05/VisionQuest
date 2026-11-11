@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { readChatStream, type ChatStreamHandlers } from "./chat-stream";
 import { SageSendError } from "@/lib/chat/send-outcome";
+import { CRISIS_RESOURCE_BLOCK, CRISIS_RESOURCE_BLOCK_ES } from "@/lib/chat/crisis-resource-blocks";
 
 function sseResponse(events: unknown[]): Response {
   const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
@@ -55,5 +56,57 @@ describe("readChatStream", () => {
   it("throws plainly when there is no body to read", async () => {
     const { handlers } = recorder();
     await assert.rejects(readChatStream(new Response(null), handlers), /No response stream/);
+  });
+});
+
+describe("readChatStream: the early 988 flag (E2.2)", () => {
+  it("hands over the 988 block the first event names, before any text", async () => {
+    const order: string[] = [];
+    const blocks: string[] = [];
+    await readChatStream(
+      sseResponse([{ conversationId: "c1", userMessageId: "m1", crisisHelp: "en" }, { text: "Hi" }, { done: true }]),
+      {
+        onIds: () => order.push("ids"),
+        onCrisisBlock: (block) => {
+          order.push("crisis");
+          blocks.push(block);
+        },
+        onText: () => order.push("text"),
+        onEvents: () => undefined,
+        onDone: () => undefined,
+      },
+    );
+    assert.deepEqual(blocks, [CRISIS_RESOURCE_BLOCK]);
+    assert.deepEqual(order.slice(0, 3), ["ids", "crisis", "text"]);
+  });
+
+  it("hands over the Spanish block for a Spanish crisis message", async () => {
+    const blocks: string[] = [];
+    const { handlers } = recorder();
+    await readChatStream(sseResponse([{ conversationId: "c1", crisisHelp: "es" }, { done: true }]), {
+      ...handlers,
+      onCrisisBlock: (block) => blocks.push(block),
+    });
+    assert.deepEqual(blocks, [CRISIS_RESOURCE_BLOCK_ES]);
+  });
+
+  it("ignores a language it does not know", async () => {
+    const blocks: string[] = [];
+    const { handlers } = recorder();
+    await readChatStream(sseResponse([{ conversationId: "c1", crisisHelp: "fr" }, { done: true }]), {
+      ...handlers,
+      onCrisisBlock: (block) => blocks.push(block),
+    });
+    assert.deepEqual(blocks, []);
+  });
+
+  it("calls nothing when the first event has no block", async () => {
+    const blocks: string[] = [];
+    const { handlers } = recorder();
+    await readChatStream(sseResponse([{ conversationId: "c1" }, { text: "Hi" }, { done: true }]), {
+      ...handlers,
+      onCrisisBlock: (block) => blocks.push(block),
+    });
+    assert.deepEqual(blocks, []);
   });
 });

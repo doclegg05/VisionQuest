@@ -37,7 +37,7 @@ import type { Session } from "@/lib/api-error";
 import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
 import { transcriptWindowFor } from "@/lib/chat/transcript-window";
 import { handlePostResponse } from "@/lib/chat/post-response";
-import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
+import { crisisHelpLangFor, crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
 import {
   classifyProviderInitFailure,
   classifyStreamFailure,
@@ -908,7 +908,17 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
 
       try {
         // The saved message's id lets a Try again reuse it (retry-turn.ts).
-        sendEvent({ conversationId: conversation.id, userMessageId: userTurn.savedId() ?? undefined }, "conversationId");
+        // So does which 988 block applies, by language only: the full reply
+        // ends with the block (the safety net below), but a Stop or a dropped
+        // connection ends the stream first, and the chat still shows it (E2).
+        sendEvent(
+          {
+            conversationId: conversation.id,
+            userMessageId: userTurn.savedId() ?? undefined,
+            crisisHelp: crisisHelpLangFor(crisisSignal) ?? undefined,
+          },
+          "conversationId",
+        );
 
         // Send soft-cap warning as an SSE event before the AI response
         if (quota.warning) {

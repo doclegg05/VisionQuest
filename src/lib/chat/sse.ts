@@ -14,6 +14,8 @@ export interface ChatSseEvent {
   failure?: string;
   /** The 988 block the server added to `error`, when it added one. */
   crisisBlock?: string;
+  /** On the first event: which 988 block ("en" or "es") the message calls for. */
+  crisisHelp?: string;
   /** The id of the student's saved message, so Try again can point at it. */
   userMessageId?: string;
   heartbeat?: boolean;
@@ -60,7 +62,7 @@ export interface ChatSseParseResult {
 }
 
 const STRING_FIELDS = [
-  "conversationId", "error", "failure", "crisisBlock", "userMessageId", "quotaWarning", "text",
+  "conversationId", "error", "failure", "crisisBlock", "crisisHelp", "userMessageId", "quotaWarning", "text",
   "type", "callId", "tool", "status", "summary", "action", "target", "label", "attachmentId", "storagePath",
 ] as const;
 const BOOLEAN_FIELDS = ["done", "heartbeat"] as const;

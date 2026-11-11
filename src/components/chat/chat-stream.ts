@@ -7,6 +7,7 @@
 import { parseChatSseChunk, type ChatSseEvent } from "@/lib/chat/sse";
 import { parseSageFailureCode } from "@/lib/chat/sage-failure";
 import { SageSendError } from "@/lib/chat/send-outcome";
+import { crisisBlockForLang, parseCrisisHelpLang } from "@/lib/chat/crisis-resource-blocks";
 
 export interface AgentEventItem {
   id: string;
@@ -78,6 +79,11 @@ function nextAgentEvents(events: readonly AgentEventItem[], data: ChatSseEvent):
 export interface ChatStreamHandlers {
   /** The first event: the conversation, and the saved message a Try again can reuse. */
   onIds(ids: { conversationId: string; userMessageId: string | null }): void;
+  /**
+   * The 988 block, from the first event, when the student's message carried
+   * a crisis signal. The full reply ends with it; a stream cut short does not.
+   */
+  onCrisisBlock?(block: string): void;
   /** All text so far, each time more arrives. */
   onText(fullContent: string): void;
   onEvents(events: AgentEventItem[]): void;
@@ -105,6 +111,8 @@ function applyEvent(state: StreamState, data: ChatSseEvent, handlers: ChatStream
   }
   if (data.conversationId && !data.done) {
     handlers.onIds({ conversationId: data.conversationId, userMessageId: data.userMessageId ?? null });
+    const crisisLang = parseCrisisHelpLang(data.crisisHelp);
+    if (crisisLang) handlers.onCrisisBlock?.(crisisBlockForLang(crisisLang));
   }
   const content = data.text ? state.content + data.text : state.content;
   if (data.text) handlers.onText(content);

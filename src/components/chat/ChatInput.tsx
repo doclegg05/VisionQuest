@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Command, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
+import { Command, PaperPlaneTilt, Plus, Stop } from "@phosphor-icons/react";
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { CommandPalette } from "./CommandPalette";
 import { useDemoAccount } from "@/components/demo/DemoAccountContext";
@@ -51,6 +51,23 @@ export function UploadError({ message }: { message: string }) {
   );
 }
 
+/**
+ * Ends Sage's answer. Neutral colors: stopping is the student's choice, not
+ * an error. The visible word is the button's name.
+ */
+export function StopButton({ onStop }: { onStop: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onStop}
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)]"
+    >
+      <Stop size={16} weight="fill" aria-hidden="true" />
+      <span>Stop</span>
+    </button>
+  );
+}
+
 /** What the chat may do with the message box. */
 export interface MessageBoxHandle {
   focus(): void;
@@ -65,9 +82,11 @@ interface ChatInputProps {
   initialMessage?: string;
   /** Lets the chat put focus in the message box, such as after Try again. */
   messageBoxRef?: Ref<MessageBoxHandle>;
+  /** While Sage answers (`disabled`), a Stop button takes Send's place. */
+  onStop?: () => void;
 }
 
-export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage, messageBoxRef }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage, messageBoxRef, onStop }: ChatInputProps) {
   const canAttachFiles = chatRoleCanAttachFiles(role);
   const [message, setMessage] = useState(initialMessage ?? "");
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -402,23 +421,27 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
               {uploadStatus || (compact ? "Enter sends" : "Enter to send · Shift+Enter for a new line")}
             </p>
 
-            <motion.button
-              onClick={handleSubmit}
-              disabled={disabled || !canSend}
-              aria-label="Send message"
-              type="button"
-              title="Send"
-              whileTap={reduce || disabled || !canSend ? undefined : { scale: 0.92 }}
-              transition={{ type: "spring", stiffness: 500, damping: 25 }}
-              className={[
-                "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors",
-                canSend && !disabled
-                  ? "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-[0_8px_18px_rgba(55,181,80,0.28)] hover:opacity-95"
-                  : "cursor-not-allowed bg-[var(--surface-interactive)] text-[var(--ink-muted)] shadow-none",
-              ].join(" ")}
-            >
-              <PaperPlaneTilt size={compact ? 18 : 20} weight="fill" />
-            </motion.button>
+            {disabled && onStop ? (
+              <StopButton onStop={onStop} />
+            ) : (
+              <motion.button
+                onClick={handleSubmit}
+                disabled={disabled || !canSend}
+                aria-label="Send message"
+                type="button"
+                title="Send"
+                whileTap={reduce || disabled || !canSend ? undefined : { scale: 0.92 }}
+                transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                className={[
+                  "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors",
+                  canSend && !disabled
+                    ? "bg-[var(--accent-strong)] text-[var(--on-accent)] shadow-[0_8px_18px_rgba(55,181,80,0.28)] hover:opacity-95"
+                    : "cursor-not-allowed bg-[var(--surface-interactive)] text-[var(--ink-muted)] shadow-none",
+                ].join(" ")}
+              >
+                <PaperPlaneTilt size={compact ? 18 : 20} weight="fill" />
+              </motion.button>
+            )}
           </div>
         </div>
         {demoAccount === "student" && (
