@@ -100,7 +100,7 @@ async function createFirstDayStudent(client: PrismaClient): Promise<string> {
     data: {
       studentId: login,
       displayName: "E2E First Day Student",
-      passwordHash: hashPassword(temporaryPassword).hash,
+      passwordHash: (await hashPassword(temporaryPassword)).hash,
       role: "student",
       isActive: true,
       mustChangePassword: true,
