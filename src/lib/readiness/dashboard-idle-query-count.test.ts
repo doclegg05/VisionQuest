@@ -214,6 +214,9 @@ describe("M2 report: the idle window with one requirement tick", () => {
     const owners = async (ids: readonly string[]) => (await db.prismaAdmin.certification.findMany({
       where: { id: { in: [...ids] } }, select: { studentId: true },
     })).map((row) => row.studentId);
+    // Not awaited, unlike db.ts: the owner lookup and the clear can land a
+    // little after the write, so the toggle rate reported below is approximate
+    // (a poll right after the tick may still read a kept value).
     counter.observe(({ query, prismaModel, args, result }) => {
       if (query.client !== "app" || !isChatContextWrite(prismaModel, query.operation)) return;
       void applyChatContextWriteThrough(prismaModel, query.operation, args, result, owners);
@@ -228,7 +231,7 @@ describe("M2 report: the idle window with one requirement tick", () => {
     counter.useFixtures(DASHBOARD_FIXTURES);
   });
 
-  it("reports its rate; the tick clears only this student, so it costs one refill of the kept reads", (t) => {
+  it("reports its approximate rate; every poll answers 200 and the tick makes the window read more than plain idle", (t) => {
     const rate = perMinute(toggled);
     t.diagnostic(rateLine("dashboard-idle-toggle", toggled, rate));
     assert.deepEqual(toggled.statuses.filter((status) => status !== 200), []);
