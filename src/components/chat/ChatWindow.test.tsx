@@ -124,3 +124,10 @@ describe("ChatWindow link to the Sage notice", () => {
     assert.doesNotMatch(source, /<a\s+href="\/about-sage"/);
   });
 });
+
+describe("the conversation log while Sage answers (E1c 8)", () => {
+  it("tells screen readers when the log is busy, so a streamed reply is not read twice", () => {
+    const html = renderToString(<ChatWindow role="student" />);
+    assert.match(html, /role="log"[^>]*aria-busy="false"/);
+  });
+});

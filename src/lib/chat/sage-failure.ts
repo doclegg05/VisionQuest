@@ -24,6 +24,8 @@ export interface SageFailureMessageOptions {
   messageSaved: boolean;
   /** True only when a Try again button shows under this sentence. */
   canRetry: boolean;
+  /** An admin holds Program Setup, so they are told to check it themselves. */
+  isAdmin?: boolean;
 }
 
 /** Off and not set up need a person to fix something; a retry cannot help. */
@@ -85,27 +87,55 @@ const WHAT_TO_DO: Record<SageFailureCode, NextStep> = {
 
 const NOT_LOST = "Your message was not lost.";
 
-export function sageFailureMessage(code: SageFailureCode, options: SageFailureMessageOptions): string {
+/** Not set up, for an admin: the Open Program Setup link sits beside it. */
+const ADMIN_NOT_SET_UP_STEP = "Check the Sage connection settings in Program Setup.";
+
+function nextStep(code: SageFailureCode, options: SageFailureMessageOptions): string {
+  if (code === "not_set_up" && options.audience === "staff" && options.isAdmin) return ADMIN_NOT_SET_UP_STEP;
   const step = WHAT_TO_DO[code][options.audience];
+  return options.canRetry ? step.retry : step.noRetry;
+}
+
+export function sageFailureMessage(code: SageFailureCode, options: SageFailureMessageOptions): string {
   const parts = [
     WHAT_HAPPENED[code][options.audience],
     options.messageSaved ? NOT_LOST : null,
-    options.canRetry ? step.retry : step.noRetry,
+    nextStep(code, options),
   ];
   return parts.filter((part): part is string => part !== null).join(" ");
 }
 
-/** The note under a reply that stopped partway, when Try again shows. */
+/** The note under a reply that stopped partway, while Try again shows. */
 export const CUT_OFF_NOTE = "(Sage got cut off. Tap Try again for the full answer.)";
 
+/** The same note once Try again ran: the new answer is under it. */
+export const RETRIED_CUT_OFF_NOTE = "(Sage got cut off. The new answer is below.)";
+
+/** The same note as saved: a reload shows no Try again, so it names no button. */
+export const SAVED_CUT_OFF_NOTE = "(Sage got cut off here.)";
+
+/** The start every cut-off note shares, shown or saved. */
+const CUT_OFF_MARK = "\n\n(Sage got cut off";
+
 /**
- * A partial reply as the student keeps it: the text Sage sent, then what
- * happened. The route saves this same text, so a reload reads the same.
+ * A partial reply as the student sees it while Try again shows: the text
+ * Sage sent, then what happened.
  */
 export function cutOffReply(partial: string, code: SageFailureCode, audience: SageFailureAudience): string {
   if (offersRetry(code)) return `${partial}\n\n${CUT_OFF_NOTE}`;
   const sentence = sageFailureMessage(code, { audience, messageSaved: true, canRetry: false });
   return `${partial}\n\n(Sage got cut off.) ${sentence}`;
+}
+
+/** A partial reply as the route saves it: the same, with no Try again wording. */
+export function savedCutOffReply(partial: string, code: SageFailureCode, audience: SageFailureAudience): string {
+  if (offersRetry(code)) return `${partial}\n\n${SAVED_CUT_OFF_NOTE}`;
+  return cutOffReply(partial, code, audience);
+}
+
+/** True for a reply that stopped partway, so it does not count as an answer. */
+export function isCutOffReply(content: string): boolean {
+  return content.includes(CUT_OFF_MARK);
 }
 
 // ─── Classification ─────────────────────────────────────────────────────────

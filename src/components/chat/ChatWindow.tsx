@@ -21,29 +21,15 @@ import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
 import { determineStage } from "@/lib/sage/stage";
 import { startGoalPolling } from "./goal-polling";
+import {
+  failedTurnMessages,
+  runExclusive,
+  shouldFocusRetry,
+  type ChatMessage,
+  type FailedTurn,
+} from "./failed-turn";
 
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  events?: AgentEventItem[];
-  /** Set on a failed or cut-off reply. */
-  failure?: {
-    /** Keep the bubble on Try again: it holds a partial reply or the 988 block. */
-    keepOnRetry: boolean;
-    /** The saved student message a Try again points the server at. */
-    retryOf: string | null;
-    /** A failure sentence, drawn with the error icon. */
-    alert: boolean;
-  };
-}
-
-/** The reply that shows Try again or the setup link; one at a time. */
-interface FailedTurn {
-  messageId: string;
-  offerRetry: boolean;
-  setupLink: boolean;
-}
+type Message = ChatMessage;
 
 interface ChatWindowInnerProps {
   role: ChatRole;
@@ -221,6 +207,8 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   /** Tracks whether the warmup fetch has fired this session. */
   const warmupFiredRef = useRef(false);
   const retryButtonRef = useRef<HTMLButtonElement>(null);
+  /** Set while a Try again is running, so a second tap before re-render does nothing. */
+  const retryInFlightRef = useRef(false);
   const messageBoxRef = useRef<MessageBoxHandle>(null);
 
   useEffect(() => {
@@ -476,16 +464,11 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           isAdmin: role === "admin",
           savedUserMessageId,
         });
+        // A new chat's first message may be saved before the failure: keep
+        // its conversation so Try again answers it there, not in a new one.
+        noteConversation(outcome.conversationId ?? undefined);
         const errMsgId = `err-${Date.now()}`;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: errMsgId,
-            role: "assistant",
-            content: outcome.displayContent,
-            failure: { keepOnRetry: outcome.keepOnRetry, retryOf: outcome.retryOf, alert: outcome.alert },
-          },
-        ]);
+        setMessages((prev) => [...prev, ...failedTurnMessages(outcome, errMsgId)]);
         if (outcome.offerRetry || outcome.setupLink) {
           setFailedTurn({ messageId: errMsgId, offerRetry: outcome.offerRetry, setupLink: outcome.setupLink });
         }
@@ -504,20 +487,21 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener, role]
   );
 
-  // After a failed turn, focus goes to its Try again. This effect runs after
-  // ChatInput's own effect, which focuses the message box when sending ends.
+  // After a failed turn, focus goes to its Try again once loading has ended,
+  // after ChatInput's own effect focuses the message box (rule in failed-turn.ts).
   useEffect(() => {
-    if (failedTurn?.offerRetry) retryButtonRef.current?.focus();
-  }, [failedTurn]);
+    if (shouldFocusRetry(failedTurn, isLoading)) retryButtonRef.current?.focus();
+  }, [failedTurn, isLoading]);
 
-  const retryFailedTurn = (failedId: string) => {
-    const retry = prepareRetry(messages, failedId);
-    if (!retry) return;
-    // Before the button goes away, so focus never falls to the page.
-    messageBoxRef.current?.focus();
-    setMessages(retry.messages);
-    void handleSend(retry.text, undefined, { retryOf: retry.retryOf });
-  };
+  const retryFailedTurn = (failedId: string) =>
+    runExclusive(retryInFlightRef, async () => {
+      const retry = prepareRetry(messages, failedId);
+      if (!retry) return;
+      // Before the button goes away, so focus never falls to the page.
+      messageBoxRef.current?.focus();
+      setMessages(retry.messages);
+      await handleSend(retry.text, undefined, { retryOf: retry.retryOf });
+    });
 
   useEffect(() => {
     if (!showSidebar) return;
@@ -587,7 +571,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
           </Link>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-5" role="log" aria-label="Conversation with Sage" aria-live="polite">
+        <div className="flex-1 overflow-y-auto px-4 py-5" role="log" aria-label="Conversation with Sage" aria-live="polite" aria-busy={isLoading}>
           <div className="mx-auto max-w-3xl space-y-5">
             {messages.length === 0 && !isLoading && (
               <div className="mt-16 text-center text-[var(--ink-muted)]">
@@ -611,14 +595,20 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
             {messages.map((msg) => (
               <div key={msg.id}>
-                <MessageBubble role={msg.role} content={msg.content} failed={msg.failure?.alert} />
+                <MessageBubble
+                  role={msg.role}
+                  content={msg.content}
+                  failed={msg.failure?.alert}
+                  textId={failedTurn?.messageId === msg.id ? `failed-text-${msg.id}` : undefined}
+                />
                 {msg.events?.length ? <AgentEventList events={msg.events} /> : null}
                 {failedTurn?.messageId === msg.id && (
                   <FailedReplyActions
                     retryRef={retryButtonRef}
                     offerRetry={failedTurn.offerRetry}
                     setupHref={failedTurn.setupLink ? PROGRAM_SETUP_HREF : null}
-                    onRetry={() => retryFailedTurn(msg.id)}
+                    describedById={`failed-text-${msg.id}`}
+                    onRetry={() => void retryFailedTurn(msg.id)}
                   />
                 )}
               </div>

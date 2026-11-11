@@ -81,14 +81,28 @@ describe("resolveSendError", () => {
   });
 
   for (const code of SAGE_FAILURE_CODES) {
-    it(`(3) keeps the server's 988 block for a student on ${code}, and keeps the bubble on retry`, () => {
+    it(`(3) shows the server's 988 block for a student on ${code} in its own bubble, which stays on retry`, () => {
       const err = serverError(code, CRISIS_BLOCK);
       const outcome = resolveSendError(err, STUDENT);
-      assert.equal(outcome.displayContent, err.message);
-      assert.ok(outcome.displayContent.endsWith(CRISIS_BLOCK));
-      assert.equal(outcome.keepOnRetry, true);
+      // E1c 13: the 988 help is not drawn inside the error bubble.
+      assert.equal(outcome.displayContent, err.message.slice(0, -CRISIS_BLOCK.length));
+      assert.doesNotMatch(outcome.displayContent, /988/);
+      assert.equal(outcome.helpBlock, CRISIS_BLOCK.trimStart());
+      assert.ok(CRISIS_BLOCK.endsWith(outcome.helpBlock ?? "missing"));
+      // The error bubble goes on retry; the separate 988 bubble is untouched.
+      assert.equal(outcome.keepOnRetry, false);
     });
   }
+
+  it("(13) keeps the 988 block inside a partial reply, which is not an error bubble", () => {
+    const outcome = resolveSendError(serverError("slow", CRISIS_BLOCK), { ...STUDENT, priorContent: "First part" });
+    assert.equal(outcome.helpBlock, null);
+    assert.ok(outcome.displayContent.endsWith(CRISIS_BLOCK));
+  });
+
+  it("(13) adds no 988 bubble when the server sent no block", () => {
+    assert.equal(resolveSendError(serverError("busy"), STUDENT).helpBlock, null);
+  });
 
   it("drops a plain failure bubble on retry", () => {
     assert.equal(resolveSendError(serverError("busy"), STUDENT).keepOnRetry, false);
@@ -138,10 +152,36 @@ describe("resolveSendError", () => {
 });
 
 describe("parseSendErrorBody", () => {
+  // E1c 1: a request error (4xx) is not something Try again can fix. The
+  // registry middleware writes its text for the user, so it shows as is.
+  for (const [label, status, text] of [
+    ["the conversation was deleted in another tab", 404, "Conversation not found."],
+    ["the message failed validation", 400, "Message too long. Maximum 10,000 characters."],
+  ] as const) {
+    it(`(1) ${label}: shows the server's text with no Try again`, () => {
+      const outcome = resolveSendError(parseSendErrorBody(status, { error: text }), STUDENT);
+      assert.equal(outcome.displayContent, text);
+      assert.equal(outcome.failure, null);
+      assert.equal(outcome.offerRetry, false);
+    });
+  }
+
+  it("(2) carries the conversation the server saved the message in", () => {
+    const err = parseSendErrorBody(500, {
+      error: "Sage could not answer this time.",
+      failure: "unknown",
+      userMessageId: "m9",
+      conversationId: "c7",
+    });
+    const outcome = resolveSendError(err, STUDENT);
+    assert.equal(outcome.conversationId, "c7");
+    assert.equal(outcome.retryOf, "m9");
+    assert.equal(resolveSendError(new TypeError("network"), STUDENT).conversationId, null);
+  });
+
   it("(5) hides server text that carries no failure code behind the fixed sentence", () => {
     for (const [status, body] of [
       [500, { error: "Internal server error" }],
-      [400, { error: "Message too long. Maximum 10,000 characters." }],
       [502, null],
       [500, { error: 42, failure: "busy" }],
     ] as const) {
@@ -186,6 +226,15 @@ describe("prepareRetry", () => {
     const prepared = prepareRetry(kept, "err-1");
     assert.deepEqual(prepared?.messages, kept);
     assert.equal(prepared?.retryOf, null);
+  });
+
+  it("(7a) rewrites a kept cut-off note on retry, since its Try again is gone", () => {
+    const partial = { id: "err-1", role: "assistant" as const, content: `Part one\n\n${CUT_OFF_NOTE}${CRISIS_BLOCK}`, failure: { keepOnRetry: true, retryOf: "m1" } };
+    const prepared = prepareRetry([...messages.slice(0, 3), partial], "err-1");
+    const kept = prepared?.messages.at(-1);
+    assert.equal(kept?.content, `Part one\n\n(Sage got cut off. The new answer is below.)${CRISIS_BLOCK}`);
+    assert.doesNotMatch(kept?.content ?? "", /Try again/);
+    assert.equal(partial.content.includes(CUT_OFF_NOTE), true, "the input is not changed");
   });
 
   it("does not change the list it was given", () => {

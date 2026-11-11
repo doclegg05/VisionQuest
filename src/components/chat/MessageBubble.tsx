@@ -11,9 +11,11 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
   /** A failure sentence from Sage: drawn with the house error icon. */
   failed?: boolean;
+  /** An id for the text, so Try again can point at it with aria-describedby. */
+  textId?: string;
 }
 
-export default function MessageBubble({ role, content, isStreaming, failed }: MessageBubbleProps) {
+export default function MessageBubble({ role, content, isStreaming, failed, textId }: MessageBubbleProps) {
   const isUser = role === "user";
   const shouldReduceMotion = useReducedMotion();
 
@@ -52,10 +54,10 @@ export default function MessageBubble({ role, content, isStreaming, failed }: Me
         {failed ? (
           <div className="flex items-start gap-2">
             <WarningCircle size={20} weight="bold" aria-hidden="true" className="shrink-0" />
-            <p className="min-w-0 whitespace-pre-wrap break-words">{content}</p>
+            <p id={textId} className="min-w-0 whitespace-pre-wrap break-words">{content}</p>
           </div>
         ) : (
-          <p className="whitespace-pre-wrap break-words">
+          <p id={textId} className="whitespace-pre-wrap break-words">
             {content}
             {isStreaming && shouldReduceMotion ? "…" : ""}
           </p>

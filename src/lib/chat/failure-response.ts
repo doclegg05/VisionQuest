@@ -2,8 +2,8 @@
  * The one shape a failed Sage turn is reported in, on a JSON error body and
  * on the SSE error event alike: the fixed sentence (with the 988 block for a
  * crisis message), the cause code, the 988 block on its own so the chat can
- * keep it in view when Try again runs, and the saved message's id so Try
- * again can point at it.
+ * keep it in view when Try again runs, and the saved message's id and its
+ * conversation so Try again can point at it in the same conversation.
  */
 
 import { ApiError } from "@/lib/api-error";
@@ -20,6 +20,10 @@ export interface FailureBodyInput {
   crisisBlock: string;
   /** The student's saved message, or null when nothing was saved. */
   userMessageId: string | null;
+  /** The conversation that message is in, or null before one exists. */
+  conversationId: string | null;
+  /** The viewer is an admin, who holds Program Setup. */
+  isAdmin?: boolean;
 }
 
 export interface FailureBody {
@@ -27,20 +31,23 @@ export interface FailureBody {
   failure: SageFailureCode;
   crisisBlock?: string;
   userMessageId?: string;
+  conversationId?: string;
 }
 
 export function failureBody(input: FailureBodyInput): FailureBody {
-  const { failure, audience, crisisBlock, userMessageId } = input;
+  const { failure, audience, crisisBlock, userMessageId, conversationId } = input;
   const sentence = sageFailureMessage(failure, {
     audience,
     messageSaved: userMessageId !== null,
     canRetry: offersRetry(failure),
+    isAdmin: input.isAdmin ?? false,
   });
   return {
     error: sentence + crisisBlock,
     failure,
     ...(crisisBlock ? { crisisBlock } : {}),
     ...(userMessageId ? { userMessageId } : {}),
+    ...(conversationId ? { conversationId } : {}),
   };
 }
 
@@ -79,6 +86,7 @@ export async function answerPreStreamFailures(run: () => Promise<Response>, cont
         audience: context.audience,
         crisisBlock: context.crisisBlock,
         userMessageId: context.userTurn.savedId(),
+        conversationId: context.userTurn.conversationId(),
       },
       500,
     );
