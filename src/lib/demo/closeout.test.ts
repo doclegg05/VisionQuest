@@ -249,6 +249,17 @@ describe("demo closeout apply", () => {
     assert.equal(rowsOf(split.db, "dm-"), rowsOf(whole.db, "dm-"));
   });
 
+  it("deletes a demo row that names a demo upload or goal, and does not refuse for it", async () => {
+    const { db } = await scene();
+    copyOf(db, "PortfolioItem", "dm-", { fileId: "dm-FileUpload" });
+    copyOf(db, "VisionBoardItem", "dm-", { goalId: "dm-Goal", fileId: "dm-FileUpload" });
+
+    const outcome = await apply(db);
+
+    assert.deepEqual(outcome.refusals, []);
+    assert.equal(outcome.kind, "applied");
+  });
+
   it("rolls everything back when a statement fails half way", async () => {
     const { db } = await scene();
     const before = db.snapshot();
@@ -368,6 +379,17 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
   {
     name: "an unmarked student's task would lose its link to a demo appointment", code: "kept_rows_would_be_blanked", count: 1,
     arrange: ({ db }) => void copyOf(db, "StudentTask", "rl-", { appointmentId: "dm-Appointment" }),
+  },
+  {
+    name: "an unmarked student's portfolio item names a demo upload, with no foreign key", code: "kept_rows_name_deleted_rows", count: 1,
+    arrange: ({ db }) => void copyOf(db, "PortfolioItem", "rl-", { fileId: "dm-FileUpload" }),
+  },
+  {
+    name: "an unmarked student's form submission and vision board name a demo upload and a demo goal", code: "kept_rows_name_deleted_rows", count: 3,
+    arrange: ({ db }) => {
+      copyOf(db, "FormSubmission", "rl-", { fileId: "dm-FileUpload", signatureFileId: "dm-FileUpload" });
+      copyOf(db, "VisionBoardItem", "rl-", { goalId: "dm-Goal" });
+    },
   },
   {
     name: "the plan holds an account that is not marked", code: "plan_includes_unmarked", count: 1, expectAccounts: 1,

@@ -31,7 +31,7 @@ import {
   type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type DemoEnv, type Ids, type Run, type Where,
 } from "./closeout.core";
 import {
-  deletedAuditRowsWithUnmarkedActor, recentActivity, recordsAboutOthers, rowsTheDatabaseWouldBlank, setNullLinksInto,
+  deletedAuditRowsWithUnmarkedActor, keptRowsLinkedToDeleted, recentActivity, recordsAboutOthers, setNullLinksInto, type SetNullLink,
 } from "./closeout.guards";
 import { leftBehind, orphanCounts, type LeftBehind } from "./closeout.orphans";
 import type { LocalSchema } from "./closeout.local";
@@ -182,8 +182,26 @@ const ACCOUNT_ROOT: DeleteStep = {
 /** Every removal, in the order it runs. The demo class goes just before the accounts. */
 export const DELETE_STEPS: readonly DeleteStep[] = [...ACCOUNT_STEPS, ...JOB_STEPS, ...CLASS_STEPS, CLASS_ROOT, ACCOUNT_ROOT];
 
-/** Every SetNull foreign key into a model a step deletes from. See `rowsTheDatabaseWouldBlank`. */
+/** Every SetNull foreign key into a model a step deletes from. See `keptRowsLinkedToDeleted`. */
 export const SET_NULL_LINKS = setNullLinksInto(new Set(DELETE_STEPS.map((step) => step.model)));
+
+const unlinked = (child: Prisma.ModelName, from: string, parent: Prisma.ModelName): SetNullLink => ({ child, from, parent, to: "id" });
+
+/**
+ * Columns that hold the id of a row a step deletes, with no foreign key at
+ * all. The database neither blanks nor blocks them, so a kept row would be left
+ * naming an upload or a goal that is gone. closeout.inventory.test.ts fails
+ * when a new unlinked `...Id` column is neither listed here nor explained.
+ */
+export const UNLINKED_REFS: readonly SetNullLink[] = [
+  unlinked("FormSubmission", "fileId", "FileUpload"),
+  unlinked("FormSubmission", "signatureFileId", "FileUpload"),
+  unlinked("CertRequirement", "fileId", "FileUpload"),
+  unlinked("PortfolioItem", "fileId", "FileUpload"),
+  unlinked("Application", "resumeFileId", "FileUpload"),
+  unlinked("VisionBoardItem", "fileId", "FileUpload"),
+  unlinked("VisionBoardItem", "goalId", "Goal"),
+];
 
 /** Which rows that name an account are NOT deleted by the plan, and so must not exist. */
 export type Survives =
@@ -522,7 +540,8 @@ async function prewriteRefusals(run: Run, gate: Gate, enrolledInDemoClass: numbe
     refusal("marked_staff_over_unmarked_students", await unmarkedUnderPlannedStaff(run)),
     refusal("marked_account_on_kept_rows", await keptRowsNamingAccounts(run)),
     refusal("records_about_unmarked_people", await recordsAboutOthers(run, DELETE_STEPS)),
-    refusal("kept_rows_would_be_blanked", await rowsTheDatabaseWouldBlank(run, DELETE_STEPS, SET_NULL_LINKS)),
+    refusal("kept_rows_would_be_blanked", await keptRowsLinkedToDeleted(run, DELETE_STEPS, SET_NULL_LINKS)),
+    refusal("kept_rows_name_deleted_rows", await keptRowsLinkedToDeleted(run, DELETE_STEPS, UNLINKED_REFS)),
   ];
   return found.filter((entry) => entry.count > 0);
 }

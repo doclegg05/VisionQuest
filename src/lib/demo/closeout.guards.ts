@@ -10,6 +10,8 @@
  *     real data.
  *   - SetNull links: a kept row whose link to a deleted row the database would
  *     quietly blank. No count changes, so only this check can see it.
+ *   - Unlinked ids: a kept row that names a deleted upload or goal in a column
+ *     with no foreign key. Nothing changes at all, so again only this check.
  *
  * Each returns a count. closeout.ts turns a count above 0 into a refusal.
  */
@@ -134,8 +136,12 @@ export function setNullLinksInto(parents: ReadonlySet<string>): SetNullLink[] {
     }));
 }
 
-/** Kept rows that point at a row the plan deletes, through a SetNull link. The database would blank each one. */
-export async function rowsTheDatabaseWouldBlank(run: Run, steps: readonly DeleteStep[], links: readonly SetNullLink[]): Promise<number> {
+/**
+ * Kept rows that point at a row the plan deletes, through one of these links.
+ * Through a SetNull foreign key the database would blank each one; through a
+ * column with no foreign key it would be left naming a row that is gone.
+ */
+export async function keptRowsLinkedToDeleted(run: Run, steps: readonly DeleteStep[], links: readonly SetNullLink[]): Promise<number> {
   const stepsOf = (model: string) => steps.filter((step) => step.model === model);
   let total = 0;
   for (const link of links) {

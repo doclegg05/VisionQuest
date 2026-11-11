@@ -378,6 +378,14 @@ if (!SHOULD_RUN) {
         arrange: () => copyRow("StudentTask", `${real.prefix}StudentTask`, { appointmentId: `${demo.prefix}Appointment` }),
       },
       {
+        name: "an unmarked student's portfolio item names a demo upload, with no foreign key", code: "kept_rows_name_deleted_rows",
+        arrange: () => copyRow("PortfolioItem", `${real.prefix}PortfolioItem`, { fileId: `${demo.prefix}FileUpload` }),
+      },
+      {
+        name: "an unmarked student's vision board item names a demo goal, with no foreign key", code: "kept_rows_name_deleted_rows",
+        arrange: () => copyRow("VisionBoardItem", `${real.prefix}VisionBoardItem`, { goalId: `${demo.prefix}Goal` }),
+      },
+      {
         // Found only after deletes have run: Postgres cascades the unmarked link when the demo goal goes.
         name: "a cascade would remove an unmarked student's row", code: "unlisted_rows_removed",
         arrange: () => copyRow("GoalResourceLink", `${real.prefix}GoalResourceLink`, { goalId: `${demo.prefix}Goal` }),

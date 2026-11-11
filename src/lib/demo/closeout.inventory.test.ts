@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PrismaClient } from "@prisma/client";
-import { CLASS_COLUMNS, DELETE_STEPS, GUARDED_REFS, KEPT_ON_PURPOSE, SET_NULL_LINKS, UNMARKED_ON_DEMO_CLASS, tableOf } from "./closeout";
+import { CLASS_COLUMNS, DELETE_STEPS, GUARDED_REFS, KEPT_ON_PURPOSE, SET_NULL_LINKS, UNLINKED_REFS, UNMARKED_ON_DEMO_CLASS, tableOf } from "./closeout";
 import { ABOUT_OTHERS } from "./closeout.guards";
 import { ORPHAN_PROBES } from "./closeout.orphans";
 import { EDGES, MODELS, modelNamed } from "./closeout.fixtures";
@@ -31,6 +31,48 @@ const NOT_PERSON_IDS: Readonly<Record<string, string>> = {
   "ProgressionEdge.fromId": "a progression node id in the shared curriculum graph",
   "ProgressionEdge.toId": "a progression node id in the shared curriculum graph",
   "Wager.targetId": "the goal or task a wager is about; the wager itself is deleted with its student",
+};
+
+/**
+ * Text columns named like a row id (`...Id`) that have no relation, and that
+ * no closeout list checks at run time. Each line says why a kept row's value
+ * there can never be the id of a row the closeout deletes.
+ */
+const NOT_ROW_LINKS: Readonly<Record<string, string>> = {
+  "Student.studentId": "the login name, not a row id",
+  "Student.googleId": "the Google account id, from outside the database",
+  "Conversation.summaryUpToMessageId": "a message of the same conversation; both go with their student",
+  "SageInsight.sourceMessageId": "a message of the insight's own student; both go together",
+  "SageInsight.sourceConversationId": "a conversation of the insight's own student; both go together",
+  "Goal.sourceMessageId": "a message of the goal's own student; both go together",
+  "ProgressionEvent.sourceId": "the row that earned the event, of the event's own student",
+  "StudentAlert.sourceId": "the row that raised the alert, of the alert's own student",
+  "Opportunity.sourceJobLeadId": "counted as leftBehind.opportunitiesFromDemoLeads; the listing is shared content and stays",
+  "Application.pathwayClusterId": "a career cluster key from the catalog, not a row",
+  "Connection.tokenContactId": "an EmployerContact id; employers are shared and never deleted",
+  "OutboundMessage.providerId": "the SMS or email provider's message id, from outside the database",
+  "OutboundMessage.employerId": "an Employer id; employers are shared and never deleted",
+  "FormSubmission.formId": "a form key from the catalog, not a row",
+  "ProgramDocument.certificationId": "a certification key from the catalog, not a row",
+  "ProgramDocument.platformId": "a platform key from the catalog, not a row",
+  "SageMemory.sourceId": "the conversation or operation the memory came from, of the memory's own subject",
+  "Wager.sourceOperationId": "a Sage operation of the wager's own student; both go together",
+  "Wager.sourceMessageId": "a message of the wager's own student; both go together",
+  "WagerVerdict.knowledgeUpdateId": "a knowledge update of the verdict's own wager; both go together",
+  "GoalResourceLink.resourceId": "a shared learning resource key, not a row the closeout deletes",
+  "CareerDiscovery.conversationId": "a conversation of the discovery's own student; both go together",
+  "MoodEntry.conversationId": "a conversation of the entry's own student; both go together",
+  "FailedExtraction.conversationId": "a conversation of the extraction's own student; both go together",
+  "FailedExtraction.sourceMessageId": "a message of the extraction's own student; both go together",
+  "JobScrapeRun.backgroundJobId": "the job that ran this scrape, for the run's own class config",
+  "JobListing.sourceId": "the job board's own listing id, from outside the database",
+  "JobListing.scrapeBatchId": "a scrape batch label, not a row",
+  "JobBrowseListing.sourceId": "the job board's own listing id, from outside the database",
+  "JobBrowseListing.scrapeBatchId": "a scrape batch label, not a row",
+  "StudentSavedJob.snapshotSourceId": "the job board's own listing id, copied when the job was saved",
+  "StudentHiddenJob.snapshotSourceId": "the job board's own listing id, copied when the job was hidden",
+  "ClassRequirement.itemId": "a requirement item key from the catalog, not a row",
+  "StaffInvite.regionId": "a Region id; regions are shared and never deleted",
 };
 
 /**
@@ -132,6 +174,38 @@ describe("demo closeout inventory", () => {
 
     assert.deepEqual(SET_NULL_LINKS.map((link) => key(link.child, link.from)).sort(), expected);
     for (const link of SET_NULL_LINKS) assert.ok(modelNamed(link.child).fields.some((field) => field.name === "id"), `${link.child} needs an id`);
+  });
+
+  it("classifies every text column named like a row id that has no relation", () => {
+    // A link with no foreign key is invisible to the database's delete rules,
+    // so a kept row can be left naming a deleted file or goal with nothing to stop it.
+    const unlinked = new Set(UNLINKED_REFS.map((link) => key(link.child, link.from)));
+    const probed = new Set(ORPHAN_PROBES.map((probe) => key(probe.model, probe.column)));
+    const unclassified = MODELS.flatMap((model) => {
+      const foreignKeys = new Set(EDGES.filter((edge) => edge.child === model.name).flatMap((edge) => edge.from));
+      return model.fields.filter((field) => field.kind === "scalar" && field.type === "String" && !field.isId && /Id$/.test(field.name) && !foreignKeys.has(field.name))
+        .map((field) => key(model.name, field.name));
+    }).filter((column) => ![unlinked, probed, ownedColumns, guardedColumns, classColumns].some((list) => list.has(column))
+      && !Object.hasOwn(NOT_ROW_LINKS, column) && !Object.hasOwn(NOT_PERSON_IDS, column));
+
+    assert.deepEqual(unclassified, []);
+  });
+
+  it("checks at run time each unlinked file and goal column, each into a model the tool deletes from", () => {
+    assert.deepEqual(UNLINKED_REFS.map((link) => key(link.child, link.from)).sort(), [
+      "Application.resumeFileId", "CertRequirement.fileId", "FormSubmission.fileId", "FormSubmission.signatureFileId",
+      "PortfolioItem.fileId", "VisionBoardItem.fileId", "VisionBoardItem.goalId",
+    ]);
+    const foreignKeys = new Set(EDGES.map((edge) => key(edge.child, edge.from[0])));
+    for (const link of UNLINKED_REFS) {
+      assert.ok(deletedModels.has(link.parent), `${link.parent} is not deleted by any step`);
+      assert.equal(foreignKeys.has(key(link.child, link.from)), false, `${link.child}.${link.from} has a foreign key`);
+      assert.ok(modelNamed(link.child).fields.some((field) => field.name === "id"), `${link.child} needs an id`);
+    }
+    for (const column of Object.keys(NOT_ROW_LINKS)) {
+      const [model, name] = column.split(".");
+      assert.ok(modelNamed(model).fields.some((field) => field.name === name), `${column} is not in the schema`);
+    }
   });
 
   it("probes for orphans in exactly the account and class columns that have no foreign key", () => {
