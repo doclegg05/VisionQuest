@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 
 // getSession() must expose the demo marker from the Student row, and must
 // honor the COHORT_DEMO_MODE switch on every call, even when the row came out
-// of the 10 second session cache. Turning the switch off is the owner's
+// of the 60 second session cache. Turning the switch off is the owner's
 // emergency stop for demo mode: it cannot wait for a cache entry to expire.
 
 const TEST_JWT_SECRET = "demo-session-test-secret-at-least-32-chars-long";
@@ -52,7 +52,7 @@ let verifyToken: typeof import("./auth").verifyToken;
 let originalSecret: string | undefined;
 let originalSwitch: string | undefined;
 
-// Each test uses its own student id so the real 10 second session cache never
+// Each test uses its own student id so the real 60 second session cache never
 // hands one test another test's row. The cache test reuses an id on purpose.
 let nextId = 0;
 function freshId(): string {

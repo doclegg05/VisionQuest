@@ -7,6 +7,7 @@ import {
   hashPassword,
   normalizeStudentId,
   normalizeEmail,
+  sessionCachePrimer,
   setSessionCookie,
   signMfaSessionToken,
   setMfaSessionCookie,
@@ -168,7 +169,7 @@ async function auditFailedSignIn({ login, ip, student, accountLocked, isOAuthOnl
  */
 async function upgradeLegacyHash(student: Student, password: string): Promise<boolean> {
   try {
-    const { hash: newHash } = hashPassword(password);
+    const { hash: newHash } = await hashPassword(password);
     const migrated = await prisma.student.updateMany({
       where: { id: student.id, passwordHash: student.passwordHash },
       data: { passwordHash: newHash },
@@ -204,13 +205,21 @@ async function startMfaChallenge(student: Student, ip: string): Promise<NextResp
   });
 }
 
-async function startSession(student: Student, ip: string): Promise<NextResponse> {
+async function startSession(
+  student: Student,
+  ip: string,
+  primeSessionCache: (row: Student) => void,
+): Promise<NextResponse> {
   // True while the account still holds a password somebody else chose: one
   // staff typed when they made the account or reset it. The session is
   // issued either way, and a true answer holds it to the change-password
   // screen, enforced in src/proxy.ts for every page and API route.
   const mustChangePassword = passwordChangeRequired(student);
   await setSessionCookie(student.id, student.role, student.sessionVersion, { mustChangePassword });
+  // The row was read and checked just now, so the first page after sign-in
+  // does not read it again. The primer stores nothing if the account was
+  // changed since it was read (see `sessionCachePrimer`).
+  primeSessionCache(student);
 
   await logAuditEvent({
     actorId: student.id,
@@ -248,6 +257,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const body = await parseBody(req, loginSchema);
   const login = body.studentId.trim();
   const password = body.password.trim();
+  // Taken before the account is read, so it can tell if the row goes stale.
+  const primeSessionCache = sessionCachePrimer();
   const { student, normalizedLogin } = await findAccount(login);
   const { locked: accountLocked, unit: accountUnit } = await countAccountAttempt(student, normalizedLogin);
 
@@ -255,7 +266,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Do not distinguish between: no account found, OAuth-only account, wrong password, or inactive account.
   const isOAuthOnly = student !== null && !student.passwordHash && student.authProvider === "google";
   // Always run the KDF to equalize timing and avoid an account-enumeration oracle.
-  const { valid: passwordMatches, needsRehash } = verifyPasswordSafeWithStatus(
+  const { valid: passwordMatches, needsRehash } = await verifyPasswordSafeWithStatus(
     password,
     student?.passwordHash ?? null,
   );
@@ -278,5 +289,5 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // "right password" off a count, past the per-account lock (see `giveBack`).
   await giveBack([takenUnit(networkKey, networkRl), accountUnit]);
 
-  return student.mfaEnabled ? startMfaChallenge(student, ip) : startSession(student, ip);
+  return student.mfaEnabled ? startMfaChallenge(student, ip) : startSession(student, ip, primeSessionCache);
 });

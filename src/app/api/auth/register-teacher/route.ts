@@ -217,7 +217,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "That ID is already taken. Please use a different email." }, { status: 409 });
   }
 
-  const { hash } = hashPassword(password);
+  const { hash } = await hashPassword(password);
   const account = await prisma.student.create({
     data: { studentId, displayName, passwordHash: hash, email, role },
   });

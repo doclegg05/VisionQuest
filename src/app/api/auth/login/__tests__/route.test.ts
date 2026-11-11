@@ -42,6 +42,7 @@ mock.module("@/lib/auth", {
     normalizeStudentId: (raw: string) =>
       raw.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9@._-]/g, ""),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
+    sessionCachePrimer: () => () => undefined,
     setSessionCookie: async (studentId: string, role: string, sessionVersion: number) => {
       // Mirrors the real flag set in src/lib/auth.ts setSessionCookie.
       cookieSets.push({

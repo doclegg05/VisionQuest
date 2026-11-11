@@ -664,4 +664,12 @@ describe("the Render blueprint states the choice", () => {
       value: "http://127.0.0.1:11437",
     });
   });
+
+  // Production depends on the app's pool size, and the file did not say so.
+  // It is listed for the owner to set once the app and the database share a
+  // region, so the file carries no number and the default in code stays.
+  it("lists the app's connection pool size, and no value for it", () => {
+    assert.deepEqual(blueprintEntries().get("DB_POOL_SIZE"), { property: "sync", value: "false" });
+    assert.doesNotMatch(blueprint, /DB_POOL_SIZE\s*\n\s*value:/, "no number in the blueprint");
+  });
 });

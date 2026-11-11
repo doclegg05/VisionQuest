@@ -94,7 +94,7 @@ const inFlight = new Map<string, Promise<() => unknown>>();
 // node-cache is configured with `maxKeys: 10_000` and THROWS `ECACHEFULL` from
 // set() once full — it does not evict. `cached()` used to call set() unguarded,
 // so that throw propagated to whoever was awaiting it. getSession() caches
-// every session lookup here for 10s, so a full cache turned every
+// every session lookup here (for 60s today), so a full cache turned every
 // authenticated request into a 500, and the cache is fillable from outside:
 // `credly:<username>` takes a caller-set username with a 600s TTL, and the
 // documents-list key carries caller-supplied search text.
@@ -190,6 +190,26 @@ export async function cached<T>(
   }
   const readSnapshot = await pending;
   return readSnapshot() as T;
+}
+
+/**
+ * Store a value the caller already holds, as `cached()` would have stored it
+ * after fetching. For a caller that has just read the value for its own
+ * reasons and would otherwise make the next reader fetch it again (sign-in
+ * and the session row: `sessionCachePrimer` in src/lib/auth.ts).
+ *
+ * Only for a value the caller knows is current. `cached()` drops a fetch that
+ * an invalidation overtook; this cannot, so the caller must check that for
+ * itself. A fetch already in flight for the key is left alone and stores its
+ * own answer when it lands. Never throws: like every other cache write, a
+ * failure is logged and costs a re-fetch.
+ */
+export function primeCache<T>(key: string, ttlSeconds: number, value: T): void {
+  try {
+    adapter.set(key, value, ttlSeconds);
+  } catch (error) {
+    noteCacheFailure("prime", error);
+  }
 }
 
 /**

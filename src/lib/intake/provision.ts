@@ -429,7 +429,7 @@ export async function provisionIntakeStudent(
   // until staff issues a password out of band, and there is no secret in scope
   // for the anonymous response to print (review finding B2).
   const temporaryPassword = source === "staff" ? generateTemporaryPassword() : null;
-  const passwordHash = temporaryPassword ? hashPassword(temporaryPassword).hash : null;
+  const passwordHash = temporaryPassword ? (await hashPassword(temporaryPassword)).hash : null;
 
   const { student, spokesRecord } = await prisma.$transaction(async (tx) => {
     // 1. Create Student

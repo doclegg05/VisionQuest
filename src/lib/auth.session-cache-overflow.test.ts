@@ -5,7 +5,7 @@ import { before, mock, test } from "node:test";
 // ---------------------------------------------------------------------------
 // getSession() must survive a full cache.
 //
-// getSession() caches its `Student` lookup for 10s through `cached()`. The
+// getSession() caches its `Student` lookup for 60s through `cached()`. The
 // backing node-cache is capped at 10,000 keys and THROWS `ECACHEFULL` from
 // set() rather than evicting, so once the cache filled, every authenticated
 // request threw out of getSession() and became a 500. The cache is fillable

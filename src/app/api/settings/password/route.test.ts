@@ -149,6 +149,8 @@ mock.module("@/lib/auth", {
     },
     normalizeStudentId: (raw: string) => raw.trim().toLowerCase(),
     normalizeEmail: (raw: string) => raw.trim().toLowerCase(),
+    // Sign-in, which these tests also drive, asks for this before it reads the account.
+    sessionCachePrimer: () => () => undefined,
     signMfaSessionToken: (id: string) => `mfa-token-for-${id}`,
     setMfaSessionCookie: async () => undefined,
   },
