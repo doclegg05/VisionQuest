@@ -7,14 +7,14 @@ import { prisma } from "@/lib/db";
  * GET /api/teacher/failed-extractions
  *
  * Open dead-letter rows (see prisma FailedExtraction) for students the
- * teacher manages, newest first, capped at 50. `payload` holds student
- * conversation text, so it is EXCLUDED by default — pass ?include=payload to
- * fetch it (still scoped to managed students; coordinators fail closed via
- * buildManagedStudentWhere).
+ * teacher manages, newest first, capped at 50. The list carries ids, dates,
+ * kind, status and the student's display name only. The stored `payload`
+ * (student conversation text) and the `error` text (which can quote a model
+ * reply) come from GET /api/teacher/failed-extractions/:id, one row at a
+ * time, and that route writes a `failed_extraction` view row. Coordinators
+ * fail closed via buildManagedStudentWhere.
  */
-export const GET = withTeacherAuth(async (session, req: Request) => {
-  const includePayload = new URL(req.url).searchParams.get("include") === "payload";
-
+export const GET = withTeacherAuth(async (session, _req: Request) => {
   const failures = await prisma.failedExtraction.findMany({
     where: {
       status: "open",
@@ -27,12 +27,10 @@ export const GET = withTeacherAuth(async (session, req: Request) => {
       studentId: true,
       conversationId: true,
       extractorKey: true,
-      error: true,
       attempts: true,
       status: true,
       createdAt: true,
-      student: { select: { displayName: true, studentId: true } },
-      ...(includePayload ? { payload: true } : {}),
+      student: { select: { displayName: true } },
     },
   });
 

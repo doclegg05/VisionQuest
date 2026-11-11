@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withTeacherAuth } from "@/lib/api-error";
-import { logAuditEvent } from "@/lib/audit";
+import { logAuditEvent, recordStudentView } from "@/lib/audit";
 import { invalidate } from "@/lib/cache";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
@@ -41,6 +41,13 @@ export const GET = withTeacherAuth(async (
     },
     orderBy: { createdAt: "desc" },
     take: MAX_MEMORIES,
+  });
+
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: studentId,
+    surface: "memories",
   });
 
   return NextResponse.json({ success: true, data: { memories } });

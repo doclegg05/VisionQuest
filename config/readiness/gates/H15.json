@@ -5,6 +5,13 @@
   "title": "Every staff read of one student's record is written down",
   "doneWhen": "The route walk passes with an empty exemption list or a reason beside each entry. A test for each route finds its view row.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/lib/audit.staff-reads.test.ts",
+      "src/app/api/teacher/staff-read-views.test.ts",
+      "src/lib/audit.test.ts",
+      "src/app/api/teacher/failed-extractions/route.test.ts",
+      "src/components/teacher/FailedExtractionDetails.test.tsx"
+    ]
   }
 }

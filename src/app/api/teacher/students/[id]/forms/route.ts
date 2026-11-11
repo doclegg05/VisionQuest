@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { tryLogAuditEvent } from "@/lib/audit";
+import { recordStudentView, tryLogAuditEvent } from "@/lib/audit";
 import { syncStudentAlerts } from "@/lib/advising";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { errorForLog } from "@/lib/log-error";
@@ -41,6 +41,13 @@ export const GET = withTeacherAuth(async (
     ...s,
     file: fileMap.get(s.fileId) || null,
   }));
+
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: managedStudent.id,
+    surface: "forms",
+  });
 
   return NextResponse.json({ submissions: enriched });
 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { withTeacherAuth } from "@/lib/api-error";
+import { recordStudentView } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { checkTokenQuota } from "@/lib/llm-usage";
@@ -88,6 +89,13 @@ export const GET = withTeacherAuth(async (
   const todaySummary = today.length > 0
     ? today[0]
     : { date: todayStr, totalTokens: 0, inputTokens: 0, outputTokens: 0, callCount: 0 };
+
+  await recordStudentView({
+    actorId: session.id,
+    actorRole: session.role,
+    targetStudentId: studentId,
+    surface: "usage",
+  });
 
   return NextResponse.json({
     studentId,
