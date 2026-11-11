@@ -67,7 +67,7 @@ export function StopButton({ onStop, armed = false }: { onStop: () => void; arme
       type="button"
       onClick={onStop}
       aria-disabled={armed ? undefined : true}
-      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)] aria-disabled:cursor-wait aria-disabled:opacity-60 aria-disabled:hover:bg-[var(--chat-panel-bg)]"
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)] aria-disabled:cursor-wait aria-disabled:opacity-70 aria-disabled:hover:bg-[var(--chat-panel-bg)]"
     >
       <Stop size={16} weight="fill" aria-hidden="true" />
       <span>Stop</span>

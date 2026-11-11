@@ -13,7 +13,8 @@
       "src/components/chat/ChatWindow.test.tsx",
       "src/components/chat/chat-stream.test.ts",
       "src/app/api/chat/send/__tests__/route.early-crisis.test.ts",
-      "src/lib/ai/chat-provider-local.test.ts"
+      "src/lib/ai/chat-provider-local.test.ts",
+      "src/components/chat/MessageBubble.test.tsx"
     ]
   }
 }

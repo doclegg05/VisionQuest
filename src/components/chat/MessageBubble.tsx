@@ -58,7 +58,9 @@ export default function MessageBubble({ role, content, isStreaming, failed, text
           </div>
         ) : (
           <p id={textId} className="whitespace-pre-wrap break-words">
-            {content}
+            {/* A reply stopped before any text is saved with a leading break
+                (sage-failure.ts savedCutOffReply); drop it on screen only. */}
+            {content.replace(/^\s+/, "")}
             {isStreaming && shouldReduceMotion ? "…" : ""}
           </p>
         )}

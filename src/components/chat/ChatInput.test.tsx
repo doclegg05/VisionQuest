@@ -177,7 +177,7 @@ describe("Stop before it is armed (E2b 1 and 2)", () => {
     const html = renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} disabled />);
     const button = stopButton(html);
     assert.match(button, / aria-disabled="true"/);
-    assert.match(button, /aria-disabled:opacity-60/);
+    assert.match(button, /aria-disabled:opacity-70/);
     assert.match(button, /aria-disabled:hover:bg-\[var\(--chat-panel-bg\)\]/);
     assert.match(button, />Stop</);
     assert.match(button, /min-w-11/);
@@ -206,7 +206,7 @@ describe("Stop stays full strength while Sage answers (E2b 5)", () => {
     const textarea = html.match(/<textarea[^>]*>/)?.[0] ?? "";
     assert.match(textarea, /opacity-75/);
     const stop = html.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Stop(?:(?!<\/button>)[\s\S])*<\/button>/)?.[0] ?? "";
-    // Only the unarmed dim (aria-disabled:opacity-60), which an armed Stop never matches.
+    // Only the unarmed dim (aria-disabled:opacity-70), which an armed Stop never matches.
     assert.doesNotMatch(stop, /(?<!aria-disabled:)opacity/);
   });
 });
@@ -222,6 +222,19 @@ describe("the Stop label's contrast in both themes (E2b 5)", () => {
       const ground = composite(parseColor(panel!), parseColor(area!));
       const ratio = contrastRatio(composite(parseColor(ink!), parseColor(ground)), ground);
       assert.ok(ratio >= 4.5, `${theme}: ${ratio.toFixed(2)}:1`);
+    });
+
+    it(`still reaches 4.5:1 while unarmed (the whole button at 70%) in ${theme}`, () => {
+      const ink = cssTokenValue(css, "--ink-strong", theme);
+      const panel = cssTokenValue(css, "--chat-panel-bg", theme);
+      const area = cssTokenValue(css, "--chat-area-bg", theme);
+      assert.ok(ink && panel && area, "tokens are defined");
+      const areaColor = parseColor(area!);
+      const button = composite(parseColor(panel!), areaColor);
+      const dim = (color: string) => composite({ ...parseColor(color), a: parseColor(color).a * 0.7 }, areaColor);
+      const label = composite(parseColor(ink!), parseColor(button));
+      const ratio = contrastRatio(dim(label), dim(button));
+      assert.ok(ratio >= 4.5, `${theme} unarmed: ${ratio.toFixed(2)}:1`);
     });
   }
 });

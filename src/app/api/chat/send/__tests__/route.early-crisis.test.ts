@@ -126,8 +126,10 @@ describe("POST /api/chat/send: a Stop before any text saves the 988 help (E2c 3)
     await stopBeforeAnyText(CRISIS_MESSAGE);
     const saves = assistantSaves();
     assert.equal(saves.length, 1, JSON.stringify(saves));
-    assert.match(saves[0], /call or text 988/);
-    assert.ok(saves[0].startsWith("\n\n(Sage stopped here.)"), saves[0]);
+    const { SAVED_CUT_OFF_NOTE } = await import("@/lib/chat/sage-failure");
+    const { CRISIS_RESOURCE_BLOCK } = await import("@/lib/chat/crisis-resource-blocks");
+    // Exactly the note, then the 988 block as written: nothing reworded.
+    assert.equal(saves[0], `\n\n${SAVED_CUT_OFF_NOTE}${CRISIS_RESOURCE_BLOCK}`);
   });
 
   it("an ordinary message: saves no reply (unchanged)", async () => {
