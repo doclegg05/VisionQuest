@@ -163,6 +163,7 @@ Every task here touches authentication, so `sec-spec` reviews each one and no fi
 | E6 | Launch | "Sage is an AI and can be wrong" under the message box, linked to the notice page. | No such line exists in chat. | pass | Component test. Reading level passes. | S | H6, E2 | ux |
 | E7 | Pilot | The mini chat has Retry and Help on failure. | `src/components/chat/SageMiniChat.tsx:244` | pass | Component test. | S | E1 | none |
 | E8 | Pilot | Chat opens with its history. Conversations and the active history arrive from the server page, with no new-chat screen in between. | `src/components/chat/ChatWindow.tsx:275`, `:303` | pass | A test finds history in the first render. | M | E5 | none |
+| E9 | Launch | Chat never traps a student waiting. The stream's first event (ids and the 988 flag) leaves right after the message is saved, before any context loads, so Stop works at once. A send with no first event in 20 seconds ends with Try again. After 2 minutes with no word, the wait words say Stop works. A Stop or a dropped connection aborts the model call, which is not retried. (Planned as E7; that id was already the mini chat gate.) | `src/app/api/chat/send/route.ts`, `src/lib/chat/turn-context.ts`, `src/lib/ai/abort.ts`, `src/components/chat/send-abort.ts` | pass | Route test: the first stream event arrives before context assembly; a stalled turn ends with a Try again within the bound; a client abort cancels the provider call. | M | E1, E2 | ux, code |
 
 ### Stream F: server and database performance
 
@@ -217,8 +218,8 @@ Two tasks never have open pull requests against the same file here. The later ta
 | --- | --- |
 | `src/app/(student)/layout.tsx` | G1, A3, H6, F2 |
 | `src/app/(student)/dashboard/page.tsx` and `DashboardClient.tsx` | D1, F2, D4, G5 |
-| `src/components/chat/ChatWindow.tsx` | E1, E2, E6, E3, E5, E8 |
-| `src/app/api/chat/send/route.ts` | E1, E3, E4 |
+| `src/components/chat/ChatWindow.tsx` | E1, E2, E6, E3, E5, E8, E9 |
+| `src/app/api/chat/send/route.ts` | E1, E3, E4, E9 |
 | `src/components/settings/SettingsView.tsx` | A3, E1, D7 |
 | `src/components/auth/AuthPageClient.tsx` | D3, H6, A5 |
 | `src/components/teacher/ClassRosterManager.tsx` | B1, B3, B4 |
