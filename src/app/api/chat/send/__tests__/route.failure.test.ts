@@ -421,7 +421,7 @@ describe("POST /api/chat/send — round 3 failure fixes (E1c)", () => {
     mockSaveMessage.mock.mockImplementation(async () => ({ id }));
   }
 
-  type ReplyWhere = { role: string; NOT?: { content?: { contains?: string } } };
+  type ReplyWhere = { role: string; NOT?: { OR?: Array<{ content?: { contains?: string } }> } };
 
   /**
    * findFirst answers: the stored question, then (role assistant) the newest of
@@ -434,8 +434,8 @@ describe("POST /api/chat/send — round 3 failure fixes (E1c)", () => {
       if (args.where.role !== "assistant") {
         return { id: SAVED_ID, conversationId: CONVERSATION_ID, createdAt: new Date(0) };
       }
-      const excluded = args.where.NOT?.content?.contains;
-      const kept = replies.filter((r) => excluded === undefined || !r.content.includes(excluded));
+      const excluded = (args.where.NOT?.OR ?? []).flatMap((clause) => clause.content?.contains ?? []);
+      const kept = replies.filter((r) => !excluded.some((mark) => r.content.includes(mark)));
       return kept.at(-1) ?? null;
     });
   }
@@ -488,6 +488,13 @@ describe("POST /api/chat/send — round 3 failure fixes (E1c)", () => {
       assert.equal(res.status, 200);
       await readSseBody(res);
       assert.equal(userSaves(), 0);
+    });
+
+    it("still answers a Try again after a partial saved with the old note, before E2b (E2b 6)", async () => {
+      storedQuestion({ content: "Part one\n\n(Sage got cut off here.)" });
+      const res = await post({ conversationId: CONVERSATION_ID, retryOf: SAVED_ID });
+      assert.equal(res.status, 200);
+      await readSseBody(res);
     });
 
     it("refuses when a full answer was saved and a cut-off copy came after it", async () => {
@@ -561,7 +568,7 @@ describe("POST /api/chat/send — round 3 failure fixes (E1c)", () => {
     await readSseBody(await post({}));
     const saved = mockSaveMessage.mock.calls.find((call: { arguments: unknown[] }) => call.arguments[2] === "assistant");
     assert.ok(saved, "the partial was saved");
-    assert.equal(saved!.arguments[3], "Part one\n\n(Sage got cut off here.)");
+    assert.equal(saved!.arguments[3], "Part one\n\n(Sage stopped here.)");
   });
 
   it("(12) tells an admin to check Program Setup when Sage is not set up", async () => {
