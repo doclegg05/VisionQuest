@@ -45,7 +45,8 @@ const perStudent = (mine: unknown, theirs: unknown) => (args: unknown) => (stude
 
 describe("loadStudentDashboard", () => {
   it("builds what the per-student readers build from the same rows", async () => {
-    const loaded = await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    // The real clock for both: readActivity's 30-day window ends today.
+    const loaded = await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID));
     const overview = await readers.readOverview(DASHBOARD_STUDENT_ID);
     const activity = await readers.readActivity(DASHBOARD_STUDENT_ID);
     const step = await nextStep.getStudentNextStep(DASHBOARD_STUDENT_ID);
