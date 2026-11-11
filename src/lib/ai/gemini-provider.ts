@@ -1,3 +1,4 @@
+import { linkedController } from "./abort";
 import { assertCloudInferenceAllowed } from "./demo-local-only";
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type Content, type EnhancedGenerateContentResponse, type FunctionDeclaration, type GenerateContentStreamResult, type Part, type SafetySetting, type Schema, type SingleRequestOptions, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
@@ -168,7 +169,7 @@ function isRetryableError(error: unknown): boolean {
 }
 
 /** Runs `fn`, retrying transient failures with 500ms/1500ms backoff (3 attempts total). */
-async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+async function withTransientRetry<T>(fn: () => Promise<T>, label: string, signal?: AbortSignal): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     try {
@@ -176,7 +177,8 @@ async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promi
     } catch (error) {
       lastError = error;
       const retriesLeft = attempt < RETRY_DELAYS_MS.length;
-      if (!retriesLeft || !isRetryableError(error)) throw error;
+      // A Stop or a dropped connection is never retried (E7).
+      if (!retriesLeft || signal?.aborted || !isRetryableError(error)) throw error;
       logger.warn("Gemini transient failure, retrying", {
         label,
         attempt: attempt + 1,
@@ -201,6 +203,7 @@ async function establishStream(
   send: (options: SingleRequestOptions) => Promise<GenerateContentStreamResult>,
   label: string,
   establishTimeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<{
   result: GenerateContentStreamResult;
   iterator: AsyncIterator<EnhancedGenerateContentResponse>;
@@ -211,7 +214,7 @@ async function establishStream(
   return withTransientRetry(async () => {
     // One controller per attempt: aborting a timed-out attempt must not
     // poison the retry that follows it.
-    const controller = new AbortController();
+    const controller = linkedController(signal);
     const established = (async () => {
       const result = await send(abortableRequestOptions(controller.signal));
       const iterator = result.stream[Symbol.asyncIterator]();
@@ -229,7 +232,7 @@ async function establishStream(
       timeoutMessage("stream establishment", establishTimeoutMs),
       () => controller.abort(),
     );
-  }, label);
+  }, label, signal);
 }
 
 export class GeminiProvider implements AIProvider {
@@ -303,13 +306,14 @@ export class GeminiProvider implements AIProvider {
         })),
       });
 
-      const result = await this.withRequestDeadline((requestOptions) =>
-        chat.sendMessage(lastMessage.content, requestOptions),
+      const result = await this.withRequestDeadline(
+        (requestOptions) => chat.sendMessage(lastMessage.content, requestOptions),
+        options?.signal,
       );
       const text = result.response.text();
       reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
       return text;
-    }, "generateResponse");
+    }, "generateResponse", options?.signal);
   }
 
   /**
@@ -318,8 +322,9 @@ export class GeminiProvider implements AIProvider {
    */
   private withRequestDeadline<T>(
     send: (options: SingleRequestOptions) => Promise<T>,
+    signal?: AbortSignal,
   ): Promise<T> {
-    const controller = new AbortController();
+    const controller = linkedController(signal);
     return withDeadline(
       send(abortableRequestOptions(controller.signal)),
       this.requestTimeoutMs,
@@ -354,6 +359,7 @@ export class GeminiProvider implements AIProvider {
       },
       "streamResponse",
       this.streamEstablishTimeoutMs,
+      options?.signal,
     );
 
     let outputChars = 0;
@@ -401,13 +407,14 @@ export class GeminiProvider implements AIProvider {
         })),
       });
 
-      const result = await this.withRequestDeadline((requestOptions) =>
-        chat.sendMessage(lastMessage.content, requestOptions),
+      const result = await this.withRequestDeadline(
+        (requestOptions) => chat.sendMessage(lastMessage.content, requestOptions),
+        options?.signal,
       );
       const text = result.response.text();
       reportUsage(onUsage, result.response.usageMetadata, systemPrompt, messages, text);
       return text;
-    }, "generateStructuredResponse");
+    }, "generateStructuredResponse", options?.signal);
   }
 
   /**
@@ -511,6 +518,7 @@ export class GeminiProvider implements AIProvider {
         (requestOptions) => model.generateContentStream({ contents }, requestOptions),
         "streamWithTools",
         this.streamEstablishTimeoutMs,
+        options?.signal,
       );
 
       // Stream text as it arrives, keeping every raw part verbatim: the SDK's

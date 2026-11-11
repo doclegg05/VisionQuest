@@ -5,17 +5,12 @@ import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
 import { chatLimitsFor } from "@/lib/chat/chat-limits";
 import { getDemoLimits } from "@/lib/demo/config";
 import { DEMO_SAGE_LIMIT } from "@/lib/demo/copy";
-import { usesMacPromptCache } from "@/lib/ai/local-model";
-import { buildCacheableSystemPrompt, buildSystemPrompt, ConversationStage } from "@/lib/sage/system-prompts";
+import type { ConversationStage } from "@/lib/sage/system-prompts";
 import { promptStageForMessage } from "@/lib/sage/stage";
-import { getDocumentContext } from "@/lib/sage/knowledge-base-server";
-import { getMemoryContext, getStaffMemoryContext } from "@/lib/sage/memory/retrieve";
-import { getStudentProfile } from "@/lib/sage/memory/profile";
 import { extractAndStoreStaffMemories } from "@/lib/sage/memory/staff-extract";
 import {
   findRelevantForms,
   getDirectFormAnswer,
-  getFormContext,
   resolveDirectFormMatch,
 } from "@/lib/sage/knowledge-base";
 import {
@@ -34,8 +29,7 @@ import { chatSendBodySchema, createUserTurn, findRetriedUserMessage, type ChatSe
 import { answerPreStreamFailures, failureBody, failureResponse } from "@/lib/chat/failure-response";
 import { createSseResponse, presentFormSseExtras } from "@/lib/chat/direct-reply";
 import type { Session } from "@/lib/api-error";
-import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, getConversationContext, maybeUpdateSummary, COMPACT_HISTORY_TOKEN_BUDGET, FULL_HISTORY_TOKEN_BUDGET } from "@/lib/chat/conversation";
-import { transcriptWindowFor } from "@/lib/chat/transcript-window";
+import { getOrCreateConversation, getOrCreateTeacherConversation, saveMessage, maybeUpdateSummary } from "@/lib/chat/conversation";
 import { handlePostResponse } from "@/lib/chat/post-response";
 import { crisisHelpLangFor, crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
 import {
@@ -46,24 +40,10 @@ import {
   type FailureCapture,
 } from "@/lib/chat/sage-failure";
 import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
-import { formatAttachmentContext } from "@/lib/chat/attachment-context";
-import { loadOpenOrientationItems } from "@/lib/chat/open-orientation-items";
+import { assembleTurnContext, type TurnContext } from "@/lib/chat/turn-context";
 import { detectCrisisSignal } from "@/lib/sage/crisis-detection";
-import { assembleStudentContextBundle, selfMetricLineFromBundle } from "@/lib/sage/context-bundle";
-import { studentVisibleAlerts } from "@/lib/chat/student-visible-alerts";
-import { getSituationalSnapshot } from "@/lib/sage/situational-snapshot";
-import { renderRecentActivity } from "@/lib/sage/recent-activity";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
-import {
-  buildStaffStudentContext,
-  shouldAttemptStaffStudentContext,
-} from "@/lib/sage/staff-student-context";
-import { formatClustersForPrompt } from "@/lib/spokes/career-clusters";
 import { checkTokenQuota, withUsageLogging } from "@/lib/llm-usage";
-import { estimateTokens } from "@/lib/llm-usage-estimate";
-import { prisma } from "@/lib/db";
-import { type ProgramType } from "@/lib/program-type";
-import { getStudentProgramType } from "@/lib/program-type-server";
 import { runAgentTurn } from "@/lib/sage/agent/loop";
 import { executeAgentTool, executeSlashCommand } from "@/lib/sage/agent/executor";
 import { isAgentLoopEnabled } from "@/lib/sage/agent/flags";
@@ -92,29 +72,6 @@ function capForPersist(text: string): string {
   return text.length > MAX_ASSISTANT_CHARS
     ? text.slice(0, MAX_ASSISTANT_CHARS) + TRUNCATED_REPLY_SUFFIX
     : text;
-}
-
-const TRIVIAL_PATTERN = /^(hi|hello|hey|yo|sup|thanks?|thank you|thx|ty|ok|okay|k|cool|nice|great|got it|sure|yes|no|yep|nope|yeah|nah|yup|hm|hmm|wow|oh|ah|lol|haha|bye|goodbye|cya)[!.,?]*$/i;
-
-/**
- * Detects messages that don't benefit from RAG retrieval — short pleasantries,
- * acknowledgements, single-word replies. Skipping RAG on these saves the
- * embedding lookup + ~6,000 chars of prompt bloat + ~200-300ms first-token delay.
- * Expanded 2026-08-27 to catch more simple responses (yeah/nah/yup/hm/wow/etc).
- */
-function isTrivialMessage(message: string): boolean {
-  const trimmed = message.trim();
-  if (trimmed.length === 0) return true;
-  if (trimmed.length <= 4) return true;
-  if (TRIVIAL_PATTERN.test(trimmed)) return true;
-  // Short messages with no question words and few tokens are usually
-  // continuations of prior context — Sage's history covers them.
-  const tokens = trimmed.split(/\s+/);
-  if (tokens.length <= 3 && !/[?]/.test(trimmed)) return true;
-  // Expand: 2-3 word responses without question marks are usually simple
-  // reactions or confirmations that don't need RAG context.
-  if (tokens.length <= 2) return true;
-  return false;
 }
 
 function getDirectSmallTalkAnswer(message: string): string | null {
@@ -172,7 +129,7 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const crisisBlock = crisisResourceBlockFor(crisisSignal, "") ?? "";
   const userTurn = createUserTurn(session.id, userMessage, retried);
   return answerPreStreamFailures(
-    () => sendTurn({ session, body, userMessage, crisisSignal, crisisBlock, userTurn }),
+    () => sendTurn({ session, body, userMessage, crisisSignal, crisisBlock, userTurn, requestSignal: req.signal }),
     { audience: isStaffChat ? "staff" : "student", crisisBlock, userTurn, studentId: session.id },
   );
 });
@@ -184,10 +141,12 @@ interface SendTurnInput {
   crisisSignal: ReturnType<typeof detectCrisisSignal> | null;
   crisisBlock: string;
   userTurn: UserTurn;
+  /** Aborts when the client disconnects before the reply finishes. */
+  requestSignal: AbortSignal;
 }
 
 /** Everything after the crisis scan; a throw before the stream opens is answered by the caller. */
-async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock, userTurn }: SendTurnInput): Promise<Response> {
+async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock, userTurn, requestSignal }: SendTurnInput): Promise<Response> {
   const conversationId = body.conversationId || null;
   const requestedStage = body.requestedStage;
   const isTeacher = isStaffRole(session.role);
@@ -529,308 +488,6 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
   // Save user message
   await userTurn.save(conversation.id);
 
-  let staffStudentContext: string | null = null;
-  let staffStudentTargetId: string | null = null;
-  let staffStudentContextResolution: "none" | "resolved" | "ambiguous" | "not_found" = "none";
-  const priorUserMessages = isTeacher
-    ? (conversation.messages ?? [])
-        .filter((message) => message.role === "user")
-        .map((message) => message.content)
-    : [];
-  // Coordinators never get buildStaffStudentContext — it resolves individual
-  // students via managed_student_ids, which is teacher-scoped RLS and does
-  // not recognize coordinators. Coordinator chat stays at the regional/
-  // aggregate level (see coordinator_assistant stage prompt).
-  const shouldBuildStaffStudentContext =
-    isTeacher &&
-    (Boolean(body.targetStudentId) ||
-      (!isAdmin && shouldAttemptStaffStudentContext(userMessage, priorUserMessages)));
-  if (shouldBuildStaffStudentContext) {
-    const contextResult = await buildStaffStudentContext(session, {
-      userMessage,
-      priorUserMessages,
-      targetStudentId: body.targetStudentId,
-    });
-    staffStudentContext = contextResult.context;
-    staffStudentTargetId = contextResult.targetStudentId;
-    staffStudentContextResolution = contextResult.resolution;
-  }
-
-  // Fetch program context once for students — reused by both the system
-  // prompt and the post-response handler.
-  let studentProgramType: ProgramType | null = null;
-  let studentClassroomConfirmedAt: Date | null = null;
-  if (!isStaffChat) {
-    const [programType, studentRecord] = await Promise.all([
-      getStudentProgramType(session.id),
-      prisma.student.findUnique({
-        where: { id: session.id },
-        select: { classroomConfirmedAt: true },
-      }),
-    ]);
-    studentProgramType = programType;
-    studentClassroomConfirmedAt = studentRecord?.classroomConfirmedAt ?? null;
-  }
-
-  // Build system prompt — staff (teacher/admin/coordinator) get a streamlined path
-  let systemPrompt: string;
-  let systemPrefixLength: number | undefined;
-  const buildTurnPrompt = (...args: Parameters<typeof buildSystemPrompt>) => {
-    if (!usesMacPromptCache()) return buildSystemPrompt(...args);
-    const prompt = buildCacheableSystemPrompt(...args);
-    systemPrefixLength = prompt.systemPrefixLength;
-    return prompt.text;
-  };
-  let recentActivityBlock = "";
-
-  if (staffChatStage) {
-    systemPrompt = buildTurnPrompt(staffChatStage, {
-      studentName: session.displayName,
-      userMessage,
-      staffStudentContext,
-      staffRole: session.role,
-    }, promptTier);
-  } else {
-    // Canonical context feed: the bundle is the single entry point for Sage
-    // student chat. includeChatPromptContext composes getStudentPromptContext
-    // (wrapped, not removed) so the prompt inputs are identical to before; the
-    // only new content is the self-metric line from meta.selfMetrics.
-    const bundle = await assembleStudentContextBundle(session.id, {
-      viewer: "sage",
-      conversationId: conversation.id,
-      conversationStage,
-      includeChatPromptContext: true,
-      priorSummaryLimit: promptTier === "compact" ? 1 : 3,
-    });
-    const promptContext = bundle.chatPromptContext;
-    if (!promptContext) {
-      throw new Error(
-        "assembleStudentContextBundle returned no chatPromptContext despite includeChatPromptContext",
-      );
-    }
-
-    // Whole-student situational awareness. Skipped for the first-meeting
-    // discovery stage (no history to summarize) and the compact tier (token
-    // budget). Cached per student; never blocks chat if it fails. Use the
-    // stored stage (not prompt override) so logistics turns still get a
-    // snapshot once the student has history.
-    const situationalSnapshot =
-      conversationStage !== "discovery" && promptTier !== "compact"
-        ? (await getSituationalSnapshot(session.id)) ?? undefined
-        : undefined;
-
-    systemPrompt =
-      buildTurnPrompt(promptStage, {
-        studentName: session.displayName,
-        programType: studentProgramType,
-        classroomConfirmedAt: studentClassroomConfirmedAt,
-        situationalSnapshot,
-        bhag: promptContext.goalsByLevel["bhag"],
-        monthly: promptContext.goalsByLevel["monthly"],
-        weekly: promptContext.goalsByLevel["weekly"],
-        daily: promptContext.goalsByLevel["daily"],
-        goals_summary: promptContext.goalsSummary,
-        student_status_summary: promptContext.studentStatusSummary,
-        userMessage,
-        career_clusters:
-          promptStage === "discovery"
-            ? formatClustersForPrompt()
-            : undefined,
-        discovery_summary: promptContext.discoverySummary,
-        career_profile_context: promptContext.careerProfileContext,
-        skillGapContext: promptContext.skillGapContext,
-        pathwayContext: promptContext.pathwayContext,
-        coachingArcContext: promptContext.coachingArcContext,
-        selfMetricsLine: selfMetricLineFromBundle(bundle),
-      }, promptTier);
-    systemPrompt = systemPrefixLength === undefined
-      ? promptContext.priorConversationContext + systemPrompt
-      : systemPrompt + promptContext.priorConversationContext;
-
-    // RECENT ACTIVITY — what actually happened since the last conversation,
-    // built from bundle fields every turn already pays to fetch
-    // (recentEvents + alert descriptors); before this the queries ran and the
-    // results were discarded. Skipped for discovery (first meeting — nothing
-    // to reference), matching the situational-snapshot rule. Deliberately
-    // INCLUDED on the compact/local tier, unlike the snapshot: the block is
-    // hard-bounded by construction (≤5 event + ≤3 alert lines, each ≤120
-    // chars, ~1KB worst case), and on the local/FERPA path it is the only
-    // recency signal Sage gets — the snapshot exclusion was about unbounded
-    // cached prose under the 3k-token budget, not about recency itself.
-    if (conversationStage !== "discovery") {
-      recentActivityBlock = renderRecentActivity({
-        events: bundle.recentEvents,
-        alerts: studentVisibleAlerts(bundle.alerts),
-      });
-    }
-  }
-
-  // Per-section prompt-size instrumentation (sage.prompt.size below). Tracks
-  // chars contributed by each block as it's appended, mirroring the existing
-  // documentContextChars/formContextChars vars this replaces/extends.
-  const sectionSizes: Record<string, number> = { systemBase: systemPrompt.length };
-
-  // Appended after the base prompt (same pattern as the RAG/memory blocks) so
-  // its cost shows up as its own row in the sage.prompt.size sections map.
-  if (recentActivityBlock) {
-    const block = `\n\n${recentActivityBlock}`;
-    systemPrompt += block;
-    sectionSizes.recentActivity = block.length;
-  }
-
-  // Inject document-based context from ProgramDocument (RAG layer).
-  // Skip RAG for trivial messages — short pleasantries don't benefit from
-  // ~6,000 chars of program docs and the round-trip just delays first token.
-  // In agent mode, Sage can call `lookup_program_info` if she needs specifics.
-  const trivialMessage = isTrivialMessage(userMessage);
-  let documentContextChars = 0;
-  let formContextChars = 0;
-
-  // Parallelize conversation history loading with RAG/form/memory loads.
-  // Previously this happened sequentially after context assembly (line 719),
-  // adding ~100-200ms to first-token latency. Now it runs in parallel.
-  // Transcript window by provider CLASS, not tier: the cloud number is a
-  // disclosure decision (FERPA review W9) and lives in transcript-window.ts.
-  const maxRecentMessages = transcriptWindowFor({
-    providerClass,
-    stage: conversationStage,
-  });
-  const conversationContextPromise = getConversationContext(
-    conversation.id,
-    maxRecentMessages,
-    promptTier === "compact"
-      ? COMPACT_HISTORY_TOKEN_BUDGET
-      : FULL_HISTORY_TOKEN_BUDGET,
-  );
-
-  if (!trivialMessage) {
-    // Parallelize RAG, form context, memory loads, and conversation history
-    // to reduce waterfall. These are independent lookups that were previously
-    // sequential, adding ~300-500ms to first token latency (PR 183). Conversation
-    // history parallelization adds another ~100-200ms gain (2026-08-27).
-    const memoryEnabled = process.env.SAGE_MEMORY_ENABLED?.trim().toLowerCase() !== "false";
-    const [documentContext, formContext, memoryData] = await Promise.all([
-      getDocumentContext(
-        userMessage,
-        isStaffChat ? "staff" : "student",
-        3,
-        promptTier === "compact" ? 2000 : 6000,
-        // Attribution for the query embedding's LlmCallLog row and audit event
-        // (FERPA review W5). Staff chat has no student subject here.
-        { studentId: isStaffChat ? null : session.id },
-      ),
-      Promise.resolve(getFormContext(userMessage)),
-      memoryEnabled
-        ? (async () => {
-            if (isStaffChat) {
-              const staffMemory = await getStaffMemoryContext(session.id, userMessage);
-              return { type: "staff" as const, staffMemory };
-            } else {
-              const profile = await getStudentProfile(session.id);
-              const memoryContext = await getMemoryContext(session.id, userMessage, undefined, profile.contents);
-              return { type: "student" as const, profile, memoryContext };
-            }
-          })()
-        : Promise.resolve(null),
-    ]);
-
-    if (documentContext) {
-      documentContextChars = documentContext.length;
-      systemPrompt += documentContext;
-      sectionSizes.docRag = documentContextChars;
-    }
-    if (formContext) {
-      formContextChars = formContext.length;
-      systemPrompt += formContext;
-      sectionSizes.form = formContextChars;
-    }
-
-    // Durable memory (Phase 2): what Sage remembers from previous sessions.
-    // Two audiences, strictly separated — a student turn reads only
-    // student-subject memories, a staff turn reads only that staff member's
-    // own teacher-subject memories. The pairing is enforced in
-    // memory/retrieve.ts (assertViewerMaySeeSubject), not by these call sites.
-    // Staff still get student context from staff-student-context, which is
-    // classroom-scoped and audited; memory is not a second door onto it.
-    if (memoryData) {
-      if (memoryData.type === "staff" && memoryData.staffMemory) {
-        systemPrompt += memoryData.staffMemory;
-        sectionSizes.memoryStaffRecall = memoryData.staffMemory.length;
-      } else if (memoryData.type === "student") {
-        if (memoryData.profile.block) {
-          systemPrompt += `\n\n${memoryData.profile.block}`;
-          sectionSizes.memoryProfile = memoryData.profile.block.length;
-        }
-        if (memoryData.memoryContext) {
-          systemPrompt += memoryData.memoryContext;
-          sectionSizes.memoryRecall = memoryData.memoryContext.length;
-        }
-      }
-    }
-  }
-
-  // Attached files (Phase 3): gists loaded server-side, ownership-scoped.
-  // The gist content is student-document derived — wrap it like other
-  // untrusted reference data so it cannot smuggle instructions.
-  // turnHasAttachment gates the tools that need a fileUploadId (toolsForTurn);
-  // only a file this student owns counts.
-  let turnHasAttachment = false;
-  if (body.attachmentIds && body.attachmentIds.length > 0) {
-    const attachments = await prisma.fileUpload.findMany({
-      where: { id: { in: body.attachmentIds }, studentId: session.id },
-      select: { id: true, filename: true, gist: true },
-    });
-    if (attachments.length > 0) {
-      turnHasAttachment = true;
-      // A student's signed form is filed with submit_form, which needs the
-      // checklist item's id; staff chat has no orientation checklist of its own.
-      const openOrientationItems = isStaffChat ? [] : await loadOpenOrientationItems(session.id);
-      const attachmentsBlock = formatAttachmentContext({ files: attachments, openOrientationItems });
-      systemPrompt += attachmentsBlock;
-      sectionSizes.attachments = attachmentsBlock.length;
-    }
-  }
-
-  // 80% daily warning — inject into system prompt so Sage mentions it naturally
-  if (dailyRemaining !== null && perAccountDailyLimit !== null) {
-    const usagePercent = 1 - (dailyRemaining / perAccountDailyLimit);
-    if (usagePercent >= 0.8) {
-      const dailyWarningBlock = `\n\n[SYSTEM NOTE: This user has used ${Math.round(usagePercent * 100)}% of their daily message limit. Naturally mention that you're getting a lot of questions today and your answers may be shorter for a bit. Do not make it alarming.]`;
-      systemPrompt += dailyWarningBlock;
-      sectionSizes.dailyWarning = dailyWarningBlock.length;
-    }
-  }
-
-  // Log assembled prompt size for before/after comparison in Render logs.
-  // Remove in a follow-up PR once baseline data is collected.
-  logger.info("sage.prompt.size", {
-    size: systemPrompt.length,
-    promptTier,
-    provider: provider.name,
-    stage: conversationStage,
-    role: session.role,
-    ragSkipped: trivialMessage,
-    documentContextChars,
-    formContextChars,
-    sections: sectionSizes,
-    estInputTokens: estimateTokens(systemPrompt.length),
-  });
-
-  // Format message history for Gemini, using compacted context when available.
-  // This was loaded in parallel with RAG/form/memory above (conversationContextPromise).
-  // The user message was saved above, before this window was loaded, so the
-  // window normally already ends with it. Append it only when it does not
-  // (e.g. another send landed in between), so the model reads it once. A Try
-  // again after a saved partial reads question, partial, question (pinned in
-  // route.failure.test.ts).
-  const conversationContext = await conversationContextPromise;
-  const lastLoaded = conversationContext.messages.at(-1);
-  const windowEndsWithUserMessage =
-    lastLoaded?.role === "user" && lastLoaded.content === userMessage;
-  const allMessages = windowEndsWithUserMessage
-    ? conversationContext.messages
-    : [...conversationContext.messages, { role: "user" as const, content: userMessage }];
-
   // Stream response via SSE
   // Local (Ollama) providers MUST use streaming: Cloudflare Tunnel returns 524
   // if the origin takes >100s to send the first byte. With stream:true, Ollama
@@ -840,8 +497,23 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
   const useNonStreaming = false;
   const encoder = new TextEncoder();
   let fullResponse = "";
+  // E7: one abort for the whole turn. A Stop or a dropped connection (the
+  // stream's cancel, or the request's own signal) aborts the model call, so
+  // the shared local model stops generating a reply nobody will read.
+  const turnAbort = new AbortController();
+  const onRequestAbort = () => turnAbort.abort(requestSignal.reason);
+  if (requestSignal.aborted) onRequestAbort();
+  else requestSignal.addEventListener("abort", onRequestAbort, { once: true });
+  /** The client cancelled the stream: nothing can be sent or closed any more. */
+  const life = { cancelled: false };
+  /** Null until context assembly (inside the stream) finishes. */
+  let turn: TurnContext | null = null;
 
   const stream = new ReadableStream({
+    cancel(reason) {
+      life.cancelled = true;
+      turnAbort.abort(reason);
+    },
     async start(controller) {
       let streamClosed = false;
       let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -854,7 +526,7 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
       let confirmCardProposed = false;
 
       const enqueueSse = (payload: string, label: string): boolean => {
-        if (streamClosed) return false;
+        if (streamClosed || life.cancelled || turnAbort.signal.aborted) return false;
         try {
           controller.enqueue(encoder.encode(payload));
           return true;
@@ -887,7 +559,7 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
 
       const closeStream = () => {
         stopHeartbeat();
-        if (streamClosed) return;
+        if (streamClosed || life.cancelled) return;
         try {
           controller.close();
         } catch (error) {
@@ -924,6 +596,40 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
         if (quota.warning) {
           sendEvent({ quotaWarning: quota.warning }, "quotaWarning");
         }
+
+        // Context assembly runs after the first event (E7), so Stop is armed
+        // while it loads and a stalled load cannot lock the message box.
+        turn = await assembleTurnContext({
+          session,
+          body,
+          userMessage,
+          conversation,
+          conversationStage,
+          promptStage,
+          staffChatStage,
+          isTeacher,
+          isAdmin,
+          provider,
+          promptTier,
+          providerClass,
+          daily:
+            dailyRemaining !== null && perAccountDailyLimit !== null
+              ? { remaining: dailyRemaining, limit: perAccountDailyLimit }
+              : null,
+        });
+        // A Stop while the context loaded: the model is never called.
+        if (turnAbort.signal.aborted) throw new ChatSseClientClosedError();
+        const {
+          systemPrompt,
+          systemPrefixLength,
+          allMessages,
+          staffStudentTargetId,
+          staffStudentContextResolution,
+          studentProgramType,
+          studentClassroomConfirmedAt,
+          turnHasAttachment,
+        } = turn;
+        const signal = turnAbort.signal;
 
         // Real token accounting: every generation path below (agent loop,
         // non-streaming fallback, plain stream fallback) logs one
@@ -1082,6 +788,7 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
             conversationId: conversation.id,
             targetStudentId: staffStudentTargetId ?? undefined,
             hasAttachment: turnHasAttachment,
+            signal,
           });
           for await (const event of agentEvents) {
             if (event.type === "text") {
@@ -1132,10 +839,10 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
             // the route drives done via sendEvent({ done: true }) below.
           }
         } else if (useNonStreaming) {
-          fullResponse = await loggedProvider.generateResponse(systemPrompt, allMessages, undefined, { systemPrefixLength });
+          fullResponse = await loggedProvider.generateResponse(systemPrompt, allMessages, undefined, { systemPrefixLength, signal });
           sendEvent({ text: fullResponse }, "text");
         } else {
-          for await (const chunk of loggedProvider.streamResponse(systemPrompt, allMessages, undefined, { systemPrefixLength })) {
+          for await (const chunk of loggedProvider.streamResponse(systemPrompt, allMessages, undefined, { systemPrefixLength, signal })) {
             fullResponse += chunk;
             sendEvent({ text: chunk }, "text");
           }
@@ -1257,10 +964,19 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
       } catch (error) {
         // For the audit row below; the log lines carry the name and code only.
         const msg = error instanceof Error ? error.message : String(error);
-        const clientClosed = error instanceof ChatSseClientClosedError || streamClosed;
-        const errorCode = clientClosed ? "CLIENT_STREAM_CLOSED" : "AI_STREAM_FAILED";
+        const clientClosed =
+          error instanceof ChatSseClientClosedError || streamClosed || life.cancelled || turnAbort.signal.aborted;
+        // Context assembly failed before any model call: the fixed unknown
+        // sentence, as a throw before the stream answered before E7.
+        const assemblyFailed = turn === null && !clientClosed;
+        const errorCode = clientClosed ? "CLIENT_STREAM_CLOSED" : assemblyFailed ? "CONTEXT_ASSEMBLY_FAILED" : "AI_STREAM_FAILED";
         if (clientClosed) {
           logger.warn("Chat SSE client disconnected", { error: errorForLog(error), provider: provider.name });
+        } else if (assemblyFailed) {
+          logger.error("Chat context assembly failed before the model call", {
+            error: errorForLog(error),
+            student: studentLogKey(session.id),
+          });
         } else {
           logger.error("Stream error", { error: errorForLog(error), provider: provider.name });
         }
@@ -1268,7 +984,7 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
         // persisted partial alike; skipped when the streamed text already
         // carries it. Decided once here for both uses.
         const streamCrisisBlock = crisisResourceBlockFor(crisisSignal, fullResponse) ?? "";
-        const failure = classifyStreamFailure(failureCapture?.lastError() ?? error);
+        const failure = assemblyFailed ? "unknown" : classifyStreamFailure(failureCapture?.lastError() ?? error);
         const audience = isStaffChat ? "staff" : "student";
         // Keep the transcript two-sided: persist whatever Sage streamed
         // before the failure, marked so the student knows it was cut off.
@@ -1310,12 +1026,13 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
           allowCloud,
           inputChars: userMessage.length,
           outputChars: fullResponse.length,
-          reason: msg,
+          // An assembly error can quote a query, so its text stays out of the row.
+          reason: assemblyFailed ? "Context assembly failed before the model call." : msg,
           errorCode,
           metadata: {
             conversationStage,
-            staffStudentContextResolution,
-            staffStudentTargetId,
+            staffStudentContextResolution: turn?.staffStudentContextResolution ?? "none",
+            staffStudentTargetId: turn?.staffStudentTargetId ?? null,
           },
         });
         if (!clientClosed) {

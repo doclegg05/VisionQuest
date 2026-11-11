@@ -96,9 +96,20 @@ const CHAT_SEND_ADMIN_QUERIES_COLD = 22;
 const CHAT_SEND_APP_QUERIES_WARM = 29;
 /** Four audit rows, the rate limit counter and the wager read, every turn. */
 const CHAT_SEND_ADMIN_QUERIES_WARM = 6;
-/** App plus admin round trips before the route constructs its stream. */
-const CHAT_SEND_ROUND_TRIPS_COLD = 190;
-const CHAT_SEND_ROUND_TRIPS_WARM = 127;
+/**
+ * App plus admin round trips before the route constructs its stream. E7
+ * (2026-11-11) sends the stream's first event right after the message is
+ * saved and moved context assembly inside `start()`, so this fell from 190
+ * and 127: what is left is auth, provider resolution, the rate limit, the
+ * conversation load and the save. The query totals above did not change;
+ * they are pinned on the before-provider section, where the same queries now
+ * all land, and M3 still reads the larger figure.
+ */
+const CHAT_SEND_ROUND_TRIPS_COLD = 18;
+const CHAT_SEND_ROUND_TRIPS_WARM = 12;
+/** [app, admin] queries before the stream since E7: the conversation load and the save, then auth, config, audit and the limiter. */
+const CHAT_SEND_BEFORE_STREAM_COLD: [number, number] = [2, 18];
+const CHAT_SEND_BEFORE_STREAM_WARM: [number, number] = [2, 3];
 /**
  * App plus admin round trips before the provider is first called. M3 is the
  * larger of this and the stream figure: what `query-count.mjs chat-send` prints.
@@ -116,7 +127,7 @@ const CHAT_SEND_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/chat/conversation.ts › getOrCreateConversation": [1, 0],
   "src/lib/chat/conversation.ts › saveMessage": [1, 0],
   "src/lib/program-type-server.ts › getStudentProgramType": [1, 0],
-  "src/app/api/chat/send/route.ts › sendTurn": [1, 0],
+  "src/lib/chat/turn-context.ts › loadStudentProgram": [1, 0],
   "src/lib/progression/fetch-readiness-data.ts › fetchStudentReadinessData": [8, 0],
   "src/lib/sage/context-bundle.ts › assembleStudentContextBundle": [9, 0],
   "src/lib/chat/context.ts › (anonymous)": [7, 0],
@@ -472,12 +483,15 @@ describe("M3: chat send query count before the response stream", () => {
     assert.ok(fetchedUrls.includes(`${LOCAL_AI_URL}/api/embed`), "retrieval did not run");
   });
 
-  it("cold turn issues the pinned number of queries on each client before the stream", (t) => {
+  it("cold turn issues the pinned number of queries on each client before the stream and before the provider", (t) => {
     for (const line of formatQueryBreakdown("M3 chat send, cold, before stream", cold.beforeStream).split("\n")) t.diagnostic(line);
     const after = summarizeQueries(cold.afterProvider);
     t.diagnostic(`after the provider was called (not pinned): app ${after.app}, admin ${after.admin}`);
-    const summary = summarizeQueries(cold.beforeStream);
+    const summary = summarizeQueries(cold.beforeProvider.queries);
+    const stream = summarizeQueries(cold.beforeStream);
     for (const line of reportLines(cold, "cold")) t.diagnostic(line);
+
+    assert.deepEqual([stream.app, stream.admin], CHAT_SEND_BEFORE_STREAM_COLD);
 
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_COLD);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_COLD);
@@ -488,13 +502,16 @@ describe("M3: chat send query count before the response stream", () => {
   });
 
   it("cold turn's queries come from the pinned functions", () => {
-    assert.deepEqual(countsByFunction(cold.beforeStream), CHAT_SEND_COLD_BY_FUNCTION);
+    assert.deepEqual(countsByFunction(cold.beforeProvider.queries), CHAT_SEND_COLD_BY_FUNCTION);
   });
 
-  it("warm turn issues the pinned number of queries on each client before the stream", (t) => {
+  it("warm turn issues the pinned number of queries on each client before the stream and before the provider", (t) => {
     for (const line of formatQueryBreakdown("M3 chat send, warm, before stream", warm.beforeStream).split("\n")) t.diagnostic(line);
-    const summary = summarizeQueries(warm.beforeStream);
+    const summary = summarizeQueries(warm.beforeProvider.queries);
+    const stream = summarizeQueries(warm.beforeStream);
     for (const line of reportLines(warm, "warm")) t.diagnostic(line);
+
+    assert.deepEqual([stream.app, stream.admin], CHAT_SEND_BEFORE_STREAM_WARM);
 
     assert.equal(summary.app, CHAT_SEND_APP_QUERIES_WARM);
     assert.equal(summary.admin, CHAT_SEND_ADMIN_QUERIES_WARM);

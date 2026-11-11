@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 
-import { STOP_ARM_DELAY_MS, stopArmed } from "./wait-and-stop";
+import { FIRST_EVENT_TIMEOUT_MS, STOP_ARM_DELAY_MS, firstEventOverdue, stopArmed } from "./wait-and-stop";
 
 export interface SendAbort {
   /** A new send: a new controller, not stopped, not armed. */
@@ -45,14 +45,39 @@ const IDLE: SendState = {
   sentAt: 0,
 };
 
+/** One pending timeout: start replaces it, cancel clears it. */
+function oneTimer() {
+  let id: ReturnType<typeof setTimeout> | null = null;
+  const cancel = () => {
+    if (id) clearTimeout(id);
+    id = null;
+  };
+  return {
+    start(run: () => void, ms: number) {
+      cancel();
+      id = setTimeout(run, ms);
+    },
+    cancel,
+  };
+}
+
+/**
+ * E7: no first event in time. Ends the send as a failure, not a Stop, so the
+ * chat shows E1's unknown sentence with Try again and the box unlocks.
+ */
+function endIfFirstEventLate(state: SendState): SendState {
+  // The timer fired, so at least the bound has passed whatever the clock reads.
+  const now = Math.max(Date.now(), state.sentAt + FIRST_EVENT_TIMEOUT_MS);
+  if (!firstEventOverdue({ idsArrived: state.idsArrived, sentAt: state.sentAt, now })) return state;
+  state.controller?.abort();
+  return { ...state, stopKept: false };
+}
+
 export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAbort {
   let state = IDLE;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const clearTimer = () => {
-    if (timer) clearTimeout(timer);
-    timer = null;
-  };
+  const armTimer = oneTimer();
+  const firstEventTimer = oneTimer();
+  const clearTimers = () => [armTimer, firstEventTimer].forEach((timer) => timer.cancel());
   const isArmed = (now = Date.now()) =>
     state.controller !== null && stopArmed({ idsArrived: state.idsArrived, sentAt: state.sentAt, now });
   // The timer fired, so at least the delay has passed whatever the clock reads.
@@ -62,17 +87,21 @@ export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAb
     state = { ...state, stopped: true, stopKept: false };
     state.controller?.abort();
   };
+  const onFirstEventLate = () => {
+    state = endIfFirstEventLate(state);
+  };
 
   return {
     begin() {
-      clearTimer();
       const controller = new AbortController();
       state = { ...IDLE, controller, sentAt: Date.now() };
       onArmedChange(false);
-      timer = setTimeout(onDelay, STOP_ARM_DELAY_MS);
+      armTimer.start(onDelay, STOP_ARM_DELAY_MS);
+      firstEventTimer.start(onFirstEventLate, FIRST_EVENT_TIMEOUT_MS);
       return controller;
     },
     noteIds() {
+      firstEventTimer.cancel();
       state = { ...state, idsArrived: true };
       if (state.stopKept) abortReply();
       onArmedChange(isArmed());
@@ -85,11 +114,11 @@ export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAb
     armed: () => isArmed(),
     end(controller) {
       if (state.controller !== controller) return;
-      clearTimer();
+      clearTimers();
       state = { ...IDLE, stopped: state.stopped };
       onArmedChange(false);
     },
-    dispose: clearTimer,
+    dispose: clearTimers,
   };
 }
 

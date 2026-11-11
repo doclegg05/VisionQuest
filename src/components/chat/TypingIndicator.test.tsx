@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { renderToString } from "react-dom/server";
 
 import TypingIndicator from "./TypingIndicator";
-import { SLOW_REPLY_WORDS, TYPING_SR_WORDS } from "./wait-and-stop";
+import { SLOW_REPLY_WORDS, STALLED_REPLY_WORDS, TYPING_SR_WORDS } from "./wait-and-stop";
 
 function statusRegions(html: string): string[] {
   return html.match(/role="status"/g) ?? [];
@@ -38,5 +38,13 @@ describe("TypingIndicator (E2.1)", () => {
     assert.ok(!after.includes(TYPING_SR_WORDS), after);
     assert.doesNotMatch(after, /sr-only/);
     assert.ok(after.includes(SLOW_REPLY_WORDS), after);
+  });
+
+  it("after two minutes says Stop works, in place of the wait words and in the same status (E7 2)", () => {
+    const html = renderToString(<TypingIndicator slow stalled />);
+    assert.ok(html.includes(STALLED_REPLY_WORDS), html);
+    assert.ok(!html.includes(SLOW_REPLY_WORDS), html);
+    assert.equal(statusRegions(html).length, 1);
+    assert.doesNotMatch(html, /sr-only/);
   });
 });

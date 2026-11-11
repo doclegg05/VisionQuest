@@ -26,7 +26,7 @@ import { useSendAbort } from "./send-abort";
 import { fetchGoalCount, postChatMessage, startOptimisticGreeting } from "./send-request";
 import { messagesAfterSendError, turnResultMessages } from "./send-turn";
 import { createTurnRecorder, type SentSoFar } from "./turn-recorder";
-import { logBusy, showsCannedOpener, startSlowReplyTimer } from "./wait-and-stop";
+import { logBusy, showsCannedOpener, startSlowReplyTimer, startStalledReplyTimer } from "./wait-and-stop";
 
 type Message = ChatMessage;
 
@@ -218,6 +218,8 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
   const [slowForSend, setSlowForSend] = useState<number | null>(null);
   const waitingForWord = isLoading && !streamingContent;
   const slowReply = waitingForWord && slowForSend === sendCount;
+  const [stalledForSend, setStalledForSend] = useState<number | null>(null);
+  const stalledReply = waitingForWord && stalledForSend === sendCount;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -235,12 +237,16 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
     return () => clearTimeout(timer);
   }, [goalToast]);
 
-  // The wait words: five seconds with no word from Sage, timed per send and
-  // cancelled by the first streamed word.
+  // The wait words at five seconds, then at two minutes that Stop works (E7); per send.
   useEffect(() => {
     if (!waitingForWord) return;
     const send = sendCount;
-    return startSlowReplyTimer(() => setSlowForSend(send));
+    const cancelSlow = startSlowReplyTimer(() => setSlowForSend(send));
+    const cancelStalled = startStalledReplyTimer(() => setStalledForSend(send));
+    return () => {
+      cancelSlow();
+      cancelStalled();
+    };
   }, [waitingForWord, sendCount]);
 
   const scrollToBottom = useCallback(() => {
@@ -640,7 +646,7 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
               <AgentEventList events={streamingEvents} />
             )}
 
-            {isLoading && !streamingContent && !optimisticGreeting && <TypingIndicator slow={slowReply} />}
+            {isLoading && !streamingContent && !optimisticGreeting && <TypingIndicator slow={slowReply} stalled={stalledReply} />}
 
             <div ref={messagesEndRef} />
           </div>
