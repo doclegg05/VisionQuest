@@ -18,7 +18,7 @@ import { nextStepFromFacts, nextStepQueries } from "@/lib/progression/student-ne
 import { readDashboardGlobals, type DashboardGlobals } from "./globals";
 import { readLiveSignals, readPageLiveSignals, type LiveSignals } from "./live";
 import { overviewFromFacts, summarizeActivity, type DashboardActivity, type DashboardOverview } from "./readers";
-import { getSlowSignals, getStudentShell, readAndKeepSlowSignals, type SlowSignals, type StudentShell } from "./signals";
+import { getSlowSignals, getStudentShell, readAndKeepSlowSignals, readPageShell, type SlowSignals, type StudentShell } from "./signals";
 import { ownStudentId, type CacheSession } from "./student-cache";
 import { supportFromFacts, type DashboardSupport } from "./support";
 
@@ -85,8 +85,8 @@ export function overviewOf({ slow, globals }: Omit<DashboardSignals, "shell" | "
 
 export async function loadStudentDashboard(session: CacheSession, now = new Date()): Promise<StudentDashboard> {
   const studentId = ownStudentId(session);
-  const shell = await getStudentShell(session);
-  const [slow, live, globals] = await Promise.all([
+  const [shell, slow, live, globals] = await Promise.all([
+    readPageShell(session),
     readAndKeepSlowSignals(session),
     readPageLiveSignals(studentId),
     readDashboardGlobals(),

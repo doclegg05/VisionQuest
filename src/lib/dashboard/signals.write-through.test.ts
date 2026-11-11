@@ -83,6 +83,26 @@ describe("dashboard shell cache, cleared by the real write-through", () => {
   });
 });
 
+describe("the page-render shell (readPageShell)", () => {
+  it("reads fresh over a kept shell and keeps what it read for the polls", async () => {
+    await shellReads(A);
+    const before = calls.length;
+    await asStudent(A, () => signals.readPageShell(A));
+    assert.equal(calls.slice(before).filter((call) => call.action !== "executeRaw").length, 3, "the page was served a kept shell");
+    assert.equal(await shellReads(A), 0, "the poll did not get the shell the page kept");
+  });
+
+  it("a Goal write that lands during the page's read leaves nothing pre-write kept", async () => {
+    const held = holdNextEngineRequest();
+    const page = asStudent(A, () => signals.readPageShell(A));
+    await held.reached;
+    await asStudent(A, () => db.prisma.goal.create({ data: { studentId: A.id, level: "monthly", content: "Book the GED test" } }));
+    held.release();
+    await page;
+    assert.equal(await shellReads(A), 3, "a shell read that began before A's goal write was kept after it");
+  });
+});
+
 describe("dashboard globals, cleared by the real write-through", () => {
   it("an OrientationItem write through `prisma` clears the kept orientation total", async () => {
     const { globalCacheKey } = await import("./student-cache");

@@ -19,6 +19,9 @@ let consentScopes: string[];
 const CURRENT_NOTICE = `sage_notice:${SAGE_NOTICE_VERSION}`;
 // How often each gate read the database.
 const gateReads = { securityQuestions: 0, sageNotice: 0 };
+// The Progression row the nav facts read, and how often it was read.
+let progressionRow: { state: string } | null = null;
+let progressionReads = 0;
 
 mock.module("@/lib/auth", { exports: { getSession: async () => session } });
 
@@ -32,7 +35,7 @@ mock.module("next/navigation", {
 
 const prismaMock = {
   goal: { count: async () => 0 },
-  progression: { findUnique: async () => null },
+  progression: { findUnique: async () => { progressionReads++; return progressionRow; } },
   orientationProgress: { count: async () => 0 },
   securityQuestionAnswer: {
     findMany: async () => {
@@ -81,6 +84,8 @@ beforeEach(() => {
   invalidateAllChatContext();
   gateReads.securityQuestions = 0;
   gateReads.sageNotice = 0;
+  progressionRow = null;
+  progressionReads = 0;
 });
 
 async function redirectTarget(): Promise<string | null> {
@@ -245,5 +250,22 @@ describe("student layout keeps only a satisfied gate", () => {
     assert.equal(await redirectTarget(), "/sage-notice");
     consentScopes = [CURRENT_NOTICE];
     assert.equal(await redirectTarget(), "/recovery-setup");
+  });
+});
+
+// The nav facts (W1): a page load reads them fresh, even when a poll or an
+// earlier load kept them, so a kept wrong value cannot pin the nav.
+describe("student layout reads the nav facts fresh on every page load", () => {
+  beforeEach(() => {
+    session = { id: "stu-1", studentId: "student1", displayName: "Test Student", role: "student" };
+    questionKeys = SECURITY_QUESTIONS.map((question) => question.key);
+    consentScopes = [CURRENT_NOTICE];
+    progressionRow = { state: "{}" };
+  });
+
+  it("reads progression on each of two page loads", async () => {
+    assert.equal(await redirectTarget(), null);
+    assert.equal(await redirectTarget(), null);
+    assert.equal(progressionReads, 2);
   });
 });

@@ -20,6 +20,7 @@ import { overviewQueries } from "./readers";
 import { orientationItemsQuery } from "./support";
 import { invalidate } from "@/lib/cache";
 import { cachedWhen, studentCacheKey, type CacheSession } from "./student-cache";
+import { perRequest } from "./per-request";
 
 type Tx = Prisma.TransactionClient;
 
@@ -60,18 +61,33 @@ async function readShell(tx: Tx, studentId: string): Promise<StudentShell> {
   return { goalPlanningCount, progressionState: progression?.state ?? null, orientationCompletedCount };
 }
 
+const shellKey = (session: CacheSession) => studentCacheKey(session, "shell");
+const readShellNow = (studentId: string) => withAppReadTransaction((tx) => readShell(tx, studentId));
 /**
- * The layout's three facts, kept per student. Kept only once a Progression
- * row exists: a student without one (new, or a read that lost its RLS
- * context and saw no rows) is read again on every request.
+ * Kept only once a Progression row exists: a student without one (new, or a
+ * read that lost its RLS context and saw no rows) is read again every time.
  */
+const keepShell = (shell: StudentShell) => shell.progressionState !== null;
+
+/** The layout's three facts for a poll: kept ones when there are any, else read and kept. */
 export function getStudentShell(session: CacheSession): Promise<StudentShell> {
-  return cachedWhen(
-    studentCacheKey(session, "shell"),
-    SHELL_TTL_SECONDS,
-    () => withAppReadTransaction((tx) => readShell(tx, session.id)),
-    (shell) => shell.progressionState !== null,
-  );
+  return cachedWhen(shellKey(session), SHELL_TTL_SECONDS, () => readShellNow(session.id), keepShell);
+}
+
+const pageShellFor = perRequest((studentId: string, role: string) => {
+  const session = { id: studentId, role };
+  return readFreshAndKeep(shellKey(session), SHELL_TTL_SECONDS, () => readShellNow(studentId), keepShell);
+});
+
+/**
+ * The three facts for a page render (the student layout and the dashboard
+ * page): read fresh, so a kept value a pre-commit read left behind
+ * (src/lib/chat-context-write-through.ts, "Known, accepted races") cannot pin
+ * the nav or readiness, then kept for the polls. One read per request: the
+ * layout and the page share it through `perRequest`.
+ */
+export function readPageShell(session: CacheSession): Promise<StudentShell> {
+  return pageShellFor(session.id, session.role);
 }
 
 async function readReadinessSignals(tx: Tx, studentId: string) {

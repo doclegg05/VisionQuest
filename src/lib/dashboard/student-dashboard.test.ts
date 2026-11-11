@@ -90,6 +90,23 @@ describe("loadStudentDashboard", () => {
     }
   });
 
+  it("a page render reads the shell fresh over a kept one, and keeps it for the polls", async () => {
+    await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    counter.useFixtures({ ...DASHBOARD_FIXTURES, "goal.count": 5 });
+    const reloaded = await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    assert.equal(reloaded.goalCount, 5, "the page was served a kept shell");
+    const read = await modelsRead(() => loader.readStudentSupport(student(DASHBOARD_STUDENT_ID), NOW));
+    assert.ok(!read.has("progression"), "the poll did not get the shell the page kept");
+  });
+
+  it("reads the shell alongside the other groups, not before them", async () => {
+    const { queries } = await counter.section(() => loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW));
+    const lastShellRead = queries.findIndex((q) => q.model === "orientationProgress" && q.operation === "count");
+    const firstSlowRead = queries.findIndex((q) => q.model === "certification");
+    assert.ok(lastShellRead >= 0 && firstSlowRead >= 0);
+    assert.ok(firstSlowRead < lastShellRead, "the slow signals waited for the shell");
+  });
+
   it("does not keep a shell with no Progression row, so a lost RLS context is read again", async () => {
     counter.useFixtures({ ...DASHBOARD_FIXTURES, "progression.findUnique": null, "goal.count": 0, "orientationProgress.count": 0 });
     await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
