@@ -163,12 +163,32 @@ describe("Stop before it is armed (E2b 1 and 2)", () => {
     assert.doesNotMatch(button, / disabled=""/);
   });
 
-  it("does nothing when pressed unarmed", () => {
+  it("passes an unarmed press to the chat, whose gate decides (E2c 2)", () => {
+    // send-abort.ts ignores a tap under 800 ms and keeps a later one until
+    // the ids arrive, so the button itself must not drop the press.
     let calls = 0;
     const element = StopButton({ onStop: () => { calls += 1; }, armed: false });
     assert.equal(element.props["aria-disabled"], true);
     element.props.onClick();
-    assert.equal(calls, 0);
+    assert.equal(calls, 1);
+  });
+
+  it("looks dimmed while unarmed, with no hover change (E2c 1)", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} disabled />);
+    const button = stopButton(html);
+    assert.match(button, / aria-disabled="true"/);
+    assert.match(button, /aria-disabled:opacity-60/);
+    assert.match(button, /aria-disabled:hover:bg-\[var\(--chat-panel-bg\)\]/);
+    assert.match(button, />Stop</);
+    assert.match(button, /min-w-11/);
+  });
+
+  it("is full strength once armed: not aria-disabled, so the dim never applies (E2c 1)", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} stopArmed disabled />);
+    const button = stopButton(html);
+    assert.doesNotMatch(button, /aria-disabled="/);
+    assert.doesNotMatch(button, /(?<!aria-disabled:)opacity-/);
+    assert.match(button, /(?<!:)hover:bg-\[var\(--surface-interactive\)\]/);
   });
 
   it("drops aria-disabled once armed", () => {
@@ -186,7 +206,8 @@ describe("Stop stays full strength while Sage answers (E2b 5)", () => {
     const textarea = html.match(/<textarea[^>]*>/)?.[0] ?? "";
     assert.match(textarea, /opacity-75/);
     const stop = html.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Stop(?:(?!<\/button>)[\s\S])*<\/button>/)?.[0] ?? "";
-    assert.doesNotMatch(stop, /opacity/);
+    // Only the unarmed dim (aria-disabled:opacity-60), which an armed Stop never matches.
+    assert.doesNotMatch(stop, /(?<!aria-disabled:)opacity/);
   });
 });
 

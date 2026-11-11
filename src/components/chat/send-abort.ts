@@ -5,7 +5,7 @@
  * without a DOM; useSendAbort wraps it for ChatWindow.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { STOP_ARM_DELAY_MS, stopArmed } from "./wait-and-stop";
 
@@ -14,7 +14,11 @@ export interface SendAbort {
   begin(): AbortController;
   /** The stream's first event arrived (ids, and the crisis flag with them). */
   noteIds(): void;
-  /** Ends the reply, only once armed. Before that it does nothing. */
+  /**
+   * Ends the reply once armed. A press after the delay but before the ids is
+   * kept, and noteIds ends the reply then. A press under the delay (a second
+   * tap on Send) does nothing.
+   */
   stop(): void;
   wasStopped(): boolean;
   armed(): boolean;
@@ -27,11 +31,19 @@ export interface SendAbort {
 interface SendState {
   controller: AbortController | null;
   stopped: boolean;
+  /** Stop was pressed after the delay but before the ids. */
+  stopKept: boolean;
   idsArrived: boolean;
   sentAt: number;
 }
 
-const IDLE: SendState = { controller: null, stopped: false, idsArrived: false, sentAt: 0 };
+const IDLE: SendState = {
+  controller: null,
+  stopped: false,
+  stopKept: false,
+  idsArrived: false,
+  sentAt: 0,
+};
 
 export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAbort {
   let state = IDLE;
@@ -45,24 +57,29 @@ export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAb
     state.controller !== null && stopArmed({ idsArrived: state.idsArrived, sentAt: state.sentAt, now });
   // The timer fired, so at least the delay has passed whatever the clock reads.
   const onDelay = () => onArmedChange(isArmed(Math.max(Date.now(), state.sentAt + STOP_ARM_DELAY_MS)));
+  const delayPassed = () => Date.now() - state.sentAt >= STOP_ARM_DELAY_MS;
+  const abortReply = () => {
+    state = { ...state, stopped: true, stopKept: false };
+    state.controller?.abort();
+  };
 
   return {
     begin() {
       clearTimer();
       const controller = new AbortController();
-      state = { controller, stopped: false, idsArrived: false, sentAt: Date.now() };
+      state = { ...IDLE, controller, sentAt: Date.now() };
       onArmedChange(false);
       timer = setTimeout(onDelay, STOP_ARM_DELAY_MS);
       return controller;
     },
     noteIds() {
       state = { ...state, idsArrived: true };
+      if (state.stopKept) abortReply();
       onArmedChange(isArmed());
     },
     stop() {
-      if (!isArmed()) return;
-      state = { ...state, stopped: true };
-      state.controller?.abort();
+      if (isArmed()) abortReply();
+      else if (state.controller && !state.idsArrived && delayPassed()) state = { ...state, stopKept: true };
     },
     wasStopped: () => state.stopped,
     armed: () => isArmed(),
@@ -76,12 +93,16 @@ export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAb
   };
 }
 
-/** The gate for ChatWindow, with `isArmed` as state so the Stop button redraws. */
-export function useSendAbort(): SendAbort & { isArmed: boolean } {
+/**
+ * The gate for ChatWindow, and `isArmed` beside it as state so the Stop
+ * button redraws. The gate is made once and never changes, so arming does
+ * not give handleSend or the retry a new identity.
+ */
+export function useSendAbort(): { gate: SendAbort; isArmed: boolean } {
   const [isArmed, setIsArmed] = useState(false);
   const [gate] = useState(() => createSendAbort(setIsArmed));
   // Leaving the page clears the timer but deliberately does not abort: the
   // server then finishes and saves the full reply.
   useEffect(() => gate.dispose, [gate]);
-  return useMemo(() => ({ ...gate, isArmed }), [gate, isArmed]);
+  return { gate, isArmed };
 }

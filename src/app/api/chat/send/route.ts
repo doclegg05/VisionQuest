@@ -1272,9 +1272,12 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
         const audience = isStaffChat ? "staff" : "student";
         // Keep the transcript two-sided: persist whatever Sage streamed
         // before the failure, marked so the student knows it was cut off.
+        // A crisis message that stopped before any text still saves the
+        // note and the 988 block, so a reload shows the help under it; the
+        // note keeps it a cut-off reply, so Try again is not refused (E2c 3).
         // A failed persist is logged and never hides the original error
         // from the client below.
-        if (fullResponse.length > 0) {
+        if (fullResponse.length > 0 || streamCrisisBlock) {
           try {
             await saveMessage(
               conversation.id,

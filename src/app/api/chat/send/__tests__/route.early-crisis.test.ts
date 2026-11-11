@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
-import { beforeEach, describe, it } from "node:test";
+import { after, before, beforeEach, describe, it } from "node:test";
 import { mockRequest, mockTeacherSession } from "@/lib/test-helpers";
-import { readSseBody, resetMocks, route, setSession } from "./route-harness";
+import {
+  mockLogAiAuditEvent,
+  mockRunAgentTurn,
+  mockSaveMessage,
+  readSseBody,
+  resetMocks,
+  route,
+  setSession,
+} from "./route-harness";
 
 // E2: a Stop or a dropped connection ends the stream before the 988 block the
 // route appends at the end, so the first event says it applies.
@@ -61,3 +69,70 @@ describe("POST /api/chat/send: the 988 block on the first event (E2)", () => {
     assert.equal(first.crisisHelp, undefined);
   });
 });
+
+describe("POST /api/chat/send: a Stop before any text saves the 988 help (E2c 3)", () => {
+  const previousAgentFlag = process.env.SAGE_AGENT_ENABLED;
+  const previousAgentMode = process.env.SAGE_AGENT_MODE;
+  before(() => {
+    process.env.SAGE_AGENT_MODE = "full";
+    delete process.env.SAGE_AGENT_ENABLED;
+  });
+  after(() => {
+    if (previousAgentFlag === undefined) delete process.env.SAGE_AGENT_ENABLED;
+    else process.env.SAGE_AGENT_ENABLED = previousAgentFlag;
+    if (previousAgentMode === undefined) delete process.env.SAGE_AGENT_MODE;
+    else process.env.SAGE_AGENT_MODE = previousAgentMode;
+  });
+
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  /**
+   * Sage starts with a tool call, so no text has streamed when the student
+   * presses Stop. The route notices the closed stream on its next event.
+   */
+  async function stopBeforeAnyText(message: string): Promise<void> {
+    let release: () => void = () => undefined;
+    const stopped = new Promise<void>((resolve) => { release = resolve; });
+    mockRunAgentTurn.mock.mockImplementation(async function* () {
+      await stopped;
+      yield { type: "tool_call", callId: "t1", tool: "lookup_program_info", args: {} };
+    });
+    const res = await post(message);
+    const reader = res.body!.getReader();
+    await reader.read(); // the first event: ids and crisisHelp
+    await reader.cancel();
+    release();
+    for (let i = 0; i < 200 && !failedAuditWritten(); i += 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.ok(failedAuditWritten(), "the route finished the stopped turn");
+  }
+
+  function failedAuditWritten(): boolean {
+    return mockLogAiAuditEvent.mock.calls.some(
+      (call: { arguments: Array<{ status?: string }> }) => call.arguments[0]?.status === "failed",
+    );
+  }
+
+  function assistantSaves(): string[] {
+    return mockSaveMessage.mock.calls
+      .filter((call: { arguments: unknown[] }) => call.arguments[2] === "assistant")
+      .map((call: { arguments: unknown[] }) => String(call.arguments[3]));
+  }
+
+  it("a crisis message: saves the 988 block as the reply, marked as stopped so Try again still works", async () => {
+    await stopBeforeAnyText(CRISIS_MESSAGE);
+    const saves = assistantSaves();
+    assert.equal(saves.length, 1, JSON.stringify(saves));
+    assert.match(saves[0], /call or text 988/);
+    assert.ok(saves[0].startsWith("\n\n(Sage stopped here.)"), saves[0]);
+  });
+
+  it("an ordinary message: saves no reply (unchanged)", async () => {
+    await stopBeforeAnyText(NORMAL_MESSAGE);
+    assert.deepEqual(assistantSaves(), []);
+  });
+});
+

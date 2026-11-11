@@ -25,6 +25,7 @@ import { runExclusive, shouldFocusRetry, type ChatMessage, type FailedTurn } fro
 import { useSendAbort } from "./send-abort";
 import { fetchGoalCount, postChatMessage, startOptimisticGreeting } from "./send-request";
 import { messagesAfterSendError, turnResultMessages } from "./send-turn";
+import { createTurnRecorder, type SentSoFar } from "./turn-recorder";
 import { logBusy, showsCannedOpener, startSlowReplyTimer } from "./wait-and-stop";
 
 type Message = ChatMessage;
@@ -211,7 +212,7 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
   const retryInFlightRef = useRef(false);
   const messageBoxRef = useRef<MessageBoxHandle>(null);
   /** The answer in flight, so Stop can end it once armed; and whether Stop did. */
-  const sendAbort = useSendAbort();
+  const { gate: sendAbort, isArmed: stopIsArmed } = useSendAbort();
   /** Counts sends, so the wait words belong to one send and reset on the next. */
   const [sendCount, setSendCount] = useState(0);
   const [slowForSend, setSlowForSend] = useState<number | null>(null);
@@ -411,54 +412,83 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
     clearOptimisticGreeting();
   }, [clearOptimisticGreeting]);
 
+  /** A finished turn's bubbles, and its Try again when the reply came back empty or cut off. */
+  const showTurnResult = useCallback((shown: { messages: ChatMessage[]; failedTurn: FailedTurn | null }) => {
+    setMessages((prev) => [...prev, ...shown.messages]);
+    if (shown.failedTurn) setFailedTurn(shown.failedTurn);
+  }, []);
+
+  /**
+   * What a Stop or a failure leaves on screen: the partial, the 988 help when
+   * the first event flagged it, and Try again when it applies.
+   */
+  const showSendFailure = useCallback(
+    (err: unknown, sent: SentSoFar, noteConversation: (nextId: string | undefined) => void) => {
+      const stopped = sendAbort.wasStopped();
+      if (!stopped) console.error("Send error:", err instanceof Error ? err.name : "Unknown error");
+      const after = messagesAfterSendError({
+        err,
+        stopped,
+        ...sent,
+        role,
+        id: `${stopped ? "stop" : "err"}-${Date.now()}`,
+      });
+      // A new chat's first message may be saved before the failure: keep its conversation for Try again.
+      if (after.conversationId) noteConversation(after.conversationId);
+      showTurnResult(after);
+    },
+    [role, sendAbort, showTurnResult]
+  );
+
   const handleSend = useCallback(
     async (text: string, attachmentIds?: string[], retry?: { retryOf: string | null }) => {
       beginTurnDisplay(text, Boolean(retry));
       const prevGoalCountPromise = fetchGoalCount();
-      // Outside the try, so the catch knows what streamed in before a Stop or failure.
-      let fullContent = "";
-      let savedUserMessageId: string | null = null;
-      let earlyCrisisBlock: string | null = null; // the 988 block flagged on the first event (E2)
-      let latestEvents: AgentEventItem[] = [];
       const noteConversation = makeConversationNoter();
+      // Outside the try, so the catch knows what streamed in before a Stop or failure.
+      const turn = createTurnRecorder({
+        noteIds: sendAbort.noteIds,
+        noteConversation,
+        onFirstText: clearOptimisticGreeting,
+        showText: setStreamingContent,
+        showEvents: setStreamingEvents,
+      });
       const controller = sendAbort.begin();
       try {
-        const stage = searchParams.get("stage") ?? defaultStage;
-        const res = await postChatMessage({ text, conversationId, stage, attachmentIds, retryOf: retry?.retryOf, signal: controller.signal });
-        const result = await readChatStream(res, {
-          onIds: (ids) => {
-            sendAbort.noteIds();
-            savedUserMessageId = ids.userMessageId;
-            noteConversation(ids.conversationId);
-          },
-          onCrisisBlock: (block) => { earlyCrisisBlock = block; },
-          onText: (content) => {
-            if (!fullContent) clearOptimisticGreeting(); // B4: the first real word replaces it
-            fullContent = content;
-            setStreamingContent(content);
-          },
-          onEvents: (events) => { latestEvents = events; setStreamingEvents(events); },
-          onDone: noteConversation,
+        const res = await postChatMessage({
+          text,
+          conversationId,
+          stage: searchParams.get("stage") ?? defaultStage,
+          attachmentIds,
+          retryOf: retry?.retryOf,
+          signal: controller.signal,
         });
-        const shown = turnResultMessages({ result, id: `msg-${Date.now()}`, savedUserMessageId, crisisBlock: earlyCrisisBlock });
-        setMessages((prev) => [...prev, ...shown.messages]);
-        if (shown.failedTurn) setFailedTurn(shown.failedTurn);
+        const result = await readChatStream(res, turn.handlers);
+        const { savedUserMessageId, crisisBlock } = turn.sent();
+        showTurnResult(turnResultMessages({ result, id: `msg-${Date.now()}`, savedUserMessageId, crisisBlock }));
         pollForGoals(await prevGoalCountPromise);
         setTimeout(() => checkProgression(), 2000); // XP, achievement and level changes
       } catch (err) {
-        const stopped = sendAbort.wasStopped();
-        if (!stopped) console.error("Send error:", err instanceof Error ? err.name : "Unknown error");
-        const after = messagesAfterSendError({ err, stopped, partial: fullContent, events: latestEvents, crisisBlock: earlyCrisisBlock, role, savedUserMessageId, id: `${stopped ? "stop" : "err"}-${Date.now()}` });
-        // A new chat's first message may be saved before the failure: keep its conversation for Try again.
-        if (after.conversationId) noteConversation(after.conversationId);
-        setMessages((prev) => [...prev, ...after.messages]);
-        if (after.failedTurn) setFailedTurn(after.failedTurn);
+        showSendFailure(err, turn.sent(), noteConversation);
       } finally {
         sendAbort.end(controller);
         endTurnDisplay();
       }
     },
-    [conversationId, pollForGoals, checkProgression, searchParams, defaultStage, role, sendAbort, beginTurnDisplay, endTurnDisplay, clearOptimisticGreeting, makeConversationNoter]
+    [
+      conversationId,
+      pollForGoals,
+      checkProgression,
+      searchParams,
+      defaultStage,
+      sendAbort,
+      beginTurnDisplay,
+      endTurnDisplay,
+      clearOptimisticGreeting,
+      makeConversationNoter,
+      showTurnResult,
+      showSendFailure,
+    ]
   );
 
   // After a failed turn, focus goes to its Try again once loading has ended,
@@ -628,7 +658,7 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
         <ChatInput
           onSend={handleSend}
           onStop={stopReply}
-          stopArmed={sendAbort.isArmed}
+          stopArmed={stopIsArmed}
           disabled={isLoading}
           role={role}
           initialMessage={deepLinkPrefill}
