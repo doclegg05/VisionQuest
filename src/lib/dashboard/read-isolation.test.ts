@@ -15,6 +15,7 @@ process.env.ADMIN_DATABASE_URL ??= process.env.DATABASE_URL;
 
 const A = { id: "cisolationaaaaaaaaaaaaaa1", role: "student" };
 const POOL_WAIT_MS = 10_000;
+const RUN_LIMIT_MS = 10_000;
 
 let db: typeof import("@/lib/db");
 let rls: typeof import("@/lib/rls-context");
@@ -43,6 +44,7 @@ function assertReadGroup(list: readonly TransactionStart[], label: string): void
   for (const start of list) {
     assert.equal(start.isolationLevel, "RepeatableRead", `${label} ran at ${String(start.isolationLevel)}`);
     assert.equal(start.maxWait, POOL_WAIT_MS, `${label} waits ${String(start.maxWait)} ms for a connection`);
+    assert.equal(start.timeout, RUN_LIMIT_MS, `${label} may run ${String(start.timeout)} ms`);
   }
 }
 
@@ -62,17 +64,23 @@ describe("dashboard transaction isolation", () => {
     assertReadGroup(await startsOf(() => signals.readSlowSignals(A.id)), "the slow-signal read");
   });
 
+  it("the page-render shell read (layout and page) runs at REPEATABLE READ", async () => {
+    const signals = await import("./signals");
+    assertReadGroup(await startsOf(() => signals.readPageShell(A)), "the page shell read");
+  });
+
   it("the live reads run at REPEATABLE READ", async () => {
     const live = await import("./live");
     assertReadGroup(await startsOf(() => live.readLiveSignals(A.id)), "the live read");
     assertReadGroup(await startsOf(() => live.readPageCounts(A.id)), "the page live read");
   });
 
-  it("task writes stay SERIALIZABLE, with the same pool wait", async () => {
+  it("task writes stay SERIALIZABLE, with the same pool wait and run limit", async () => {
     const [start] = await startsOf(() => db.withAppTransaction((tx) =>
       tx.studentTask.create({ data: { studentId: A.id, createdById: A.id, title: "Call the clinic" } })));
     assert.equal(start?.isolationLevel, "Serializable");
     assert.equal(start?.maxWait, POOL_WAIT_MS);
+    assert.equal(start?.timeout, RUN_LIMIT_MS);
   });
 });
 
@@ -89,10 +97,12 @@ describe("src/lib/db.ts isolation source pin", () => {
     assert.match(body("withAppReadTransaction"), /TransactionIsolationLevel\.RepeatableRead/);
   });
 
-  it("both start through the one helper that sets maxWait", () => {
+  it("both start through the one helper that sets maxWait and timeout", () => {
     assert.match(body("withAppTransaction"), /runAppTransaction\(/);
     assert.match(body("withAppReadTransaction"), /runAppTransaction\(/);
     const helper = source.slice(source.indexOf("async function runAppTransaction<"));
-    assert.match(helper.slice(0, helper.indexOf("\n}\n")), /maxWait: TRANSACTION_MAX_WAIT_MS/);
+    const helperBody = helper.slice(0, helper.indexOf("\n}\n"));
+    assert.match(helperBody, /maxWait: TRANSACTION_MAX_WAIT_MS/);
+    assert.match(helperBody, /timeout: TRANSACTION_TIMEOUT_MS/);
   });
 });

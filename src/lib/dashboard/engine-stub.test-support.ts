@@ -37,11 +37,12 @@ function responseFor(call: EngineCall, answer: EngineAnswer): { data: Record<str
 export interface TransactionStart {
   readonly isolationLevel: unknown;
   readonly maxWait: unknown;
+  readonly timeout: unknown;
 }
 
 function toStart(options: unknown): TransactionStart {
   const read = (key: string) => (typeof options === "object" && options !== null ? Reflect.get(options, key) : undefined);
-  return { isolationLevel: read("isolationLevel"), maxWait: read("maxWait") };
+  return { isolationLevel: read("isolationLevel"), maxWait: read("maxWait"), timeout: read("timeout") };
 }
 
 /**

@@ -266,6 +266,23 @@ const rlsExtension = Prisma.defineExtension((client) =>
 );
 
 /**
+ * The owners of the certifications a CertRequirement write touched, so the
+ * write-through clears only them (src/lib/chat-context-write-through.ts).
+ * The admin client: a lookup of owner ids alone, never returned to a caller,
+ * and it must find the owner whatever the writer's RLS context, without
+ * taking a second app-pool connection while an interactive transaction holds
+ * one. Committed rows only; a miss, an error, or no answer inside
+ * CERT_OWNER_LOOKUP_TIMEOUT_MS makes the write clear everyone.
+ */
+const certificationOwners: CertificationOwners = async (certificationIds) => {
+  const rows = await adminClient.certification.findMany({
+    where: { id: { in: [...certificationIds] } },
+    select: { studentId: true },
+  });
+  return rows.map((row) => row.studentId);
+};
+
+/**
  * Prisma extension: chat-context write-through invalidation.
  *
  * The shared app client is the one boundary EVERY write path crosses — route
@@ -278,22 +295,6 @@ const rlsExtension = Prisma.defineExtension((client) =>
  * by contract — a cache failure never fails the write. Proven end to end by
  * scripts/sage-freshness-eval.mjs (Group B must be FRESH).
  */
-/**
- * The owners of the certifications a CertRequirement write touched, so the
- * write-through clears only them (src/lib/chat-context-write-through.ts).
- * The admin client: a lookup of owner ids alone, never returned to a caller,
- * and it must find the owner whatever the writer's RLS context, without
- * taking a second app-pool connection while an interactive transaction holds
- * one. Committed rows only; a miss makes the write clear everyone.
- */
-const certificationOwners: CertificationOwners = async (certificationIds) => {
-  const rows = await adminClient.certification.findMany({
-    where: { id: { in: [...certificationIds] } },
-    select: { studentId: true },
-  });
-  return rows.map((row) => row.studentId);
-};
-
 const chatContextWriteThroughExtension = Prisma.defineExtension((client) =>
   client.$extends({
     name: "chat-context-write-through",
@@ -393,6 +394,16 @@ export const prismaAdmin: PrismaClient = adminClient;
  */
 const TRANSACTION_MAX_WAIT_MS = APP_POOL_TIMEOUT_SECONDS * 1000;
 
+/**
+ * How long an interactive transaction may run once it has its connection.
+ * Prisma's default is 5 s. These groups are a handful of short sequential
+ * queries, each a full round trip, so 5 s is enough on an idle database but
+ * tight when a whole class polls at once and every round trip slows. 10 s
+ * matches the pool wait, so neither phase is the shorter limit, and still
+ * frees a stuck connection well before the next poll wave queues behind it.
+ */
+const TRANSACTION_TIMEOUT_MS = 10_000;
+
 async function runAppTransaction<T>(
   work: (tx: Prisma.TransactionClient) => Promise<T>,
   isolationLevel: Prisma.TransactionIsolationLevel,
@@ -402,7 +413,7 @@ async function runAppTransaction<T>(
   return appClient.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('app.current_user_id', ${ctx.userId}, true), set_config('app.current_role', ${ctx.role}, true), set_config('app.current_student_id', ${ctx.studentId}, true)`;
     return work(tx);
-  }, { isolationLevel, maxWait: TRANSACTION_MAX_WAIT_MS });
+  }, { isolationLevel, maxWait: TRANSACTION_MAX_WAIT_MS, timeout: TRANSACTION_TIMEOUT_MS });
 }
 
 /** Interactive transactions must set RLS on the SAME connection as their writes.
