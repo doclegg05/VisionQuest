@@ -333,24 +333,37 @@ Supabase handles managed backups. To make an export yourself, follow these steps
    ```
 
    Never type or paste the value into a command itself. Every command below reads it from the variable.
-2. Make the export in a folder outside the checkout that only you can open.
+2. Split the password off. `pg_dump` and `psql` read the password from `PGPASSWORD`, so it never appears on a command line, where other programs on this computer could read it. Run these three lines:
+
+   ```sh
+   export PGPASSWORD="$(node -e 'process.stdout.write(decodeURIComponent(new URL(process.env.ADMIN_DATABASE_URL).password))')"
+   export URL_WITHOUT_PASSWORD="$(node -e 'const url = new URL(process.env.ADMIN_DATABASE_URL); url.password = ""; process.stdout.write(url.href)')"
+   test -n "$PGPASSWORD" && test -n "$URL_WITHOUT_PASSWORD" && echo ready
+   ```
+
+   Success looks like `ready`. If it prints an error or nothing, stop and ask a developer.
+3. Make the export in a folder outside the checkout that only you can open.
 
    ```sh
    mkdir -p -m 700 "$HOME/VisionQuest-backups"
-   pg_dump "$ADMIN_DATABASE_URL" --schema=visionquest --file="$HOME/VisionQuest-backups/visionquest-$(date +%Y-%m-%d-%H%M).sql"
+   pg_dump "$URL_WITHOUT_PASSWORD" --schema=visionquest --file="$HOME/VisionQuest-backups/visionquest-$(date +%Y-%m-%d-%H%M).sql"
    chmod 600 "$HOME/VisionQuest-backups/"*.sql
    ls -lh "$HOME/VisionQuest-backups"
    ```
 
    Success looks like a file named for today with a size above zero. If `pg_dump` prints an error, stop, keep the output, and ask a developer.
-3. Close the terminal window when you are done. That removes the value from memory.
+4. Remove the password from this window, then close the window when you are done. Closing it removes every value from memory.
+
+   ```sh
+   unset PGPASSWORD URL_WITHOUT_PASSWORD
+   ```
 
 Never copy the export into this checkout. As a second lock, `.gitignore` leaves out `/*.sql`, `/*.dump` and `/backups/` at the top of the checkout.
 
-Restore:
+Restore, after steps 1 and 2 above in a new window:
 
 ```sh
-psql "$ADMIN_DATABASE_URL" --set ON_ERROR_STOP=1 --single-transaction --file="$HOME/VisionQuest-backups/NAME_OF_THE_EXPORT.sql"
+psql "$URL_WITHOUT_PASSWORD" --set ON_ERROR_STOP=1 --single-transaction --file="$HOME/VisionQuest-backups/NAME_OF_THE_EXPORT.sql"
 ```
 
 Replace `NAME_OF_THE_EXPORT.sql` with the file name that `ls` showed. This puts an export into a database whose `visionquest` schema is empty, such as a new Supabase project. It stops at the first error and then changes nothing. Putting an export back over the live database removes every change made after the export was taken. Do not do that alone: ask a developer, and read `docs/runbooks/backup-restore.md` first.
@@ -413,7 +426,7 @@ What the tool does not remove:
    ```
    Success looks like each command finishing with no line that starts with `error`. If `git switch main` refuses because of changed files, stop and ask a developer.
 2. **In Render, delete `COHORT_DEMO_MODE` and keep `AI_LOCAL_ONLY`.** Open the Render dashboard, service `visionquest`, **Environment** tab. Delete the key `COHORT_DEMO_MODE`. Delete `COHORT_DEMO_STUDENTS_PER_HOUR`, `COHORT_DEMO_STUDENTS_PER_DAY` and `COHORT_DEMO_SAGE_PER_DAY` too if you added them. Do not delete `AI_LOCAL_ONLY`. Its value must stay `true`, because it is the switch that blocks cloud AI for every account (see [Cloud AI block](#cloud-ai-block-check-before-deploying)). Save, and wait until the deploy shows **Live**. Success looks like the sign in page with no demo buttons and with the Google block back. From then on the demo endpoints answer 404, and a demo session that is still open stops working on its next request.
-3. **Wait 15 minutes after the deploy shows Live.** A visitor who was using the demo when it closed may still have a request in flight. Success looks like 15 minutes on the clock since the deploy went Live.
+3. **Wait 30 minutes after the deploy shows Live.** A visitor who was using the demo when it closed may still have a request in flight, and the tool refuses while a demo account was used in the last 30 minutes. Success looks like 30 minutes on the clock since the deploy went Live.
 4. **Open a new terminal window used only for this, and load the connection string.** In the new window, go to the main checkout folder. Copy the value stored in the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL`. Run the first line below, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history. The second line clears the clipboard.
    ```sh
    read -rs ADMIN_DATABASE_URL && export ADMIN_DATABASE_URL
@@ -435,7 +448,7 @@ What the tool does not remove:
    * `refusals` is the list of reasons an apply would stop. Each is one sentence and a count. Fix the cause and run the preview again. The tool has no option that skips a refusal.
 
    Success looks like exit code 0, no line that starts with `An apply would be refused`, and a last line that says `To apply, use --expect-accounts=` followed by a number. Write that number down. If the refusal says a demo account was used in the last 30 minutes, check step 2 again, wait 30 minutes and run the preview again. For any other refusal you cannot fix yourself, stop, keep the output, and ask a developer.
-6. **Confirm the backup right before the apply.** In the Supabase dashboard open the project, then Database, then Backups. Check that a backup from today exists, or that point in time recovery is on. If neither is true, make an export with the steps under [Backups](#backups), in this same window. The variable is already loaded, so skip their step 1. Restoring a backup puts the whole database back as it was when the backup was taken, so every change made after it is lost, including real work done since. That is why the backup must be from right before the apply. Success looks like today's backup in the list, or an export file in `$HOME/VisionQuest-backups` with a size above zero. Without one, do not go on.
+6. **Make or confirm the backup right before the apply.** Make an export with the steps under [Backups](#backups), in this same window. The variable is already loaded, so skip their step 1. In their step 4, run the `unset` line but do not close the window, because step 7 still needs it. A backup in the Supabase dashboard (Database, then Backups) counts instead only if point in time recovery is on for the project. A daily backup can be almost a day old, and restoring it would throw away every change made after it, including real work done since, so only an export made now or point in time recovery can put the database back to the moment right before the apply. Success looks like an export file in `$HOME/VisionQuest-backups` with today's date and time and a size above zero, or point in time recovery shown as on in the dashboard. Without one, do not go on.
 7. **Run the apply.** Use the number from step 5 in place of `NUMBER`:
    ```sh
    node --import tsx scripts/demo-closeout.ts --apply --confirm-demo-disabled --expect-accounts=NUMBER
