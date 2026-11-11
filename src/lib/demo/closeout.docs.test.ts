@@ -79,6 +79,20 @@ describe("demo closeout backup commands in DEPLOY.md", () => {
     assert.match(backups, /unset PGPASSWORD/);
   });
 
+  it("prints no part of the connection string when it cannot be read, as with a raw / or # in the password", () => {
+    const scripts = [...backups.matchAll(/export \w+="\$\(node -e '([^']*)'\)"/g)].map((match) => match[1]);
+    assert.equal(scripts.length, 2, `${scripts.length} node lines`);
+    const secret = "S3cr/et#pw";
+    const env = { ...process.env, ADMIN_DATABASE_URL: `postgresql://postgres.abcdefghijklmnopqrst:${secret}@db.example.test:5432/postgres` };
+    for (const script of scripts) {
+      const result = spawnSync(process.execPath, ["-e", script], { env, encoding: "utf8" });
+      assert.notEqual(result.status, 0, script);
+      for (const piece of ["S3cr", "et#pw", "abcdefghijklmnopqrst", "db.example.test"]) {
+        assert.ok(!result.stdout.includes(piece) && !result.stderr.includes(piece), `${piece} printed by: ${script}`);
+      }
+    }
+  });
+
   it("writes the export outside the checkout, in a folder and a file only the owner can read", () => {
     assert.match(backups, /mkdir -p -m 700 "\$HOME\/VisionQuest-backups"/);
     assert.match(backups, /pg_dump .*--file="\$HOME\/VisionQuest-backups\//);

@@ -336,8 +336,8 @@ Supabase handles managed backups. To make an export yourself, follow these steps
 2. Split the password off. `pg_dump` and `psql` read the password from `PGPASSWORD`, so it never appears on a command line, where other programs on this computer could read it. Run these three lines:
 
    ```sh
-   export PGPASSWORD="$(node -e 'process.stdout.write(decodeURIComponent(new URL(process.env.ADMIN_DATABASE_URL).password))')"
-   export URL_WITHOUT_PASSWORD="$(node -e 'const url = new URL(process.env.ADMIN_DATABASE_URL); url.password = ""; process.stdout.write(url.href)')"
+   export PGPASSWORD="$(node -e 'try { process.stdout.write(decodeURIComponent(new URL(process.env.ADMIN_DATABASE_URL).password)) } catch { console.error("The connection string could not be read. Nothing from it was printed."); process.exit(1) }')"
+   export URL_WITHOUT_PASSWORD="$(node -e 'try { const url = new URL(process.env.ADMIN_DATABASE_URL); url.password = ""; process.stdout.write(url.href) } catch { console.error("The connection string could not be read. Nothing from it was printed."); process.exit(1) }')"
    test -n "$PGPASSWORD" && test -n "$URL_WITHOUT_PASSWORD" && echo ready
    ```
 
