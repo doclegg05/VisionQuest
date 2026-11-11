@@ -65,7 +65,7 @@ describe("dashboard transaction isolation", () => {
   it("the live reads run at REPEATABLE READ", async () => {
     const live = await import("./live");
     assertReadGroup(await startsOf(() => live.readLiveSignals(A.id)), "the live read");
-    assertReadGroup(await startsOf(() => live.readPageLiveSignals(A.id)), "the page live read");
+    assertReadGroup(await startsOf(() => live.readPageCounts(A.id)), "the page live read");
   });
 
   it("task writes stay SERIALIZABLE, with the same pool wait", async () => {

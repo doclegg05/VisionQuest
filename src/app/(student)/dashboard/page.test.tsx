@@ -68,8 +68,10 @@ mock.module("@/lib/sage/panel-data", {
 });
 
 // Renders only the intro slot: the header and signature banner the page passes in.
-mock.module("./DashboardClient", { defaultExport: (props: { initialSupport?: { alertCount: number }; intro?: ReactNode }) => {
+interface ClientProps { initialSupport?: { alertCount: number }; initialOverview?: unknown; initialActivity?: unknown; intro?: ReactNode }
+mock.module("./DashboardClient", { defaultExport: (props: ClientProps) => {
   if (props.initialSupport) ambientRenders.push(props.initialSupport);
+  clientRenders.push(props);
   return props.intro ?? null;
 } });
 mock.module("@/lib/dashboard/tasks", { namedExports: {
@@ -83,6 +85,7 @@ mock.module("@/components/progression/PathToEmployment", {
 });
 
 const ambientRenders: Array<{ alertCount: number }> = [];
+const clientRenders: ClientProps[] = [];
 
 let DashboardPage: typeof import("./page").default;
 
@@ -118,5 +121,46 @@ describe("DashboardPage signed-form banner (R5)", () => {
     // /intake is the public QR-code enrollment form. It collects the identity
     // the student already has, and it is the surface that used to hand out sessions.
     assert.doesNotMatch(html, /href="\/intake"/);
+  });
+});
+
+// W2: one region's failed read shows that region's "could not load" fallback
+// (DashboardClient, given no initial data); it never fails the whole page.
+describe("DashboardPage when one region's read fails", () => {
+  async function renderWith<K extends keyof typeof prismaMock>(model: K, failing: typeof prismaMock[K]) {
+    const original = prismaMock[model];
+    prismaMock[model] = failing;
+    try {
+      renderToString(await DashboardPage());
+    } finally {
+      prismaMock[model] = original;
+    }
+    const props = clientRenders.at(-1);
+    assert.ok(props, "DashboardClient was not rendered");
+    return props;
+  }
+  const fail = async () => { throw new Error("read failed"); };
+
+  it("a rejected overview read still renders the page with the other regions", async () => {
+    const props = await renderWith("certTemplate", { findMany: fail });
+    assert.equal(props.initialOverview, undefined);
+    assert.notEqual(props.initialActivity, undefined);
+    assert.notEqual(props.initialSupport, undefined);
+  });
+
+  it("rejected alert counts leave the advising region to its fallback and keep the others", async () => {
+    type CountAlerts = typeof prismaMock.studentAlert.count;
+    const count: CountAlerts = mock.fn<(args: Parameters<CountAlerts>[0]) => Promise<number>>(fail);
+    const props = await renderWith("studentAlert", { ...prismaMock.studentAlert, count });
+    assert.equal(props.initialSupport, undefined);
+    assert.notEqual(props.initialOverview, undefined);
+    assert.notEqual(props.initialActivity, undefined);
+  });
+
+  it("a rejected live read still renders the page, every region on its fallback", async () => {
+    const props = await renderWith("studentSavedJob", { count: fail });
+    assert.equal(props.initialSupport, undefined);
+    assert.equal(props.initialOverview, undefined);
+    assert.equal(props.initialActivity, undefined);
   });
 });

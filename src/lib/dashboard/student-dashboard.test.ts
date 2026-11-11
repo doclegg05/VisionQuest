@@ -50,6 +50,7 @@ describe("loadStudentDashboard", () => {
     const overview = await readers.readOverview(DASHBOARD_STUDENT_ID);
     const activity = await readers.readActivity(DASHBOARD_STUDENT_ID);
     const step = await nextStep.getStudentNextStep(DASHBOARD_STUDENT_ID);
+    assert.ok(loaded.overview && loaded.support, "a region failed to load");
     assert.deepEqual(loaded.overview.outcomes, overview.outcomes);
     assert.deepEqual({ ...loaded.activity, fetchedAt: "" }, { ...activity, fetchedAt: "" });
     assert.deepEqual(loaded.support.nextStep, step);
@@ -81,6 +82,7 @@ describe("loadStudentDashboard", () => {
       ]);
       assert.equal(mine.goalCount, 2, `pass ${pass}`);
       assert.equal(theirs.goalCount, 0, `pass ${pass}`);
+      assert.ok(mine.support && theirs.support && mine.overview && theirs.overview, `a region failed to load, pass ${pass}`);
       assert.equal(mine.support.alertCount, 1, `pass ${pass}`);
       assert.equal(theirs.support.alertCount, 4, `pass ${pass}`);
       assert.match(mine.overview.outcomes[2].value, /^1 applications/);

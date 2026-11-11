@@ -25,12 +25,12 @@ const readOrientationTotal = () => prisma.orientationItem.count();
 const readReadyToWorkTemplates = () => prisma.certTemplate.findMany(READY_TO_WORK_TEMPLATES);
 
 /** Kept only when non-zero: an empty answer is what a read without RLS context sees. */
-function orientationTotal(): Promise<number> {
+export function orientationTotal(): Promise<number> {
   return cachedWhen(globalCacheKey("orientation-item-count"), GLOBALS_TTL_SECONDS, readOrientationTotal, (n) => n > 0);
 }
 
-/** Kept only when non-empty, for the same reason. */
-function readyToWorkTemplates(): Promise<readonly CertTemplate[]> {
+/** Kept only when non-empty, for the same reason. The overview alone reads it. */
+export function readyToWorkTemplates(): Promise<readonly CertTemplate[]> {
   return cachedWhen(globalCacheKey("ready-to-work-templates"), GLOBALS_TTL_SECONDS, readReadyToWorkTemplates, (rows) => rows.length > 0);
 }
 
