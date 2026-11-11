@@ -144,10 +144,16 @@ export function readSlowSignals(studentId: string): Promise<SlowSignals> {
  * How long a poll may serve slow signals the page or an earlier poll kept.
  * Longer than the poll interval on purpose: a TTL shorter than the poll never
  * serves a poll. What bounds staleness is invalidation, not the TTL: every
- * input but three is cleared on write (./student-cache.ts), and the page render
- * always reads fresh. The three that no write clears (discovery chat turns,
- * the class's Ready-to-Work requirement, a pathway's active flag) can lag by
- * up to this long, on a poll only.
+ * watched input is cleared on write (./student-cache.ts), and the page render
+ * always reads fresh. Five inputs no write clears, so on a poll only, never
+ * on a page load, they can lag by up to this long:
+ * 1. the discovery chat turn count (`Message`, unwatched because it is
+ *    written on every chat turn);
+ * 2. `Conversation.stage`, which that count filters on (stage writes are not
+ *    watched; only a summary write is);
+ * 3. `ClassRequirement`, the class's Ready-to-Work applicability;
+ * 4. `StudentClassEnrollment`, which class that requirement is read from;
+ * 5. `Pathway.active`, a pathway switched on or off.
  */
 export const SLOW_SIGNALS_TTL_SECONDS = 600;
 

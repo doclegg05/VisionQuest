@@ -17,6 +17,19 @@
  *    and every `prismaAdmin` writer that hand-invalidates, which
  *    src/lib/db.admin-write-through.test.ts enforces. student-cache.test.ts
  *    pins that coupling to the prefixes in src/lib/cache.ts.
+ *
+ * Where these rules stop holding:
+ * - The cache is in-process memory (src/lib/cache.ts). It assumes one Render
+ *   instance. A second instance would keep its own copies and never see the
+ *   other's invalidations, so a write on one would leave the other serving the
+ *   old value for up to the TTL. Scaling past one instance breaks invalidation
+ *   and needs a shared cache, or these TTLs cut to what may lag, first.
+ * - Only writes through the app's `prisma` client invalidate (plus the
+ *   `prismaAdmin` writers that hand-invalidate). A seed script, a SQL editor
+ *   session or any other process writing while the server runs leaves kept
+ *   values in place for up to 10 minutes (every TTL here is 600 s).
+ * - A deploy or restart empties the cache, so the first request after one
+ *   reads everything fresh.
  */
 import { cached } from "@/lib/cache";
 
