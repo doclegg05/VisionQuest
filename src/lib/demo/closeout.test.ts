@@ -24,7 +24,7 @@ import {
   type SelectionRule,
 } from "./closeout";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN } from "./config";
-import { FakeDb, LOCAL, MODELS, copyOf, scene, seedUniverse, type Scene } from "./closeout.fixtures";
+import { FakeDb, LOCAL, MODELS, closeoutRowsToRemove, copyOf, scene, seedUniverse, type Scene } from "./closeout.fixtures";
 
 const DEMO_OFF = {};
 const DEMO_ON = { COHORT_DEMO_MODE: "true" };
@@ -483,5 +483,28 @@ describe("demo closeout refusals", () => {
     assert.deepEqual([...plan.accountIds].sort(), [demo.staffId, demo.studentId].sort());
     assert.deepEqual(plan.classIds, [demo.classId]);
     assert.equal(plan.accountIds.includes(real.studentId), false);
+  });
+});
+
+describe("demo closeout Postgres test cleanup", () => {
+  it("removes nothing when the test never seeded, as when it found demo accounts already there", () => {
+    assert.equal(closeoutRowsToRemove(false, []), null);
+  });
+
+  it("removes only the closeout audit rows this run wrote, never one that was there before it began", async () => {
+    const { db } = await scene();
+    db.insert("AuditLog", { id: "closeout-before-the-test", action: "demo.closeout", targetType: "demo" });
+    await apply(db);
+    const where = closeoutRowsToRemove(true, ["closeout-before-the-test"]);
+    assert.ok(where);
+
+    await db.client().$transaction(async (tx) => {
+      const table = tx.auditLog;
+      assert.ok(typeof table === "object" && table !== null && "deleteMany" in table && typeof table.deleteMany === "function");
+      await table.deleteMany({ where });
+    });
+
+    const left = db.rows("AuditLog").filter((row) => row.action === "demo.closeout").map((row) => row.id);
+    assert.deepEqual(left, ["closeout-before-the-test"]);
   });
 });

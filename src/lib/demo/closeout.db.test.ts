@@ -38,7 +38,7 @@ import { after, afterEach, before, describe, it } from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import path from "node:path";
 import { REFUSALS, runDemoCloseout, tableOf, type CloseoutClient, type CloseoutOptions, type CloseoutOutcome, type CloseoutTx, type RefusalCode } from "./closeout";
-import { MODELS, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
+import { MODELS, closeoutRowsToRemove, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
 import { readLocalSchema } from "./closeout.local";
 
 const SHOULD_RUN = process.env.DEMO_CLOSEOUT_DB_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
@@ -84,12 +84,18 @@ if (!SHOULD_RUN) {
     let added: Array<{ model: string; id: string }> = [];
     /** Rows with no id column that a test added, each removed by its own statement. */
     let removals: Array<() => Promise<unknown>> = [];
+    /** False until a test seeds. Cleanup touches nothing before then. See `closeoutRowsToRemove`. */
+    let seeded = false;
+    /** The closeout audit rows the database held before this run, which cleanup must keep. */
+    let preexistingCloseoutRows: string[] = [];
 
     before(async () => {
       const url = process.env.DATABASE_URL ?? "";
       assert.ok(isLocalDatabase(url), "DATABASE_URL must point at a database on this machine. This test deletes demo accounts.");
       const { PrismaClient: Client } = await import("@prisma/client");
       connected = new Client({ datasources: { db: { url } } });
+      const earlier = await db().auditLog.findMany({ where: { action: "demo.closeout" }, select: { id: true } });
+      preexistingCloseoutRows = earlier.map((row) => row.id);
       const existing = await db().student.count({ where: { demoAccount: { not: null } } });
       assert.equal(existing, 0, "This database already holds demo accounts. Point DATABASE_URL at an empty test database.");
     });
@@ -108,6 +114,7 @@ if (!SHOULD_RUN) {
 
     /** Seeds a marked and an unmarked universe under prefixes no other run used. */
     async function seed(): Promise<void> {
+      seeded = true;
       run += 1;
       const stamp = `cdb${Date.now().toString(36)}${run}`;
       demo = await seedUniverse(write, { prefix: `${stamp}dm-`, demo: true, tolerant: true });
@@ -117,19 +124,20 @@ if (!SHOULD_RUN) {
 
     /** Removes whatever the test left, children before parents. Safe to run twice. */
     async function cleanup(): Promise<void> {
-      if (!connected) return;
+      const ownCloseoutRows = closeoutRowsToRemove(seeded, preexistingCloseoutRows);
+      if (!connected || !ownCloseoutRows) return;
       for (const remove of removals) await remove();
       removals = [];
       const rows = [...(real?.created ?? []), ...(demo?.created ?? []), ...added].reverse();
       for (const row of rows) {
         if (row.id !== null) await tableOf(db(), row.model).deleteMany({ where: { id: { in: [row.id] } } });
       }
-      await db().auditLog.deleteMany({ where: { action: "demo.closeout" } });
+      await tableOf(db(), "AuditLog").deleteMany({ where: ownCloseoutRows });
       added = [];
     }
 
     afterEach(cleanup);
-    // Safe when `before` failed: nothing was connected, so there is nothing to clean or close.
+    // Safe when `before` failed: cleanup removes nothing unless a test seeded, and the client is still closed.
     after(async () => {
       if (!connected) return;
       await cleanup();

@@ -607,6 +607,17 @@ export async function seedUniverse(write: SeedWriter, options: SeedOptions): Pro
   return { prefix, studentId: seeder.studentId, staffId: seeder.staffId, classId: seeder.classId, created: seeder.created, skipped: seeder.skipped };
 }
 
+/**
+ * The closeout's own audit rows a Postgres test may remove when it cleans up.
+ * None unless the run seeded: a run that stopped in `before`, because the
+ * database already held demo accounts, must not touch that database. And never
+ * a row that was there before the run began.
+ */
+export function closeoutRowsToRemove(seeded: boolean, preexisting: readonly string[]): Row | null {
+  if (!seeded) return null;
+  return { action: "demo.closeout", id: { notIn: [...preexisting] } };
+}
+
 /** What the tests tell the closeout about this checkout: it matches the fake database. */
 export const LOCAL = { migrations: [FAKE_MIGRATION], schemaModels: MODELS.map((model) => model.name) } as const;
 
