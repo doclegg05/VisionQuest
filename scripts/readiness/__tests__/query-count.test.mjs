@@ -85,3 +85,13 @@ test("reads the idle rate a rate path prints and totals it by client", async () 
   assert.equal(rateTotal(rate, { client: "admin" }), 4);
   assert.equal(parseRate("dashboard-idle", "nothing"), null);
 });
+
+test("reads the idle round trips a minute beside the statements, when the test prints them", async () => {
+  const { parseRate, rateTotal } = await queryCount();
+  const line = "# IDLE_RATE path=dashboard-idle windowMs=3600000 ticks=30 appPerMinute=6.5 adminPerMinute=0.6 perMinute=7.1"
+    + " appRoundTripsPerMinute=17.2 adminRoundTripsPerMinute=0.6";
+  const rate = parseRate("dashboard-idle", line);
+  assert.deepEqual(rate, { windowMs: 3600000, ticks: 30, app: 6.5, admin: 0.6, appRoundTrips: 17.2, adminRoundTrips: 0.6 });
+  // The metric stays statements: the round trips are reported, not totalled.
+  assert.equal(rateTotal(rate, { client: "all" }), 7.1);
+});
