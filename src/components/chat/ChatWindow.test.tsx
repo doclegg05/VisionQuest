@@ -131,3 +131,23 @@ describe("the conversation log while Sage answers (E1c 8)", () => {
     assert.match(html, /role="log"[^>]*aria-busy="false"/);
   });
 });
+
+describe("ChatWindow wires the wait and Stop pieces (E2)", () => {
+  // renderToString cannot press Send, so the source is checked for the wiring;
+  // the behavior itself is tested in wait-and-stop.test.ts, TypingIndicator
+  // and ChatInput.
+  it("passes Stop, the wait words, the abort signal and the opener rule", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    assert.match(source, /onStop=\{stopReply\}/);
+    assert.match(source, /<TypingIndicator slow=\{slowReply\} \/>/);
+    assert.match(source, /signal: controller\.signal/);
+    assert.match(source, /showsCannedOpener\(\{ role, isFirstMessage, localProvider \}\)/);
+    assert.match(source, /onCrisisBlock:/);
+  });
+
+  it("renders with the local provider flag", () => {
+    const html = renderToString(<ChatWindow role="student" localProvider />);
+    assert.match(html, /role="log"/);
+  });
+});

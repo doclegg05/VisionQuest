@@ -5,6 +5,15 @@
   "title": "A wait the student can read",
   "doneWhen": "Component tests cover the 5 second message and Stop.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/components/chat/wait-and-stop.test.ts",
+      "src/components/chat/TypingIndicator.test.tsx",
+      "src/components/chat/ChatInput.test.tsx",
+      "src/components/chat/ChatWindow.test.tsx",
+      "src/components/chat/chat-stream.test.ts",
+      "src/app/api/chat/send/__tests__/route.early-crisis.test.ts",
+      "src/lib/ai/chat-provider-local.test.ts"
+    ]
   }
 }

@@ -28,12 +28,15 @@ import {
   type ChatMessage,
   type FailedTurn,
 } from "./failed-turn";
+import { showsCannedOpener, startSlowReplyTimer, stoppedTurnMessages, withEarlyCrisisHelp } from "./wait-and-stop";
 
 type Message = ChatMessage;
 
 interface ChatWindowInnerProps {
   role: ChatRole;
   defaultStage?: string;
+  /** Sage runs on the local model: no canned opener (wait-and-stop.ts). */
+  localProvider: boolean;
 }
 
 const REQUESTED_STAGE_OPENERS = {
@@ -174,7 +177,7 @@ function AgentEventList({ events }: { events: AgentEventItem[] }) {
   );
 }
 
-function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
+function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerProps) {
   const searchParams = useSearchParams();
   const requestedStage = searchParams.get("stage");
   const requestedStageOpener =
@@ -210,6 +213,14 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   /** Set while a Try again is running, so a second tap before re-render does nothing. */
   const retryInFlightRef = useRef(false);
   const messageBoxRef = useRef<MessageBoxHandle>(null);
+  /** The answer in flight, so Stop can end it; and whether Stop did. */
+  const abortRef = useRef<AbortController | null>(null);
+  const stoppedRef = useRef(false);
+  /** Counts sends, so the wait words belong to one send and reset on the next. */
+  const [sendCount, setSendCount] = useState(0);
+  const [slowForSend, setSlowForSend] = useState<number | null>(null);
+  const waitingForWord = isLoading && !streamingContent;
+  const slowReply = waitingForWord && slowForSend === sendCount;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -224,6 +235,14 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
     const timer = setTimeout(() => setGoalToast(null), 4000);
     return () => clearTimeout(timer);
   }, [goalToast]);
+
+  // The wait words: five seconds with no word from Sage, timed per send and
+  // cancelled by the first streamed word.
+  useEffect(() => {
+    if (!waitingForWord) return;
+    const send = sendCount;
+    return startSlowReplyTimer(() => setSlowForSend(send));
+  }, [waitingForWord, sendCount]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -356,6 +375,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         setMessages((prev) => [...prev, { id: `temp-${Date.now()}`, role: "user", content: text }]);
       }
       setIsLoading(true);
+      setSendCount((count) => count + 1);
       setStreamingContent("");
       setStreamingEvents([]);
       const greetingGeneration = ++greetingGenerationRef.current;
@@ -365,7 +385,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       // is in flight. Discard it if the user sends a second message before SSE
       // arrives (handled by checking messages.length in the SSE reader below).
       const isFirstMessage = !conversationId && messages.length === 0;
-      if (isFirstMessage && role === "student") {
+      if (showsCannedOpener({ role, isFirstMessage, localProvider })) {
         if (requestedStageOpener) {
           setOptimisticGreeting(requestedStageOpener);
         } else {
@@ -392,6 +412,12 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
       let fullContent = "";
       let savedUserMessageId: string | null = null;
       let refreshedConversationList = false;
+      /** The 988 block the server flagged on the first event (E2). */
+      let earlyCrisisBlock: string | null = null;
+      let latestEvents: AgentEventItem[] = [];
+      const controller = new AbortController();
+      abortRef.current = controller;
+      stoppedRef.current = false;
       const noteConversation = (nextId: string | undefined) => {
         setConversationId(nextId ?? conversationId);
         if (!refreshedConversationList && nextId && nextId !== conversationId) {
@@ -405,6 +431,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         const res = await apiFetch("/api/chat/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             message: text,
             conversationId,
@@ -424,6 +451,9 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             savedUserMessageId = ids.userMessageId;
             noteConversation(ids.conversationId);
           },
+          onCrisisBlock: (block) => {
+            earlyCrisisBlock = block;
+          },
           onText: (content) => {
             // B4: First real token clears the optimistic greeting.
             if (!fullContent) {
@@ -433,7 +463,10 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             fullContent = content;
             setStreamingContent(content);
           },
-          onEvents: setStreamingEvents,
+          onEvents: (events) => {
+            latestEvents = events;
+            setStreamingEvents(events);
+          },
           onDone: noteConversation,
         });
 
@@ -448,7 +481,9 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
             ? { keepOnRetry: outcome.keepOnRetry, retryOf: savedUserMessageId, alert: !result.content }
             : undefined,
         };
-        setMessages((prev) => [...prev, assistantMsg]);
+        // A stream that ended early never reached the 988 block at its end.
+        const shown = result.completed ? [assistantMsg] : withEarlyCrisisHelp([assistantMsg], earlyCrisisBlock, msgId);
+        setMessages((prev) => [...prev, ...shown]);
         if (outcome.offerRetry) {
           setFailedTurn({ messageId: msgId, offerRetry: true, setupLink: false });
         }
@@ -457,6 +492,17 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         // Check for XP/achievement/level changes
         setTimeout(() => checkProgression(), 2000);
       } catch (err) {
+        if (stoppedRef.current) {
+          // The student chose to stop: no failure, no Try again.
+          const stopped = stoppedTurnMessages({
+            id: `stop-${Date.now()}`,
+            partial: fullContent,
+            events: latestEvents,
+            crisisBlock: earlyCrisisBlock,
+          });
+          setMessages((prev) => [...prev, ...stopped]);
+          return;
+        }
         console.error("Send error:", err instanceof Error ? err.name : "Unknown error");
         const outcome = resolveSendError(err, {
           priorContent: fullContent,
@@ -468,11 +514,13 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         // its conversation so Try again answers it there, not in a new one.
         noteConversation(outcome.conversationId ?? undefined);
         const errMsgId = `err-${Date.now()}`;
-        setMessages((prev) => [...prev, ...failedTurnMessages(outcome, errMsgId)]);
+        const failed = withEarlyCrisisHelp(failedTurnMessages(outcome, errMsgId), earlyCrisisBlock, errMsgId);
+        setMessages((prev) => [...prev, ...failed]);
         if (outcome.offerRetry || outcome.setupLink) {
           setFailedTurn({ messageId: errMsgId, offerRetry: outcome.offerRetry, setupLink: outcome.setupLink });
         }
       } finally {
+        if (abortRef.current === controller) abortRef.current = null;
         greetingGenerationRef.current++;
         setIsLoading(false);
         // A failure mid-reply moved the partial text into `messages` above, so
@@ -484,7 +532,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
         setOptimisticGreeting(null);
       }
     },
-    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener, role]
+    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener, role, localProvider]
   );
 
   // After a failed turn, focus goes to its Try again once loading has ended,
@@ -492,6 +540,12 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
   useEffect(() => {
     if (shouldFocusRetry(failedTurn, isLoading)) retryButtonRef.current?.focus();
   }, [failedTurn, isLoading]);
+
+  /** Ends Sage's answer; handleSend's catch shows what a Stop leaves. */
+  const stopReply = useCallback(() => {
+    stoppedRef.current = true;
+    abortRef.current?.abort();
+  }, []);
 
   const retryFailedTurn = (failedId: string) =>
     runExclusive(retryInFlightRef, async () => {
@@ -633,7 +687,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
               <AgentEventList events={streamingEvents} />
             )}
 
-            {isLoading && !streamingContent && !optimisticGreeting && <TypingIndicator />}
+            {isLoading && !streamingContent && !optimisticGreeting && <TypingIndicator slow={slowReply} />}
 
             <div ref={messagesEndRef} />
           </div>
@@ -650,6 +704,7 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 
         <ChatInput
           onSend={handleSend}
+          onStop={stopReply}
           disabled={isLoading}
           role={role}
           initialMessage={deepLinkPrefill}
@@ -670,12 +725,14 @@ function ChatWindowInner({ role, defaultStage }: ChatWindowInnerProps) {
 interface ChatWindowProps {
   role?: ChatRole;
   defaultStage?: string;
+  /** From the server: Sage runs on the local model. Default false keeps today's opener. */
+  localProvider?: boolean;
 }
 
-export default function ChatWindow({ role = "student", defaultStage }: ChatWindowProps = {}) {
+export default function ChatWindow({ role = "student", defaultStage, localProvider = false }: ChatWindowProps = {}) {
   return (
     <Suspense>
-      <ChatWindowInner role={role} defaultStage={defaultStage} />
+      <ChatWindowInner role={role} defaultStage={defaultStage} localProvider={localProvider} />
     </Suspense>
   );
 }

@@ -215,6 +215,18 @@ export async function resolveAiProvider(
   return maybeDeidentify(provider, request);
 }
 
+/**
+ * True when a Sage chat turn resolves to the local model. The chat route
+ * calls resolveAiProvider with no `preferCloud`, so that is exactly the demo
+ * local-only switches or `ai_provider = "local"`. The chat page passes only
+ * this boolean to the client (E2: no canned opener on the slow local model);
+ * provider names, URLs and keys stay on the server.
+ */
+export async function isChatProviderLocal(): Promise<boolean> {
+  if (isDemoLocalOnlyRequired()) return true;
+  return (await getConfiguredProviderType()) === "local";
+}
+
 // ---------------------------------------------------------------------------
 // De-identification (FERPA review Sprint 3, memo B §2.0)
 // ---------------------------------------------------------------------------
