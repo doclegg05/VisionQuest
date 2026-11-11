@@ -103,14 +103,16 @@ describe("demo closeout counts of what it leaves", () => {
 });
 
 describe("demo closeout audit records", () => {
-  it("does not refuse a demo chat's audit row, whose target is a conversation id", async () => {
+  it("does not refuse audit rows about the demo's own chat, certification and appointment, which the plan deletes", async () => {
     const { db, demo } = await scene();
-    copyOf(db, "AuditLog", "dm-", { actorId: demo.studentId, targetType: "sage_conversation", targetId: "a-conversation" });
+    const targets = { sage_conversation: "dm-Conversation", certification: "dm-Certification", appointment: "dm-Appointment" };
+    for (const [targetType, targetId] of Object.entries(targets)) copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType, targetId });
 
     const outcome = await apply(db);
 
+    assert.deepEqual(outcome.refusals, []);
     assert.equal(outcome.kind, "applied");
-    assert.equal(db.rows("AuditLog").some((row) => row.targetId === "a-conversation"), false);
+    assert.equal(db.rows("AuditLog").some((row) => Object.values(targets).includes(String(row.targetId))), false);
   });
 
   it("writes the per-model counts, the files left, the newest migration and the unmarked actors to its own audit row", async () => {

@@ -513,7 +513,7 @@ async function prewriteRefusals(run: Run, gate: Gate, enrolledInDemoClass: numbe
     refusal("unmarked_rows_on_demo_class", attached),
     refusal("marked_staff_over_unmarked_students", await unmarkedUnderPlannedStaff(run)),
     refusal("marked_account_on_kept_rows", await keptRowsNamingAccounts(run)),
-    refusal("records_about_unmarked_people", await recordsAboutOthers(run)),
+    refusal("records_about_unmarked_people", await recordsAboutOthers(run, DELETE_STEPS)),
     refusal("kept_rows_would_be_blanked", await rowsTheDatabaseWouldBlank(run, DELETE_STEPS, SET_NULL_LINKS)),
   ];
   return found.filter((entry) => entry.count > 0);

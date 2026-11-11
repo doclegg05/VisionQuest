@@ -18,7 +18,7 @@ export const REFUSALS = {
   unmarked_rows_on_demo_class: "Rows that belong to accounts not marked as demo are attached to a demo class. Nothing was deleted.",
   marked_staff_over_unmarked_students: "A marked demo account teaches or coordinates a class or region that has unmarked students. Nothing was deleted.",
   marked_account_on_kept_rows: "A marked demo account is named on rows that belong to other people or to the program. Nothing was deleted.",
-  records_about_unmarked_people: "A marked demo account is on an audit record, a Sage action or a message about a person or class that is not demo. Deleting it would erase the record of what the demo account did to real data. Nothing was deleted.",
+  records_about_unmarked_people: "A marked demo account is on an audit record, a Sage action or a message about a person, a class or a record that is not demo, such as a real student's appointment. Deleting it would erase the record of what the demo account did to real data. Nothing was deleted.",
   kept_rows_would_be_blanked: "Rows that are kept point at a row the closeout would delete, and the database would quietly blank that link. Nothing was deleted.",
   rows_left_pointing: "Rows would be left pointing at a deleted account or class. Nothing was deleted.",
   unlisted_rows_removed: "The deletion would remove rows the preview did not list. Nothing was deleted.",

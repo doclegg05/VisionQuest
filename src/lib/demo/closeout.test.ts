@@ -345,6 +345,19 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
     arrange: ({ db, demo, real }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "class", targetId: real.classId }),
   },
   {
+    // The demo instructor's routes log a row id as the target, not the student's.
+    name: "a marked account's audit row is about an unmarked student's certification", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "certification", targetId: "rl-Certification" }),
+  },
+  {
+    name: "a marked account's audit row is about an unmarked student's appointment", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "appointment", targetId: "rl-Appointment" }),
+  },
+  {
+    name: "a marked account's audit row names a target no step deletes", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.studentId, targetType: "sage_conversation", targetId: "a-conversation-the-plan-keeps" }),
+  },
+  {
     name: "a marked account's Sage operation is about an unmarked student", code: "records_about_unmarked_people", count: 1,
     arrange: ({ db, demo, real }) => void copyOf(db, "SageOperation", "dm-", { actorId: demo.staffId, targetStudentId: real.studentId }),
   },

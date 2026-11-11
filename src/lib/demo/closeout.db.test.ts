@@ -171,7 +171,7 @@ if (!SHOULD_RUN) {
     async function copyRow(model: string, sourceId: string, changes: Row): Promise<void> {
       const [source] = await tableOf(db(), model).findMany({ where: { id: sourceId }, select: scalarColumns(model) });
       assert.ok(source, `${model} was not seeded`);
-      const id = `${sourceId}.copy`;
+      const id = typeof changes.id === "string" ? changes.id : `${sourceId}.copy`;
       await tableOf(db(), model).create({ data: { ...source, id, ...changes } });
       added.push({ model, id });
     }
@@ -252,6 +252,19 @@ if (!SHOULD_RUN) {
       assert.equal(await db().student.count({ where: { demoAccount: { not: null } } }), 0);
     });
 
+    it("applies when a marked account's audit rows are about the demo student's own certification and appointment", async () => {
+      await seed();
+      for (const model of ["Certification", "Appointment"]) {
+        await copyRow("AuditLog", `${demo.prefix}AuditLog`, { id: `${demo.prefix}AuditLog.${model}`, actorId: demo.staffId, targetType: model.toLowerCase(), targetId: `${demo.prefix}${model}`, createdAt: new Date(0) });
+      }
+
+      const outcome = await closeout(db(), { apply: true, expectAccounts: 2 });
+
+      assert.deepEqual(outcome.refusals, []);
+      assert.equal(outcome.kind, "applied");
+      assert.equal(await db().auditLog.count({ where: { targetId: { in: [`${demo.prefix}Certification`, `${demo.prefix}Appointment`] } } }), 0);
+    });
+
     it("keeps the shared rows a demo account merely referenced", async () => {
       await seed();
 
@@ -318,6 +331,14 @@ if (!SHOULD_RUN) {
       {
         name: "a marked account's audit row is about an unmarked student", code: "records_about_unmarked_people",
         arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "student", targetId: real.studentId, createdAt: new Date(0) }),
+      },
+      {
+        name: "a marked account's audit row is about an unmarked student's certification", code: "records_about_unmarked_people",
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "certification", targetId: `${real.prefix}Certification`, createdAt: new Date(0) }),
+      },
+      {
+        name: "a marked account's audit row is about an unmarked student's appointment", code: "records_about_unmarked_people",
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "appointment", targetId: `${real.prefix}Appointment`, createdAt: new Date(0) }),
       },
       {
         name: "an unmarked student's task links to a demo appointment", code: "kept_rows_would_be_blanked",
