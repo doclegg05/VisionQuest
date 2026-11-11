@@ -126,8 +126,6 @@ async function deleteFirstDayStudent(client: PrismaClient, id: string | undefine
     await client.consentRecord.deleteMany({ where: { studentId: id } });
     await client.securityQuestionAnswer.deleteMany({ where: { studentId: id } });
     await client.auditLog.deleteMany({ where: { OR: [{ actorId: id }, { targetId: id }] } });
-    // login:user:<id>, security-questions:<id> and any other per-account limiter row.
-    await client.rateLimitEntry.deleteMany({ where: { key: { contains: id } } });
   }
   if (revokedTokenKeys.length > 0) {
     await client.sageConfirmationUse.deleteMany({ where: { tokenHash: { in: revokedTokenKeys } } });
