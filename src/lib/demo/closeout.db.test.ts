@@ -286,7 +286,9 @@ if (!SHOULD_RUN) {
     const refusals: readonly DbRefusal[] = [
       { name: "demo mode is on", code: "demo_mode_on", env: { COHORT_DEMO_MODE: "true" } },
       { name: "the role cannot see every row", code: "cannot_see_every_row", asRole: "vq_app" },
-      { name: "the checkout is at another migration", code: "schema_mismatch", local: { ...readLocalSchema(ROOT), newestMigration: "29991231000000_not_applied" } },
+      { name: "the checkout is at another migration", code: "schema_mismatch", local: { ...readLocalSchema(ROOT), migrations: [...readLocalSchema(ROOT).migrations, "29991231000000_not_applied"] } },
+      // The newest name agrees: only the whole set shows the database never ran this one.
+      { name: "the checkout has an older migration the database never applied", code: "schema_mismatch", local: { ...readLocalSchema(ROOT), migrations: ["00000000000001_never_applied", ...readLocalSchema(ROOT).migrations] } },
       { name: "the expected count is not the plan's", code: "expected_accounts_mismatch", expectAccounts: 3 },
       {
         name: "a marked account sent a message in the last 30 minutes", code: "demo_recently_active",

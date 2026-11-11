@@ -488,7 +488,8 @@ interface Gate {
 function unreadableRefusals(server: ServerFacts, local: LocalSchema): Refusal[] {
   const clientModels = new Set<string>(Object.values(Prisma.ModelName));
   const sameModels = local.schemaModels.length === clientModels.size && local.schemaModels.every((model) => clientModels.has(model));
-  const sameMigration = server.newestMigration !== null && server.newestMigration === local.newestMigration;
+  const applied = server.appliedMigrations ?? [];
+  const sameMigration = applied.length > 0 && applied.length === local.migrations.length && local.migrations.every((name) => applied.includes(name));
   return [
     refusal("cannot_see_every_row", server.seesEveryRow ? 0 : 1),
     refusal("schema_mismatch", sameModels && sameMigration ? 0 : 1),
@@ -629,7 +630,7 @@ async function inTransaction(tx: CloseoutTx, options: CloseoutOptions): Promise<
   if (!options.apply) return { kind: "preview", target, preview, refusals };
   if (refusals.length > 0) return { kind: "refused", target, preview, refusals };
   try {
-    return { kind: "applied", target, preview, refusals: [], ...(await applyPlan(run, preview, server.newestMigration ?? "")) };
+    return { kind: "applied", target, preview, refusals: [], ...(await applyPlan(run, preview, server.appliedMigrations?.at(-1) ?? "")) };
   } catch (error) {
     if (error instanceof CloseoutRefused) throw new CloseoutRefused(error.refused, error.preview, target);
     throw error;

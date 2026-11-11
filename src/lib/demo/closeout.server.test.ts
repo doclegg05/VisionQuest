@@ -75,6 +75,16 @@ describe("demo closeout and the server", () => {
     assert.equal(outcome.kind, "applied");
   });
 
+  it("accepts a migration applied out of order when the two sets are the same", async () => {
+    const { db } = await scene();
+    const late = "20260903120000_applied_after_newer_ones";
+    db.appliedMigrations = [FAKE_MIGRATION, late];
+
+    const outcome = await preview(db, { local: { ...LOCAL, migrations: [late, FAKE_MIGRATION] } });
+
+    assert.deepEqual(outcome.refusals, []);
+  });
+
   it("finds the migration ledger in the public schema too", async () => {
     const { db } = await scene();
     db.ledgerSchema = "public";
@@ -103,7 +113,20 @@ const UNREADABLE: readonly Unreadable[] = [
   },
   {
     name: "this checkout has a newer migration than the database", code: "schema_mismatch",
-    local: { ...LOCAL, newestMigration: "20261201000000_not_deployed_yet" },
+    local: { ...LOCAL, migrations: [...LOCAL.migrations, "20261201000000_not_deployed_yet"] },
+  },
+  {
+    // The newest names agree, so only a comparison of the whole set sees it.
+    name: "the database is missing an older migration this checkout has", code: "schema_mismatch",
+    local: { ...LOCAL, migrations: ["20261001000000_never_applied", ...LOCAL.migrations] },
+  },
+  {
+    name: "the database applied an older migration this checkout does not have", code: "schema_mismatch",
+    arrange: (db) => { db.appliedMigrations = ["20261001000000_only_in_the_database", FAKE_MIGRATION]; },
+  },
+  {
+    name: "a migration in the ledger failed and was never finished", code: "schema_mismatch",
+    arrange: (db) => { db.failedMigrations = [FAKE_MIGRATION]; db.appliedMigrations = []; },
   },
   {
     name: "the database has no migration ledger", code: "schema_mismatch",
@@ -113,7 +136,7 @@ const UNREADABLE: readonly Unreadable[] = [
     name: "the ledger lists no applied migration", code: "schema_mismatch",
     arrange: (db) => { db.appliedMigrations = []; },
   },
-  { name: "this checkout has no migrations folder", code: "schema_mismatch", local: { ...LOCAL, newestMigration: null } },
+  { name: "this checkout has no migrations folder", code: "schema_mismatch", local: { ...LOCAL, migrations: [] } },
   {
     name: "the schema file has a model the generated client does not know", code: "schema_mismatch",
     local: { ...LOCAL, schemaModels: [...LOCAL.schemaModels, "ModelAddedSinceGenerate"] },
@@ -265,19 +288,19 @@ describe("demo closeout after the commit", () => {
 describe("demo closeout reads this checkout", () => {
   const ROOT = path.resolve(__dirname, "../../..");
 
-  it("finds the newest migration folder by name and every model in the schema file", () => {
+  it("finds every migration folder and every model in the schema file", () => {
     const local = readLocalSchema(ROOT);
     const folders = readdirSync(path.join(ROOT, "prisma/migrations"), { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
 
-    assert.match(local.newestMigration ?? "", /^\d{14}_/);
-    assert.deepEqual(folders.filter((name) => name > (local.newestMigration ?? "")), []);
+    assert.ok(local.migrations.length > 1);
+    assert.deepEqual([...local.migrations], [...folders].sort());
     assert.deepEqual([...local.schemaModels].sort(), [...LOCAL.schemaModels].sort());
   });
 
   it("matches the generated client, so a run from an up to date checkout is not refused for it", async () => {
     const { db } = await scene();
     const local = readLocalSchema(ROOT);
-    db.appliedMigrations = [local.newestMigration ?? ""];
+    db.appliedMigrations = [...local.migrations];
 
     const outcome = await preview(db, { local });
 
@@ -285,7 +308,7 @@ describe("demo closeout reads this checkout", () => {
   });
 
   it("reports nothing, rather than throwing, for a folder that is not a checkout", () => {
-    assert.deepEqual(readLocalSchema(path.join(ROOT, "no-such-folder")), { newestMigration: null, schemaModels: [] });
+    assert.deepEqual(readLocalSchema(path.join(ROOT, "no-such-folder")), { migrations: [], schemaModels: [] });
   });
 
   it("ignores files beside the migration folders", () => {
@@ -296,7 +319,7 @@ describe("demo closeout reads this checkout", () => {
       writeFileSync(path.join(folder, "prisma/migrations/migration_lock.toml"), "provider = \"postgresql\"\n");
       writeFileSync(path.join(folder, "prisma/schema.prisma"), "model One {\n  id String @id\n}\n\nenum Kind {\n  a\n}\n\nmodel Two {\n  id String @id\n}\n");
 
-      assert.deepEqual(readLocalSchema(folder), { newestMigration: "20260301000000_newest", schemaModels: ["One", "Two"] });
+      assert.deepEqual(readLocalSchema(folder), { migrations: ["20260101000000_first", "20260301000000_newest"], schemaModels: ["One", "Two"] });
     } finally {
       rmSync(folder, { recursive: true, force: true });
     }

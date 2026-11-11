@@ -30,8 +30,8 @@ export interface ServerFacts {
   readonly now: Date;
   /** True for a superuser or a role with BYPASSRLS: no policy hides a row from it. */
   readonly seesEveryRow: boolean;
-  /** The newest migration the ledger lists as applied, or null when there is no ledger or no row. */
-  readonly newestMigration: string | null;
+  /** Every migration the ledger lists as applied, sorted, or null when there is no ledger. */
+  readonly appliedMigrations: readonly string[] | null;
 }
 
 function rowsOf(result: unknown): Row[] {
@@ -66,19 +66,21 @@ export async function tryCreateLock(tx: CloseoutTx): Promise<boolean> {
 }
 
 /**
- * The newest applied migration by name. Prisma keeps the ledger in the first
- * schema the datasource lists (visionquest here); an older setup has it in
- * public. Byte order, so it sorts the way the folder names do.
+ * Every migration the ledger lists as finished and not rolled back. Prisma
+ * keeps the ledger in the first schema the datasource lists (visionquest
+ * here); an older setup has it in public. Null when there is no ledger.
  */
-async function newestAppliedMigration(tx: CloseoutTx): Promise<string | null> {
+async function appliedMigrations(tx: CloseoutTx): Promise<string[] | null> {
   const found = await tx.$queryRaw`SELECT to_regclass('visionquest._prisma_migrations') IS NOT NULL AS in_app_schema, to_regclass('public._prisma_migrations') IS NOT NULL AS in_public`;
-  let newest: unknown = null;
+  let rows: unknown;
   if (firstValue(found, "in_app_schema") === true) {
-    newest = firstValue(await tx.$queryRaw`SELECT max(migration_name COLLATE "C") AS newest FROM visionquest."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`, "newest");
+    rows = await tx.$queryRaw`SELECT DISTINCT migration_name AS name FROM visionquest."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
   } else if (firstValue(found, "in_public") === true) {
-    newest = firstValue(await tx.$queryRaw`SELECT max(migration_name COLLATE "C") AS newest FROM public."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`, "newest");
+    rows = await tx.$queryRaw`SELECT DISTINCT migration_name AS name FROM public."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
+  } else {
+    return null;
   }
-  return typeof newest === "string" ? newest : null;
+  return idsOf(rowsOf(rows), "name").sort();
 }
 
 /** Asks the server which database this is, what time it is, what the role may see and how far it is migrated. */
@@ -93,7 +95,7 @@ export async function readServerFacts(tx: CloseoutTx): Promise<ServerFacts> {
     target: { database, serverAddress: typeof address === "string" ? address : null },
     now,
     seesEveryRow: firstValue(role, "rolsuper") === true || firstValue(role, "rolbypassrls") === true,
-    newestMigration: await newestAppliedMigration(tx),
+    appliedMigrations: await appliedMigrations(tx),
   };
 }
 

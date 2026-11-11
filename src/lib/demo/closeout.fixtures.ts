@@ -165,6 +165,8 @@ export class FakeDb {
   /** The schema that holds Prisma's migration ledger, and the migrations it lists as applied. */
   ledgerSchema: "visionquest" | "public" | null = "visionquest";
   appliedMigrations: readonly string[] = [FAKE_MIGRATION];
+  /** Migrations the ledger lists as started but never finished, as after a failed deploy. */
+  failedMigrations: readonly string[] = [];
   /** True while some other transaction holds the demo student create lock. */
   createLockHeld = false;
   /** Name a model to make the next delete from it throw, as a lost connection would. */
@@ -311,7 +313,8 @@ export class FakeDb {
     if (sql.includes('"_prisma_migrations"')) {
       const schema = sql.includes('visionquest."_prisma_migrations"') ? "visionquest" : "public";
       if (schema !== this.ledgerSchema) throw new Error(`relation "${schema}._prisma_migrations" does not exist`);
-      return [{ newest: [...this.appliedMigrations].sort().at(-1) ?? null }];
+      // The statement keeps finished, not rolled back rows only; a failed row has no finish time.
+      return this.appliedMigrations.map((name) => ({ name }));
     }
     const orphan = ORPHAN_STATEMENT.exec(sql);
     if (orphan) return [{ orphans: this.orphans(orphan, flatValues(values), state.rowSecurityOff) }];
@@ -592,7 +595,7 @@ export async function seedUniverse(write: SeedWriter, options: SeedOptions): Pro
 }
 
 /** What the tests tell the closeout about this checkout: it matches the fake database. */
-export const LOCAL = { newestMigration: FAKE_MIGRATION, schemaModels: MODELS.map((model) => model.name) } as const;
+export const LOCAL = { migrations: [FAKE_MIGRATION], schemaModels: MODELS.map((model) => model.name) } as const;
 
 export interface Scene {
   readonly db: FakeDb;
