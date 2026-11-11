@@ -86,6 +86,12 @@ const STUDENT_SCOPED_MODEL_LIST: readonly Prisma.ModelName[] = [
   // Progression on a duplicate — the chat award keys on the conversation
   // id, so it fires once per conversation, not once per turn.
   "Progression",
+  // The student layout keeps a satisfied gate per student for 10 minutes
+  // (src/lib/dashboard/student-gates.ts, keys under chat:snapshot:). Both are
+  // monotonic today, but a future answer reset or consent revocation must
+  // reach the gate at once, not after the TTL. Both are rare writes.
+  "SecurityQuestionAnswer",
+  "ConsentRecord",
 ];
 
 /**

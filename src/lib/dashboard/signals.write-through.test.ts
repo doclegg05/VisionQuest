@@ -29,6 +29,7 @@ function answer(call: EngineCall): unknown {
   if (call.action === "createOne" && call.modelName === "StudentTask") return { id: "task-1", studentId: A.id };
   if (call.action === "updateOne" && call.modelName === "OrientationItem") return { id: "item-1" };
   if (call.action === "createOne" && call.modelName === "Certification") return { id: "cert-1", studentId: A.id };
+  if (call.action === "deleteMany" || call.action === "updateMany" || call.action === "createMany") return { count: 1 };
   // The slow signals' reads: nothing found, except the counts above (1 each),
   // which is enough for the read to count as having seen the student's rows.
   if (call.action === "findFirst" || call.action === "findUnique") return null;
@@ -100,6 +101,34 @@ describe("the page-render shell (readPageShell)", () => {
     held.release();
     await page;
     assert.equal(await shellReads(A), 3, "a shell read that began before A's goal write was kept after it");
+  });
+});
+
+describe("layout gate keys, cleared by the real write-through", () => {
+  /** Plants a satisfied gate for A, runs `write`, and says whether the gate was read again. */
+  async function gateReread(layer: string, write: () => Promise<unknown>): Promise<boolean> {
+    const { studentCacheKey } = await import("./student-cache");
+    const key = studentCacheKey(A, layer);
+    await cache.cached(key, 600, async () => true);
+    await asStudent(A, write);
+    let reread = false;
+    await cache.cached(key, 600, async () => { reread = true; return false; });
+    return reread;
+  }
+
+  it("replacing the recovery answers clears the kept recovery gate", async () => {
+    const reread = await gateReread("gate:recovery-questions", () => db.prisma.$transaction(async (tx) => {
+      await tx.securityQuestionAnswer.deleteMany({ where: { studentId: A.id } });
+      await tx.securityQuestionAnswer.createMany({ data: [{ studentId: A.id, questionKey: "first-job", answerHash: "h" }] });
+    }));
+    assert.equal(reread, true, "the recovery gate outlived a SecurityQuestionAnswer write");
+  });
+
+  it("revoking a consent clears the kept Sage notice gate", async () => {
+    const reread = await gateReread("gate:sage-notice:v1", () => db.prisma.consentRecord.updateMany({
+      where: { studentId: A.id, scope: "sage_notice:v1", revokedAt: null }, data: { revokedAt: new Date() },
+    }));
+    assert.equal(reread, true, "the Sage notice gate outlived a ConsentRecord write");
   });
 });
 

@@ -8,6 +8,9 @@
  * scopes, so nothing revokes it. A kept "satisfied" therefore cannot let a
  * student past a gate they have not passed, and an unsatisfied student is read
  * on every request, so no kept value can hold one at a gate after they pass it.
+ * Should that change, any SecurityQuestionAnswer or ConsentRecord write
+ * through `prisma` clears the student's gate keys at once (the write-through,
+ * src/lib/chat-context-write-through.ts).
  *
  * Keys hold the student's id (and the notice version) and are filled only
  * from the student's own session; see ./student-cache.ts. The layout keeps
