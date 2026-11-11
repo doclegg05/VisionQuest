@@ -5,10 +5,13 @@
  *     minutes means the demo may still be served, and the server would make the
  *     demo instructor, class and starters again beside real students.
  *   - Records about other people: an audit row, a Sage operation or a message a
- *     demo account is on, but that is about someone the plan keeps. Deleting it
- *     would remove the proof of what a demo account did to real data.
+ *     demo account is on, but that is about someone or something the plan
+ *     keeps. Deleting it would remove the proof of what a demo account did to
+ *     real data.
  *   - SetNull links: a kept row whose link to a deleted row the database would
  *     quietly blank. No count changes, so only this check can see it.
+ *   - Unlinked ids: a kept row that names a deleted upload or goal in a column
+ *     with no foreign key. Nothing changes at all, so again only this check.
  *
  * Each returns a count. closeout.ts turns a count above 0 into a refusal.
  */
@@ -32,9 +35,6 @@ export async function recentActivity(run: Run): Promise<number> {
   return total;
 }
 
-/** The audit target types that name an account or a class. Others (a conversation, a goal) are left alone. */
-const PERSON_OR_CLASS_TARGETS = ["student", "class"];
-
 /** The columns, all deleted by a step, whose rows can be about someone the plan keeps. */
 export const ABOUT_OTHERS = [
   { model: "AuditLog", column: "actorId" },
@@ -42,21 +42,53 @@ export const ABOUT_OTHERS = [
   { model: "OutboundMessage", column: "toId" },
 ] as const;
 
-/** Rows a planned account is on that are about an unplanned account or class. */
-export async function recordsAboutOthers(run: Run): Promise<number> {
+function hasIdColumn(model: string): boolean {
+  return Prisma.dmmf.datamodel.models.some((entry) => entry.name === model && entry.fields.some((field) => field.name === "id" && field.type === "String"));
+}
+
+/** Which of these ids are the id of a row some step deletes. Only the candidates are looked up. */
+async function deletedAmong(run: Run, steps: readonly DeleteStep[], candidates: readonly string[]): Promise<Set<string>> {
+  const found = new Set<string>();
+  for (const step of steps.filter((entry) => hasIdColumn(entry.model))) {
+    for (const chunk of chunksOf(idsFor(run, step.scope), run.chunk)) {
+      for (const wanted of chunksOf(candidates, run.chunk)) {
+        const rows = await tableOf(run.tx, step.model).findMany({ where: { AND: [step.where(chunk), { id: { in: wanted } }] }, select: { id: true } });
+        idsOf(rows, "id").forEach((id) => found.add(id));
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Audit rows a planned account wrote whose target the plan keeps. The target
+ * is often a row id, not a person: an appointment, a certification, a goal.
+ * So every target id must be a planned account, a planned class or a row a
+ * step deletes. Anything else is a record of what a demo account did to data
+ * that stays, and deleting it would erase that record.
+ */
+async function auditRowsAboutKeptTargets(run: Run, steps: readonly DeleteStep[], planned: ReadonlySet<string>): Promise<number> {
+  const targets: string[] = [];
+  for (const chunk of chunksOf(run.plan.accountIds, run.chunk)) {
+    const rows = await tableOf(run.tx, "AuditLog").findMany({ where: { actorId: { in: chunk }, targetId: { not: null } }, select: { targetId: true } });
+    targets.push(...idsOf(rows, "targetId").filter((id) => !planned.has(id)));
+  }
+  if (targets.length === 0) return 0;
+  const deleted = await deletedAmong(run, steps, [...new Set(targets)]);
+  return targets.filter((id) => !deleted.has(id)).length;
+}
+
+/** Rows a planned account is on that are about a kept account, class or row. */
+export async function recordsAboutOthers(run: Run, steps: readonly DeleteStep[]): Promise<number> {
   const planned = new Set([...run.plan.accountIds, ...run.plan.classIds]);
   const outside = (values: readonly string[]): number => values.filter((value) => !planned.has(value)).length;
-  let total = 0;
+  let total = await auditRowsAboutKeptTargets(run, steps, planned);
   for (const chunk of chunksOf(run.plan.accountIds, run.chunk)) {
-    const audits = await tableOf(run.tx, "AuditLog").findMany({
-      where: { actorId: { in: chunk }, targetType: { in: PERSON_OR_CLASS_TARGETS }, targetId: { not: null } },
-      select: { targetId: true },
-    });
     const operations = await tableOf(run.tx, "SageOperation").findMany({
       where: { actorId: { in: chunk }, targetStudentId: { not: null } },
       select: { targetStudentId: true },
     });
-    total += outside(idsOf(audits, "targetId")) + outside(idsOf(operations, "targetStudentId"));
+    total += outside(idsOf(operations, "targetStudentId"));
     total += await tableOf(run.tx, "OutboundMessage").count({ where: { toId: { in: chunk }, connection: { student: UNMARKED } } });
   }
   return total;
@@ -104,8 +136,12 @@ export function setNullLinksInto(parents: ReadonlySet<string>): SetNullLink[] {
     }));
 }
 
-/** Kept rows that point at a row the plan deletes, through a SetNull link. The database would blank each one. */
-export async function rowsTheDatabaseWouldBlank(run: Run, steps: readonly DeleteStep[], links: readonly SetNullLink[]): Promise<number> {
+/**
+ * Kept rows that point at a row the plan deletes, through one of these links.
+ * Through a SetNull foreign key the database would blank each one; through a
+ * column with no foreign key it would be left naming a row that is gone.
+ */
+export async function keptRowsLinkedToDeleted(run: Run, steps: readonly DeleteStep[], links: readonly SetNullLink[]): Promise<number> {
   const stepsOf = (model: string) => steps.filter((step) => step.model === model);
   let total = 0;
   for (const link of links) {

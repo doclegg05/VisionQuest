@@ -12,6 +12,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
+import { RECENT_MINUTES } from "./closeout.guards";
 
 const ROOT = path.resolve(__dirname, "../../..");
 const read = (file: string): string => readFileSync(path.join(ROOT, file), "utf8");
@@ -63,10 +64,19 @@ describe("demo closeout backup commands in DEPLOY.md", () => {
   it("never shows a connection string, or a name standing in for one, on a command line", () => {
     assert.doesNotMatch(backups, /"DIRECT_URL"|"DATABASE_URL"|"ADMIN_DATABASE_URL"/);
     assert.doesNotMatch(backups, /postgres(ql)?:\/\//);
-    for (const command of backups.split("\n").filter((line) => /^\s*(pg_dump|psql|pg_restore)\b/.test(line))) {
-      assert.match(command, /"\$ADMIN_DATABASE_URL"/, command);
-    }
     assert.match(backups, /read -rs ADMIN_DATABASE_URL/);
+  });
+
+  it("keeps the password off the command line: pg_dump and psql get a URL without it, and the password goes in PGPASSWORD", () => {
+    const commands = backups.split("\n").filter((line) => /^\s*(pg_dump|psql|pg_restore)\b/.test(line));
+    assert.ok(commands.length >= 2, `${commands.length} commands`);
+    for (const command of commands) {
+      assert.match(command, /"\$URL_WITHOUT_PASSWORD"/, command);
+      assert.doesNotMatch(command, /ADMIN_DATABASE_URL|PGPASSWORD/, command);
+    }
+    assert.match(backups, /export PGPASSWORD="\$\(node -e '[^']*process\.env\.ADMIN_DATABASE_URL[^']*\.password[^']*'\)"/);
+    assert.match(backups, /export URL_WITHOUT_PASSWORD="\$\(node -e '[^']*process\.env\.ADMIN_DATABASE_URL[^']*password = ""[^']*'\)"/);
+    assert.match(backups, /unset PGPASSWORD/);
   });
 
   it("writes the export outside the checkout, in a folder and a file only the owner can read", () => {
@@ -117,9 +127,11 @@ describe("demo closeout procedure in DEPLOY.md", () => {
     assert.ok(apply > off && real > apply, `steps: off ${off}, apply ${apply}, real ${real}`);
   });
 
-  it("waits 15 minutes after the deploy, confirms the backup right before the apply, and previews again the next day", () => {
-    assert.match(steps, /15 minutes/);
-    const backup = stepWith("Confirm the backup");
+  it("waits as long after the deploy as the tool's own recent activity window, confirms the backup right before the apply, and previews again the next day", () => {
+    const wait = stepWith("Wait ");
+    assert.match(numbered[wait - 1], new RegExp(`^${wait}\\. \\*\\*Wait ${RECENT_MINUTES} minutes after the deploy shows Live`));
+    assert.doesNotMatch(steps, /15 minutes/);
+    const backup = stepWith("Make or confirm the backup");
     assert.equal(backup + 1, stepWith("Run the apply"));
     assert.match(step(backup), /every change made after/i);
     assert.match(steps, /next day/i);
@@ -130,6 +142,33 @@ describe("demo closeout procedure in DEPLOY.md", () => {
     assert.doesNotMatch(steps, /`unmarked` is the people it leaves alone/);
     assert.match(steps, /above 0 means mock accounts may still be in the database/);
     assert.match(steps, /`marked` is 0 and `unmarked\.students` is the number you expect/);
+  });
+
+  it("makes a fresh export the default backup, and counts a dashboard backup only with point in time recovery", () => {
+    const backup = step(stepWith("Make or confirm the backup"));
+    assert.match(backup, /\[Backups\]\(#backups\)/);
+    assert.match(backup, /point in time recovery is on/);
+    assert.doesNotMatch(backup, /a backup from today exists/);
+    assert.doesNotMatch(backup, /today's backup in the list/);
+  });
+
+  it("says which printed value to compare with which Supabase dashboard field, and not to compare the server address", () => {
+    const preview = step(stepWith("Run the preview and read it"));
+    assert.match(preview, /`Project ref:`.*Project ID.*Project Settings, General/);
+    assert.match(preview, /`Target: database \.\.\. on host \.\.\.`.*host.*Connect/);
+    assert.match(preview, /`Server address:`.*do not compare it/i);
+    assert.doesNotMatch(preview, /The host must be the production database host shown in the Supabase dashboard, Project Settings, Database/);
+  });
+
+  it("asks for each orphan column in the preview, says the apply refuses if one rises, and does not ask for 0 orphans afterwards", () => {
+    const preview = step(stepWith("Run the preview and read it"));
+    assert.match(preview, /`leftBehind\.orphans`/);
+    assert.match(preview, /each column/i);
+    assert.match(preview, /refuses if any column is higher/);
+    const again = step(stepWith("Run the preview again"));
+    assert.doesNotMatch(again, /0 rows name an account or class that does not exist/);
+    assert.doesNotMatch(again, /orphan total is above 0/);
+    assert.match(again, /`marked` is 0/);
   });
 
   it("never says a stopped run rolled back, and gives the sentence the tool prints instead", () => {

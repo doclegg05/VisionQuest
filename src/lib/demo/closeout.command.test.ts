@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { closeoutClientOptions, runCloseoutCommand, type CommandResult } from "./closeout.command";
-import { FAILURES, REFUSALS, targetLine } from "./closeout.report";
+import { FAILURES, REFUSALS, targetLines } from "./closeout.report";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN } from "./config";
 import { LOCAL, scene, type FakeDb } from "./closeout.fixtures";
 
@@ -18,7 +18,11 @@ const PASSWORD = ["not", "a", "real", "password"].join("-");
 const USER = "owner.projectref";
 const URL = ["postgresql://", USER, ":", PASSWORD, "@db.example.test:5432/visionquest?sslmode=require"].join("");
 const APPLY = ["--apply", "--confirm-demo-disabled", "--expect-accounts=2"];
-const TARGET = "Target: database closeout_fake on host 10.0.0.7 (the connection string names db.example.test)";
+const TARGET = [
+  "Target: database closeout_fake on host db.example.test",
+  "Project ref: not in the connection string.",
+  "Server address: 10.0.0.7. This is the private address the server reports. It is not in the Supabase dashboard, so do not compare it.",
+];
 
 function command(db: FakeDb, argv: readonly string[], env: Readonly<Record<string, string>> = { ADMIN_DATABASE_URL: URL }) {
   const opened: string[] = [];
@@ -38,8 +42,8 @@ describe("demo closeout command", () => {
 
     assert.equal(exitCode, 0);
     assert.deepEqual(stderr, []);
-    assert.equal(stdout[0], TARGET);
-    assert.equal(JSON.parse(stdout[1]).kind, "preview");
+    assert.deepEqual(stdout.slice(0, 3), TARGET);
+    assert.equal(JSON.parse(stdout[3]).kind, "preview");
     assert.ok(stdout.length > 3);
     assert.deepEqual(opened, [URL]);
     assert.equal(db.snapshot(), before);
@@ -53,8 +57,8 @@ describe("demo closeout command", () => {
 
     assert.equal(exitCode, 0);
     assert.deepEqual(stderr, []);
-    assert.equal(stdout[0], TARGET);
-    assert.equal(JSON.parse(stdout[1]).kind, "applied");
+    assert.deepEqual(stdout.slice(0, 3), TARGET);
+    assert.equal(JSON.parse(stdout[3]).kind, "applied");
     assert.equal(db.rows("Student").filter((row) => row.demoAccount !== null).length, 0);
   });
 
@@ -120,7 +124,7 @@ describe("demo closeout command", () => {
     const { exitCode, stdout, stderr } = await command(db, APPLY).result;
 
     assert.equal(exitCode, 2);
-    assert.equal(stdout[0], TARGET);
+    assert.deepEqual(stdout.slice(0, 3), TARGET);
     assert.deepEqual(stderr, [`Refused: ${REFUSALS.unmarked_student_in_demo_class} (count: 1)`]);
     assert.equal(db.snapshot(), before);
   });
@@ -132,8 +136,8 @@ describe("demo closeout command", () => {
     const { exitCode, stdout, stderr } = await command(db, []).result;
 
     assert.equal(exitCode, 2);
-    assert.equal(stdout[0], TARGET);
-    assert.equal(JSON.parse(stdout[1]).kind, "unreadable");
+    assert.deepEqual(stdout.slice(0, 3), TARGET);
+    assert.equal(JSON.parse(stdout[3]).kind, "unreadable");
     assert.deepEqual(stderr, [`Refused: ${REFUSALS.cannot_see_every_row} (count: 1)`]);
   });
 
@@ -166,37 +170,67 @@ describe("demo closeout command", () => {
   });
 });
 
-describe("demo closeout target line", () => {
+describe("demo closeout target lines", () => {
   const server = { database: "postgres", serverAddress: "10.0.47.12" };
+  const REF = "abcdefghijklmnopqrst";
+  const POOLER = "aws-0-us-east-1.pooler.supabase.com";
+  const supabase = (password: string) => ["postgresql://postgres.", REF, ":", password, "@", POOLER, ":5432/postgres?sslmode=require"].join("");
+  const ADDRESS_LINE = "Server address: 10.0.47.12. This is the private address the server reports. It is not in the Supabase dashboard, so do not compare it.";
 
-  it("gives the server's database name and address, and the host the connection string names", () => {
-    assert.equal(targetLine(server, URL), "Target: database postgres on host 10.0.47.12 (the connection string names db.example.test)");
+  it("gives the host and the project ref from the connection string, and the server's address on its own line", () => {
+    assert.deepEqual(targetLines(server, supabase(PASSWORD)), [
+      `Target: database postgres on host ${POOLER}`,
+      `Project ref: ${REF}`,
+      ADDRESS_LINE,
+    ]);
   });
 
-  it("falls back to the connection string's host when the server reports no address", () => {
-    assert.equal(targetLine({ ...server, serverAddress: null }, URL), "Target: database postgres on host db.example.test");
+  it("says when the connection string holds no project ref, and when the server reports no address", () => {
+    assert.deepEqual(targetLines({ ...server, serverAddress: null }, URL), [
+      "Target: database postgres on host db.example.test",
+      "Project ref: not in the connection string.",
+      "Server address: not reported.",
+    ]);
   });
 
   it("does not trust the host in a connection string that overrides it with a host option", () => {
-    const overridden = `${URL}&host=%2Fvar%2Frun%2Fpostgresql`;
+    const overridden = `${URL}&host=/var/run/postgresql`;
 
-    assert.equal(targetLine(server, overridden), "Target: database postgres on host 10.0.47.12");
-    assert.equal(targetLine({ ...server, serverAddress: null }, overridden), "Target: database postgres on host unknown");
+    assert.equal(targetLines(server, overridden)[0], "Target: database postgres on host unknown");
   });
 
-  it("says unknown, and prints nothing else, for a connection string it cannot read", () => {
-    for (const unreadable of ["", "not a url", `postgresql://${USER}:12/${PASSWORD}@db.example.test/visionquest`]) {
-      const line = targetLine({ ...server, serverAddress: null }, unreadable);
-
-      assert.equal(line, "Target: database postgres on host unknown", unreadable);
+  it("says unknown, and prints nothing else from it, for a connection string it cannot read", () => {
+    for (const unreadable of ["", "not a url", "postgresql://"]) {
+      assert.deepEqual(targetLines({ ...server, serverAddress: null }, unreadable).slice(0, 2), [
+        "Target: database postgres on host unknown",
+        "Project ref: not in the connection string.",
+      ], unreadable);
     }
+  });
+
+  it("never prints any part of a password, whatever characters it holds", () => {
+    const passwords = [
+      "Zq9?Xw8", "Zq9#Xw8", "Zq9/Xw8", "Zq9@Xw8", "Zq9%40Xw8", "Zq9%3FXw8%23Vu7%2FTs6",
+      "Zq9?Xw8#Vu7/Ts6@Rp5%40On4", "Zq9:Xw8", "Zq9@evil.example.test:5432/Xw8", "123/Zq9@Xw8", "Zq9?host=Xw8",
+    ];
+    for (const password of passwords) {
+      const printed = targetLines(server, supabase(password)).join("\n");
+      const pieces = password.split(/[^A-Za-z0-9]+/).filter((piece) => piece.length >= 3 && /\d/.test(piece));
+
+      for (const piece of pieces) assert.equal(printed.includes(piece), false, `${password}: ${piece}`);
+      assert.match(printed, new RegExp(`^Target: database postgres on host (${POOLER.replace(/\./g, "\\.")}|unknown)$`, "m"), password);
+    }
+  });
+
+  it("finds the host and ref when the password is percent encoded, as Prisma needs it", () => {
+    assert.deepEqual(targetLines(server, supabase("Zq9%3FXw8%40Vu7%2F")).slice(0, 2), [`Target: database postgres on host ${POOLER}`, `Project ref: ${REF}`]);
   });
 
   it("never holds the user, the password, the query string or the path", () => {
     for (const address of ["10.0.47.12", null]) {
-      const line = targetLine({ ...server, serverAddress: address }, URL);
+      const printed = targetLines({ ...server, serverAddress: address }, URL).join("\n");
 
-      for (const secret of [USER, PASSWORD, "sslmode", "visionquest", "5432", "postgresql://"]) assert.equal(line.includes(secret), false, secret);
+      for (const secret of [USER, PASSWORD, "sslmode", "visionquest", "5432", "postgresql://"]) assert.equal(printed.includes(secret), false, secret);
     }
   });
 });
@@ -259,15 +293,33 @@ describe("demo closeout sentences about what is left", () => {
     assert.ok(stdout.includes("1 public credential page of an account with no demo mark is switched on. Anyone who has its address can open it. This tool does not change it."), stdout.join("\n"));
   });
 
-  it("says how many rows name an account or class that does not exist, and that the number must be 0", async () => {
+  it("says how many rows name an account or class that does not exist, column by column, and that the apply compares them", async () => {
     const { db } = await scene();
     const clean = await command(db, []).result;
     db.insert("AuditLog", { action: "x", targetType: "student", targetId: "gone-student" });
+    db.insert("AuditLog", { action: "x", targetType: "student", targetId: "gone-too" });
+    db.insert("SageMemory", { subjectType: "student", subjectId: "gone-student", content: "x", kind: "x", category: "x", sourceType: "x", sourceHash: "x" });
 
     const { stdout } = await command(db, []).result;
 
     assert.ok(clean.stdout.includes("0 rows name an account or class that does not exist."), clean.stdout.join("\n"));
-    assert.ok(stdout.includes("1 row names an account or class that does not exist. After an apply this must be 0. If it is not, stop and ask a developer. The tool does not change these rows."), stdout.join("\n"));
+    for (const line of [
+      "3 rows name an account or class that does not exist. Some are expected, such as Sage records kept on purpose for students who left. Write down each number below. The apply counts them again after its deletes and refuses if any column is higher. The tool does not change these rows.",
+      "Orphan rows in AuditLog.targetId: 2",
+      "Orphan rows in SageMemory.subjectId: 1",
+    ]) assert.ok(stdout.includes(line), `${line}\n---\n${stdout.join("\n")}`);
+    assert.equal(stdout.some((line) => line.startsWith("Orphan rows in AuditLog.actorId")), false);
+  });
+
+  it("says after an apply, for each column with orphan rows, that it did not rise", async () => {
+    const { db } = await scene();
+    db.insert("AuditLog", { action: "x", targetType: "student", targetId: "gone-student" });
+
+    const { exitCode, stdout } = await command(db, APPLY).result;
+
+    assert.equal(exitCode, 0);
+    assert.ok(stdout.includes("Orphan rows in AuditLog.targetId: 1 before the deletes, 1 after. Not higher."), stdout.join("\n"));
+    assert.ok(stdout.includes("No column of orphan rows is higher after the deletes than before them."), stdout.join("\n"));
   });
 
   it("says what the tool leaves in settings, staff notices, listings and storage", async () => {
@@ -301,7 +353,7 @@ describe("demo closeout sentences about what is left", () => {
     const { exitCode, stdout, stderr } = await command(db, APPLY).result;
 
     assert.equal(exitCode, 3);
-    assert.equal(JSON.parse(stdout[1]).kind, "applied");
+    assert.equal(JSON.parse(stdout[3]).kind, "applied");
     assert.deepEqual(stderr, ["Not finished: 1 demo account was created while the closeout ran, so demo mode is still on somewhere. It is still in the database. Check that demo mode is off in Render, wait 30 minutes, and start again from the preview."]);
   });
 
@@ -328,7 +380,7 @@ describe("demo closeout failures", () => {
     const { exitCode, stdout, stderr } = await command(db, APPLY).result;
 
     assert.equal(exitCode, 1);
-    assert.deepEqual(stdout, [TARGET]);
+    assert.deepEqual(stdout, TARGET);
     assert.deepEqual(stderr, ["The tool stopped. Run the preview again to see whether anything was deleted. If `marked` is 0, the closeout finished. If this keeps happening, stop and ask a developer. Do not change the database by hand."]);
     assert.equal(stderr[0], FAILURES.stopped);
     assert.equal(db.snapshot(), before);
@@ -431,7 +483,7 @@ describe("demo closeout command prints counts, the database name and the host on
     assert.doesNotMatch(text, /@|maria|gonzalez/i);
     assert.doesNotMatch(text, /\bc[a-z0-9]{24}\b/);
     for (const secret of [DEMO_INSTRUCTOR_LOGIN, DEMO_CLASS_CODE, PASSWORD, USER, "postgresql://", "sslmode"]) assert.equal(text.includes(secret), false, secret);
-    assert.deepEqual(textLeaves(JSON.parse(result.stdout[1])), []);
+    assert.deepEqual(textLeaves(JSON.parse(result.stdout[3])), []);
     assert.ok(db.disconnects >= 1);
   }
 
@@ -443,7 +495,7 @@ describe("demo closeout command prints counts, the database name and the host on
 
     const result = await command(db, []).result;
 
-    assert.equal(JSON.parse(result.stdout[1]).kind, "preview");
+    assert.equal(JSON.parse(result.stdout[3]).kind, "preview");
     assertNoLeak(db, seeded, result);
   });
 
@@ -467,7 +519,7 @@ describe("demo closeout command prints counts, the database name and the host on
 
     const result = await command(db, APPLY).result;
 
-    assert.equal(JSON.parse(result.stdout[1]).kind, "applied");
+    assert.equal(JSON.parse(result.stdout[3]).kind, "applied");
     assertNoLeak(db, seeded, result);
   });
 

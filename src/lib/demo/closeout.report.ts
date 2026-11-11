@@ -1,8 +1,9 @@
 /**
  * Demo closeout (readiness H10): every word the tool can say.
  *
- * Fixed sentences only. A sentence may carry a count, the database name or the
- * host. It never carries a name, a login, an email, an id or any text that came
+ * Fixed sentences only. A sentence may carry a count, the database name, the
+ * host, the server's address or the Supabase project ref. It never carries a
+ * name, a login, an email, an id, any part of a password or any text that came
  * from an error, because an error can quote all of those.
  */
 
@@ -18,10 +19,12 @@ export const REFUSALS = {
   unmarked_rows_on_demo_class: "Rows that belong to accounts not marked as demo are attached to a demo class. Nothing was deleted.",
   marked_staff_over_unmarked_students: "A marked demo account teaches or coordinates a class or region that has unmarked students. Nothing was deleted.",
   marked_account_on_kept_rows: "A marked demo account is named on rows that belong to other people or to the program. Nothing was deleted.",
-  records_about_unmarked_people: "A marked demo account is on an audit record, a Sage action or a message about a person or class that is not demo. Deleting it would erase the record of what the demo account did to real data. Nothing was deleted.",
+  records_about_unmarked_people: "A marked demo account is on an audit record, a Sage action or a message about a person, a class or a record that is not demo, such as a real student's appointment. Deleting it would erase the record of what the demo account did to real data. Nothing was deleted.",
   kept_rows_would_be_blanked: "Rows that are kept point at a row the closeout would delete, and the database would quietly blank that link. Nothing was deleted.",
+  kept_rows_name_deleted_rows: "Rows that are kept hold the id of an upload or a goal the closeout would delete, with no link in the database to stop it, so they would be left pointing at nothing. Nothing was deleted.",
   rows_left_pointing: "Rows would be left pointing at a deleted account or class. Nothing was deleted.",
   unlisted_rows_removed: "The deletion would remove rows the preview did not list. Nothing was deleted.",
+  orphans_rose: "After the deletes, more rows would name an account or class that does not exist than before them, so the deletion would leave rows pointing at nothing. Nothing was deleted.",
 } as const;
 export type RefusalCode = keyof typeof REFUSALS;
 
@@ -62,33 +65,74 @@ export function failureSentence(error: unknown, apply: boolean): string {
 
 /** A host name or address made only of the characters one can hold. Anything else is not printed. */
 const HOST_SHAPE = /^[A-Za-z0-9.:[\]-]+$/;
+/** A Supabase pooler user: `postgres.` and the 20 character project ref, which is not a secret. */
+const SUPABASE_USER = /^postgres\.([a-z0-9]{20})$/;
+
+/** What the connection string says about where it goes. Never the password or anything else from the user part. */
+interface NamedTarget {
+  readonly host: string | null;
+  readonly projectRef: string | null;
+}
+
+const NOTHING: NamedTarget = { host: null, projectRef: null };
 
 /**
- * The host a connection string names, or null when it cannot be trusted: the
- * string does not parse, it carries a `host` option (which overrides the host
- * written in it), or it parsed into something that is not shaped like a host.
+ * Reads the host and the user from a connection string by hand, without
+ * trusting it to be encoded. The host is what follows the last `@`, which a
+ * password can never reach past, up to the port, path, query or fragment. The
+ * user is what comes before the first `:` of the part before that `@`.
  */
-function hostNamedIn(connectionString: string): string | null {
+function splitConnectionString(connectionString: string): { readonly user: string; readonly host: string; readonly rest: string } | null {
+  const scheme = connectionString.indexOf("://");
+  if (scheme === -1) return null;
+  const afterScheme = connectionString.slice(scheme + 3);
+  const at = afterScheme.lastIndexOf("@");
+  const userInfo = at === -1 ? "" : afterScheme.slice(0, at);
+  const hostAndRest = afterScheme.slice(at + 1);
+  const end = hostAndRest.startsWith("[") ? hostAndRest.indexOf("]") + 1 : hostAndRest.search(/[:/?#]|$/);
+  return { user: userInfo.split(":")[0], host: hostAndRest.slice(0, end), rest: hostAndRest.slice(end) };
+}
+
+/** The same host as the standard parser reads, when it can read the string at all. A disagreement means do not trust either. */
+function standardHostAgrees(connectionString: string, host: string): boolean {
   try {
-    const url = new URL(connectionString);
-    if (url.searchParams.has("host") || url.pathname.includes("@")) return null;
-    return HOST_SHAPE.test(url.hostname) ? url.hostname : null;
+    return new URL(connectionString).hostname === host;
   } catch {
-    // An unreadable connection string names no host. The caller prints "unknown".
-    return null;
+    // Not readable by the standard parser, as with a password that is not percent encoded. The hand reading stands.
+    return true;
   }
 }
 
 /**
- * The first line of every run: which database this is. The name and the
- * address come from the server. The connection string adds only its host name,
- * and never its user, password, port, path or options.
+ * The host and the Supabase project ref a connection string names, each null
+ * when it cannot be trusted: the string does not parse, it carries a `host`
+ * option (which overrides the host written in it), or a part is not shaped
+ * like a host or a ref.
  */
-export function targetLine(target: { readonly database: string; readonly serverAddress: string | null }, connectionString: string): string {
-  const named = hostNamedIn(connectionString);
-  const host = target.serverAddress ?? named ?? "unknown";
-  const also = target.serverAddress !== null && named !== null && named !== target.serverAddress ? ` (the connection string names ${named})` : "";
-  return `Target: database ${target.database} on host ${host}${also}`;
+export function namedTarget(connectionString: string): NamedTarget {
+  const parts = splitConnectionString(connectionString);
+  if (!parts || !HOST_SHAPE.test(parts.host) || /[?&]host=/.test(parts.rest)) return NOTHING;
+  if (!standardHostAgrees(connectionString, parts.host)) return NOTHING;
+  return { host: parts.host, projectRef: SUPABASE_USER.exec(parts.user)?.[1] ?? null };
+}
+
+/**
+ * The first lines of every run: which database this is. The database name and
+ * the server's own address come from the server. The connection string adds
+ * its host and, for a Supabase pooler user, the project ref. These two are what
+ * the owner compares with the Supabase dashboard. Never the password, port,
+ * path or options.
+ */
+export function targetLines(target: { readonly database: string; readonly serverAddress: string | null }, connectionString: string): string[] {
+  const named = namedTarget(connectionString);
+  const address = target.serverAddress !== null && HOST_SHAPE.test(target.serverAddress)
+    ? `Server address: ${target.serverAddress}. This is the private address the server reports. It is not in the Supabase dashboard, so do not compare it.`
+    : "Server address: not reported.";
+  return [
+    `Target: database ${target.database} on host ${named.host ?? "unknown"}`,
+    named.projectRef ? `Project ref: ${named.projectRef}` : "Project ref: not in the connection string.",
+    address,
+  ];
 }
 
 const many = (count: number, one: string, more: string): string => `${count} ${count === 1 ? one : more}`;
@@ -127,9 +171,10 @@ function leftoverLines(counts: ReportCounts): string[] {
   const files = counts.uploadedFilesLeftInStorage;
   const folders = counts.leftBehind.storageFoldersOfDemoAccounts;
   const listings = counts.leftBehind.opportunitiesFromDemoLeads;
-  const lines = [orphaned === 0
-    ? "0 rows name an account or class that does not exist."
-    : `${many(orphaned, "row names", "rows name")} an account or class that does not exist. After an apply this must be 0. If it is not, stop and ask a developer. The tool does not change these rows.`];
+  const lines = orphaned === 0
+    ? ["0 rows name an account or class that does not exist."]
+    : [`${many(orphaned, "row names", "rows name")} an account or class that does not exist. Some are expected, such as Sage records kept on purpose for students who left. Write down each number below. The apply counts them again after its deletes and refuses if any column is higher. The tool does not change these rows.`,
+      ...Object.entries(orphans).filter(([, count]) => count > 0).map(([column, count]) => `Orphan rows in ${column}: ${count}`)];
   if (settings > 0) lines.push(`${many(settings, "program setting holds", "program settings hold")} the id of the demo class. Remove the class from ${settings === 1 ? "it" : "them"} in Program Setup, or ask a developer.`);
   if (notices > 0) lines.push(`${many(notices, "notice to a staff member names", "notices to staff members name")} a demo account. ${notices === 1 ? "It stays in that staff member's list of notices." : "They stay in those staff members' lists of notices."}`);
   if (listings > 0) lines.push(`${many(listings, "opportunity listing was", "opportunity listings were")} copied from a demo class job lead. ${listings === 1 ? "It stays." : "They stay."}`);
@@ -184,9 +229,17 @@ export function afterCommitLine(markedAccounts: number | null): { readonly finis
   };
 }
 
+/** Each orphan column that held a row before or after the deletes, and whether it rose. The apply refuses if one did. */
+function orphanChangeLines(orphans: Readonly<Record<string, { readonly before: number; readonly after: number }>>): string[] {
+  const lines = Object.entries(orphans).filter(([, change]) => change.before + change.after > 0).map(([column, change]) =>
+    `Orphan rows in ${column}: ${change.before} before the deletes, ${change.after} after. ${change.after > change.before ? "Higher." : "Not higher."}`);
+  const rose = Object.values(orphans).some((change) => change.after > change.before);
+  return [...lines, rose ? "A column of orphan rows is higher after the deletes. Stop and ask a developer." : "No column of orphan rows is higher after the deletes than before them."];
+}
+
 /** The sentences under an apply. */
-export function appliedLines(counts: ReportCounts): string[] {
-  return [markedLine(counts, true), ...leftBehindLines(counts)];
+export function appliedLines(counts: ReportCounts, orphans: Readonly<Record<string, { readonly before: number; readonly after: number }>>): string[] {
+  return [markedLine(counts, true), ...orphanChangeLines(orphans), ...leftBehindLines(counts)];
 }
 
 export const USAGE = [

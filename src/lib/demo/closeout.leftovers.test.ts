@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { runDemoCloseout, type CloseoutOptions, type CloseoutOutcome, type CloseoutPreview } from "./closeout";
+import { REFUSALS, runDemoCloseout, type CloseoutOptions, type CloseoutOutcome, type CloseoutPreview } from "./closeout";
 import { FAKE_MIGRATION, LOCAL, copyOf, scene, type FakeDb } from "./closeout.fixtures";
 
 const preview = (db: FakeDb, extra: Partial<CloseoutOptions> = {}): Promise<CloseoutOutcome> =>
@@ -55,6 +55,53 @@ describe("demo closeout orphan counts", () => {
     assert.ok(db.rows("SageOperation").some((row) => row.actorId === "system"));
     assert.equal(orphans["SageOperation.actorId"], 0);
   });
+
+  it("does not count the actors production writes that are not accounts: admin-key, system:..., deterministic", async () => {
+    const { db } = await scene();
+    db.insert("AuditLog", { action: "x", targetType: "student", actorId: "admin-key", targetId: "rl-student" });
+    db.insert("AuditLog", { action: "x", targetType: "system_config", actorId: "system:sage-autopilot" });
+    copyOf(db, "SageOperation", "rl-", { actorId: "system:sage-autopilot", actorType: "student" });
+    copyOf(db, "WagerVerdict", "rl-", { resolvedBy: "deterministic" });
+
+    const { orphans } = countsOf(await preview(db)).leftBehind;
+
+    assert.equal(total(orphans), 0, JSON.stringify(orphans));
+  });
+
+  it("applies over orphans that were there before, and reports each column before and after", async () => {
+    const { db } = await scene();
+    // Sage keeps operations about students who were offboarded on purpose (schema, SageOperation).
+    copyOf(db, "SageOperation", "rl-", { targetStudentId: "an-offboarded-student" });
+
+    const outcome = await apply(db);
+
+    assert.equal(outcome.kind, "applied");
+    if (outcome.kind !== "applied") return;
+    assert.deepEqual(outcome.orphans["SageOperation.targetStudentId"], { before: 1, after: 1 });
+    assert.deepEqual(outcome.orphans["AuditLog.actorId"], { before: 0, after: 0 });
+    assert.equal(Object.keys(outcome.orphans).length, Object.keys(outcome.preview.leftBehind.orphans).length);
+  });
+});
+
+describe("demo closeout refusals found by counting orphans inside the apply", () => {
+  const cases = [{
+    name: "a row naming a missing account appears during the apply", code: "orphans_rose" as const,
+    // Stands in for a row written late: it lands after the accounts are deleted, where no earlier check can see it.
+    arrange: (db: FakeDb) => db.afterDeleteFrom("Student", () => void db.insert("AuditLog", { action: "x", targetType: "x", actorId: "a-deleted-account" })),
+  }];
+  for (const refusal of cases) {
+    it(`refuses and changes nothing when ${refusal.name}`, async () => {
+      const { db } = await scene();
+      const before = db.snapshot();
+      refusal.arrange(db);
+
+      const outcome = await apply(db);
+
+      assert.equal(outcome.kind, "refused");
+      assert.deepEqual(outcome.refusals, [{ code: refusal.code, sentence: REFUSALS[refusal.code], count: 1 }]);
+      assert.equal(db.snapshot(), before);
+    });
+  }
 });
 
 describe("demo closeout queued jobs", () => {
@@ -71,6 +118,31 @@ describe("demo closeout queued jobs", () => {
     assert.equal(payloads.some((payload) => payload.includes(demo.studentId)), false);
     assert.equal(payloads.some((payload) => payload.includes(real.studentId)), true);
     assert.ok(payloads.includes("not json"));
+  });
+});
+
+describe("demo closeout jobs reached through the demo class and its wagers", () => {
+  it("deletes jobs whose payload names the demo class, its scrape config or run, or a demo wager, and keeps the same for the other universe", async () => {
+    const { db } = await scene();
+    const jobs = (prefix: string, classId: string) => [
+      { type: "scrape_jobs", payload: JSON.stringify({ configId: `${prefix}JobClassConfig`, scrapeRunId: `${prefix}JobScrapeRun` }) },
+      { type: "scrape_jobs", payload: JSON.stringify({ scrapeRunId: `${prefix}JobScrapeRun` }) },
+      { type: "wager_diagnosis", payload: JSON.stringify({ wagerId: `${prefix}Wager` }) },
+      { type: "x", payload: JSON.stringify({ classId }) },
+    ];
+    const demoClass = db.rows("SpokesClass").find((row) => String(row.id).startsWith("dm-"))?.id;
+    const realClass = db.rows("SpokesClass").find((row) => String(row.id).startsWith("rl-"))?.id;
+    jobs("dm-", String(demoClass)).forEach((job, index) => db.insert("BackgroundJob", { id: `job-dm-${index}`, ...job }));
+    jobs("rl-", String(realClass)).forEach((job, index) => db.insert("BackgroundJob", { id: `job-rl-${index}`, ...job }));
+
+    const previewed = countsOf(await preview(db));
+    const outcome = await apply(db);
+
+    assert.equal(outcome.kind, "applied");
+    assert.equal(previewed.rowsToDelete.BackgroundJob, 1 + 4);
+    const left = db.rows("BackgroundJob").map((row) => String(row.id));
+    assert.deepEqual(left.filter((id) => id.startsWith("job-dm-")), []);
+    assert.equal(left.filter((id) => id.startsWith("job-rl-")).length, 4);
   });
 });
 
@@ -103,14 +175,16 @@ describe("demo closeout counts of what it leaves", () => {
 });
 
 describe("demo closeout audit records", () => {
-  it("does not refuse a demo chat's audit row, whose target is a conversation id", async () => {
+  it("does not refuse audit rows about the demo's own chat, certification and appointment, which the plan deletes", async () => {
     const { db, demo } = await scene();
-    copyOf(db, "AuditLog", "dm-", { actorId: demo.studentId, targetType: "sage_conversation", targetId: "a-conversation" });
+    const targets = { sage_conversation: "dm-Conversation", certification: "dm-Certification", appointment: "dm-Appointment" };
+    for (const [targetType, targetId] of Object.entries(targets)) copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType, targetId });
 
     const outcome = await apply(db);
 
+    assert.deepEqual(outcome.refusals, []);
     assert.equal(outcome.kind, "applied");
-    assert.equal(db.rows("AuditLog").some((row) => row.targetId === "a-conversation"), false);
+    assert.equal(db.rows("AuditLog").some((row) => Object.values(targets).includes(String(row.targetId))), false);
   });
 
   it("writes the per-model counts, the files left, the newest migration and the unmarked actors to its own audit row", async () => {

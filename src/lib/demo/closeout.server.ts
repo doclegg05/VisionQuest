@@ -30,8 +30,8 @@ export interface ServerFacts {
   readonly now: Date;
   /** True for a superuser or a role with BYPASSRLS: no policy hides a row from it. */
   readonly seesEveryRow: boolean;
-  /** The newest migration the ledger lists as applied, or null when there is no ledger or no row. */
-  readonly newestMigration: string | null;
+  /** Every migration the ledger lists as applied, sorted, or null when there is no ledger. */
+  readonly appliedMigrations: readonly string[] | null;
 }
 
 function rowsOf(result: unknown): Row[] {
@@ -66,19 +66,21 @@ export async function tryCreateLock(tx: CloseoutTx): Promise<boolean> {
 }
 
 /**
- * The newest applied migration by name. Prisma keeps the ledger in the first
- * schema the datasource lists (visionquest here); an older setup has it in
- * public. Byte order, so it sorts the way the folder names do.
+ * Every migration the ledger lists as finished and not rolled back. Prisma
+ * keeps the ledger in the first schema the datasource lists (visionquest
+ * here); an older setup has it in public. Null when there is no ledger.
  */
-async function newestAppliedMigration(tx: CloseoutTx): Promise<string | null> {
+async function appliedMigrations(tx: CloseoutTx): Promise<string[] | null> {
   const found = await tx.$queryRaw`SELECT to_regclass('visionquest._prisma_migrations') IS NOT NULL AS in_app_schema, to_regclass('public._prisma_migrations') IS NOT NULL AS in_public`;
-  let newest: unknown = null;
+  let rows: unknown;
   if (firstValue(found, "in_app_schema") === true) {
-    newest = firstValue(await tx.$queryRaw`SELECT max(migration_name COLLATE "C") AS newest FROM visionquest."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`, "newest");
+    rows = await tx.$queryRaw`SELECT DISTINCT migration_name AS name FROM visionquest."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
   } else if (firstValue(found, "in_public") === true) {
-    newest = firstValue(await tx.$queryRaw`SELECT max(migration_name COLLATE "C") AS newest FROM public."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`, "newest");
+    rows = await tx.$queryRaw`SELECT DISTINCT migration_name AS name FROM public."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
+  } else {
+    return null;
   }
-  return typeof newest === "string" ? newest : null;
+  return idsOf(rowsOf(rows), "name").sort();
 }
 
 /** Asks the server which database this is, what time it is, what the role may see and how far it is migrated. */
@@ -93,22 +95,33 @@ export async function readServerFacts(tx: CloseoutTx): Promise<ServerFacts> {
     target: { database, serverAddress: typeof address === "string" ? address : null },
     now,
     seesEveryRow: firstValue(role, "rolsuper") === true || firstValue(role, "rolbypassrls") === true,
-    newestMigration: await newestAppliedMigration(tx),
+    appliedMigrations: await appliedMigrations(tx),
   };
 }
 
 /**
- * Queued and finished jobs whose payload names one of these accounts. The
- * payload is JSON text written by `enqueueJob` (src/lib/jobs.ts), which has no
- * foreign key, so the schema would leave every one of these rows behind.
+ * The payload keys that name a row the closeout deletes: a student (most
+ * jobs), a class, a class's scrape config and run (`scrape_jobs`, from
+ * src/app/api/teacher/jobs/refresh/route.ts) and a wager (`wager_diagnosis`).
  */
-export async function jobIdsNaming(tx: CloseoutTx, accountIds: Ids, chunkSize: number): Promise<string[]> {
-  const ids: string[] = [];
-  for (const chunk of chunksOf(accountIds, chunkSize)) {
-    const result = await tx.$queryRaw`SELECT id FROM visionquest."BackgroundJob" WHERE (CASE WHEN left(payload, 1) = '{' THEN payload::jsonb->>'studentId' END) IN (${Prisma.join(chunk)})`;
-    ids.push(...idsOf(rowsOf(result), "id"));
+export type JobPayloadKey = "studentId" | "classId" | "configId" | "scrapeRunId" | "wagerId";
+
+/**
+ * Queued and finished jobs whose payload holds one of these ids under `key`.
+ * The payload is JSON text written by `enqueueJob` (src/lib/jobs.ts), which has
+ * no foreign key, so the schema would leave every one of these rows behind.
+ * Text that does not start with `{` is skipped. pg_input_is_valid would also
+ * skip broken JSON that does, but it needs Postgres 16 and production is not
+ * known to be on it; JSON.stringify never writes broken JSON, and if a row did
+ * hold it the statement would fail and the closeout would stop, not delete.
+ */
+export async function jobIdsNaming(tx: CloseoutTx, key: JobPayloadKey, ids: Ids, chunkSize: number): Promise<string[]> {
+  const found: string[] = [];
+  for (const chunk of chunksOf(ids, chunkSize)) {
+    const result = await tx.$queryRaw`SELECT id FROM visionquest."BackgroundJob" WHERE (CASE WHEN left(payload, 1) = '{' THEN payload::jsonb->>(${key}::text) END) IN (${Prisma.join(chunk)})`;
+    found.push(...idsOf(rowsOf(result), "id"));
   }
-  return ids;
+  return found;
 }
 
 /**
@@ -136,15 +149,27 @@ function countIn(result: unknown): number {
 }
 
 /**
- * Rows of one probe whose id names no row of its parent. The literal `system`
- * is the actor of jobs and is not an id. Names come from ORPHAN_PROBES only;
- * every value is a parameter.
+ * Values production writes in an account column that are not account ids, so
+ * no missing account. Each is the actor of something no person did:
+ *   - `admin-key`: a staff promotion made with the shared ADMIN_KEY
+ *     (ADMIN_KEY_ACTOR, src/lib/promote-staff-account.ts).
+ *   - `deterministic`: a wager verdict a rule resolved (src/lib/sage/wagers.ts).
+ * And every value that starts with SENTINEL_PREFIX: `system` itself, the actor
+ * of jobs, and `system:sage-autopilot` (src/lib/sage/briefing.ts).
+ */
+export const SENTINEL_ACTORS: readonly string[] = ["admin-key", "deterministic"];
+export const SENTINEL_PREFIX = "system";
+
+/**
+ * Rows of one probe whose id names no row of its parent, sentinel actors left
+ * out. Names come from ORPHAN_PROBES only; every value is a parameter.
  */
 export async function countOrphans(tx: CloseoutTx, probe: OrphanProbe): Promise<number> {
   const table = quoted(probe.model);
   const column = quoted(probe.column);
   const kind = probe.only ? Prisma.sql`AND t.${quoted(probe.only.column)} IN (${Prisma.join([...probe.only.values])})` : Prisma.empty;
-  const query = Prisma.sql`SELECT count(*)::int AS orphans FROM visionquest.${table} t WHERE t.${column} IS NOT NULL AND t.${column} <> 'system' ${kind} AND NOT EXISTS (SELECT 1 FROM visionquest.${quoted(probe.parent)} p WHERE p.id = t.${column})`;
+  const notSentinel = Prisma.sql`t.${column} NOT IN (${Prisma.join([...SENTINEL_ACTORS])}) AND left(t.${column}, ${SENTINEL_PREFIX.length}) <> ${SENTINEL_PREFIX}`;
+  const query = Prisma.sql`SELECT count(*)::int AS orphans FROM visionquest.${table} t WHERE t.${column} IS NOT NULL AND ${notSentinel} ${kind} AND NOT EXISTS (SELECT 1 FROM visionquest.${quoted(probe.parent)} p WHERE p.id = t.${column})`;
   return countIn(await tx.$queryRaw(query));
 }
 

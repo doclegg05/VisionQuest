@@ -8,7 +8,7 @@ import { isCohortDemoEnabled } from "./config";
 import { runDemoCloseout, type CloseoutOutcome, type CloseoutTarget } from "./closeout";
 import type { CloseoutClient, DemoEnv } from "./closeout.core";
 import type { LocalSchema } from "./closeout.local";
-import { REFUSALS, USAGE, afterCommitLine, appliedLines, failureSentence, previewLines, targetLine } from "./closeout.report";
+import { REFUSALS, USAGE, afterCommitLine, appliedLines, failureSentence, previewLines, targetLines } from "./closeout.report";
 
 export interface CommandResult {
   /** 0 done, 2 refused, 1 stopped, 3 saved but demo accounts remain or could not be counted. */
@@ -64,12 +64,12 @@ const refusedLines = (outcome: CloseoutOutcome): string[] => outcome.refusals.ma
 
 /** The lines for a run that reached an answer. */
 function report(outcome: CloseoutOutcome, url: string): CommandResult {
-  const head = [targetLine(outcome.target, url), JSON.stringify(outcome, null, 2)];
+  const head = [...targetLines(outcome.target, url), JSON.stringify(outcome, null, 2)];
   if (outcome.kind === "unreadable") return { exitCode: 2, stdout: head, stderr: refusedLines(outcome) };
   if (outcome.kind === "refused") return { exitCode: 2, stdout: head, stderr: refusedLines(outcome) };
   if (outcome.kind === "preview") return { exitCode: 0, stdout: [...head, ...previewLines(outcome.preview, outcome.refusals)], stderr: [] };
   const after = afterCommitLine(outcome.afterCommit.markedAccounts);
-  const stdout = [...head, ...appliedLines(outcome.preview)];
+  const stdout = [...head, ...appliedLines(outcome.preview, outcome.orphans)];
   return after.finished ? { exitCode: 0, stdout: [...stdout, after.line], stderr: [] } : { exitCode: 3, stdout, stderr: [after.line] };
 }
 
@@ -89,7 +89,7 @@ async function attempt(parsed: Extract<Parsed, { kind: "preview" | "apply" }>, e
   } catch (error) {
     // The error is read for its code and never printed: a Prisma error can
     // quote an identifier, a row value or the connection string.
-    result = { exitCode: 1, stdout: target ? [targetLine(target, url)] : [], stderr: [failureSentence(error, apply)] };
+    result = { exitCode: 1, stdout: target ? targetLines(target, url) : [], stderr: [failureSentence(error, apply)] };
   }
   try {
     await client?.$disconnect();

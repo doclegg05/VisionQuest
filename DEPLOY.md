@@ -333,24 +333,37 @@ Supabase handles managed backups. To make an export yourself, follow these steps
    ```
 
    Never type or paste the value into a command itself. Every command below reads it from the variable.
-2. Make the export in a folder outside the checkout that only you can open.
+2. Split the password off. `pg_dump` and `psql` read the password from `PGPASSWORD`, so it never appears on a command line, where other programs on this computer could read it. Run these three lines:
+
+   ```sh
+   export PGPASSWORD="$(node -e 'process.stdout.write(decodeURIComponent(new URL(process.env.ADMIN_DATABASE_URL).password))')"
+   export URL_WITHOUT_PASSWORD="$(node -e 'const url = new URL(process.env.ADMIN_DATABASE_URL); url.password = ""; process.stdout.write(url.href)')"
+   test -n "$PGPASSWORD" && test -n "$URL_WITHOUT_PASSWORD" && echo ready
+   ```
+
+   Success looks like `ready`. If it prints an error or nothing, stop and ask a developer.
+3. Make the export in a folder outside the checkout that only you can open.
 
    ```sh
    mkdir -p -m 700 "$HOME/VisionQuest-backups"
-   pg_dump "$ADMIN_DATABASE_URL" --schema=visionquest --file="$HOME/VisionQuest-backups/visionquest-$(date +%Y-%m-%d-%H%M).sql"
+   pg_dump "$URL_WITHOUT_PASSWORD" --schema=visionquest --file="$HOME/VisionQuest-backups/visionquest-$(date +%Y-%m-%d-%H%M).sql"
    chmod 600 "$HOME/VisionQuest-backups/"*.sql
    ls -lh "$HOME/VisionQuest-backups"
    ```
 
    Success looks like a file named for today with a size above zero. If `pg_dump` prints an error, stop, keep the output, and ask a developer.
-3. Close the terminal window when you are done. That removes the value from memory.
+4. Remove the password from this window, then close the window when you are done. Closing it removes every value from memory.
+
+   ```sh
+   unset PGPASSWORD URL_WITHOUT_PASSWORD
+   ```
 
 Never copy the export into this checkout. As a second lock, `.gitignore` leaves out `/*.sql`, `/*.dump` and `/backups/` at the top of the checkout.
 
-Restore:
+Restore, after steps 1 and 2 above in a new window:
 
 ```sh
-psql "$ADMIN_DATABASE_URL" --set ON_ERROR_STOP=1 --single-transaction --file="$HOME/VisionQuest-backups/NAME_OF_THE_EXPORT.sql"
+psql "$URL_WITHOUT_PASSWORD" --set ON_ERROR_STOP=1 --single-transaction --file="$HOME/VisionQuest-backups/NAME_OF_THE_EXPORT.sql"
 ```
 
 Replace `NAME_OF_THE_EXPORT.sql` with the file name that `ls` showed. This puts an export into a database whose `visionquest` schema is empty, such as a new Supabase project. It stops at the first error and then changes nothing. Putting an export back over the live database removes every change made after the export was taken. Do not do that alone: ask a developer, and read `docs/runbooks/backup-restore.md` first.
@@ -413,7 +426,7 @@ What the tool does not remove:
    ```
    Success looks like each command finishing with no line that starts with `error`. If `git switch main` refuses because of changed files, stop and ask a developer.
 2. **In Render, delete `COHORT_DEMO_MODE` and keep `AI_LOCAL_ONLY`.** Open the Render dashboard, service `visionquest`, **Environment** tab. Delete the key `COHORT_DEMO_MODE`. Delete `COHORT_DEMO_STUDENTS_PER_HOUR`, `COHORT_DEMO_STUDENTS_PER_DAY` and `COHORT_DEMO_SAGE_PER_DAY` too if you added them. Do not delete `AI_LOCAL_ONLY`. Its value must stay `true`, because it is the switch that blocks cloud AI for every account (see [Cloud AI block](#cloud-ai-block-check-before-deploying)). Save, and wait until the deploy shows **Live**. Success looks like the sign in page with no demo buttons and with the Google block back. From then on the demo endpoints answer 404, and a demo session that is still open stops working on its next request.
-3. **Wait 15 minutes after the deploy shows Live.** A visitor who was using the demo when it closed may still have a request in flight. Success looks like 15 minutes on the clock since the deploy went Live.
+3. **Wait 30 minutes after the deploy shows Live.** A visitor who was using the demo when it closed may still have a request in flight, and the tool refuses while a demo account was used in the last 30 minutes. Success looks like 30 minutes on the clock since the deploy went Live.
 4. **Open a new terminal window used only for this, and load the connection string.** In the new window, go to the main checkout folder. Copy the value stored in the Render dashboard, service `visionquest`, **Environment** tab, key `ADMIN_DATABASE_URL`. Run the first line below, paste the value, and press Return. Nothing shows as you paste, and the value is not saved in your shell history. The second line clears the clipboard.
    ```sh
    read -rs ADMIN_DATABASE_URL && export ADMIN_DATABASE_URL
@@ -425,14 +438,17 @@ What the tool does not remove:
    node --import tsx scripts/demo-closeout.ts
    ```
    The preview reads and changes nothing. Read it top to bottom:
-   * The first line is `Target: database ... on host ...`. The host must be the production database host shown in the Supabase dashboard, Project Settings, Database. If it is not, stop.
+   * The first three lines say which database this is. Check two of them against the Supabase dashboard of the production project. If either does not match, stop.
+     * The line `Project ref:` must show the same letters as the Project ID in the Supabase dashboard, Project Settings, General. If it says `not in the connection string`, the value you loaded is not a Supabase pooler connection string: stop and ask a developer.
+     * The line `Target: database ... on host ...` must show the same host as the connection string in the Supabase dashboard. Click **Connect** at the top of the project page, choose the session pooler, and read the host: the part after the `@` and before the next `:`. The database name is `postgres` on every Supabase project, so it tells you nothing.
+     * The line `Server address:` is a private address that the dashboard does not show. Do not compare it.
    * `marked` is the accounts and classes the apply would delete, and `rowsToDelete` is the rows that would go, table by table.
    * `unmarked` is the accounts the tool leaves. Read the sentences under the counts. A number above 0 means mock accounts may still be in the database.
-   * `leftBehind.orphans` lists rows that name an account or class that does not exist. Write down the total the tool prints.
+   * `leftBehind.orphans` lists, for each column, the rows that name an account or class that does not exist. Some are expected, such as Sage records kept on purpose for students who left. The lines that start with `Orphan rows in` give each column's number. Write them down. The apply counts each column again after its deletes and refuses if any column is higher, so you do not need to compare them yourself.
    * `refusals` is the list of reasons an apply would stop. Each is one sentence and a count. Fix the cause and run the preview again. The tool has no option that skips a refusal.
 
    Success looks like exit code 0, no line that starts with `An apply would be refused`, and a last line that says `To apply, use --expect-accounts=` followed by a number. Write that number down. If the refusal says a demo account was used in the last 30 minutes, check step 2 again, wait 30 minutes and run the preview again. For any other refusal you cannot fix yourself, stop, keep the output, and ask a developer.
-6. **Confirm the backup right before the apply.** In the Supabase dashboard open the project, then Database, then Backups. Check that a backup from today exists, or that point in time recovery is on. If neither is true, make an export with the steps under [Backups](#backups), in this same window. The variable is already loaded, so skip their step 1. Restoring a backup puts the whole database back as it was when the backup was taken, so every change made after it is lost, including real work done since. That is why the backup must be from right before the apply. Success looks like today's backup in the list, or an export file in `$HOME/VisionQuest-backups` with a size above zero. Without one, do not go on.
+6. **Make or confirm the backup right before the apply.** Make an export with the steps under [Backups](#backups), in this same window. The variable is already loaded, so skip their step 1. In their step 4, run the `unset` line but do not close the window, because step 7 still needs it. A backup in the Supabase dashboard (Database, then Backups) counts instead only if point in time recovery is on for the project. A daily backup can be almost a day old, and restoring it would throw away every change made after it, including real work done since, so only an export made now or point in time recovery can put the database back to the moment right before the apply. Success looks like an export file in `$HOME/VisionQuest-backups` with today's date and time and a size above zero, or point in time recovery shown as on in the dashboard. Without one, do not go on.
 7. **Run the apply.** Use the number from step 5 in place of `NUMBER`:
    ```sh
    node --import tsx scripts/demo-closeout.ts --apply --confirm-demo-disabled --expect-accounts=NUMBER
@@ -445,7 +461,7 @@ What the tool does not remove:
    ```sh
    node --import tsx scripts/demo-closeout.ts
    ```
-   Success looks like `marked` is 0 and `unmarked.students` is the number you expect, and the line `0 rows name an account or class that does not exist.` If `marked` is above 0, start again from step 5. If the orphan total is above 0, stop and ask a developer.
+   Success looks like `marked` is 0 and `unmarked.students` is the number you expect. If `marked` is above 0, start again from step 5. The orphan numbers can be above 0 here: the apply in step 7 has already checked that no column rose, and its output said so on the line `No column of orphan rows is higher after the deletes than before them.`
 9. **Set `REAL_STUDENT_DATA` to `true`.** In the Render dashboard, service `visionquest`, **Environment** tab, add the key `REAL_STUDENT_DATA` with the value `true`. Do it only after step 8 has succeeded, and before the first real student gets an account. From then on production refuses to start if `COHORT_DEMO_MODE` is ever turned on again. Success looks like the next deploy showing **Live**.
 10. **Check the site.** Success looks like all of these:
     * The Render log of the start after step 9 has no line named `boot_probe_demo_closeout_unfinished` and none named `boot_probe_demo_rows_beside_real_data`.
@@ -455,7 +471,7 @@ What the tool does not remove:
 11. **Close the terminal window.** That removes the connection string from memory. Success looks like the window gone.
 12. **The next day, run the preview once more, then close the terminal.** Open a new terminal window, do step 4 again and run the preview from step 5. Success looks like `marked` still 0. If it is above 0, demo accounts were made after the closeout. Stop and ask a developer. Then close the terminal window.
 
-The tool refuses, and deletes nothing, in these cases: demo mode is on in its terminal; its connection is limited by row level security; the checkout and the database are not at the same migration; the number given with `--expect-accounts` is not the number of marked accounts; a demo account was created or used in the last 30 minutes; a class has the demo class code but the demo instructor does not own it; an account with no demo mark is in the plan, is enrolled in the demo class or has rows attached to it; a marked account teaches or coordinates a class or region that has unmarked students; a marked account is named on a row that belongs to someone else or to the program; a marked account is on an audit record, a Sage action or a message about a person or class that is not demo; a kept row points at a row the closeout would delete and the database would blank that link. It also checks its own work before it saves. If any row would be left pointing at a deleted account or class, or any table would lose a row the preview did not count, it cancels the whole transaction and reports a refusal.
+The tool refuses, and deletes nothing, in these cases: demo mode is on in its terminal; its connection is limited by row level security; the checkout and the database are not at the same migration; the number given with `--expect-accounts` is not the number of marked accounts; a demo account was created or used in the last 30 minutes; a class has the demo class code but the demo instructor does not own it; an account with no demo mark is in the plan, is enrolled in the demo class or has rows attached to it; a marked account teaches or coordinates a class or region that has unmarked students; a marked account is named on a row that belongs to someone else or to the program; a marked account is on an audit record, a Sage action or a message about a person, a class or a record that is not demo, such as a real student's appointment or certification; a kept row points at a row the closeout would delete and the database would blank that link; a kept row holds the id of an upload or a goal the closeout would delete in a column with no link. It also checks its own work before it saves. If any row would be left pointing at a deleted account or class, any column of orphan rows would be higher after the deletes than before them, or any table would lose a row the preview did not count, it cancels the whole transaction and reports a refusal.
 
 ### Reset the fictional roster (owner operation)
 

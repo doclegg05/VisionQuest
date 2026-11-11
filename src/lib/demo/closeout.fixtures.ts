@@ -14,6 +14,7 @@
  */
 import { Prisma } from "@prisma/client";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN } from "./config";
+import { SENTINEL_ACTORS, SENTINEL_PREFIX } from "./closeout.server";
 
 export type Row = Readonly<Record<string, unknown>>;
 type Field = Prisma.DMMF.Field;
@@ -130,7 +131,7 @@ export const FAKE_MIGRATION = "20261101000000_fake_newest";
 const LOCK_STATEMENT = /pg_try_advisory_xact_lock/;
 
 /** An orphan probe from closeout.server.ts, with its table, column, kind column (if any) and parent. */
-const ORPHAN_STATEMENT = /^SELECT count\(\*\)::int AS orphans FROM visionquest\."(\w+)" t WHERE t\."(\w+)" IS NOT NULL AND t\."\w+" <> 'system' (?:AND t\."(\w+)" IN \([?, ]+\) )?AND NOT EXISTS \(SELECT 1 FROM visionquest\."(\w+)" p WHERE/;
+const ORPHAN_STATEMENT = /^SELECT count\(\*\)::int AS orphans FROM visionquest\."(\w+)" t WHERE t\."(\w+)" IS NOT NULL AND t\."\w+" NOT IN \([?, ]+\) AND left\(t\."\w+", \?\) <> \? (?:AND t\."(\w+)" IN \([?, ]+\) )?AND NOT EXISTS \(SELECT 1 FROM visionquest\."(\w+)" p WHERE/;
 
 /** A statement built with Prisma.sql, as opposed to a tagged template's strings. */
 function isSql(query: TemplateStringsArray | Prisma.Sql): query is Prisma.Sql {
@@ -145,10 +146,10 @@ function flatValues(values: readonly unknown[]): unknown[] {
   });
 }
 
-function studentIdIn(payload: unknown): string | null {
-  if (typeof payload !== "string" || !payload.startsWith("{")) return null;
+function payloadValue(payload: unknown, key: unknown): string | null {
+  if (typeof payload !== "string" || !payload.startsWith("{") || typeof key !== "string") return null;
   const parsed: unknown = JSON.parse(payload);
-  const id: unknown = isRecord(parsed) ? parsed.studentId : undefined;
+  const id: unknown = isRecord(parsed) ? parsed[key] : undefined;
   return typeof id === "string" ? id : null;
 }
 
@@ -165,12 +166,16 @@ export class FakeDb {
   /** The schema that holds Prisma's migration ledger, and the migrations it lists as applied. */
   ledgerSchema: "visionquest" | "public" | null = "visionquest";
   appliedMigrations: readonly string[] = [FAKE_MIGRATION];
+  /** Migrations the ledger lists as started but never finished, as after a failed deploy. */
+  failedMigrations: readonly string[] = [];
   /** True while some other transaction holds the demo student create lock. */
   createLockHeld = false;
   /** Name a model to make the next delete from it throw, as a lost connection would. */
   failOnDeleteOf: string | null = null;
   /** What that delete throws. An object with a `code` stands in for a Prisma error. */
   failure: unknown = null;
+  /** Runs right after the next delete from this model: a row written late, inside the closeout's own view. */
+  private afterDelete: { readonly model: string; readonly then: () => void } | null = null;
   /** Thrown after the callback has finished and its changes are kept: a connection lost during COMMIT. */
   failOnCommit: unknown = null;
   /** Runs once, right after the next transaction commits: a write that landed while the tool ran. */
@@ -181,6 +186,10 @@ export class FakeDb {
   transactions = 0;
   writes = 0;
   disconnects = 0;
+
+  afterDeleteFrom(model: string, then: () => void): void {
+    this.afterDelete = { model, then };
+  }
 
   rows(model: string): readonly Row[] {
     modelNamed(model);
@@ -287,6 +296,11 @@ export class FakeDb {
         const doomed = select(args.where);
         if (doomed.length > 0) this.writes += 1;
         this.remove(model.name, doomed);
+        const hook = this.afterDelete;
+        if (hook?.model === model.name) {
+          this.afterDelete = null;
+          hook.then();
+        }
         return { count: doomed.length };
       },
       create: async (args) => {
@@ -311,14 +325,16 @@ export class FakeDb {
     if (sql.includes('"_prisma_migrations"')) {
       const schema = sql.includes('visionquest."_prisma_migrations"') ? "visionquest" : "public";
       if (schema !== this.ledgerSchema) throw new Error(`relation "${schema}._prisma_migrations" does not exist`);
-      return [{ newest: [...this.appliedMigrations].sort().at(-1) ?? null }];
+      // The statement keeps finished, not rolled back rows only; a failed row has no finish time.
+      return this.appliedMigrations.map((name) => ({ name }));
     }
     const orphan = ORPHAN_STATEMENT.exec(sql);
     if (orphan) return [{ orphans: this.orphans(orphan, flatValues(values), state.rowSecurityOff) }];
     if (sql.includes('FROM visionquest."Notification" n')) return this.notices(new Set(flatValues(values)), state.rowSecurityOff);
-    if (sql.includes('visionquest."BackgroundJob"') && sql.includes("payload::jsonb->>'studentId'")) {
-      const named = new Set(flatValues(values));
-      return this.readable("BackgroundJob", state.rowSecurityOff).filter((row) => named.has(studentIdIn(row.payload))).map((row) => ({ id: row.id }));
+    if (sql.includes('visionquest."BackgroundJob"') && sql.includes("payload::jsonb->>(?::text)")) {
+      const [key, ...ids] = flatValues(values);
+      const named = new Set(ids);
+      return this.readable("BackgroundJob", state.rowSecurityOff).filter((row) => named.has(payloadValue(row.payload, key))).map((row) => ({ id: row.id }));
     }
     throw new Error(`The fake database does not know this statement: ${sql}`);
   }
@@ -329,7 +345,7 @@ export class FakeDb {
     const parentIds = new Set(this.readable(parent, rowSecurityOff).map((row) => row.id));
     return this.readable(model, rowSecurityOff).filter((row) => {
       const value = row[column];
-      if (typeof value !== "string" || value === "system") return false;
+      if (typeof value !== "string" || SENTINEL_ACTORS.includes(value) || value.startsWith(SENTINEL_PREFIX)) return false;
       if (kindColumn && !values.includes(row[kindColumn])) return false;
       return !parentIds.has(value);
     }).length;
@@ -591,8 +607,19 @@ export async function seedUniverse(write: SeedWriter, options: SeedOptions): Pro
   return { prefix, studentId: seeder.studentId, staffId: seeder.staffId, classId: seeder.classId, created: seeder.created, skipped: seeder.skipped };
 }
 
+/**
+ * The closeout's own audit rows a Postgres test may remove when it cleans up.
+ * None unless the run seeded: a run that stopped in `before`, because the
+ * database already held demo accounts, must not touch that database. And never
+ * a row that was there before the run began.
+ */
+export function closeoutRowsToRemove(seeded: boolean, preexisting: readonly string[]): Row | null {
+  if (!seeded) return null;
+  return { action: "demo.closeout", id: { notIn: [...preexisting] } };
+}
+
 /** What the tests tell the closeout about this checkout: it matches the fake database. */
-export const LOCAL = { newestMigration: FAKE_MIGRATION, schemaModels: MODELS.map((model) => model.name) } as const;
+export const LOCAL = { migrations: [FAKE_MIGRATION], schemaModels: MODELS.map((model) => model.name) } as const;
 
 export interface Scene {
   readonly db: FakeDb;

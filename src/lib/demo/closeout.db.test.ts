@@ -38,7 +38,7 @@ import { after, afterEach, before, describe, it } from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import path from "node:path";
 import { REFUSALS, runDemoCloseout, tableOf, type CloseoutClient, type CloseoutOptions, type CloseoutOutcome, type CloseoutTx, type RefusalCode } from "./closeout";
-import { MODELS, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
+import { MODELS, closeoutRowsToRemove, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
 import { readLocalSchema } from "./closeout.local";
 
 const SHOULD_RUN = process.env.DEMO_CLOSEOUT_DB_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
@@ -84,12 +84,18 @@ if (!SHOULD_RUN) {
     let added: Array<{ model: string; id: string }> = [];
     /** Rows with no id column that a test added, each removed by its own statement. */
     let removals: Array<() => Promise<unknown>> = [];
+    /** False until a test seeds. Cleanup touches nothing before then. See `closeoutRowsToRemove`. */
+    let seeded = false;
+    /** The closeout audit rows the database held before this run, which cleanup must keep. */
+    let preexistingCloseoutRows: string[] = [];
 
     before(async () => {
       const url = process.env.DATABASE_URL ?? "";
       assert.ok(isLocalDatabase(url), "DATABASE_URL must point at a database on this machine. This test deletes demo accounts.");
       const { PrismaClient: Client } = await import("@prisma/client");
       connected = new Client({ datasources: { db: { url } } });
+      const earlier = await db().auditLog.findMany({ where: { action: "demo.closeout" }, select: { id: true } });
+      preexistingCloseoutRows = earlier.map((row) => row.id);
       const existing = await db().student.count({ where: { demoAccount: { not: null } } });
       assert.equal(existing, 0, "This database already holds demo accounts. Point DATABASE_URL at an empty test database.");
     });
@@ -108,6 +114,7 @@ if (!SHOULD_RUN) {
 
     /** Seeds a marked and an unmarked universe under prefixes no other run used. */
     async function seed(): Promise<void> {
+      seeded = true;
       run += 1;
       const stamp = `cdb${Date.now().toString(36)}${run}`;
       demo = await seedUniverse(write, { prefix: `${stamp}dm-`, demo: true, tolerant: true });
@@ -117,19 +124,20 @@ if (!SHOULD_RUN) {
 
     /** Removes whatever the test left, children before parents. Safe to run twice. */
     async function cleanup(): Promise<void> {
-      if (!connected) return;
+      const ownCloseoutRows = closeoutRowsToRemove(seeded, preexistingCloseoutRows);
+      if (!connected || !ownCloseoutRows) return;
       for (const remove of removals) await remove();
       removals = [];
       const rows = [...(real?.created ?? []), ...(demo?.created ?? []), ...added].reverse();
       for (const row of rows) {
         if (row.id !== null) await tableOf(db(), row.model).deleteMany({ where: { id: { in: [row.id] } } });
       }
-      await db().auditLog.deleteMany({ where: { action: "demo.closeout" } });
+      await tableOf(db(), "AuditLog").deleteMany({ where: ownCloseoutRows });
       added = [];
     }
 
     afterEach(cleanup);
-    // Safe when `before` failed: nothing was connected, so there is nothing to clean or close.
+    // Safe when `before` failed: cleanup removes nothing unless a test seeded, and the client is still closed.
     after(async () => {
       if (!connected) return;
       await cleanup();
@@ -171,7 +179,7 @@ if (!SHOULD_RUN) {
     async function copyRow(model: string, sourceId: string, changes: Row): Promise<void> {
       const [source] = await tableOf(db(), model).findMany({ where: { id: sourceId }, select: scalarColumns(model) });
       assert.ok(source, `${model} was not seeded`);
-      const id = `${sourceId}.copy`;
+      const id = typeof changes.id === "string" ? changes.id : `${sourceId}.copy`;
       await tableOf(db(), model).create({ data: { ...source, id, ...changes } });
       added.push({ model, id });
     }
@@ -252,6 +260,50 @@ if (!SHOULD_RUN) {
       assert.equal(await db().student.count({ where: { demoAccount: { not: null } } }), 0);
     });
 
+    it("applies when a marked account's audit rows are about the demo student's own certification and appointment", async () => {
+      await seed();
+      for (const model of ["Certification", "Appointment"]) {
+        await copyRow("AuditLog", `${demo.prefix}AuditLog`, { id: `${demo.prefix}AuditLog.${model}`, actorId: demo.staffId, targetType: model.toLowerCase(), targetId: `${demo.prefix}${model}`, createdAt: new Date(0) });
+      }
+
+      const outcome = await closeout(db(), { apply: true, expectAccounts: 2 });
+
+      assert.deepEqual(outcome.refusals, []);
+      assert.equal(outcome.kind, "applied");
+      assert.equal(await db().auditLog.count({ where: { targetId: { in: [`${demo.prefix}Certification`, `${demo.prefix}Appointment`] } } }), 0);
+    });
+
+    it("does not count the actors production writes that are not accounts as orphans", async () => {
+      await seed();
+      const counted = async () => {
+        const outcome = await closeout(db(), { apply: false });
+        assert.ok(outcome.kind === "preview");
+        return outcome.preview.leftBehind.orphans;
+      };
+      const before = await counted();
+      for (const actorId of ["admin-key", "system", "system:sage-autopilot"]) {
+        await insertRow("AuditLog", { id: `${real.prefix}sentinel-${actorId}`, action: "x", targetType: "x", actorId, createdAt: new Date(0) });
+      }
+
+      assert.deepEqual(await counted(), before);
+    });
+
+    it("deletes the jobs that name the demo class's scrape config or a demo wager, and keeps the other universe's", async () => {
+      await seed();
+      const jobs = (universe: SeededUniverse) => [
+        { id: `${universe.prefix}job-scrape`, type: "scrape_jobs", payload: JSON.stringify({ configId: `${universe.prefix}JobClassConfig`, scrapeRunId: `${universe.prefix}JobScrapeRun` }) },
+        { id: `${universe.prefix}job-wager`, type: "wager_diagnosis", payload: JSON.stringify({ wagerId: `${universe.prefix}Wager` }) },
+        { id: `${universe.prefix}job-text`, type: "x", payload: "not json" },
+      ];
+      for (const job of [...jobs(demo), ...jobs(real)]) await insertRow("BackgroundJob", job);
+
+      const outcome = await closeout(db(), { apply: true, expectAccounts: 2 });
+
+      assert.equal(outcome.kind, "applied");
+      const left = await db().backgroundJob.findMany({ where: { id: { in: [...jobs(demo), ...jobs(real)].map((job) => job.id) } }, select: { id: true } });
+      assert.deepEqual(left.map((row) => row.id).sort(), [`${demo.prefix}job-text`, ...jobs(real).map((job) => job.id)].sort());
+    });
+
     it("keeps the shared rows a demo account merely referenced", async () => {
       await seed();
 
@@ -272,6 +324,8 @@ if (!SHOULD_RUN) {
       readonly local?: CloseoutOptions["local"];
       /** Runs every transaction as this role, to stand in for a connection limited by row level security. */
       readonly asRole?: string;
+      /** Changes the transaction the closeout is given, to stand in for a row written while it runs. */
+      readonly wrap?: (tx: CloseoutTx) => CloseoutTx;
       readonly arrange?: () => Promise<void>;
     }
     const insertRow = async (model: string, data: Row & { id: string }) => {
@@ -283,10 +337,28 @@ if (!SHOULD_RUN) {
       await db().spokesClassInstructor.create({ data: { classId, instructorId } });
       removals.push(() => db().spokesClassInstructor.deleteMany({ where: { classId, instructorId } }));
     };
+    /** The transaction, with an audit row naming a missing account written right after the accounts are deleted. */
+    const writeAfterAccountsGo = (tx: CloseoutTx): CloseoutTx => new Proxy(tx, {
+      get(target, property) {
+        const value: unknown = Reflect.get(target, property, target);
+        if (property !== "student") return value;
+        const table = tableOf(target, property);
+        return {
+          count: table.count.bind(table), findMany: table.findMany.bind(table), create: table.create.bind(table),
+          deleteMany: async (args: Parameters<typeof table.deleteMany>[0]) => {
+            const result = await table.deleteMany(args);
+            await tableOf(target, "auditLog").create({ data: { id: `${demo.prefix}late-audit`, action: "x", targetType: "x", actorId: `${demo.prefix}missing-account` } });
+            return result;
+          },
+        };
+      },
+    });
     const refusals: readonly DbRefusal[] = [
       { name: "demo mode is on", code: "demo_mode_on", env: { COHORT_DEMO_MODE: "true" } },
       { name: "the role cannot see every row", code: "cannot_see_every_row", asRole: "vq_app" },
-      { name: "the checkout is at another migration", code: "schema_mismatch", local: { ...readLocalSchema(ROOT), newestMigration: "29991231000000_not_applied" } },
+      { name: "the checkout is at another migration", code: "schema_mismatch", local: { ...readLocalSchema(ROOT), migrations: [...readLocalSchema(ROOT).migrations, "29991231000000_not_applied"] } },
+      // The newest name agrees: only the whole set shows the database never ran this one.
+      { name: "the checkout has an older migration the database never applied", code: "schema_mismatch", local: { ...readLocalSchema(ROOT), migrations: ["00000000000001_never_applied", ...readLocalSchema(ROOT).migrations] } },
       { name: "the expected count is not the plan's", code: "expected_accounts_mismatch", expectAccounts: 3 },
       {
         name: "a marked account sent a message in the last 30 minutes", code: "demo_recently_active",
@@ -318,13 +390,33 @@ if (!SHOULD_RUN) {
         arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "student", targetId: real.studentId, createdAt: new Date(0) }),
       },
       {
+        name: "a marked account's audit row is about an unmarked student's certification", code: "records_about_unmarked_people",
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "certification", targetId: `${real.prefix}Certification`, createdAt: new Date(0) }),
+      },
+      {
+        name: "a marked account's audit row is about an unmarked student's appointment", code: "records_about_unmarked_people",
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "appointment", targetId: `${real.prefix}Appointment`, createdAt: new Date(0) }),
+      },
+      {
         name: "an unmarked student's task links to a demo appointment", code: "kept_rows_would_be_blanked",
         arrange: () => copyRow("StudentTask", `${real.prefix}StudentTask`, { appointmentId: `${demo.prefix}Appointment` }),
+      },
+      {
+        name: "an unmarked student's portfolio item names a demo upload, with no foreign key", code: "kept_rows_name_deleted_rows",
+        arrange: () => copyRow("PortfolioItem", `${real.prefix}PortfolioItem`, { fileId: `${demo.prefix}FileUpload` }),
+      },
+      {
+        name: "an unmarked student's vision board item names a demo goal, with no foreign key", code: "kept_rows_name_deleted_rows",
+        arrange: () => copyRow("VisionBoardItem", `${real.prefix}VisionBoardItem`, { goalId: `${demo.prefix}Goal` }),
       },
       {
         // Found only after deletes have run: Postgres cascades the unmarked link when the demo goal goes.
         name: "a cascade would remove an unmarked student's row", code: "unlisted_rows_removed",
         arrange: () => copyRow("GoalResourceLink", `${real.prefix}GoalResourceLink`, { goalId: `${demo.prefix}Goal` }),
+      },
+      {
+        // Found only after every delete has run, the accounts included: no earlier check can see a row written then.
+        name: "a row naming a missing account is written during the apply", code: "orphans_rose", wrap: writeAfterAccountsGo,
       },
       {
         // Found only after deletes have run: the marked teacher stays, and a column with no foreign key names the deleted student.
@@ -333,8 +425,9 @@ if (!SHOULD_RUN) {
       },
     ];
 
-    /** The test client, with every transaction run as `role` when one is given. */
-    function clientAs(role: string | undefined): CloseoutClient {
+    /** The test client, with every transaction run as `role` or changed by `wrap` when one is given. */
+    function clientAs(role: string | undefined, wrap?: (tx: CloseoutTx) => CloseoutTx): CloseoutClient {
+      if (wrap) return { $transaction: (work, options) => db().$transaction((tx) => work(wrap(tx)), options) };
       if (!role) return db();
       return {
         $transaction: (work, options) => db().$transaction(async (tx) => {
@@ -360,7 +453,7 @@ if (!SHOULD_RUN) {
         const accounts = refusal.accounts;
         const rule = accounts ? async () => ({ accountIds: accounts(), classIds: [] }) : undefined;
 
-        const outcome = await closeout(clientAs(refusal.asRole), {
+        const outcome = await closeout(clientAs(refusal.asRole, refusal.wrap), {
           apply: true, env: refusal.env, rule, expectAccounts: refusal.expectAccounts ?? 2, ...(refusal.local ? { local: refusal.local } : {}),
         });
 

@@ -27,16 +27,16 @@
 import { Prisma } from "@prisma/client";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN, isCohortDemoEnabled, isRealStudentDataDeclared } from "./config";
 import {
-  UNMARKED, chunksOf, countIn, idsFor, idsOf, inList, tableOf, valuesWhere,
+  UNMARKED, chunksOf, countIn, idsFor, idsOf, inList, plannedValues, tableOf, valuesWhere,
   type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type DemoEnv, type Ids, type Run, type Where,
 } from "./closeout.core";
 import {
-  deletedAuditRowsWithUnmarkedActor, recentActivity, recordsAboutOthers, rowsTheDatabaseWouldBlank, setNullLinksInto,
+  deletedAuditRowsWithUnmarkedActor, keptRowsLinkedToDeleted, recentActivity, recordsAboutOthers, setNullLinksInto, type SetNullLink,
 } from "./closeout.guards";
-import { leftBehind, type LeftBehind } from "./closeout.orphans";
+import { leftBehind, orphanCounts, type LeftBehind } from "./closeout.orphans";
 import type { LocalSchema } from "./closeout.local";
 import { refusal, type Refusal, type RefusalCode } from "./closeout.report";
-import { jobIdsNaming, readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type ServerFacts } from "./closeout.server";
+import { jobIdsNaming, readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type JobPayloadKey, type ServerFacts } from "./closeout.server";
 
 export { tableOf, type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type Where } from "./closeout.core";
 export { REFUSALS, type Refusal, type RefusalCode } from "./closeout.report";
@@ -167,9 +167,9 @@ const CLASS_STEPS: readonly DeleteStep[] = [
 ];
 
 /**
- * Queued and finished jobs whose JSON payload names a planned account
- * (`jobIdsNaming` in closeout.server.ts). BackgroundJob has no foreign key, so
- * the schema would leave every one behind.
+ * Queued and finished jobs whose JSON payload names a planned account or
+ * class, or a scrape config, scrape run or wager a step deletes (`jobsOfPlan`).
+ * BackgroundJob has no foreign key, so the schema would leave every one behind.
  */
 const JOB_STEPS: readonly DeleteStep[] = [{ model: "BackgroundJob", scope: "job", column: "id", where: inList("id") }];
 
@@ -182,8 +182,44 @@ const ACCOUNT_ROOT: DeleteStep = {
 /** Every removal, in the order it runs. The demo class goes just before the accounts. */
 export const DELETE_STEPS: readonly DeleteStep[] = [...ACCOUNT_STEPS, ...JOB_STEPS, ...CLASS_STEPS, CLASS_ROOT, ACCOUNT_ROOT];
 
-/** Every SetNull foreign key into a model a step deletes from. See `rowsTheDatabaseWouldBlank`. */
+/** Every SetNull foreign key into a model a step deletes from. See `keptRowsLinkedToDeleted`. */
 export const SET_NULL_LINKS = setNullLinksInto(new Set(DELETE_STEPS.map((step) => step.model)));
+
+const unlinked = (child: Prisma.ModelName, from: string, parent: Prisma.ModelName): SetNullLink => ({ child, from, parent, to: "id" });
+
+/**
+ * Columns that hold the id of a row a step deletes, with no foreign key at
+ * all. The database neither blanks nor blocks them, so a kept row would be left
+ * naming an upload or a goal that is gone. closeout.inventory.test.ts fails
+ * when a new unlinked `...Id` column is neither listed here nor explained.
+ */
+export const UNLINKED_REFS: readonly SetNullLink[] = [
+  unlinked("FormSubmission", "fileId", "FileUpload"),
+  unlinked("FormSubmission", "signatureFileId", "FileUpload"),
+  unlinked("CertRequirement", "fileId", "FileUpload"),
+  unlinked("PortfolioItem", "fileId", "FileUpload"),
+  unlinked("Application", "resumeFileId", "FileUpload"),
+  unlinked("VisionBoardItem", "fileId", "FileUpload"),
+  unlinked("VisionBoardItem", "goalId", "Goal"),
+];
+
+/**
+ * The jobs a run deletes. `run` has no jobs yet: only the account and class
+ * steps are read, to find the scrape configs, runs and wagers they delete.
+ */
+async function jobsOfPlan(run: Run): Promise<string[]> {
+  const deletedIds = async (model: Prisma.ModelName) => [...(await plannedValues(run, DELETE_STEPS.filter((step) => step.model === model), "id"))];
+  const named: ReadonlyArray<readonly [JobPayloadKey, Ids]> = [
+    ["studentId", run.plan.accountIds],
+    ["classId", run.plan.classIds],
+    ["configId", await deletedIds("JobClassConfig")],
+    ["scrapeRunId", await deletedIds("JobScrapeRun")],
+    ["wagerId", await deletedIds("Wager")],
+  ];
+  const found = new Set<string>();
+  for (const [key, ids] of named) (await jobIdsNaming(run.tx, key, ids, run.chunk)).forEach((id) => found.add(id));
+  return [...found];
+}
 
 /** Which rows that name an account are NOT deleted by the plan, and so must not exist. */
 export type Survives =
@@ -340,11 +376,19 @@ interface OutcomeBase {
   readonly refusals: readonly Refusal[];
 }
 
+/** One orphan column, counted in the preview and again after the deletes, in the same transaction. */
+export interface OrphanChange {
+  readonly before: number;
+  readonly after: number;
+}
+
 /** An apply's result: the rows deleted by model, and what is left. */
 export interface AppliedCounts {
   readonly deleted: Readonly<Record<string, number>>;
   /** Counted inside the transaction, after the deletes and before the commit. */
   readonly remaining: { readonly markedAccounts: number; readonly rowsPointingAtDeleted: number };
+  /** Every orphan column by `Model.column`. None may be higher after: see `orphansThatRose`. */
+  readonly orphans: Readonly<Record<string, OrphanChange>>;
 }
 
 export type CloseoutOutcome =
@@ -488,7 +532,8 @@ interface Gate {
 function unreadableRefusals(server: ServerFacts, local: LocalSchema): Refusal[] {
   const clientModels = new Set<string>(Object.values(Prisma.ModelName));
   const sameModels = local.schemaModels.length === clientModels.size && local.schemaModels.every((model) => clientModels.has(model));
-  const sameMigration = server.newestMigration !== null && server.newestMigration === local.newestMigration;
+  const applied = server.appliedMigrations ?? [];
+  const sameMigration = applied.length > 0 && applied.length === local.migrations.length && local.migrations.every((name) => applied.includes(name));
   return [
     refusal("cannot_see_every_row", server.seesEveryRow ? 0 : 1),
     refusal("schema_mismatch", sameModels && sameMigration ? 0 : 1),
@@ -512,8 +557,9 @@ async function prewriteRefusals(run: Run, gate: Gate, enrolledInDemoClass: numbe
     refusal("unmarked_rows_on_demo_class", attached),
     refusal("marked_staff_over_unmarked_students", await unmarkedUnderPlannedStaff(run)),
     refusal("marked_account_on_kept_rows", await keptRowsNamingAccounts(run)),
-    refusal("records_about_unmarked_people", await recordsAboutOthers(run)),
-    refusal("kept_rows_would_be_blanked", await rowsTheDatabaseWouldBlank(run, DELETE_STEPS, SET_NULL_LINKS)),
+    refusal("records_about_unmarked_people", await recordsAboutOthers(run, DELETE_STEPS)),
+    refusal("kept_rows_would_be_blanked", await keptRowsLinkedToDeleted(run, DELETE_STEPS, SET_NULL_LINKS)),
+    refusal("kept_rows_name_deleted_rows", await keptRowsLinkedToDeleted(run, DELETE_STEPS, UNLINKED_REFS)),
   ];
   return found.filter((entry) => entry.count > 0);
 }
@@ -561,6 +607,24 @@ function refuseIf(count: number, code: RefusalCode, preview: CloseoutPreview): v
   if (count > 0) throw new CloseoutRefused(refusal(code, count), preview);
 }
 
+/**
+ * Orphan columns counted again after the deletes. Some orphans are expected
+ * and stay (Sage keeps operations about students who left), so the rule is
+ * that no column may rise: a rise is a row the deletes left pointing at
+ * nothing. Returns each column's change and the number of rows above before.
+ */
+async function orphansThatRose(run: Run, before: Readonly<Record<string, number>>): Promise<{ changes: Record<string, OrphanChange>; rose: number }> {
+  const after = await orphanCounts(run);
+  const changes: Record<string, OrphanChange> = {};
+  let rose = 0;
+  for (const [column, now] of Object.entries(after)) {
+    const was = before[column] ?? 0;
+    changes[column] = { before: was, after: now };
+    rose += Math.max(0, now - was);
+  }
+  return { changes, rose };
+}
+
 /** Rule 3: every table must have shrunk by exactly what the preview listed for it. */
 function unlistedChanges(before: Record<string, number>, after: Record<string, number>, planned: Readonly<Record<string, number>>): number {
   return Object.keys(before).reduce((sum, model) => sum + Math.abs(before[model] - after[model] - (planned[model] ?? 0)), 0);
@@ -578,6 +642,8 @@ async function applyPlan(run: Run, preview: CloseoutPreview, newestMigration: st
   await deleteStep(run, CLASS_ROOT);
   refuseIf(await rowsStillNaming(run, ACCOUNT_COLUMNS, run.plan.accountIds), "rows_left_pointing", preview);
   await deleteStep(run, ACCOUNT_ROOT);
+  const orphans = await orphansThatRose(run, preview.leftBehind.orphans);
+  refuseIf(orphans.rose, "orphans_rose", preview);
 
   const after = await tableCounts(run.tx);
   refuseIf(unlistedChanges(before, after, preview.rowsToDelete), "unlisted_rows_removed", preview);
@@ -603,7 +669,7 @@ async function applyPlan(run: Run, preview: CloseoutPreview, newestMigration: st
   });
   // The preview's counts are the deleted counts: the row-count check above
   // has just proved every table shrank by exactly these numbers.
-  return { deleted: preview.rowsToDelete, remaining };
+  return { deleted: preview.rowsToDelete, remaining, orphans: orphans.changes };
 }
 
 type Applied = Extract<CloseoutOutcome, { kind: "applied" }>;
@@ -622,14 +688,14 @@ async function inTransaction(tx: CloseoutTx, options: CloseoutOptions): Promise<
 
   const selection = await (options.rule ?? markedDemoAccountsRule)(tx);
   const chunk = options.chunkSize ?? ID_CHUNK;
-  const jobIds = await jobIdsNaming(tx, selection.accountIds, chunk);
+  const jobIds = await jobsOfPlan({ tx, plan: { ...selection, jobIds: [] }, chunk, now: server.now });
   const run: Run = { tx, plan: { ...selection, jobIds }, chunk, now: server.now };
   const countDiffers = options.apply && options.expectAccounts !== run.plan.accountIds.length;
   const { preview, refusals } = await survey(run, { env: options.env ?? process.env, lockFree, countDiffers });
   if (!options.apply) return { kind: "preview", target, preview, refusals };
   if (refusals.length > 0) return { kind: "refused", target, preview, refusals };
   try {
-    return { kind: "applied", target, preview, refusals: [], ...(await applyPlan(run, preview, server.newestMigration ?? "")) };
+    return { kind: "applied", target, preview, refusals: [], ...(await applyPlan(run, preview, server.appliedMigrations?.at(-1) ?? "")) };
   } catch (error) {
     if (error instanceof CloseoutRefused) throw new CloseoutRefused(error.refused, error.preview, target);
     throw error;

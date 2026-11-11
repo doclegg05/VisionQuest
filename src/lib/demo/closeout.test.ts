@@ -24,7 +24,7 @@ import {
   type SelectionRule,
 } from "./closeout";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN } from "./config";
-import { FakeDb, LOCAL, MODELS, copyOf, scene, seedUniverse, type Scene } from "./closeout.fixtures";
+import { FakeDb, LOCAL, MODELS, closeoutRowsToRemove, copyOf, scene, seedUniverse, type Scene } from "./closeout.fixtures";
 
 const DEMO_OFF = {};
 const DEMO_ON = { COHORT_DEMO_MODE: "true" };
@@ -249,6 +249,17 @@ describe("demo closeout apply", () => {
     assert.equal(rowsOf(split.db, "dm-"), rowsOf(whole.db, "dm-"));
   });
 
+  it("deletes a demo row that names a demo upload or goal, and does not refuse for it", async () => {
+    const { db } = await scene();
+    copyOf(db, "PortfolioItem", "dm-", { fileId: "dm-FileUpload" });
+    copyOf(db, "VisionBoardItem", "dm-", { goalId: "dm-Goal", fileId: "dm-FileUpload" });
+
+    const outcome = await apply(db);
+
+    assert.deepEqual(outcome.refusals, []);
+    assert.equal(outcome.kind, "applied");
+  });
+
   it("rolls everything back when a statement fails half way", async () => {
     const { db } = await scene();
     const before = db.snapshot();
@@ -345,6 +356,19 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
     arrange: ({ db, demo, real }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "class", targetId: real.classId }),
   },
   {
+    // The demo instructor's routes log a row id as the target, not the student's.
+    name: "a marked account's audit row is about an unmarked student's certification", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "certification", targetId: "rl-Certification" }),
+  },
+  {
+    name: "a marked account's audit row is about an unmarked student's appointment", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.staffId, targetType: "appointment", targetId: "rl-Appointment" }),
+  },
+  {
+    name: "a marked account's audit row names a target no step deletes", code: "records_about_unmarked_people", count: 1,
+    arrange: ({ db, demo }) => void copyOf(db, "AuditLog", "dm-", { actorId: demo.studentId, targetType: "sage_conversation", targetId: "a-conversation-the-plan-keeps" }),
+  },
+  {
     name: "a marked account's Sage operation is about an unmarked student", code: "records_about_unmarked_people", count: 1,
     arrange: ({ db, demo, real }) => void copyOf(db, "SageOperation", "dm-", { actorId: demo.staffId, targetStudentId: real.studentId }),
   },
@@ -355,6 +379,17 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
   {
     name: "an unmarked student's task would lose its link to a demo appointment", code: "kept_rows_would_be_blanked", count: 1,
     arrange: ({ db }) => void copyOf(db, "StudentTask", "rl-", { appointmentId: "dm-Appointment" }),
+  },
+  {
+    name: "an unmarked student's portfolio item names a demo upload, with no foreign key", code: "kept_rows_name_deleted_rows", count: 1,
+    arrange: ({ db }) => void copyOf(db, "PortfolioItem", "rl-", { fileId: "dm-FileUpload" }),
+  },
+  {
+    name: "an unmarked student's form submission and vision board name a demo upload and a demo goal", code: "kept_rows_name_deleted_rows", count: 3,
+    arrange: ({ db }) => {
+      copyOf(db, "FormSubmission", "rl-", { fileId: "dm-FileUpload", signatureFileId: "dm-FileUpload" });
+      copyOf(db, "VisionBoardItem", "rl-", { goalId: "dm-Goal" });
+    },
   },
   {
     name: "the plan holds an account that is not marked", code: "plan_includes_unmarked", count: 1, expectAccounts: 1,
@@ -379,6 +414,7 @@ const REFUSALS_TESTED_ELSEWHERE: Readonly<Partial<Record<RefusalCode, string>>> 
   schema_mismatch: "closeout.server.test.ts",
   expected_accounts_mismatch: "closeout.server.test.ts",
   demo_recently_active: "closeout.server.test.ts",
+  orphans_rose: "closeout.leftovers.test.ts",
 };
 
 describe("demo closeout refusals", () => {
@@ -447,5 +483,28 @@ describe("demo closeout refusals", () => {
     assert.deepEqual([...plan.accountIds].sort(), [demo.staffId, demo.studentId].sort());
     assert.deepEqual(plan.classIds, [demo.classId]);
     assert.equal(plan.accountIds.includes(real.studentId), false);
+  });
+});
+
+describe("demo closeout Postgres test cleanup", () => {
+  it("removes nothing when the test never seeded, as when it found demo accounts already there", () => {
+    assert.equal(closeoutRowsToRemove(false, []), null);
+  });
+
+  it("removes only the closeout audit rows this run wrote, never one that was there before it began", async () => {
+    const { db } = await scene();
+    db.insert("AuditLog", { id: "closeout-before-the-test", action: "demo.closeout", targetType: "demo" });
+    await apply(db);
+    const where = closeoutRowsToRemove(true, ["closeout-before-the-test"]);
+    assert.ok(where);
+
+    await db.client().$transaction(async (tx) => {
+      const table = tx.auditLog;
+      assert.ok(typeof table === "object" && table !== null && "deleteMany" in table && typeof table.deleteMany === "function");
+      await table.deleteMany({ where });
+    });
+
+    const left = db.rows("AuditLog").filter((row) => row.action === "demo.closeout").map((row) => row.id);
+    assert.deepEqual(left, ["closeout-before-the-test"]);
   });
 });
