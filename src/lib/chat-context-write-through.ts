@@ -49,6 +49,16 @@ export type ChatContextInvalidation =
 /** The students who own these certifications, as found in the database. */
 export type CertificationOwners = (certificationIds: readonly string[]) => Promise<readonly string[]>;
 
+/**
+ * How long a CertRequirement write waits for its owner lookup. src/lib/db.ts
+ * awaits the write-through before the write returns, often inside the
+ * writer's interactive transaction (5 s Prisma timeout), while the admin pool
+ * can make the lookup wait 10 s for a connection. Past this bound the lookup
+ * counts as "owner not found" and the write clears everyone, so a busy pool
+ * costs a re-query, never the student's write.
+ */
+export const CERT_OWNER_LOOKUP_TIMEOUT_MS = 250;
+
 const NONE: ChatContextInvalidation = { scope: "none" };
 const ALL: ChatContextInvalidation = { scope: "all" };
 
@@ -247,10 +257,24 @@ export function resolveChatContextInvalidation(
     : ALL;
 }
 
+/** The lookup's answer, or null once CERT_OWNER_LOOKUP_TIMEOUT_MS passes. */
+async function withinOwnerLookupBound(lookup: Promise<readonly string[]>): Promise<readonly string[] | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), CERT_OWNER_LOOKUP_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([lookup, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** The owning students, or null when any certification's owner was not found. */
 async function ownersOf(certificationIds: readonly string[], owners: CertificationOwners | undefined): Promise<readonly string[] | null> {
   if (!owners) return null;
-  const studentIds = await owners(certificationIds);
+  const studentIds = await withinOwnerLookupBound(owners(certificationIds));
+  if (!studentIds) return null;
   // Fewer owners than certifications can mean one was not found (deleted, or
   // created in a transaction not yet committed): clear everyone instead.
   return studentIds.length >= new Set(certificationIds).size ? studentIds : null;
