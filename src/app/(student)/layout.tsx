@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getRoleHomePath } from "@/lib/role-home";
 import { parseState, createInitialState } from "@/lib/progression/engine";
 import { computeNavPhase, type NavPhase } from "@/lib/nav-progression";
-import { getStudentShell } from "@/lib/dashboard/signals";
+import { readPageShell } from "@/lib/dashboard/signals";
 import { readRecoveryQuestionKeys, readSageNoticeAcknowledged } from "@/lib/dashboard/student-gates";
 import { needsRecoverySetup } from "@/lib/security-questions";
 import { needsSageNotice, SAGE_NOTICE_ACK_PATH, SAGE_NOTICE_VERSION } from "@/lib/about-sage/notice";
@@ -27,10 +27,10 @@ export default async function StudentLayout({
     redirect(getRoleHomePath(session.role));
   }
 
-  // The nav phase's three facts, read once and shared with the dashboard page
-  // (getStudentShell keeps them per student until a write clears them).
+  // The nav phase's three facts, read fresh on every page load and shared with
+  // the dashboard page in the same request (readPageShell); polls get the kept copy.
   const [shell, securityKeys, noticeAcknowledged] = await Promise.all([
-    getStudentShell(session),
+    readPageShell(session),
     // Both gates are read every request until satisfied, then kept.
     readRecoveryQuestionKeys(session),
     readSageNoticeAcknowledged(session, SAGE_NOTICE_VERSION),

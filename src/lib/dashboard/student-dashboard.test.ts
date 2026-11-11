@@ -50,6 +50,7 @@ describe("loadStudentDashboard", () => {
     const overview = await readers.readOverview(DASHBOARD_STUDENT_ID);
     const activity = await readers.readActivity(DASHBOARD_STUDENT_ID);
     const step = await nextStep.getStudentNextStep(DASHBOARD_STUDENT_ID);
+    assert.ok(loaded.overview && loaded.support, "a region failed to load");
     assert.deepEqual(loaded.overview.outcomes, overview.outcomes);
     assert.deepEqual({ ...loaded.activity, fetchedAt: "" }, { ...activity, fetchedAt: "" });
     assert.deepEqual(loaded.support.nextStep, step);
@@ -81,6 +82,7 @@ describe("loadStudentDashboard", () => {
       ]);
       assert.equal(mine.goalCount, 2, `pass ${pass}`);
       assert.equal(theirs.goalCount, 0, `pass ${pass}`);
+      assert.ok(mine.support && theirs.support && mine.overview && theirs.overview, `a region failed to load, pass ${pass}`);
       assert.equal(mine.support.alertCount, 1, `pass ${pass}`);
       assert.equal(theirs.support.alertCount, 4, `pass ${pass}`);
       assert.match(mine.overview.outcomes[2].value, /^1 applications/);
@@ -88,6 +90,23 @@ describe("loadStudentDashboard", () => {
       assert.equal(mine.readinessData.state.orientationComplete, false);
       assert.equal(theirs.readinessData.state.orientationComplete, true);
     }
+  });
+
+  it("a page render reads the shell fresh over a kept one, and keeps it for the polls", async () => {
+    await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    counter.useFixtures({ ...DASHBOARD_FIXTURES, "goal.count": 5 });
+    const reloaded = await loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW);
+    assert.equal(reloaded.goalCount, 5, "the page was served a kept shell");
+    const read = await modelsRead(() => loader.readStudentSupport(student(DASHBOARD_STUDENT_ID), NOW));
+    assert.ok(!read.has("progression"), "the poll did not get the shell the page kept");
+  });
+
+  it("reads the shell alongside the other groups, not before them", async () => {
+    const { queries } = await counter.section(() => loader.loadStudentDashboard(student(DASHBOARD_STUDENT_ID), NOW));
+    const lastShellRead = queries.findIndex((q) => q.model === "orientationProgress" && q.operation === "count");
+    const firstSlowRead = queries.findIndex((q) => q.model === "certification");
+    assert.ok(lastShellRead >= 0 && firstSlowRead >= 0);
+    assert.ok(firstSlowRead < lastShellRead, "the slow signals waited for the shell");
   });
 
   it("does not keep a shell with no Progression row, so a lost RLS context is read again", async () => {

@@ -40,6 +40,7 @@ mock.module("@/lib/db", {
     prisma: prismaMock,
     // The layout's nav facts are read in one transaction (getStudentShell).
     withAppTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
+    withAppReadTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
   },
 });
 mock.module("@/lib/security-questions", {

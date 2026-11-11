@@ -20,9 +20,10 @@ import { SmsReconsentNotice } from "@/components/student/SmsReconsentNotice";
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
-  // The task table and the Sage panel fail on their own. The shared read
-  // fails the page, as the readiness read it replaces did: without it the
-  // welcome routing below cannot be decided.
+  // The task table and the Sage panel fail on their own, and so does each
+  // region loadStudentDashboard returns (undefined: DashboardClient shows its
+  // fallback). Its readiness read fails the page, as before F2: without it
+  // the welcome routing below cannot be decided.
   const [dashboard, taskPage, sagePanel] = await Promise.allSettled([
     loadStudentDashboard(session), readTasks(session.id, taskQuerySchema.parse({})), getLatestPanelSpec(session.id),
   ]);

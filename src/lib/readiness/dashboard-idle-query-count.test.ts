@@ -65,6 +65,19 @@ import {
 const IDLE_STATEMENTS_PER_MINUTE = 7.1;
 
 /**
+ * App round trips a minute over the same window, pinned beside the metric
+ * (F2b item 10): statements leave out what each transaction adds around its
+ * queries (BEGIN, SET TRANSACTION, set_config, COMMIT; src/lib/db.ts), and
+ * those reach the database too. Reported, not the M2 gate. 2026-11-10: 14.9
+ * against 6.1 app statements, so about 2.4 round trips per app statement: most
+ * polls are a short transaction (4 statements of overhead) around a few reads.
+ */
+const IDLE_APP_ROUND_TRIPS_PER_MINUTE = 14.9;
+
+/** The idle window again, with one requirement tick (`TOGGLE_AT_MS`) in it. Reported only. */
+const TOGGLE_AT_MS = 31 * 60_000;
+
+/**
  * An hour: whole cycles of every poll interval, and long enough that entries
  * kept for ten minutes refill at their steady rate (a refill lands on the first
  * poll after expiry, so every 12 minutes at a 2 minute poll). A shorter window
@@ -120,13 +133,22 @@ function schedule(polls: readonly Poll[], pollMs: Readonly<Record<string, number
   return new Map([...byMoment].sort(([a], [b]) => a - b));
 }
 
-async function playIdleWindow(): Promise<IdleResult> {
+/** Something that happens in the window besides the polls, at `atMs`. */
+interface WindowEvent { readonly atMs: number; readonly run: () => Promise<unknown> }
+
+async function playIdleWindow(event?: WindowEvent): Promise<IdleResult> {
   const { polls, pollMs } = await loadPolls();
   const moments = schedule(polls, pollMs);
   const start = DASHBOARD_NOW.getTime();
   const statuses: number[] = [];
+  let pending = event;
   const section = await counter.section(async () => {
     for (const [at, due] of moments) {
+      if (pending && pending.atMs <= at) {
+        mock.timers.setTime(start + pending.atMs);
+        await pending.run();
+        pending = undefined;
+      }
       mock.timers.setTime(start + at);
       const responses = await Promise.all(due.map((poll) => poll.handler(new Request(`http://localhost${poll.url}`))));
       statuses.push(...responses.map((response) => response.status));
@@ -146,10 +168,21 @@ after(() => { mock.timers.reset(); });
 /** One decimal is the precision pinned. */
 const round = (n: number) => Math.round(n * 10) / 10;
 
-function perMinute(result: IdleResult): { app: number; admin: number; total: number } {
+interface Rate { app: number; admin: number; total: number; appRoundTrips: number; adminRoundTrips: number }
+
+function perMinute(result: IdleResult): Rate {
   const { app, admin } = estimateRoundTrips(result.queries, result.transactions);
   const minutes = WINDOW_MS / 60_000;
-  return { app: app.statements / minutes, admin: admin.statements / minutes, total: (app.statements + admin.statements) / minutes };
+  return {
+    app: app.statements / minutes, admin: admin.statements / minutes, total: (app.statements + admin.statements) / minutes,
+    appRoundTrips: app.roundTrips / minutes, adminRoundTrips: admin.roundTrips / minutes,
+  };
+}
+
+function rateLine(path: string, result: IdleResult, rate: Rate): string {
+  return `IDLE_RATE path=${path} windowMs=${WINDOW_MS} ticks=${result.ticks}` +
+    ` appPerMinute=${round(rate.app)} adminPerMinute=${round(rate.admin)} perMinute=${round(rate.total)}` +
+    ` appRoundTripsPerMinute=${round(rate.appRoundTrips)} adminRoundTripsPerMinute=${round(rate.adminRoundTrips)}`;
 }
 
 describe("M2: idle dashboard statements per minute", () => {
@@ -161,10 +194,45 @@ describe("M2: idle dashboard statements per minute", () => {
   it("issues the pinned number of statements per minute", (t) => {
     for (const line of formatQueryBreakdown("M2 dashboard idle, whole window", idle.queries).split("\n")) t.diagnostic(line);
     const rate = perMinute(idle);
-    t.diagnostic(
-      `IDLE_RATE path=dashboard-idle windowMs=${WINDOW_MS} ticks=${idle.ticks}` +
-        ` appPerMinute=${round(rate.app)} adminPerMinute=${round(rate.admin)} perMinute=${round(rate.total)}`,
-    );
-    assert.equal(Math.round(rate.total * 10) / 10, IDLE_STATEMENTS_PER_MINUTE);
+    t.diagnostic(rateLine("dashboard-idle", idle, rate));
+    assert.equal(round(rate.total), IDLE_STATEMENTS_PER_MINUTE);
+  });
+
+  it("issues the pinned number of app round trips per minute", () => {
+    assert.equal(round(perMinute(idle).appRoundTrips), IDLE_APP_ROUND_TRIPS_PER_MINUTE);
+  });
+});
+
+describe("M2 report: the idle window with one requirement tick", () => {
+  let toggled: IdleResult;
+  before(async () => {
+    const db: typeof import("@/lib/db") = await import("@/lib/db");
+    const { applyChatContextWriteThrough, isChatContextWrite } = await import("@/lib/chat-context-write-through");
+    const { invalidatePrefix } = await import("@/lib/cache");
+    // The counter replaces the client the write-through extension sits on, so
+    // apply it here as db.ts does, owner lookup on the admin client included.
+    const owners = async (ids: readonly string[]) => (await db.prismaAdmin.certification.findMany({
+      where: { id: { in: [...ids] } }, select: { studentId: true },
+    })).map((row) => row.studentId);
+    counter.observe(({ query, prismaModel, args, result }) => {
+      if (query.client !== "app" || !isChatContextWrite(prismaModel, query.operation)) return;
+      void applyChatContextWriteThrough(prismaModel, query.operation, args, result, owners);
+    });
+    counter.useFixtures({ ...DASHBOARD_FIXTURES, "certRequirement.update": { id: "req-1", certificationId: "cert-1", completed: true } });
+    invalidatePrefix(""); // start this window as cold as the first
+    toggled = await playIdleWindow({
+      atMs: TOGGLE_AT_MS,
+      run: () => db.prisma.certRequirement.update({ where: { id: "req-1" }, data: { completed: true } }),
+    });
+    counter.observe(null);
+    counter.useFixtures(DASHBOARD_FIXTURES);
+  });
+
+  it("reports its rate; the tick clears only this student, so it costs one refill of the kept reads", (t) => {
+    const rate = perMinute(toggled);
+    t.diagnostic(rateLine("dashboard-idle-toggle", toggled, rate));
+    assert.deepEqual(toggled.statuses.filter((status) => status !== 200), []);
+    const base = perMinute(idle);
+    assert.ok(rate.total > base.total, "the tick cleared nothing the polls read");
   });
 });

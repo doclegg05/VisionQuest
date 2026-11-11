@@ -115,11 +115,31 @@ test("certification create resolves to the student", () => {
   assert.deepEqual(res, { scope: "students", studentIds: [SID] });
 });
 
-test("certRequirement updateMany (no studentId anywhere) falls back to all", () => {
+// CertRequirement rows carry no studentId; they are one student's through
+// their certification. This test used to expect "all" for the shape below;
+// F2b item 8 resolves the certification instead, and the shell then looks up
+// its owner (applyChatContextWriteThrough's `owners`).
+test("certRequirement updateMany by certificationId resolves to that certification", () => {
   const res = resolveChatContextInvalidation("CertRequirement", "updateMany", {
     where: { certificationId: "c1" },
     data: { completed: true },
   }, { count: 4 });
+  assert.deepEqual(res, { scope: "certifications", certificationIds: ["c1"] });
+});
+
+test("certRequirement update resolves to the certification on the returned row", () => {
+  const res = resolveChatContextInvalidation("CertRequirement", "update", {
+    where: { id: "r1" },
+    data: { completed: true },
+  }, { id: "r1", certificationId: "c1", completed: true });
+  assert.deepEqual(res, { scope: "certifications", certificationIds: ["c1"] });
+});
+
+test("certRequirement updateMany with no certification named falls back to all", () => {
+  const res = resolveChatContextInvalidation("CertRequirement", "updateMany", {
+    where: { id: { in: ["r1", "r2"] } },
+    data: { completed: true },
+  }, { count: 2 });
   assert.deepEqual(res, { scope: "all" });
 });
 
@@ -287,4 +307,32 @@ test("applyChatContextWriteThrough never throws, even on garbage payloads", () =
   assert.doesNotThrow(() =>
     applyChatContextWriteThrough("Conversation", "update", { data: { summary: 7 } }, { studentId: 9 }),
   );
+});
+
+// ---------------------------------------------------------------------------
+// CertRequirement writes clear only the owning student (F2b item 8), and
+// clear everyone whenever the owner cannot be found.
+// ---------------------------------------------------------------------------
+
+async function survivors(owners: Parameters<typeof applyChatContextWriteThrough>[4]): Promise<string[]> {
+  const kept: string[] = [];
+  for (const id of [SID, OTHER_SID]) await cached(`chat:snapshot:${id}`, 60, async () => "warm");
+  await applyChatContextWriteThrough("CertRequirement", "update", { where: { id: "r1" }, data: { completed: true } },
+    { id: "r1", certificationId: "c1" }, owners);
+  for (const id of [SID, OTHER_SID]) {
+    let recomputed = false;
+    await cached(`chat:snapshot:${id}`, 60, async () => { recomputed = true; return "fresh"; });
+    if (!recomputed) kept.push(id);
+  }
+  return kept;
+}
+
+test("a requirement tick clears the certification's owner and no one else", async () => {
+  assert.deepEqual(await survivors(async (ids) => (ids.includes("c1") ? [SID] : [])), [OTHER_SID]);
+});
+
+test("a requirement tick clears everyone when the owner lookup finds nothing, fails, or is not given", async () => {
+  assert.deepEqual(await survivors(async () => []), []);
+  assert.deepEqual(await survivors(async () => { throw new Error("lookup down"); }), []);
+  assert.deepEqual(await survivors(undefined), []);
 });

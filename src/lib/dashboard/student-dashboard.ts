@@ -12,13 +12,16 @@
  * Student sessions only: the teacher's student-detail dashboard keeps calling
  * the per-student readers.
  */
+import type { CertTemplate } from "@prisma/client";
 import { readinessFromFacts, type StudentReadinessData } from "@/lib/progression/fetch-readiness-data";
 import { prisma } from "@/lib/db";
+import { errorForLog } from "@/lib/log-error";
+import { logger } from "@/lib/logger";
 import { nextStepFromFacts, nextStepQueries } from "@/lib/progression/student-next-step";
-import { readDashboardGlobals, type DashboardGlobals } from "./globals";
-import { readLiveSignals, readPageLiveSignals, type LiveSignals } from "./live";
+import { orientationTotal, readDashboardGlobals, readyToWorkTemplates, type DashboardGlobals } from "./globals";
+import { readAlertCounts, readLiveSignals, readPageCounts, type AlertCounts, type LiveSignals, type PageCounts } from "./live";
 import { overviewFromFacts, summarizeActivity, type DashboardActivity, type DashboardOverview } from "./readers";
-import { getSlowSignals, getStudentShell, readAndKeepSlowSignals, type SlowSignals, type StudentShell } from "./signals";
+import { getSlowSignals, getStudentShell, readAndKeepSlowSignals, readPageShell, type SlowSignals, type StudentShell } from "./signals";
 import { ownStudentId, type CacheSession } from "./student-cache";
 import { supportFromFacts, type DashboardSupport } from "./support";
 
@@ -29,16 +32,24 @@ export interface DashboardSignals {
   readonly globals: DashboardGlobals;
 }
 
+/**
+ * Readiness and the goal count are always there: welcome routing needs them,
+ * so their reads fail the page. Each region is undefined when one of its own
+ * reads failed, and DashboardClient then shows that region's "could not load"
+ * fallback and retries it; the other regions render.
+ */
 export interface StudentDashboard {
   readonly readinessData: StudentReadinessData;
   readonly goalCount: number;
   readonly smsAwaitingConfirmation: boolean;
-  readonly overview: DashboardOverview;
-  readonly activity: DashboardActivity;
-  readonly support: DashboardSupport;
+  readonly overview: DashboardOverview | undefined;
+  readonly activity: DashboardActivity | undefined;
+  readonly support: DashboardSupport | undefined;
 }
 
-export function readinessOf({ shell, slow, globals }: Omit<DashboardSignals, "live">): StudentReadinessData {
+type ReadinessInputs = Pick<DashboardSignals, "shell" | "slow"> & { readonly globals: Pick<DashboardGlobals, "orientationTotalCount"> };
+
+export function readinessOf({ shell, slow, globals }: ReadinessInputs): StudentReadinessData {
   return readinessFromFacts({
     progressionState: shell.progressionState,
     orientationCompletedCount: shell.orientationCompletedCount,
@@ -52,7 +63,7 @@ export function readinessOf({ shell, slow, globals }: Omit<DashboardSignals, "li
 }
 
 /** The advising region, next step included. Pure. */
-export function supportOf(signals: DashboardSignals, readinessData: StudentReadinessData, now = new Date()): DashboardSupport {
+export function supportOf(signals: Pick<DashboardSignals, "shell" | "slow" | "live">, readinessData: StudentReadinessData, now = new Date()): DashboardSupport {
   const { shell, slow, live } = signals;
   const nextStep = nextStepFromFacts(readinessData, {
     careerDiscoveryComplete: slow.careerDiscoveryComplete,
@@ -71,7 +82,7 @@ export function supportOf(signals: DashboardSignals, readinessData: StudentReadi
 }
 
 /** The outcome summaries. Pure. */
-export function overviewOf({ slow, globals }: Omit<DashboardSignals, "shell" | "live">, applicationCount: number, now = new Date()): DashboardOverview {
+export function overviewOf({ slow, globals }: { readonly slow: SlowSignals; readonly globals: Pick<DashboardGlobals, "readyToWorkTemplates"> }, applicationCount: number, now = new Date()): DashboardOverview {
   return overviewFromFacts({
     certs: slow.certs,
     templates: globals.readyToWorkTemplates,
@@ -83,26 +94,70 @@ export function overviewOf({ slow, globals }: Omit<DashboardSignals, "shell" | "
   }, now);
 }
 
-export async function loadStudentDashboard(session: CacheSession, now = new Date()): Promise<StudentDashboard> {
+/** The page's reads: the fatal ones as values, each region-only one undefined if it failed. */
+interface PageReads {
+  readonly shell: StudentShell;
+  readonly slow: SlowSignals;
+  readonly orientationTotalCount: number;
+  readonly templates: readonly CertTemplate[] | undefined;
+  readonly page: PageCounts | undefined;
+  readonly alerts: AlertCounts | undefined;
+}
+
+function fatal<T>(result: PromiseSettledResult<T>): T {
+  if (result.status === "rejected") throw result.reason;
+  return result.value;
+}
+
+function regionInput<T>(input: string, result: PromiseSettledResult<T>): T | undefined {
+  if (result.status === "fulfilled") return result.value;
+  logger.warn("Dashboard region read failed; the region shows its fallback", { input, error: errorForLog(result.reason) });
+  return undefined;
+}
+
+/** Builds a region from inputs that loaded; a missing input or a failed build leaves it to its fallback. */
+function region<I, T>(name: string, input: I | undefined, build: (input: I) => T): T | undefined {
+  if (input === undefined) return undefined;
+  try {
+    return build(input);
+  } catch (error) {
+    logger.warn("Dashboard region failed to build; the region shows its fallback", { region: name, error: errorForLog(error) });
+    return undefined;
+  }
+}
+
+async function readPage(session: CacheSession): Promise<PageReads> {
   const studentId = ownStudentId(session);
-  const shell = await getStudentShell(session);
-  const [slow, live, globals] = await Promise.all([
-    readAndKeepSlowSignals(session),
-    readPageLiveSignals(studentId),
-    readDashboardGlobals(),
+  const [shell, slow, total, templates, page, alerts] = await Promise.allSettled([
+    readPageShell(session), readAndKeepSlowSignals(session), orientationTotal(),
+    readyToWorkTemplates(), readPageCounts(studentId), readAlertCounts(studentId),
   ]);
-  const signals = { shell, slow, live, globals };
-  const readinessData = readinessOf(signals);
-  const sms = live.smsPreference;
+  return {
+    shell: fatal(shell), slow: fatal(slow), orientationTotalCount: fatal(total),
+    templates: regionInput("ready-to-work templates", templates),
+    page: regionInput("live counts", page),
+    alerts: regionInput("alert counts", alerts),
+  };
+}
+
+// Enabled but unconfirmed: the channel is on and nothing is being delivered.
+// A revoked row is not this case; that student chose to stop.
+const awaitingConfirmation = (sms: PageCounts["smsPreference"]) =>
+  sms?.enabled === true && sms.smsConsentAt === null && sms.smsRevokedAt === null;
+
+export async function loadStudentDashboard(session: CacheSession, now = new Date()): Promise<StudentDashboard> {
+  const { shell, slow, orientationTotalCount, templates, page, alerts } = await readPage(session);
+  const readinessData = readinessOf({ shell, slow, globals: { orientationTotalCount } });
+  const overviewInput = page && templates ? { applicationCount: page.applicationCount, templates } : undefined;
   return {
     readinessData,
     goalCount: shell.goalPlanningCount,
-    // Enabled but unconfirmed: the channel is on and nothing is being delivered.
-    // A revoked row is not this case; that student chose to stop.
-    smsAwaitingConfirmation: sms?.enabled === true && sms.smsConsentAt === null && sms.smsRevokedAt === null,
-    overview: overviewOf(signals, live.applicationCount, now),
-    activity: summarizeActivity(live.activityTasks, now),
-    support: supportOf(signals, readinessData, now),
+    smsAwaitingConfirmation: page ? awaitingConfirmation(page.smsPreference) : false,
+    overview: region("overview", overviewInput, (input) =>
+      overviewOf({ slow, globals: { readyToWorkTemplates: input.templates } }, input.applicationCount, now)),
+    activity: region("activity", page, (counts) => summarizeActivity(counts.activityTasks, now)),
+    support: region("support", page && alerts ? { ...page, ...alerts } : undefined, (live) =>
+      supportOf({ shell, slow, live }, readinessData, now)),
   };
 }
 

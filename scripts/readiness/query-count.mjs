@@ -24,7 +24,7 @@
 //     counted once, as Prisma's dataloader sends them,
 //   1 for each nested relation a call loads, when the level above it returned
 //     rows,
-//   withAppTransaction as it runs: 4 around its queries, each query 1;
+//   withAppTransaction or withAppReadTransaction as it runs: 4 around its queries, each query 1;
 //   any other $transaction: 2 around its queries.
 // --unit=statements counts the statements that carry a query (calls after
 // batching, plus nested loads); --unit=calls counts calls only.
@@ -68,15 +68,20 @@ const COUNT_LINE = new RegExp(
   `QUERY_COUNT path=(\\S+) cache=(cold|warm) ${COUNT_FIELDS.map((field) => `${field}=(\\d+)`).join(" ")}`,
 );
 
-const RATE_LINE = /IDLE_RATE path=(\S+) windowMs=(\d+) ticks=(\d+) appPerMinute=([\d.]+) adminPerMinute=([\d.]+) perMinute=([\d.]+)/;
+const RATE_LINE = /IDLE_RATE path=(\S+) windowMs=(\d+) ticks=(\d+) appPerMinute=([\d.]+) adminPerMinute=([\d.]+) perMinute=([\d.]+)(?: appRoundTripsPerMinute=([\d.]+) adminRoundTripsPerMinute=([\d.]+))?/;
 
-/** The idle rate a rate path's test printed, or null. */
+/**
+ * The idle rate a rate path's test printed, or null. Round trips a minute
+ * (BEGIN, SET, set_config and COMMIT included) come along when printed: the
+ * database load beside the statement metric, reported and never totalled.
+ */
 export function parseRate(name, output) {
   for (const line of output.split("\n")) {
     const match = RATE_LINE.exec(line);
     if (!match || match[1] !== name) continue;
     const [windowMs, ticks, app, admin] = match.slice(2, 6).map(Number);
-    return { windowMs, ticks, app, admin };
+    const rate = { windowMs, ticks, app, admin };
+    return match[7] === undefined ? rate : { ...rate, appRoundTrips: Number(match[7]), adminRoundTrips: Number(match[8]) };
   }
   return null;
 }
@@ -180,6 +185,9 @@ function reportRate(options, target, run, output) {
   }
   console.log(`${target.metric} ${options.name}: measured by running ${target.test}`);
   console.log(`  ${rate.ticks} poll moments in ${rate.windowMs / 60_000} simulated minutes; statements a minute: app ${rate.app}, admin ${rate.admin}`);
+  if (rate.appRoundTrips !== undefined) {
+    console.log(`  round trips a minute (BEGIN, SET, set_config, COMMIT included): app ${rate.appRoundTrips}, admin ${rate.adminRoundTrips}`);
+  }
   console.log(`reporting: statements per minute, ${options.client === "all" ? "app + admin" : options.client}`);
   if (run.status !== 0) {
     console.error(`${target.test} failed: the measured rate no longer matches the pinned value, or the path broke. Run it to see which. No number is reported.`);

@@ -33,8 +33,22 @@ function responseFor(call: EngineCall, answer: EngineAnswer): { data: Record<str
   return { data: { [`${call.action}${call.modelName ?? ""}`]: result } };
 }
 
-/** Replaces `client`'s engine transport; returns the calls it receives. */
-export function stubEngine(client: object, answer: EngineAnswer): EngineCall[] {
+/** What an interactive transaction asked the engine for when it started. */
+export interface TransactionStart {
+  readonly isolationLevel: unknown;
+  readonly maxWait: unknown;
+}
+
+function toStart(options: unknown): TransactionStart {
+  const read = (key: string) => (typeof options === "object" && options !== null ? Reflect.get(options, key) : undefined);
+  return { isolationLevel: read("isolationLevel"), maxWait: read("maxWait") };
+}
+
+/**
+ * Replaces `client`'s engine transport; returns the calls it receives.
+ * `starts`, when given, collects each interactive transaction's start options.
+ */
+export function stubEngine(client: object, answer: EngineAnswer, starts?: TransactionStart[]): EngineCall[] {
   const engine: unknown = Reflect.get(client, "_engine");
   if (typeof engine !== "object" || engine === null) throw new Error("This Prisma client has no engine to stub.");
   const calls: EngineCall[] = [];
@@ -45,6 +59,10 @@ export function stubEngine(client: object, answer: EngineAnswer): EngineCall[] {
   };
   Reflect.set(engine, "request", async (query: unknown) => respond(query));
   Reflect.set(engine, "requestBatch", async (queries: unknown[]) => queries.map(respond));
-  Reflect.set(engine, "transaction", async (action: string) => (action === "start" ? { id: "stub-transaction" } : undefined));
+  Reflect.set(engine, "transaction", async (action: string, _headers: unknown, options: unknown) => {
+    if (action !== "start") return undefined;
+    starts?.push(toStart(options));
+    return { id: "stub-transaction" };
+  });
   return calls;
 }

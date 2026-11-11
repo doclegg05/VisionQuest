@@ -13,7 +13,7 @@ const read = async (id: string) => {
   return { fetchedAt: "2026-09-10T12:00:00.000Z" };
 };
 mock.module("@/lib/auth", { namedExports: { getSession: async () => session } });
-mock.module("@/lib/db", { namedExports: { prisma: {}, withAppTransaction: async () => { throw new Error("Unexpected database access"); } } });
+mock.module("@/lib/db", { namedExports: { prisma: {}, withAppTransaction: async () => { throw new Error("Unexpected database access"); }, withAppReadTransaction: async () => { throw new Error("Unexpected database access"); } } });
 mock.module("@/lib/dashboard/readers", { namedExports: { readActivity: read } });
 mock.module("@/lib/dashboard/student-dashboard", { namedExports: {
   readStudentSupport: (s: { id: string }) => read(s.id),

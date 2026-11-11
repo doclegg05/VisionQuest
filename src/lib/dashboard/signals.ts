@@ -2,7 +2,7 @@
  * The student dashboard's slow-moving reads: the facts readiness, the next
  * step and the overview are built from, minus the live ones in ./live.ts.
  *
- * Each group runs inside one `withAppTransaction`: RLS is set once and the
+ * Each group runs inside one `withAppReadTransaction`: RLS is set once and the
  * reads share one connection, so a group of n reads costs 4 + n round trips
  * where n separate app-client calls cost 4n (see src/lib/db.ts). The reads run
  * one after another, as readTasks does: a transaction is one connection, so
@@ -13,13 +13,14 @@
  * exactly what the per-student functions other surfaces call ask.
  */
 import type { Certification, CertRequirement, Prisma } from "@prisma/client";
-import { withAppTransaction } from "@/lib/db";
+import { withAppReadTransaction } from "@/lib/db";
 import { readinessQueries } from "@/lib/progression/fetch-readiness-data";
 import { nextStepQueries } from "@/lib/progression/student-next-step";
 import { overviewQueries } from "./readers";
 import { orientationItemsQuery } from "./support";
-import { cached, invalidate } from "@/lib/cache";
+import { invalidate } from "@/lib/cache";
 import { cachedWhen, studentCacheKey, type CacheSession } from "./student-cache";
+import { perRequest } from "./per-request";
 
 type Tx = Prisma.TransactionClient;
 
@@ -60,18 +61,33 @@ async function readShell(tx: Tx, studentId: string): Promise<StudentShell> {
   return { goalPlanningCount, progressionState: progression?.state ?? null, orientationCompletedCount };
 }
 
+const shellKey = (session: CacheSession) => studentCacheKey(session, "shell");
+const readShellNow = (studentId: string) => withAppReadTransaction((tx) => readShell(tx, studentId));
 /**
- * The layout's three facts, kept per student. Kept only once a Progression
- * row exists: a student without one (new, or a read that lost its RLS
- * context and saw no rows) is read again on every request.
+ * Kept only once a Progression row exists: a student without one (new, or a
+ * read that lost its RLS context and saw no rows) is read again every time.
  */
+const keepShell = (shell: StudentShell) => shell.progressionState !== null;
+
+/** The layout's three facts for a poll: kept ones when there are any, else read and kept. */
 export function getStudentShell(session: CacheSession): Promise<StudentShell> {
-  return cachedWhen(
-    studentCacheKey(session, "shell"),
-    SHELL_TTL_SECONDS,
-    () => withAppTransaction((tx) => readShell(tx, session.id)),
-    (shell) => shell.progressionState !== null,
-  );
+  return cachedWhen(shellKey(session), SHELL_TTL_SECONDS, () => readShellNow(session.id), keepShell);
+}
+
+const pageShellFor = perRequest((studentId: string, role: string) => {
+  const session = { id: studentId, role };
+  return readFreshAndKeep(shellKey(session), SHELL_TTL_SECONDS, () => readShellNow(studentId), keepShell);
+});
+
+/**
+ * The three facts for a page render (the student layout and the dashboard
+ * page): read fresh, so a kept value a pre-commit read left behind
+ * (src/lib/chat-context-write-through.ts, "Known, accepted races") cannot pin
+ * the nav or readiness, then kept for the polls. One read per request: the
+ * layout and the page share it through `perRequest`.
+ */
+export function readPageShell(session: CacheSession): Promise<StudentShell> {
+  return pageShellFor(session.id, session.role);
 }
 
 async function readReadinessSignals(tx: Tx, studentId: string) {
@@ -117,7 +133,7 @@ async function readOverviewSignals(tx: Tx, studentId: string) {
 
 /** Every slow signal, read in one transaction. Uncached. */
 export function readSlowSignals(studentId: string): Promise<SlowSignals> {
-  return withAppTransaction(async (tx) => ({
+  return withAppReadTransaction(async (tx) => ({
     ...(await readReadinessSignals(tx, studentId)),
     ...(await readNextStepSignals(tx, studentId)),
     ...(await readOverviewSignals(tx, studentId)),
@@ -128,10 +144,16 @@ export function readSlowSignals(studentId: string): Promise<SlowSignals> {
  * How long a poll may serve slow signals the page or an earlier poll kept.
  * Longer than the poll interval on purpose: a TTL shorter than the poll never
  * serves a poll. What bounds staleness is invalidation, not the TTL: every
- * input but three is cleared on write (./student-cache.ts), and the page render
- * always reads fresh. The three that no write clears (discovery chat turns,
- * the class's Ready-to-Work requirement, a pathway's active flag) can lag by
- * up to this long, on a poll only.
+ * watched input is cleared on write (./student-cache.ts), and the page render
+ * always reads fresh. Five inputs no write clears, so on a poll only, never
+ * on a page load, they can lag by up to this long:
+ * 1. the discovery chat turn count (`Message`, unwatched because it is
+ *    written on every chat turn);
+ * 2. `Conversation.stage`, which that count filters on (stage writes are not
+ *    watched; only a summary write is);
+ * 3. `ClassRequirement`, the class's Ready-to-Work applicability;
+ * 4. `StudentClassEnrollment`, which class that requirement is read from;
+ * 5. `Pathway.active`, a pathway switched on or off.
  */
 export const SLOW_SIGNALS_TTL_SECONDS = 600;
 
@@ -160,10 +182,16 @@ export function getSlowSignals(session: CacheSession): Promise<SlowSignals> {
  * The page render reads slow signals fresh (so unwatched inputs are never
  * stale on a page load) and keeps what it read for the polls that follow.
  */
-export async function readAndKeepSlowSignals(session: CacheSession): Promise<SlowSignals> {
-  const key = slowKey(session);
-  const slow = await readSlowSignals(session.id);
-  if (!sawStudentRows(slow)) return slow;
+export function readAndKeepSlowSignals(session: CacheSession): Promise<SlowSignals> {
+  return readFreshAndKeep(slowKey(session), SLOW_SIGNALS_TTL_SECONDS, () => readSlowSignals(session.id), sawStudentRows);
+}
+
+/**
+ * Drops the kept value, then reads through `cachedWhen`, so the read is the
+ * key's in-flight read: a write that invalidates the key while the read runs
+ * also drops the in-flight entry, and `cached()` then never stores the result.
+ */
+function readFreshAndKeep<T>(key: string, ttlSeconds: number, read: () => Promise<T>, keep: (value: T) => boolean): Promise<T> {
   invalidate(key);
-  return cached(key, SLOW_SIGNALS_TTL_SECONDS, async () => slow);
+  return cachedWhen(key, ttlSeconds, read, keep);
 }

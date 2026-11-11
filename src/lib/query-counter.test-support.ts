@@ -41,8 +41,9 @@ export interface QueryCaller {
 
 /**
  * "batch": `$transaction([...])`. "interactive": `$transaction(async (tx) => ...)`.
- * "appTransaction": `withAppTransaction`, an interactive transaction on the raw
- * app client with its own isolation level and set_config.
+ * "appTransaction": `withAppTransaction` or `withAppReadTransaction`, an
+ * interactive transaction on the raw app client with its own isolation level
+ * and set_config.
  */
 export type TransactionKind = "batch" | "interactive" | "appTransaction";
 
@@ -121,7 +122,7 @@ export interface QuerySummary {
 
 export interface QueryCounter {
   /** Pass to `mock.module("@/lib/db", { exports: ... })`. */
-  readonly dbModule: Readonly<Record<"prisma" | "prismaAdmin" | "withAppTransaction", unknown>>;
+  readonly dbModule: Readonly<Record<"prisma" | "prismaAdmin" | "withAppTransaction" | "withAppReadTransaction", unknown>>;
   queries(): readonly RecordedQuery[];
   transactions(): readonly RecordedTransaction[];
   /** Runs `work` and returns the queries and transactions issued before it settled. */
@@ -529,6 +530,8 @@ export function createQueryCounter(initialFixtures: QueryFixtures = {}): QueryCo
       prismaAdmin: recorder.client("admin"),
       withAppTransaction: <T>(work: (tx: Queryable) => Promise<T>) =>
         recorder.interactive("app", "appTransaction", work),
+      withAppReadTransaction: <T>(work: (tx: Queryable) => Promise<T>) =>
+        recorder.interactive("app", "appTransaction", work),
     },
     queries: () => [...recorder.queries],
     transactions: () => [...recorder.transactions],
@@ -587,9 +590,10 @@ export function summarizeQueries(queries: readonly RecordedQuery[]): QuerySummar
 /** Round trips a lone app-client call pays: BEGIN, set_config, the query, COMMIT (`runWithContext`, src/lib/db.ts). */
 export const APP_CALL_ROUND_TRIPS = 4;
 /**
- * Statements `withAppTransaction` (src/lib/db.ts) adds around its queries:
- * BEGIN, SET TRANSACTION ISOLATION LEVEL SERIALIZABLE (it passes an isolation
- * level; counted as its own statement, the larger reading), set_config, COMMIT.
+ * Statements `withAppTransaction` and `withAppReadTransaction` (src/lib/db.ts)
+ * add around their queries: BEGIN, SET TRANSACTION ISOLATION LEVEL
+ * (SERIALIZABLE or REPEATABLE READ; both pass a level, so the count is the
+ * same; counted as its own statement, the larger reading), set_config, COMMIT.
  * Its queries run on the raw app client, so each is 1, not 4.
  */
 export const APP_TRANSACTION_OVERHEAD = 4;

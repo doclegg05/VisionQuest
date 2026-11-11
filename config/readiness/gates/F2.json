@@ -8,6 +8,8 @@
     "type": "test",
     "files": [
       "src/lib/dashboard/signals.write-through.test.ts",
+      "src/lib/dashboard/read-isolation.test.ts",
+      "src/app/(student)/dashboard/page.test.tsx",
       "src/lib/dashboard/student-dashboard.test.ts",
       "src/lib/dashboard/student-cache.test.ts",
       "src/lib/dashboard/globals.test.ts",

@@ -79,8 +79,10 @@ const DASHBOARD_ADMIN_QUERIES_COLD = 2;
  * The shell is kept per student once a Progression row exists, so warm skips its 3 reads.
  * F2 step 3: both one-time gates are satisfied for this student and kept, so warm skips 2 more.
  * F2 step 4: the orientation total and the Ready-to-Work templates are global and kept: 2 more.
+ * F2b item 3 (2026-11-10): a page render reads the shell fresh (readPageShell), once per
+ * request for the layout and the page together, so warm reads its 3 again: 27 to 30.
  */
-const DASHBOARD_APP_QUERIES_WARM = 27;
+const DASHBOARD_APP_QUERIES_WARM = 30;
 const DASHBOARD_ADMIN_QUERIES_WARM = 0;
 /** [app, admin] nested relation loads, counted only below a level that returned rows. */
 const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
@@ -88,10 +90,11 @@ const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
  * M1: app plus admin round trips, what `node scripts/readiness/query-count.mjs dashboard` prints.
  * An admin call costs a round trip too, so both clients count.
  * F2 step 2: 167 to 79 cold, 165 to 70 warm. Step 3 (gates kept once satisfied): warm 70 to 62.
- * Step 4 (global rows kept): warm 62 to 54.
+ * Step 4 (global rows kept): warm 62 to 54. F2b item 3 (shell fresh on page loads): warm 54 to 61;
+ * cold unchanged, because the layout and the page share one shell read per request.
  */
 const DASHBOARD_ROUND_TRIPS_COLD = 79;
-const DASHBOARD_ROUND_TRIPS_WARM = 54;
+const DASHBOARD_ROUND_TRIPS_WARM = 61;
 /** "file › function" -> [app, admin] for the cold render. */
 const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
@@ -128,6 +131,25 @@ const sessionToken = signToken(STUDENT_ID, "student", 0);
 const counter = createQueryCounter(DASHBOARD_FIXTURES);
 
 mock.module("@/lib/db", { exports: counter.dbModule });
+// Each render below is one request. React's `cache` passes through under this
+// renderer (see the header), so stand in a memo that lasts one render: what
+// production's react-server build does for the layout and page of a request.
+let request = 0;
+mock.module("@/lib/dashboard/per-request", {
+  exports: {
+    perRequest: <A extends readonly (string | number)[], R>(fn: (...args: A) => R) => {
+      const memo = new Map<string, { request: number; value: R }>();
+      return (...args: A): R => {
+        const key = args.join("\u0000");
+        const hit = memo.get(key);
+        if (hit && hit.request === request) return hit.value;
+        const value = fn(...args);
+        memo.set(key, { request, value });
+        return value;
+      };
+    },
+  },
+});
 mock.module("next/headers", {
   exports: {
     cookies: async () => ({
@@ -198,6 +220,7 @@ async function renderDashboard(
   DashboardPage: typeof import("@/app/(student)/dashboard/page").default,
 ): Promise<Render> {
   const errors: unknown[] = [];
+  request += 1;
   const section = await counter.section(async () => {
     const { prelude } = await prerenderToNodeStream(
       <StudentLayout><DashboardPage /></StudentLayout>,

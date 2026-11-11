@@ -6,7 +6,7 @@
  * src/lib/student-alerts.ts, the one student reader of StudentAlert.
  */
 import type { Prisma } from "@prisma/client";
-import { withAppTransaction } from "@/lib/db";
+import { withAppReadTransaction } from "@/lib/db";
 import { nextStepQueries } from "@/lib/progression/student-next-step";
 import { countStudentVisibleAlerts, countStudentVisibleAlertsOfType } from "@/lib/student-alerts";
 import { activityQuery } from "./readers";
@@ -23,8 +23,10 @@ export interface LiveSignals {
   readonly appointment: { id: string; title: string; startsAt: Date; locationLabel: string | null } | null;
 }
 
-/** What the dashboard page reads besides the live signals, in the same transaction. */
-export interface PageLiveSignals extends LiveSignals {
+export type AlertCounts = Pick<LiveSignals, "openAlertCount" | "jobsReadyAlertCount">;
+
+/** What the dashboard page reads in its one live transaction: the live counts and the page's own two reads. */
+export interface PageCounts extends Omit<LiveSignals, keyof AlertCounts> {
   readonly smsPreference: { enabled: boolean; smsConsentAt: Date | null; smsRevokedAt: Date | null } | null;
   readonly activityTasks: readonly { status: string; completedAt: Date | null }[];
 }
@@ -38,7 +40,7 @@ async function readCounts(tx: Tx, studentId: string) {
   return { savedJobCount, applicationCount, openTaskCount, appointment };
 }
 
-async function readAlertCounts(studentId: string) {
+export async function readAlertCounts(studentId: string): Promise<AlertCounts> {
   const [openAlertCount, jobsReadyAlertCount] = await Promise.all([
     countStudentVisibleAlerts(studentId),
     countStudentVisibleAlertsOfType(studentId, "connect_weekly_jobs_ready"),
@@ -49,7 +51,7 @@ async function readAlertCounts(studentId: string) {
 /** The live signals the advising poll needs. */
 export async function readLiveSignals(studentId: string): Promise<LiveSignals> {
   const [counts, alerts] = await Promise.all([
-    withAppTransaction((tx) => readCounts(tx, studentId)),
+    withAppReadTransaction((tx) => readCounts(tx, studentId)),
     readAlertCounts(studentId),
   ]);
   return { ...counts, ...alerts };
@@ -68,11 +70,10 @@ async function readPageOnly(tx: Tx, studentId: string) {
   return { smsPreference, activityTasks };
 }
 
-/** The live signals plus the page's own two reads, one transaction for all but alerts. */
-export async function readPageLiveSignals(studentId: string): Promise<PageLiveSignals> {
-  const [counts, alerts] = await Promise.all([
-    withAppTransaction(async (tx) => ({ ...(await readCounts(tx, studentId)), ...(await readPageOnly(tx, studentId)) })),
-    readAlertCounts(studentId),
-  ]);
-  return { ...counts, ...alerts };
+/**
+ * The live counts plus the page's own two reads, in one transaction. Alerts
+ * are read apart (readAlertCounts), so either can fail without the other.
+ */
+export function readPageCounts(studentId: string): Promise<PageCounts> {
+  return withAppReadTransaction(async (tx) => ({ ...(await readCounts(tx, studentId)), ...(await readPageOnly(tx, studentId)) }));
 }
