@@ -3,6 +3,7 @@ import test from "node:test";
 import { cached } from "./cache";
 import {
   applyChatContextWriteThrough,
+  CERT_OWNER_LOOKUP_TIMEOUT_MS,
   isChatContextWrite,
   resolveChatContextInvalidation,
 } from "./chat-context-write-through";
@@ -335,4 +336,22 @@ test("a requirement tick clears everyone when the owner lookup finds nothing, fa
   assert.deepEqual(await survivors(async () => []), []);
   assert.deepEqual(await survivors(async () => { throw new Error("lookup down"); }), []);
   assert.deepEqual(await survivors(undefined), []);
+});
+
+// The owner lookup runs inside the writer's open transaction (db.ts awaits the
+// write-through before the write returns), so a lookup stuck on a busy admin
+// pool must not hold the write: past the bound it counts as "owner not found".
+test("a requirement tick whose owner lookup never settles returns within the bound and clears everyone", async () => {
+  const started = Date.now();
+  const kept = await survivors(() => new Promise<readonly string[]>(() => {}));
+  const elapsed = Date.now() - started;
+  assert.deepEqual(kept, []);
+  assert.ok(elapsed < CERT_OWNER_LOOKUP_TIMEOUT_MS + 500, `took ${elapsed} ms`);
+});
+
+test("a requirement tick whose owner lookup answers inside the bound still clears only the owner", async () => {
+  const slowButInTime = (ids: readonly string[]) => new Promise<readonly string[]>((resolve) => {
+    setTimeout(() => resolve(ids.includes("c1") ? [SID] : []), CERT_OWNER_LOOKUP_TIMEOUT_MS / 5);
+  });
+  assert.deepEqual(await survivors(slowButInTime), [OTHER_SID]);
 });

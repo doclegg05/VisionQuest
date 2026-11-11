@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { QueryClient } from "@tanstack/react-query";
-import { DashboardFetchError, dashboardKey, describePoll, freshness, isNewNotification, optimisticTasks, regionPollMs, shouldShowMutationNotice, taskKey } from "./query";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
+import { DashboardFetchError, dashboardKey, describePoll, freshness, isNewNotification, optimisticTasks, refetchPlan, refetchWithoutOverlap, regionPollMs, retryOptions, shouldShowMutationNotice, taskKey } from "./query";
 import type { TaskPage } from "./tasks";
 
 it("optimistic status updates snapshot all affected task pages and roll back without touching another session", () => {
@@ -51,4 +51,48 @@ it("treats a notification as new only when the server created it after the dashb
   assert.equal(isNewNotification(since, since), false);
   assert.equal(isNewNotification(undefined, since), false);
   assert.equal(isNewNotification("not a date", since), false);
+});
+
+// F2c item 4: one read in flight per region. React Query's default for
+// invalidateQueries and refetch() cancels the running fetch and starts
+// another; the browser abort does not stop the server's read, so the two
+// overlap there. A trigger while a read is running waits for it, then reads once.
+it("a region with a read in flight waits for it before reading again; an idle one reads at once", () => {
+  assert.equal(refetchPlan("fetching"), "wait-then-read");
+  assert.equal(refetchPlan("paused"), "read");
+  assert.equal(refetchPlan("idle"), "read");
+});
+
+it("a retry joins a running read instead of cancelling it", () => {
+  assert.deepEqual(retryOptions, { cancelRefetch: false });
+});
+
+it("a refetch during a running read never overlaps it and still reads once after the trigger", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  let running = 0;
+  let maxRunning = 0;
+  let started = 0;
+  let release: (() => void) | undefined;
+  const queryFn = () => new Promise<number>((resolve) => {
+    running += 1; started += 1; maxRunning = Math.max(maxRunning, running);
+    const n = started;
+    const done = () => { running -= 1; resolve(n); };
+    if (n === 1) release = done; else setTimeout(done, 5);
+  });
+  const key = [...dashboardKey("s1"), "overview"];
+  // Data already on screen, as the dashboard seeds it: only then does React
+  // Query's default cancel the running read and start a second one.
+  const observer = new QueryObserver(client, { queryKey: key, queryFn, initialData: 0, initialDataUpdatedAt: 0, staleTime: 30_000 });
+  const unsubscribe = observer.subscribe(() => {});
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(started, 1, "the first read is running");
+  const refetched = refetchWithoutOverlap(client, dashboardKey("s1"));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(started, 1, "no second read while the first runs");
+  release?.();
+  await refetched;
+  unsubscribe();
+  assert.equal(maxRunning, 1);
+  assert.equal(started, 2, "one fresh read after the trigger");
+  assert.equal(client.getQueryData(key), 2);
 });

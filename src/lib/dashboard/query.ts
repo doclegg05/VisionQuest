@@ -1,4 +1,4 @@
-import type { QueryClient } from "@tanstack/react-query";
+import type { FetchStatus, QueryClient, QueryKey } from "@tanstack/react-query";
 import type { TaskDto, TaskPage } from "./tasks";
 
 export const dashboardKey = (sessionId: string) => ["dashboard", sessionId] as const;
@@ -65,4 +65,33 @@ export function optimisticTasks(client: QueryClient, key: readonly unknown[], up
 export function shouldShowMutationNotice(error: Error, variables: { quietConflicts?: boolean }): boolean {
   const conflictOrGone = error instanceof DashboardFetchError && (error.status === 409 || error.status === 404);
   return !(variables.quietConflicts && conflictOrGone);
+}
+
+/**
+ * One read in flight per dashboard region. React Query's default for
+ * invalidateQueries and refetch() cancels a running fetch (when data is on
+ * screen) and starts another; the browser abort does not stop the server's
+ * read, so the two overlap there. Interval polls, focus and reconnect already
+ * reuse a running fetch.
+ */
+export type RefetchStep = "wait-then-read" | "read";
+export function refetchPlan(fetchStatus: FetchStatus): RefetchStep {
+  return fetchStatus === "fetching" ? "wait-then-read" : "read";
+}
+
+/** For a Retry button: join a running read rather than cancel it. */
+export const retryOptions = { cancelRefetch: false } as const;
+
+/**
+ * Refetch every active query under `queryKey` without overlapping a running
+ * read: wait for it, then read once, so a change the trigger announced (a new
+ * notification, a saved task) is still read after it.
+ */
+export async function refetchWithoutOverlap(client: QueryClient, queryKey: QueryKey): Promise<void> {
+  const queries = client.getQueryCache().findAll({ queryKey, type: "active" });
+  await Promise.all(queries.map(async (query) => {
+    const filters = { queryKey: query.queryKey, exact: true };
+    if (refetchPlan(query.state.fetchStatus) === "wait-then-read") await client.refetchQueries(filters, retryOptions);
+    await client.invalidateQueries(filters, retryOptions);
+  }));
 }
