@@ -445,7 +445,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             )}
           </div>
         </div>
-        <AiCanBeWrongLine />
+        <AiCanBeWrongLine showLink={Boolean(compact) && role === "student"} />
         {demoAccount === "student" && (
           <div className="mt-2 px-1">
             <DemoPrivacyNotice />

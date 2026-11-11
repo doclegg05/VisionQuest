@@ -149,6 +149,8 @@ export const SAGE_NOTICE_LINK_LABEL = "About Sage";
  */
 export const SAGE_CHAT_AI_LINE = "Sage is an AI and can be wrong.";
 export const SAGE_CHAT_NOTICE_LINK = "What Sage does with your words";
+/** Said in the link text, since the notice opens in a new tab so the chat draft stays. */
+export const SAGE_CHAT_NOTICE_NEW_TAB = "(opens a new tab)";
 
 /**
  * Whether the student layout must send this student to the notice. A demo

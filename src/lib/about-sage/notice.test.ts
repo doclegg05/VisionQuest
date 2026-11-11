@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import {
   SAGE_CHAT_AI_LINE,
   SAGE_CHAT_NOTICE_LINK,
+  SAGE_CHAT_NOTICE_NEW_TAB,
   SAGE_NOTICE_ACK_BUTTON,
   SAGE_NOTICE_ACK_FAILED,
   SAGE_NOTICE_ACK_HEADING,
@@ -37,6 +38,7 @@ const allSentences = [
   SAGE_NOTICE_SIGN_OUT_LINE,
   SAGE_CHAT_AI_LINE,
   SAGE_CHAT_NOTICE_LINK,
+  SAGE_CHAT_NOTICE_NEW_TAB,
 ];
 
 const fullItems = SAGE_NOTICE_SECTIONS.flatMap((section) => section.sentences);

@@ -10,6 +10,7 @@ import type { ChatRole } from "@/lib/chat/commands";
 import {
   SAGE_CHAT_AI_LINE,
   SAGE_CHAT_NOTICE_LINK,
+  SAGE_CHAT_NOTICE_NEW_TAB,
   SAGE_NOTICE_PATH,
   SAGE_NOTICE_SECTIONS,
 } from "@/lib/about-sage/notice";
@@ -26,9 +27,22 @@ describe("the AI can be wrong line", () => {
   it("says the plan's sentence and links to the read any time notice", () => {
     assert.equal(SAGE_CHAT_AI_LINE, "Sage is an AI and can be wrong.");
     assert.equal(SAGE_NOTICE_PATH, "/about-sage");
+    const html = renderToString(<AiCanBeWrongLine showLink />);
+    assert.match(html, /Sage is an AI and can be wrong\./);
+    const text = `${SAGE_CHAT_NOTICE_LINK} ${SAGE_CHAT_NOTICE_NEW_TAB}`.replace(/[()]/g, "\\$&");
+    assert.match(html, new RegExp(`<a[^>]*href="/about-sage"[^>]*>${text}</a>`));
+  });
+
+  it("opens the notice in a new tab, so the typed message and a reply in progress stay", () => {
+    const html = renderToString(<AiCanBeWrongLine showLink />);
+    assert.match(html, /<a[^>]*target="_blank"[^>]*>/);
+    assert.match(html, /<a[^>]*rel="noopener noreferrer"[^>]*>/);
+  });
+
+  it("is the sentence alone when it has no link", () => {
     const html = renderToString(<AiCanBeWrongLine />);
     assert.match(html, /Sage is an AI and can be wrong\./);
-    assert.match(html, new RegExp(`<a[^>]*href="/about-sage"[^>]*>${SAGE_CHAT_NOTICE_LINK}</a>`));
+    assert.doesNotMatch(html, /<a\b/);
   });
 
   it("agrees with the notice, which says Sage can make mistakes", () => {
@@ -37,17 +51,20 @@ describe("the AI can be wrong line", () => {
   });
 
   it("gives the link a 44px tall target", () => {
-    const html = renderToString(<AiCanBeWrongLine />);
-    assert.match(html, /<a[^>]*class="[^"]*\bmin-h-11\b[^"]*"/);
+    const html = renderToString(<AiCanBeWrongLine showLink />);
+    // Padding gives the 44px target; the row itself stays one text line tall.
+    const linkClass = html.match(/<a[^>]*class="([^"]*)"/)?.[1].split(" ") ?? [];
+    assert.ok(linkClass.includes("py-3") && linkClass.includes("-my-3"), linkClass.join(" "));
+    assert.doesNotMatch(html, /min-h-11/);
   });
 
   it("is not a live region and takes no focus on its own", () => {
-    const html = renderToString(<AiCanBeWrongLine />);
+    const html = renderToString(<AiCanBeWrongLine showLink />);
     assert.doesNotMatch(html, /aria-live|role="(status|alert|log)"|autofocus|tabindex/i);
   });
 
   it("reads at grade 6 or below with no dashes", () => {
-    for (const text of [SAGE_CHAT_AI_LINE, SAGE_CHAT_NOTICE_LINK]) {
+    for (const text of [SAGE_CHAT_AI_LINE, SAGE_CHAT_NOTICE_LINK, SAGE_CHAT_NOTICE_NEW_TAB]) {
       const { grade } = assessReadability(text);
       assert.ok(grade <= 6, `"${text}" grade ${grade}`);
       assert.doesNotMatch(text, DASHES);
@@ -66,6 +83,10 @@ describe("ChatInput shows the line under the message box", () => {
         assert.ok(box >= 0 && send >= 0, "box and Send render");
         assert.ok(line > box && line > send, "the line comes after the box and Send");
         assert.doesNotMatch(html, /aria-live/);
+        // The full chat has "About Sage" in its header; only the small chat links,
+        // and only for students, since the notice is written to students.
+        const links = html.includes(`href="${SAGE_NOTICE_PATH}"`);
+        assert.equal(links, compact && role === "student", `link shown: ${links}`);
       });
     }
   }
