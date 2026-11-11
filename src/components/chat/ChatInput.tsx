@@ -54,14 +54,18 @@ export function UploadError({ message }: { message: string }) {
 
 /**
  * Ends Sage's answer. Neutral colors: stopping is the student's choice, not
- * an error. The visible word is the button's name.
+ * an error. The visible word is the button's name. Until the chat arms it
+ * (stopArmed in wait-and-stop.ts) it is aria-disabled and a press does
+ * nothing: a second tap on Send lands here, and a Stop before the stream's
+ * first event would lose the 988 help.
  */
-export function StopButton({ onStop }: { onStop: () => void }) {
+export function StopButton({ onStop, armed = false }: { onStop: () => void; armed?: boolean }) {
   return (
     <button
       type="button"
-      onClick={onStop}
-      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)]"
+      onClick={armed ? onStop : () => undefined}
+      aria-disabled={armed ? undefined : true}
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)] aria-disabled:cursor-wait"
     >
       <Stop size={16} weight="fill" aria-hidden="true" />
       <span>Stop</span>
@@ -85,9 +89,11 @@ interface ChatInputProps {
   messageBoxRef?: Ref<MessageBoxHandle>;
   /** While Sage answers (`disabled`), a Stop button takes Send's place. */
   onStop?: () => void;
+  /** Stop does something only once the chat arms it (wait-and-stop.ts). */
+  stopArmed?: boolean;
 }
 
-export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage, messageBoxRef, onStop }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, compact, role = "student", initialMessage, messageBoxRef, onStop, stopArmed = false }: ChatInputProps) {
   const canAttachFiles = chatRoleCanAttachFiles(role);
   const [message, setMessage] = useState(initialMessage ?? "");
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -341,7 +347,6 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             focused
               ? "border-[var(--chat-sage-mark)] shadow-[0_0_0_3px_var(--chat-composer-focus)]"
               : "border-[var(--chat-panel-border)]",
-            disabled ? "opacity-75" : "",
             compact ? "rounded-xl" : "",
           ]
             .filter(Boolean)
@@ -380,6 +385,8 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             className={[
               "custom-scrollbar relative w-full resize-none border-0 bg-transparent text-[var(--ink-strong)] placeholder:text-[var(--ink-muted)]",
               "focus:outline-none focus:ring-0 focus-visible:outline-none aria-disabled:cursor-not-allowed overflow-y-auto",
+              // The fade is here and on the other buttons, not the composer, so Stop stays full strength.
+              disabled ? "opacity-75" : "",
               compact ? "min-h-[40px] px-3 pb-1 pt-2.5 text-sm" : "min-h-[52px] px-4 py-3 text-[15px] leading-6",
             ].join(" ")}
           />
@@ -423,7 +430,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             </p>
 
             {disabled && onStop ? (
-              <StopButton onStop={onStop} />
+              <StopButton onStop={onStop} armed={stopArmed} />
             ) : (
               <motion.button
                 onClick={handleSubmit}

@@ -111,11 +111,21 @@ export const CUT_OFF_NOTE = "(Sage got cut off. Tap Try again for the full answe
 /** The same note once Try again ran: the new answer is under it. */
 export const RETRIED_CUT_OFF_NOTE = "(Sage got cut off. The new answer is below.)";
 
-/** The same note as saved: a reload shows no Try again, so it names no button. */
-export const SAVED_CUT_OFF_NOTE = "(Sage got cut off here.)";
+/**
+ * The same note as saved: a reload shows no Try again, so it names no button.
+ * The route saves it for a Stop and for a dropped connection alike, so it
+ * says only that the reply ends here.
+ */
+export const SAVED_CUT_OFF_NOTE = "(Sage stopped here.)";
 
-/** The start every cut-off note shares, shown or saved. */
+/** The start every shown cut-off note shares, and every saved one before E2b. */
 export const CUT_OFF_MARK = "\n\n(Sage got cut off";
+
+/**
+ * Every mark a cut-off reply can carry, shown or saved. Rows saved before
+ * E2b end with "(Sage got cut off here.)", so the old mark stays.
+ */
+export const CUT_OFF_MARKS: readonly string[] = [CUT_OFF_MARK, `\n\n${SAVED_CUT_OFF_NOTE}`];
 
 /**
  * A partial reply as the student sees it while Try again shows: the text
@@ -135,7 +145,7 @@ export function savedCutOffReply(partial: string, code: SageFailureCode, audienc
 
 /** True for a reply that stopped partway, so it does not count as an answer. */
 export function isCutOffReply(content: string): boolean {
-  return content.includes(CUT_OFF_MARK);
+  return CUT_OFF_MARKS.some((mark) => content.includes(mark));
 }
 
 // ─── Classification ─────────────────────────────────────────────────────────

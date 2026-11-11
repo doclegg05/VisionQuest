@@ -1515,7 +1515,7 @@ describe("POST /api/chat/send — interrupted reply on the agent-loop path (F28,
 
   // The same note the chat shows under a cut-off reply it can retry.
   // Saved with no button wording: a reload shows no Try again (E1c 7b).
-  const CUT_OFF_MARKER = "\n\n(Sage got cut off here.)";
+  const CUT_OFF_MARKER = "\n\n(Sage stopped here.)";
   const PARTIAL = "Here is the first step: ";
 
   function post(message: string) {

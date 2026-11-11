@@ -23,7 +23,7 @@ import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { chatSendSchema } from "@/lib/schemas";
 import { saveMessage } from "./conversation";
-import { CUT_OFF_MARK } from "./sage-failure";
+import { CUT_OFF_MARKS } from "./sage-failure";
 
 /** The 409's text; the registry middleware sends it to the student as is. */
 export const ALREADY_ANSWERED = "Sage already sent the answer. It is above.";
@@ -99,7 +99,7 @@ async function hasFullAnswerAfter(studentId: string, conversationId: string, aft
       studentId,
       role: "assistant",
       createdAt: { gt: after },
-      NOT: { content: { contains: CUT_OFF_MARK } },
+      NOT: { OR: CUT_OFF_MARKS.map((mark) => ({ content: { contains: mark } })) },
     },
     select: { id: true },
   });

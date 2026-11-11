@@ -10,6 +10,8 @@ import ChatInput, {
   uploadProblemFor,
 } from "./ChatInput";
 import { validateFile } from "@/lib/storage";
+import { composite, contrastRatio, cssTokenValue, parseColor } from "@/lib/wcag-contrast";
+import { readFileSync } from "node:fs";
 
 const MB = 1024 * 1024;
 const DASHES = /[-‐-―−]/;
@@ -141,9 +143,64 @@ describe("Stop while Sage answers (E2.2)", () => {
     assert.equal(stopButton(html), "");
   });
 
-  it("calls onStop when pressed", () => {
+  it("calls onStop when pressed once armed", () => {
     const onStop = () => undefined;
-    const element = StopButton({ onStop });
+    const element = StopButton({ onStop, armed: true });
     assert.equal(element.props.onClick, onStop);
   });
+});
+
+describe("Stop before it is armed (E2b 1 and 2)", () => {
+  function stopButton(html: string): string {
+    return html.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Stop(?:(?!<\/button>)[\s\S])*<\/button>/)?.[0] ?? "";
+  }
+
+  it("is drawn but aria-disabled until the chat arms it, so a double tap on Send is not a Stop", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} disabled />);
+    const button = stopButton(html);
+    assert.ok(button, html);
+    assert.match(button, / aria-disabled="true"/);
+    assert.doesNotMatch(button, / disabled=""/);
+  });
+
+  it("does nothing when pressed unarmed", () => {
+    let calls = 0;
+    const element = StopButton({ onStop: () => { calls += 1; }, armed: false });
+    assert.equal(element.props["aria-disabled"], true);
+    element.props.onClick();
+    assert.equal(calls, 0);
+  });
+
+  it("drops aria-disabled once armed", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} stopArmed disabled />);
+    assert.doesNotMatch(stopButton(html), /aria-disabled="/);
+  });
+});
+
+describe("Stop stays full strength while Sage answers (E2b 5)", () => {
+  it("fades the box and the other buttons, not the composer around Stop", () => {
+    const html = renderToString(<ChatInput onSend={() => undefined} onStop={() => undefined} stopArmed disabled />);
+    const composer = html.match(/<div class="relative flex flex-col[^"]*"/)?.[0] ?? "";
+    assert.ok(composer, html);
+    assert.doesNotMatch(composer, /opacity-/);
+    const textarea = html.match(/<textarea[^>]*>/)?.[0] ?? "";
+    assert.match(textarea, /opacity-75/);
+    const stop = html.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Stop(?:(?!<\/button>)[\s\S])*<\/button>/)?.[0] ?? "";
+    assert.doesNotMatch(stop, /opacity/);
+  });
+});
+
+describe("the Stop label's contrast in both themes (E2b 5)", () => {
+  const css = readFileSync("src/app/globals.css", "utf8");
+  for (const theme of ["light", "dark"] as const) {
+    it(`reaches 4.5:1 on the composer in ${theme}`, () => {
+      const ink = cssTokenValue(css, "--ink-strong", theme);
+      const panel = cssTokenValue(css, "--chat-panel-bg", theme);
+      const area = cssTokenValue(css, "--chat-area-bg", theme);
+      assert.ok(ink && panel && area, "tokens are defined");
+      const ground = composite(parseColor(panel!), parseColor(area!));
+      const ratio = contrastRatio(composite(parseColor(ink!), parseColor(ground)), ground);
+      assert.ok(ratio >= 4.5, `${theme}: ${ratio.toFixed(2)}:1`);
+    });
+  }
 });

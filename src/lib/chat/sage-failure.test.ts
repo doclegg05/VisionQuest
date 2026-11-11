@@ -1,8 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { assessReadability, PLAIN_LANGUAGE_IDEAL_GRADE } from "@/lib/sage/readability";
 import {
+  CUT_OFF_MARKS,
   SAGE_FAILURE_CODES,
+  SAVED_CUT_OFF_NOTE,
   classifyProviderInitFailure,
   classifyStreamFailure,
   cutOffReply,
@@ -190,7 +193,7 @@ describe("parseSageFailureCode", () => {
 describe("savedCutOffReply (E1c 7b)", () => {
   it("saves a cut-off note with no button wording, since a reload shows no Try again", () => {
     for (const code of ["busy", "slow", "unknown"] as const) {
-      assert.equal(savedCutOffReply("First part", code, "student"), "First part\n\n(Sage got cut off here.)");
+      assert.equal(savedCutOffReply("First part", code, "student"), "First part\n\n(Sage stopped here.)");
     }
   });
 
@@ -217,6 +220,19 @@ describe("isCutOffReply (E1c 4)", () => {
 
   it("treats a full answer as an answer", () => {
     assert.equal(isCutOffReply("Here is your full answer."), false);
+  });
+
+  it("knows both the new saved note and the old one that rows saved before E2b carry", () => {
+    assert.equal(isCutOffReply("x\n\n(Sage stopped here.)"), true);
+    assert.equal(isCutOffReply("x\n\n(Sage got cut off here.)"), true);
+    assert.equal(isCutOffReply("x\n\n(Sage stopped here.)\n\nCall or text 988."), true);
+    for (const mark of CUT_OFF_MARKS) assert.match(mark, /^\n\n\(Sage /);
+  });
+
+  it("says (Sage stopped here.), true for a Stop and for a drop, and plain", () => {
+    assert.equal(SAVED_CUT_OFF_NOTE, "(Sage stopped here.)");
+    const grade = assessReadability(SAVED_CUT_OFF_NOTE, { maxGrade: PLAIN_LANGUAGE_IDEAL_GRADE });
+    assert.ok(grade.withinTarget, JSON.stringify(grade));
   });
 });
 

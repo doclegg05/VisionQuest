@@ -12,7 +12,14 @@ import type { ChatMessage } from "./failed-turn";
 /** How long Sage may say nothing before the dots get words under them. */
 export const SLOW_REPLY_MS = 5000;
 
-export const SLOW_REPLY_WORDS = "Sage is thinking. This can take a minute.";
+/** Read out, never shown, while the dots run and before the wait words. */
+export const TYPING_SR_WORDS = "Sage is thinking.";
+
+/** Shown and read out after SLOW_REPLY_MS, in place of TYPING_SR_WORDS. */
+export const SLOW_REPLY_WORDS = "Sage is still thinking. This can take a minute.";
+
+/** How long after a send Stop stays inert, so a double tap on Send is not a Stop. */
+export const STOP_ARM_DELAY_MS = 800;
 
 /** Added under any text Sage sent before the student pressed Stop. */
 export const STOPPED_NOTE = "(You stopped Sage.)";
@@ -24,6 +31,32 @@ const CRISIS_MARKER = /988/;
 export function startSlowReplyTimer(onSlow: () => void): () => void {
   const timer = setTimeout(onSlow, SLOW_REPLY_MS);
   return () => clearTimeout(timer);
+}
+
+interface StopArmInput {
+  /** The stream's first event (conversation and message ids) has arrived. */
+  idsArrived: boolean;
+  /** Date.now() at the send, and now. */
+  sentAt: number;
+  now: number;
+}
+
+/**
+ * Whether Stop does anything yet. The route flags a crisis message on the
+ * stream's first event, so a Stop before it would lose the 988 help; and the
+ * Stop button sits where Send was, so a double tap would stop the reply.
+ */
+export function stopArmed({ idsArrived, sentAt, now }: StopArmInput): boolean {
+  return idsArrived && now - sentAt >= STOP_ARM_DELAY_MS;
+}
+
+/**
+ * aria-busy for the conversation log. Busy only while words stream in, so a
+ * streamed reply is read once when it is done; while Sage has sent nothing
+ * the log is not busy, so the wait words in it are read out when they appear.
+ */
+export function logBusy(isLoading: boolean, streamingContent: string): boolean {
+  return isLoading && Boolean(streamingContent);
 }
 
 interface OpenerInput {
