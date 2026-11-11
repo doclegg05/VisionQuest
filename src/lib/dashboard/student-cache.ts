@@ -47,7 +47,7 @@ export function studentCacheKey(session: CacheSession, layer: string): string {
 /**
  * A key for a row every role reads the same (an RLS policy of USING (true)).
  * `invalidateAllChatContext()` clears it, which the write-through calls for
- * every OrientationItem, CertTemplate and CertRequirement write.
+ * every OrientationItem and CertTemplate write.
  */
 export function globalCacheKey(name: string): string {
   return `chat:snapshot:~global:dashboard:${name}`;

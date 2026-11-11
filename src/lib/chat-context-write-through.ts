@@ -41,7 +41,13 @@ import { logger } from "@/lib/logger";
 export type ChatContextInvalidation =
   | { scope: "none" }
   | { scope: "all" }
-  | { scope: "students"; studentIds: string[] };
+  | { scope: "students"; studentIds: string[] }
+  // CertRequirement: one student's rows, through their certification. The
+  // shell resolves the owners (`CertificationOwners`); unresolved means "all".
+  | { scope: "certifications"; certificationIds: string[] };
+
+/** The students who own these certifications, as found in the database. */
+export type CertificationOwners = (certificationIds: readonly string[]) => Promise<readonly string[]>;
 
 const NONE: ChatContextInvalidation = { scope: "none" };
 const ALL: ChatContextInvalidation = { scope: "all" };
@@ -95,15 +101,19 @@ const STUDENT_SCOPED_MODEL_LIST: readonly Prisma.ModelName[] = [
 ];
 
 /**
- * Rows without a per-student scope that still shape every student's context
- * (orientation totals, cert requirement templates) or whose student cannot be
- * resolved from write args (CertRequirement is keyed by certificationId).
+ * Rows without a per-student scope that shape every student's context
+ * (orientation totals, cert requirement templates).
  */
 const GLOBAL_MODEL_LIST: readonly Prisma.ModelName[] = [
   "OrientationItem",
   "CertTemplate",
-  "CertRequirement",
 ];
+
+/**
+ * Keyed by certificationId, not studentId: a write clears the certification's
+ * owner, looked up after the write, and everyone when the owner is not found.
+ */
+const CERT_REQUIREMENT_MODEL: Prisma.ModelName = "CertRequirement";
 
 /**
  * Conversation is special-cased: the context only reads its `summary`
@@ -137,6 +147,7 @@ export function isChatContextWrite(
   return (
     STUDENT_SCOPED_MODELS.has(model) ||
     GLOBAL_MODELS.has(model) ||
+    model === CERT_REQUIREMENT_MODEL ||
     model === CONVERSATION_MODEL
   );
 }
@@ -153,16 +164,16 @@ function stringProp(value: unknown, key: string): string | null {
   return typeof prop === "string" ? prop : null;
 }
 
-/** Collect studentIds from one data/create/update payload or an array of them. */
-function collectFromPayload(payload: unknown, into: Set<string>): void {
+/** Collect `key` (studentId, certificationId) from one data/create/update payload or an array of them. */
+function collectFromPayload(payload: unknown, into: Set<string>, key = "studentId"): void {
   if (Array.isArray(payload)) {
     for (const entry of payload) {
-      const id = stringProp(entry, "studentId");
+      const id = stringProp(entry, key);
       if (id) into.add(id);
     }
     return;
   }
-  const id = stringProp(payload, "studentId");
+  const id = stringProp(payload, key);
   if (id) into.add(id);
 }
 
@@ -172,15 +183,31 @@ function collectFromPayload(payload: unknown, into: Set<string>): void {
  * `studentId_itemId: { studentId, itemId }`. Filter objects
  * (`studentId: { in: [...] }`) are ignored — the caller falls back to "all".
  */
-function collectFromWhere(where: unknown, into: Set<string>): void {
+function collectFromWhere(where: unknown, into: Set<string>, key = "studentId"): void {
   const record = asRecord(where);
   if (!record) return;
-  const direct = record.studentId;
+  const direct = record[key];
   if (typeof direct === "string") into.add(direct);
   for (const value of Object.values(record)) {
-    const nested = stringProp(value, "studentId");
+    const nested = stringProp(value, key);
     if (nested) into.add(nested);
   }
+}
+
+/** Every `key` value a write names in its args or returned row(s). */
+function collectIds(args: unknown, result: unknown, key: string): Set<string> {
+  const ids = new Set<string>();
+  const argsRecord = asRecord(args);
+  if (argsRecord) {
+    collectFromPayload(argsRecord.data, ids, key);
+    collectFromPayload(argsRecord.create, ids, key); // upsert
+    collectFromPayload(argsRecord.update, ids, key); // upsert
+    collectFromWhere(argsRecord.where, ids, key);
+  }
+  // Row-returning operations (create/update/upsert/delete/…AndReturn) carry
+  // the id unless the caller's `select` dropped it.
+  collectFromPayload(result, ids, key);
+  return ids;
 }
 
 function conversationWriteTouchesSummary(args: unknown): boolean {
@@ -209,46 +236,56 @@ export function resolveChatContextInvalidation(
     return NONE;
   }
   if (model && GLOBAL_MODELS.has(model)) return ALL;
-
-  const studentIds = new Set<string>();
-  const argsRecord = asRecord(args);
-  if (argsRecord) {
-    collectFromPayload(argsRecord.data, studentIds);
-    collectFromPayload(argsRecord.create, studentIds); // upsert
-    collectFromPayload(argsRecord.update, studentIds); // upsert
-    collectFromWhere(argsRecord.where, studentIds);
+  if (model === CERT_REQUIREMENT_MODEL) {
+    const certificationIds = collectIds(args, result, "certificationId");
+    return certificationIds.size > 0 ? { scope: "certifications", certificationIds: [...certificationIds] } : ALL;
   }
-  // Row-returning operations (create/update/upsert/delete/…AndReturn) carry
-  // the studentId unless the caller's `select` dropped it.
-  collectFromPayload(result, studentIds);
 
+  const studentIds = collectIds(args, result, "studentId");
   return studentIds.size > 0
     ? { scope: "students", studentIds: [...studentIds] }
     : ALL;
 }
 
+/** The owning students, or null when any certification's owner was not found. */
+async function ownersOf(certificationIds: readonly string[], owners: CertificationOwners | undefined): Promise<readonly string[] | null> {
+  if (!owners) return null;
+  const studentIds = await owners(certificationIds);
+  // Fewer owners than certifications can mean one was not found (deleted, or
+  // created in a transaction not yet committed): clear everyone instead.
+  return studentIds.length >= new Set(certificationIds).size ? studentIds : null;
+}
+
+function invalidateStudents(studentIds: readonly string[]): void {
+  for (const studentId of studentIds) invalidateChatContext(studentId);
+}
+
 /**
  * Fire-safe shell for src/lib/db.ts: resolve and apply the invalidation for a
- * completed write. Must never throw — a cache miss costs a re-query; a failed
- * write costs the user their action.
+ * completed write. Never rejects: a cache miss costs a re-query; a failed
+ * write costs the user their action. Every scope but "certifications" is
+ * applied before the first await, so a caller that does not await still sees
+ * it at once. `owners` resolves a CertRequirement write's certifications to
+ * students; without it, or when it fails, such a write clears everyone.
  */
-export function applyChatContextWriteThrough(
+export async function applyChatContextWriteThrough(
   model: string | undefined,
   operation: string,
   args: unknown,
   result: unknown,
-): void {
+  owners?: CertificationOwners,
+): Promise<void> {
   try {
     const invalidation = resolveChatContextInvalidation(model, operation, args, result);
     if (invalidation.scope === "none") return;
-    if (invalidation.scope === "all") {
-      invalidateAllChatContext();
-      return;
-    }
-    for (const studentId of invalidation.studentIds) {
-      invalidateChatContext(studentId);
-    }
+    if (invalidation.scope === "all") return invalidateAllChatContext();
+    if (invalidation.scope === "students") return invalidateStudents(invalidation.studentIds);
+    const studentIds = await ownersOf(invalidation.certificationIds, owners);
+    if (studentIds) invalidateStudents(studentIds);
+    else invalidateAllChatContext();
   } catch (error) {
+    // A failed owner lookup still clears: over-invalidation is safe.
+    invalidateAllChatContext();
     logger.warn("chat-context write-through invalidation failed; write unaffected", {
       model: model ?? "(raw)",
       operation,

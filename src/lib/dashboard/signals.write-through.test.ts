@@ -30,6 +30,7 @@ function answer(call: EngineCall): unknown {
   if (call.action === "updateOne" && call.modelName === "OrientationItem") return { id: "item-1" };
   if (call.action === "createOne" && call.modelName === "Certification") return { id: "cert-1", studentId: A.id };
   if (call.action === "deleteMany" || call.action === "updateMany" || call.action === "createMany") return { count: 1 };
+  if (call.action === "updateOne" && call.modelName === "CertRequirement") return { id: "req-1", certificationId: "cert-1" };
   // The slow signals' reads: nothing found, except the counts above (1 each),
   // which is enough for the read to count as having seen the student's rows.
   if (call.action === "findFirst" || call.action === "findUnique") return null;
@@ -53,6 +54,9 @@ before(async () => {
   rls = await import("@/lib/rls-context");
   cache = await import("@/lib/cache");
   calls = stubEngine(db.prisma, answer);
+  // The owner lookup for a CertRequirement write runs on the admin client.
+  stubEngine(db.prismaAdmin, (call) =>
+    call.action === "findMany" && call.modelName === "Certification" ? [{ studentId: A.id }] : answer(call));
 });
 beforeEach(() => { cache.invalidateAllChatContext(); });
 
@@ -161,6 +165,14 @@ describe("kept slow signals, cleared by the real write-through", () => {
     await asStudent(A, () => db.prisma.certification.create({ data: { studentId: A.id, certType: "ready-to-work" } }));
     assert.equal(await slowReads(A), full, "A's slow signals outlived A's certification write");
     assert.equal(await slowReads(B), 0, "B's slow signals were cleared by A's write");
+  });
+
+  it("one student's requirement tick clears that student's slow signals and no one else's", async () => {
+    const full = await slowReads(A);
+    await slowReads(B);
+    await asStudent(A, () => db.prisma.certRequirement.update({ where: { id: "req-1" }, data: { completed: true } }));
+    assert.equal(await slowReads(A), full, "A's slow signals outlived A's requirement tick");
+    assert.equal(await slowReads(B), 0, "B's slow signals were cleared by A's requirement tick");
   });
 
   it("a Goal write that lands during the page's read leaves nothing pre-write kept", async () => {

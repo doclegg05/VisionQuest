@@ -4,6 +4,7 @@ import { rlsContextFromHeaders } from "./rls-headers";
 import {
   applyChatContextWriteThrough,
   isChatContextWrite,
+  type CertificationOwners,
 } from "./chat-context-write-through";
 import { logger } from "./logger";
 
@@ -277,6 +278,22 @@ const rlsExtension = Prisma.defineExtension((client) =>
  * by contract — a cache failure never fails the write. Proven end to end by
  * scripts/sage-freshness-eval.mjs (Group B must be FRESH).
  */
+/**
+ * The owners of the certifications a CertRequirement write touched, so the
+ * write-through clears only them (src/lib/chat-context-write-through.ts).
+ * The admin client: a lookup of owner ids alone, never returned to a caller,
+ * and it must find the owner whatever the writer's RLS context, without
+ * taking a second app-pool connection while an interactive transaction holds
+ * one. Committed rows only; a miss makes the write clear everyone.
+ */
+const certificationOwners: CertificationOwners = async (certificationIds) => {
+  const rows = await adminClient.certification.findMany({
+    where: { id: { in: [...certificationIds] } },
+    select: { studentId: true },
+  });
+  return rows.map((row) => row.studentId);
+};
+
 const chatContextWriteThroughExtension = Prisma.defineExtension((client) =>
   client.$extends({
     name: "chat-context-write-through",
@@ -285,7 +302,7 @@ const chatContextWriteThroughExtension = Prisma.defineExtension((client) =>
         if (!isChatContextWrite(model, operation)) return query(args);
         return (async () => {
           const result = await query(args);
-          applyChatContextWriteThrough(model, operation, args, result);
+          await applyChatContextWriteThrough(model, operation, args, result, certificationOwners);
           return result;
         })();
       },
