@@ -149,9 +149,9 @@ describe("DashboardPage when one region's read fails", () => {
   });
 
   it("rejected alert counts leave the advising region to its fallback and keep the others", async () => {
-    type CountAlerts = typeof prismaMock.studentAlert.count;
-    const count: CountAlerts = mock.fn<(args: Parameters<CountAlerts>[0]) => Promise<number>>(fail);
-    const props = await renderWith("studentAlert", { ...prismaMock.studentAlert, count });
+    const store = createStudentAlertStore();
+    const count = mock.fn(async (_args: Parameters<typeof store.count>[0]): Promise<number> => fail());
+    const props = await renderWith("studentAlert", { findMany: store.findMany, count });
     assert.equal(props.initialSupport, undefined);
     assert.notEqual(props.initialOverview, undefined);
     assert.notEqual(props.initialActivity, undefined);
