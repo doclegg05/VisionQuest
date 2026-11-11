@@ -146,6 +146,31 @@ describe("ChatWindow wires the wait and Stop pieces (E2)", () => {
     assert.match(source, /onCrisisBlock:/);
   });
 
+  it("arms Stop from the first event's ids and marks the log busy only while words stream (E2b 1 to 3)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    assert.match(source, /stopArmed=\{sendAbort\.isArmed\}/);
+    assert.match(source, /sendAbort\.noteIds\(\)/);
+    assert.match(source, /aria-busy=\{logBusy\(isLoading, streamingContent\)\}/);
+  });
+
+  it("says why leaving the page does not abort the reply (E2b 9)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    assert.match(source, /deliberately does not abort/);
+  });
+
+  it("keeps handleSend under 50 lines and the file under 700 (E2b 7)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
+    const lines = source.split("\n");
+    assert.ok(lines.length < 700, String(lines.length));
+    const start = lines.findIndex((line) => /const handleSend = useCallback\(/.test(line));
+    const end = lines.findIndex((line, i) => i > start && /^  \);$/.test(line));
+    assert.ok(start >= 0 && end > start, "handleSend not found");
+    assert.ok(end - start + 1 <= 50, `handleSend is ${end - start + 1} lines`);
+  });
+
   it("renders with the local provider flag", () => {
     const html = renderToString(<ChatWindow role="student" localProvider />);
     assert.match(html, /role="log"/);

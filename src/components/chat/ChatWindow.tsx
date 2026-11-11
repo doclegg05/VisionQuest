@@ -14,21 +14,18 @@ import TypingIndicator from "./TypingIndicator";
 import BrandLockup from "@/components/ui/BrandLockup";
 import { StarterChips } from "./StarterChips";
 import type { ChatRole } from "@/lib/chat/commands";
-import { prepareRetry, resolveSendError, resolveStreamOutcome } from "@/lib/chat/send-outcome";
+import { prepareRetry } from "@/lib/chat/send-outcome";
 import { readChatStream, formatToolName, type AgentEventItem } from "./chat-stream";
-import { FailedReplyActions, PROGRAM_SETUP_HREF, readSendError } from "./FailedReplyActions";
+import { FailedReplyActions, PROGRAM_SETUP_HREF } from "./FailedReplyActions";
 import { useProgression } from "@/components/progression/ProgressionProvider";
 import { STAGE_OPENERS } from "@/lib/chat/stage-openers";
 import { determineStage } from "@/lib/sage/stage";
 import { startGoalPolling } from "./goal-polling";
-import {
-  failedTurnMessages,
-  runExclusive,
-  shouldFocusRetry,
-  type ChatMessage,
-  type FailedTurn,
-} from "./failed-turn";
-import { showsCannedOpener, startSlowReplyTimer, stoppedTurnMessages, withEarlyCrisisHelp } from "./wait-and-stop";
+import { runExclusive, shouldFocusRetry, type ChatMessage, type FailedTurn } from "./failed-turn";
+import { useSendAbort } from "./send-abort";
+import { fetchGoalCount, postChatMessage, startOptimisticGreeting } from "./send-request";
+import { messagesAfterSendError, turnResultMessages } from "./send-turn";
+import { logBusy, showsCannedOpener, startSlowReplyTimer } from "./wait-and-stop";
 
 type Message = ChatMessage;
 
@@ -213,9 +210,8 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
   /** Set while a Try again is running, so a second tap before re-render does nothing. */
   const retryInFlightRef = useRef(false);
   const messageBoxRef = useRef<MessageBoxHandle>(null);
-  /** The answer in flight, so Stop can end it; and whether Stop did. */
-  const abortRef = useRef<AbortController | null>(null);
-  const stoppedRef = useRef(false);
+  /** The answer in flight, so Stop can end it once armed; and whether Stop did. */
+  const sendAbort = useSendAbort();
   /** Counts sends, so the wait words belong to one send and reset on the next. */
   const [sendCount, setSendCount] = useState(0);
   const [slowForSend, setSlowForSend] = useState<number | null>(null);
@@ -224,6 +220,8 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
 
   useEffect(() => {
     mountedRef.current = true;
+    // Unmount deliberately does not abort the reply in flight: the server then
+    // finishes it and saves the full reply, which shows when the student is back.
     return () => {
       mountedRef.current = false;
       cancelGoalPollRef.current?.();
@@ -363,176 +361,104 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
     });
   }, []);
 
+  /** The screen at the start of a send: the student's bubble, the dots, and the opener. */
+  const beginTurnDisplay = useCallback((text: string, isRetry: boolean) => {
+    // A Try again from an earlier turn never stays on screen past a new send.
+    setFailedTurn(null);
+    // B2: loading shows at once, before any network call. A Try again
+    // answers the message already on screen, so it adds no new bubble.
+    if (!isRetry) setMessages((prev) => [...prev, { id: `temp-${Date.now()}`, role: "user", content: text }]);
+    setIsLoading(true);
+    setSendCount((count) => count + 1);
+    setStreamingContent("");
+    setStreamingEvents([]);
+    const greetingGeneration = ++greetingGenerationRef.current;
+    const isFirstMessage = !conversationId && messages.length === 0;
+    if (showsCannedOpener({ role, isFirstMessage, localProvider })) {
+      const isCurrent = () => greetingGenerationRef.current === greetingGeneration;
+      startOptimisticGreeting({ opener: requestedStageOpener, deriveStage: deriveStageFromGoals, isCurrent, show: setOptimisticGreeting });
+    }
+  }, [conversationId, messages.length, role, localProvider, requestedStageOpener, deriveStageFromGoals]);
+
+  /**
+   * Sets the conversation a send's events name, and refreshes the list once
+   * when a new chat gets its id. One noter per send.
+   */
+  const makeConversationNoter = useCallback(() => {
+    let refreshedList = false;
+    return (nextId: string | undefined) => {
+      setConversationId(nextId ?? conversationId);
+      if (refreshedList || !nextId || nextId === conversationId) return;
+      refreshConversationList();
+      refreshedList = true;
+    };
+  }, [conversationId, refreshConversationList]);
+
+  /** B4: hides the canned opener, and stops a pending one from appearing. */
+  const clearOptimisticGreeting = useCallback(() => {
+    greetingGenerationRef.current++;
+    setOptimisticGreeting(null);
+  }, []);
+
+  /** The screen once a send is over, whatever happened. */
+  const endTurnDisplay = useCallback(() => {
+    setIsLoading(false);
+    // A failure mid-reply moved the partial text into `messages`, so nothing
+    // may stay drawn as still streaming below it.
+    setStreamingContent("");
+    setStreamingEvents([]);
+    // B4: the optimistic greeting never outlives the send, error paths included.
+    clearOptimisticGreeting();
+  }, [clearOptimisticGreeting]);
+
   const handleSend = useCallback(
     async (text: string, attachmentIds?: string[], retry?: { retryOf: string | null }) => {
-      // A Try again from an earlier turn never stays on screen past a new send.
-      setFailedTurn(null);
-
-      // B2: Hoist the loading state so the TypingIndicator renders immediately
-      // on send, before the goals pre-fetch or any network call. A Try again
-      // answers the message already on screen, so it adds no new bubble.
-      if (!retry) {
-        setMessages((prev) => [...prev, { id: `temp-${Date.now()}`, role: "user", content: text }]);
-      }
-      setIsLoading(true);
-      setSendCount((count) => count + 1);
-      setStreamingContent("");
-      setStreamingEvents([]);
-      const greetingGeneration = ++greetingGenerationRef.current;
-
-      // B4: If this is the first message of a new conversation (no conversationId
-      // and no prior messages), show an optimistic greeting immediately while SSE
-      // is in flight. Discard it if the user sends a second message before SSE
-      // arrives (handled by checking messages.length in the SSE reader below).
-      const isFirstMessage = !conversationId && messages.length === 0;
-      if (showsCannedOpener({ role, isFirstMessage, localProvider })) {
-        if (requestedStageOpener) {
-          setOptimisticGreeting(requestedStageOpener);
-        } else {
-          // Derive stage asynchronously — don't await here so rendering isn't blocked.
-          // The greeting will appear as soon as the stage resolves (typically <200ms).
-          void deriveStageFromGoals().then((stage) => {
-            if (greetingGenerationRef.current === greetingGeneration) {
-              setOptimisticGreeting(STAGE_OPENERS[stage]);
-            }
-          });
-        }
-      }
-
-      const prevGoalCountPromise = apiFetch("/api/goals")
-        .then(async (goalsRes) => {
-          if (!goalsRes.ok) return 0;
-          const goalsData = await goalsRes.json();
-          return Array.isArray(goalsData.goals) ? goalsData.goals.length : 0;
-        })
-        .catch(() => 0);
-
-      // Outside the try so the catch knows what streamed in before a failure
-      // and whether the server had already saved the student's message.
+      beginTurnDisplay(text, Boolean(retry));
+      const prevGoalCountPromise = fetchGoalCount();
+      // Outside the try, so the catch knows what streamed in before a Stop or failure.
       let fullContent = "";
       let savedUserMessageId: string | null = null;
-      let refreshedConversationList = false;
-      /** The 988 block the server flagged on the first event (E2). */
-      let earlyCrisisBlock: string | null = null;
+      let earlyCrisisBlock: string | null = null; // the 988 block flagged on the first event (E2)
       let latestEvents: AgentEventItem[] = [];
-      const controller = new AbortController();
-      abortRef.current = controller;
-      stoppedRef.current = false;
-      const noteConversation = (nextId: string | undefined) => {
-        setConversationId(nextId ?? conversationId);
-        if (!refreshedConversationList && nextId && nextId !== conversationId) {
-          refreshConversationList();
-          refreshedConversationList = true;
-        }
-      };
-
+      const noteConversation = makeConversationNoter();
+      const controller = sendAbort.begin();
       try {
-        const stageParam = searchParams.get("stage") ?? defaultStage;
-        const res = await apiFetch("/api/chat/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            message: text,
-            conversationId,
-            // Only send on the first message of a new conversation
-            requestedStage: conversationId ? undefined : stageParam,
-            attachmentIds: attachmentIds && attachmentIds.length > 0 ? attachmentIds : undefined,
-            retryOf: retry?.retryOf ?? undefined,
-          }),
-        });
-
-        if (!res.ok) {
-          throw await readSendError(res);
-        }
-
+        const stage = searchParams.get("stage") ?? defaultStage;
+        const res = await postChatMessage({ text, conversationId, stage, attachmentIds, retryOf: retry?.retryOf, signal: controller.signal });
         const result = await readChatStream(res, {
           onIds: (ids) => {
+            sendAbort.noteIds();
             savedUserMessageId = ids.userMessageId;
             noteConversation(ids.conversationId);
           },
-          onCrisisBlock: (block) => {
-            earlyCrisisBlock = block;
-          },
+          onCrisisBlock: (block) => { earlyCrisisBlock = block; },
           onText: (content) => {
-            // B4: First real token clears the optimistic greeting.
-            if (!fullContent) {
-              greetingGenerationRef.current++;
-              setOptimisticGreeting(null);
-            }
+            if (!fullContent) clearOptimisticGreeting(); // B4: the first real word replaces it
             fullContent = content;
             setStreamingContent(content);
           },
-          onEvents: (events) => {
-            latestEvents = events;
-            setStreamingEvents(events);
-          },
+          onEvents: (events) => { latestEvents = events; setStreamingEvents(events); },
           onDone: noteConversation,
         });
-
-        const msgId = `msg-${Date.now()}`;
-        const outcome = resolveStreamOutcome(result.completed, result.content);
-        const assistantMsg: Message = {
-          id: msgId,
-          role: "assistant",
-          content: outcome.content,
-          events: result.events.length > 0 ? result.events : undefined,
-          failure: outcome.offerRetry
-            ? { keepOnRetry: outcome.keepOnRetry, retryOf: savedUserMessageId, alert: !result.content }
-            : undefined,
-        };
-        // A stream that ended early never reached the 988 block at its end.
-        const shown = result.completed ? [assistantMsg] : withEarlyCrisisHelp([assistantMsg], earlyCrisisBlock, msgId);
-        setMessages((prev) => [...prev, ...shown]);
-        if (outcome.offerRetry) {
-          setFailedTurn({ messageId: msgId, offerRetry: true, setupLink: false });
-        }
-        const prevGoalCount = await prevGoalCountPromise;
-        pollForGoals(prevGoalCount);
-        // Check for XP/achievement/level changes
-        setTimeout(() => checkProgression(), 2000);
+        const shown = turnResultMessages({ result, id: `msg-${Date.now()}`, savedUserMessageId, crisisBlock: earlyCrisisBlock });
+        setMessages((prev) => [...prev, ...shown.messages]);
+        if (shown.failedTurn) setFailedTurn(shown.failedTurn);
+        pollForGoals(await prevGoalCountPromise);
+        setTimeout(() => checkProgression(), 2000); // XP, achievement and level changes
       } catch (err) {
-        if (stoppedRef.current) {
-          // The student chose to stop: no failure, no Try again.
-          const stopped = stoppedTurnMessages({
-            id: `stop-${Date.now()}`,
-            partial: fullContent,
-            events: latestEvents,
-            crisisBlock: earlyCrisisBlock,
-          });
-          setMessages((prev) => [...prev, ...stopped]);
-          return;
-        }
-        console.error("Send error:", err instanceof Error ? err.name : "Unknown error");
-        const outcome = resolveSendError(err, {
-          priorContent: fullContent,
-          audience: role === "student" ? "student" : "staff",
-          isAdmin: role === "admin",
-          savedUserMessageId,
-        });
-        // A new chat's first message may be saved before the failure: keep
-        // its conversation so Try again answers it there, not in a new one.
-        noteConversation(outcome.conversationId ?? undefined);
-        const errMsgId = `err-${Date.now()}`;
-        const failed = withEarlyCrisisHelp(failedTurnMessages(outcome, errMsgId), earlyCrisisBlock, errMsgId);
-        setMessages((prev) => [...prev, ...failed]);
-        if (outcome.offerRetry || outcome.setupLink) {
-          setFailedTurn({ messageId: errMsgId, offerRetry: outcome.offerRetry, setupLink: outcome.setupLink });
-        }
+        const stopped = sendAbort.wasStopped();
+        if (!stopped) console.error("Send error:", err instanceof Error ? err.name : "Unknown error");
+        const after = messagesAfterSendError({ err, stopped, partial: fullContent, events: latestEvents, crisisBlock: earlyCrisisBlock, role, savedUserMessageId, id: `${stopped ? "stop" : "err"}-${Date.now()}` });
+        // A new chat's first message may be saved before the failure: keep its conversation for Try again.
+        if (after.conversationId) noteConversation(after.conversationId);
+        setMessages((prev) => [...prev, ...after.messages]);
+        if (after.failedTurn) setFailedTurn(after.failedTurn);
       } finally {
-        if (abortRef.current === controller) abortRef.current = null;
-        greetingGenerationRef.current++;
-        setIsLoading(false);
-        // A failure mid-reply moved the partial text into `messages` above, so
-        // nothing may stay drawn as still streaming below it.
-        setStreamingContent("");
-        setStreamingEvents([]);
-        // B4: Ensure optimistic greeting is always cleared when streaming ends,
-        // including on error paths.
-        setOptimisticGreeting(null);
+        sendAbort.end(controller);
+        endTurnDisplay();
       }
     },
-    [conversationId, messages.length, deriveStageFromGoals, pollForGoals, refreshConversationList, checkProgression, searchParams, defaultStage, requestedStageOpener, role, localProvider]
+    [conversationId, pollForGoals, checkProgression, searchParams, defaultStage, role, sendAbort, beginTurnDisplay, endTurnDisplay, clearOptimisticGreeting, makeConversationNoter]
   );
 
   // After a failed turn, focus goes to its Try again once loading has ended,
@@ -541,11 +467,8 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
     if (shouldFocusRetry(failedTurn, isLoading)) retryButtonRef.current?.focus();
   }, [failedTurn, isLoading]);
 
-  /** Ends Sage's answer; handleSend's catch shows what a Stop leaves. */
-  const stopReply = useCallback(() => {
-    stoppedRef.current = true;
-    abortRef.current?.abort();
-  }, []);
+  /** Ends Sage's answer once armed; handleSend's catch shows what a Stop leaves. */
+  const stopReply = sendAbort.stop;
 
   const retryFailedTurn = (failedId: string) =>
     runExclusive(retryInFlightRef, async () => {
@@ -625,7 +548,7 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
           </Link>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-5" role="log" aria-label="Conversation with Sage" aria-live="polite" aria-busy={isLoading}>
+        <div className="flex-1 overflow-y-auto px-4 py-5" role="log" aria-label="Conversation with Sage" aria-live="polite" aria-busy={logBusy(isLoading, streamingContent)}>
           <div className="mx-auto max-w-3xl space-y-5">
             {messages.length === 0 && !isLoading && (
               <div className="mt-16 text-center text-[var(--ink-muted)]">
@@ -705,6 +628,7 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
         <ChatInput
           onSend={handleSend}
           onStop={stopReply}
+          stopArmed={sendAbort.isArmed}
           disabled={isLoading}
           role={role}
           initialMessage={deepLinkPrefill}

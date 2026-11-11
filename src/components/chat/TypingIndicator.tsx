@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
-import { SLOW_REPLY_WORDS } from "./wait-and-stop";
+import { SLOW_REPLY_WORDS, TYPING_SR_WORDS } from "./wait-and-stop";
 
 interface TypingIndicatorProps {
   /** Sage has said nothing for SLOW_REPLY_MS: show the wait words. */
@@ -11,8 +11,9 @@ interface TypingIndicatorProps {
 
 /**
  * The dots while Sage has not sent a word. This is the turn's one polite
- * status: the words that appear after five seconds are its content, so a
- * screen reader announces them once, when they appear.
+ * status, and it says one thing at a time: hidden words at first, then,
+ * after five seconds, only the visible wait words, read out once when they
+ * appear.
  */
 export default function TypingIndicator({ slow = false }: TypingIndicatorProps) {
   const reduce = useReducedMotion();
@@ -26,7 +27,7 @@ export default function TypingIndicator({ slow = false }: TypingIndicatorProps) 
         S
       </div>
       <div className="min-w-0">
-        <span className="sr-only">Sage is typing.</span>
+        {!slow && <span className="sr-only">{TYPING_SR_WORDS}</span>}
         <div className="flex items-center gap-1.5 px-1 py-2" aria-hidden="true">
           {[0, 1, 2].map((i) => (
             <motion.span

@@ -7,7 +7,11 @@ import {
   SLOW_REPLY_MS,
   SLOW_REPLY_WORDS,
   STOPPED_NOTE,
+  STOP_ARM_DELAY_MS,
+  TYPING_SR_WORDS,
+  logBusy,
   showsCannedOpener,
+  stopArmed,
   startSlowReplyTimer,
   stoppedTurnMessages,
   withEarlyCrisisHelp,
@@ -139,5 +143,56 @@ describe("the canned opener (E2.3)", () => {
     assert.equal(showsCannedOpener({ role: "student", isFirstMessage: true, localProvider: true }), false);
     assert.equal(showsCannedOpener({ role: "student", isFirstMessage: false, localProvider: false }), false);
     assert.equal(showsCannedOpener({ role: "teacher", isFirstMessage: true, localProvider: false }), false);
+  });
+});
+
+describe("when Stop works (E2b 1 and 2)", () => {
+  const sentAt = 1_000_000;
+
+  it("waits 800 ms after the send", () => {
+    assert.equal(STOP_ARM_DELAY_MS, 800);
+  });
+
+  it("is not armed before the first event's ids, however long the wait", () => {
+    for (const now of [sentAt, sentAt + 800, sentAt + 60_000]) {
+      assert.equal(stopArmed({ idsArrived: false, sentAt, now }), false, String(now - sentAt));
+    }
+  });
+
+  it("is not armed in the first 800 ms, so a double tap on Send is not a Stop", () => {
+    assert.equal(stopArmed({ idsArrived: true, sentAt, now: sentAt }), false);
+    assert.equal(stopArmed({ idsArrived: true, sentAt, now: sentAt + 799 }), false);
+  });
+
+  it("is armed once the ids are in and 800 ms have passed", () => {
+    assert.equal(stopArmed({ idsArrived: true, sentAt, now: sentAt + 800 }), true);
+    assert.equal(stopArmed({ idsArrived: true, sentAt, now: sentAt + 5000 }), true);
+  });
+});
+
+describe("the log's busy flag (E2b 3)", () => {
+  it("is not busy while Sage has sent no words, so the wait words are read out", () => {
+    assert.equal(logBusy(true, ""), false);
+  });
+
+  it("is busy while words stream in, so a streamed reply is not read twice", () => {
+    assert.equal(logBusy(true, "Here is"), true);
+  });
+
+  it("is not busy when Sage is done", () => {
+    assert.equal(logBusy(false, ""), false);
+    assert.equal(logBusy(false, "left over"), false);
+  });
+});
+
+describe("what a screen reader hears while Sage thinks (E2b 4)", () => {
+  it("reads well as a pair: the hidden words, then the visible ones", () => {
+    assert.equal(TYPING_SR_WORDS, "Sage is thinking.");
+    assert.ok(!SLOW_REPLY_WORDS.startsWith(TYPING_SR_WORDS), SLOW_REPLY_WORDS);
+    for (const words of [TYPING_SR_WORDS, SLOW_REPLY_WORDS]) {
+      assert.doesNotMatch(words, DASHES);
+      const grade = assessReadability(words, { maxGrade: PLAIN_LANGUAGE_IDEAL_GRADE });
+      assert.ok(grade.withinTarget, JSON.stringify(grade));
+    }
   });
 });
