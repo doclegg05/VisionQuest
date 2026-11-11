@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider, useIsMutating, useMutation, useQuery,
 import type { DashboardActivity, DashboardOverview } from "@/lib/dashboard/readers";
 import type { TaskDto, TaskPage } from "@/lib/dashboard/tasks";
 import { taskQuerySchema, type TaskDetails, type TaskQuery } from "@/lib/dashboard/task-schemas";
-import { dashboardFetch, dashboardKey, describePoll, freshness, isNewNotification, optimisticTasks, regionPollMs, shouldShowMutationNotice, taskKey } from "@/lib/dashboard/query";
+import { dashboardFetch, dashboardKey, describePoll, freshness, isNewNotification, optimisticTasks, refetchWithoutOverlap, regionPollMs, retryOptions, shouldShowMutationNotice, taskKey } from "@/lib/dashboard/query";
 import { useNotifications } from "@/components/ui/NotificationProvider";
 import { TaskTable } from "@/components/dashboard/TaskTable";
 import type { DashboardSupport } from "@/lib/dashboard/support";
@@ -59,7 +59,7 @@ function useRefetchOnNotification(sessionId: string, initialFetchedAt: string | 
   const newestId = newest?.id;
   const newestAt = newest?.createdAt;
   useEffect(() => {
-    if (newestId !== undefined && isNewNotification(newestAt, since)) void client.invalidateQueries({ queryKey: dashboardKey(sessionId) });
+    if (newestId !== undefined && isNewNotification(newestAt, since)) void refetchWithoutOverlap(client, dashboardKey(sessionId));
   }, [client, newestId, newestAt, since, sessionId]);
 }
 function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initialTasks, initialSupport, moodContent, intro }: DashboardClientProps) {
@@ -87,7 +87,7 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
     },
     onError: (error, variables, context) => { context?.rollback(); if (shouldShowMutationNotice(error, variables)) setNotice({ open: true, message: error.message }); },
     onSuccess: (result) => { setNotice({ open: true, message: result.audited === false || result.alertsSynced === false ? "Task saved. Some follow-up updates are delayed; your instructor may need to check them." : "Task saved." }); router.refresh(); },
-    onSettled: () => { void client.invalidateQueries({ queryKey: root }); },
+    onSettled: () => { void refetchWithoutOverlap(client, root); },
   });
   const save = async (values: TaskDetails, task?: TaskDto, version?: string) => {
     await mutation.mutateAsync({ url: task ? `/api/tasks/${task.id}` : "/api/tasks", method: task ? "PATCH" : "POST", body: task ? { ...values, updatedAt: version ?? task.updatedAt } : values, quietConflicts: !!task });
@@ -102,18 +102,18 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
     <div className={`${styles.workspace} min-w-0 space-y-6 text-[var(--ink-strong)]`}>
       <section aria-label="Your next action">
         {support.data && <PathToEmployment {...support.data.nextStep} />}
-        <RegionStatus pollMs={regionPollMs.support} loading={support.isPending} error={support.isError} refreshing={support.isFetching && !support.isPending} hasData={!!support.data} fetchedAt={support.data?.fetchedAt} retry={() => { void support.refetch(); }} />
+        <RegionStatus pollMs={regionPollMs.support} loading={support.isPending} error={support.isError} refreshing={support.isFetching && !support.isPending} hasData={!!support.data} fetchedAt={support.data?.fetchedAt} retry={() => { void support.refetch(retryOptions); }} />
         {!support.data && support.isError && <Link className="inline-flex items-center min-h-11 underline" href="/goals">Review your plan while this section is unavailable</Link>}
       </section>
       {intro}
-      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl">Your Recorded Progress</h2><button disabled={pending || overview.isFetching || activity.isFetching || tasks.isFetching} className="min-h-11 secondary-button px-4 py-2 text-sm" onClick={() => { void client.invalidateQueries({ queryKey: root }); router.refresh(); }}>Refresh dashboard</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl">Your Recorded Progress</h2><button disabled={pending || overview.isFetching || activity.isFetching || tasks.isFetching} className="min-h-11 secondary-button px-4 py-2 text-sm" onClick={() => { void refetchWithoutOverlap(client, root); router.refresh(); }}>Refresh dashboard</button></div>
       <section aria-label="Outcome summaries">
-        <RegionStatus pollMs={regionPollMs.overview} loading={overview.isPending} error={overview.isError} refreshing={overview.isFetching && !overview.isPending} hasData={!!overview.data} fetchedAt={overview.data?.fetchedAt} retry={() => { void overview.refetch(); }} />
+        <RegionStatus pollMs={regionPollMs.overview} loading={overview.isPending} error={overview.isError} refreshing={overview.isFetching && !overview.isPending} hasData={!!overview.data} fetchedAt={overview.data?.fetchedAt} retry={() => { void overview.refetch(retryOptions); }} />
         {overview.data && <dl className="grid gap-x-8 gap-y-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-5 sm:grid-cols-2 xl:grid-cols-4">{overview.data.outcomes.map((outcome) => <div key={outcome.label} className="min-w-0"><dt className="font-semibold">{outcome.label}</dt><dd className="mt-2"><p className="text-lg font-semibold leading-snug">{outcome.value}</p><p className="mt-2 text-sm leading-relaxed text-[var(--ink-muted)]">{outcome.detail}</p><Link className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--ink-strong)] underline decoration-[var(--accent-secondary)] underline-offset-4" href={outcome.href}>View {outcome.label.toLowerCase()}</Link></dd></div>)}</dl>}
       </section>
       <section aria-labelledby="tasks-heading" className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-6">
         <TaskTable data={tasks.data} query={query} setQuery={setQuery} pending={pending || tasks.isFetching} save={save} remove={remove} setStatus={setStatus} />
-        <RegionStatus pollMs={regionPollMs.tasks} loading={tasks.isPending} error={tasks.isError} refreshing={tasks.isFetching && !tasks.isPending} hasData={!!tasks.data} fetchedAt={tasks.data?.fetchedAt} retry={() => { void tasks.refetch(); }} />
+        <RegionStatus pollMs={regionPollMs.tasks} loading={tasks.isPending} error={tasks.isError} refreshing={tasks.isFetching && !tasks.isPending} hasData={!!tasks.data} fetchedAt={tasks.data?.fetchedAt} retry={() => { void tasks.refetch(retryOptions); }} />
       </section>
       <section aria-label="Advising and support" className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-6">
         <h2 className="font-display text-xl">Advising and Support</h2>
@@ -123,11 +123,11 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
           {support.data.orientationItems.length > 0 && <div><h3 className="font-semibold">Next Orientation Items</h3><ul className="mt-2 list-inside list-disc text-sm">{support.data.orientationItems.map((item) => <li key={item.id}>{item.label}</li>)}</ul><Link className="inline-flex min-h-11 items-center underline" href="/orientation">Continue orientation</Link></div>}
           {moodContent}
         </div> : <p className="mt-3 text-sm">{support.isPending ? "Loading advising…" : "Advising is unavailable. Retry Your next action above, or open appointments."} <Link className="inline-flex items-center min-h-11 underline" href="/appointments">Open appointments</Link></p>}
-        {support.isError && support.data && <p className="mt-3 text-sm" role="status">Showing last loaded advising data. <button className="min-h-11 underline" onClick={() => { void support.refetch(); }}>Retry advising</button></p>}
+        {support.isError && support.data && <p className="mt-3 text-sm" role="status">Showing last loaded advising data. <button className="min-h-11 underline" onClick={() => { void support.refetch(retryOptions); }}>Retry advising</button></p>}
       </section>
       <section aria-labelledby="activity-heading" className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-6">
         <h2 id="activity-heading" className="font-display text-xl">Task Activity</h2>
-        <RegionStatus pollMs={regionPollMs.activity} loading={activity.isPending} error={activity.isError} refreshing={activity.isFetching && !activity.isPending} hasData={!!activity.data} fetchedAt={activity.data?.fetchedAt} retry={() => { void activity.refetch(); }} />
+        <RegionStatus pollMs={regionPollMs.activity} loading={activity.isPending} error={activity.isError} refreshing={activity.isFetching && !activity.isPending} hasData={!!activity.data} fetchedAt={activity.data?.fetchedAt} retry={() => { void activity.refetch(retryOptions); }} />
         {activity.data && <TaskCharts data={activity.data} />}
       </section>
     </div>
