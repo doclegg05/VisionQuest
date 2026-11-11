@@ -33,7 +33,7 @@ import {
 import {
   deletedAuditRowsWithUnmarkedActor, recentActivity, recordsAboutOthers, rowsTheDatabaseWouldBlank, setNullLinksInto,
 } from "./closeout.guards";
-import { leftBehind, type LeftBehind } from "./closeout.orphans";
+import { leftBehind, orphanCounts, type LeftBehind } from "./closeout.orphans";
 import type { LocalSchema } from "./closeout.local";
 import { refusal, type Refusal, type RefusalCode } from "./closeout.report";
 import { jobIdsNaming, readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type ServerFacts } from "./closeout.server";
@@ -340,11 +340,19 @@ interface OutcomeBase {
   readonly refusals: readonly Refusal[];
 }
 
+/** One orphan column, counted in the preview and again after the deletes, in the same transaction. */
+export interface OrphanChange {
+  readonly before: number;
+  readonly after: number;
+}
+
 /** An apply's result: the rows deleted by model, and what is left. */
 export interface AppliedCounts {
   readonly deleted: Readonly<Record<string, number>>;
   /** Counted inside the transaction, after the deletes and before the commit. */
   readonly remaining: { readonly markedAccounts: number; readonly rowsPointingAtDeleted: number };
+  /** Every orphan column by `Model.column`. None may be higher after: see `orphansThatRose`. */
+  readonly orphans: Readonly<Record<string, OrphanChange>>;
 }
 
 export type CloseoutOutcome =
@@ -562,6 +570,24 @@ function refuseIf(count: number, code: RefusalCode, preview: CloseoutPreview): v
   if (count > 0) throw new CloseoutRefused(refusal(code, count), preview);
 }
 
+/**
+ * Orphan columns counted again after the deletes. Some orphans are expected
+ * and stay (Sage keeps operations about students who left), so the rule is
+ * that no column may rise: a rise is a row the deletes left pointing at
+ * nothing. Returns each column's change and the number of rows above before.
+ */
+async function orphansThatRose(run: Run, before: Readonly<Record<string, number>>): Promise<{ changes: Record<string, OrphanChange>; rose: number }> {
+  const after = await orphanCounts(run);
+  const changes: Record<string, OrphanChange> = {};
+  let rose = 0;
+  for (const [column, now] of Object.entries(after)) {
+    const was = before[column] ?? 0;
+    changes[column] = { before: was, after: now };
+    rose += Math.max(0, now - was);
+  }
+  return { changes, rose };
+}
+
 /** Rule 3: every table must have shrunk by exactly what the preview listed for it. */
 function unlistedChanges(before: Record<string, number>, after: Record<string, number>, planned: Readonly<Record<string, number>>): number {
   return Object.keys(before).reduce((sum, model) => sum + Math.abs(before[model] - after[model] - (planned[model] ?? 0)), 0);
@@ -579,6 +605,8 @@ async function applyPlan(run: Run, preview: CloseoutPreview, newestMigration: st
   await deleteStep(run, CLASS_ROOT);
   refuseIf(await rowsStillNaming(run, ACCOUNT_COLUMNS, run.plan.accountIds), "rows_left_pointing", preview);
   await deleteStep(run, ACCOUNT_ROOT);
+  const orphans = await orphansThatRose(run, preview.leftBehind.orphans);
+  refuseIf(orphans.rose, "orphans_rose", preview);
 
   const after = await tableCounts(run.tx);
   refuseIf(unlistedChanges(before, after, preview.rowsToDelete), "unlisted_rows_removed", preview);
@@ -604,7 +632,7 @@ async function applyPlan(run: Run, preview: CloseoutPreview, newestMigration: st
   });
   // The preview's counts are the deleted counts: the row-count check above
   // has just proved every table shrank by exactly these numbers.
-  return { deleted: preview.rowsToDelete, remaining };
+  return { deleted: preview.rowsToDelete, remaining, orphans: orphans.changes };
 }
 
 type Applied = Extract<CloseoutOutcome, { kind: "applied" }>;

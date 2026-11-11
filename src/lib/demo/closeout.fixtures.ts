@@ -14,6 +14,7 @@
  */
 import { Prisma } from "@prisma/client";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN } from "./config";
+import { SENTINEL_ACTORS, SENTINEL_PREFIX } from "./closeout.server";
 
 export type Row = Readonly<Record<string, unknown>>;
 type Field = Prisma.DMMF.Field;
@@ -130,7 +131,7 @@ export const FAKE_MIGRATION = "20261101000000_fake_newest";
 const LOCK_STATEMENT = /pg_try_advisory_xact_lock/;
 
 /** An orphan probe from closeout.server.ts, with its table, column, kind column (if any) and parent. */
-const ORPHAN_STATEMENT = /^SELECT count\(\*\)::int AS orphans FROM visionquest\."(\w+)" t WHERE t\."(\w+)" IS NOT NULL AND t\."\w+" <> 'system' (?:AND t\."(\w+)" IN \([?, ]+\) )?AND NOT EXISTS \(SELECT 1 FROM visionquest\."(\w+)" p WHERE/;
+const ORPHAN_STATEMENT = /^SELECT count\(\*\)::int AS orphans FROM visionquest\."(\w+)" t WHERE t\."(\w+)" IS NOT NULL AND t\."\w+" NOT IN \([?, ]+\) AND left\(t\."\w+", \?\) <> \? (?:AND t\."(\w+)" IN \([?, ]+\) )?AND NOT EXISTS \(SELECT 1 FROM visionquest\."(\w+)" p WHERE/;
 
 /** A statement built with Prisma.sql, as opposed to a tagged template's strings. */
 function isSql(query: TemplateStringsArray | Prisma.Sql): query is Prisma.Sql {
@@ -173,6 +174,8 @@ export class FakeDb {
   failOnDeleteOf: string | null = null;
   /** What that delete throws. An object with a `code` stands in for a Prisma error. */
   failure: unknown = null;
+  /** Runs right after the next delete from this model: a row written late, inside the closeout's own view. */
+  private afterDelete: { readonly model: string; readonly then: () => void } | null = null;
   /** Thrown after the callback has finished and its changes are kept: a connection lost during COMMIT. */
   failOnCommit: unknown = null;
   /** Runs once, right after the next transaction commits: a write that landed while the tool ran. */
@@ -183,6 +186,10 @@ export class FakeDb {
   transactions = 0;
   writes = 0;
   disconnects = 0;
+
+  afterDeleteFrom(model: string, then: () => void): void {
+    this.afterDelete = { model, then };
+  }
 
   rows(model: string): readonly Row[] {
     modelNamed(model);
@@ -289,6 +296,11 @@ export class FakeDb {
         const doomed = select(args.where);
         if (doomed.length > 0) this.writes += 1;
         this.remove(model.name, doomed);
+        const hook = this.afterDelete;
+        if (hook?.model === model.name) {
+          this.afterDelete = null;
+          hook.then();
+        }
         return { count: doomed.length };
       },
       create: async (args) => {
@@ -332,7 +344,7 @@ export class FakeDb {
     const parentIds = new Set(this.readable(parent, rowSecurityOff).map((row) => row.id));
     return this.readable(model, rowSecurityOff).filter((row) => {
       const value = row[column];
-      if (typeof value !== "string" || value === "system") return false;
+      if (typeof value !== "string" || SENTINEL_ACTORS.includes(value) || value.startsWith(SENTINEL_PREFIX)) return false;
       if (kindColumn && !values.includes(row[kindColumn])) return false;
       return !parentIds.has(value);
     }).length;

@@ -132,6 +132,17 @@ describe("demo closeout procedure in DEPLOY.md", () => {
     assert.match(steps, /`marked` is 0 and `unmarked\.students` is the number you expect/);
   });
 
+  it("asks for each orphan column in the preview, says the apply refuses if one rises, and does not ask for 0 orphans afterwards", () => {
+    const preview = step(stepWith("Run the preview and read it"));
+    assert.match(preview, /`leftBehind\.orphans`/);
+    assert.match(preview, /each column/i);
+    assert.match(preview, /refuses if any column is higher/);
+    const again = step(stepWith("Run the preview again"));
+    assert.doesNotMatch(again, /0 rows name an account or class that does not exist/);
+    assert.doesNotMatch(again, /orphan total is above 0/);
+    assert.match(again, /`marked` is 0/);
+  });
+
   it("never says a stopped run rolled back, and gives the sentence the tool prints instead", () => {
     assert.doesNotMatch(steps, /Exit code 1 means it failed, the transaction was rolled back/);
     assert.match(steps, /Run the preview again to see whether anything was deleted/);

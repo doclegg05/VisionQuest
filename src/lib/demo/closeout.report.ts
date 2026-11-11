@@ -22,6 +22,7 @@ export const REFUSALS = {
   kept_rows_would_be_blanked: "Rows that are kept point at a row the closeout would delete, and the database would quietly blank that link. Nothing was deleted.",
   rows_left_pointing: "Rows would be left pointing at a deleted account or class. Nothing was deleted.",
   unlisted_rows_removed: "The deletion would remove rows the preview did not list. Nothing was deleted.",
+  orphans_rose: "After the deletes, more rows would name an account or class that does not exist than before them, so the deletion would leave rows pointing at nothing. Nothing was deleted.",
 } as const;
 export type RefusalCode = keyof typeof REFUSALS;
 
@@ -127,9 +128,10 @@ function leftoverLines(counts: ReportCounts): string[] {
   const files = counts.uploadedFilesLeftInStorage;
   const folders = counts.leftBehind.storageFoldersOfDemoAccounts;
   const listings = counts.leftBehind.opportunitiesFromDemoLeads;
-  const lines = [orphaned === 0
-    ? "0 rows name an account or class that does not exist."
-    : `${many(orphaned, "row names", "rows name")} an account or class that does not exist. After an apply this must be 0. If it is not, stop and ask a developer. The tool does not change these rows.`];
+  const lines = orphaned === 0
+    ? ["0 rows name an account or class that does not exist."]
+    : [`${many(orphaned, "row names", "rows name")} an account or class that does not exist. Some are expected, such as Sage records kept on purpose for students who left. Write down each number below. The apply counts them again after its deletes and refuses if any column is higher. The tool does not change these rows.`,
+      ...Object.entries(orphans).filter(([, count]) => count > 0).map(([column, count]) => `Orphan rows in ${column}: ${count}`)];
   if (settings > 0) lines.push(`${many(settings, "program setting holds", "program settings hold")} the id of the demo class. Remove the class from ${settings === 1 ? "it" : "them"} in Program Setup, or ask a developer.`);
   if (notices > 0) lines.push(`${many(notices, "notice to a staff member names", "notices to staff members name")} a demo account. ${notices === 1 ? "It stays in that staff member's list of notices." : "They stay in those staff members' lists of notices."}`);
   if (listings > 0) lines.push(`${many(listings, "opportunity listing was", "opportunity listings were")} copied from a demo class job lead. ${listings === 1 ? "It stays." : "They stay."}`);
@@ -184,9 +186,17 @@ export function afterCommitLine(markedAccounts: number | null): { readonly finis
   };
 }
 
+/** Each orphan column that held a row before or after the deletes, and whether it rose. The apply refuses if one did. */
+function orphanChangeLines(orphans: Readonly<Record<string, { readonly before: number; readonly after: number }>>): string[] {
+  const lines = Object.entries(orphans).filter(([, change]) => change.before + change.after > 0).map(([column, change]) =>
+    `Orphan rows in ${column}: ${change.before} before the deletes, ${change.after} after. ${change.after > change.before ? "Higher." : "Not higher."}`);
+  const rose = Object.values(orphans).some((change) => change.after > change.before);
+  return [...lines, rose ? "A column of orphan rows is higher after the deletes. Stop and ask a developer." : "No column of orphan rows is higher after the deletes than before them."];
+}
+
 /** The sentences under an apply. */
-export function appliedLines(counts: ReportCounts): string[] {
-  return [markedLine(counts, true), ...leftBehindLines(counts)];
+export function appliedLines(counts: ReportCounts, orphans: Readonly<Record<string, { readonly before: number; readonly after: number }>>): string[] {
+  return [markedLine(counts, true), ...orphanChangeLines(orphans), ...leftBehindLines(counts)];
 }
 
 export const USAGE = [

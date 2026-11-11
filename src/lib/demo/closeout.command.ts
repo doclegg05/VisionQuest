@@ -69,7 +69,7 @@ function report(outcome: CloseoutOutcome, url: string): CommandResult {
   if (outcome.kind === "refused") return { exitCode: 2, stdout: head, stderr: refusedLines(outcome) };
   if (outcome.kind === "preview") return { exitCode: 0, stdout: [...head, ...previewLines(outcome.preview, outcome.refusals)], stderr: [] };
   const after = afterCommitLine(outcome.afterCommit.markedAccounts);
-  const stdout = [...head, ...appliedLines(outcome.preview)];
+  const stdout = [...head, ...appliedLines(outcome.preview, outcome.orphans)];
   return after.finished ? { exitCode: 0, stdout: [...stdout, after.line], stderr: [] } : { exitCode: 3, stdout, stderr: [after.line] };
 }
 

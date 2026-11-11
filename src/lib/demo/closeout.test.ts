@@ -392,6 +392,7 @@ const REFUSALS_TESTED_ELSEWHERE: Readonly<Partial<Record<RefusalCode, string>>> 
   schema_mismatch: "closeout.server.test.ts",
   expected_accounts_mismatch: "closeout.server.test.ts",
   demo_recently_active: "closeout.server.test.ts",
+  orphans_rose: "closeout.leftovers.test.ts",
 };
 
 describe("demo closeout refusals", () => {

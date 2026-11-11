@@ -265,6 +265,21 @@ if (!SHOULD_RUN) {
       assert.equal(await db().auditLog.count({ where: { targetId: { in: [`${demo.prefix}Certification`, `${demo.prefix}Appointment`] } } }), 0);
     });
 
+    it("does not count the actors production writes that are not accounts as orphans", async () => {
+      await seed();
+      const counted = async () => {
+        const outcome = await closeout(db(), { apply: false });
+        assert.ok(outcome.kind === "preview");
+        return outcome.preview.leftBehind.orphans;
+      };
+      const before = await counted();
+      for (const actorId of ["admin-key", "system", "system:sage-autopilot"]) {
+        await insertRow("AuditLog", { id: `${real.prefix}sentinel-${actorId}`, action: "x", targetType: "x", actorId, createdAt: new Date(0) });
+      }
+
+      assert.deepEqual(await counted(), before);
+    });
+
     it("keeps the shared rows a demo account merely referenced", async () => {
       await seed();
 
@@ -285,6 +300,8 @@ if (!SHOULD_RUN) {
       readonly local?: CloseoutOptions["local"];
       /** Runs every transaction as this role, to stand in for a connection limited by row level security. */
       readonly asRole?: string;
+      /** Changes the transaction the closeout is given, to stand in for a row written while it runs. */
+      readonly wrap?: (tx: CloseoutTx) => CloseoutTx;
       readonly arrange?: () => Promise<void>;
     }
     const insertRow = async (model: string, data: Row & { id: string }) => {
@@ -296,6 +313,22 @@ if (!SHOULD_RUN) {
       await db().spokesClassInstructor.create({ data: { classId, instructorId } });
       removals.push(() => db().spokesClassInstructor.deleteMany({ where: { classId, instructorId } }));
     };
+    /** The transaction, with an audit row naming a missing account written right after the accounts are deleted. */
+    const writeAfterAccountsGo = (tx: CloseoutTx): CloseoutTx => new Proxy(tx, {
+      get(target, property) {
+        const value: unknown = Reflect.get(target, property, target);
+        if (property !== "student") return value;
+        const table = tableOf(target, property);
+        return {
+          count: table.count.bind(table), findMany: table.findMany.bind(table), create: table.create.bind(table),
+          deleteMany: async (args: Parameters<typeof table.deleteMany>[0]) => {
+            const result = await table.deleteMany(args);
+            await tableOf(target, "auditLog").create({ data: { id: `${demo.prefix}late-audit`, action: "x", targetType: "x", actorId: `${demo.prefix}missing-account` } });
+            return result;
+          },
+        };
+      },
+    });
     const refusals: readonly DbRefusal[] = [
       { name: "demo mode is on", code: "demo_mode_on", env: { COHORT_DEMO_MODE: "true" } },
       { name: "the role cannot see every row", code: "cannot_see_every_row", asRole: "vq_app" },
@@ -350,14 +383,19 @@ if (!SHOULD_RUN) {
         arrange: () => copyRow("GoalResourceLink", `${real.prefix}GoalResourceLink`, { goalId: `${demo.prefix}Goal` }),
       },
       {
+        // Found only after every delete has run, the accounts included: no earlier check can see a row written then.
+        name: "a row naming a missing account is written during the apply", code: "orphans_rose", wrap: writeAfterAccountsGo,
+      },
+      {
         // Found only after deletes have run: the marked teacher stays, and a column with no foreign key names the deleted student.
         name: "a row would be left naming a deleted account", code: "rows_left_pointing", accounts: () => [demo.studentId], expectAccounts: 1,
         arrange: () => copyRow("SageInsight", `${demo.prefix}SageInsight`, { studentId: demo.staffId, dismissedBy: demo.studentId }),
       },
     ];
 
-    /** The test client, with every transaction run as `role` when one is given. */
-    function clientAs(role: string | undefined): CloseoutClient {
+    /** The test client, with every transaction run as `role` or changed by `wrap` when one is given. */
+    function clientAs(role: string | undefined, wrap?: (tx: CloseoutTx) => CloseoutTx): CloseoutClient {
+      if (wrap) return { $transaction: (work, options) => db().$transaction((tx) => work(wrap(tx)), options) };
       if (!role) return db();
       return {
         $transaction: (work, options) => db().$transaction(async (tx) => {
@@ -383,7 +421,7 @@ if (!SHOULD_RUN) {
         const accounts = refusal.accounts;
         const rule = accounts ? async () => ({ accountIds: accounts(), classIds: [] }) : undefined;
 
-        const outcome = await closeout(clientAs(refusal.asRole), {
+        const outcome = await closeout(clientAs(refusal.asRole, refusal.wrap), {
           apply: true, env: refusal.env, rule, expectAccounts: refusal.expectAccounts ?? 2, ...(refusal.local ? { local: refusal.local } : {}),
         });
 

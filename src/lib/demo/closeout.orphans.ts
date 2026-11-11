@@ -2,9 +2,10 @@
  * Demo closeout (readiness H10): what the tool leaves behind, as counts.
  *
  *   - Orphans: rows whose account or class column has no foreign key and names
- *     an account or class that does not exist. Nothing in the database stops a
- *     row written late from naming a deleted demo account, so the owner runs
- *     the preview again after the apply and every count must read 0.
+ *     an account or class that does not exist. Some are expected: Sage keeps
+ *     operations about students who were offboarded. So the apply counts every
+ *     column again after its deletes, in its own transaction, and refuses if
+ *     any column rose (`orphansThatRose` in closeout.ts).
  *   - Text that names the plan: program settings that hold a demo class id,
  *     staff notices that mention a demo account by name, and listings mirrored
  *     from a demo class's job lead.
@@ -71,7 +72,7 @@ export async function orphanCounts(run: Run): Promise<Record<string, number>> {
 }
 
 export interface LeftBehind {
-  /** Rows naming an account or class that does not exist, by `Model.column`. Every one must read 0 after an apply. */
+  /** Rows naming an account or class that does not exist, by `Model.column`. None may be higher after an apply. */
   readonly orphans: Readonly<Record<string, number>>;
   /** Program settings whose value holds a demo class id, such as a pilot class list. */
   readonly systemConfigNamingDemoClass: number;

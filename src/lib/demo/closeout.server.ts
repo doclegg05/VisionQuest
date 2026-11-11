@@ -138,15 +138,27 @@ function countIn(result: unknown): number {
 }
 
 /**
- * Rows of one probe whose id names no row of its parent. The literal `system`
- * is the actor of jobs and is not an id. Names come from ORPHAN_PROBES only;
- * every value is a parameter.
+ * Values production writes in an account column that are not account ids, so
+ * no missing account. Each is the actor of something no person did:
+ *   - `admin-key`: a staff promotion made with the shared ADMIN_KEY
+ *     (ADMIN_KEY_ACTOR, src/lib/promote-staff-account.ts).
+ *   - `deterministic`: a wager verdict a rule resolved (src/lib/sage/wagers.ts).
+ * And every value that starts with SENTINEL_PREFIX: `system` itself, the actor
+ * of jobs, and `system:sage-autopilot` (src/lib/sage/briefing.ts).
+ */
+export const SENTINEL_ACTORS: readonly string[] = ["admin-key", "deterministic"];
+export const SENTINEL_PREFIX = "system";
+
+/**
+ * Rows of one probe whose id names no row of its parent, sentinel actors left
+ * out. Names come from ORPHAN_PROBES only; every value is a parameter.
  */
 export async function countOrphans(tx: CloseoutTx, probe: OrphanProbe): Promise<number> {
   const table = quoted(probe.model);
   const column = quoted(probe.column);
   const kind = probe.only ? Prisma.sql`AND t.${quoted(probe.only.column)} IN (${Prisma.join([...probe.only.values])})` : Prisma.empty;
-  const query = Prisma.sql`SELECT count(*)::int AS orphans FROM visionquest.${table} t WHERE t.${column} IS NOT NULL AND t.${column} <> 'system' ${kind} AND NOT EXISTS (SELECT 1 FROM visionquest.${quoted(probe.parent)} p WHERE p.id = t.${column})`;
+  const notSentinel = Prisma.sql`t.${column} NOT IN (${Prisma.join([...SENTINEL_ACTORS])}) AND left(t.${column}, ${SENTINEL_PREFIX.length}) <> ${SENTINEL_PREFIX}`;
+  const query = Prisma.sql`SELECT count(*)::int AS orphans FROM visionquest.${table} t WHERE t.${column} IS NOT NULL AND ${notSentinel} ${kind} AND NOT EXISTS (SELECT 1 FROM visionquest.${quoted(probe.parent)} p WHERE p.id = t.${column})`;
   return countIn(await tx.$queryRaw(query));
 }
 

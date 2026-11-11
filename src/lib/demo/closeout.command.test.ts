@@ -259,15 +259,33 @@ describe("demo closeout sentences about what is left", () => {
     assert.ok(stdout.includes("1 public credential page of an account with no demo mark is switched on. Anyone who has its address can open it. This tool does not change it."), stdout.join("\n"));
   });
 
-  it("says how many rows name an account or class that does not exist, and that the number must be 0", async () => {
+  it("says how many rows name an account or class that does not exist, column by column, and that the apply compares them", async () => {
     const { db } = await scene();
     const clean = await command(db, []).result;
     db.insert("AuditLog", { action: "x", targetType: "student", targetId: "gone-student" });
+    db.insert("AuditLog", { action: "x", targetType: "student", targetId: "gone-too" });
+    db.insert("SageMemory", { subjectType: "student", subjectId: "gone-student", content: "x", kind: "x", category: "x", sourceType: "x", sourceHash: "x" });
 
     const { stdout } = await command(db, []).result;
 
     assert.ok(clean.stdout.includes("0 rows name an account or class that does not exist."), clean.stdout.join("\n"));
-    assert.ok(stdout.includes("1 row names an account or class that does not exist. After an apply this must be 0. If it is not, stop and ask a developer. The tool does not change these rows."), stdout.join("\n"));
+    for (const line of [
+      "3 rows name an account or class that does not exist. Some are expected, such as Sage records kept on purpose for students who left. Write down each number below. The apply counts them again after its deletes and refuses if any column is higher. The tool does not change these rows.",
+      "Orphan rows in AuditLog.targetId: 2",
+      "Orphan rows in SageMemory.subjectId: 1",
+    ]) assert.ok(stdout.includes(line), `${line}\n---\n${stdout.join("\n")}`);
+    assert.equal(stdout.some((line) => line.startsWith("Orphan rows in AuditLog.actorId")), false);
+  });
+
+  it("says after an apply, for each column with orphan rows, that it did not rise", async () => {
+    const { db } = await scene();
+    db.insert("AuditLog", { action: "x", targetType: "student", targetId: "gone-student" });
+
+    const { exitCode, stdout } = await command(db, APPLY).result;
+
+    assert.equal(exitCode, 0);
+    assert.ok(stdout.includes("Orphan rows in AuditLog.targetId: 1 before the deletes, 1 after. Not higher."), stdout.join("\n"));
+    assert.ok(stdout.includes("No column of orphan rows is higher after the deletes than before them."), stdout.join("\n"));
   });
 
   it("says what the tool leaves in settings, staff notices, listings and storage", async () => {
