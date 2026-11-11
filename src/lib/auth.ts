@@ -154,6 +154,9 @@ const DUMMY_HASH: Promise<string> = (async () => {
   const derived = await scryptHash("dummy-password-never-matches", salt);
   return `scrypt$${salt}$${derived}`;
 })();
+// Keep a scrypt failure here from crashing boot as an unhandled rejection.
+// It is not swallowed: every sign-in that awaits DUMMY_HASH gets the rejection.
+DUMMY_HASH.catch(() => undefined);
 
 function isKnownHashFormat(stored: string): boolean {
   return stored.startsWith("scrypt$") || stored.includes(":");

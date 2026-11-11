@@ -24,7 +24,7 @@ import { prismaAdmin } from "./db";
 import { cached, invalidate } from "./cache";
 
 const KEY_PREFIX = "session-revoked:";
-/** Matches the Student-row cache in getSession. */
+/** Shorter than the Student-row cache in getSession (60 s); logout clears it at once anyway. */
 const REVOCATION_CACHE_TTL_S = 10;
 
 function revocationKey(token: string): string {
