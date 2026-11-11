@@ -46,7 +46,8 @@ export function tableOf(tx: object, model: string): CloseoutTable {
 
 /**
  * What one run deletes: accounts (Student rows), classes (SpokesClass rows) and
- * queued jobs (BackgroundJob rows whose payload names one of the accounts).
+ * queued jobs (BackgroundJob rows whose payload names one of them, or a scrape
+ * config, scrape run or wager the plan deletes).
  */
 export interface CloseoutPlan {
   readonly accountIds: Ids;

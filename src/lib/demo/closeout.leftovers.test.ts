@@ -121,6 +121,31 @@ describe("demo closeout queued jobs", () => {
   });
 });
 
+describe("demo closeout jobs reached through the demo class and its wagers", () => {
+  it("deletes jobs whose payload names the demo class, its scrape config or run, or a demo wager, and keeps the same for the other universe", async () => {
+    const { db } = await scene();
+    const jobs = (prefix: string, classId: string) => [
+      { type: "scrape_jobs", payload: JSON.stringify({ configId: `${prefix}JobClassConfig`, scrapeRunId: `${prefix}JobScrapeRun` }) },
+      { type: "scrape_jobs", payload: JSON.stringify({ scrapeRunId: `${prefix}JobScrapeRun` }) },
+      { type: "wager_diagnosis", payload: JSON.stringify({ wagerId: `${prefix}Wager` }) },
+      { type: "x", payload: JSON.stringify({ classId }) },
+    ];
+    const demoClass = db.rows("SpokesClass").find((row) => String(row.id).startsWith("dm-"))?.id;
+    const realClass = db.rows("SpokesClass").find((row) => String(row.id).startsWith("rl-"))?.id;
+    jobs("dm-", String(demoClass)).forEach((job, index) => db.insert("BackgroundJob", { id: `job-dm-${index}`, ...job }));
+    jobs("rl-", String(realClass)).forEach((job, index) => db.insert("BackgroundJob", { id: `job-rl-${index}`, ...job }));
+
+    const previewed = countsOf(await preview(db));
+    const outcome = await apply(db);
+
+    assert.equal(outcome.kind, "applied");
+    assert.equal(previewed.rowsToDelete.BackgroundJob, 1 + 4);
+    const left = db.rows("BackgroundJob").map((row) => String(row.id));
+    assert.deepEqual(left.filter((id) => id.startsWith("job-dm-")), []);
+    assert.equal(left.filter((id) => id.startsWith("job-rl-")).length, 4);
+  });
+});
+
 describe("demo closeout counts of what it leaves", () => {
   it("counts settings that hold a demo class id, staff notices about a demo student and listings mirrored from a demo lead", async () => {
     const { db, demo, real } = await scene();

@@ -146,10 +146,10 @@ function flatValues(values: readonly unknown[]): unknown[] {
   });
 }
 
-function studentIdIn(payload: unknown): string | null {
-  if (typeof payload !== "string" || !payload.startsWith("{")) return null;
+function payloadValue(payload: unknown, key: unknown): string | null {
+  if (typeof payload !== "string" || !payload.startsWith("{") || typeof key !== "string") return null;
   const parsed: unknown = JSON.parse(payload);
-  const id: unknown = isRecord(parsed) ? parsed.studentId : undefined;
+  const id: unknown = isRecord(parsed) ? parsed[key] : undefined;
   return typeof id === "string" ? id : null;
 }
 
@@ -331,9 +331,10 @@ export class FakeDb {
     const orphan = ORPHAN_STATEMENT.exec(sql);
     if (orphan) return [{ orphans: this.orphans(orphan, flatValues(values), state.rowSecurityOff) }];
     if (sql.includes('FROM visionquest."Notification" n')) return this.notices(new Set(flatValues(values)), state.rowSecurityOff);
-    if (sql.includes('visionquest."BackgroundJob"') && sql.includes("payload::jsonb->>'studentId'")) {
-      const named = new Set(flatValues(values));
-      return this.readable("BackgroundJob", state.rowSecurityOff).filter((row) => named.has(studentIdIn(row.payload))).map((row) => ({ id: row.id }));
+    if (sql.includes('visionquest."BackgroundJob"') && sql.includes("payload::jsonb->>(?::text)")) {
+      const [key, ...ids] = flatValues(values);
+      const named = new Set(ids);
+      return this.readable("BackgroundJob", state.rowSecurityOff).filter((row) => named.has(payloadValue(row.payload, key))).map((row) => ({ id: row.id }));
     }
     throw new Error(`The fake database does not know this statement: ${sql}`);
   }

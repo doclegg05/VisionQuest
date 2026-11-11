@@ -27,7 +27,7 @@
 import { Prisma } from "@prisma/client";
 import { DEMO_CLASS_CODE, DEMO_INSTRUCTOR_LOGIN, isCohortDemoEnabled, isRealStudentDataDeclared } from "./config";
 import {
-  UNMARKED, chunksOf, countIn, idsFor, idsOf, inList, tableOf, valuesWhere,
+  UNMARKED, chunksOf, countIn, idsFor, idsOf, inList, plannedValues, tableOf, valuesWhere,
   type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type DemoEnv, type Ids, type Run, type Where,
 } from "./closeout.core";
 import {
@@ -36,7 +36,7 @@ import {
 import { leftBehind, orphanCounts, type LeftBehind } from "./closeout.orphans";
 import type { LocalSchema } from "./closeout.local";
 import { refusal, type Refusal, type RefusalCode } from "./closeout.report";
-import { jobIdsNaming, readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type ServerFacts } from "./closeout.server";
+import { jobIdsNaming, readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type JobPayloadKey, type ServerFacts } from "./closeout.server";
 
 export { tableOf, type CloseoutClient, type CloseoutPlan, type CloseoutTx, type DeleteStep, type Where } from "./closeout.core";
 export { REFUSALS, type Refusal, type RefusalCode } from "./closeout.report";
@@ -167,9 +167,9 @@ const CLASS_STEPS: readonly DeleteStep[] = [
 ];
 
 /**
- * Queued and finished jobs whose JSON payload names a planned account
- * (`jobIdsNaming` in closeout.server.ts). BackgroundJob has no foreign key, so
- * the schema would leave every one behind.
+ * Queued and finished jobs whose JSON payload names a planned account or
+ * class, or a scrape config, scrape run or wager a step deletes (`jobsOfPlan`).
+ * BackgroundJob has no foreign key, so the schema would leave every one behind.
  */
 const JOB_STEPS: readonly DeleteStep[] = [{ model: "BackgroundJob", scope: "job", column: "id", where: inList("id") }];
 
@@ -202,6 +202,24 @@ export const UNLINKED_REFS: readonly SetNullLink[] = [
   unlinked("VisionBoardItem", "fileId", "FileUpload"),
   unlinked("VisionBoardItem", "goalId", "Goal"),
 ];
+
+/**
+ * The jobs a run deletes. `run` has no jobs yet: only the account and class
+ * steps are read, to find the scrape configs, runs and wagers they delete.
+ */
+async function jobsOfPlan(run: Run): Promise<string[]> {
+  const deletedIds = async (model: Prisma.ModelName) => [...(await plannedValues(run, DELETE_STEPS.filter((step) => step.model === model), "id"))];
+  const named: ReadonlyArray<readonly [JobPayloadKey, Ids]> = [
+    ["studentId", run.plan.accountIds],
+    ["classId", run.plan.classIds],
+    ["configId", await deletedIds("JobClassConfig")],
+    ["scrapeRunId", await deletedIds("JobScrapeRun")],
+    ["wagerId", await deletedIds("Wager")],
+  ];
+  const found = new Set<string>();
+  for (const [key, ids] of named) (await jobIdsNaming(run.tx, key, ids, run.chunk)).forEach((id) => found.add(id));
+  return [...found];
+}
 
 /** Which rows that name an account are NOT deleted by the plan, and so must not exist. */
 export type Survives =
@@ -670,7 +688,7 @@ async function inTransaction(tx: CloseoutTx, options: CloseoutOptions): Promise<
 
   const selection = await (options.rule ?? markedDemoAccountsRule)(tx);
   const chunk = options.chunkSize ?? ID_CHUNK;
-  const jobIds = await jobIdsNaming(tx, selection.accountIds, chunk);
+  const jobIds = await jobsOfPlan({ tx, plan: { ...selection, jobIds: [] }, chunk, now: server.now });
   const run: Run = { tx, plan: { ...selection, jobIds }, chunk, now: server.now };
   const countDiffers = options.apply && options.expectAccounts !== run.plan.accountIds.length;
   const { preview, refusals } = await survey(run, { env: options.env ?? process.env, lockFree, countDiffers });

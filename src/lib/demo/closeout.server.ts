@@ -100,17 +100,28 @@ export async function readServerFacts(tx: CloseoutTx): Promise<ServerFacts> {
 }
 
 /**
- * Queued and finished jobs whose payload names one of these accounts. The
- * payload is JSON text written by `enqueueJob` (src/lib/jobs.ts), which has no
- * foreign key, so the schema would leave every one of these rows behind.
+ * The payload keys that name a row the closeout deletes: a student (most
+ * jobs), a class, a class's scrape config and run (`scrape_jobs`, from
+ * src/app/api/teacher/jobs/refresh/route.ts) and a wager (`wager_diagnosis`).
  */
-export async function jobIdsNaming(tx: CloseoutTx, accountIds: Ids, chunkSize: number): Promise<string[]> {
-  const ids: string[] = [];
-  for (const chunk of chunksOf(accountIds, chunkSize)) {
-    const result = await tx.$queryRaw`SELECT id FROM visionquest."BackgroundJob" WHERE (CASE WHEN left(payload, 1) = '{' THEN payload::jsonb->>'studentId' END) IN (${Prisma.join(chunk)})`;
-    ids.push(...idsOf(rowsOf(result), "id"));
+export type JobPayloadKey = "studentId" | "classId" | "configId" | "scrapeRunId" | "wagerId";
+
+/**
+ * Queued and finished jobs whose payload holds one of these ids under `key`.
+ * The payload is JSON text written by `enqueueJob` (src/lib/jobs.ts), which has
+ * no foreign key, so the schema would leave every one of these rows behind.
+ * Text that does not start with `{` is skipped. pg_input_is_valid would also
+ * skip broken JSON that does, but it needs Postgres 16 and production is not
+ * known to be on it; JSON.stringify never writes broken JSON, and if a row did
+ * hold it the statement would fail and the closeout would stop, not delete.
+ */
+export async function jobIdsNaming(tx: CloseoutTx, key: JobPayloadKey, ids: Ids, chunkSize: number): Promise<string[]> {
+  const found: string[] = [];
+  for (const chunk of chunksOf(ids, chunkSize)) {
+    const result = await tx.$queryRaw`SELECT id FROM visionquest."BackgroundJob" WHERE (CASE WHEN left(payload, 1) = '{' THEN payload::jsonb->>(${key}::text) END) IN (${Prisma.join(chunk)})`;
+    found.push(...idsOf(rowsOf(result), "id"));
   }
-  return ids;
+  return found;
 }
 
 /**

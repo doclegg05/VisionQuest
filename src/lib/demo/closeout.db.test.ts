@@ -280,6 +280,22 @@ if (!SHOULD_RUN) {
       assert.deepEqual(await counted(), before);
     });
 
+    it("deletes the jobs that name the demo class's scrape config or a demo wager, and keeps the other universe's", async () => {
+      await seed();
+      const jobs = (universe: SeededUniverse) => [
+        { id: `${universe.prefix}job-scrape`, type: "scrape_jobs", payload: JSON.stringify({ configId: `${universe.prefix}JobClassConfig`, scrapeRunId: `${universe.prefix}JobScrapeRun` }) },
+        { id: `${universe.prefix}job-wager`, type: "wager_diagnosis", payload: JSON.stringify({ wagerId: `${universe.prefix}Wager` }) },
+        { id: `${universe.prefix}job-text`, type: "x", payload: "not json" },
+      ];
+      for (const job of [...jobs(demo), ...jobs(real)]) await insertRow("BackgroundJob", job);
+
+      const outcome = await closeout(db(), { apply: true, expectAccounts: 2 });
+
+      assert.equal(outcome.kind, "applied");
+      const left = await db().backgroundJob.findMany({ where: { id: { in: [...jobs(demo), ...jobs(real)].map((job) => job.id) } }, select: { id: true } });
+      assert.deepEqual(left.map((row) => row.id).sort(), [`${demo.prefix}job-text`, ...jobs(real).map((job) => job.id)].sort());
+    });
+
     it("keeps the shared rows a demo account merely referenced", async () => {
       await seed();
 
