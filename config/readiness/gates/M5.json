@@ -1,0 +1,15 @@
+{
+  "id": "M5",
+  "kind": "metric",
+  "set": "launch",
+  "title": "Orientation video size",
+  "doneWhen": "10 MB or less",
+  "check": {
+    "type": "metric",
+    "run": "node -e \"console.log((require('fs').statSync('public/media/sage-welcome-orientation.mp4').size / 1e6).toFixed(1))\"",
+    "baseline": 34.7,
+    "target": 10,
+    "direction": "atMost",
+    "unit": "MB"
+  }
+}

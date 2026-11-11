@@ -1,0 +1,10 @@
+{
+  "id": "G7",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Tailwind scans `src` only",
+  "doneWhen": "The `spokes-visual` CI artifact shows no visual change.",
+  "check": {
+    "type": "pending"
+  }
+}

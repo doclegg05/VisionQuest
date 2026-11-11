@@ -1,0 +1,10 @@
+{
+  "id": "E8",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Chat opens with its history",
+  "doneWhen": "A test finds history in the first render.",
+  "check": {
+    "type": "pending"
+  }
+}

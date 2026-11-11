@@ -1,0 +1,10 @@
+{
+  "id": "F3",
+  "kind": "task",
+  "set": "launch",
+  "title": "Bookkeeping after the response",
+  "doneWhen": "The lint rule is an error and the tree passes it. Route tests show the response does not wait.",
+  "check": {
+    "type": "pending"
+  }
+}

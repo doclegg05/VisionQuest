@@ -1,0 +1,14 @@
+{
+  "id": "E0",
+  "kind": "task",
+  "set": "launch",
+  "title": "Measure before changing any timeout",
+  "doneWhen": "The numbers are in the ops evidence checklist and R11 is answered.",
+  "check": {
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "E0: Chat time to first text measured at the host"
+    ]
+  }
+}

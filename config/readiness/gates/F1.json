@@ -1,0 +1,10 @@
+{
+  "id": "F1",
+  "kind": "task",
+  "set": "launch",
+  "title": "Pool and session",
+  "doneWhen": "Tests for the cache, its invalidation and the hash.",
+  "check": {
+    "type": "pending"
+  }
+}

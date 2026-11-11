@@ -1,0 +1,10 @@
+{
+  "id": "A4",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Staff can finish MFA setup",
+  "doneWhen": "Component tests, plus a test for the R7 policy.",
+  "check": {
+    "type": "pending"
+  }
+}

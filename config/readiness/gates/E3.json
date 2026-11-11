@@ -1,0 +1,10 @@
+{
+  "id": "E3",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Retry repeats nothing",
+  "doneWhen": "A route test retries and finds one user message in history.",
+  "check": {
+    "type": "pending"
+  }
+}

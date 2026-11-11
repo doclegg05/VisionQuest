@@ -1,0 +1,10 @@
+{
+  "id": "E2",
+  "kind": "task",
+  "set": "launch",
+  "title": "A wait the student can read",
+  "doneWhen": "Component tests cover the 5 second message and Stop.",
+  "check": {
+    "type": "pending"
+  }
+}

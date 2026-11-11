@@ -1,0 +1,10 @@
+{
+  "id": "H4",
+  "kind": "task",
+  "set": "launch",
+  "title": "The block on cloud AI is explicit",
+  "doneWhen": "Boot check tests for each flag combination.",
+  "check": {
+    "type": "pending"
+  }
+}

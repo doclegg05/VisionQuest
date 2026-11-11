@@ -1,0 +1,10 @@
+{
+  "id": "G5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Load less up front",
+  "doneWhen": "The T3 script shows a smaller signed-in payload on a preview build.",
+  "check": {
+    "type": "pending"
+  }
+}

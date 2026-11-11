@@ -1,0 +1,14 @@
+{
+  "id": "T1",
+  "kind": "task",
+  "set": "launch",
+  "title": "Readiness scorecard",
+  "doneWhen": "The script prints one row per gate, its own tests pass, and the first run is committed as the baseline.",
+  "check": {
+    "type": "test",
+    "files": [
+      "scripts/readiness/__tests__/scorecard.test.mjs",
+      "scripts/readiness/__tests__/gates.test.mjs"
+    ]
+  }
+}

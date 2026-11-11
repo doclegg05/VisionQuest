@@ -1,0 +1,15 @@
+{
+  "id": "M3",
+  "kind": "metric",
+  "set": "pilot",
+  "title": "Estimated database round trips before chat sends its first byte",
+  "doneWhen": "12 or fewer, measured from a normal chat turn",
+  "check": {
+    "type": "metric",
+    "run": null,
+    "baseline": 167,
+    "target": 12,
+    "direction": "atMost",
+    "unit": "round trips"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "D1",
+  "kind": "task",
+  "set": "launch",
+  "title": "The signed-form banner is removed from the student home, per R5",
+  "doneWhen": "A test finds no banner and no intake query on the student dashboard for any account.",
+  "check": {
+    "type": "pending"
+  }
+}

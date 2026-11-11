@@ -1,0 +1,22 @@
+{
+  "id": "O-7",
+  "kind": "owner",
+  "set": "launch",
+  "title": "Demo closeout",
+  "doneWhen": "When the demo ends: do the W9 steps in order, take a backup, run the H10 closeout kit as a preview, apply it, and confirm zero demo rows. No real student account is created before that count is zero.",
+  "check": {
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "1. Keep the fence on",
+      "2. Fence holds",
+      "3. End demo entry",
+      "4. Fence still holds",
+      "5. Normal sign-in only",
+      "O-7: Backup taken before the closeout",
+      "O-7: Closeout kit preview run",
+      "O-7: Closeout kit applied",
+      "O-7: Zero demo rows confirmed"
+    ]
+  }
+}

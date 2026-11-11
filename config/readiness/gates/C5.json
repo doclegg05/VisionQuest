@@ -1,0 +1,10 @@
+{
+  "id": "C5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "One class filter",
+  "doneWhen": "A test shows the header and the page agree after a reload.",
+  "check": {
+    "type": "pending"
+  }
+}

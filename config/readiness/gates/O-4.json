@@ -1,0 +1,19 @@
+{
+  "id": "O-4",
+  "kind": "owner",
+  "set": "launch",
+  "title": "Model acceptance at the host",
+  "doneWhen": "Model acceptance at the host: the W1 rows, including E0.",
+  "check": {
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "Host record: chip, RAM, Ollama version, `OLLAMA_NUM_PARALLEL`, `OLLAMA_KEEP_ALIVE`, context length",
+      "Relay and fence in effect",
+      "Fail-closed with the host stopped",
+      "Provider routing matches the report",
+      "Selected 12B model evals",
+      "E0: Chat time to first text measured at the host"
+    ]
+  }
+}

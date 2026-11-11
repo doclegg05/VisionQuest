@@ -71,16 +71,16 @@ Rules that do not bend:
 
 ## Metrics
 
-T2 and T3 replace the estimates below with measured baselines before any performance task starts.
+T2 measured M1, M3 and M6 with a counting stand-in for the database client. The unit is estimated round trips: 4 for each query on the app client, because the RLS wrapper sends BEGIN, `set_config`, the query and COMMIT, and 1 for each nested relation a query loads. The counts are what the code issues for a fixture, so real data can differ. A database review trusted M1 and M6 and found that M3's fixture is not a normal chat turn. Task T4 fixes that before any work is budgeted against M3.
 
 | ID | Metric | Baseline | Target | Set |
 | --- | --- | --- | --- | --- |
-| M1 | App queries for one student dashboard render | about 39, counted in review | 20 or fewer | Launch |
+| M1 | Estimated database round trips for one student dashboard render | 167, measured: 41 queries at 4 round trips each, and 3 nested loads | 85 or fewer | Launch |
 | M2 | Statements per open dashboard per minute at idle | about 60 | 8 or fewer | Launch |
-| M3 | Database round trips before chat sends its first byte | 35 to 65 | 10 or fewer | Pilot |
+| M3 | Estimated database round trips before chat sends its first byte | Not yet trusted. 167 with a fixture the database review found unrealistic; a normal turn issues more. | 12 or fewer | Pilot |
 | M4 | Compressed scripts and styles on the sign-in page | 322 KB, measured | 235 KB or less | Launch |
 | M5 | Orientation video size | 34.7 MB, measured | 10 MB or less | Launch |
-| M6 | App queries for one teacher home render | about 44 | 20 or fewer | Pilot |
+| M6 | Estimated database round trips for one teacher home render | 111, measured: 18 queries at 4 round trips each, and 39 nested loads | 60 or fewer | Pilot |
 | M7 | Production `/api/health` `latency_ms` | 530, measured | 60 or less | Launch, owner |
 | M8 | Signed-in student dashboard, median server time in production | not measured | under 1 second | Pilot |
 
@@ -92,9 +92,10 @@ Columns: **Set** is Launch or Pilot. **Src** is `seen` when the orchestrator re-
 
 | ID | Set | Task | Done when | Size | Extra review |
 | --- | --- | --- | --- | --- | --- |
-| T1 | Launch | Readiness scorecard. `config/readiness/gates.json` lists every gate in this plan with its check. `scripts/readiness/scorecard.mjs` runs the local checks, reads owner rows from the ops evidence checklist, writes `reports/readiness/latest.md`, and exits 1 under `--strict` when a Launch gate fails. It names the two sandbox-only unit failures so a third cannot pass unnoticed. | The script prints one row per gate, its own tests pass, and the first run is committed as the baseline. | M | none |
+| T1 | Launch | Readiness scorecard. `config/readiness/gates/` holds one file per gate in this plan, each with its check. `scripts/readiness/scorecard.mjs` runs the local checks, reads owner rows from the ops evidence checklist, writes `reports/readiness/latest.md`, and exits 1 under `--strict` when a Launch gate fails. It names the two sandbox-only unit failures so a third cannot pass unnoticed. | The script prints one row per gate, its own tests pass, and the first run is committed as the baseline. | M | none |
 | T2 | Launch | Query counter. A test helper that counts app-client queries for one call, with measured baselines for M1, M3 and M6 written into `gates.json`. | Two runs give the same counts. | M | db |
-| T3 | Launch | Page weight script. Sums the compressed bytes of the scripts and styles a URL loads, for M4. | It reproduces the 322 KB sign-in figure against production. | S | none |
+| T3 | Launch | Page weight script. Sums the compressed bytes of the scripts and styles a URL loads, for M4. | Its tests pass and it weighs the production sign-in page. On 2026-11-10 it reproduced the 322 KB hand measurement. | S | none |
+| T4 | Pilot | Counter fidelity. The chat-send fixture becomes a normal turn at a stage the app stores. Same-tick admin lookups count as the one batch Prisma sends. A query that returns nothing counts no nested loads. Nested loads are split by client. A test fails when a layout or template is added above a measured page. | M3 is re-pinned from a normal turn, and the database reviewer trusts all three baselines. | M | db |
 
 ### Stream A: sign-in and accounts
 
@@ -133,13 +134,14 @@ Every task here touches authentication, so `sec-spec` reviews each one and no fi
 
 | ID | Set | Task | Evidence | Src | Done when | Size | After | Extra review |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| D1 | Launch | The signed-form banner tells the truth, per R5. | `src/app/(student)/dashboard/page.tsx:54` | seen | Tests: a teacher-created student sees no banner, a QR-intake student without a signed packet sees it, and signing clears it. | M | T1 | ux |
+| D1 | Launch | The signed-form banner is removed from the student home, per R5. The instructor roster keeps its "Missing intake" signal. | `src/app/(student)/dashboard/page.tsx:54` | seen | A test finds no banner and no intake query on the student dashboard for any account. | S | T1 | ux |
 | D2 | Launch | Orientation documents open on phones. An "Open the document" link beside the iframe, and the link alone below `md`. One fetch of `/api/orientation`, not two. | `src/components/orientation/OrientationWizard.tsx:523` | pass | Component test for the link. Owner row O-10 for real phones. | S | T1 | ux |
 | D3 | Launch | Sign-in form first on phones. Form before the hero below `lg`, the environment note removed, and one label for the login field across sign-in and recovery. | `src/components/auth/AuthPageClient.tsx:169`, `:322`, `:399` | pass | The CI a11y and touch-target suites stay green. A test pins the shared label. | S | T1 | ux |
 | D4 | Pilot, needs R8 | Student home works on a phone. Task cards with one Mark done button. No filters, column picker, bulk actions or paging for students. Local time. Polling text removed. | `src/components/dashboard/TaskTable.tsx:51`, `src/app/(student)/dashboard/DashboardClient.tsx:44` | pass | Component tests at 375px. `ui-copy:readability` passes. | M | F2 | ux |
 | D5 | Pilot | Forms keep what was typed. Goal forms wait for the save and show errors inline. Inline inputs are 44px with a focus ring. A failed file delete and Credly errors are shown. | `src/components/goals/GoalsPageClient.tsx:649`, `src/components/files/FileManager.tsx:108` | pass | Component tests fail a mocked save and find the text still in the field. | M | none | ux |
 | D6 | Pilot | One error line. A shared component with an icon and `role="alert"`, a committed codemod over the roughly 86 `text-danger` lines, and a lint rule. Runs when no other UI task is open. | `src/app/globals.css:232` | pass | The lint rule is an error and the tree passes it. | M | all other UI tasks | ux |
 | D7 | Pilot | Student wording, and the text-message setup dead end. | `src/components/settings/SettingsView.tsx:51`, `:821`, `:873` | pass | A component test reaches the phone field with texts off. | S | A3, E1 | ux |
+| D8 | Pilot, needs R13 | An instructor can get a missing Student Profile form signed. Today no instructor screen can refile a packet that failed to save at enrolment, and the student has no page that can sign it. | `src/lib/intake/provision.ts:270`, `src/lib/intake/pdf-stamped-packet.ts:1081` | pass | An instructor action files the signed packet and the roster's "Missing intake" clears. Route and component tests cover it. | M | none | sec-aud, ux |
 
 ### Stream E: chat that fits a slow local model
 
@@ -149,7 +151,7 @@ Every task here touches authentication, so `sec-spec` reviews each one and no fi
 | E1 | Launch | Honest failure states. Separate messages for off, busy, slow and not set up, shown once with Retry. The relay returns different codes for busy and offline. Students never see API-key instructions, per R9. Upload errors wrap and are announced, and the file picker has `accept`. | `src/app/api/chat/send/route.ts:147`, `scripts/mac-relay/server.mjs:73`, `src/lib/chat/send-outcome.ts:45`, `src/components/chat/ChatInput.tsx:331` | seen | Route tests map each cause to its message. `test:relay` passes. The `error-message-audit` skill finds no technical wording. | M | A3 | ux |
 | E2 | Launch | A wait the student can read. Words under the dots after 5 seconds, a Stop button, and no canned opener when the provider is local. | `src/components/chat/TypingIndicator.tsx:9`, `src/components/chat/ChatWindow.tsx:406`, `:739` | pass | Component tests cover the 5 second message and Stop. | M | E1 | ux |
 | E3 | Pilot | Retry repeats nothing. Retry reuses the saved turn and keeps attachments, keyed by a client message id. | `src/components/chat/ChatWindow.tsx:688`, `src/app/api/chat/send/route.ts:599` | pass | A route test retries and finds one user message in history. | M | E2 | none |
-| E4 | Pilot | First byte early. The stream opens before context is built and sends a status event. Messages load once. Work that can wait is deferred. Audit rows that policy requires stay awaited. | `src/app/api/chat/send/route.ts:911`, `src/lib/chat/conversation.ts:26` | pass | M3 at target, measured by the T2 counter. | L | E3 | db, sec-aud |
+| E4 | Pilot | First byte early. The stream opens before context is built and sends a status event. Messages load once. Work that can wait is deferred. Audit rows that policy requires stay awaited. | `src/app/api/chat/send/route.ts:911`, `src/lib/chat/conversation.ts:26` | pass | M3 at target, measured by the T2 counter. | L | E3, T4 | db, sec-aud |
 | E5 | Pilot | Smooth typing on slow phones. The bubble is memoized, the streaming bubble has its own state, and the view scrolls only when the student is near the bottom. | `src/components/chat/ChatWindow.tsx:266`, `:480`, `:682` | pass | A render-count test shows earlier bubbles do not re-render per token. | S | E3 | none |
 | E6 | Launch | "Sage is an AI and can be wrong" under the message box, linked to the notice page. | No such line exists in chat. | pass | Component test. Reading level passes. | S | H6, E2 | ux |
 | E7 | Pilot | The mini chat has Retry and Help on failure. | `src/components/chat/SageMiniChat.tsx:244` | pass | Component test. | S | E1 | none |
@@ -163,7 +165,7 @@ Every task here touches authentication, so `sec-spec` reviews each one and no fi
 | F2 | Launch | Dashboard read diet. Poll every 2 minutes or on the notification event. Cache readiness and next step per student for 30 seconds behind the existing write-through. One per-request loader so the layout and page stop repeating reads. Cache global rows for 5 to 10 minutes. | `src/lib/dashboard/query.ts:6`, `src/app/(student)/dashboard/page.tsx:26`, `src/lib/progression/fetch-readiness-data.ts:31` | seen | M1 and M2 at target. A test proves a write clears the cache. | L | T2, D1, H6 | db |
 | F3 | Launch | Bookkeeping after the response. `deferAfterResponse` for `syncStudentAlerts` on the student write routes, a lint rule that forbids awaiting it there, and one pending sync per student. | `src/lib/dashboard/tasks.ts:100`, `src/app/api/orientation/welcome-video/route.ts:45`, `src/app/api/portfolio/route.ts:187` | pass | The lint rule is an error and the tree passes it. Route tests show the response does not wait. | M | T1 | db |
 | F4 | Pilot | Transactions that fit. Plain reads in place of the Serializable read. Explicit timeouts. Interactive transactions on the app client move to `withAppTransaction`. The alert sync writes one multi-row upsert. | `src/lib/dashboard/tasks.ts:24`, `src/lib/advising-sync.ts:255`, `src/lib/goal-stale-detection.ts:41` | pass | The CI RLS suites are green. A test covers a bulk change of 20 tasks. | L | C2, F3 | db, sec-aud |
-| F5 | Pilot | Teacher home in one pass. One roster fetch for queue, overview and today. A paged admin queue. An index on `Message(studentId, createdAt)`, added with the `database-migration` skill. | `src/lib/teacher/dashboard.ts:141`, `:254`, `src/lib/teacher/today.ts:45`, `prisma/schema.prisma:186` | pass | M6 at target. The migration is additive. | L | C4 | db |
+| F5 | Pilot | Teacher home in one pass. One roster fetch for queue, overview and today. A paged admin queue. An index on `Message(studentId, createdAt)`, added with the `database-migration` skill. | `src/lib/teacher/dashboard.ts:141`, `:254`, `src/lib/teacher/today.ts:45`, `prisma/schema.prisma:186` | pass | M6 at target. The migration is additive. | L | C4, T4 | db |
 | F6 | Pilot | The jobs list sends only what it shows. | `src/app/api/jobs/route.ts:132` | pass | A test finds no `description` in the response. | S | none | none |
 | F7 | Hold | A cheaper RLS wrapper. Each query is its own transaction today. Do not start unless M8 misses its target after O-8 and F1 to F5. It needs its own design first. | `src/lib/db.ts:204` | seen | Not scheduled. | L | F5 | sec-spec, db |
 
@@ -243,6 +245,16 @@ E0 and the owner track run beside every wave.
 | Specialists | `security-specialist`, `security-auditor`, `database-architect`, `ux-reviewer` | Foreground on the diff, per the Extra review column | Nothing | `vq-security-review`, `student-data-privacy`, `database-migration` as the task needs |
 | Orchestrator | this session | Selects, briefs, verifies from artifacts, pushes, tracks | Plan, scorecard output, `decisions.tsv`, handoff | `orchestrate`, `show-me-your-work`, `pr`, `unslop` |
 
+Models. Britt asked on 2026-11-10 that subagents run on a cheaper model wherever the work allows.
+
+| Model | Used for |
+| --- | --- |
+| Fable 5.2 | Work where a mistake is costly: every task that touches authentication or the block on cloud AI (stream A, F1, H4), tasks sized L, database transaction work (F4), security-specialist reviews, and the final audit |
+| Opus 5.5 | Builds sized M, and the code, database, security-auditor and UX reviews |
+| Sonnet 5.5 | Builds sized S, scouts, and docs tasks |
+
+A downgraded agent runs at its model's default effort. Reviews never drop below Opus, because a cheaper builder makes the review matter more. A task that fails review twice on a cheaper model is re-run one tier up.
+
 Domain skills by task: `database-migration` for F5 and any schema change, `student-data-privacy` for H1, H2, H4, H6 and E4, `sage-prompt-engineering` for C2 and stream E, `error-message-audit` for E1, `deploy` for H7, `technical-writing` for H8, `wizard` for the owner track script.
 
 Every brief carries the same fields: the goal and the user consequence, the evidence, the files the agent may edit, the files it must not touch, the skills to load, the environment recipe, the "Done when" check, and what to hand back. The hand-back is the branch, the commits, the quoted red and green runs, the gate output and anything left undone. A builder stops and reports when it cannot reproduce the defect, when the fix needs a file outside its brief, or when it needs a schema change the brief did not name.
@@ -288,11 +300,11 @@ Each has a default that applies if Britt approves the plan without changing it.
 
 | ID | Decision | Default |
 | --- | --- | --- |
-| R1 | Where real students live. | **Decided by Britt, 2026-11-10: one stack, used in sequence.** The demo stays open for about eight more weeks. Then the demo closes, the demo data is cleared, and only real data is used. There is no second stack. Still open: the app and the database look far apart, and neither Render nor Supabase can move a region in place. After O-1, if the regions differ, one piece is recreated. A new Render service in the database's region is the small move. A new Supabase project is needed only if the data must sit in US East, and the closeout is the cheapest moment for it because no real student data exists yet. |
-| R2 | Who pushes and merges. | **Decided by Britt, 2026-11-10: the orchestrator pushes, opens pull requests and merges.** Docs and tooling merge when CI is green. Changes that run in production merge in batches at the end of a wave. Still open: whether a merge to `main` deploys on its own. Until that is known, a pull request that carries a migration is named to Britt before it merges. |
+| R1 | Where real students live. | **Decided by Britt, 2026-11-10: one stack, used in sequence.** The demo stays open for about eight more weeks. Then the demo closes, the demo data is cleared, and only real data is used. There is no second stack. The regions differ: the database is in AWS us-west-2, Oregon (verified 2026-11-10), and Britt recalls setting Render to Ohio, which matches the measured delay of about 50 ms per round trip. Neither Render nor Supabase can move a region in place, so one piece is recreated at closeout. A new Render service in the database's region is the small move. A new Supabase project is needed only if the data must sit in US East, and the closeout is the cheapest moment for it because no real student data exists yet. |
+| R2 | Who pushes and merges. | **Decided by Britt, 2026-11-10: the orchestrator pushes, opens pull requests and merges.** Docs and tooling merge when CI is green. Changes that run in production merge in batches at the end of a wave. Britt confirmed that a merge to `main` deploys to Render. A deploy takes about five minutes, restarts the service, and applies any pending migration. So each wave merges as one back-to-back batch, and a pull request that carries a migration is named to Britt before it merges. |
 | R3 | The per-network sign-in limit. | Successful sign-ins do not count. 30 failed attempts per network per 15 minutes. 5 per account stays. |
 | R4 | Student password length. | Keep 12 characters and add a "Make a password" button for staff. |
-| R5 | When the signed-form banner shows. | Only for accounts made by QR intake with no signed packet. Never for teacher-created accounts. |
+| R5 | When the signed-form banner shows. | **Decided on Britt's behalf, 2026-11-10, open to veto: the student banner is removed.** The first default was to show it only to QR-intake accounts with no signed packet. D1's builder then traced three facts. "Sign my form" is a dead end for every student, intake students included. No record says which accounts came from intake, and the only stand-in is `mustChangePassword`, which task A3 will set for teacher-created accounts. The instructor roster already shows "Missing intake". A banner the student cannot act on does not belong on their home page. |
 | R6 | Who may edit program-wide orientation and certification items. | Admins and program coordinators. Instructors read. |
 | R7 | Staff MFA. | Required for admins and coordinators at next sign-in. Instructors are prompted. |
 | R8 | The three product-shaping screen changes: C4 teacher home, D4 student home, and removing the XP card in C7. | Not started until Britt approves each. |
@@ -300,6 +312,7 @@ Each has a default that applies if Britt approves the plan without changing it.
 | R10 | Notice and acknowledgement wording. | An agent drafts at a 6th-grade level. Britt approves before H6 merges. |
 | R11 | Chat's 45 second first-text limit against 70 to 80 second cold starts. | Decided after E0. No change before then. |
 | R12 | Whether regional coordinators may place an unplaced instructor. | No. It waits for the Microsoft sign-in phase. |
+| R13 | Whether instructors refile a missing intake packet in the app, and how the student signs it. | Task D8 does not start until Britt says how the program handles a missing signed form today. |
 
 ## Risks
 

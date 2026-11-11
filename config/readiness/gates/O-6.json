@@ -1,0 +1,18 @@
+{
+  "id": "O-6",
+  "kind": "owner",
+  "set": "launch",
+  "title": "Render in line with render.yaml",
+  "doneWhen": "Bring Render in line with `render.yaml`: health check path `/api/health`, the build command, `SAGE_AGENT_MODE`, and the mail and Sentry keys `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`.",
+  "check": {
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "O-6: Render health check path set",
+      "O-6: Render build command matches render.yaml",
+      "O-6: SAGE_AGENT_MODE set in Render",
+      "O-6: Mail keys set in Render",
+      "O-6: Sentry keys set in Render"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "M7",
+  "kind": "metric",
+  "set": "launch",
+  "title": "Production `/api/health` `latency_ms`",
+  "doneWhen": "60 or less",
+  "check": {
+    "type": "metric",
+    "run": "node -e \"fetch('https://visionquest.onrender.com/api/health').then((r) => r.json()).then((j) => console.log(j.latency_ms))\"",
+    "baseline": 530,
+    "target": 60,
+    "direction": "atMost",
+    "unit": "ms",
+    "needs": "network"
+  }
+}

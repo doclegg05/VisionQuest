@@ -1,0 +1,16 @@
+{
+  "id": "T2",
+  "kind": "task",
+  "set": "launch",
+  "title": "Query counter",
+  "doneWhen": "Two runs give the same counts.",
+  "check": {
+    "type": "test",
+    "files": [
+      "src/lib/query-counter.test.ts",
+      "src/lib/readiness/dashboard-query-count.test.tsx",
+      "src/lib/readiness/teacher-home-query-count.test.tsx",
+      "src/lib/readiness/chat-send-query-count.test.ts"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "D4",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Student home works on a phone",
+  "doneWhen": "Component tests at 375px. `ui-copy:readability` passes.",
+  "check": {
+    "type": "pending"
+  }
+}

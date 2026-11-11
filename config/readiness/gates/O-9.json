@@ -1,0 +1,16 @@
+{
+  "id": "O-9",
+  "kind": "owner",
+  "set": "pilot",
+  "title": "Notice wording, retention numbers and staff MFA policy approved",
+  "doneWhen": "Approve the notice wording, the retention numbers and the staff MFA policy.",
+  "check": {
+    "type": "owner",
+    "doc": "docs/audits/2026-11-09-ops-evidence-checklist.md",
+    "rows": [
+      "O-9: Notice wording approved",
+      "O-9: Retention numbers approved",
+      "O-9: Staff MFA policy approved"
+    ]
+  }
+}

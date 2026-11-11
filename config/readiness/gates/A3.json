@@ -1,0 +1,10 @@
+{
+  "id": "A3",
+  "kind": "task",
+  "set": "launch",
+  "title": "Students can change a password, and must after staff set one",
+  "doneWhen": "Route tests cover a wrong current password, the rate limit, the flag clearing and other sessions ending. A layout test covers the gate.",
+  "check": {
+    "type": "pending"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "B3",
+  "kind": "task",
+  "set": "launch",
+  "title": "First-day guidance",
+  "doneWhen": "Tests cover the empty states and the corrected hint.",
+  "check": {
+    "type": "pending"
+  }
+}

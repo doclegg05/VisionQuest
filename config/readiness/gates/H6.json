@@ -1,0 +1,10 @@
+{
+  "id": "H6",
+  "kind": "task",
+  "set": "launch",
+  "title": "Notice and acknowledgement",
+  "doneWhen": "Tests for the gate and the stored record. Reading level passes.",
+  "check": {
+    "type": "pending"
+  }
+}

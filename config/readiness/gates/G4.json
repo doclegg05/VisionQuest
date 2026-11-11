@@ -1,0 +1,10 @@
+{
+  "id": "G4",
+  "kind": "task",
+  "set": "pilot",
+  "title": "File downloads cache privately",
+  "doneWhen": "A route test finds `private, max-age=3600`.",
+  "check": {
+    "type": "pending"
+  }
+}

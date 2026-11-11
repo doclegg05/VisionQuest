@@ -1,0 +1,10 @@
+{
+  "id": "F5",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Teacher home in one pass",
+  "doneWhen": "M6 at target. The migration is additive.",
+  "check": {
+    "type": "pending"
+  }
+}

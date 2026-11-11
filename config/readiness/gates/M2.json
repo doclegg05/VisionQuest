@@ -1,0 +1,15 @@
+{
+  "id": "M2",
+  "kind": "metric",
+  "set": "launch",
+  "title": "Statements per open dashboard per minute at idle",
+  "doneWhen": "8 or fewer",
+  "check": {
+    "type": "metric",
+    "run": null,
+    "baseline": 60,
+    "target": 8,
+    "direction": "atMost",
+    "unit": "statements per minute"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "H1",
+  "kind": "task",
+  "set": "launch",
+  "title": "Errors reach a person",
+  "doneWhen": "Unit tests find a captured, scrubbed event for a thrown route error and for an alert line.",
+  "check": {
+    "type": "pending"
+  }
+}

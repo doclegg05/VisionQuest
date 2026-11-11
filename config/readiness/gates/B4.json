@@ -1,0 +1,10 @@
+{
+  "id": "B4",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Class actions that cannot hurt by accident",
+  "doneWhen": "A route test refuses self-removal. Component tests cover both confirms.",
+  "check": {
+    "type": "pending"
+  }
+}

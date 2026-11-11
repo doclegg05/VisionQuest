@@ -1,0 +1,10 @@
+{
+  "id": "E4",
+  "kind": "task",
+  "set": "pilot",
+  "title": "First byte early",
+  "doneWhen": "M3 at target, measured by the T2 counter.",
+  "check": {
+    "type": "pending"
+  }
+}

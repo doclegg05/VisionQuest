@@ -1,0 +1,10 @@
+{
+  "id": "E1",
+  "kind": "task",
+  "set": "launch",
+  "title": "Honest failure states",
+  "doneWhen": "Route tests map each cause to its message. `test:relay` passes. The `error-message-audit` skill finds no technical wording.",
+  "check": {
+    "type": "pending"
+  }
+}

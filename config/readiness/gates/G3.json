@@ -1,0 +1,10 @@
+{
+  "id": "G3",
+  "kind": "task",
+  "set": "launch",
+  "title": "Smaller orientation video",
+  "doneWhen": "M5 at target. Captions still line up.",
+  "check": {
+    "type": "pending"
+  }
+}

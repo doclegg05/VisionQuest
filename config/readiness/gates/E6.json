@@ -1,0 +1,10 @@
+{
+  "id": "E6",
+  "kind": "task",
+  "set": "launch",
+  "title": "\"Sage is an AI and can be wrong\" under the message box, linked to the notice page",
+  "doneWhen": "Component test. Reading level passes.",
+  "check": {
+    "type": "pending"
+  }
+}

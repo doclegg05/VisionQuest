@@ -1,0 +1,10 @@
+{
+  "id": "T4",
+  "kind": "task",
+  "set": "pilot",
+  "title": "Counter fidelity",
+  "doneWhen": "M3 is re-pinned from a normal turn, and the database reviewer trusts all three baselines.",
+  "check": {
+    "type": "pending"
+  }
+}
