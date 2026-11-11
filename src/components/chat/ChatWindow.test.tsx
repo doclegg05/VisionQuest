@@ -140,7 +140,7 @@ describe("ChatWindow wires the wait and Stop pieces (E2)", () => {
     const { readFileSync } = await import("node:fs");
     const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
     assert.match(source, /onStop=\{stopReply\}/);
-    assert.match(source, /<TypingIndicator slow=\{slowReply\} \/>/);
+    assert.match(source, /<TypingIndicator slow=\{slowReply\} stalled=\{stalledReply\} \/>/);
     assert.match(source, /signal: controller\.signal/);
     assert.match(source, /showsCannedOpener\(\{ role, isFirstMessage, localProvider \}\)/);
     assert.match(source, /readChatStream\(res, turn\.handlers\)/);

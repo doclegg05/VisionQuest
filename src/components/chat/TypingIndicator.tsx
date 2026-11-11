@@ -2,11 +2,13 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
-import { SLOW_REPLY_WORDS, TYPING_SR_WORDS } from "./wait-and-stop";
+import { SLOW_REPLY_WORDS, STALLED_REPLY_WORDS, TYPING_SR_WORDS } from "./wait-and-stop";
 
 interface TypingIndicatorProps {
   /** Sage has said nothing for SLOW_REPLY_MS: show the wait words. */
   slow?: boolean;
+  /** Sage has said nothing for REPLY_STALL_MS: say that Stop works (E7). */
+  stalled?: boolean;
 }
 
 /**
@@ -15,8 +17,9 @@ interface TypingIndicatorProps {
  * after five seconds, only the visible wait words, read out once when they
  * appear.
  */
-export default function TypingIndicator({ slow = false }: TypingIndicatorProps) {
+export default function TypingIndicator({ slow = false, stalled = false }: TypingIndicatorProps) {
   const reduce = useReducedMotion();
+  const words = stalled ? STALLED_REPLY_WORDS : slow ? SLOW_REPLY_WORDS : null;
 
   return (
     <div className="flex gap-3" role="status">
@@ -27,7 +30,7 @@ export default function TypingIndicator({ slow = false }: TypingIndicatorProps) 
         S
       </div>
       <div className="min-w-0">
-        {!slow && <span className="sr-only">{TYPING_SR_WORDS}</span>}
+        {!words && <span className="sr-only">{TYPING_SR_WORDS}</span>}
         <div className="flex items-center gap-1.5 px-1 py-2" aria-hidden="true">
           {[0, 1, 2].map((i) => (
             <motion.span
@@ -42,7 +45,7 @@ export default function TypingIndicator({ slow = false }: TypingIndicatorProps) 
             />
           ))}
         </div>
-        {slow && <p className="px-1 text-sm leading-6 text-[var(--ink-muted)]">{SLOW_REPLY_WORDS}</p>}
+        {words && <p className="px-1 text-sm leading-6 text-[var(--ink-muted)]">{words}</p>}
       </div>
     </div>
   );

@@ -27,9 +27,37 @@ export const STOPPED_NOTE = "(You stopped Sage.)";
 /** Same marker the server's safety net dedupes on (crisis-safety-net.ts). */
 const CRISIS_MARKER = /988/;
 
+/**
+ * How long a send may wait for the stream's first event (ids and the crisis
+ * flag) before the chat ends it with E1's "unknown" failure and Try again
+ * (E7). Since E7 the route sends that event right after it saves the
+ * message, before any context loads or model call, so it normally comes in
+ * well under a second. Twenty seconds is far past that and still short of
+ * the server's own bounds (the local model's 45 second first word, its
+ * 300 second first byte), so it only fires when the request itself is stuck.
+ */
+export const FIRST_EVENT_TIMEOUT_MS = 20_000;
+
+/**
+ * No word from Sage for this long after the first event: the wait words say
+ * Stop works. Past the local model's 45 second first word bound and its
+ * startup retries, and a slow first load can still answer, so the chat does
+ * not end the reply itself; Stop is already armed once the ids are in.
+ */
+export const REPLY_STALL_MS = 120_000;
+
+/** Shown after REPLY_STALL_MS in place of SLOW_REPLY_WORDS. */
+export const STALLED_REPLY_WORDS = "Sage is taking a long time. You can tap Stop and send it again.";
+
 /** Calls `onSlow` once after SLOW_REPLY_MS. Returns a cancel. */
 export function startSlowReplyTimer(onSlow: () => void): () => void {
   const timer = setTimeout(onSlow, SLOW_REPLY_MS);
+  return () => clearTimeout(timer);
+}
+
+/** Calls `onStalled` once after REPLY_STALL_MS. Returns a cancel. */
+export function startStalledReplyTimer(onStalled: () => void): () => void {
+  const timer = setTimeout(onStalled, REPLY_STALL_MS);
   return () => clearTimeout(timer);
 }
 
@@ -39,6 +67,11 @@ interface StopArmInput {
   /** Date.now() at the send, and now. */
   sentAt: number;
   now: number;
+}
+
+/** The first event has not come within FIRST_EVENT_TIMEOUT_MS of the send. */
+export function firstEventOverdue({ idsArrived, sentAt, now }: StopArmInput): boolean {
+  return !idsArrived && now - sentAt >= FIRST_EVENT_TIMEOUT_MS;
 }
 
 /**
