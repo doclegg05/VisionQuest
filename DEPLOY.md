@@ -425,7 +425,10 @@ What the tool does not remove:
    node --import tsx scripts/demo-closeout.ts
    ```
    The preview reads and changes nothing. Read it top to bottom:
-   * The first line is `Target: database ... on host ...`. The host must be the production database host shown in the Supabase dashboard, Project Settings, Database. If it is not, stop.
+   * The first three lines say which database this is. Check two of them against the Supabase dashboard of the production project. If either does not match, stop.
+     * The line `Project ref:` must show the same letters as the Project ID in the Supabase dashboard, Project Settings, General. If it says `not in the connection string`, the value you loaded is not a Supabase pooler connection string: stop and ask a developer.
+     * The line `Target: database ... on host ...` must show the same host as the connection string in the Supabase dashboard. Click **Connect** at the top of the project page, choose the session pooler, and read the host: the part after the `@` and before the next `:`. The database name is `postgres` on every Supabase project, so it tells you nothing.
+     * The line `Server address:` is a private address that the dashboard does not show. Do not compare it.
    * `marked` is the accounts and classes the apply would delete, and `rowsToDelete` is the rows that would go, table by table.
    * `unmarked` is the accounts the tool leaves. Read the sentences under the counts. A number above 0 means mock accounts may still be in the database.
    * `leftBehind.orphans` lists, for each column, the rows that name an account or class that does not exist. Some are expected, such as Sage records kept on purpose for students who left. The lines that start with `Orphan rows in` give each column's number. Write them down. The apply counts each column again after its deletes and refuses if any column is higher, so you do not need to compare them yourself.

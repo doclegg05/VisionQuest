@@ -132,6 +132,14 @@ describe("demo closeout procedure in DEPLOY.md", () => {
     assert.match(steps, /`marked` is 0 and `unmarked\.students` is the number you expect/);
   });
 
+  it("says which printed value to compare with which Supabase dashboard field, and not to compare the server address", () => {
+    const preview = step(stepWith("Run the preview and read it"));
+    assert.match(preview, /`Project ref:`.*Project ID.*Project Settings, General/);
+    assert.match(preview, /`Target: database \.\.\. on host \.\.\.`.*host.*Connect/);
+    assert.match(preview, /`Server address:`.*do not compare it/i);
+    assert.doesNotMatch(preview, /The host must be the production database host shown in the Supabase dashboard, Project Settings, Database/);
+  });
+
   it("asks for each orphan column in the preview, says the apply refuses if one rises, and does not ask for 0 orphans afterwards", () => {
     const preview = step(stepWith("Run the preview and read it"));
     assert.match(preview, /`leftBehind\.orphans`/);

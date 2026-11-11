@@ -1,8 +1,9 @@
 /**
  * Demo closeout (readiness H10): every word the tool can say.
  *
- * Fixed sentences only. A sentence may carry a count, the database name or the
- * host. It never carries a name, a login, an email, an id or any text that came
+ * Fixed sentences only. A sentence may carry a count, the database name, the
+ * host, the server's address or the Supabase project ref. It never carries a
+ * name, a login, an email, an id, any part of a password or any text that came
  * from an error, because an error can quote all of those.
  */
 
@@ -63,33 +64,74 @@ export function failureSentence(error: unknown, apply: boolean): string {
 
 /** A host name or address made only of the characters one can hold. Anything else is not printed. */
 const HOST_SHAPE = /^[A-Za-z0-9.:[\]-]+$/;
+/** A Supabase pooler user: `postgres.` and the 20 character project ref, which is not a secret. */
+const SUPABASE_USER = /^postgres\.([a-z0-9]{20})$/;
+
+/** What the connection string says about where it goes. Never the password or anything else from the user part. */
+interface NamedTarget {
+  readonly host: string | null;
+  readonly projectRef: string | null;
+}
+
+const NOTHING: NamedTarget = { host: null, projectRef: null };
 
 /**
- * The host a connection string names, or null when it cannot be trusted: the
- * string does not parse, it carries a `host` option (which overrides the host
- * written in it), or it parsed into something that is not shaped like a host.
+ * Reads the host and the user from a connection string by hand, without
+ * trusting it to be encoded. The host is what follows the last `@`, which a
+ * password can never reach past, up to the port, path, query or fragment. The
+ * user is what comes before the first `:` of the part before that `@`.
  */
-function hostNamedIn(connectionString: string): string | null {
+function splitConnectionString(connectionString: string): { readonly user: string; readonly host: string; readonly rest: string } | null {
+  const scheme = connectionString.indexOf("://");
+  if (scheme === -1) return null;
+  const afterScheme = connectionString.slice(scheme + 3);
+  const at = afterScheme.lastIndexOf("@");
+  const userInfo = at === -1 ? "" : afterScheme.slice(0, at);
+  const hostAndRest = afterScheme.slice(at + 1);
+  const end = hostAndRest.startsWith("[") ? hostAndRest.indexOf("]") + 1 : hostAndRest.search(/[:/?#]|$/);
+  return { user: userInfo.split(":")[0], host: hostAndRest.slice(0, end), rest: hostAndRest.slice(end) };
+}
+
+/** The same host as the standard parser reads, when it can read the string at all. A disagreement means do not trust either. */
+function standardHostAgrees(connectionString: string, host: string): boolean {
   try {
-    const url = new URL(connectionString);
-    if (url.searchParams.has("host") || url.pathname.includes("@")) return null;
-    return HOST_SHAPE.test(url.hostname) ? url.hostname : null;
+    return new URL(connectionString).hostname === host;
   } catch {
-    // An unreadable connection string names no host. The caller prints "unknown".
-    return null;
+    // Not readable by the standard parser, as with a password that is not percent encoded. The hand reading stands.
+    return true;
   }
 }
 
 /**
- * The first line of every run: which database this is. The name and the
- * address come from the server. The connection string adds only its host name,
- * and never its user, password, port, path or options.
+ * The host and the Supabase project ref a connection string names, each null
+ * when it cannot be trusted: the string does not parse, it carries a `host`
+ * option (which overrides the host written in it), or a part is not shaped
+ * like a host or a ref.
  */
-export function targetLine(target: { readonly database: string; readonly serverAddress: string | null }, connectionString: string): string {
-  const named = hostNamedIn(connectionString);
-  const host = target.serverAddress ?? named ?? "unknown";
-  const also = target.serverAddress !== null && named !== null && named !== target.serverAddress ? ` (the connection string names ${named})` : "";
-  return `Target: database ${target.database} on host ${host}${also}`;
+export function namedTarget(connectionString: string): NamedTarget {
+  const parts = splitConnectionString(connectionString);
+  if (!parts || !HOST_SHAPE.test(parts.host) || /[?&]host=/.test(parts.rest)) return NOTHING;
+  if (!standardHostAgrees(connectionString, parts.host)) return NOTHING;
+  return { host: parts.host, projectRef: SUPABASE_USER.exec(parts.user)?.[1] ?? null };
+}
+
+/**
+ * The first lines of every run: which database this is. The database name and
+ * the server's own address come from the server. The connection string adds
+ * its host and, for a Supabase pooler user, the project ref. These two are what
+ * the owner compares with the Supabase dashboard. Never the password, port,
+ * path or options.
+ */
+export function targetLines(target: { readonly database: string; readonly serverAddress: string | null }, connectionString: string): string[] {
+  const named = namedTarget(connectionString);
+  const address = target.serverAddress !== null && HOST_SHAPE.test(target.serverAddress)
+    ? `Server address: ${target.serverAddress}. This is the private address the server reports. It is not in the Supabase dashboard, so do not compare it.`
+    : "Server address: not reported.";
+  return [
+    `Target: database ${target.database} on host ${named.host ?? "unknown"}`,
+    named.projectRef ? `Project ref: ${named.projectRef}` : "Project ref: not in the connection string.",
+    address,
+  ];
 }
 
 const many = (count: number, one: string, more: string): string => `${count} ${count === 1 ? one : more}`;
