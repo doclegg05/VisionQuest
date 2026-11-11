@@ -21,10 +21,12 @@ interface FailedReplyActionsProps {
   /** Admin only, when Sage is not set up. */
   setupHref: string | null;
   retryRef?: Ref<HTMLButtonElement>;
+  /** The id of the failed text, so a screen reader hears why on Try again. */
+  describedById?: string;
 }
 
 /** Shown once under a failed or cut-off reply. Replaced when the student retries. */
-export function FailedReplyActions({ onRetry, offerRetry, setupHref, retryRef }: FailedReplyActionsProps) {
+export function FailedReplyActions({ onRetry, offerRetry, setupHref, retryRef, describedById }: FailedReplyActionsProps) {
   if (!offerRetry && !setupHref) return null;
   return (
     <div className="ml-11 mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -33,7 +35,8 @@ export function FailedReplyActions({ onRetry, offerRetry, setupHref, retryRef }:
           ref={retryRef}
           onClick={onRetry}
           type="button"
-          className="inline-flex min-h-11 items-center rounded-xl border border-[var(--chat-panel-border)] px-4 text-sm font-semibold text-[var(--chat-sage-action)] hover:text-[var(--ink-strong)]"
+          aria-describedby={describedById}
+          className="inline-flex min-h-11 items-center rounded-xl border border-[var(--chat-input-border)] px-4 text-sm font-semibold text-[var(--chat-sage-action)] hover:bg-[var(--chat-sage-mark-bg)]"
         >
           Try again
         </button>
@@ -42,7 +45,7 @@ export function FailedReplyActions({ onRetry, offerRetry, setupHref, retryRef }:
         <Link
           href={setupHref}
           prefetch={false}
-          className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--chat-sage-action)] underline underline-offset-4 hover:text-[var(--ink-strong)]"
+          className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-[var(--chat-sage-action)] underline underline-offset-4 hover:bg-[var(--chat-sage-mark-bg)]"
         >
           Open Program Setup
         </Link>

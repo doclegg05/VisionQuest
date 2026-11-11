@@ -11,6 +11,8 @@
       "src/lib/chat/send-outcome.test.ts",
       "src/app/api/chat/send/__tests__/route.test.ts",
       "src/components/chat/ChatWindow.failure.test.tsx",
+      "src/components/chat/failed-turn.test.ts",
+      "src/components/chat/ChatWindow.test.tsx",
       "src/components/chat/ChatInput.test.tsx",
       "src/components/settings/SettingsView.test.tsx",
       "src/app/api/chat/send/__tests__/route.failure.test.ts",
