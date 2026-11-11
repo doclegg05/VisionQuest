@@ -6,7 +6,7 @@
  * src/lib/student-alerts.ts, the one student reader of StudentAlert.
  */
 import type { Prisma } from "@prisma/client";
-import { withAppTransaction } from "@/lib/db";
+import { withAppReadTransaction } from "@/lib/db";
 import { nextStepQueries } from "@/lib/progression/student-next-step";
 import { countStudentVisibleAlerts, countStudentVisibleAlertsOfType } from "@/lib/student-alerts";
 import { activityQuery } from "./readers";
@@ -49,7 +49,7 @@ async function readAlertCounts(studentId: string) {
 /** The live signals the advising poll needs. */
 export async function readLiveSignals(studentId: string): Promise<LiveSignals> {
   const [counts, alerts] = await Promise.all([
-    withAppTransaction((tx) => readCounts(tx, studentId)),
+    withAppReadTransaction((tx) => readCounts(tx, studentId)),
     readAlertCounts(studentId),
   ]);
   return { ...counts, ...alerts };
@@ -71,7 +71,7 @@ async function readPageOnly(tx: Tx, studentId: string) {
 /** The live signals plus the page's own two reads, one transaction for all but alerts. */
 export async function readPageLiveSignals(studentId: string): Promise<PageLiveSignals> {
   const [counts, alerts] = await Promise.all([
-    withAppTransaction(async (tx) => ({ ...(await readCounts(tx, studentId)), ...(await readPageOnly(tx, studentId)) })),
+    withAppReadTransaction(async (tx) => ({ ...(await readCounts(tx, studentId)), ...(await readPageOnly(tx, studentId)) })),
     readAlertCounts(studentId),
   ]);
   return { ...counts, ...alerts };

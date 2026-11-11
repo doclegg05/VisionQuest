@@ -24,7 +24,7 @@
 //     counted once, as Prisma's dataloader sends them,
 //   1 for each nested relation a call loads, when the level above it returned
 //     rows,
-//   withAppTransaction as it runs: 4 around its queries, each query 1;
+//   withAppTransaction or withAppReadTransaction as it runs: 4 around its queries, each query 1;
 //   any other $transaction: 2 around its queries.
 // --unit=statements counts the statements that carry a query (calls after
 // batching, plus nested loads); --unit=calls counts calls only.

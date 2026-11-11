@@ -48,6 +48,7 @@ mock.module("@/lib/db", {
   namedExports: {
     prisma: prismaMock,
     withAppTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
+    withAppReadTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
   },
 });
 

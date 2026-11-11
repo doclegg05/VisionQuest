@@ -105,9 +105,12 @@ const adminUrlMatchesAppUrl =
   Boolean(process.env.ADMIN_DATABASE_URL) &&
   process.env.ADMIN_DATABASE_URL === process.env.DATABASE_URL;
 
+/** Seconds the app pool waits for a free connection (`pool_timeout`). */
+const APP_POOL_TIMEOUT_SECONDS = positiveIntFromEnv(process.env.DB_POOL_TIMEOUT, 10);
+
 function applyPoolDefaults(): void {
   const poolSize = positiveIntFromEnv(process.env.DB_POOL_SIZE, 5);
-  const poolTimeout = positiveIntFromEnv(process.env.DB_POOL_TIMEOUT, 10);
+  const poolTimeout = APP_POOL_TIMEOUT_SECONDS;
 
   const url = process.env.DATABASE_URL ?? "";
   if (url) process.env.DATABASE_URL = withPoolDefaults(url, poolSize, poolTimeout);
@@ -366,14 +369,40 @@ export const prisma = appClient
  */
 export const prismaAdmin: PrismaClient = adminClient;
 
-/** Interactive transactions must set RLS on the SAME connection as their writes.
- * Do not use the per-query extension inside an interactive transaction.
+/**
+ * How long an interactive transaction waits to start: as long as the pool
+ * waits for a connection. Prisma's own default is 2 s, which under a class of
+ * students fails a transaction while the pool would still have served it.
  */
-export async function withAppTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+const TRANSACTION_MAX_WAIT_MS = APP_POOL_TIMEOUT_SECONDS * 1000;
+
+async function runAppTransaction<T>(
+  work: (tx: Prisma.TransactionClient) => Promise<T>,
+  isolationLevel: Prisma.TransactionIsolationLevel,
+): Promise<T> {
   const ctx = getRlsContext() ?? await tryLoadContextFromHeaders();
   if (!ctx) throw new Error("Authenticated transaction requires RLS context");
   return appClient.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('app.current_user_id', ${ctx.userId}, true), set_config('app.current_role', ${ctx.role}, true), set_config('app.current_student_id', ${ctx.studentId}, true)`;
     return work(tx);
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel, maxWait: TRANSACTION_MAX_WAIT_MS });
+}
+
+/** Interactive transactions must set RLS on the SAME connection as their writes.
+ * Do not use the per-query extension inside an interactive transaction.
+ * SERIALIZABLE: for writes (src/lib/dashboard/tasks.ts). Reads use
+ * withAppReadTransaction. src/lib/dashboard/read-isolation.test.ts pins both.
+ */
+export async function withAppTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return runAppTransaction(work, Prisma.TransactionIsolationLevel.Serializable);
+}
+
+/**
+ * A group of reads on one connection with the student's RLS context, at
+ * REPEATABLE READ: one snapshot for the whole group, and no serialization
+ * failures, which a read-only group would otherwise risk and gain nothing from.
+ * Writes skip the chat-context write-through here, as in withAppTransaction.
+ */
+export async function withAppReadTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return runAppTransaction(work, Prisma.TransactionIsolationLevel.RepeatableRead);
 }

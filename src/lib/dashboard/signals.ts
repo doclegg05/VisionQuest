@@ -2,7 +2,7 @@
  * The student dashboard's slow-moving reads: the facts readiness, the next
  * step and the overview are built from, minus the live ones in ./live.ts.
  *
- * Each group runs inside one `withAppTransaction`: RLS is set once and the
+ * Each group runs inside one `withAppReadTransaction`: RLS is set once and the
  * reads share one connection, so a group of n reads costs 4 + n round trips
  * where n separate app-client calls cost 4n (see src/lib/db.ts). The reads run
  * one after another, as readTasks does: a transaction is one connection, so
@@ -13,7 +13,7 @@
  * exactly what the per-student functions other surfaces call ask.
  */
 import type { Certification, CertRequirement, Prisma } from "@prisma/client";
-import { withAppTransaction } from "@/lib/db";
+import { withAppReadTransaction } from "@/lib/db";
 import { readinessQueries } from "@/lib/progression/fetch-readiness-data";
 import { nextStepQueries } from "@/lib/progression/student-next-step";
 import { overviewQueries } from "./readers";
@@ -69,7 +69,7 @@ export function getStudentShell(session: CacheSession): Promise<StudentShell> {
   return cachedWhen(
     studentCacheKey(session, "shell"),
     SHELL_TTL_SECONDS,
-    () => withAppTransaction((tx) => readShell(tx, session.id)),
+    () => withAppReadTransaction((tx) => readShell(tx, session.id)),
     (shell) => shell.progressionState !== null,
   );
 }
@@ -117,7 +117,7 @@ async function readOverviewSignals(tx: Tx, studentId: string) {
 
 /** Every slow signal, read in one transaction. Uncached. */
 export function readSlowSignals(studentId: string): Promise<SlowSignals> {
-  return withAppTransaction(async (tx) => ({
+  return withAppReadTransaction(async (tx) => ({
     ...(await readReadinessSignals(tx, studentId)),
     ...(await readNextStepSignals(tx, studentId)),
     ...(await readOverviewSignals(tx, studentId)),
