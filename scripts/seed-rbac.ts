@@ -243,7 +243,7 @@ const PERMISSION_SEEDS: readonly PermSeed[] = [
   ["admin.ai_config_delete", "admin", "Delete AI Config Override", "Remove custom AI config and revert to defaults", ["admin"]],
   ["admin.ai_config_test", "admin", "Test AI Config", "Send a test prompt to verify AI configuration works", ["admin"]],
   ["admin.settings_api_key_get", "admin", "Get API Key Status", "Check whether a personal API key is configured", ["student", "teacher", "admin"]],
-  ["admin.settings_api_key_set", "admin", "Set API Key", "Store a personal Gemini API key for enhanced AI access", ["student", "teacher", "admin"]],
+  ["admin.settings_api_key_set", "admin", "Set API Key", "Store a personal Gemini API key for enhanced AI access", ["teacher", "admin"]],
   ["admin.settings_api_key_delete", "admin", "Delete API Key", "Remove a stored personal API key", ["student", "teacher", "admin"]],
   ["admin.settings_credly_get", "admin", "Get Credly Settings", "View Credly integration configuration", ["student"]],
   ["admin.settings_credly_set", "admin", "Set Credly Username", "Configure Credly username for badge syncing", ["student"]],

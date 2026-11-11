@@ -86,3 +86,12 @@ describe("DELETE /api/settings/api-key", () => {
     assert.deepEqual(updates[0], { where: { id: session.id }, data: { geminiApiKey: null } });
   });
 });
+
+describe("registry entry for setting a personal key (E1c 6)", () => {
+  it("does not list students, whom the route refuses", async () => {
+    const { TOOLS } = await import("@/lib/registry/tools");
+    const tool = TOOLS.find((entry) => entry.id === "admin.settings_api_key_set");
+    assert.ok(tool, "the tool is registered");
+    assert.deepEqual(tool!.requiredRoles, ["teacher", "admin"]);
+  });
+});

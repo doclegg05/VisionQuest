@@ -2010,7 +2010,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     name: "Set API Key",
     description: "Store a personal Gemini API key for enhanced AI access",
     endpoint: { method: "POST", path: "/api/settings/api-key" },
-    requiredRoles: ["student", "teacher", "admin"],
+    requiredRoles: ["teacher", "admin"],
     auditLevel: "full",
     enabled: true,
     tags: ["admin", "settings", "api-key", "security"],
