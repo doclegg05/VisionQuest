@@ -55,17 +55,19 @@ export function UploadError({ message }: { message: string }) {
 /**
  * Ends Sage's answer. Neutral colors: stopping is the student's choice, not
  * an error. The visible word is the button's name. Until the chat arms it
- * (stopArmed in wait-and-stop.ts) it is aria-disabled and a press does
- * nothing: a second tap on Send lands here, and a Stop before the stream's
- * first event would lose the 988 help.
+ * (stopArmed in wait-and-stop.ts) it is aria-disabled and drawn dimmed with
+ * no hover change, since a phone shows no wait cursor. A press still goes to
+ * the chat, whose gate (send-abort.ts) ignores a second tap on Send and
+ * holds a later press until the stream's first event, so the 988 help is
+ * not lost.
  */
 export function StopButton({ onStop, armed = false }: { onStop: () => void; armed?: boolean }) {
   return (
     <button
       type="button"
-      onClick={armed ? onStop : () => undefined}
+      onClick={onStop}
       aria-disabled={armed ? undefined : true}
-      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)] aria-disabled:cursor-wait"
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[var(--chat-panel-border)] bg-[var(--chat-panel-bg)] px-4 text-sm font-semibold text-[var(--ink-strong)] transition-colors hover:bg-[var(--surface-interactive)] aria-disabled:cursor-wait aria-disabled:opacity-60 aria-disabled:hover:bg-[var(--chat-panel-bg)]"
     >
       <Stop size={16} weight="fill" aria-hidden="true" />
       <span>Stop</span>

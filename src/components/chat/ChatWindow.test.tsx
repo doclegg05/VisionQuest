@@ -143,14 +143,15 @@ describe("ChatWindow wires the wait and Stop pieces (E2)", () => {
     assert.match(source, /<TypingIndicator slow=\{slowReply\} \/>/);
     assert.match(source, /signal: controller\.signal/);
     assert.match(source, /showsCannedOpener\(\{ role, isFirstMessage, localProvider \}\)/);
-    assert.match(source, /onCrisisBlock:/);
+    assert.match(source, /readChatStream\(res, turn\.handlers\)/);
   });
 
   it("arms Stop from the first event's ids and marks the log busy only while words stream (E2b 1 to 3)", async () => {
     const { readFileSync } = await import("node:fs");
     const source = readFileSync("src/components/chat/ChatWindow.tsx", "utf8");
-    assert.match(source, /stopArmed=\{sendAbort\.isArmed\}/);
-    assert.match(source, /sendAbort\.noteIds\(\)/);
+    assert.match(source, /stopArmed=\{stopIsArmed\}/);
+    // The recorder calls it from onIds, after the ids are noted (turn-recorder.test.ts).
+    assert.match(source, /noteIds: sendAbort\.noteIds/);
     assert.match(source, /aria-busy=\{logBusy\(isLoading, streamingContent\)\}/);
   });
 
