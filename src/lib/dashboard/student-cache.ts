@@ -31,7 +31,7 @@
  * - A deploy or restart empties the cache, so the first request after one
  *   reads everything fresh.
  */
-import { cached } from "@/lib/cache";
+import { cached, invalidate } from "@/lib/cache";
 
 /** The session fields the cache rules read. */
 export interface CacheSession {
@@ -54,7 +54,24 @@ export function ownStudentId(session: CacheSession): string {
 
 /** A per-student key. `invalidateChatContext(studentId)` clears it. */
 export function studentCacheKey(session: CacheSession, layer: string): string {
-  return `chat:snapshot:${ownStudentId(session)}:dashboard:${layer}`;
+  return keyForStudent(ownStudentId(session), layer);
+}
+
+function keyForStudent(studentId: string, layer: string): string {
+  return `chat:snapshot:${studentId}:dashboard:${layer}`;
+}
+
+/** The layer of a student's kept slow signals (./signals.ts). */
+export const SLOW_SIGNALS_LAYER = "slow";
+
+/**
+ * Drops one student's kept slow signals and nothing else: not the shell, the
+ * layout gates or Sage's chat layers. For writes made on nearly every chat
+ * turn (a message, a conversation stage), where clearing all of the
+ * student's chat context would undo Sage's cache.
+ */
+export function invalidateKeptSlowSignals(studentId: string): void {
+  invalidate(keyForStudent(studentId, SLOW_SIGNALS_LAYER));
 }
 
 /**

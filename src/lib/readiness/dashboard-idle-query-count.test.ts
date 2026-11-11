@@ -219,7 +219,7 @@ describe("M2 report: the idle window with one requirement tick", () => {
     // (a poll right after the tick may still read a kept value).
     counter.observe(({ query, prismaModel, args, result }) => {
       if (query.client !== "app" || !isChatContextWrite(prismaModel, query.operation)) return;
-      void applyChatContextWriteThrough(prismaModel, query.operation, args, result, owners);
+      void applyChatContextWriteThrough(prismaModel, query.operation, args, result, { certificationOwners: owners });
     });
     counter.useFixtures({ ...DASHBOARD_FIXTURES, "certRequirement.update": { id: "req-1", certificationId: "cert-1", completed: true } });
     invalidatePrefix(""); // start this window as cold as the first
