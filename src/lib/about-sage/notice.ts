@@ -142,6 +142,15 @@ export const SAGE_NOTICE_FULL_LINK = "Read the full notice";
 export const SAGE_NOTICE_LINK_LABEL = "About Sage";
 
 /**
+ * The line under the chat message box (readiness task E6), for every role.
+ * It agrees with "Sage can make mistakes." in the notice and links to
+ * SAGE_NOTICE_PATH. It is not part of the acknowledged notice, so it does
+ * not change SAGE_NOTICE_VERSION.
+ */
+export const SAGE_CHAT_AI_LINE = "Sage is an AI and can be wrong.";
+export const SAGE_CHAT_NOTICE_LINK = "What Sage does with your words";
+
+/**
  * Whether the student layout must send this student to the notice. A demo
  * account is a shared, made-up student with its own privacy notice
  * (DEMO_PRIVACY_NOTICE), so it is never asked, the same way

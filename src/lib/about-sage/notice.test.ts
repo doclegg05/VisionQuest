@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import { assessReadability } from "@/lib/sage/readability";
 import { readFileSync } from "node:fs";
 import {
+  SAGE_CHAT_AI_LINE,
+  SAGE_CHAT_NOTICE_LINK,
   SAGE_NOTICE_ACK_BUTTON,
   SAGE_NOTICE_ACK_FAILED,
   SAGE_NOTICE_ACK_HEADING,
@@ -33,6 +35,8 @@ const allSentences = [
   SAGE_NOTICE_ACK_STALE,
   SAGE_NOTICE_ACK_SIGNED_OUT,
   SAGE_NOTICE_SIGN_OUT_LINE,
+  SAGE_CHAT_AI_LINE,
+  SAGE_CHAT_NOTICE_LINK,
 ];
 
 const fullItems = SAGE_NOTICE_SECTIONS.flatMap((section) => section.sentences);

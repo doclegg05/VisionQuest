@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useImperativeHandle, useRef, useState, t
 import { motion, useReducedMotion } from "framer-motion";
 import { Command, PaperPlaneTilt, Plus, Stop } from "@phosphor-icons/react";
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { AiCanBeWrongLine } from "./AiCanBeWrongLine";
 import { CommandPalette } from "./CommandPalette";
 import { useDemoAccount } from "@/components/demo/DemoAccountContext";
 import { DemoPrivacyNotice } from "@/components/demo/DemoPrivacyNotice";
@@ -444,6 +445,7 @@ export default function ChatInput({ onSend, disabled, compact, role = "student",
             )}
           </div>
         </div>
+        <AiCanBeWrongLine />
         {demoAccount === "student" && (
           <div className="mt-2 px-1">
             <DemoPrivacyNotice />
