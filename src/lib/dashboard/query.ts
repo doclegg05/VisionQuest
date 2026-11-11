@@ -83,15 +83,16 @@ export function refetchPlan(fetchStatus: FetchStatus): RefetchStep {
 export const retryOptions = { cancelRefetch: false } as const;
 
 /**
- * Refetch every active query under `queryKey` without overlapping a running
- * read: wait for it, then read once, so a change the trigger announced (a new
- * notification, a saved task) is still read after it.
+ * Refresh every query under `queryKey` without overlapping a running read:
+ * wait for the reads already running, then mark every query stale once, so a
+ * change the trigger announced (a new notification, a saved task) is still
+ * read after it. Marking stale covers queries that are disabled right now (the
+ * dashboard disables its regions while a task save is pending) and cached pages
+ * no one is watching: each reads again when it is next enabled or shown.
  */
 export async function refetchWithoutOverlap(client: QueryClient, queryKey: QueryKey): Promise<void> {
-  const queries = client.getQueryCache().findAll({ queryKey, type: "active" });
-  await Promise.all(queries.map(async (query) => {
-    const filters = { queryKey: query.queryKey, exact: true };
-    if (refetchPlan(query.state.fetchStatus) === "wait-then-read") await client.refetchQueries(filters, retryOptions);
-    await client.invalidateQueries(filters, retryOptions);
-  }));
+  const running = client.getQueryCache().findAll({ queryKey })
+    .filter((query) => refetchPlan(query.state.fetchStatus) === "wait-then-read");
+  await Promise.all(running.map((query) => client.refetchQueries({ queryKey: query.queryKey, exact: true }, retryOptions)));
+  await client.invalidateQueries({ queryKey }, retryOptions);
 }

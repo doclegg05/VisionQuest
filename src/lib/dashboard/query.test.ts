@@ -96,3 +96,21 @@ it("a refetch during a running read never overlaps it and still reads once after
   assert.equal(started, 2, "one fresh read after the trigger");
   assert.equal(client.getQueryData(key), 2);
 });
+
+it("a refetch while a region is disabled (a task save pending) still re-reads it once it is enabled again", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  let started = 0;
+  const queryFn = async () => { started += 1; return started; };
+  const key = [...dashboardKey("s1"), "overview"];
+  // Seeded and fresh, as the dashboard is right after an optimistic task save.
+  const observer = new QueryObserver(client, { queryKey: key, queryFn, enabled: false, initialData: 0, initialDataUpdatedAt: Date.now(), staleTime: 30_000 });
+  const unsubscribe = observer.subscribe(() => {});
+  await refetchWithoutOverlap(client, dashboardKey("s1"));
+  // isStale() counts only enabled observers in query-core v5, so read the flag the re-enable acts on.
+  assert.equal(client.getQueryCache().find({ queryKey: key })?.state.isInvalidated, true, "the save marks the region invalidated");
+  observer.setOptions({ queryKey: key, queryFn, enabled: true, staleTime: 30_000 });
+  await new Promise((r) => setTimeout(r, 10));
+  unsubscribe();
+  assert.equal(started, 1, "re-enabling reads the region after the save");
+  client.clear();
+});
