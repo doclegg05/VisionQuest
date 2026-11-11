@@ -229,13 +229,24 @@ describe("POST /api/chat/send — a throw before the stream opens (E1b)", () => 
 
   type FailureBody = { error: string; failure?: string; crisisBlock?: string; userMessageId?: string };
 
+  /**
+   * E7 moved context assembly (the bundle, RAG, memory, history) after the
+   * stream's first event, so a throw there now arrives as the stream's error
+   * event, with the same sentence, code and 988 block it had as a 500 body.
+   */
+  async function streamFailure(res: Response): Promise<FailureBody> {
+    assert.equal(res.status, 200);
+    const body = await readSseBody(res);
+    const line = body.split("\n").find((l) => l.startsWith("data: ") && l.includes('"failure"'));
+    assert.ok(line, body);
+    return JSON.parse(line!.slice("data: ".length)) as FailureBody;
+  }
+
   it("a throw after the message was saved answers with the fixed unknown sentence and the saved id", async () => {
     mockAssembleStudentContextBundle.mock.mockImplementation(async () => {
       throw new Error("prisma: connection to the database was lost");
     });
-    const res = await post("How do I finish my OSHA 10 certification?");
-    assert.equal(res.status, 500);
-    const body = (await res.json()) as FailureBody;
+    const body = await streamFailure(await post("How do I finish my OSHA 10 certification?"));
     assert.equal(body.failure, "unknown");
     assert.equal(
       body.error,
@@ -261,7 +272,7 @@ describe("POST /api/chat/send — a throw before the stream opens (E1b)", () => 
     mockAssembleStudentContextBundle.mock.mockImplementation(async () => {
       throw new Error("boom");
     });
-    const body = (await (await post(CRISIS_MESSAGE)).json()) as FailureBody;
+    const body = await streamFailure(await post(CRISIS_MESSAGE));
     assert.match(body.error, /call or text 988/);
     assert.ok(body.crisisBlock && body.error.endsWith(body.crisisBlock));
   });
@@ -270,9 +281,9 @@ describe("POST /api/chat/send — a throw before the stream opens (E1b)", () => 
     mockAssembleStudentContextBundle.mock.mockImplementation(async () => {
       throw new Error("prisma: secret detail");
     });
-    await post("How do I finish my OSHA 10 certification?");
+    await readSseBody(await post("How do I finish my OSHA 10 certification?"));
     const logged = JSON.stringify(mockLogger.error.mock.calls.map((call: { arguments: unknown[] }) => call.arguments));
-    assert.match(logged, /before the stream opened/);
+    assert.match(logged, /assembly failed before the model call/);
     assert.doesNotMatch(logged, /secret detail/);
     assert.doesNotMatch(logged, new RegExp(session.id));
   });
@@ -446,7 +457,11 @@ describe("POST /api/chat/send — round 3 failure fixes (E1c)", () => {
       mockAssembleStudentContextBundle.mock.mockImplementation(async () => {
         throw new Error("boom");
       });
-      const body = (await (await post({})).json()) as { conversationId?: string; userMessageId?: string };
+      // A stream error event since E7 (context assembly runs inside the stream).
+      const sse = await readSseBody(await post({}));
+      const line = sse.split("\n").find((l) => l.startsWith("data: ") && l.includes('"failure"'));
+      assert.ok(line, sse);
+      const body = JSON.parse(line!.slice(6)) as { conversationId?: string; userMessageId?: string };
       assert.equal(body.conversationId, CONVERSATION_ID);
       assert.equal(body.userMessageId, SAVED_ID);
     });

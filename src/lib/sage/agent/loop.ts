@@ -31,12 +31,14 @@ interface AgentTurnOptions {
    * offered (toolsForTurn).
    */
   hasAttachment: boolean;
+  /** Aborts the model call on a Stop or a dropped connection (E7). */
+  signal?: AbortSignal;
 }
 
 export async function* runAgentTurn(
   options: AgentTurnOptions,
 ): AsyncGenerator<AgentEvent> {
-  const { provider, systemPrompt, systemPrefixLength, messages, session, conversationId, targetStudentId, toolNames, maxHops, hasAttachment } =
+  const { provider, systemPrompt, systemPrefixLength, messages, session, conversationId, targetStudentId, toolNames, maxHops, hasAttachment, signal } =
     options;
 
   const role = session.role || "student";
@@ -44,7 +46,7 @@ export async function* runAgentTurn(
 
   // No tools available or provider can't function-call → fall back to plain stream.
   if (enabledTools.length === 0 || !provider.streamWithTools) {
-    yield* runFallbackStream(provider, systemPrompt, messages, systemPrefixLength);
+    yield* runFallbackStream(provider, systemPrompt, messages, systemPrefixLength, signal);
     return;
   }
 
@@ -76,7 +78,7 @@ export async function* runAgentTurn(
         records.set(callId, record);
         return toHandlerResult(record);
       },
-      { maxHops: maxHops ?? 8, systemPrefixLength },
+      { maxHops: maxHops ?? 8, systemPrefixLength, signal },
     );
 
     for await (const event of stream) {
@@ -194,9 +196,10 @@ async function* runFallbackStream(
   systemPrompt: string,
   messages: ChatMessage[],
   systemPrefixLength?: number,
+  signal?: AbortSignal,
 ): AsyncGenerator<AgentEvent> {
   const finalChunks: string[] = [];
-  for await (const chunk of provider.streamResponse(systemPrompt, messages, undefined, { systemPrefixLength })) {
+  for await (const chunk of provider.streamResponse(systemPrompt, messages, undefined, { systemPrefixLength, signal })) {
     finalChunks.push(chunk);
     yield { type: "text", text: chunk };
   }

@@ -139,6 +139,8 @@ describe("POST /api/chat/send — rate limiting", () => {
         body: { message: "Hello, can you help me?" },
       });
       const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+      // Drained so the turn (now run inside the stream, E7) ends in this test.
+      await readSseBody(res);
       assert.notEqual(res.status, 429);
       assert.equal(mockRateLimit.mock.callCount(), 0);
       assert.equal(mockRateLimitDaily.mock.callCount(), 0);
@@ -416,7 +418,7 @@ describe("POST /api/chat/send — SSE happy path", () => {
       body: { message: "Just checking in" },
     });
 
-    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(await route.POST(req as never, { params: Promise.resolve({}) } as never));
     assert.equal(toolCapturedBy_withRegistry, "sage.chat");
   });
 
@@ -505,7 +507,7 @@ describe("POST /api/chat/send — Sage self-metric wiring", () => {
       body: { message: "How am I doing on my goals?" },
     });
 
-    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(await route.POST(req as never, { params: Promise.resolve({}) } as never));
 
     // Bundle is the canonical feed: assembled with viewer "sage" + the
     // prompt-context composition flag + the active conversation id.
@@ -536,7 +538,7 @@ describe("POST /api/chat/send — Sage self-metric wiring", () => {
       method: "POST",
       body: { message: "How am I doing on my goals?" },
     });
-    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(await route.POST(req as never, { params: Promise.resolve({}) } as never));
 
     const promptCtx = mockBuildSystemPrompt.mock.calls[0].arguments[1];
     assert.equal(promptCtx.selfMetricsLine, "");
@@ -550,7 +552,7 @@ describe("POST /api/chat/send — Sage self-metric wiring", () => {
       method: "POST",
       body: { message: "How am I doing on my goals?" },
     });
-    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(await route.POST(req as never, { params: Promise.resolve({}) } as never));
 
     // The gated situational call fires for a non-discovery stage at non-compact tier...
     assert.equal(mockGetSituationalSnapshot.mock.callCount(), 1);
@@ -1747,7 +1749,7 @@ describe("POST /api/chat/send — de-identification round trip (AC3)", () => {
       method: "POST",
       body: { message: "I'm Test Student, mail me at test.student@example.org" },
     });
-    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(await route.POST(req as never, { params: Promise.resolve({}) } as never));
     assert.equal(seen.length, 1);
     assert.equal(seen[0], "Coaching [STUDENT_NAME].");
     assert.doesNotMatch(seen[0], /Test Student/);
@@ -1759,7 +1761,7 @@ describe("POST /api/chat/send — de-identification round trip (AC3)", () => {
       method: "POST",
       body: { message: "hi, it's Test Student" },
     });
-    await route.POST(req as never, { params: Promise.resolve({}) } as never);
+    await readSseBody(await route.POST(req as never, { params: Promise.resolve({}) } as never));
     const request = mockResolveAiProvider.mock.calls[0].arguments[0] as {
       sessionRole?: string;
       sessionDisplayName?: string;
