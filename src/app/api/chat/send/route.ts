@@ -41,7 +41,7 @@ import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
 import {
   classifyProviderInitFailure,
   classifyStreamFailure,
-  cutOffReply,
+  savedCutOffReply,
   withFailureCapture,
   type FailureCapture,
 } from "@/lib/chat/sage-failure";
@@ -49,12 +49,8 @@ import { scanStudentMessageForCrisis } from "@/lib/chat/crisis-scan";
 import { formatAttachmentContext } from "@/lib/chat/attachment-context";
 import { loadOpenOrientationItems } from "@/lib/chat/open-orientation-items";
 import { detectCrisisSignal } from "@/lib/sage/crisis-detection";
-import {
-  assembleStudentContextBundle,
-  selfMetricLineFromBundle,
-  type AlertSummary,
-} from "@/lib/sage/context-bundle";
-import { STUDENT_VISIBLE_ALERT_TYPES } from "@/lib/student-alerts";
+import { assembleStudentContextBundle, selfMetricLineFromBundle } from "@/lib/sage/context-bundle";
+import { studentVisibleAlerts } from "@/lib/chat/student-visible-alerts";
 import { getSituationalSnapshot } from "@/lib/sage/situational-snapshot";
 import { renderRecentActivity } from "@/lib/sage/recent-activity";
 import { formatChatSseComment, formatChatSseEvent } from "@/lib/chat/sse";
@@ -132,21 +128,6 @@ function getDirectSmallTalkAnswer(message: string): string | null {
   return null;
 }
 
-const STUDENT_VISIBLE_ALERT_TYPE_SET: ReadonlySet<string> = new Set(STUDENT_VISIBLE_ALERT_TYPES);
-
-/**
- * Alert descriptors a student may read. bundle.alerts is built from the
- * staff-facing advising descriptors (inactivity stages say "consider
- * archiving", certification stalls name the instructor's next step), and
- * without this filter those lines reached the student's own Sage prompt. Only
- * the types whose copy is written for the student pass (the same set the
- * Advising page shows). With today's bundle inputs — no tasks or appointments
- * are passed to the descriptor builder — that is no alerts at all.
- */
-function studentVisibleAlerts(alerts: readonly AlertSummary[] | undefined): AlertSummary[] {
-  return (alerts ?? []).filter((alert) => STUDENT_VISIBLE_ALERT_TYPE_SET.has(alert.type));
-}
-
 class ChatSseClientClosedError extends Error {
   constructor() {
     super("Client disconnected before Sage completed streaming.");
@@ -177,8 +158,8 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // limiter below. The exemption covers teacher, admin, and coordinator; a
   // `cdc` role exists (src/lib/role-home.ts) and would be scanned as a
   // student if it were ever granted sage.chat (it is not: scripts/seed-rbac.ts).
-  // A Try again of a saved message skips it: the first send already scanned.
-  if (!isStaffChat && !retried) {
+  // A Try again scans too: the first send's alert may have failed (it dedupes).
+  if (!isStaffChat) {
     await scanStudentMessageForCrisis({
       studentId: session.id,
       userMessage,
@@ -392,7 +373,7 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
     // that the student's message was kept.
     const failure = classifyProviderInitFailure(err);
     const audience = isStaffChat ? "staff" : "student";
-    return failureResponse({ failure, audience, crisisBlock, userMessageId: null }, 503);
+    return failureResponse({ failure, audience, crisisBlock, userMessageId: null, conversationId: null, isAdmin }, 503);
   }
   const promptTier = getPromptTier(provider);
   const providerClass = getProviderClass(provider.name);
@@ -531,6 +512,7 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
 
   // Resolve form commitment against the prior assistant turn BEFORE saving
   // the new user message into history (conversation.messages is already loaded).
+  // On a Try again after a saved partial, that turn is the partial itself.
   const priorMessages = conversation.messages ?? [];
   const lastAssistantMessage = [...priorMessages]
     .reverse()
@@ -838,7 +820,9 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
   // This was loaded in parallel with RAG/form/memory above (conversationContextPromise).
   // The user message was saved above, before this window was loaded, so the
   // window normally already ends with it. Append it only when it does not
-  // (e.g. another send landed in between), so the model reads it once.
+  // (e.g. another send landed in between), so the model reads it once. A Try
+  // again after a saved partial reads question, partial, question (pinned in
+  // route.failure.test.ts).
   const conversationContext = await conversationContextPromise;
   const lastLoaded = conversationContext.messages.at(-1);
   const windowEndsWithUserMessage =
@@ -1286,7 +1270,7 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
               conversation.id,
               session.id,
               "assistant",
-              cutOffReply(capForPersist(fullResponse), failure, audience) + streamCrisisBlock,
+              savedCutOffReply(capForPersist(fullResponse), failure, audience) + streamCrisisBlock,
             );
           } catch (persistError) {
             // Name and Prisma code only: a Prisma validation error quotes the
@@ -1324,7 +1308,9 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
         if (!clientClosed) {
           // The student's message was saved before the stream opened.
           const userMessageId = userTurn.savedId();
-          const errorEvent = failureBody({ failure, audience, crisisBlock: streamCrisisBlock, userMessageId });
+          const errorEvent = failureBody({
+            failure, audience, crisisBlock: streamCrisisBlock, userMessageId, conversationId: conversation.id, isAdmin,
+          });
           try {
             sendEvent(errorEvent, "error");
           } catch {

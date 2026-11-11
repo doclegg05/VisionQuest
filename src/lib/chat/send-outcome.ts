@@ -14,6 +14,7 @@
 
 import {
   CUT_OFF_NOTE,
+  RETRIED_CUT_OFF_NOTE,
   cutOffReply,
   offersRetry,
   parseSageFailureCode,
@@ -50,6 +51,8 @@ interface SageSendErrorDetails {
   crisisBlock?: string | null;
   /** The id of the student's saved message, when the server saved it. */
   userMessageId?: string | null;
+  /** The conversation that message was saved in. */
+  conversationId?: string | null;
 }
 
 /**
@@ -61,6 +64,7 @@ export class SageSendError extends Error {
   readonly failure: SageFailureCode | null;
   readonly crisisBlock: string | null;
   readonly userMessageId: string | null;
+  readonly conversationId: string | null;
 
   constructor(message: string, failure: SageFailureCode | null, details: SageSendErrorDetails = {}) {
     super(message);
@@ -68,6 +72,7 @@ export class SageSendError extends Error {
     this.failure = failure;
     this.crisisBlock = details.crisisBlock || null;
     this.userMessageId = details.userMessageId || null;
+    this.conversationId = details.conversationId || null;
   }
 }
 
@@ -77,20 +82,26 @@ function stringField(data: unknown, key: string): string | null {
   return typeof value === "string" && value ? value : null;
 }
 
+/** A request error: the registry middleware writes its text for the user. */
+function isRequestError(status: number): boolean {
+  return status >= 400 && status < 500;
+}
+
 /**
  * Reads a refused send's JSON body. The server's own text is shown only when
  * the server chose it for the student: a body with a `failure` code, or a
- * rate limit (429). Anything else, such as a framework's "Internal server
- * error", becomes a plain Error, which resolveSendError turns into the fixed
- * sentence.
+ * request error (4xx, rate limits included), which no Try again can fix.
+ * Anything else, such as a framework's "Internal server error", becomes a
+ * plain Error, which resolveSendError turns into the fixed sentence.
  */
 export function parseSendErrorBody(status: number, data: unknown): Error {
   const text = stringField(data, "error");
   const failure = parseSageFailureCode(data);
-  if (!text || (failure === null && status !== 429)) return new Error(`Send refused (${status})`);
+  if (!text || (failure === null && !isRequestError(status))) return new Error(`Send refused (${status})`);
   return new SageSendError(text, failure, {
     crisisBlock: stringField(data, "crisisBlock"),
     userMessageId: stringField(data, "userMessageId"),
+    conversationId: stringField(data, "conversationId"),
   });
 }
 
@@ -109,10 +120,17 @@ export interface SendErrorOutcome {
   /** Null for a server sentence with no cause code, such as a rate limit. */
   failure: SageFailureCode | null;
   offerRetry: boolean;
-  /** Keep the bubble on Try again: it carries a partial reply or the 988 block. */
+  /** Keep the bubble on Try again: it carries a partial reply. */
   keepOnRetry: boolean;
   /** The saved student message a Try again points the server at. */
   retryOf: string | null;
+  /** The conversation the server saved the message in, so Try again uses it. */
+  conversationId: string | null;
+  /**
+   * The 988 block as its own bubble, when there is no partial reply to carry
+   * it, so it is not drawn as part of the error. It stays on Try again.
+   */
+  helpBlock: string | null;
   /** Draw the bubble as an error (no partial reply in it). */
   alert: boolean;
   /** Admin only, when Sage is not set up: a link to Program Setup. */
@@ -129,20 +147,30 @@ function describeError(err: unknown, context: SendErrorContext) {
   return new SageSendError(text, "unknown");
 }
 
+/** The error sentence and the 988 block apart, when the server sent both. */
+function splitHelpBlock(message: string, crisisBlock: string | null): { sentence: string; helpBlock: string | null } {
+  if (!crisisBlock || !message.endsWith(crisisBlock)) return { sentence: message, helpBlock: null };
+  // The block opens with the line break that joined it to the sentence.
+  return { sentence: message.slice(0, -crisisBlock.length), helpBlock: crisisBlock.replace(/^\n+/, "") };
+}
+
 export function resolveSendError(err: unknown, context: SendErrorContext): SendErrorOutcome {
   const described = describeError(err, context);
   const failure = described.failure;
   const offerRetry = failure !== null && offersRetry(failure);
   const partial = context.priorContent;
+  const split = splitHelpBlock(described.message, described.crisisBlock);
   const displayContent = partial
     ? cutOffReply(partial, failure ?? "unknown", context.audience) + (described.crisisBlock ?? "")
-    : described.message;
+    : split.sentence;
   return {
     displayContent,
     failure,
     offerRetry,
-    keepOnRetry: Boolean(partial) || described.crisisBlock !== null,
+    keepOnRetry: Boolean(partial),
     retryOf: described.userMessageId ?? context.savedUserMessageId,
+    conversationId: described.conversationId,
+    helpBlock: partial ? null : split.helpBlock,
     alert: !partial,
     setupLink: context.audience === "staff" && context.isAdmin && failure === "not_set_up",
   };
@@ -155,10 +183,15 @@ interface RetryableMessage {
   failure?: { keepOnRetry: boolean; retryOf: string | null };
 }
 
+/** A kept cut-off reply after Try again: its button is gone, so the note changes. */
+function retireCutOffNote<M extends RetryableMessage>(message: M): M {
+  return { ...message, content: message.content.replace(CUT_OFF_NOTE, RETRIED_CUT_OFF_NOTE) };
+}
+
 /**
  * The transcript to resend from. The student's message stays: the retry
  * answers it and does not add it again. The failed turn goes, unless it
- * carries a partial reply or the 988 block, which must stay in view.
+ * carries a partial reply, which stays in view with its note rewritten.
  */
 export function prepareRetry<M extends RetryableMessage>(
   messages: readonly M[],
@@ -171,7 +204,9 @@ export function prepareRetry<M extends RetryableMessage>(
   const failed = messages[failedIndex];
   const keep = failed.failure?.keepOnRetry ?? false;
   return {
-    messages: keep ? [...messages] : messages.filter((_, index) => index !== failedIndex),
+    messages: keep
+      ? messages.map((message, index) => (index === failedIndex ? retireCutOffNote(message) : message))
+      : messages.filter((_, index) => index !== failedIndex),
     text: messages[userIndex].content,
     retryOf: failed.failure?.retryOf ?? null,
   };

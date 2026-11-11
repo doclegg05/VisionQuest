@@ -6,7 +6,9 @@ import {
   classifyProviderInitFailure,
   classifyStreamFailure,
   cutOffReply,
+  isCutOffReply,
   offersRetry,
+  savedCutOffReply,
   parseSageFailureCode,
   sageFailureMessage,
   type SageFailureCode,
@@ -182,5 +184,58 @@ describe("parseSageFailureCode", () => {
     for (const value of [null, undefined, "off", 3, {}, { failure: "offline" }, { failure: 1 }]) {
       assert.equal(parseSageFailureCode(value), null);
     }
+  });
+});
+
+describe("savedCutOffReply (E1c 7b)", () => {
+  it("saves a cut-off note with no button wording, since a reload shows no Try again", () => {
+    for (const code of ["busy", "slow", "unknown"] as const) {
+      assert.equal(savedCutOffReply("First part", code, "student"), "First part\n\n(Sage got cut off here.)");
+    }
+  });
+
+  it("saves the same text as the screen when no retry can help", () => {
+    assert.equal(savedCutOffReply("First part", "off", "student"), cutOffReply("First part", "off", "student"));
+  });
+
+  it("never says Try again or uses a dash", () => {
+    for (const code of SAGE_FAILURE_CODES) {
+      const text = savedCutOffReply("x", code, "student");
+      assert.doesNotMatch(text, /Try again/, text);
+      assert.doesNotMatch(text, DASHES, text);
+    }
+  });
+});
+
+describe("isCutOffReply (E1c 4)", () => {
+  it("knows a saved or shown cut-off reply, with or without the 988 block after it", () => {
+    for (const code of SAGE_FAILURE_CODES) {
+      assert.equal(isCutOffReply(savedCutOffReply("x", code, "student")), true, code);
+      assert.equal(isCutOffReply(cutOffReply("x", code, "student") + "\n\nCall or text 988."), true, code);
+    }
+  });
+
+  it("treats a full answer as an answer", () => {
+    assert.equal(isCutOffReply("Here is your full answer."), false);
+  });
+});
+
+describe("admin wording (E1c 12)", () => {
+  it("tells an admin to check Program Setup, which their link opens", () => {
+    assert.equal(
+      sageFailureMessage("not_set_up", { audience: "staff", messageSaved: false, canRetry: false, isAdmin: true }),
+      "Sage is not set up yet. Check the Sage connection settings in Program Setup.",
+    );
+  });
+
+  it("keeps the other staff and student sentences as they were", () => {
+    assert.equal(
+      sageFailureMessage("not_set_up", { audience: "staff", messageSaved: false, canRetry: false, isAdmin: false }),
+      "Sage is not set up yet. An admin needs to check the Sage connection settings.",
+    );
+    assert.equal(
+      sageFailureMessage("busy", { audience: "staff", messageSaved: false, canRetry: true, isAdmin: true }),
+      "Sage is helping other people right now. Wait a little, then tap Try again.",
+    );
   });
 });

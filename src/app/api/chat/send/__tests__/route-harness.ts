@@ -120,6 +120,12 @@ mock.module("@/lib/api-error", {
       e.name = "ApiError";
       return e;
     },
+    conflict: (msg: string) => {
+      const e = new Error(msg) as Error & { statusCode: number };
+      e.statusCode = 409;
+      e.name = "ApiError";
+      return e;
+    },
     ApiError: class ApiError extends Error {
       statusCode: number;
       code: string;
