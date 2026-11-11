@@ -18,7 +18,7 @@ import { readinessQueries } from "@/lib/progression/fetch-readiness-data";
 import { nextStepQueries } from "@/lib/progression/student-next-step";
 import { overviewQueries } from "./readers";
 import { orientationItemsQuery } from "./support";
-import { cached, invalidate } from "@/lib/cache";
+import { invalidate } from "@/lib/cache";
 import { cachedWhen, studentCacheKey, type CacheSession } from "./student-cache";
 
 type Tx = Prisma.TransactionClient;
@@ -160,10 +160,16 @@ export function getSlowSignals(session: CacheSession): Promise<SlowSignals> {
  * The page render reads slow signals fresh (so unwatched inputs are never
  * stale on a page load) and keeps what it read for the polls that follow.
  */
-export async function readAndKeepSlowSignals(session: CacheSession): Promise<SlowSignals> {
-  const key = slowKey(session);
-  const slow = await readSlowSignals(session.id);
-  if (!sawStudentRows(slow)) return slow;
+export function readAndKeepSlowSignals(session: CacheSession): Promise<SlowSignals> {
+  return readFreshAndKeep(slowKey(session), SLOW_SIGNALS_TTL_SECONDS, () => readSlowSignals(session.id), sawStudentRows);
+}
+
+/**
+ * Drops the kept value, then reads through `cachedWhen`, so the read is the
+ * key's in-flight read: a write that invalidates the key while the read runs
+ * also drops the in-flight entry, and `cached()` then never stores the result.
+ */
+function readFreshAndKeep<T>(key: string, ttlSeconds: number, read: () => Promise<T>, keep: (value: T) => boolean): Promise<T> {
   invalidate(key);
-  return cached(key, SLOW_SIGNALS_TTL_SECONDS, async () => slow);
+  return cachedWhen(key, ttlSeconds, read, keep);
 }

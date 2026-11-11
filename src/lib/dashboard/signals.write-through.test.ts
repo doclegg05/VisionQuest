@@ -113,4 +113,38 @@ describe("kept slow signals, cleared by the real write-through", () => {
     assert.equal(await slowReads(A), full, "A's slow signals outlived A's certification write");
     assert.equal(await slowReads(B), 0, "B's slow signals were cleared by A's write");
   });
+
+  it("a Goal write that lands during the page's read leaves nothing pre-write kept", async () => {
+    const full = await slowReads(A);
+    cache.invalidateAllChatContext();
+    const held = holdNextEngineRequest();
+    const page = asStudent(A, () => signals.readAndKeepSlowSignals(A));
+    await held.reached;
+    await asStudent(A, () => db.prisma.goal.create({ data: { studentId: A.id, level: "monthly", content: "Finish the resume" } }));
+    held.release();
+    await page;
+    assert.equal(await slowReads(A), full, "a read that began before A's goal write was kept after it");
+  });
 });
+
+/**
+ * Parks the next engine request until `release`; `reached` resolves once it
+ * arrives. Every other request passes straight through.
+ */
+function holdNextEngineRequest(): { reached: Promise<void>; release: () => void } {
+  const engine: unknown = Reflect.get(db.prisma, "_engine");
+  if (typeof engine !== "object" || engine === null) throw new Error("no engine");
+  const original: unknown = Reflect.get(engine, "request");
+  if (typeof original !== "function") throw new Error("no engine request");
+  let arrive = () => {};
+  let release = () => {};
+  const reached = new Promise<void>((resolve) => { arrive = resolve; });
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  Reflect.set(engine, "request", async (...args: unknown[]) => {
+    Reflect.set(engine, "request", original);
+    arrive();
+    await gate;
+    return Reflect.apply(original, engine, args);
+  });
+  return { reached, release };
+}
