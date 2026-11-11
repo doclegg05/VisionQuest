@@ -115,7 +115,7 @@ export const RETRIED_CUT_OFF_NOTE = "(Sage got cut off. The new answer is below.
 export const SAVED_CUT_OFF_NOTE = "(Sage got cut off here.)";
 
 /** The start every cut-off note shares, shown or saved. */
-const CUT_OFF_MARK = "\n\n(Sage got cut off";
+export const CUT_OFF_MARK = "\n\n(Sage got cut off";
 
 /**
  * A partial reply as the student sees it while Try again shows: the text

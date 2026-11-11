@@ -421,12 +421,23 @@ describe("POST /api/chat/send — round 3 failure fixes (E1c)", () => {
     mockSaveMessage.mock.mockImplementation(async () => ({ id }));
   }
 
-  /** findFirst answers: the stored question, then (role assistant) what came after it. */
-  function storedQuestion(after: { content: string } | null) {
+  type ReplyWhere = { role: string; NOT?: { content?: { contains?: string } } };
+
+  /**
+   * findFirst answers: the stored question, then (role assistant) the newest of
+   * the replies after it, oldest first, that passes the query's `NOT` filter.
+   */
+  function storedQuestion(after: { content: string } | null, ...later: Array<{ content: string }>) {
     newConversationSavesAs("cnewmessage0000000000001");
-    mockMessageFindFirst.mock.mockImplementation(async (args: { where: { role: string } }) =>
-      args.where.role === "assistant" ? after : { id: SAVED_ID, conversationId: CONVERSATION_ID, createdAt: new Date(0) },
-    );
+    const replies = [after, ...later].filter((r): r is { content: string } => r !== null);
+    mockMessageFindFirst.mock.mockImplementation(async (args: { where: ReplyWhere }) => {
+      if (args.where.role !== "assistant") {
+        return { id: SAVED_ID, conversationId: CONVERSATION_ID, createdAt: new Date(0) };
+      }
+      const excluded = args.where.NOT?.content?.contains;
+      const kept = replies.filter((r) => excluded === undefined || !r.content.includes(excluded));
+      return kept.at(-1) ?? null;
+    });
   }
 
   describe("(2) a throw after the save names the conversation, so Try again stays in it", () => {
@@ -477,6 +488,25 @@ describe("POST /api/chat/send — round 3 failure fixes (E1c)", () => {
       assert.equal(res.status, 200);
       await readSseBody(res);
       assert.equal(userSaves(), 0);
+    });
+
+    it("refuses when a full answer was saved and a cut-off copy came after it", async () => {
+      const full = "Here is the whole answer.";
+      storedQuestion({ content: full }, { content: sageFailure.savedCutOffReply(full, "unknown", "student") });
+      const res = await post({ conversationId: CONVERSATION_ID, retryOf: SAVED_ID });
+      assert.equal(res.status, 409);
+      assert.equal(mockResolveAiProvider.mock.callCount(), 0);
+    });
+
+    it("still runs the crisis scan on a refused Try again", async () => {
+      storedQuestion({ content: "Here is the whole answer." });
+      const req = mockRequest("/api/chat/send", {
+        method: "POST",
+        body: { message: "I want to kill myself", conversationId: CONVERSATION_ID, retryOf: SAVED_ID },
+      });
+      const res = await route.POST(req as never, { params: Promise.resolve({}) } as never);
+      assert.equal(res.status, 409);
+      assert.equal(mockRecordWellbeingConcern.mock.callCount(), 1);
     });
 
     it("looks only after the stored question, in its conversation", async () => {

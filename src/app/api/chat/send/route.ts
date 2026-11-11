@@ -142,14 +142,6 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   const body = await parseBody(req, chatSendBodySchema);
   const userMessage = body.message.trim();
   const isStaffChat = staffChatStageFor(session.role) !== null;
-  // A Try again of a message already saved reuses it (src/lib/chat/retry-turn.ts).
-  const retried = await findRetriedUserMessage({
-    studentId: session.id,
-    conversationId: body.conversationId || null,
-    retryOf: body.retryOf,
-    content: userMessage,
-  });
-
   // Crisis scan — request-time, student-only, never throws. Runs before the
   // direct-answer branches, provider resolution, and rate limits so every
   // exit below still raises the staff alert (VQ-R-001). Single call site:
@@ -158,13 +150,21 @@ export const POST = withRegistry("sage.chat", async (session, req, _ctx, _tool) 
   // limiter below. The exemption covers teacher, admin, and coordinator; a
   // `cdc` role exists (src/lib/role-home.ts) and would be scanned as a
   // student if it were ever granted sage.chat (it is not: scripts/seed-rbac.ts).
-  // A Try again scans too: the first send's alert may have failed (it dedupes).
+  // A Try again scans too, even one refused below as already answered: the
+  // first send's alert may have failed (it dedupes).
   if (!isStaffChat) {
     await scanStudentMessageForCrisis({
       studentId: session.id,
       userMessage,
     });
   }
+  // A Try again of a message already saved reuses it (src/lib/chat/retry-turn.ts).
+  const retried = await findRetriedUserMessage({
+    studentId: session.id,
+    conversationId: body.conversationId || null,
+    retryOf: body.retryOf,
+    content: userMessage,
+  });
   // The student-facing 988 block for every exit below. The scan above keeps
   // its detection to itself (it only raises the staff alert), so this is the
   // one extra detection per request; no path detects again. Staff: null.

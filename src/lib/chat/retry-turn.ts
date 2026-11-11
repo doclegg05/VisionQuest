@@ -23,7 +23,7 @@ import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 import { chatSendSchema } from "@/lib/schemas";
 import { saveMessage } from "./conversation";
-import { isCutOffReply } from "./sage-failure";
+import { CUT_OFF_MARK } from "./sage-failure";
 
 /** The 409's text; the registry middleware sends it to the student as is. */
 export const ALREADY_ANSWERED = "Sage already sent the answer. It is above.";
@@ -87,14 +87,23 @@ async function lookUpRetry(
   }
 }
 
-/** The latest reply after the question, unless it is a cut-off partial. */
+/**
+ * Any reply after the question that is not a cut-off partial. A full answer
+ * can be followed by a cut-off copy of itself (the client left before `done`),
+ * so the newest reply alone is not enough.
+ */
 async function hasFullAnswerAfter(studentId: string, conversationId: string, after: Date): Promise<boolean> {
   const reply = await prisma.message.findFirst({
-    where: { conversationId, studentId, role: "assistant", createdAt: { gt: after } },
-    orderBy: { createdAt: "desc" },
-    select: { content: true },
+    where: {
+      conversationId,
+      studentId,
+      role: "assistant",
+      createdAt: { gt: after },
+      NOT: { content: { contains: CUT_OFF_MARK } },
+    },
+    select: { id: true },
   });
-  return reply !== null && !isCutOffReply(reply.content);
+  return reply !== null;
 }
 
 export interface UserTurn {
