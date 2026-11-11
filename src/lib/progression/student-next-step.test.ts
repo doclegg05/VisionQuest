@@ -230,8 +230,16 @@ test("dashboard renders StudentNextStepResult, not a second engine", () => {
   );
   const supportSource = readFileSync(join(testDir, "../dashboard/support.ts"), "utf8");
   const clientSource = readFileSync(join(testDir, "../../app/(student)/dashboard/DashboardClient.tsx"), "utf8");
-  assert.ok(dashboardSource.includes("readSupport(session.id, readinessData)"));
-  assert.ok(supportSource.includes("getStudentNextStep(studentId, readiness)"));
+  // The page reads through loadStudentDashboard, whose advising region is
+  // built by nextStepFromFacts; getStudentNextStep, which every other
+  // surface calls, builds through the same function.
+  const loaderSource = readFileSync(join(testDir, "../dashboard/student-dashboard.ts"), "utf8");
+  const engineSource = readFileSync(join(testDir, "student-next-step.ts"), "utf8");
+  assert.ok(dashboardSource.includes("loadStudentDashboard(session)"));
+  assert.ok(loaderSource.includes("nextStepFromFacts(readinessData, {"));
+  assert.ok(supportSource.includes("nextStep, alertCount,"));
+  assert.ok(/export async function getStudentNextStep[\s\S]*return nextStepFromFacts\(readinessData, \{/.test(engineSource));
+  assert.ok(/export function nextStepFromFacts[\s\S]*return resolveStudentNextStep\(\{/.test(engineSource));
   assert.ok(clientSource.includes("<PathToEmployment {...support.data.nextStep}"));
   assert.ok(!clientSource.includes("findNextGap") && !clientSource.includes("const nextStep ="));
 });

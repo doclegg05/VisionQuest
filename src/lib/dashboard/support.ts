@@ -1,17 +1,40 @@
-import { prisma } from "@/lib/db";
-import { countStudentVisibleAlerts } from "@/lib/student-alerts";
-import { getStudentNextStep } from "@/lib/progression/student-next-step";
-import type { StudentReadinessData } from "@/lib/progression/fetch-readiness-data";
+import type { Prisma } from "@prisma/client";
+import type { StudentNextStepResult } from "@/lib/progression/student-next-step";
 
-export async function readSupport(studentId: string, readiness?: StudentReadinessData) {
-  const [nextStep, alertCount, appointment, orientationItems] = await Promise.all([
-    getStudentNextStep(studentId, readiness),
-    countStudentVisibleAlerts(studentId),
-    prisma.appointment.findFirst({ where: { studentId, status: "scheduled", startsAt: { gte: new Date() } }, orderBy: [{ startsAt: "asc" }, { id: "asc" }], select: { id: true, title: true, startsAt: true, locationLabel: true } }),
-    prisma.orientationItem.findMany({ where: { required: true, OR: [
-      { progress: { none: { studentId } } }, { progress: { some: { studentId, completed: false } } },
-    ] }, orderBy: { sortOrder: "asc" }, take: 3, select: { id: true, label: true } }),
-  ]);
-  return { nextStep, alertCount, appointment: appointment ? { ...appointment, startsAt: appointment.startsAt.toISOString() } : null, orientationItems, fetchedAt: new Date().toISOString() };
+/** The student's next scheduled appointment. Live: nothing invalidates a cached copy. */
+export function nextAppointmentQuery(studentId: string, now = new Date()) {
+  return {
+    where: { studentId, status: "scheduled", startsAt: { gte: now } },
+    orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+    select: { id: true, title: true, startsAt: true, locationLabel: true },
+  } satisfies Prisma.AppointmentFindFirstArgs;
 }
-export type DashboardSupport = Awaited<ReturnType<typeof readSupport>>;
+
+/** Up to three required orientation items the student has not finished. */
+export function orientationItemsQuery(studentId: string) {
+  return {
+    where: { required: true, OR: [
+      { progress: { none: { studentId } } }, { progress: { some: { studentId, completed: false } } },
+    ] },
+    orderBy: { sortOrder: "asc" }, take: 3, select: { id: true, label: true },
+  } satisfies Prisma.OrientationItemFindManyArgs;
+}
+
+export interface SupportFacts {
+  readonly nextStep: StudentNextStepResult;
+  readonly alertCount: number;
+  readonly appointment: { id: string; title: string; startsAt: Date; locationLabel: string | null } | null;
+  readonly orientationItems: readonly { id: string; label: string }[];
+}
+
+/** The advising region from facts already read. Pure. */
+export function supportFromFacts(facts: SupportFacts, now = new Date()) {
+  const { nextStep, alertCount, appointment } = facts;
+  return {
+    nextStep, alertCount,
+    appointment: appointment ? { ...appointment, startsAt: appointment.startsAt.toISOString() } : null,
+    orientationItems: [...facts.orientationItems],
+    fetchedAt: now.toISOString(),
+  };
+}
+export type DashboardSupport = ReturnType<typeof supportFromFacts>;

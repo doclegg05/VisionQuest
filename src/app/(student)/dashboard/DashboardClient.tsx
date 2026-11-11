@@ -9,7 +9,8 @@ import { QueryClient, QueryClientProvider, useIsMutating, useMutation, useQuery,
 import type { DashboardActivity, DashboardOverview } from "@/lib/dashboard/readers";
 import type { TaskDto, TaskPage } from "@/lib/dashboard/tasks";
 import { taskQuerySchema, type TaskDetails, type TaskQuery } from "@/lib/dashboard/task-schemas";
-import { dashboardFetch, dashboardKey, freshness, optimisticTasks, shouldShowMutationNotice, taskKey } from "@/lib/dashboard/query";
+import { dashboardFetch, dashboardKey, describePoll, freshness, isNewNotification, optimisticTasks, regionPollMs, shouldShowMutationNotice, taskKey } from "@/lib/dashboard/query";
+import { useNotifications } from "@/components/ui/NotificationProvider";
 import { TaskTable } from "@/components/dashboard/TaskTable";
 import type { DashboardSupport } from "@/lib/dashboard/support";
 import { PathToEmployment } from "@/components/progression/PathToEmployment";
@@ -37,12 +38,29 @@ function SessionDashboard(props: DashboardClientProps) {
   useEffect(() => () => { client.clear(); }, [client]);
   return <QueryClientProvider client={client}><DashboardWorkspace {...props} /></QueryClientProvider>;
 }
-function RegionStatus({ loading, error, refreshing, hasData, fetchedAt, retry }: {
-  loading: boolean; error: boolean; refreshing: boolean; hasData: boolean; fetchedAt?: string; retry: () => void;
+function RegionStatus({ loading, error, refreshing, hasData, fetchedAt, pollMs, retry }: {
+  loading: boolean; error: boolean; refreshing: boolean; hasData: boolean; fetchedAt?: string; pollMs: number; retry: () => void;
 }) {
   return <div className="my-3 text-sm text-[var(--ink-muted)]" aria-live="polite">
-    {loading ? "Loading your records…" : error ? <><span>{hasData ? "Showing last saved data. Refresh failed; these records may be out of date." : "This section could not load. Other sections are still available."}</span> <button className="min-h-11 underline" onClick={retry}>Try again</button></> : refreshing ? "Refreshing…" : fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })} UTC · checks every 30 seconds while visible` : null}
+    {loading ? "Loading your records…" : error ? <><span>{hasData ? "Showing last saved data. Refresh failed; these records may be out of date." : "This section could not load. Other sections are still available."}</span> <button className="min-h-11 underline" onClick={retry}>Try again</button></> : refreshing ? "Refreshing…" : fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })} UTC · ${describePoll(pollMs)}` : null}
   </div>;
+}
+/**
+ * Refetches every region when a notification newer than the data on screen
+ * arrives (a teacher's task, an appointment, a crisis follow-up). Not every
+ * change is pushed (orientation and certification verification, goal
+ * confirmation and new alerts are not), so the polls stay.
+ */
+function useRefetchOnNotification(sessionId: string, initialFetchedAt: string | undefined) {
+  const client = useQueryClient();
+  const { notifications } = useNotifications();
+  const [since] = useState(() => initialFetchedAt ?? new Date().toISOString());
+  const newest = notifications[0];
+  const newestId = newest?.id;
+  const newestAt = newest?.createdAt;
+  useEffect(() => {
+    if (newestId !== undefined && isNewNotification(newestAt, since)) void client.invalidateQueries({ queryKey: dashboardKey(sessionId) });
+  }, [client, newestId, newestAt, since, sessionId]);
 }
 function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initialTasks, initialSupport, moodContent, intro }: DashboardClientProps) {
   const client = useQueryClient();
@@ -52,12 +70,13 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
   const root = dashboardKey(sessionId);
   const pending = useIsMutating({ mutationKey: root }) > 0;
   const options = { ...freshness, enabled: !pending };
-  const overview = useQuery({ ...options, queryKey: [...root, "overview"], queryFn: ({ signal }) => dashboardFetch<DashboardOverview>("/api/dashboard/overview", { signal }), initialData: initialOverview, initialDataUpdatedAt: initialOverview ? Date.parse(initialOverview.fetchedAt) : undefined });
-  const activity = useQuery({ ...options, queryKey: [...root, "activity"], queryFn: ({ signal }) => dashboardFetch<DashboardActivity>("/api/dashboard/activity", { signal }), initialData: initialActivity, initialDataUpdatedAt: initialActivity ? Date.parse(initialActivity.fetchedAt) : undefined });
-  const support = useQuery({ ...options, queryKey: [...root, "support"], queryFn: ({ signal }) => dashboardFetch<DashboardSupport>("/api/dashboard/support", { signal }), initialData: initialSupport, initialDataUpdatedAt: initialSupport ? Date.parse(initialSupport.fetchedAt) : undefined });
+  useRefetchOnNotification(sessionId, initialSupport?.fetchedAt);
+  const overview = useQuery({ ...options, refetchInterval: regionPollMs.overview, queryKey: [...root, "overview"], queryFn: ({ signal }) => dashboardFetch<DashboardOverview>("/api/dashboard/overview", { signal }), initialData: initialOverview, initialDataUpdatedAt: initialOverview ? Date.parse(initialOverview.fetchedAt) : undefined });
+  const activity = useQuery({ ...options, refetchInterval: regionPollMs.activity, queryKey: [...root, "activity"], queryFn: ({ signal }) => dashboardFetch<DashboardActivity>("/api/dashboard/activity", { signal }), initialData: initialActivity, initialDataUpdatedAt: initialActivity ? Date.parse(initialActivity.fetchedAt) : undefined });
+  const support = useQuery({ ...options, refetchInterval: regionPollMs.support, queryKey: [...root, "support"], queryFn: ({ signal }) => dashboardFetch<DashboardSupport>("/api/dashboard/support", { signal }), initialData: initialSupport, initialDataUpdatedAt: initialSupport ? Date.parse(initialSupport.fetchedAt) : undefined });
   const params = new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]));
   const isDefault = JSON.stringify(query) === JSON.stringify(taskQuerySchema.parse({}));
-  const tasks = useQuery({ ...options, queryKey: [...taskKey(sessionId), query], queryFn: ({ signal }) => dashboardFetch<TaskPage>(`/api/tasks?${params}`, { signal }), initialData: isDefault ? initialTasks : undefined, initialDataUpdatedAt: initialTasks ? Date.parse(initialTasks.fetchedAt) : undefined });
+  const tasks = useQuery({ ...options, refetchInterval: regionPollMs.tasks, queryKey: [...taskKey(sessionId), query], queryFn: ({ signal }) => dashboardFetch<TaskPage>(`/api/tasks?${params}`, { signal }), initialData: isDefault ? initialTasks : undefined, initialDataUpdatedAt: initialTasks ? Date.parse(initialTasks.fetchedAt) : undefined });
   type Mutation = { url: string; method: string; body: unknown; updates?: { id: string; patch: Partial<TaskDto> }[]; quietConflicts?: boolean };
   const mutation = useMutation({
     mutationKey: root,
@@ -83,18 +102,18 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
     <div className={`${styles.workspace} min-w-0 space-y-6 text-[var(--ink-strong)]`}>
       <section aria-label="Your next action">
         {support.data && <PathToEmployment {...support.data.nextStep} />}
-        <RegionStatus loading={support.isPending} error={support.isError} refreshing={support.isFetching && !support.isPending} hasData={!!support.data} fetchedAt={support.data?.fetchedAt} retry={() => { void support.refetch(); }} />
+        <RegionStatus pollMs={regionPollMs.support} loading={support.isPending} error={support.isError} refreshing={support.isFetching && !support.isPending} hasData={!!support.data} fetchedAt={support.data?.fetchedAt} retry={() => { void support.refetch(); }} />
         {!support.data && support.isError && <Link className="inline-flex items-center min-h-11 underline" href="/goals">Review your plan while this section is unavailable</Link>}
       </section>
       {intro}
       <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl">Your Recorded Progress</h2><button disabled={pending || overview.isFetching || activity.isFetching || tasks.isFetching} className="min-h-11 secondary-button px-4 py-2 text-sm" onClick={() => { void client.invalidateQueries({ queryKey: root }); router.refresh(); }}>Refresh dashboard</button></div>
       <section aria-label="Outcome summaries">
-        <RegionStatus loading={overview.isPending} error={overview.isError} refreshing={overview.isFetching && !overview.isPending} hasData={!!overview.data} fetchedAt={overview.data?.fetchedAt} retry={() => { void overview.refetch(); }} />
+        <RegionStatus pollMs={regionPollMs.overview} loading={overview.isPending} error={overview.isError} refreshing={overview.isFetching && !overview.isPending} hasData={!!overview.data} fetchedAt={overview.data?.fetchedAt} retry={() => { void overview.refetch(); }} />
         {overview.data && <dl className="grid gap-x-8 gap-y-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-5 sm:grid-cols-2 xl:grid-cols-4">{overview.data.outcomes.map((outcome) => <div key={outcome.label} className="min-w-0"><dt className="font-semibold">{outcome.label}</dt><dd className="mt-2"><p className="text-lg font-semibold leading-snug">{outcome.value}</p><p className="mt-2 text-sm leading-relaxed text-[var(--ink-muted)]">{outcome.detail}</p><Link className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--ink-strong)] underline decoration-[var(--accent-secondary)] underline-offset-4" href={outcome.href}>View {outcome.label.toLowerCase()}</Link></dd></div>)}</dl>}
       </section>
       <section aria-labelledby="tasks-heading" className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-6">
         <TaskTable data={tasks.data} query={query} setQuery={setQuery} pending={pending || tasks.isFetching} save={save} remove={remove} setStatus={setStatus} />
-        <RegionStatus loading={tasks.isPending} error={tasks.isError} refreshing={tasks.isFetching && !tasks.isPending} hasData={!!tasks.data} fetchedAt={tasks.data?.fetchedAt} retry={() => { void tasks.refetch(); }} />
+        <RegionStatus pollMs={regionPollMs.tasks} loading={tasks.isPending} error={tasks.isError} refreshing={tasks.isFetching && !tasks.isPending} hasData={!!tasks.data} fetchedAt={tasks.data?.fetchedAt} retry={() => { void tasks.refetch(); }} />
       </section>
       <section aria-label="Advising and support" className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-6">
         <h2 className="font-display text-xl">Advising and Support</h2>
@@ -108,7 +127,7 @@ function DashboardWorkspace({ sessionId, initialOverview, initialActivity, initi
       </section>
       <section aria-labelledby="activity-heading" className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-6">
         <h2 id="activity-heading" className="font-display text-xl">Task Activity</h2>
-        <RegionStatus loading={activity.isPending} error={activity.isError} refreshing={activity.isFetching && !activity.isPending} hasData={!!activity.data} fetchedAt={activity.data?.fetchedAt} retry={() => { void activity.refetch(); }} />
+        <RegionStatus pollMs={regionPollMs.activity} loading={activity.isPending} error={activity.isError} refreshing={activity.isFetching && !activity.isPending} hasData={!!activity.data} fetchedAt={activity.data?.fetchedAt} retry={() => { void activity.refetch(); }} />
         {activity.data && <TaskCharts data={activity.data} />}
       </section>
     </div>

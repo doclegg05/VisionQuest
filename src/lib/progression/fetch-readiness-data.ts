@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { type ProgressionState } from "./engine";
 import { type ReadinessResult } from "./readiness-score";
@@ -18,51 +19,78 @@ export interface StudentReadinessData {
  * see src/lib/progression/welcome-routing.ts.
  */
 
-export async function fetchStudentReadinessData(studentId: string): Promise<StudentReadinessData> {
-  const [
-    progression,
-    orientationDoneCount,
-    orientationTotalCount,
-    bhagGoal,
-    certificationsEarned,
-    portfolioItemCount,
-    resumeData,
-    publicPage,
-  ] = await Promise.all([
-    prisma.progression.findUnique({ where: { studentId }, select: { state: true } }),
-    prisma.orientationProgress.count({ where: { studentId, completed: true } }),
-    prisma.orientationItem.count(),
-    prisma.goal.findFirst({
-      where: { studentId, level: "bhag", status: "completed" },
-      select: { id: true },
-    }),
-    prisma.certification.count({ where: { studentId, status: "completed" } }),
-    prisma.portfolioItem.count({ where: { studentId } }),
-    prisma.resumeData.findUnique({ where: { studentId }, select: { id: true } }),
-    prisma.publicCredentialPage.findUnique({
-      where: { studentId },
-      select: { isPublic: true },
-    }),
-  ]);
+/** The facts readiness is computed from, already read. */
+export interface ReadinessFacts {
+  progressionState: string | null;
+  orientationCompletedCount: number;
+  orientationTotalCount: number;
+  bhagCompleted: boolean;
+  certificationsEarned: number;
+  portfolioItemCount: number;
+  hasResume: boolean;
+  portfolioShared: boolean;
+}
 
-  const bhagCompleted = !!bhagGoal;
-  const snapshot = buildReadinessSnapshot({
-    progressionState: progression?.state ?? null,
-    orientationCompletedCount: orientationDoneCount,
-    orientationTotalCount,
-    bhagCompleted,
-    certificationsEarned,
-    portfolioItemCount,
-    hasResume: Boolean(resumeData),
-    portfolioShared: Boolean(publicPage?.isPublic),
-  });
+/**
+ * The per-student readiness reads, as Prisma arguments, so a caller that runs
+ * them on another client (the student dashboard reads them inside one
+ * transaction) asks exactly what `fetchStudentReadinessData` asks. The
+ * orientation item total is global and takes no arguments.
+ */
+export function readinessQueries(studentId: string) {
+  return {
+    progression: { where: { studentId }, select: { state: true } },
+    orientationCompletedCount: { where: { studentId, completed: true } },
+    bhagGoal: { where: { studentId, level: "bhag", status: "completed" }, select: { id: true } },
+    certificationsEarned: { where: { studentId, status: "completed" } },
+    portfolioItemCount: { where: { studentId } },
+    resume: { where: { studentId }, select: { id: true } },
+    publicPage: { where: { studentId }, select: { isPublic: true } },
+  } satisfies {
+    progression: Prisma.ProgressionFindUniqueArgs;
+    orientationCompletedCount: Prisma.OrientationProgressCountArgs;
+    bhagGoal: Prisma.GoalFindFirstArgs;
+    certificationsEarned: Prisma.CertificationCountArgs;
+    portfolioItemCount: Prisma.PortfolioItemCountArgs;
+    resume: Prisma.ResumeDataFindUniqueArgs;
+    publicPage: Prisma.PublicCredentialPageFindUniqueArgs;
+  };
+}
 
+/** Readiness from facts already read. Pure. */
+export function readinessFromFacts(facts: ReadinessFacts): StudentReadinessData {
+  const snapshot = buildReadinessSnapshot(facts);
   return {
     state: snapshot.state,
     readiness: snapshot.readiness,
     orientationProgress: snapshot.orientationProgress,
-    bhagCompleted,
+    bhagCompleted: facts.bhagCompleted,
   };
+}
+
+export async function fetchStudentReadinessData(studentId: string): Promise<StudentReadinessData> {
+  const q = readinessQueries(studentId);
+  const [progression, orientationCompletedCount, orientationTotalCount, bhagGoal, certificationsEarned, portfolioItemCount, resume, publicPage] =
+    await Promise.all([
+      prisma.progression.findUnique(q.progression),
+      prisma.orientationProgress.count(q.orientationCompletedCount),
+      prisma.orientationItem.count(),
+      prisma.goal.findFirst(q.bhagGoal),
+      prisma.certification.count(q.certificationsEarned),
+      prisma.portfolioItem.count(q.portfolioItemCount),
+      prisma.resumeData.findUnique(q.resume),
+      prisma.publicCredentialPage.findUnique(q.publicPage),
+    ]);
+  return readinessFromFacts({
+    progressionState: progression?.state ?? null,
+    orientationCompletedCount,
+    orientationTotalCount,
+    bhagCompleted: Boolean(bhagGoal),
+    certificationsEarned,
+    portfolioItemCount,
+    hasResume: Boolean(resume),
+    portfolioShared: Boolean(publicPage?.isPublic),
+  });
 }
 
 /**

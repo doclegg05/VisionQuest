@@ -2,12 +2,7 @@ import assert from "node:assert/strict";
 import { before, describe, it, mock } from "node:test";
 import { renderToString } from "react-dom/server";
 import type { ReactNode } from "react";
-import type { StudentNextStepResult } from "@/lib/progression/student-next-step";
-import {
-  createStudentAlertStore,
-  makePreloadedReadiness,
-  STUDENT_ID,
-} from "@/lib/student-alerts.test-support";
+import { createStudentAlertStore, STUDENT_ID } from "@/lib/student-alerts.test-support";
 
 // Node does not process CSS modules; the browser harness verifies their real styles.
 mock.module("@/components/dashboard/dashboard.module.css", { defaultExport: { workspace: "workspace" } });
@@ -15,22 +10,44 @@ mock.module("@/components/dashboard/dashboard.module.css", { defaultExport: { wo
 
 // Module mocks, registered before the page is imported. Every read not under
 // test returns the quietest value that keeps the page off the welcome redirect
-// (one goal, orientation complete).
+// (one goal, orientation complete). The page reads through
+// loadStudentDashboard, which runs most reads in transactions, so the same
+// fake answers both the client and a transaction.
+const zero = async () => 0;
+const none = async () => null;
+const prismaMock = {
+  goal: { count: async () => 1, findFirst: none },
+  progression: { findUnique: none },
+  orientationProgress: { count: async () => 1 },
+  orientationItem: { count: async () => 1, findMany: async () => [] },
+  certification: { count: zero, findMany: async () => [] },
+  certTemplate: { findMany: async () => [] },
+  portfolioItem: { count: zero },
+  resumeData: { findUnique: none },
+  publicCredentialPage: { findUnique: none },
+  careerDiscovery: { findUnique: none },
+  message: { count: zero },
+  studentClassEnrollment: { findFirst: none },
+  studentSavedJob: { count: zero },
+  application: { count: zero },
+  appointment: { findFirst: none },
+  studentTask: { findMany: async () => [], count: zero },
+  studentAlert: createStudentAlertStore(),
+  // R5: the dashboard reads no intake form submissions. A read here fails the
+  // render. (The education plan's findFirst is the overview's, not intake.)
+  formSubmission: {
+    count: async () => { throw new Error("the dashboard must not read intake form submissions"); },
+    findFirst: none,
+  },
+  // The SMS re-consent notice reads the student's own preference row.
+  // Null = never set one up, which is the case for this fixture and for
+  // most students; the notice renders for nobody here.
+  notificationPreference: { findUnique: none },
+};
 mock.module("@/lib/db", {
   namedExports: {
-    prisma: {
-      goal: { count: async () => 1 },
-      appointment: { findFirst: async () => null },
-      studentTask: { findMany: async () => [] },
-      studentAlert: createStudentAlertStore(),
-      orientationItem: { findMany: async () => [] },
-      // R5: the dashboard reads no intake form submissions. A read here fails the render.
-      formSubmission: { count: async () => { throw new Error("the dashboard must not read intake form submissions"); } },
-      // The SMS re-consent notice reads the student's own preference row.
-      // Null = never set one up, which is the case for this fixture and for
-      // most students; the notice renders for nobody here.
-      notificationPreference: { findUnique: async () => null },
-    },
+    prisma: prismaMock,
+    withAppTransaction: async <T,>(work: (tx: typeof prismaMock) => Promise<T>) => work(prismaMock),
   },
 });
 
@@ -45,39 +62,14 @@ mock.module("@/lib/auth", {
   },
 });
 
-mock.module("@/lib/progression/fetch-readiness-data", {
-  namedExports: { fetchStudentReadinessData: async () => makePreloadedReadiness() },
-});
-
 mock.module("@/lib/sage/panel-data", {
   namedExports: { getLatestPanelSpec: async () => null },
-});
-
-const nextStep: StudentNextStepResult = {
-  currentStepKey: "followUp",
-  title: "Keep your applications moving",
-  description: "",
-  whyItMatters: "",
-  actionLabel: "View Career Hub",
-  actionLink: "/career",
-  steps: [],
-};
-
-mock.module("@/lib/progression/student-next-step", {
-  namedExports: {
-    getStudentNextStep: async () => nextStep,
-    nextStepShortLabel: () => null,
-  },
 });
 
 // Renders only the intro slot: the header and signature banner the page passes in.
 mock.module("./DashboardClient", { defaultExport: (props: { initialSupport?: { alertCount: number }; intro?: ReactNode }) => {
   if (props.initialSupport) ambientRenders.push(props.initialSupport);
   return props.intro ?? null;
-} });
-mock.module("@/lib/dashboard/readers", { namedExports: {
-  readOverview: async () => ({ outcomes: [], fetchedAt: new Date().toISOString() }),
-  readActivity: async () => ({ statuses: [], completions: [], unknownCompletionDates: 0, fetchedAt: new Date().toISOString() }),
 } });
 mock.module("@/lib/dashboard/tasks", { namedExports: {
   readTasks: async () => ({ tasks: [], total: 0, page: 1, pageSize: 10, fetchedAt: new Date().toISOString() }),

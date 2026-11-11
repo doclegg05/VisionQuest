@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getRoleHomePath } from "@/lib/role-home";
-import { prisma } from "@/lib/db";
 import { parseState, createInitialState } from "@/lib/progression/engine";
 import { computeNavPhase, type NavPhase } from "@/lib/nav-progression";
-import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
+import { getStudentShell } from "@/lib/dashboard/signals";
+import { readRecoveryQuestionKeys, readSageNoticeAcknowledged } from "@/lib/dashboard/student-gates";
 import { needsRecoverySetup } from "@/lib/security-questions";
-import { hasAcknowledgedSageNotice } from "@/lib/consent";
 import { needsSageNotice, SAGE_NOTICE_ACK_PATH, SAGE_NOTICE_VERSION } from "@/lib/about-sage/notice";
 import NavBar from "@/components/ui/NavBar";
 import NotificationProvider from "@/components/ui/NotificationProvider";
@@ -28,16 +27,13 @@ export default async function StudentLayout({
     redirect(getRoleHomePath(session.role));
   }
 
-  // Lightweight fetch for nav phase (cached by Next.js request dedup)
-  const [goalCount, progression, orientationDone, securityKeys, noticeAcknowledged] = await Promise.all([
-    prisma.goal.count({ where: { studentId: session.id, status: { in: [...GOAL_PLANNING_STATUSES] } } }),
-    prisma.progression.findUnique({ where: { studentId: session.id }, select: { state: true } }),
-    prisma.orientationProgress.count({ where: { studentId: session.id, completed: true } }),
-    prisma.securityQuestionAnswer.findMany({
-      where: { studentId: session.id },
-      select: { questionKey: true },
-    }),
-    hasAcknowledgedSageNotice(session.id, SAGE_NOTICE_VERSION),
+  // The nav phase's three facts, read once and shared with the dashboard page
+  // (getStudentShell keeps them per student until a write clears them).
+  const [shell, securityKeys, noticeAcknowledged] = await Promise.all([
+    getStudentShell(session),
+    // Both gates are read every request until satisfied, then kept.
+    readRecoveryQuestionKeys(session),
+    readSageNoticeAcknowledged(session, SAGE_NOTICE_VERSION),
   ]);
 
   // One-time Sage notice gate (H6): a student reads what Sage keeps and who
@@ -56,15 +52,15 @@ export default async function StudentLayout({
   // password to forget, so they skip it.
   if (needsRecoverySetup({
     demoAccount: session.demoAccount,
-    questionKeys: securityKeys.map((k) => k.questionKey),
+    questionKeys: securityKeys,
   })) {
     redirect("/recovery-setup");
   }
 
-  const progState = progression ? parseState(progression.state) : createInitialState();
+  const progState = shell.progressionState ? parseState(shell.progressionState) : createInitialState();
   const navPhase: NavPhase = computeNavPhase({
-    hasGoals: goalCount > 0,
-    orientationStarted: orientationDone > 0,
+    hasGoals: shell.goalPlanningCount > 0,
+    orientationStarted: shell.orientationCompletedCount > 0,
     orientationComplete: progState.orientationComplete || false,
   });
 

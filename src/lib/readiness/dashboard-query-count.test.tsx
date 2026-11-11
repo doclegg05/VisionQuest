@@ -48,7 +48,6 @@ import { readFileSync } from "node:fs";
 import { before, describe, it, mock } from "node:test";
 import type { ReactNode } from "react";
 import { prerenderToNodeStream } from "react-dom/static";
-import { createInitialState } from "@/lib/progression/engine";
 import {
   countsByFunction,
   createQueryCounter,
@@ -60,7 +59,7 @@ import {
   type RecordedTransaction,
 } from "@/lib/query-counter.test-support";
 import { unansweredLoadProblems, type UnansweredAllowances } from "./unanswered-loads";
-import { SECURITY_QUESTIONS } from "@/lib/security-questions";
+import { DASHBOARD_FIXTURES, DASHBOARD_JWT_SECRET, DASHBOARD_STUDENT_ID } from "./dashboard-fixtures.test-support";
 import { signToken } from "@/lib/session-token";
 
 // Set to the measured value. A change to any of these is a change in what the
@@ -68,36 +67,49 @@ import { signToken } from "@/lib/session-token";
 // The 2026-11-10 review estimated about 39 app queries by reading. It missed
 // the mood check-in gate (1) and counted the reader block as 24, not 25.
 // H6 (Sage notice gate in the student layout) added 1: 40 to 41.
-const DASHBOARD_APP_QUERIES_COLD = 41;
+// F2 step 2 (2026-11-10): 41 to 34. The layout and page share one read of the
+// planning-goal count, progression and orientation count (getStudentShell),
+// and the page reads every other fact once, grouped into transactions
+// (src/lib/dashboard/student-dashboard.ts): 7 repeated reads gone, and 25
+// reads now cost 1 round trip each inside three transactions instead of 4.
+const DASHBOARD_APP_QUERIES_COLD = 34;
 /** The session lookup and its revocation check; both cached for seconds. */
 const DASHBOARD_ADMIN_QUERIES_COLD = 2;
-/** Nothing on the app client is cached today, so warm equals cold. */
-const DASHBOARD_APP_QUERIES_WARM = 41;
+/**
+ * The shell is kept per student once a Progression row exists, so warm skips its 3 reads.
+ * F2 step 3: both one-time gates are satisfied for this student and kept, so warm skips 2 more.
+ * F2 step 4: the orientation total and the Ready-to-Work templates are global and kept: 2 more.
+ */
+const DASHBOARD_APP_QUERIES_WARM = 27;
 const DASHBOARD_ADMIN_QUERIES_WARM = 0;
 /** [app, admin] nested relation loads, counted only below a level that returned rows. */
 const DASHBOARD_NESTED_LOADS_COLD: [number, number] = [3, 0];
 /**
  * M1: app plus admin round trips, what `node scripts/readiness/query-count.mjs dashboard` prints.
  * An admin call costs a round trip too, so both clients count.
+ * F2 step 2: 167 to 79 cold, 165 to 70 warm. Step 3 (gates kept once satisfied): warm 70 to 62.
+ * Step 4 (global rows kept): warm 62 to 54.
  */
-const DASHBOARD_ROUND_TRIPS_COLD = 167;
-const DASHBOARD_ROUND_TRIPS_WARM = 165;
+const DASHBOARD_ROUND_TRIPS_COLD = 79;
+const DASHBOARD_ROUND_TRIPS_WARM = 54;
 /** "file › function" -> [app, admin] for the cold render. */
 const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
   "src/lib/session-revocation.ts › (anonymous)": [0, 1],
   "src/lib/auth.ts › (anonymous)": [0, 1],
-  "src/app/(student)/layout.tsx › StudentLayout": [4, 0],
   "src/lib/consent.ts › hasAcknowledgedSageNotice": [1, 0],
-  "src/app/(student)/dashboard/page.tsx › DashboardPage": [2, 0],
-  "src/lib/progression/fetch-readiness-data.ts › fetchStudentReadinessData": [8, 0],
-  "src/lib/dashboard/readers.ts › readOverview": [7, 0],
-  "src/lib/dashboard/readers.ts › readActivity": [1, 0],
+  "src/lib/dashboard/student-gates.ts › readQuestionKeys": [1, 0],
+  "src/lib/dashboard/signals.ts › readShell": [3, 0],
   "src/lib/dashboard/tasks.ts › (anonymous)": [2, 0],
-  "src/lib/dashboard/support.ts › readSupport": [2, 0],
-  "src/lib/progression/student-next-step.ts › getStudentNextStep": [9, 0],
-  "src/lib/student-alerts.ts › countStudentVisibleAlerts": [2, 0],
-  "src/lib/student-alerts.ts › countStudentVisibleAlertsOfType": [1, 0],
   "src/lib/sage/panel-data.ts › getLatestPanelSpec": [1, 0],
+  "src/lib/dashboard/signals.ts › readReadinessSignals": [5, 0],
+  "src/lib/dashboard/live.ts › readCounts": [4, 0],
+  "src/lib/student-alerts.ts › countStudentVisibleAlerts": [1, 0],
+  "src/lib/student-alerts.ts › countStudentVisibleAlertsOfType": [1, 0],
+  "src/lib/dashboard/globals.ts › readOrientationTotal": [1, 0],
+  "src/lib/dashboard/globals.ts › readReadyToWorkTemplates": [1, 0],
+  "src/lib/dashboard/live.ts › readPageOnly": [2, 0],
+  "src/lib/dashboard/signals.ts › readNextStepSignals": [6, 0],
+  "src/lib/dashboard/signals.ts › readOverviewSignals": [4, 0],
   "src/lib/mood.ts › hasMoodEntryToday": [1, 0],
 };
 /**
@@ -107,65 +119,13 @@ const DASHBOARD_COLD_BY_FUNCTION: Record<string, [number, number]> = {
  */
 const DASHBOARD_UNANSWERED_WITH_NESTED: UnansweredAllowances = {};
 
-const STUDENT_ID = "stu-readiness-001";
-const NOW = new Date("2026-11-10T15:00:00.000Z");
+const STUDENT_ID = DASHBOARD_STUDENT_ID;
 const SESSION_COOKIE = "vq-session";
 
-process.env.JWT_SECRET = "readiness-query-count-jwt-secret-for-tests-only";
+process.env.JWT_SECRET = DASHBOARD_JWT_SECRET;
 const sessionToken = signToken(STUDENT_ID, "student", 0);
-const progressionState = JSON.stringify(createInitialState());
 
-const taskRow = {
-  id: "task-1", studentId: STUDENT_ID, createdById: "tch-1", appointmentId: null,
-  title: "Finish your resume", description: null, status: "open", priority: "normal",
-  dueAt: null, completedAt: null, createdAt: NOW, updatedAt: NOW,
-};
-
-const counter = createQueryCounter({
-  // Session (admin client).
-  "admin:sageConfirmationUse.findUnique": null,
-  "admin:student.findUnique": {
-    id: STUDENT_ID, studentId: "readiness-student", displayName: "Riley Fixture",
-    role: "student", sessionVersion: 0, isActive: true, demoAccount: null,
-  },
-  // Layout and page.
-  "goal.count": 2,
-  "progression.findUnique": { state: progressionState },
-  "orientationProgress.count": 3,
-  "securityQuestionAnswer.findMany": SECURITY_QUESTIONS.map((question) => ({ questionKey: question.key })),
-  // The Sage notice is acknowledged, so no redirect to /sage-notice (H6).
-  "consentRecord.findFirst": { id: "consent-notice" },
-  "notificationPreference.findUnique": null,
-  "formSubmission.count": 1,
-  // Readiness.
-  "orientationItem.count": 8,
-  "goal.findFirst": null,
-  "certification.count": 0,
-  "portfolioItem.count": 1,
-  "resumeData.findUnique": { id: "resume-1" },
-  "publicCredentialPage.findUnique": null,
-  // Overview, activity, tasks.
-  "certification.findMany": [{
-    id: "cert-1", studentId: STUDENT_ID, certType: "ready-to-work", status: "in_progress",
-    verificationStatus: null,
-    requirements: [{ id: "req-1", templateId: "tpl-1", completed: true, verifiedBy: null }],
-  }],
-  "certTemplate.findMany": [{ id: "tpl-1", certType: "ready-to-work", required: true, needsFile: false, needsVerify: true }],
-  "studentClassEnrollment.findFirst": { class: { requirements: [{ status: "required" }] } },
-  "application.count": 1,
-  "formSubmission.findFirst": { status: "approved" },
-  "studentTask.findMany": [taskRow],
-  "studentTask.count": 1,
-  // Support and next step.
-  "careerDiscovery.findUnique": { status: "complete" },
-  "message.count": 6,
-  "studentSavedJob.count": 1,
-  "studentAlert.count": 1,
-  "appointment.findFirst": { id: "appt-1", title: "Advising check-in", startsAt: NOW, locationLabel: "Room 2" },
-  "orientationItem.findMany": [{ id: "item-1", label: "Sign the attendance policy" }],
-  "sagePanel.findFirst": null,
-  "moodEntry.findFirst": null,
-});
+const counter = createQueryCounter(DASHBOARD_FIXTURES);
 
 mock.module("@/lib/db", { exports: counter.dbModule });
 mock.module("next/headers", {

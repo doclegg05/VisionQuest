@@ -8,6 +8,10 @@
 //            chat-send      M3, POST /api/chat/send before its first word: the
 //                           larger of the round trips before the route builds
 //                           its stream and before it first calls the provider
+//            dashboard-idle M2, statements per minute an open, idle student
+//                           dashboard costs through its polls. A rate, not a
+//                           render: --cache and --unit do not apply to it,
+//                           --client does
 //
 // The last line of stdout is the count as a bare number, printed only when
 // the measurement ran clean. By default it is the cold count in estimated
@@ -51,6 +55,7 @@ export const PATHS = {
   dashboard: { metric: "M1", test: "src/lib/readiness/dashboard-query-count.test.tsx" },
   "teacher-home": { metric: "M6", test: "src/lib/readiness/teacher-home-query-count.test.tsx" },
   "chat-send": { metric: "M3", test: "src/lib/readiness/chat-send-query-count.test.ts" },
+  "dashboard-idle": { metric: "M2", test: "src/lib/readiness/dashboard-idle-query-count.test.ts", rate: true },
 };
 const DEFAULT_CLIENT = "all";
 const CACHES = ["cold", "warm"];
@@ -62,6 +67,24 @@ const COUNT_FIELDS = [
 const COUNT_LINE = new RegExp(
   `QUERY_COUNT path=(\\S+) cache=(cold|warm) ${COUNT_FIELDS.map((field) => `${field}=(\\d+)`).join(" ")}`,
 );
+
+const RATE_LINE = /IDLE_RATE path=(\S+) windowMs=(\d+) ticks=(\d+) appPerMinute=([\d.]+) adminPerMinute=([\d.]+) perMinute=([\d.]+)/;
+
+/** The idle rate a rate path's test printed, or null. */
+export function parseRate(name, output) {
+  for (const line of output.split("\n")) {
+    const match = RATE_LINE.exec(line);
+    if (!match || match[1] !== name) continue;
+    const [windowMs, ticks, app, admin] = match.slice(2, 6).map(Number);
+    return { windowMs, ticks, app, admin };
+  }
+  return null;
+}
+
+/** Statements per minute for the chosen client. */
+export function rateTotal(rate, { client }) {
+  return (client === "admin" ? 0 : rate.app) + (client === "app" ? 0 : rate.admin);
+}
 
 const BOUNDARY_LINE = /QUERY_BOUNDARY path=(\S+) cache=(cold|warm) beforeStream=(\d+) beforeProvider=(\d+)/;
 
@@ -148,11 +171,29 @@ export function total(count, { client, unit }) {
   return app + admin + count.read;
 }
 
+function reportRate(options, target, run, output) {
+  const rate = parseRate(options.name, output);
+  if (!rate) {
+    console.error(output);
+    console.error(`No idle rate was printed by ${target.test}.`);
+    process.exit(2);
+  }
+  console.log(`${target.metric} ${options.name}: measured by running ${target.test}`);
+  console.log(`  ${rate.ticks} poll moments in ${rate.windowMs / 60_000} simulated minutes; statements a minute: app ${rate.app}, admin ${rate.admin}`);
+  console.log(`reporting: statements per minute, ${options.client === "all" ? "app + admin" : options.client}`);
+  if (run.status !== 0) {
+    console.error(`${target.test} failed: the measured rate no longer matches the pinned value, or the path broke. Run it to see which. No number is reported.`);
+    process.exit(1);
+  }
+  console.log(String(rateTotal(rate, options)));
+}
+
 function main() {
   const options = parseArguments(process.argv.slice(2));
   const target = PATHS[options.name];
   const run = runTest(target.test);
   const output = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
+  if (target.rate) return reportRate(options, target, run, output);
   const counts = parseCounts(options.name, output);
   const chosen = counts[options.cache];
 

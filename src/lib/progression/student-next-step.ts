@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { GOAL_PLANNING_STATUSES } from "@/lib/goals";
 import {
@@ -305,6 +306,76 @@ export function nextStepShortLabel(result: StudentNextStepResult): string | null
   return result.steps.find((step) => step.key === result.currentStepKey)?.label ?? null;
 }
 
+/** Every fact the next step reads besides readiness, already counted. */
+export interface NextStepFacts {
+  careerDiscoveryComplete: boolean;
+  goalCount: number;
+  monthlyGoalCount: number;
+  sageProposedUnconfirmedGoalCount: number;
+  discoveryAssistantTurnCount: number;
+  completedMilestoneCount: number;
+  savedJobCount: number;
+  applicationCount: number;
+  openAlertCount: number;
+  jobsReadyAlertCount: number;
+  openTaskCount: number;
+}
+
+/**
+ * The next step's reads, as Prisma arguments. One definition, so a caller
+ * that runs them on another client (the student dashboard reads them inside
+ * one transaction) asks exactly what `getStudentNextStep` asks. Alert counts
+ * are not here: every student read of StudentAlert goes through
+ * src/lib/student-alerts.ts.
+ */
+export function nextStepQueries(studentId: string) {
+  // Planning statuses that can still be awaiting instructor confirmation —
+  // "confirmed" and "completed" goals are settled by definition.
+  const unconfirmablePlanningStatuses = GOAL_PLANNING_STATUSES.filter(
+    (status) => status !== "confirmed" && status !== "completed",
+  );
+  return {
+    careerDiscovery: { where: { studentId }, select: { status: true } },
+    goalCount: { where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } } },
+    monthlyGoalCount: { where: { studentId, level: "monthly", status: { in: [...GOAL_PLANNING_STATUSES] } } },
+    sageProposedUnconfirmedGoalCount: {
+      where: { studentId, status: { in: unconfirmablePlanningStatuses }, sourceMessageId: { not: null }, confirmedAt: null },
+    },
+    discoveryAssistantTurnCount: { where: { studentId, role: "assistant", conversation: { stage: "discovery" } } },
+    completedMilestoneCount: { where: { studentId, level: { in: ["weekly", "task", "daily"] }, status: "completed" } },
+    savedJobCount: { where: { studentId } },
+    applicationCount: { where: { studentId } },
+    openTaskCount: { where: { studentId, status: { in: ["open", "in_progress"] } } },
+  } satisfies {
+    careerDiscovery: Prisma.CareerDiscoveryFindUniqueArgs;
+    goalCount: Prisma.GoalCountArgs;
+    monthlyGoalCount: Prisma.GoalCountArgs;
+    sageProposedUnconfirmedGoalCount: Prisma.GoalCountArgs;
+    discoveryAssistantTurnCount: Prisma.MessageCountArgs;
+    completedMilestoneCount: Prisma.GoalCountArgs;
+    savedJobCount: Prisma.StudentSavedJobCountArgs;
+    applicationCount: Prisma.ApplicationCountArgs;
+    openTaskCount: Prisma.StudentTaskCountArgs;
+  };
+}
+
+/** The next step from facts already read. Pure. */
+export function nextStepFromFacts(readinessData: StudentReadinessData, facts: NextStepFacts): StudentNextStepResult {
+  const { state, bhagCompleted } = readinessData;
+  // Journey step 0. buildReadinessSnapshot already resolved the all-items
+  // convention into state.orientationComplete (persisted flag OR every
+  // orientation item complete); an unseeded checklist never blocks.
+  const orientationComplete = state.orientationComplete || readinessData.orientationProgress.total === 0;
+  const { careerDiscoveryComplete, ...counts } = facts;
+  return resolveStudentNextStep({
+    state,
+    orientationComplete,
+    bhagCompleted,
+    hasCompletedDiscovery: careerDiscoveryComplete,
+    ...counts,
+  });
+}
+
 export async function getStudentNextStep(
   studentId: string,
   /**
@@ -313,96 +384,29 @@ export async function getStudentNextStep(
    */
   preloadedReadinessData?: StudentReadinessData | Promise<StudentReadinessData>,
 ): Promise<StudentNextStepResult> {
-  // Planning statuses that can still be awaiting instructor confirmation —
-  // "confirmed" and "completed" goals are settled by definition.
-  const unconfirmablePlanningStatuses = GOAL_PLANNING_STATUSES.filter(
-    (status) => status !== "confirmed" && status !== "completed",
-  );
-
+  const q = nextStepQueries(studentId);
   // Run ALL queries in parallel, including readiness data if not preloaded.
-  // This reduces waterfall from (readiness → 10 queries) to (readiness + 10 queries).
   const [
-    readinessData,
-    careerDiscovery,
-    goalCount,
-    monthlyGoalsCount,
-    sageProposedUnconfirmedCount,
-    discoveryAssistantTurns,
-    completedMilestonesCount,
-    savedJobsCount,
-    applicationsCount,
-    openAlertsCount,
-    jobsReadyAlertsCount,
-    openTasksCount,
+    readinessData, careerDiscovery, goalCount, monthlyGoalCount, sageProposedUnconfirmedGoalCount,
+    discoveryAssistantTurnCount, completedMilestoneCount, savedJobCount, applicationCount,
+    openAlertCount, jobsReadyAlertCount, openTaskCount,
   ] = await Promise.all([
     preloadedReadinessData ?? fetchStudentReadinessData(studentId),
-    prisma.careerDiscovery.findUnique({
-      where: { studentId },
-      select: { status: true },
-    }),
-    prisma.goal.count({
-      where: { studentId, status: { in: [...GOAL_PLANNING_STATUSES] } },
-    }),
-    prisma.goal.count({
-      where: {
-        studentId,
-        level: "monthly",
-        status: { in: [...GOAL_PLANNING_STATUSES] },
-      },
-    }),
-    prisma.goal.count({
-      where: {
-        studentId,
-        status: { in: unconfirmablePlanningStatuses },
-        sourceMessageId: { not: null },
-        confirmedAt: null,
-      },
-    }),
-    prisma.message.count({
-      where: {
-        studentId,
-        role: "assistant",
-        conversation: { stage: "discovery" },
-      },
-    }),
-    prisma.goal.count({
-      where: { studentId, level: { in: ["weekly", "task", "daily"] }, status: "completed" },
-    }),
-    prisma.studentSavedJob.count({
-      where: { studentId },
-    }),
-    prisma.application.count({
-      where: { studentId },
-    }),
+    prisma.careerDiscovery.findUnique(q.careerDiscovery),
+    prisma.goal.count(q.goalCount),
+    prisma.goal.count(q.monthlyGoalCount),
+    prisma.goal.count(q.sageProposedUnconfirmedGoalCount),
+    prisma.message.count(q.discoveryAssistantTurnCount),
+    prisma.goal.count(q.completedMilestoneCount),
+    prisma.studentSavedJob.count(q.savedJobCount),
+    prisma.application.count(q.applicationCount),
     countStudentVisibleAlerts(studentId),
     countStudentVisibleAlertsOfType(studentId, "connect_weekly_jobs_ready"),
-    prisma.studentTask.count({
-      where: { studentId, status: { in: ["open", "in_progress"] } },
-    }),
+    prisma.studentTask.count(q.openTaskCount),
   ]);
-
-  const { state, bhagCompleted } = readinessData;
-
-  // Journey step 0. buildReadinessSnapshot already resolved the all-items
-  // convention into state.orientationComplete (persisted flag OR every
-  // orientation item complete); an unseeded checklist never blocks.
-  const orientationComplete =
-    state.orientationComplete || readinessData.orientationProgress.total === 0;
-
-  return resolveStudentNextStep({
-    state,
-    orientationComplete,
-    bhagCompleted,
-    hasCompletedDiscovery: careerDiscovery?.status === "complete",
-    goalCount,
-    monthlyGoalCount: monthlyGoalsCount,
-    sageProposedUnconfirmedGoalCount: sageProposedUnconfirmedCount,
-    discoveryAssistantTurnCount: discoveryAssistantTurns,
-    completedMilestoneCount: completedMilestonesCount,
-    savedJobCount: savedJobsCount,
-    applicationCount: applicationsCount,
-    openAlertCount: openAlertsCount,
-    jobsReadyAlertCount: jobsReadyAlertsCount,
-    openTaskCount: openTasksCount,
+  return nextStepFromFacts(readinessData, {
+    careerDiscoveryComplete: careerDiscovery?.status === "complete",
+    goalCount, monthlyGoalCount, sageProposedUnconfirmedGoalCount, discoveryAssistantTurnCount,
+    completedMilestoneCount, savedJobCount, applicationCount, openAlertCount, jobsReadyAlertCount, openTaskCount,
   });
 }
