@@ -101,21 +101,21 @@ describe("followUpMessage", () => {
     for (const action of ACTIONS) {
       const message = followUpMessage(action, "already-handled");
       assert.equal(message.tone, "success");
-      assert.match(message.text, /The alert was already handled\.$/);
+      assert.match(message.text, /The alert was already dealt with\.$/);
       assert.doesNotMatch(message.text, /could not|changed|closed|someone/i);
     }
-    assert.equal(followUpMessage({ kind: "task" }, "already-handled").text, "Task saved. The alert was already handled.");
+    assert.equal(followUpMessage({ kind: "task" }, "already-handled").text, "Task saved. The alert was already dealt with.");
     assert.equal(
       followUpMessage({ kind: "form", status: "approved" }, "already-handled").text,
-      "Form approved. The alert was already handled.",
+      "Form approved. The alert was already dealt with.",
     );
     assert.equal(
       followUpMessage({ kind: "form", status: "rejected" }, "already-handled").text,
-      "Form returned. The alert was already handled.",
+      "Form returned. The alert was already dealt with.",
     );
     assert.equal(
       followUpMessage({ kind: "assign", title: "Resume basics" }, "already-handled").text,
-      '"Resume basics" assigned. The alert was already handled.',
+      '"Resume basics" assigned. The alert was already dealt with.',
     );
   });
 

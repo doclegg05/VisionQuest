@@ -91,7 +91,7 @@ export function followUpMessage(action: FollowUpAction, outcome: LinkedAlertOutc
     case "resolved":
       return { tone: "success", text: resolvedText(action) };
     case "already-handled":
-      return { tone: "success", text: `${saved} The alert was already handled.` };
+      return { tone: "success", text: `${saved} The alert was already dealt with.` };
     case "not-closed":
       // The save worked; only the alert is still open, so the instructor closes it rather than saving again.
       return { tone: "error", text: `${saved} Could not close the alert. Close it from the queue.` };
