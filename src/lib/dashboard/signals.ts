@@ -19,7 +19,7 @@ import { nextStepQueries } from "@/lib/progression/student-next-step";
 import { overviewQueries } from "./readers";
 import { orientationItemsQuery } from "./support";
 import { invalidate } from "@/lib/cache";
-import { cachedWhen, studentCacheKey, type CacheSession } from "./student-cache";
+import { cachedWhen, SLOW_SIGNALS_LAYER, studentCacheKey, type CacheSession } from "./student-cache";
 import { perRequest } from "./per-request";
 
 type Tx = Prisma.TransactionClient;
@@ -144,16 +144,19 @@ export function readSlowSignals(studentId: string): Promise<SlowSignals> {
  * How long a poll may serve slow signals the page or an earlier poll kept.
  * Longer than the poll interval on purpose: a TTL shorter than the poll never
  * serves a poll. What bounds staleness is invalidation, not the TTL: every
- * watched input is cleared on write (./student-cache.ts), and the page render
- * always reads fresh. Five inputs no write clears, so on a poll only, never
- * on a page load, they can lag by up to this long:
- * 1. the discovery chat turn count (`Message`, unwatched because it is
- *    written on every chat turn);
- * 2. `Conversation.stage`, which that count filters on (stage writes are not
- *    watched; only a summary write is);
- * 3. `ClassRequirement`, the class's Ready-to-Work applicability;
- * 4. `StudentClassEnrollment`, which class that requirement is read from;
- * 5. `Pathway.active`, a pathway switched on or off.
+ * input is cleared on write through the app's `prisma` client
+ * (src/lib/chat-context-write-through.ts), and the page render always reads
+ * fresh. That includes the five inputs F2 first left unwatched: a chat
+ * message and a conversation stage change clear the student's kept slow
+ * signals, an enrollment write clears that student, a class requirement write
+ * clears the students enrolled in the class (everyone when that lookup fails
+ * or runs out of time), and any Pathway write clears everyone.
+ *
+ * What can still lag, on a poll only and for up to this long, is a write the
+ * app never sees: a script, a seed, the SQL editor, or any other process
+ * writing to the database while the server runs (see ./student-cache.ts), and
+ * a `prismaAdmin` write whose caller does not clear the cache by hand
+ * (src/lib/db.admin-write-through.test.ts checks the ones it can see).
  */
 export const SLOW_SIGNALS_TTL_SECONDS = 600;
 
@@ -171,7 +174,7 @@ export function sawStudentRows(slow: SlowSignals): boolean {
     || slow.applicability !== null || slow.educationPlanStatus !== null;
 }
 
-const slowKey = (session: CacheSession) => studentCacheKey(session, "slow");
+const slowKey = (session: CacheSession) => studentCacheKey(session, SLOW_SIGNALS_LAYER);
 
 /** The slow signals for a poll: kept ones when there are any, else read and kept. */
 export function getSlowSignals(session: CacheSession): Promise<SlowSignals> {

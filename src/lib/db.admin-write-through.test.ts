@@ -233,7 +233,7 @@ describe("prismaAdmin chat-context write-through guard", () => {
     // A model deliberately NOT watched (chat-context-write-through.ts documents
     // why) must not creep in, or the guard would start demanding invalidation
     // for writes nothing caches.
-    assert.ok(!watched.includes("Message"), "Message is deliberately not watched");
+    assert.ok(!watched.includes("ProgressionEvent"), "ProgressionEvent is deliberately not watched");
   });
 
   it("actually scans real source (guards against an empty glob passing vacuously)", () => {
@@ -280,7 +280,7 @@ describe("prismaAdmin chat-context write-through guard", () => {
       const source = `import { prisma, prismaAdmin } from "@/lib/db";
         await prisma.appointment.update({ where: {}, data: {} });
         await prismaAdmin.appointment.findMany({});
-        await prismaAdmin.message.create({ data: {} });`;
+        await prismaAdmin.progressionEvent.create({ data: {} });`;
       assert.deepEqual(findAdminWatchedWrites(source, watched), []);
     });
 

@@ -5,6 +5,8 @@ import {
   applyChatContextWriteThrough,
   isChatContextWrite,
   type CertificationOwners,
+  type ClassMembers,
+  type WriteThroughLookups,
 } from "./chat-context-write-through";
 import { logger } from "./logger";
 
@@ -283,6 +285,22 @@ const certificationOwners: CertificationOwners = async (certificationIds) => {
 };
 
 /**
+ * The students enrolled in the classes a ClassRequirement write touched, any
+ * enrollment status, so the write-through clears only them. Same client and
+ * bound as `certificationOwners`; an error or no answer in time makes the
+ * write clear everyone.
+ */
+const classMembers: ClassMembers = async (classIds) => {
+  const rows = await adminClient.studentClassEnrollment.findMany({
+    where: { classId: { in: [...classIds] } },
+    select: { studentId: true },
+  });
+  return rows.map((row) => row.studentId);
+};
+
+const writeThroughLookups: WriteThroughLookups = { certificationOwners, classMembers };
+
+/**
  * Prisma extension: chat-context write-through invalidation.
  *
  * The shared app client is the one boundary EVERY write path crosses — route
@@ -303,7 +321,7 @@ const chatContextWriteThroughExtension = Prisma.defineExtension((client) =>
         if (!isChatContextWrite(model, operation)) return query(args);
         return (async () => {
           const result = await query(args);
-          await applyChatContextWriteThrough(model, operation, args, result, certificationOwners);
+          await applyChatContextWriteThrough(model, operation, args, result, writeThroughLookups);
           return result;
         })();
       },
