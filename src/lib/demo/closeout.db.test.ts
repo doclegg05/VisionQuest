@@ -173,7 +173,16 @@ if (!SHOULD_RUN) {
     }
 
     /** A row the demo universe wrote, by its own id, or the closeout's own audit row. A kept row that names a demo id still counts. */
-    const isDemoRow = (row: Row) => (typeof row.id === "string" && row.id.startsWith(demo.prefix)) || row.action === "demo.closeout";
+    // A row with an id is demo by its id. A row without one (RegionCoordinator, RegionInstructor and
+    // SpokesClassInstructor key on two ids, StudentWorkProfile on studentId) is demo when the account
+    // or class it keys on is. Not any value: the shared Region carries the demo prefix, and a real
+    // coordinator's row in it must still count as kept.
+    const ACCOUNT_KEYS = ["studentId", "instructorId", "coordinatorId", "classId"];
+    const isDemoRow = (row: Row) =>
+      row.action === "demo.closeout" ||
+      (typeof row.id === "string"
+        ? row.id.startsWith(demo.prefix)
+        : ACCOUNT_KEYS.some((key) => typeof row[key] === "string" && String(row[key]).startsWith(demo.prefix)));
     const refusalCodes = (outcome: CloseoutOutcome): RefusalCode[] => outcome.refusals.map((refusal) => refusal.code);
 
     /** A copy of a seeded row with some columns changed, tracked for cleanup. */
@@ -495,7 +504,8 @@ if (!SHOULD_RUN) {
       const failing = (tx: CloseoutTx): CloseoutTx => new Proxy(tx, {
         get(target, property) {
           const value: unknown = Reflect.get(target, property, target);
-          if (typeof property !== "string" || property.startsWith("$") || typeof value !== "object" || value === null) return value;
+          // Model tables only: Prisma reads its own internals (`_tracingHelper` and others) through this proxy too.
+          if (typeof property !== "string" || property.startsWith("$") || typeof value !== "object" || value === null || !("deleteMany" in value)) return value;
           const table = tableOf(target, property);
           return {
             count: table.count.bind(table), findMany: table.findMany.bind(table), create: table.create.bind(table), updateMany: table.updateMany.bind(table),
