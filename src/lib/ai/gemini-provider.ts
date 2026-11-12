@@ -1,4 +1,4 @@
-import { linkedController } from "./abort";
+import { linkedController, type LinkedAbort } from "./abort";
 import { assertCloudInferenceAllowed } from "./demo-local-only";
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory, SchemaType, type Content, type EnhancedGenerateContentResponse, type FunctionDeclaration, type GenerateContentStreamResult, type Part, type SafetySetting, type Schema, type SingleRequestOptions, type Tool, type UsageMetadata } from "@google/generative-ai";
 import { randomUUID } from "crypto";
@@ -209,7 +209,7 @@ async function establishStream(
   iterator: AsyncIterator<EnhancedGenerateContentResponse>;
   first: IteratorResult<EnhancedGenerateContentResponse>;
   /** Aborts the live request. Survives establishment so the stall guard can use it. */
-  controller: AbortController;
+  controller: LinkedAbort;
 }> {
   return withTransientRetry(async () => {
     // One controller per attempt: aborting a timed-out attempt must not
@@ -259,7 +259,7 @@ export class GeminiProvider implements AIProvider {
    */
   private nextChunk(
     iterator: AsyncIterator<EnhancedGenerateContentResponse>,
-    controller: AbortController,
+    controller: LinkedAbort,
   ): Promise<IteratorResult<EnhancedGenerateContentResponse>> {
     return withDeadline(
       iterator.next(),
