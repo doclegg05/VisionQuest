@@ -23,7 +23,7 @@ const ALLOWED_IMPORTS = new Set(["./crisis-patterns", "./crisis-patterns-residua
 
 function importsOf(path: string): string[] {
   const source = readFileSync(path, "utf8");
-  return [...source.matchAll(/^import[^;]*?from\s+"([^"]+)"/gms)].map((match) => match[1]);
+  return [...source.matchAll(/^import[^;]*?from\s+"([^"]+)"/gm)].map((match) => match[1]);
 }
 
 describe("the crisis patterns load in the browser (E9b 1)", () => {
