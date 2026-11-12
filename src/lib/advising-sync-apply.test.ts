@@ -330,6 +330,60 @@ describe("applyStudentAlertSyncPlan and a teacher's hold", () => {
   });
 });
 
+// The sync reads its alerts before its transaction (loadStudentAlertSyncContext),
+// so a teacher can dismiss or snooze one in between. Every status change is
+// conditional on the state the sync read, so that teacher's decision is kept.
+describe("applyStudentAlertSyncPlan and a hold that lands after the read", () => {
+  function teacherDismisses(alert: AlertDescriptor): void {
+    rows.set(alert.alertKey, { ...stored(alert), status: "dismissed", dismissedAt: NEXT_DAY });
+  }
+
+  it("keeps a dismiss of an open alert that is still found", async () => {
+    seed(STALLED);
+    const existing = readExisting();
+    teacherDismisses(STALLED);
+
+    await runSync(THREE_WEEKS_LATER, [STALLED_LONGER], existing);
+
+    assert.equal(stored(STALLED).status, "dismissed");
+    assert.deepEqual(stored(STALLED).dismissedAt, NEXT_DAY);
+    assert.equal(stored(STALLED).summary, STALLED_LONGER.summary, "the text is still refreshed");
+  });
+
+  it("keeps a dismiss of an open alert whose condition has cleared", async () => {
+    seed(STALLED);
+    const existing = readExisting();
+    teacherDismisses(STALLED);
+
+    await runSync(THREE_WEEKS_LATER, [], existing);
+
+    assert.equal(stored(STALLED).status, "dismissed");
+    assert.equal(stored(STALLED).resolvedAt, null);
+  });
+
+  it("keeps a dismiss of a resolved alert whose condition returns", async () => {
+    seed(STALLED, { status: "resolved", resolvedAt: NEXT_DAY });
+    const existing = readExisting();
+    teacherDismisses(STALLED);
+
+    await runSync(THREE_WEEKS_LATER, [STALLED], existing);
+
+    assert.equal(stored(STALLED).status, "dismissed");
+  });
+
+  it("keeps a snooze of an open alert that is still found", async () => {
+    const until = new Date(THREE_WEEKS_LATER.getTime() + 24 * 60 * 60 * 1000);
+    seed(STALLED);
+    const existing = readExisting();
+    rows.set(STALLED.alertKey, { ...stored(STALLED), status: "snoozed", snoozedUntil: until, snoozedBy: "teacher-1" });
+
+    await runSync(THREE_WEEKS_LATER, [STALLED], existing);
+
+    assert.equal(stored(STALLED).status, "snoozed");
+    assert.deepEqual(stored(STALLED).snoozedUntil, until);
+  });
+});
+
 // The sync runs for every active student each morning and after student
 // activity, inside one interactive transaction: its cost is round trips.
 describe("applyStudentAlertSyncPlan round trips", () => {

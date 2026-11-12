@@ -1,7 +1,7 @@
 import "server-only";
 
 import { buildStudentAlertDescriptors, type AlertDescriptor } from "./advising-alerts";
-import { isHeldByTeacher } from "./alert-hold";
+import { type DetectedAlertWriter, writeDetectedAlert } from "./alert-hold";
 import { prisma } from "./db";
 import { buildGoalEvidenceEntries, buildGoalReviewQueue } from "./goal-evidence";
 import { parseState } from "./progression/engine";
@@ -238,24 +238,48 @@ export function buildStudentAlertSyncPlan({
   };
 }
 
-/** The part of the app client, or of its transaction, that reads alerts. */
-type AlertReader = { studentAlert: Pick<typeof prisma.studentAlert, "findMany"> };
+type ExistingAlert = StudentAlertSyncContext["existing"][number];
 
 /**
- * Which of these alerts are open right now. `existing` cannot say: it holds no
- * resolved rows, and only the alert types the context read lists.
+ * Writes one alert the sync wants open. `prev` is what the context read found, before this transaction, so a teacher
+ * can dismiss or snooze the alert in between. Every status change is therefore conditional on the state that was read
+ * (`writeDetectedAlert`, the detectors' writer), and a hold that landed since is kept.
+ *
+ * The context read lists no resolved rows, so an alert it did not find is resolved, missing, or open but of a type the
+ * read leaves out. Only a row that is still resolved is reopened, as a new spell; anything else gets its text, or is
+ * created if it does not exist.
  */
-async function readOpenAlertKeys(
-  tx: AlertReader,
+async function writeSyncAlert(
+  tx: DetectedAlertWriter,
   studentId: string,
-  alertKeys: string[],
-): Promise<Set<string>> {
-  if (alertKeys.length === 0) return new Set();
-  const open = await tx.studentAlert.findMany({
-    where: { studentId, alertKey: { in: alertKeys }, status: "open" },
-    select: { alertKey: true },
+  prev: ExistingAlert | undefined,
+  alert: AlertDescriptor,
+  now: Date,
+): Promise<void> {
+  const text = {
+    severity: alert.severity,
+    title: alert.title,
+    summary: alert.summary,
+    sourceType: alert.sourceType,
+    sourceId: alert.sourceId,
+  };
+  const detected = { studentId, alertKey: alert.alertKey, type: alert.type, ...text };
+  if (prev) {
+    await writeDetectedAlert(tx, prev, detected, now);
+    return;
+  }
+  const { count } = await tx.studentAlert.updateMany({
+    where: { alertKey: alert.alertKey, status: "resolved" },
+    data: {
+      ...text,
+      status: "open",
+      detectedAt: now,
+      resolvedAt: null,
+      snoozedUntil: null,
+      snoozedBy: null,
+    },
   });
-  return new Set(open.map((alert) => alert.alertKey));
+  if (count === 0) await writeDetectedAlert(tx, undefined, detected, now);
 }
 
 export async function applyStudentAlertSyncPlan({
@@ -273,51 +297,8 @@ export async function applyStudentAlertSyncPlan({
   const existingByKey = new Map(existing.map((alert) => [alert.alertKey, alert]));
 
   await prisma.$transaction(async (tx) => {
-    const openKeys = await readOpenAlertKeys(tx, studentId, [...desiredKeys]);
-
     for (const alert of desiredAlerts) {
-      if (isHeldByTeacher(existingByKey.get(alert.alertKey), now)) {
-        await tx.studentAlert.update({
-          where: { alertKey: alert.alertKey },
-          data: {
-            severity: alert.severity,
-            title: alert.title,
-            summary: alert.summary,
-            sourceType: alert.sourceType,
-            sourceId: alert.sourceId,
-          },
-        });
-      } else {
-        await tx.studentAlert.upsert({
-          where: { alertKey: alert.alertKey },
-          update: {
-            severity: alert.severity,
-            status: "open",
-            title: alert.title,
-            summary: alert.summary,
-            sourceType: alert.sourceType,
-            sourceId: alert.sourceId,
-            // detectedAt is when this spell of the alert began, and the queue
-            // prints it as the alert's age. Only a reopened alert restarts it.
-            ...(openKeys.has(alert.alertKey) ? {} : { detectedAt: now }),
-            resolvedAt: null,
-            snoozedUntil: null,
-            snoozedBy: null,
-          },
-          create: {
-            studentId,
-            alertKey: alert.alertKey,
-            type: alert.type,
-            severity: alert.severity,
-            status: "open",
-            title: alert.title,
-            summary: alert.summary,
-            sourceType: alert.sourceType,
-            sourceId: alert.sourceId,
-            detectedAt: now,
-          },
-        });
-      }
+      await writeSyncAlert(tx, studentId, existingByKey.get(alert.alertKey), alert, now);
     }
 
     const staleNonDismissedIds = existing
@@ -326,7 +307,8 @@ export async function applyStudentAlertSyncPlan({
 
     if (staleNonDismissedIds.length > 0) {
       await tx.studentAlert.updateMany({
-        where: { id: { in: staleNonDismissedIds } },
+        // Only rows still open or snoozed: a dismiss that landed after the read stays a dismiss.
+        where: { id: { in: staleNonDismissedIds }, status: { in: ["open", "snoozed"] } },
         data: {
           status: "resolved",
           resolvedAt: now,

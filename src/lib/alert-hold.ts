@@ -43,8 +43,17 @@ export interface DetectedAlert {
  * dismiss or snooze that commits after the read is kept (PR #248 review):
  * Postgres re-checks an UPDATE's WHERE against the latest committed row.
  */
+/** The writes `writeDetectedAlert` makes. Narrow, so the app client's extended transaction fits as well as a plain one. */
+export interface DetectedAlertWriter {
+  studentAlert: {
+    upsert(args: Prisma.StudentAlertUpsertArgs): PromiseLike<unknown>;
+    updateMany(args: Prisma.StudentAlertUpdateManyArgs): PromiseLike<Prisma.BatchPayload>;
+    update(args: Prisma.StudentAlertUpdateArgs): PromiseLike<unknown>;
+  };
+}
+
 export async function writeDetectedAlert(
-  tx: Prisma.TransactionClient,
+  tx: DetectedAlertWriter,
   prev: AlertHoldState | undefined,
   alert: DetectedAlert,
   now: Date,
