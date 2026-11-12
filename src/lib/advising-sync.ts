@@ -293,8 +293,9 @@ async function writeSyncAlert(
     sourceType: alert.sourceType,
     sourceId: alert.sourceId,
   };
+  const detected = { studentId, alertKey: alert.alertKey, type: alert.type, ...text };
   if (prev) {
-    await writeDetectedAlert(tx, prev, { studentId, alertKey: alert.alertKey, type: alert.type, ...text }, now);
+    await writeDetectedAlert(tx, prev, detected, now);
     return;
   }
   if (resolved) {
@@ -310,7 +311,7 @@ async function writeSyncAlert(
   const row = await tx.studentAlert.upsert({
     where: { alertKey: alert.alertKey },
     update: text,
-    create: { studentId, alertKey: alert.alertKey, type: alert.type, ...text, status: "open", detectedAt: now },
+    create: { ...detected, status: "open", detectedAt: now },
     select: { studentId: true },
   });
   if (!belongsTo(row, studentId)) {
