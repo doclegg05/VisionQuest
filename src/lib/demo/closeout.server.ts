@@ -68,10 +68,12 @@ export async function tryCreateLock(tx: CloseoutTx): Promise<boolean> {
 /**
  * Every migration the ledger lists as finished and not rolled back. Prisma
  * keeps the ledger in the first schema the datasource lists (visionquest
- * here); an older setup has it in public. Null when there is no ledger.
+ * here); an older setup has it in public. Null when there is no ledger, or
+ * the role may not read it: a failed read would abort the transaction, and a
+ * role that cannot read the ledger is refused as a schema mismatch anyway.
  */
 async function appliedMigrations(tx: CloseoutTx): Promise<string[] | null> {
-  const found = await tx.$queryRaw`SELECT to_regclass('visionquest._prisma_migrations') IS NOT NULL AS in_app_schema, to_regclass('public._prisma_migrations') IS NOT NULL AS in_public`;
+  const found = await tx.$queryRaw`SELECT coalesce(has_table_privilege(to_regclass('visionquest._prisma_migrations'), 'SELECT'), false) AS in_app_schema, coalesce(has_table_privilege(to_regclass('public._prisma_migrations'), 'SELECT'), false) AS in_public`;
   let rows: unknown;
   if (firstValue(found, "in_app_schema") === true) {
     rows = await tx.$queryRaw`SELECT DISTINCT migration_name AS name FROM visionquest."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
@@ -173,7 +175,8 @@ export async function countOrphans(tx: CloseoutTx, probe: OrphanProbe): Promise<
   const table = quoted(probe.model);
   const column = quoted(probe.column);
   const kind = probe.only ? Prisma.sql`AND t.${quoted(probe.only.column)} IN (${Prisma.join([...probe.only.values])})` : Prisma.empty;
-  const notSentinel = Prisma.sql`t.${column} NOT IN (${Prisma.join([...SENTINEL_ACTORS])}) AND left(t.${column}, ${SENTINEL_PREFIX.length}) <> ${SENTINEL_PREFIX}`;
+  // A number parameter arrives as bigint, and Postgres has no left(text, bigint).
+  const notSentinel = Prisma.sql`t.${column} NOT IN (${Prisma.join([...SENTINEL_ACTORS])}) AND left(t.${column}, ${SENTINEL_PREFIX.length}::int) <> ${SENTINEL_PREFIX}`;
   const query = Prisma.sql`SELECT count(*)::int AS orphans FROM visionquest.${table} t WHERE t.${column} IS NOT NULL AND ${notSentinel} ${kind} AND NOT EXISTS (SELECT 1 FROM visionquest.${quoted(probe.parent)} p WHERE p.id = t.${column})`;
   return countIn(await tx.$queryRaw(query));
 }

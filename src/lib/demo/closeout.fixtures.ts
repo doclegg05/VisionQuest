@@ -132,7 +132,7 @@ export const FAKE_MIGRATION = "20261101000000_fake_newest";
 const LOCK_STATEMENT = /pg_try_advisory_xact_lock/;
 
 /** An orphan probe from closeout.server.ts, with its table, column, kind column (if any) and parent. */
-const ORPHAN_STATEMENT = /^SELECT count\(\*\)::int AS orphans FROM visionquest\."(\w+)" t WHERE t\."(\w+)" IS NOT NULL AND t\."\w+" NOT IN \([?, ]+\) AND left\(t\."\w+", \?\) <> \? (?:AND t\."(\w+)" IN \([?, ]+\) )?AND NOT EXISTS \(SELECT 1 FROM visionquest\."(\w+)" p WHERE/;
+const ORPHAN_STATEMENT = /^SELECT count\(\*\)::int AS orphans FROM visionquest\."(\w+)" t WHERE t\."(\w+)" IS NOT NULL AND t\."\w+" NOT IN \([?, ]+\) AND left\(t\."\w+", \?::int\) <> \? (?:AND t\."(\w+)" IN \([?, ]+\) )?AND NOT EXISTS \(SELECT 1 FROM visionquest\."(\w+)" p WHERE/;
 
 /** A statement built with Prisma.sql, as opposed to a tagged template's strings. */
 function isSql(query: TemplateStringsArray | Prisma.Sql): query is Prisma.Sql {
@@ -431,6 +431,15 @@ export interface SeededUniverse {
 const FIXED_DATE = new Date("2026-11-01T12:00:00.000Z");
 /** A column that names the staff member who acted: verifiedBy, reviewedBy, assignedById, actorId. */
 const ACTOR_COLUMN = /(By|ById)$|^actorId$/;
+/**
+ * Keys a CHECK constraint allows only one of (ResumeVersion_one_opening and
+ * CoverLetter_one_opening, migration 20260905120000_add_connections). The
+ * seeder links the first and leaves the rest null, as Postgres requires.
+ */
+const ONE_OF: ReadonlyMap<string, readonly string[]> = new Map([
+  ["ResumeVersion", ["jobListingId", "jobLeadId"]],
+  ["CoverLetter", ["jobListingId", "jobLeadId"]],
+]);
 const ENUMS = new Map(Prisma.dmmf.datamodel.enums.map((entry) => [entry.name, entry.values[0]?.name]));
 
 class UniverseSeeder {
@@ -528,7 +537,8 @@ class UniverseSeeder {
       if (parent) edge.from.forEach((column, index) => (data[column] = parent[edge.to[index]]));
       else if (edge.required) return null;
     }
-    return data;
+    const [, ...others] = ONE_OF.get(model.name) ?? [];
+    return { ...data, ...Object.fromEntries(others.map((column) => [column, null])) };
   }
 
   /** This universe's one row of `model`, written on first use; null when it could not be written. */

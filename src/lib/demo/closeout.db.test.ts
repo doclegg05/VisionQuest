@@ -264,7 +264,7 @@ if (!SHOULD_RUN) {
     it("applies when a marked account's audit rows are about the demo student's own certification and appointment", async () => {
       await seed();
       for (const model of ["Certification", "Appointment"]) {
-        await copyRow("AuditLog", `${demo.prefix}AuditLog`, { id: `${demo.prefix}AuditLog.${model}`, actorId: demo.staffId, targetType: model.toLowerCase(), targetId: `${demo.prefix}${model}`, createdAt: new Date(0) });
+        await copyRow("AuditLog", `${demo.prefix}AuditLog.x1`, { id: `${demo.prefix}AuditLog.${model}`, actorId: demo.staffId, targetType: model.toLowerCase(), targetId: `${demo.prefix}${model}`, createdAt: new Date(0) });
       }
 
       const outcome = await closeout(db(), { apply: true, expectAccounts: 2 });
@@ -295,7 +295,7 @@ if (!SHOULD_RUN) {
     it("applies when a demo student signed up for a real career event, and keeps that audit row with the demo id replaced", async () => {
       await seed();
       const id = `${demo.prefix}AuditLog.event`;
-      await copyRow("AuditLog", `${demo.prefix}AuditLog`, { id, actorId: demo.studentId, action: "event.registered", targetType: "event", targetId: `${real.prefix}CareerEvent`, createdAt: new Date(0) });
+      await copyRow("AuditLog", `${demo.prefix}AuditLog.x1`, { id, actorId: demo.studentId, action: "event.registered", targetType: "event", targetId: `${real.prefix}CareerEvent`, createdAt: new Date(0) });
 
       const outcome = await closeout(db(), { apply: true, expectAccounts: 2 });
 
@@ -405,20 +405,20 @@ if (!SHOULD_RUN) {
       },
       {
         name: "a marked account's audit row is about an unmarked student", code: "records_about_unmarked_people",
-        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "student", targetId: real.studentId, createdAt: new Date(0) }),
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog.x1`, { actorId: demo.staffId, targetType: "student", targetId: real.studentId, createdAt: new Date(0) }),
       },
       {
         name: "a marked account's audit row is about an unmarked student's certification", code: "records_about_unmarked_people",
-        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "certification", targetId: `${real.prefix}Certification`, createdAt: new Date(0) }),
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog.x1`, { actorId: demo.staffId, targetType: "certification", targetId: `${real.prefix}Certification`, createdAt: new Date(0) }),
       },
       {
         name: "a marked account's audit row is about an unmarked student's appointment", code: "records_about_unmarked_people",
-        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "appointment", targetId: `${real.prefix}Appointment`, createdAt: new Date(0) }),
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog.x1`, { actorId: demo.staffId, targetType: "appointment", targetId: `${real.prefix}Appointment`, createdAt: new Date(0) }),
       },
       {
         // Staff edits of shared content keep refusing: only the student actions in closeout.shared-content.ts are kept.
         name: "the demo instructor edited a real career event", code: "records_about_unmarked_people",
-        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, action: "event.updated", targetType: "event", targetId: `${real.prefix}CareerEvent`, createdAt: new Date(0) }),
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog.x1`, { actorId: demo.staffId, action: "event.updated", targetType: "event", targetId: `${real.prefix}CareerEvent`, createdAt: new Date(0) }),
       },
       {
         name: "an unmarked student's task links to a demo appointment", code: "kept_rows_would_be_blanked",
