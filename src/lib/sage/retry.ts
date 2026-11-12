@@ -12,6 +12,11 @@ interface RetryOptions {
    * when the exhausted failure is dead-lettered.
    */
   alertKey: string;
+  /**
+   * A Stop or a dropped connection (E9b 8). Once it aborts, a failure is
+   * rethrown at once: no retry, no warning, no alert and no dead letter.
+   */
+  signal?: AbortSignal;
   /** Total attempts including the first. Defaults to 3. */
   maxAttempts?: number;
   /**
@@ -60,7 +65,7 @@ function buildPayloadSafely(failurePayload?: () => string): string {
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  { label, alertKey, maxAttempts = 3, context = {}, studentId, conversationId, failurePayload }: RetryOptions,
+  { label, alertKey, maxAttempts = 3, context = {}, studentId, conversationId, failurePayload, signal }: RetryOptions,
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -68,6 +73,10 @@ export async function retryWithBackoff<T>(
       return await fn();
     } catch (error) {
       lastError = error;
+      if (signal?.aborted) {
+        logger.info(`${label} stopped by the client`, { attempt, ...context });
+        throw error;
+      }
       logger.warn(`${label} attempt failed`, {
         attempt,
         maxAttempts,
