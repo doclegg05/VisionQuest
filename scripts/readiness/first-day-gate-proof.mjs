@@ -13,8 +13,10 @@ for (const name of ["DATABASE_URL", "DIRECT_URL", "ADMIN_DATABASE_URL"]) {
 const layout = "src/app/(student)/layout.tsx";
 const mutations = [
   { path: "src/lib/password-change-gate.ts", from: "account.mustChangePassword === true", to: "false && account.mustChangePassword === true", gate: "/change-password", next: "/sage-notice" },
-  { path: layout, from: "if (needsSageNotice(", to: "if (false && needsSageNotice(", gate: "/sage-notice", next: "/recovery-setup" },
-  { path: layout, from: "if (needsRecoverySetup(", to: "if (false && needsRecoverySetup(", gate: "/recovery-setup", next: "/dashboard" },
+  // Remove enforcement, keeping the surrounding session narrowing valid.
+  // A literal false && guard makes TypeScript treat its RHS as unreachable.
+  { path: layout, from: "redirect(SAGE_NOTICE_ACK_PATH);", to: "void SAGE_NOTICE_ACK_PATH;", gate: "/sage-notice", next: "/recovery-setup" },
+  { path: layout, from: 'redirect("/recovery-setup");', to: "void 0;", gate: "/recovery-setup", next: "/dashboard" },
 ];
 const originals = new Map(mutations.map(({ path }) => [path, readFileSync(path, "utf8")]));
 const output = "reports/first-day-gate-proof";
