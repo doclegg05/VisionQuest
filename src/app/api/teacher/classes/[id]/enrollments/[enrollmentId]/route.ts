@@ -3,8 +3,11 @@ import { withTeacherAuth, badRequest } from "@/lib/api-error";
 import { assertStaffCanManageClass } from "@/lib/classroom";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit";
+import { updateEnrollmentStatus, VALID_ENROLLMENT_STATUSES, type EnrollmentStatus } from "@/lib/class-enrollment-status";
 
-const VALID_ENROLLMENT_STATUSES = ["active", "inactive", "completed", "withdrawn", "archived"] as const;
+function isEnrollmentStatus(value: string): value is EnrollmentStatus {
+  return VALID_ENROLLMENT_STATUSES.some((status) => status === value);
+}
 
 export const PATCH = withTeacherAuth(async (
   session,
@@ -17,7 +20,7 @@ export const PATCH = withTeacherAuth(async (
   const status = typeof body.status === "string" ? body.status.trim() : "";
   const archiveReason = typeof body.archiveReason === "string" ? body.archiveReason.trim() : "";
 
-  if (!VALID_ENROLLMENT_STATUSES.includes(status as (typeof VALID_ENROLLMENT_STATUSES)[number])) {
+  if (!isEnrollmentStatus(status)) {
     throw badRequest("Enrollment status is invalid.");
   }
 
@@ -42,20 +45,7 @@ export const PATCH = withTeacherAuth(async (
     return NextResponse.json({ error: "Enrollment not found." }, { status: 404 });
   }
 
-  const updated = await prisma.studentClassEnrollment.update({
-    where: { id: enrollmentId },
-    data: {
-      status,
-      archivedAt: status === "archived" ? new Date() : null,
-      archiveReason: status === "archived" ? archiveReason || null : null,
-    },
-    select: {
-      id: true,
-      status: true,
-      archivedAt: true,
-      archiveReason: true,
-    },
-  });
+  const updated = await updateEnrollmentStatus(enrollmentId, status, archiveReason);
 
   await logAuditEvent({
     actorId: session.id,
