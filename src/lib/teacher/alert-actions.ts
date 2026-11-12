@@ -15,10 +15,12 @@
  *
  * Zero rows updated is a conflict: the caller answers 409 and the client reloads the queue.
  */
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 
-export const ALERT_CHANGED_MESSAGE = "Someone else changed this alert. The list now shows the latest.";
+/** True whether an instructor or the alert sync changed it: the sync also reopens and resolves alerts. */
+export const ALERT_CHANGED_MESSAGE = "This alert changed. The list now shows the latest.";
 
 const undoExpectationSchema = z.object({
   status: z.enum(["resolved", "dismissed"]),
@@ -47,10 +49,14 @@ export interface AlertTarget {
   studentId: string;
 }
 
+/**
+ * `alreadySaved` marks an answer that reports a decision already stored, not one this request made. Its stamp may be
+ * another instructor's, so the client offers no Undo for it.
+ */
 export type AlertActionResponse =
-  | { status: "resolved"; resolvedAt: string }
-  | { status: "dismissed"; dismissedAt: string }
-  | { status: "snoozed"; snoozedUntil: string }
+  | { status: "resolved"; resolvedAt: string; alreadySaved?: true }
+  | { status: "dismissed"; dismissedAt: string; alreadySaved?: true }
+  | { status: "snoozed"; snoozedUntil: string; alreadySaved?: true }
   | { status: "open" };
 
 export type AlertActionOutcome =
@@ -66,7 +72,7 @@ const HOUR_MS = 60 * 60 * 1000;
 
 interface ForwardWrite {
   status: "resolved" | "dismissed" | "snoozed";
-  data: Record<string, Date | string | null>;
+  data: Prisma.StudentAlertUpdateManyMutationInput;
   response: AlertActionResponse;
 }
 
@@ -106,9 +112,16 @@ async function savedAnswer(alert: AlertTarget, status: ForwardWrite["status"]): 
     select: { status: true, resolvedAt: true, dismissedAt: true, snoozedUntil: true },
   });
   if (!current || current.status !== status) return null;
-  if (status === "resolved" && current.resolvedAt) return { status, resolvedAt: current.resolvedAt.toISOString() };
-  if (status === "dismissed" && current.dismissedAt) return { status, dismissedAt: current.dismissedAt.toISOString() };
-  if (status === "snoozed" && current.snoozedUntil) return { status, snoozedUntil: current.snoozedUntil.toISOString() };
+  const alreadySaved = true;
+  if (status === "resolved" && current.resolvedAt) {
+    return { status, resolvedAt: current.resolvedAt.toISOString(), alreadySaved };
+  }
+  if (status === "dismissed" && current.dismissedAt) {
+    return { status, dismissedAt: current.dismissedAt.toISOString(), alreadySaved };
+  }
+  if (status === "snoozed" && current.snoozedUntil) {
+    return { status, snoozedUntil: current.snoozedUntil.toISOString(), alreadySaved };
+  }
   return null;
 }
 
@@ -121,7 +134,7 @@ async function applyForward(
   const write = forwardWrite(input, actorId, now);
   const { count } = await prisma.studentAlert.updateMany({
     where: { id: alert.id, studentId: alert.studentId, status: "open" },
-    data: { status: write.status, ...write.data },
+    data: { ...write.data, status: write.status },
   });
   if (count === 1) return { kind: "changed", response: write.response };
   const saved = await savedAnswer(alert, write.status);
