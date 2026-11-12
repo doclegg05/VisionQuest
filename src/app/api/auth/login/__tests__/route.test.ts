@@ -663,7 +663,7 @@ describe("POST /api/auth/login — both units come back only for a right passwor
       mockRequest("/api/auth/login", {
         method: "POST",
         body,
-        headers: { "x-forwarded-for": ADDRESS },
+        headers: { "x-forwarded-for": `${ADDRESS}, 172.70.1.9` },
       }) as never,
     );
   }

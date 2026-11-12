@@ -160,7 +160,7 @@ const BASE_PAYLOAD = {
 };
 
 /** `forwardedFor: null` sends no `x-forwarded-for` header at all. */
-function postIntake(payload: Record<string, unknown>, forwardedFor: string | null = "203.0.113.7"): Request {
+function postIntake(payload: Record<string, unknown>, forwardedFor: string | null = "203.0.113.7, 172.70.1.9"): Request {
   return new Request("http://localhost:3000/api/intake/submit", {
     method: "POST",
     headers: {
@@ -444,12 +444,12 @@ describe("POST /api/intake/submit — caller-supplied class and error text", () 
   // neither guard the shared helper has (src/lib/client-ip.ts), so a caller
   // could mint a fresh per-network bucket with any text it liked.
   it("counts a well-formed address under its own bucket", async () => {
-    assert.equal(await networkKeyFor("10.0.0.1, 203.0.113.7"), "intake:submit:ip:203.0.113.7");
+    assert.equal(await networkKeyFor("10.0.0.1, 203.0.113.7, 172.70.1.9"), "intake:submit:ip:203.0.113.7");
   });
 
   for (const [name, forwardedFor] of [
-    ["text that is not an address", "not-an-address; drop table"],
-    ["an address longer than any real one", `1${"0".repeat(60)}`],
+    ["text that is not an address", "not-an-address; drop table, 172.70.1.9"],
+    ["an address longer than any real one", `1${"0".repeat(60)}, 172.70.1.9`],
     ["no header at all", null],
   ] as const) {
     it(`puts ${name} in the one shared bucket`, async () => {

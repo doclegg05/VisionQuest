@@ -68,7 +68,7 @@ const BODY = {
   password: "a-long-enough-password",
 };
 function post(body: unknown = BODY) {
-  return POST(mockRequest("/api/staff-invites/accept", { method: "POST", body, headers: { "x-forwarded-for": "9.9.9.9" } }));
+  return POST(mockRequest("/api/staff-invites/accept", { method: "POST", body, headers: { "x-forwarded-for": `9.9.9.9, 172.70.1.9` } }));
 }
 
 beforeEach(() => {

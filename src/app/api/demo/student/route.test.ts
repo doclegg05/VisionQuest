@@ -84,7 +84,7 @@ describe("POST /api/demo/student", () => {
   });
 
   it("sets a demo session cookie and returns the redirect", async () => {
-    const response = await route.POST(post({ "x-forwarded-for": "203.0.113.9" }) as never);
+    const response = await route.POST(post({ "x-forwarded-for": `203.0.113.9, 172.70.1.9` }) as never);
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {

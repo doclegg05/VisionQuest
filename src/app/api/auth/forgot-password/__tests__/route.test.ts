@@ -92,7 +92,7 @@ async function post(login: string) {
   const req = mockRequest("/api/auth/forgot-password", {
     method: "POST",
     body: { login },
-    headers: { "x-forwarded-for": ADDRESS },
+    headers: { "x-forwarded-for": `${ADDRESS}, 172.70.1.9` },
   });
   return route.POST(req as never);
 }

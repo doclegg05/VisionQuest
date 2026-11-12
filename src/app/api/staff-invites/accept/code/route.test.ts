@@ -47,7 +47,7 @@ const ADMIN = { id: "a1", studentId: "admin", displayName: "Admin", role: "admin
 
 function post(body: unknown) {
   return POST(
-    mockRequest("/api/staff-invites/accept/code", { method: "POST", body, headers: { "x-forwarded-for": "9.9.9.9" } }),
+    mockRequest("/api/staff-invites/accept/code", { method: "POST", body, headers: { "x-forwarded-for": `9.9.9.9, 172.70.1.9` } }),
   );
 }
 

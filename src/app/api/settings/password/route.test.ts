@@ -200,7 +200,7 @@ function change(body: unknown): Promise<Response> {
   return changeRoute.POST(
     new NextRequest("http://localhost:3000/api/settings/password", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-forwarded-for": ADDRESS },
+      headers: { "Content-Type": "application/json", "x-forwarded-for": `${ADDRESS}, 172.70.1.9` },
       body: JSON.stringify(body),
     }),
   );
@@ -214,7 +214,7 @@ function signIn(password: string): Promise<Response> {
   return loginRoute.POST(
     new NextRequest("http://localhost:3000/api/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-forwarded-for": ADDRESS },
+      headers: { "Content-Type": "application/json", "x-forwarded-for": `${ADDRESS}, 172.70.1.9` },
       body: JSON.stringify({ studentId: "tanesha", password }),
     }),
   );

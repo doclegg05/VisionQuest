@@ -371,7 +371,7 @@ describe("POST /api/auth/reset-password", () => {
       mockRequest("/api/auth/reset-password", {
         method: "POST",
         body: { token: "good-token", password: "a-long-new-password" },
-        headers: { "x-forwarded-for": address },
+        headers: { "x-forwarded-for": `${address}, 172.70.1.9` },
       }) as never,
     );
   }

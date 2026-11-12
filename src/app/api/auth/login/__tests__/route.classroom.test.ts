@@ -136,7 +136,7 @@ function signIn(studentId: string, password: string, address = CLASSROOM_ADDRESS
   return loginRoute.POST(
     new NextRequest("http://localhost:3000/api/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-forwarded-for": address },
+      headers: { "Content-Type": "application/json", "x-forwarded-for": `${address}, 172.70.1.9` },
       body: JSON.stringify({ studentId, password }),
     }),
   );

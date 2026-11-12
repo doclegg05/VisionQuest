@@ -49,7 +49,7 @@ function post(body: unknown) {
   const req = mockRequest("/api/csp-report", {
     method: "POST",
     body,
-    headers: { "x-forwarded-for": `10.0.0.1, ${CLIENT_IP}` },
+    headers: { "x-forwarded-for": `10.0.0.1, ${CLIENT_IP}, 172.70.1.9` },
   });
   return route.POST(req as never);
 }
@@ -139,7 +139,7 @@ describe("POST /api/csp-report", () => {
   it("ignores malformed JSON with 204 and no log line", async () => {
     const req = new Request("http://localhost:3000/api/csp-report", {
       method: "POST",
-      headers: { "Content-Type": "application/csp-report", "x-forwarded-for": CLIENT_IP },
+      headers: { "Content-Type": "application/csp-report", "x-forwarded-for": `${CLIENT_IP}, 172.70.1.9` },
       body: "{not json",
     });
     const res = await route.POST(req as never);

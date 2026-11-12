@@ -4,7 +4,7 @@ import { hashPassword, invalidateSessionCache, normalizeEmail, normalizeStudentI
 import { prismaAdmin as prisma } from "@/lib/db";
 import { afterWrite } from "@/lib/after-write";
 import { deferAfterResponse } from "@/lib/after-response";
-import { clientIpBucket } from "@/lib/client-ip";
+import { clientIpAddress, clientIpBucket } from "@/lib/client-ip";
 import { rateLimit, refundRateLimit } from "@/lib/rate-limit";
 import {
   hasConfiguredSecurityQuestionSet,
@@ -307,10 +307,10 @@ async function signInAfterReset(account: Awaited<ReturnType<typeof setNewPasswor
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
+  const ip = clientIpAddress(req);
   // Every attempt takes a unit first, in one atomic statement, so a burst of
   // guesses cannot race past the limit. A recovery that works gives it back.
-  const networkKey = `reset-password-questions:${ip}`;
+  const networkKey = `reset-password-questions:${clientIpBucket(req)}`;
   const networkRl = await rateLimit(networkKey, NETWORK_FAILED_ATTEMPT_LIMIT, NETWORK_LIMIT_WINDOW_MS);
   if (!networkRl.success) {
     return NextResponse.json({ error: "Too many reset attempts. Please try again later." }, { status: 429 });
