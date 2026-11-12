@@ -58,6 +58,8 @@ export interface TurnContextInput {
   providerClass: ReturnType<typeof getProviderClass>;
   /** The per-account daily cap and what is left of it, when one applies. */
   daily: { remaining: number; limit: number } | null;
+  /** The turn's Stop: aborts the retrieval embedding fetch (E9b 5). */
+  signal?: AbortSignal;
 }
 
 export interface TurnContext {
@@ -200,6 +202,7 @@ async function appendRetrieval(build: PromptBuild, input: TurnContextInput): Pro
     // (FERPA review W5). Staff chat has no student subject here.
     getDocumentContext(userMessage, isStaffChat ? "staff" : "student", 3, promptTier === "compact" ? 2000 : 6000, {
       studentId: isStaffChat ? null : session.id,
+      signal: input.signal,
     }),
     Promise.resolve(getFormContext(userMessage)),
     memoryEnabled ? loadMemory(session.id, userMessage, isStaffChat) : Promise.resolve(null),

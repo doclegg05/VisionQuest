@@ -155,6 +155,12 @@ export function buildWebsearchQuery(userMessage: string): string {
 /** Subject attribution stays attached to every embedding request and cache entry. */
 export interface QueryEmbeddingSubject {
   studentId?: string | null;
+  /**
+   * The chat turn's Stop (E9b 5): aborts the query embedding fetch. Lookups
+   * that share one in-flight embedding are the same turn's documents and
+   * passages, so one Stop ends them together.
+   */
+  signal?: AbortSignal;
 }
 
 interface QueryVector { vector: number[]; model: string }
@@ -174,6 +180,7 @@ async function getQueryVector(userMessage: string, subject?: QueryEmbeddingSubje
     pending = cached(key, QUERY_EMBED_CACHE_TTL_SECONDS, async () => {
       const result = await embedTextsWithModel([userMessage], {
         taskType: "RETRIEVAL_QUERY",
+        signal: subject?.signal,
         usage: {
           callSite: "sage_embedding_query",
           studentId: subject?.studentId ?? null,

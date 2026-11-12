@@ -38,6 +38,8 @@ export interface EmbeddingUsageContext {
 
 interface EmbedTextsOptions {
   taskType: EmbeddingTaskType;
+  /** Aborts the provider's fetch, for a chat turn's Stop (E9b 5). */
+  signal?: AbortSignal;
   usage?: EmbeddingUsageContext;
 }
 
@@ -72,7 +74,7 @@ export async function embedTexts(
 /** Keep vectors and their producing model together even if config changes in flight. */
 export async function embedTextsWithModel(
   texts: string[],
-  { taskType, usage }: EmbedTextsOptions,
+  { taskType, usage, signal }: EmbedTextsOptions,
 ): Promise<{ vectors: number[][]; model: string }> {
   const studentId = usage?.studentId ?? null;
   const provider = await resolveEmbeddingProvider({
@@ -84,6 +86,7 @@ export async function embedTextsWithModel(
     taskType,
     callSite: usage?.callSite,
     studentId,
+    signal,
   });
   return { vectors, model: provider.model };
 }

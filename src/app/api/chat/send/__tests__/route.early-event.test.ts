@@ -5,6 +5,7 @@ import type { GenerationOptions } from "@/lib/ai/types";
 import {
   mockAssembleStudentContextBundle,
   mockBuildStaffStudentContext,
+  mockGetDocumentContext,
   mockLogAiAuditEvent,
   mockRecordWellbeingConcern,
   mockResolveAiProvider,
@@ -243,5 +244,44 @@ describe("POST /api/chat/send: a client abort cancels the model call (E7 3)", ()
     await until(() => auditStatuses().some((a) => a.status === "failed"), "the stopped turn was finished");
     assert.equal(seen.calls, 0, "no model call after the student left");
     assert.match(assistantSaves()[0] ?? "", /988/);
+  });
+
+  it("a Stop while the context is stalled ends the turn and saves the 988 row without waiting (E9b 5)", BOUND, async () => {
+    const { provider, seen } = hangingProvider();
+    mockResolveAiProvider.mock.mockImplementation(async () => provider);
+    // Never opened: the assembly stays stalled for the whole test.
+    const assembly = gate();
+    mockAssembleStudentContextBundle.mock.mockImplementation(async () => {
+      await assembly.wait;
+      throw new Error("never reached in this test");
+    });
+    const res = await post(CRISIS_MESSAGE);
+    const reader = res.body!.getReader();
+    await reader.read();
+    await reader.cancel();
+    await until(() => auditStatuses().some((a) => a.status === "failed"), "the stopped turn was finished");
+    assert.equal(auditStatuses().find((a) => a.status === "failed")?.errorCode, "CLIENT_STREAM_CLOSED");
+    assert.equal(seen.calls, 0, "no model call after the student left");
+    assert.match(assistantSaves()[0] ?? "", /988/);
+    assembly.open();
+  });
+
+  it("the retrieval lookup gets the turn's signal, so a Stop aborts its embedding fetch (E9b 5)", BOUND, async () => {
+    let signal: AbortSignal | undefined;
+    mockGetDocumentContext.mock.mockImplementation(
+      async (_m: string, _r: string, _n: number, _b: number, subject?: { signal?: AbortSignal }) => {
+        signal = subject?.signal;
+        await new Promise<void>((_resolve, reject) => {
+          subject?.signal?.addEventListener("abort", () => reject(subject.signal?.reason), { once: true });
+        });
+        return "";
+      },
+    );
+    const res = await post(NORMAL_MESSAGE);
+    const reader = res.body!.getReader();
+    await reader.read();
+    await until(() => signal !== undefined, "the retrieval started");
+    await reader.cancel();
+    await until(() => signal?.aborted === true, "the retrieval's signal aborted");
   });
 });

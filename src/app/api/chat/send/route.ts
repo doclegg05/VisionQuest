@@ -1,5 +1,6 @@
 import { getPromptTier, resolveAiProvider, type AIProvider } from "@/lib/ai";
 import { getProviderClass, logAiAuditEvent, policyDecisionForProvider } from "@/lib/ai/audit";
+import { abortable } from "@/lib/ai/abort";
 import { rateLimit, rateLimitDaily, refundRateLimit } from "@/lib/rate-limit";
 import { rateLimitsDisabled } from "@/lib/rate-limit-switch";
 import { chatLimitsFor } from "@/lib/chat/chat-limits";
@@ -598,8 +599,9 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
         }
 
         // Context assembly runs after the first event (E7), so Stop is armed
-        // while it loads and a stalled load cannot lock the message box.
-        turn = await assembleTurnContext({
+        // while it loads; a Stop ends the wait at once, and its signal aborts
+        // the retrieval embedding fetch (E9b 5).
+        turn = await abortable(assembleTurnContext({
           session,
           body,
           userMessage,
@@ -612,11 +614,9 @@ async function sendTurn({ session, body, userMessage, crisisSignal, crisisBlock,
           provider,
           promptTier,
           providerClass,
-          daily:
-            dailyRemaining !== null && perAccountDailyLimit !== null
-              ? { remaining: dailyRemaining, limit: perAccountDailyLimit }
-              : null,
-        });
+          daily: dailyRemaining !== null && perAccountDailyLimit !== null ? { remaining: dailyRemaining, limit: perAccountDailyLimit } : null,
+          signal: turnAbort.signal,
+        }), turnAbort.signal);
         // A Stop while the context loaded: the model is never called.
         if (turnAbort.signal.aborted) throw new ChatSseClientClosedError();
         const {

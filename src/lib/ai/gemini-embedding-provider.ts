@@ -15,7 +15,7 @@ import { assertCloudInferenceAllowed } from "./demo-local-only";
 
 import { retryWithBackoff } from "@/lib/sage/retry";
 import { logLlmCall } from "@/lib/llm-usage";
-import { EMBEDDING_DIMENSIONS, type EmbeddingProvider, type EmbeddingTaskType } from "./embedding-types";
+import { EMBEDDING_DIMENSIONS, type EmbedOptions, type EmbeddingProvider, type EmbeddingTaskType } from "./embedding-types";
 
 const BATCH_LIMIT = 100;
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta";
@@ -45,7 +45,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 
   async embed(
     texts: string[],
-    opts: { taskType: EmbeddingTaskType; callSite?: string; studentId?: string | null },
+    opts: EmbedOptions,
   ): Promise<number[][]> {
     assertCloudInferenceAllowed();
     if (texts.length === 0) {
@@ -61,8 +61,9 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
       const startedAt = Date.now();
 
       const vectors = await retryWithBackoff(
-        () => this.callBatchEmbed(batch, opts.taskType),
+        () => this.callBatchEmbed(batch, opts.taskType, opts.signal),
         {
+          signal: opts.signal,
           label: "Gemini embedding",
           alertKey: "embedding_request_exhausted",
           context: { taskType: opts.taskType, batchSize: batch.length },
@@ -89,12 +90,14 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
   private async callBatchEmbed(
     texts: string[],
     taskType: EmbeddingTaskType,
+    signal?: AbortSignal,
   ): Promise<number[][]> {
     assertCloudInferenceAllowed();
     const response = await fetch(
       `${API_BASE}/models/${this.model}:batchEmbedContents`,
       {
         method: "POST",
+        signal,
         headers: {
           "content-type": "application/json",
           "x-goog-api-key": this.apiKey,
