@@ -24,18 +24,64 @@ describe("closeLinkedAlert", () => {
     assert.deepEqual(calls, [["/api/teacher/alerts/a1", { action: "resolve" }]]);
   });
 
-  it("reads a 409 as an alert someone already closed", async () => {
+  it("reads a 409 as an alert already handled", async () => {
     const outcome = await closeLinkedAlert("a1", async () => {
       throw new ApiClientError(409, "This alert changed. The list now shows the latest.");
     });
-    assert.equal(outcome, "already-closed");
+    assert.equal(outcome, "already-handled");
   });
 
   it("reads any other failure as an alert still open, never as a failed save", async () => {
-    const outcome = await closeLinkedAlert("a1", async () => {
-      throw new ApiClientError(500, "Server error");
-    });
+    const outcome = await closeLinkedAlert(
+      "a1",
+      async () => {
+        throw new ApiClientError(500, "Server error");
+      },
+      () => {},
+    );
     assert.equal(outcome, "not-closed");
+  });
+
+  // A failed close is not shown as a failure, so the log is its only trace. It carries the status or the error
+  // class, never the alert id or anything the server said.
+  it("logs a failed close with its status only", async () => {
+    const logged: unknown[][] = [];
+    await closeLinkedAlert(
+      "alert-secret-id",
+      async () => {
+        throw new ApiClientError(500, "Server error about alert-secret-id");
+      },
+      (...args) => logged.push(args),
+    );
+    assert.equal(logged.length, 1);
+    assert.deepEqual(logged[0][1], { status: 500 });
+    assert.doesNotMatch(JSON.stringify(logged), /alert-secret-id/);
+  });
+
+  it("logs a network failure with its error class only", async () => {
+    const logged: unknown[][] = [];
+    await closeLinkedAlert(
+      "alert-secret-id",
+      async () => {
+        throw new TypeError("Failed to fetch alert-secret-id");
+      },
+      (...args) => logged.push(args),
+    );
+    assert.equal(logged.length, 1);
+    assert.deepEqual(logged[0][1], { name: "TypeError" });
+    assert.doesNotMatch(JSON.stringify(logged), /alert-secret-id/);
+  });
+
+  it("logs nothing when the alert was already handled", async () => {
+    const logged: unknown[][] = [];
+    await closeLinkedAlert(
+      "a1",
+      async () => {
+        throw new ApiClientError(409, "This alert changed.");
+      },
+      (...args) => logged.push(args),
+    );
+    assert.equal(logged.length, 0);
   });
 
   it("sends nothing when the follow-up has no alert", async () => {
@@ -49,14 +95,28 @@ describe("closeLinkedAlert", () => {
 });
 
 describe("followUpMessage", () => {
-  it("says the alert was already closed as a success, for every follow-up", () => {
+  // The route answers 409 for an alert another instructor closed, a snoozed one, and one the sync resolved, so the
+  // words claim none of those in particular.
+  it("says the alert was already handled as a success, for every follow-up", () => {
     for (const action of ACTIONS) {
-      const message = followUpMessage(action, "already-closed");
+      const message = followUpMessage(action, "already-handled");
       assert.equal(message.tone, "success");
-      assert.match(message.text, /Someone else already closed the alert\.$/);
-      assert.doesNotMatch(message.text, /could not|changed/i);
+      assert.match(message.text, /The alert was already dealt with\.$/);
+      assert.doesNotMatch(message.text, /could not|changed|closed|someone/i);
     }
-    assert.equal(followUpMessage({ kind: "task" }, "already-closed").text, "Task saved. Someone else already closed the alert.");
+    assert.equal(followUpMessage({ kind: "task" }, "already-handled").text, "Task saved. The alert was already dealt with.");
+    assert.equal(
+      followUpMessage({ kind: "form", status: "approved" }, "already-handled").text,
+      "Form approved. The alert was already dealt with.",
+    );
+    assert.equal(
+      followUpMessage({ kind: "form", status: "rejected" }, "already-handled").text,
+      "Form returned. The alert was already dealt with.",
+    );
+    assert.equal(
+      followUpMessage({ kind: "assign", title: "Resume basics" }, "already-handled").text,
+      '"Resume basics" assigned. The alert was already dealt with.',
+    );
   });
 
   it("says the save worked when the alert could not be closed", () => {
@@ -91,7 +151,7 @@ describe("followUpMessage", () => {
 
   it("uses no dashes in what an instructor reads", () => {
     for (const action of ACTIONS) {
-      for (const outcome of ["resolved", "already-closed", "not-closed", "no-alert"] as const) {
+      for (const outcome of ["resolved", "already-handled", "not-closed", "no-alert"] as const) {
         assert.doesNotMatch(followUpMessage(action, outcome).text, /[–—]| - /);
       }
     }

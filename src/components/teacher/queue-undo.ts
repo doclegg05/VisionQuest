@@ -70,7 +70,7 @@ const ALREADY_SAVED_TEXT: Record<UndoableAlertAction, string> = {
 
 /** Reads the route's answer to a Resolved, Dismiss or Snooze. */
 export function saveReceiptFrom(action: QueueAlertRequest, body: unknown): SaveReceipt {
-  if (typeof body === "object" && body !== null && (body as Record<string, unknown>).alreadySaved === true) {
+  if (typeof body === "object" && body !== null && "alreadySaved" in body && body.alreadySaved === true) {
     return ALREADY_SAVED;
   }
   return undoExpectationFrom(action, body);
@@ -78,12 +78,19 @@ export function saveReceiptFrom(action: QueueAlertRequest, body: unknown): SaveR
 
 /** The expected state in the route's answer to a Resolved or Dismiss, or null if it holds none. */
 export function undoExpectationFrom(action: QueueAlertRequest, body: unknown): UndoExpectation | null {
-  if (action === "snooze" || typeof body !== "object" || body === null) return null;
-  const answer = body as Record<string, unknown>;
+  if (action === "snooze" || typeof body !== "object" || body === null || !("status" in body)) return null;
   const status = action === "resolve" ? "resolved" : "dismissed";
-  const at = action === "resolve" ? answer.resolvedAt : answer.dismissedAt;
-  if (answer.status !== status || typeof at !== "string") return null;
+  const at = action === "resolve" ? resolvedStampIn(body) : dismissedStampIn(body);
+  if (body.status !== status || typeof at !== "string") return null;
   return { status, at };
+}
+
+function resolvedStampIn(body: object): unknown {
+  return "resolvedAt" in body ? body.resolvedAt : undefined;
+}
+
+function dismissedStampIn(body: object): unknown {
+  return "dismissedAt" in body ? body.dismissedAt : undefined;
 }
 
 /** The parts of a queue alert the flow needs. The title and name are shown in a confirm, never logged. */

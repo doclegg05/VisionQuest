@@ -87,19 +87,18 @@ const studentAlert = {
   upsert: async (args: { where: { alertKey: string }; create: AlertCreate; update: Partial<AlertRow> }) => {
     statements += 1;
     const row = rows.get(args.where.alertKey);
-    rows.set(
-      args.where.alertKey,
-      row
-        ? { ...row, ...args.update }
-        : {
-            id: `alert-${rows.size + 1}`,
-            resolvedAt: null,
-            snoozedUntil: null,
-            snoozedBy: null,
-            dismissedAt: null,
-            ...args.create,
-          },
-    );
+    const written: AlertRow = row
+      ? { ...row, ...args.update }
+      : {
+          id: `alert-${rows.size + 1}`,
+          resolvedAt: null,
+          snoozedUntil: null,
+          snoozedBy: null,
+          dismissedAt: null,
+          ...args.create,
+        };
+    rows.set(args.where.alertKey, written);
+    return written;
   },
   update: async ({ where, data }: { where: { alertKey: string }; data: Partial<AlertRow> }) => {
     statements += 1;
@@ -387,18 +386,52 @@ describe("applyStudentAlertSyncPlan and a hold that lands after the read", () =>
 // The sync runs for every active student each morning and after student
 // activity, inside one interactive transaction: its cost is round trips.
 describe("applyStudentAlertSyncPlan round trips", () => {
-  it("adds at most one statement per sync, however many alerts are open", async () => {
-    const alerts = ["a", "b", "c"].map((suffix) => ({ ...STALLED, alertKey: `overdue_task:${suffix}` }));
+  const alerts = ["a", "b", "c"].map((suffix) => ({ ...STALLED, alertKey: `overdue_task:${suffix}` }));
+
+  it("issues one statement per alert that is still open", async () => {
     for (const alert of alerts) seed(alert);
 
     await runSync(THREE_WEEKS_LATER, alerts);
 
-    assert.ok(statements <= alerts.length + 1, `expected at most ${alerts.length + 1} statements, saw ${statements}`);
+    assert.equal(statements, alerts.length);
+  });
+
+  // New and reopened alerts share one lookup of the resolved rows, then one write each.
+  it("issues one lookup, then one statement per new alert", async () => {
+    await runSync(THREE_WEEKS_LATER, alerts);
+
+    assert.equal(statements, alerts.length + 1);
+    for (const alert of alerts) assert.equal(stored(alert).status, "open");
+  });
+
+  it("issues one lookup, then one statement per resolved alert it reopens", async () => {
+    for (const alert of alerts) seed(alert, { status: "resolved", resolvedAt: NEXT_DAY });
+
+    await runSync(THREE_WEEKS_LATER, alerts);
+
+    assert.equal(statements, alerts.length + 1);
+    for (const alert of alerts) {
+      assert.equal(stored(alert).status, "open");
+      assert.deepEqual(stored(alert).detectedAt, THREE_WEEKS_LATER);
+    }
   });
 
   it("issues no statement for a student with no alerts", async () => {
     await runSync(THREE_WEEKS_LATER, []);
 
     assert.equal(statements, 0);
+  });
+});
+
+// alertKey is the unique key, and not every key names its student
+// (goal_platform_stale:<link id>), so every write also checks the student.
+describe("applyStudentAlertSyncPlan and another student's row", () => {
+  it("never reopens a resolved alert that belongs to another student", async () => {
+    seed(PLATFORM_STALE, { studentId: "student-2", status: "resolved", resolvedAt: NEXT_DAY });
+
+    await assert.rejects(runSync(THREE_WEEKS_LATER, [PLATFORM_STALE]));
+
+    assert.equal(stored(PLATFORM_STALE).status, "resolved");
+    assert.equal(stored(PLATFORM_STALE).studentId, "student-2");
   });
 });
