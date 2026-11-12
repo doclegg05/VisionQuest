@@ -18,10 +18,11 @@ Summary as of the last handoff (2026-10-19). The full earlier text is in `.claud
 - **Branches**: 33 GitHub branches and 27 local branches remain after the 2026-10-19 cleanup. Open Items lists each group.
 
 ## Last Session
-- **Date**: 2026-11-09
-- **Handoff**: .claude/handoffs/2026-11-09-consolidated-plan-execution.md
+- **Date**: 2026-11-12
+- **Handoff**: .claude/handoffs/2026-11-12-readiness-sol-sprint.md
 
 ## Open Items
+- [ ] **Readiness wave 1 and the Sol review sprint (2026-11-12)** are on local `wave1/integration`, not pushed. Next: push, CI (first runs of the demo closeout, alert actions and first-day tests), then Britt's decisions in `.claude/handoffs/2026-11-12-readiness-sol-sprint.md`. Owed lever: a script that proves every unit test file reported (local full runs can drop files silently).
 - Plan work (the 18 dated plans) is consolidated in `docs/plans/2026-11-09-consolidated-remaining-work.md` (2026-11-09). The items below are everything else.
 - [ ] **Push and merge the six branches built 2026-11-09** (handoff `.claude/handoffs/2026-11-09-consolidated-plan-execution.md`). Review follow-ups, each its own small PR: (a) `src/lib/sage/coaching-arcs.ts:316` counts certifications with `status: "complete"` but writers write `"completed"`, so the week-6 count is always 0 (Sage behavior; needs a `SAGE_PROMPT_REVISION` check and evals); (b) about 25 `text-danger` error lines render white with no icon in dark, so make a shared error component plus a lint; (c) the unlayered `.surface-section`/`.theme-card`/`.panel` background, border and shadow still beat utilities, so move the whole rule into `@layer components`; (d) coordinator region map SVG labels draw under 13px (HTML overlay, as MoodSparkline); (e) the backfill host guard and `src/lib/e2e-seed-guard.ts` both read a `?host=` URL as loopback (one shared host parser); (f) Credly: an OK-empty answer never clears a non-empty stored cache, and `CredlyBadges.tsx` swallows client fetch errors; (g) jobs: no screen shows a save whose listing is gone while `totalSaved` counts it, a concurrent double save can 500 (P2002), and Sage saves carry no vacancy key.
 - [ ] **Cohort packet export before a second site** (owner decision, 2026-10-26): the current audited, demo-denied, in-memory ZIP without an export rate limit is accepted for the demo and single-site pilot. Implement streaming and a per-staff rate limit before a second site uses VisionQuest; reassess sooner if pilot export volume/concurrency increases. Decision: `docs/decisions/engineering-log.md`.
