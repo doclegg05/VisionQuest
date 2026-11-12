@@ -3,6 +3,8 @@
  * Throws immediately if a required variable is missing or malformed so deploys fail fast.
  */
 
+import { clientIpConfigFrom } from "./client-ip";
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -138,6 +140,10 @@ export function validateRuntimeEnv() {
   validateAppBaseUrl(env.APP_BASE_URL);
   validateGoogleRedirectUri(env.GOOGLE_REDIRECT_URI);
   validateSmtpPort(env.SMTP_PORT);
+  // TRUSTED_PROXY_HOPS and CLOUDFLARE_IN_FRONT pick which header hop the rate
+  // limits count (src/lib/client-ip.ts); a typo must stop the boot, not trust
+  // the wrong hop on every request.
+  clientIpConfigFrom(process.env);
 
   if (env.CRON_SECRET) {
     assertNoSurroundingQuotes("CRON_SECRET", env.CRON_SECRET);

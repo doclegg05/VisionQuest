@@ -177,6 +177,8 @@ If you do not use the blueprint:
 | `API_KEY_ENCRYPTION_KEY` | Base64-encoded 32-byte key |
 | `APP_BASE_URL` | Public Render URL |
 | `CRON_SECRET` | Shared secret for internal scheduled routes |
+| `TRUSTED_PROXY_HOPS` | How many proxies append to `X-Forwarded-For` before the app. Default `1` (Render's proxy). The per-network sign-in and recovery limits count the entry that many places from the right, never the first entry, which the caller writes. A value that is not a whole number from 1 to 10 stops the boot |
+| `CLOUDFLARE_IN_FRONT` | `true` only when every request comes through a Cloudflare zone of our own; the limits then count `CF-Connecting-IP`. Default off (`false` or unset), because without Cloudflare in front a caller can send that header itself. Any other value stops the boot |
 | `STORAGE_ENDPOINT` | Supabase S3 endpoint |
 | `STORAGE_REGION` | Usually `us-east-1` |
 | `STORAGE_BUCKET` | `Uploads` (existing private bucket; case-sensitive) |

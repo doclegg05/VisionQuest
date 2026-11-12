@@ -18,7 +18,8 @@ import { makeDemoLogin, makeDemoStudentName } from "./names";
  * `rateLimit`. That limiter fails open when its store is degraded
  * (src/lib/rate-limit.ts), and a limit that disappears when the database has a
  * bad moment is not a limit. The per-network check does use it, and is only a
- * speed bump: the caller chooses the address it counts (src/lib/client-ip.ts).
+ * speed bump: one network address shared by a classroom counts as one
+ * (src/lib/client-ip.ts).
  *
  * The caps are checked twice. A cheap pre-check comes first, so a visitor who
  * will be refused never starts the bootstrap. It reads with no lock, though, so

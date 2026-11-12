@@ -444,7 +444,7 @@ describe("POST /api/intake/submit — caller-supplied class and error text", () 
   // neither guard the shared helper has (src/lib/client-ip.ts), so a caller
   // could mint a fresh per-network bucket with any text it liked.
   it("counts a well-formed address under its own bucket", async () => {
-    assert.equal(await networkKeyFor("203.0.113.7, 10.0.0.1"), "intake:submit:ip:203.0.113.7");
+    assert.equal(await networkKeyFor("10.0.0.1, 203.0.113.7"), "intake:submit:ip:203.0.113.7");
   });
 
   for (const [name, forwardedFor] of [

@@ -124,6 +124,17 @@ services:
         value: "false"
       - key: SAGE_RAG_ABSTAIN_DISTANCE
         value: "0.40"
+      # Which address the per-network rate limits count (src/lib/client-ip.ts,
+      # readiness A6). Render's proxy appends the address it saw to
+      # X-Forwarded-For, so the client is this many entries from the right.
+      # The first entry is whatever the caller wrote and is never used.
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      # "true" only when every request reaches this service through a
+      # Cloudflare zone of our own; then CF-Connecting-IP is read instead.
+      # Without Cloudflare in front a caller can send that header itself.
+      - key: CLOUDFLARE_IN_FRONT
+        value: "false"
       - key: CF_ACCESS_CLIENT_ID
         sync: false
       - key: CF_ACCESS_CLIENT_SECRET
