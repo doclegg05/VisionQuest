@@ -10,6 +10,7 @@ import {
 } from "@/lib/goal-resource-links";
 import type { DashboardQuickActionKind } from "@/lib/intervention-notifications";
 import { useConfirm } from "@/components/ui/useConfirm";
+import { closeLinkedAlert, followUpMessage, type LinkedAlertOutcome } from "./dashboard-followup";
 
 interface DashboardActionStudent {
   id: string;
@@ -111,9 +112,9 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-async function resolveLinkedAlert(alertId: string | null | undefined) {
-  if (!alertId) return;
-  await api.patch(`/api/teacher/alerts/${alertId}`, { action: "resolve" });
+/** Closes the queue alert a follow-up came from. Never throws: the follow-up itself has already saved. */
+function resolveLinkedAlert(alertId: string | null | undefined): Promise<LinkedAlertOutcome> {
+  return closeLinkedAlert(alertId, (url, body) => api.patch(url, body));
 }
 
 export default function DashboardActionPanel({
@@ -224,11 +225,8 @@ export default function DashboardActionPanel({
         status,
         notes: notes || "",
       });
-      await resolveLinkedAlert(intent.alertId);
-      setMessage({
-        tone: "success",
-        text: status === "approved" ? "Form approved and queue item resolved." : "Form returned and queue item resolved.",
-      });
+      const outcome = await resolveLinkedAlert(intent.alertId);
+      setMessage(followUpMessage({ kind: "form", status }, outcome));
       await Promise.all([loadContext(), onChanged()]);
     } catch (error) {
       setMessage({
@@ -252,8 +250,8 @@ export default function DashboardActionPanel({
         dueAt: taskForm.dueAt ? new Date(`${taskForm.dueAt}T12:00:00.000Z`).toISOString() : null,
         priority: taskForm.priority,
       });
-      await resolveLinkedAlert(intent.alertId);
-      setMessage({ tone: "success", text: "Follow-up task created and queue item resolved." });
+      const outcome = await resolveLinkedAlert(intent.alertId);
+      setMessage(followUpMessage({ kind: "task" }, outcome));
       await onChanged();
       setTaskForm(buildTaskDraft(intent));
     } catch (error) {
@@ -284,12 +282,8 @@ export default function DashboardActionPanel({
         dueAt: toDueAtPayload(draft.dueAt),
         notes: draft.notes.trim(),
       });
-      await resolveLinkedAlert(intent.alertId);
-
-      setMessage({
-        tone: "success",
-        text: `"${recommendation.title}" assigned and queue item resolved.`,
-      });
+      const outcome = await resolveLinkedAlert(intent.alertId);
+      setMessage(followUpMessage({ kind: "assign", title: recommendation.title }, outcome));
       await Promise.all([loadContext(), onChanged()]);
     } catch (error) {
       setMessage({
