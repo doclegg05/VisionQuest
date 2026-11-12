@@ -51,7 +51,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
       action: "mfa.disable_failed",
       targetType: "student",
       targetId: student.id,
-      summary: `MFA disable attempt failed for ${student.studentId} — invalid token.`,
+      summary: `MFA disable attempt failed: invalid token.`,
     });
 
     return NextResponse.json({ error: "Invalid MFA code." }, { status: 401 });
@@ -84,7 +84,7 @@ export const POST = withTeacherAuth(async (session, req: NextRequest) => {
     action: "mfa.disabled",
     targetType: "student",
     targetId: student.id,
-    summary: `MFA disabled for ${student.studentId}.`,
+    summary: `MFA disabled.`,
   });
 
   return NextResponse.json({ disabled: true });
