@@ -243,6 +243,17 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
           DEMO_CLOSEOUT_DB_TEST_ENABLED: "true"
 
+      - name: Run alert actions integration test
+        # C11: the queue's Undo sends back the timestamp a Resolve or Dismiss
+        # answered with, and reopens only an alert that still holds it. Only a
+        # real database can show that the stamp survives the column's precision
+        # and still matches. Same hermetic Postgres as the steps above.
+        run: npm run test:alertactions
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/visionquest_ci"
+          ALERT_ACTIONS_DB_TEST_ENABLED: "true"
+
       # --- Gate-tier benchmarks ------------------------------------------
       # Numbers, not pass/fail: each suite writes reports/benchmarks/latest/
       # <suite>.json and --compare exits 1 when a gate- or nightly-tier metric

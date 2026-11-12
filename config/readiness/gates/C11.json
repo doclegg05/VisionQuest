@@ -8,7 +8,9 @@
     "type": "test",
     "files": [
       "src/app/api/teacher/alerts/[id]/route.test.ts",
-      "src/components/teacher/queue-undo.conflict.test.ts"
+      "src/components/teacher/queue-undo.conflict.test.ts",
+      "src/components/teacher/dashboard-followup.test.ts",
+      "src/lib/advising-sync-apply.test.ts"
     ]
   }
 }
