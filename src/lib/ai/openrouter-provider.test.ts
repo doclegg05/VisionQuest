@@ -7,6 +7,7 @@ import {
   OpenRouterProvider,
   buildRequestBody,
   classifyOpenRouterFailure,
+  failureFromResponse,
   normalizeToolName,
 } from "./openrouter-provider";
 import type { ChatMessage, ToolDeclaration, ToolStreamEvent, TokenUsage } from "./types";
@@ -71,6 +72,33 @@ const completion = (content: string, finishReason = "stop") => ({
   model: MODEL,
   choices: [{ message: { role: "assistant", content }, finish_reason: finishReason }],
   usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+});
+
+describe("OpenRouter budget diagnostics", () => {
+  it("keeps the documented budget source and reason without the upstream text", async () => {
+    const error = await failureFromResponse(jsonResponse(402, {
+      error: {
+        message: `private upstream detail ${KEY}`,
+        metadata: { limit_source: "openrouter_credits", reason: "weight_exceeds_budget", remedy_hint: KEY },
+      },
+    }));
+    assert.equal(error.kind, "credits");
+    assert.match(error.message, /limit_source=openrouter_credits/);
+    assert.match(error.message, /reason=weight_exceeds_budget/);
+    assert.doesNotMatch(inspect(error), /private upstream detail/);
+    assert.equal(inspect(error).includes(KEY), false);
+  });
+
+  it("drops arbitrary metadata and malformed error bodies", async () => {
+    for (const body of [
+      JSON.stringify({ error: { metadata: { limit_source: KEY, reason: KEY } } }),
+      "not json",
+      "null",
+    ]) {
+      const error = await failureFromResponse(new Response(body, { status: 402 }));
+      assert.equal(error.message, "OpenRouter request failed (402, credits)");
+    }
+  });
 });
 const textChunk = (content: string) => ({ provider: "Google", model: MODEL, choices: [{ delta: { content } }] });
 const stopChunk = (promptTokens: number, completionTokens: number) => ({

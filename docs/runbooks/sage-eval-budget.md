@@ -83,6 +83,24 @@ The app swallows two kinds of error that would otherwise turn NOT RUN into FAILE
 
 ## Merging with a NOT RUN eval
 
+An HTTP 402 alone does not prove the account balance is empty. OpenRouter also
+rejects requests whose estimated token reservation exceeds the available
+in-flight budget. The provider error keeps only documented identifiers from
+`error.metadata`: `limit_source` and `reason`. It never prints the upstream
+message, remedy hint, key, or response body.
+
+- `openrouter_key_limit`: check the key's own spending limit.
+- `openrouter_credits` with `weight_exceeds_budget`: reduce an oversized request's
+  token reservation or fund the account; repeating the same request cannot help.
+- `openrouter_in_flight_budget` with `in_flight_budget_exhausted`: requests or
+  recently completed calls occupy the in-flight budget. Follow OpenRouter's
+  `Retry-After` guidance before rerunning.
+- No identifiers: the cause remains unspecified; do not infer an empty balance.
+
+Check key access with `GET https://openrouter.ai/api/v1/key`, keeping the bearer
+key private. A 401 must be fixed before testing paid generation. See the
+[OpenRouter limits documentation](https://openrouter.ai/docs/api_reference/limits).
+
 A NOT RUN result never substitutes for a green gating eval on a Sage PR. Before merging a PR whose red-team, tool-selection, chat-harness or memory eval reads NOT RUN:
 
 1. Fix the cause the summary line names: the secret, the key's limit, or the credits.
