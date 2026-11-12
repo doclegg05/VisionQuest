@@ -16,7 +16,10 @@
       "src/lib/dashboard/query.test.ts",
       "src/app/(student)/layout.test.tsx",
       "src/lib/readiness/dashboard-query-count.test.tsx",
-      "src/lib/readiness/dashboard-idle-query-count.test.ts"
+      "src/lib/readiness/dashboard-idle-query-count.test.ts",
+      "src/lib/class-enrollment-status.test.ts",
+      "src/lib/chat-context-write-through.test.ts",
+      "src/lib/db.admin-write-through.test.ts"
     ]
   }
 }

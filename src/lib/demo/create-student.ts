@@ -89,7 +89,7 @@ async function siteCapRefusal(client: StudentCounter, limits: DemoLimits, now: D
  * under the lock, so two visitors never get the same number.
  */
 async function insertStudent(classId: string, limits: DemoLimits, now: Date): Promise<DemoStudentResult> {
-  return prismaAdmin.$transaction(async (tx): Promise<DemoStudentResult> => {
+  const result = await prismaAdmin.$transaction(async (tx): Promise<DemoStudentResult> => {
     // `::bigint` keeps the bound value a number Postgres can match to the
     // one-key form of the lock, whatever type the driver sends it as.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DEMO_STUDENT_CREATE_LOCK}::bigint)`;
@@ -112,6 +112,11 @@ async function insertStudent(classId: string, limits: DemoLimits, now: Date): Pr
     });
     return { kind: "created", student };
   });
+  // `prismaAdmin` has no chat-context write-through (see its doc block in
+  // db.ts), so the new student's cached Sage context is dropped by hand once
+  // the rows are committed.
+  if (result.kind === "created") invalidateChatContext(result.student.id);
+  return result;
 }
 
 export async function createDemoStudent(networkKey: string, now: Date = new Date()): Promise<DemoStudentResult> {
@@ -130,11 +135,6 @@ export async function createDemoStudent(networkKey: string, now: Date = new Date
   if (result.kind === "limited") return result;
 
   const { student } = result;
-
-  // `prismaAdmin` has no chat-context write-through (see its doc block in
-  // db.ts), so the new student's cached Sage context is dropped by hand once
-  // the rows are committed.
-  invalidateChatContext(student.id);
 
   // A failed audit write is logged by `tryLogAuditEvent` and must not turn a
   // student that now exists into a 500, so the result is not checked.

@@ -208,6 +208,26 @@ describe("provisionIntakeStudent — an existing match on the staff path", () =>
     assert.equal(created.spokesUpserts.length, 1);
     assert.equal(created.alerts.length, 0);
   });
+
+  // prismaAdmin skips the write-through, so the enrollment this path adds must
+  // clear the student's kept dashboard and Sage context by hand, as the
+  // new-student path does. The real cache runs here; only the database is fake.
+  it("clears the matched student's kept context after adding the enrollment, and no one else's", async () => {
+    const { cached } = await import("@/lib/cache");
+    const keptAfter = async (studentId: string) => {
+      let reread = false;
+      await cached(`chat:snapshot:${studentId}`, 600, async () => { reread = true; return "fresh"; });
+      return !reread;
+    };
+    state.spokesMatch = EXISTING;
+    for (const id of [EXISTING.id, "stu_bystander"]) await cached(`chat:snapshot:${id}`, 600, async () => "warm");
+
+    await provision.provisionIntakeStudent(PAYLOAD, { source: "staff" });
+
+    assert.equal(created.enrollments.length, 1, "the staff path should have enrolled the student");
+    assert.equal(await keptAfter(EXISTING.id), false, "the matched student's kept context outlived the new enrollment");
+    assert.equal(await keptAfter("stu_bystander"), true, "another student's kept context was cleared");
+  });
 });
 
 describe("provisionIntakeStudent — a staff caller who cannot manage the matched student", () => {

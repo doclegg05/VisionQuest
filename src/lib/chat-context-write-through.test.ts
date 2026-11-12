@@ -204,6 +204,17 @@ test("conversation title/active updates resolve to none (per-turn writes must no
   }
 });
 
+// Deleting a conversation cascades its messages away (lowering the discovery
+// turn count) and drops a summary Sage used, though the delete names neither.
+test("deleting a conversation clears its student; a delete that names none clears everyone", () => {
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "delete", { where: { id: "conv1" } },
+    { id: "conv1", studentId: SID, stage: "discovery" }), { scope: "students", studentIds: [SID] });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "deleteMany", { where: { studentId: SID } }, { count: 3 }),
+    { scope: "students", studentIds: [SID] });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "deleteMany", { where: { active: false } }, { count: 3 }),
+    { scope: "all" });
+});
+
 test("conversation summary write resolves to the student (prior-conversation context)", () => {
   const res = resolveChatContextInvalidation("Conversation", "update", {
     where: { id: "conv1" },
@@ -378,6 +389,31 @@ test("a chat message clears only its student's dashboard slow signals", () => {
   const res = resolveChatContextInvalidation("Message", "create",
     { data: { conversationId: "conv1", studentId: SID, role: "assistant", content: "Hi" } }, { id: "m1", studentId: SID });
   assert.deepEqual(res, { scope: "dashboard", studentIds: [SID] });
+});
+
+// A per-turn write that names no student must not fall back to clearing
+// everyone's Sage layers: it clears only the kept slow signals, for everyone.
+test("a chat message or stage write that names no student clears every student's slow signals only", () => {
+  assert.deepEqual(resolveChatContextInvalidation("Message", "create",
+    { data: { student: { connect: { id: SID } }, conversation: { connect: { id: "conv1" } }, role: "user", content: "Hi" }, select: { id: true } },
+    { id: "m2" }), { scope: "allDashboards" });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "updateMany",
+    { where: { id: { in: ["conv1"] } }, data: { stage: "discovery" } }, { count: 1 }), { scope: "allDashboards" });
+});
+
+test("the every-dashboard fallback drops every student's slow signals and keeps Sage's layers", async () => {
+  const slow = (id: string) => `chat:snapshot:${id}:dashboard:slow`;
+  const sage = `chat:pathway:${SID}`;
+  for (const key of [slow(SID), slow(OTHER_SID), sage]) await cached(key, 60, async () => "warm");
+  await applyChatContextWriteThrough("Message", "create", { data: { student: { connect: { id: SID } } } }, { id: "m2" });
+  const reread = async (key: string) => {
+    let again = false;
+    await cached(key, 60, async () => { again = true; return "fresh"; });
+    return again;
+  };
+  assert.equal(await reread(slow(SID)), true, "a student's slow signals outlived the fallback");
+  assert.equal(await reread(slow(OTHER_SID)), true, "another student's slow signals outlived the fallback");
+  assert.equal(await reread(sage), false, "the fallback dropped Sage's chat layers");
 });
 
 test("an enrollment write clears its student, and a pathway write clears everyone", () => {

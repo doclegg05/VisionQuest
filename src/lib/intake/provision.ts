@@ -393,6 +393,11 @@ export async function provisionIntakeStudent(
       }
     }
 
+    // prismaAdmin skips the write-through, so the enrollment and record
+    // written above must drop the student's kept context by hand, as the
+    // new-student path below does.
+    invalidateChatContext(student.id);
+
     const pdfStorageKey = await stampPacket(student.id, student.studentId, payload);
 
     await tryLogAuditEvent({
