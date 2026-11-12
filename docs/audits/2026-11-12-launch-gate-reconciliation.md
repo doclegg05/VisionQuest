@@ -83,3 +83,11 @@ two skipped tests; database-only suites remain conditional on CI. The readiness
 runner tests pass 87/87. Focused scorecard checks pass B3 (101), C9 (27), H3 (16),
 H6 (99) and the H8 owner approval. Browser focus/scroll and controlled-removal
 evidence still await CI on the pushed commit.
+
+The first CI run on `dea2dbc6` exposed a real B3 scroll jump: focus stayed,
+but Create Class moved the viewport by 68-237 pixels. An isolated local
+PostgreSQL/Chromium run reproduced a 79-pixel jump. Explicit scroll preservation
+through list/detail refreshes fixes it; the unchanged create/save focus and
+scroll assertions now pass locally (one browser test, no retries). User input
+cancels preservation. The build, targeted lint and 29 focused unit tests pass.
+CI still needs to rerun on the correction.

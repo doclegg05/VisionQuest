@@ -15,6 +15,7 @@ import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
 import ClassIntakeFlyerModal from "./ClassIntakeFlyerModal";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
+import { useClassActionScroll } from "./useClassActionScroll";
 
 interface InstructorOption {
   id: string;
@@ -136,6 +137,10 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   const [newStudentPassword, setNewStudentPassword] = useState("");
   const [createStudentError, setCreateStudentError] = useState("");
   const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null);
+  const preserveActionScroll = useClassActionScroll(
+    creatingClass || saving,
+    !detailLoading && (!selectedClassId || classDetail?.id === selectedClassId || Boolean(error)),
+  );
 
   async function loadClasses(preferredClassId?: string) {
     if (!loadedOnce.current) setLoading(true);
@@ -325,6 +330,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
 
   async function createClass() {
     if (creatingClass) return;
+    preserveActionScroll();
     setCreatingClass(true);
     setError("");
     setMessage("");
@@ -353,6 +359,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   async function saveClassSettings() {
     if (saving || !selectedClassId || !(await regionMove.confirmMove())) return;
 
+    preserveActionScroll();
     setSaving(true);
     setError("");
     setMessage("");
