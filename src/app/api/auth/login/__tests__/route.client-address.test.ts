@@ -109,10 +109,10 @@ function networkKeys(): string[] {
   return limiterKeys.filter((key) => key.startsWith("login:") && !key.startsWith("login:unknown:") && !key.startsWith("login:user:"));
 }
 
-describe("POST /api/auth/login: the per-network limit counts the address Render appended", () => {
+describe("POST /api/auth/login: the per-network limit counts the client Cloudflare forwarded to Render", () => {
   it("counts one address however the caller rotates a forged first hop", async () => {
     for (let i = 0; i < 5; i += 1) {
-      assert.equal(await signIn("alice", `10.0.${i}.${i}, 198.51.100.4`), 401);
+      assert.equal(await signIn("alice", `10.0.${i}.${i}, 198.51.100.4, 172.70.1.9`), 401);
     }
 
     assert.deepEqual([...new Set(networkKeys())], ["login:198.51.100.4"]);
@@ -126,10 +126,18 @@ describe("POST /api/auth/login: the per-network limit counts the address Render 
   });
 
   it("records the counted address on the audit row, not the forged one", async () => {
-    await signIn("alice", "6.6.6.6, 198.51.100.4");
+    await signIn("alice", "6.6.6.6, 198.51.100.4, 172.70.1.9");
 
     assert.equal(audits.length, 1);
     assert.equal(audits[0]?.metadata?.ip, "198.51.100.4");
+  });
+
+  it("limits an IPv6 client by its /64 and records the full address on the audit row", async () => {
+    await signIn("alice", "2001:db8:1:2:aaaa::7, 2400:cb00::1");
+    await signIn("alice", "2001:db8:1:2:bbbb::8, 2400:cb00::1");
+
+    assert.deepEqual([...new Set(networkKeys())], ["login:2001:db8:1:2::/64"]);
+    assert.deepEqual(audits.map((row) => row.metadata?.ip), ["2001:db8:1:2:aaaa::7", "2001:db8:1:2:bbbb::8"]);
   });
 });
 

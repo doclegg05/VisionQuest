@@ -160,7 +160,7 @@ function resetRequest(overrides: Record<string, unknown> = {}) {
       securityQuestions: ANSWERS,
       ...overrides,
     },
-    headers: { "x-forwarded-for": IP },
+    headers: { "x-forwarded-for": `${IP}, 172.70.1.9` },
   });
 }
 

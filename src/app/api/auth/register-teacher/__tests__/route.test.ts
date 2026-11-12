@@ -553,7 +553,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
     function attemptFrom(ip: string, registrationKey: string) {
       return mockRequest("/api/auth/register-teacher", {
         method: "POST",
-        headers: { "x-forwarded-for": ip },
+        headers: { "x-forwarded-for": `${ip}, 172.70.1.9` },
         body: {
           registrationKey,
           role: "teacher",
@@ -655,7 +655,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
     function distinctGuess(index: number) {
       return mockRequest("/api/auth/register-teacher", {
         method: "POST",
-        headers: { "x-forwarded-for": `198.51.100.${index}` },
+        headers: { "x-forwarded-for": `198.51.100.${index}, 172.70.1.9` },
         body: {
           registrationKey: `wrong-key-guess-${index}`,
           role: "admin",
@@ -725,7 +725,7 @@ describe("POST /api/auth/register-teacher (staff registration)", () => {
       const res = await registerRoute.POST(
         mockRequest("/api/auth/register-teacher", {
           method: "POST",
-          headers: { "x-forwarded-for": "198.51.100.200" },
+          headers: { "x-forwarded-for": `198.51.100.200, 172.70.1.9` },
           body: {
             registrationKey: TEACHER_KEY,
             role: "teacher",

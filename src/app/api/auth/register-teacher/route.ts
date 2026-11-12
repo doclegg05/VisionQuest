@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prismaAdmin as prisma } from "@/lib/db";
 import { hashPassword, normalizeEmail, normalizeStudentId, setSessionCookie } from "@/lib/auth";
-import { clientIpBucket } from "@/lib/client-ip";
+import { clientIpAddress, clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -83,8 +83,8 @@ function tooManyAttempts(): NextResponse {
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
-  const rl = await rateLimit(`register-staff:${ip}`, 5, 15 * 60 * 1000);
+  const ip = clientIpAddress(req);
+  const rl = await rateLimit(`register-staff:${clientIpBucket(req)}`, 5, 15 * 60 * 1000);
   if (!rl.success) {
     return tooManyAttempts();
   }

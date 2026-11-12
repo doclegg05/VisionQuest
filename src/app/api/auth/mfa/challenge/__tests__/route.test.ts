@@ -248,7 +248,7 @@ function challengeRequest(token: string, options: { withSessionToken?: boolean }
   return mockRequest("/api/auth/mfa/challenge", {
     method: "POST",
     body: withSessionToken ? { token, mfaSessionToken: "challenge-token" } : { token },
-    headers: { "x-forwarded-for": IP },
+    headers: { "x-forwarded-for": `${IP}, 172.70.1.9` },
   });
 }
 

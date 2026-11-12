@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { forbidden, withAuth, type Session } from "@/lib/api-error";
 import { logAuditEvent } from "@/lib/audit";
 import { setSessionCookie } from "@/lib/auth";
-import { clientIpBucket } from "@/lib/client-ip";
+import { clientIpAddress } from "@/lib/client-ip";
 import { assertNotDemoAccount } from "@/lib/demo/guards";
 import { errorForLog } from "@/lib/log-error";
 import { studentLogKey } from "@/lib/log-keys";
@@ -74,7 +74,7 @@ export const POST = withAuth(async (session, req: NextRequest) => {
     newPassword: body.newPassword,
   });
 
-  const ip = clientIpBucket(req);
+  const ip = clientIpAddress(req);
   if (result.kind === "wrong_current_password") {
     await auditOwnAttempt(session, {
       action: "auth.password.change_failed",

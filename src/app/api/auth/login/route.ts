@@ -12,7 +12,7 @@ import {
   signMfaSessionToken,
   setMfaSessionCookie,
 } from "@/lib/auth";
-import { clientIpBucket } from "@/lib/client-ip";
+import { clientIpAddress, clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -284,10 +284,10 @@ async function startSession(
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
+  const ip = clientIpAddress(req);
   // Every attempt takes a unit first, in one atomic statement, so a burst of
   // guesses cannot race past the limit. A right password gives it back below.
-  const networkKey = `login:${ip}`;
+  const networkKey = `login:${clientIpBucket(req)}`;
   const networkRl = await rateLimit(networkKey, NETWORK_FAILED_SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
   if (!networkRl.success) {
     return NextResponse.json({ error: NETWORK_LIMIT_MESSAGE }, { status: 429 });

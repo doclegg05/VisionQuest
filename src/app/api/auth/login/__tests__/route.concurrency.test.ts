@@ -105,7 +105,7 @@ async function burst(count: number, ip = "203.0.113.7"): Promise<number[]> {
         mockRequest("/api/auth/login", {
           method: "POST",
           body: { studentId: "alice", password: "correct-horse" },
-          headers: { "x-forwarded-for": ip },
+          headers: { "x-forwarded-for": `${ip}, 172.70.1.9` },
         }) as any,
       ),
     ),

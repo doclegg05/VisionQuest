@@ -7,7 +7,7 @@ import {
   getMfaSessionToken,
   clearMfaSessionCookie,
 } from "@/lib/auth";
-import { clientIpBucket } from "@/lib/client-ip";
+import { clientIpAddress, clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit";
 import { withErrorHandler } from "@/lib/api-error";
@@ -52,9 +52,9 @@ const ACCOUNT_LOCKED_MESSAGE =
  * real session JWT cookie.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = clientIpBucket(req);
+  const ip = clientIpAddress(req);
 
-  const rl = await rateLimit(`mfa-challenge:${ip}`, NETWORK_LIMIT_ATTEMPTS, NETWORK_LIMIT_WINDOW_MS);
+  const rl = await rateLimit(`mfa-challenge:${clientIpBucket(req)}`, NETWORK_LIMIT_ATTEMPTS, NETWORK_LIMIT_WINDOW_MS);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many MFA attempts. Please try again later." },

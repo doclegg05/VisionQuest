@@ -22,11 +22,13 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import {
+  clientIpAddress,
   clientIpBucket,
   clientIpConfigFrom,
   clientIpFrom,
   DEFAULT_TRUSTED_PROXY_HOPS,
   MAX_FORWARDED_IP_CHARS,
+  rateLimitBucketFor,
   resolveClientIp,
   type ClientIpConfig,
 } from "./client-ip";
@@ -144,6 +146,75 @@ describe("resolveClientIp: the hop the platform appended", () => {
   });
 });
 
+describe("resolveClientIp: Render's domain, behind Cloudflare (two trusted hops)", () => {
+  const RENDER_VIA_CLOUDFLARE: ClientIpConfig = { trustedProxyHops: 2, cloudflareInFront: false };
+
+  it("reads the client from the shape a published Render trace shows: client, then Cloudflare edge", () => {
+    // https://rohitpaulk.com/articles/render-rails-remote-ip: the app sees
+    // `X-Forwarded-For: <client>, <cloudflare edge>`.
+    assert.equal(forwardedFor("198.51.100.4, 172.70.1.9", RENDER_VIA_CLOUDFLARE), "198.51.100.4");
+  });
+
+  it("counts one address however a forged prefix rotates", () => {
+    const seen = new Set<string | null>();
+    for (let i = 0; i < 50; i += 1) {
+      seen.add(forwardedFor(`10.${i}.0.1, 203.0.113.${i}, 198.51.100.4, 172.70.1.9`, RENDER_VIA_CLOUDFLARE));
+    }
+    assert.deepEqual([...seen], ["198.51.100.4"]);
+  });
+
+  it("puts students behind different edges in their own buckets, not the edge's", () => {
+    assert.notEqual(
+      forwardedFor("198.51.100.4, 172.70.1.9", RENDER_VIA_CLOUDFLARE),
+      forwardedFor("198.51.100.5, 172.70.1.9", RENDER_VIA_CLOUDFLARE),
+    );
+  });
+
+  it("puts a one-entry chain in the shared unknown bucket, never that entry", () => {
+    assert.equal(forwardedFor("198.51.100.4", RENDER_VIA_CLOUDFLARE), "unknown");
+  });
+
+  it("puts an empty second-from-right entry in the shared unknown bucket", () => {
+    assert.equal(forwardedFor(", 172.70.1.9", RENDER_VIA_CLOUDFLARE), "unknown");
+  });
+});
+
+describe("rateLimitBucketFor: one bucket per IPv6 /64, IPv4-mapped read as IPv4", () => {
+  it("collapses addresses that differ only below the /64 into one bucket", () => {
+    const seen = new Set<string>();
+    for (const address of ["2001:db8:1:2::1", "2001:db8:1:2:ffff:ffff:ffff:ffff", "2001:0DB8:0001:0002:abcd::9"]) {
+      seen.add(rateLimitBucketFor(address));
+    }
+    assert.deepEqual([...seen], ["2001:db8:1:2::/64"]);
+  });
+
+  it("keeps different /64s apart", () => {
+    assert.notEqual(rateLimitBucketFor("2001:db8:1:2::1"), rateLimitBucketFor("2001:db8:1:3::1"));
+  });
+
+  it("reads compressed forms at either end", () => {
+    assert.equal(rateLimitBucketFor("::1"), "0:0:0:0::/64");
+    assert.equal(rateLimitBucketFor("fe80::"), "fe80:0:0:0::/64");
+  });
+
+  it("reads an IPv4-mapped address as the IPv4 address", () => {
+    assert.equal(rateLimitBucketFor("::ffff:198.51.100.4"), "198.51.100.4");
+    assert.equal(rateLimitBucketFor("0000:0000:0000:0000:0000:ffff:192.168.100.228"), "192.168.100.228");
+    assert.equal(rateLimitBucketFor("::ffff:c633:6404"), "198.51.100.4");
+  });
+
+  it("leaves an IPv4 address and the unknown bucket as they are", () => {
+    assert.equal(rateLimitBucketFor("198.51.100.4"), "198.51.100.4");
+    assert.equal(rateLimitBucketFor("unknown"), "unknown");
+  });
+
+  it("puts a colon value that is not an IPv6 address in the shared unknown bucket", () => {
+    for (const bad of ["1::2::3", "1:2:3:4:5:6:7:8:9", "12345::1", ":::", "1:2:3:4:5:6:7", "::ffff:300.1.1.1", "::ffff:1.2.3"]) {
+      assert.equal(rateLimitBucketFor(bad), "unknown", bad);
+    }
+  });
+});
+
 describe("resolveClientIp: Cloudflare in front", () => {
   it("reads CF-Connecting-IP and ignores X-Forwarded-For", () => {
     const headers = headersWith({ "cf-connecting-ip": "198.51.100.4", "x-forwarded-for": "6.6.6.6, 162.158.1.1" });
@@ -166,9 +237,9 @@ describe("resolveClientIp: Cloudflare in front", () => {
 });
 
 describe("clientIpConfigFrom: the two deployment settings", () => {
-  it("defaults to one trusted proxy and Cloudflare off", () => {
+  it("defaults to two trusted proxies (Cloudflare's edge, then Render's proxy) and the Cloudflare header off", () => {
     assert.deepEqual(clientIpConfigFrom({}), { trustedProxyHops: DEFAULT_TRUSTED_PROXY_HOPS, cloudflareInFront: false });
-    assert.equal(DEFAULT_TRUSTED_PROXY_HOPS, 1);
+    assert.equal(DEFAULT_TRUSTED_PROXY_HOPS, 2);
   });
 
   it("reads both settings", () => {
@@ -199,10 +270,22 @@ describe("clientIpFrom and clientIpBucket read the deployment settings", () => {
     else process.env.CLOUDFLARE_IN_FRONT = saved.cf;
   });
 
-  it("takes the appended hop with the settings unset", () => {
+  it("takes the client Cloudflare forwarded, not the edge, with the settings unset", () => {
     delete process.env.TRUSTED_PROXY_HOPS;
     delete process.env.CLOUDFLARE_IN_FRONT;
-    assert.equal(clientIpFrom(requestWithForwardedFor("6.6.6.6, 198.51.100.4")), "198.51.100.4");
+    assert.equal(clientIpFrom(requestWithForwardedFor("6.6.6.6, 198.51.100.4, 172.68.10.20")), "198.51.100.4");
+  });
+
+  it("buckets an IPv6 client by its /64 but keeps the full address for the audit row", () => {
+    delete process.env.TRUSTED_PROXY_HOPS;
+    delete process.env.CLOUDFLARE_IN_FRONT;
+    const req = requestWithForwardedFor("2001:db8:1:2:aaaa::7, 2400:cb00::1");
+    assert.equal(clientIpBucket(req), "2001:db8:1:2::/64");
+    assert.equal(clientIpAddress(req), "2001:db8:1:2:aaaa::7");
+  });
+
+  it("puts a request with no proxy header in the shared unknown bucket and audit value", () => {
+    assert.equal(clientIpAddress(requestWithForwardedFor(null)), "unknown");
   });
 
   it("follows CLOUDFLARE_IN_FRONT", () => {

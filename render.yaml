@@ -125,14 +125,19 @@ services:
       - key: SAGE_RAG_ABSTAIN_DISTANCE
         value: "0.40"
       # Which address the per-network rate limits count (src/lib/client-ip.ts,
-      # readiness A6). Render's proxy appends the address it saw to
-      # X-Forwarded-For, so the client is this many entries from the right.
-      # The first entry is whatever the caller wrote and is never used.
+      # readiness A6). Render serves onrender.com through Cloudflare, so the
+      # chain is client, Cloudflare edge, Render's proxy, app, and the app sees
+      # X-Forwarded-For "<client>, <cloudflare edge>". The client is 2 entries
+      # from the right. Too low (1) counts the edge, so every student behind
+      # one edge shares a bucket; too high (3+) reaches the entries the caller
+      # wrote, so the address is forgeable. DEPLOY.md "Check the sign-in
+      # limits' client address" confirms the value after a deploy.
       - key: TRUSTED_PROXY_HOPS
-        value: "1"
-      # "true" only when every request reaches this service through a
-      # Cloudflare zone of our own; then CF-Connecting-IP is read instead.
-      # Without Cloudflare in front a caller can send that header itself.
+        value: "2"
+      # "true" reads CF-Connecting-IP, which Cloudflare sets to the client on
+      # every request it proxies (Cloudflare sits in front of Render's own
+      # domain). Off until the DEPLOY.md check shows that header holds the
+      # real client and no request can reach Render without Cloudflare.
       - key: CLOUDFLARE_IN_FRONT
         value: "false"
       - key: CF_ACCESS_CLIENT_ID
