@@ -19,6 +19,7 @@
  */
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it, mock } from "node:test";
+import type { Session } from "@/lib/api-error";
 
 const SHOULD_RUN = process.env.ALERT_ACTIONS_DB_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -48,7 +49,17 @@ if (!SHOULD_RUN) {
     let actions: typeof import("./alert-actions");
     let sync: typeof import("../advising-sync");
     let prismaAdmin: typeof import("../db").prismaAdmin;
+    let context: typeof import("@/lib/rls-context");
+    let api: typeof import("@/lib/api-error");
     let target: { id: string; studentId: string };
+
+    // CI runs this job with RLS_CONTEXT_INJECTION and RLS_CONTEXT_STRICT on, so every
+    // app-client query needs a context, as a request would have (tasks.db.test.ts).
+    const admin: Session = { id: ACTOR, studentId: ACTOR, role: "admin", displayName: "Alert Test Admin" };
+    const asAdmin = <T>(work: () => T) => context.withRlsContext(api.rlsContextFor(admin), work);
+    const act = (...args: Parameters<typeof actions.applyAlertAction>) => asAdmin(() => actions.applyAlertAction(...args));
+    const applySync = (...args: Parameters<typeof sync.applyStudentAlertSyncPlan>) =>
+      asAdmin(() => sync.applyStudentAlertSyncPlan(...args));
 
     before(async () => {
       // Checked before ../db is imported, so no client ever connects to another host.
@@ -60,6 +71,8 @@ if (!SHOULD_RUN) {
       actions = await import("./alert-actions");
       sync = await import("../advising-sync");
       ({ prismaAdmin } = await import("../db"));
+      context = await import("@/lib/rls-context");
+      api = await import("@/lib/api-error");
     });
 
     // The alert goes with its student (onDelete: Cascade).
@@ -90,7 +103,7 @@ if (!SHOULD_RUN) {
 
     // A timestamp with sub-millisecond detail would not round trip; the app's Date never has any, and this pins it.
     it("reopens with the exact timestamp the resolve answered with", async () => {
-      const resolved = await actions.applyAlertAction(target, { action: "resolve" }, ACTOR, new Date());
+      const resolved = await act(target, { action: "resolve" }, ACTOR, new Date());
       assert.equal(resolved.kind, "changed");
       assert.ok(resolved.kind === "changed" && resolved.response.status === "resolved");
       const at = resolved.response.resolvedAt;
@@ -98,7 +111,7 @@ if (!SHOULD_RUN) {
       const stored = await prismaAdmin.studentAlert.findUniqueOrThrow({ where: { id: target.id } });
       assert.equal(stored.resolvedAt?.toISOString(), at, "the stored stamp equals the answer's");
 
-      const reopened = await actions.applyAlertAction(
+      const reopened = await act(
         target,
         { action: "reopen", expected: { status: "resolved", at } },
         ACTOR,
@@ -111,11 +124,11 @@ if (!SHOULD_RUN) {
     });
 
     it("refuses an Undo whose timestamp is a millisecond off, and changes nothing", async () => {
-      const resolved = await actions.applyAlertAction(target, { action: "resolve" }, ACTOR, new Date());
+      const resolved = await act(target, { action: "resolve" }, ACTOR, new Date());
       assert.ok(resolved.kind === "changed" && resolved.response.status === "resolved");
       const off = new Date(new Date(resolved.response.resolvedAt).getTime() + 1).toISOString();
 
-      const refused = await actions.applyAlertAction(
+      const refused = await act(
         target,
         { action: "reopen", expected: { status: "resolved", at: off } },
         ACTOR,
@@ -128,14 +141,14 @@ if (!SHOULD_RUN) {
     });
 
     it("reopens a dismiss with the exact timestamp the dismiss answered with", async () => {
-      const dismissed = await actions.applyAlertAction(target, { action: "dismiss" }, ACTOR, new Date());
+      const dismissed = await act(target, { action: "dismiss" }, ACTOR, new Date());
       assert.ok(dismissed.kind === "changed" && dismissed.response.status === "dismissed");
       const at = dismissed.response.dismissedAt;
 
       const stored = await prismaAdmin.studentAlert.findUniqueOrThrow({ where: { id: target.id } });
       assert.equal(stored.dismissedAt?.toISOString(), at, "the stored stamp equals the answer's");
 
-      const reopened = await actions.applyAlertAction(
+      const reopened = await act(
         target,
         { action: "reopen", expected: { status: "dismissed", at } },
         ACTOR,
@@ -157,7 +170,7 @@ if (!SHOULD_RUN) {
       assert.equal(existing.length, 1);
       assert.equal(existing[0].status, "open");
 
-      const dismissed = await actions.applyAlertAction(target, { action: "dismiss" }, ACTOR, new Date());
+      const dismissed = await act(target, { action: "dismiss" }, ACTOR, new Date());
       assert.ok(dismissed.kind === "changed" && dismissed.response.status === "dismissed");
 
       const desired = {
@@ -169,7 +182,7 @@ if (!SHOULD_RUN) {
         sourceType: "certification",
         sourceId: target.studentId,
       };
-      await sync.applyStudentAlertSyncPlan({ studentId: target.studentId, now: new Date(), existing, desiredAlerts: [desired] });
+      await applySync({ studentId: target.studentId, now: new Date(), existing, desiredAlerts: [desired] });
 
       const stored = await prismaAdmin.studentAlert.findUniqueOrThrow({ where: { id: target.id } });
       assert.equal(stored.status, "dismissed");
@@ -178,8 +191,8 @@ if (!SHOULD_RUN) {
     });
 
     it("answers a second dismiss as already saved, so no Undo is offered for it", async () => {
-      const first = await actions.applyAlertAction(target, { action: "dismiss" }, ACTOR, new Date());
-      const second = await actions.applyAlertAction(target, { action: "dismiss" }, `${ACTOR}-b`, new Date());
+      const first = await act(target, { action: "dismiss" }, ACTOR, new Date());
+      const second = await act(target, { action: "dismiss" }, `${ACTOR}-b`, new Date());
       assert.equal(second.kind, "unchanged");
       assert.ok(first.kind === "changed" && first.response.status === "dismissed");
       assert.ok(second.kind === "unchanged" && second.response.status === "dismissed");
