@@ -10,6 +10,9 @@ import { studentLogKey } from "@/lib/log-keys";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+/** How long a presigned archive download link stays valid. */
+const ARCHIVE_LINK_SECONDS = 60;
+
 export const POST = withTeacherAuth(async (session, _req: NextRequest, ctx: unknown) => {
   const { id: identifier } = await (ctx as RouteContext).params;
   const student = await assertStaffCanManageStudent(session, identifier);
@@ -83,9 +86,12 @@ export const GET = withTeacherAuth(async (session, req: NextRequest, ctx: unknow
     );
 
   // Archives can be 50-100MB — presigned URL bypasses Node.js memory entirely.
+  // The redirect is followed at once, so the link only needs to live a
+  // minute; a leaked or logged URL then stops working quickly (H15c).
   const presigned = await getPresignedDownloadUrl(storageKey, {
     contentType: "application/zip",
     contentDisposition: disposition,
+    expiresIn: ARCHIVE_LINK_SECONDS,
   });
   if (presigned) {
     if (!(await recordDownload())) return unrecorded();
