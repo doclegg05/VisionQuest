@@ -1,11 +1,13 @@
 /**
  * The last step of a dashboard follow-up: after its task, form review or resource has saved, close the queue alert
  * it came from. The save has landed by then, so this step never throws and its answer is never a failure that would
- * invite a second task. A 409 means the alert was already closed, by another instructor or by the alert sync.
+ * invite a second task. A 409 means the alert was already handled: another instructor closed or snoozed it, or the
+ * alert sync resolved it.
  */
 import { ApiClientError } from "@/lib/api";
+import { errorForLog, type LoggedError } from "@/lib/log-error";
 
-export type LinkedAlertOutcome = "resolved" | "already-closed" | "not-closed" | "no-alert";
+export type LinkedAlertOutcome = "resolved" | "already-handled" | "not-closed" | "no-alert";
 
 export type FollowUpAction =
   | { kind: "task" }
@@ -18,14 +20,35 @@ export interface FollowUpMessage {
 }
 
 type Patch = (url: string, body: unknown) => Promise<unknown>;
+type FailureDetail = { status: number } | LoggedError;
+type Log = (message: string, detail: FailureDetail) => void;
 
-export async function closeLinkedAlert(alertId: string | null | undefined, patch: Patch): Promise<LinkedAlertOutcome> {
+/**
+ * What a failed close may log: the HTTP status, or the error's class. Never the alert id, and never the message,
+ * which can quote it.
+ */
+function failureForLog(error: unknown): FailureDetail {
+  if (error instanceof ApiClientError) return { status: error.status };
+  return errorForLog(error);
+}
+
+function logToConsole(message: string, detail: FailureDetail): void {
+  console.error(message, detail);
+}
+
+export async function closeLinkedAlert(
+  alertId: string | null | undefined,
+  patch: Patch,
+  log: Log = logToConsole,
+): Promise<LinkedAlertOutcome> {
   if (!alertId) return "no-alert";
   try {
     await patch(`/api/teacher/alerts/${encodeURIComponent(alertId)}`, { action: "resolve" });
     return "resolved";
   } catch (error: unknown) {
-    if (error instanceof ApiClientError && error.status === 409) return "already-closed";
+    if (error instanceof ApiClientError && error.status === 409) return "already-handled";
+    // The message tells the instructor to close it from the queue, so this log is the failure's only trace.
+    log("Dashboard follow-up could not close its alert", failureForLog(error));
     return "not-closed";
   }
 }
@@ -67,8 +90,8 @@ export function followUpMessage(action: FollowUpAction, outcome: LinkedAlertOutc
   switch (outcome) {
     case "resolved":
       return { tone: "success", text: resolvedText(action) };
-    case "already-closed":
-      return { tone: "success", text: `${saved} Someone else already closed the alert.` };
+    case "already-handled":
+      return { tone: "success", text: `${saved} The alert was already handled.` };
     case "not-closed":
       // The save worked; only the alert is still open, so the instructor closes it rather than saving again.
       return { tone: "error", text: `${saved} Could not close the alert. Close it from the queue.` };
