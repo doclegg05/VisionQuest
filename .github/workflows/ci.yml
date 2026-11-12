@@ -630,6 +630,11 @@ jobs:
             echo "::group::collect $spec"
             npx tsx scripts/seed-e2e-users.ts >/dev/null
             npx playwright test "$spec" --workers=1 --reporter=line --timeout=180000 || true
+            # Each invocation empties test-results/, so keep this collector's
+            # failure screenshots and traces before the next one runs.
+            if [ -d test-results ] && [ -n "$(ls -A test-results)" ]; then
+              mkdir -p bench-failures && cp -R test-results "bench-failures/$(basename "$spec" .spec.ts)"
+            fi
             echo "::endgroup::"
           done
         env:
@@ -647,6 +652,14 @@ jobs:
           # job's hermetic Postgres is and no real deployment is. See
           # src/lib/email.ts.
           EMAIL_SINK_ALLOW_HERMETIC: "1"
+
+      - name: Upload browser benchmark failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-collector-failures
+          path: bench-failures/
+          if-no-files-found: ignore
 
       - name: Score browser benchmarks
         env:

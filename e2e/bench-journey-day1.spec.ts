@@ -185,7 +185,9 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
         // six-collector run, which is the frequency that makes it worth a
         // wait rather than a retry: retrying the tap would inflate
         // studentTaps, and this suite's whole point is counting taps honestly.
-        await page.waitForLoadState("networkidle");
+        // Bounded like every other wait here: with no navigation timeout set, a
+        // page that never goes quiet would spend the whole test budget unnamed.
+        await page.waitForLoadState("networkidle", { timeout: ACTION_TIMEOUT_MS });
       },
     );
 
