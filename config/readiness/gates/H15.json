@@ -14,7 +14,12 @@
       "src/components/teacher/FailedExtractionDetails.test.tsx",
       "src/lib/staff-read-walk.test.ts",
       "src/app/api/staff-read-views.shared-routes.test.ts",
-      "src/lib/sage/staff-student-context.test.ts"
+      "src/lib/sage/staff-student-context.test.ts",
+      "src/lib/student-archive.storage-key.test.ts",
+      "src/app/api/teacher/students/[id]/archive/route.test.ts",
+      "src/app/api/audit-summary-names.test.ts",
+      "src/app/api/orientation/route.test.ts",
+      "src/lib/sage/agent/executor-security.test.ts"
     ]
   }
 }
