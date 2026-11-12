@@ -208,6 +208,12 @@ describe("rateLimitBucketFor: one bucket per IPv6 /64, IPv4-mapped read as IPv4"
     assert.equal(rateLimitBucketFor("unknown"), "unknown");
   });
 
+  it("puts a value with no colon that is not an IPv4 address in the shared unknown bucket", () => {
+    for (const bad of ["deadbeef", "1.2.3.4.5.6", "999.1.1.1", "1.2.3", "localhost"]) {
+      assert.equal(rateLimitBucketFor(bad), "unknown", bad);
+    }
+  });
+
   it("puts a colon value that is not an IPv6 address in the shared unknown bucket", () => {
     for (const bad of ["1::2::3", "1:2:3:4:5:6:7:8:9", "12345::1", ":::", "1:2:3:4:5:6:7", "::ffff:300.1.1.1", "::ffff:1.2.3"]) {
       assert.equal(rateLimitBucketFor(bad), "unknown", bad);

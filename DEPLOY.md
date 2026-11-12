@@ -326,16 +326,19 @@ Run this after every deploy that changes `TRUSTED_PROXY_HOPS` or `CLOUDFLARE_IN_
 3. In the Supabase SQL editor:
 
    ```sql
-   SELECT "createdAt", metadata FROM visionquest."AuditLog" WHERE action LIKE 'auth.login_failed%' ORDER BY "createdAt" DESC LIMIT 3;
+   SELECT "createdAt", metadata FROM visionquest."AuditLog" WHERE action LIKE 'auth.login_failed%' AND "createdAt" > now() - interval '2 minutes' ORDER BY "createdAt" DESC LIMIT 5;
    ```
 
-4. Judge `metadata.ip` on the newest row:
+4. Pick the row that has `metadata.loginHash` (a real student's failed sign-in in the same two minutes has none), and judge its `metadata.ip`:
    - **Equal to the address from step 1**: correct.
    - **`203.0.113.9`**: the address can be forged. Block launch; `TRUSTED_PROXY_HOPS` is too high.
    - **A Cloudflare address**: `TRUSTED_PROXY_HOPS` is too low, and every student behind that edge shares one limit. Cloudflare's ranges are listed at https://www.cloudflare.com/ips/. As of 2026-11 they are IPv4 `173.245.48.0/20`, `103.21.244.0/22`, `103.22.200.0/22`, `103.31.4.0/22`, `141.101.64.0/18`, `108.162.192.0/18`, `190.93.240.0/20`, `188.114.96.0/20`, `197.234.240.0/22`, `198.41.128.0/17`, `162.158.0.0/15`, `104.16.0.0/13`, `104.24.0.0/14`, `172.64.0.0/13`, `131.0.72.0/22` and IPv6 `2400:cb00::/32`, `2606:4700::/32`, `2803:f800::/32`, `2405:b500::/32`, `2405:8100::/32`, `2a06:98c0::/29`, `2c0f:f248::/32`.
-   - **`unknown`**: the chain was shorter than `TRUSTED_PROXY_HOPS`. Lower it by one and check again.
+   - **`unknown`**: the chain was shorter than `TRUSTED_PROXY_HOPS`. Lower it by one, redeploy, and run every step again, including the forged header in step 2: a lower setting is the one that can be forged.
 5. Repeat steps 1 to 4 from a second network (a phone hotspot), and again with `curl -6` in step 2. An IPv6 row must show the full address from `curl -6 https://ifconfig.me`; the limit itself counts that address's /64.
+   If `curl -6` in step 2 says it could not resolve the host, visionquest.onrender.com has no IPv6 address. That is not a failed check; skip the IPv6 run.
 6. Confirm the row holds `metadata.loginHash` and that the text `zz-address-check-0001` appears nowhere in it.
+
+What this check cannot see: a request that reaches Render without passing Cloudflare. If Render's own address can be reached directly, a caller there could still choose the counted address. The check above tests only the normal path through Cloudflare.
 
 ## 10. Monitoring And Recovery
 

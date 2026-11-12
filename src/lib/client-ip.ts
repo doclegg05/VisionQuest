@@ -198,7 +198,8 @@ function mappedIpv4(groups: readonly number[]): string | null {
  * unknown bucket, so it cannot mint buckets either.
  */
 export function rateLimitBucketFor(address: string): string {
-  if (!address.includes(":")) return address;
+  // A value with no colon is IPv4 or the unknown bucket; anything else cannot mint its own bucket.
+  if (!address.includes(":")) return address === UNKNOWN || ipv4Groups(address) !== null ? address : UNKNOWN;
   const groups = ipv6Groups(address);
   if (groups === null) return UNKNOWN;
   const v4 = mappedIpv4(groups);

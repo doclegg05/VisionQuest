@@ -13,7 +13,8 @@
       "src/app/api/auth/login/__tests__/route.client-address.test.ts",
       "src/app/api/auth/reset-password/questions/__tests__/route.test.ts",
       "src/app/api/csp-report/route.test.ts",
-      "src/app/api/intake/submit/route.test.ts"
+      "src/app/api/intake/submit/route.test.ts",
+      "src/lib/connect/employer-request.test.ts"
     ]
   }
 }

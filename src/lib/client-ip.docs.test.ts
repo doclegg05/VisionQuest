@@ -52,8 +52,13 @@ describe("DEPLOY.md owner check for the client address", () => {
     const check = ownerCheck();
     assert.match(
       check,
-      /SELECT "createdAt", metadata FROM visionquest\."AuditLog" WHERE action LIKE 'auth\.login_failed%' ORDER BY "createdAt" DESC LIMIT 3;/u,
+      /SELECT "createdAt", metadata FROM visionquest\."AuditLog" WHERE action LIKE 'auth\.login_failed%' AND "createdAt" > now\(\) - interval '2 minutes' ORDER BY "createdAt" DESC LIMIT 5;/u,
     );
+    // On a busy system the newest row can be a real student's; the probe's row is the one with a hash.
+    assert.match(check, /Pick the row that has `metadata\.loginHash`/u);
+    // A lower hop count is the forgeable direction, so lowering it repeats the forged-header step.
+    assert.match(check, /including the forged header in step 2/u);
+    assert.match(check, /What this check cannot see/u);
     assert.match(check, /metadata\.loginHash/u);
     assert.match(check, /zz-address-check-0001` appears nowhere/u);
   });
