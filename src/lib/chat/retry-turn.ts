@@ -28,8 +28,16 @@ import { CUT_OFF_MARKS } from "./sage-failure";
 /** The 409's text; the registry middleware sends it to the student as is. */
 export const ALREADY_ANSWERED = "Sage already sent the answer. It is above.";
 
+/**
+ * How recent a saved copy must be for a Try again with no saved id to reuse
+ * it (E9b 6). The chat's own timeout is 20 seconds, so a real retry comes
+ * well inside this; an older identical message is a new question.
+ */
+export const UNSAVED_RETRY_WINDOW_MS = 5 * 60_000;
+
 export const chatSendBodySchema = chatSendSchema.extend({
-  retryOf: z.string().cuid("Invalid message ID.").optional(),
+  // null: a Try again that never learned the saved id (E9b 6).
+  retryOf: z.string().cuid("Invalid message ID.").nullable().optional(),
 });
 
 export type ChatSendBody = z.infer<typeof chatSendBodySchema>;
@@ -42,7 +50,8 @@ export interface RetriedMessage {
 interface RetryLookup {
   studentId: string;
   conversationId: string | null;
-  retryOf: string | undefined;
+  /** The saved id, null for a Try again that never got one, undefined for a plain send. */
+  retryOf: string | null | undefined;
   content: string;
 }
 
@@ -55,6 +64,7 @@ interface RetryLookup {
  */
 export async function findRetriedUserMessage(lookup: RetryLookup): Promise<RetriedMessage | null> {
   const { retryOf, conversationId } = lookup;
+  if (retryOf === null && conversationId) return lookUpUnsavedRetry(lookup, conversationId);
   if (!retryOf || !conversationId) return null;
   const found = await lookUpRetry(lookup, retryOf, conversationId);
   if (found === "answered") throw conflict(ALREADY_ANSWERED);
@@ -81,6 +91,31 @@ async function lookUpRetry(
     if (latest?.id !== stored.id) return null;
     if (await hasFullAnswerAfter(studentId, conversationId, stored.createdAt)) return "answered";
     return { id: stored.id, conversationId: stored.conversationId };
+  } catch (error) {
+    logger.warn("Chat retry lookup failed; saving the message as new", { error: errorForLog(error) });
+    return null;
+  }
+}
+
+/**
+ * A Try again after the chat's own timeout (E9b 6): no saved id came back,
+ * but the route may have saved the message anyway. Reuse the newest message
+ * in this conversation when it is this account's, says the same thing, is
+ * recent, and has no full answer after it. Otherwise save it as new; a new
+ * conversation cannot be matched, which is accepted.
+ */
+async function lookUpUnsavedRetry(lookup: RetryLookup, conversationId: string): Promise<RetriedMessage | null> {
+  const { studentId, content } = lookup;
+  try {
+    const latest = await prisma.message.findFirst({
+      where: { conversationId, studentId, role: "user" },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, conversationId: true, content: true, createdAt: true },
+    });
+    if (!latest || latest.content !== content) return null;
+    if (Date.now() - latest.createdAt.getTime() > UNSAVED_RETRY_WINDOW_MS) return null;
+    if (await hasFullAnswerAfter(studentId, conversationId, latest.createdAt)) return null;
+    return { id: latest.id, conversationId: latest.conversationId };
   } catch (error) {
     logger.warn("Chat retry lookup failed; saving the message as new", { error: errorForLog(error) });
     return null;

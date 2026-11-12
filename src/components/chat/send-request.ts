@@ -65,7 +65,8 @@ export async function postChatMessage({ text, conversationId, stage, attachmentI
       // Only send on the first message of a new conversation
       requestedStage: conversationId ? undefined : stage,
       attachmentIds: attachmentIds && attachmentIds.length > 0 ? attachmentIds : undefined,
-      retryOf: retryOf ?? undefined,
+      // null is kept: a Try again with no saved id, which the route matches (E9b 6).
+      retryOf,
     }),
   });
   if (!res.ok) throw await readSendError(res);
