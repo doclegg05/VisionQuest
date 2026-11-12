@@ -15,6 +15,7 @@ import { z } from "zod";
 import { withAuth, badRequest, notFound, rateLimited } from "@/lib/api-error";
 import { withRegistry } from "@/lib/registry/middleware";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { recordStudentView } from "@/lib/audit";
 import { isStaffRole } from "@/lib/api-error";
 import { parseBody } from "@/lib/schemas";
 import { prisma } from "@/lib/db";
@@ -50,8 +51,14 @@ export const GET = withAuth(async (session, req: Request) => {
     if (!isStaffRole(session.role)) {
       throw notFound("Insights not found.");
     }
-    await assertStaffCanManageStudent(session, requestedStudentId);
-    targetStudentId = requestedStudentId;
+    const student = await assertStaffCanManageStudent(session, requestedStudentId);
+    targetStudentId = student.id;
+    await recordStudentView({
+      actorId: session.id,
+      actorRole: session.role,
+      targetStudentId,
+      surface: "insights",
+    });
   }
 
   const insights = await prisma.sageInsight.findMany({
