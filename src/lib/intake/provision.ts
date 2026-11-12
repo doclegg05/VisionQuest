@@ -406,7 +406,7 @@ export async function provisionIntakeStudent(
       action: "student.intake.updated",
       targetType: "student",
       targetId: student.id,
-      summary: `Staff-authenticated intake updated records for existing student ${student.studentId}.`,
+      summary: `Staff-authenticated intake updated records for an existing student.`,
       metadata: { county: payload.county, source },
     });
 
@@ -538,7 +538,7 @@ export async function provisionIntakeStudent(
     action: "student.intake.provisioned",
     targetType: "student",
     targetId: student.id,
-    summary: `Automated intake provisioned new student ${student.studentId} in ${activeClass?.name || payload.county}.`,
+    summary: `Automated intake provisioned a new student in ${activeClass?.name || payload.county}.`,
     metadata: {
       county: payload.county,
       classId: activeClass?.id,

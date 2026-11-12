@@ -111,8 +111,8 @@ export const PATCH = withTeacherAuth(async (
     targetType: "student",
     targetId: student.id,
     summary: clusterId
-      ? `Manually marked career discovery complete for student ${student.studentId} and set the ${clusterId} career cluster.`
-      : `Manually marked career discovery complete for student ${student.studentId}.`,
+      ? `Manually marked career discovery complete for the student and set the ${clusterId} career cluster.`
+      : `Manually marked career discovery complete for the student.`,
     metadata: {
       studentId: student.id,
       source: "manual_override",

@@ -178,10 +178,11 @@ async function auditFailedSignIn(attempt: FailedSignIn): Promise<void> {
 
 /**
  * The summary and metadata of a failed sign-in. A login that names an account
- * is not secret and is kept as typed; one that names no account is kept only
- * as a hash, because it may be a password typed in the wrong box.
+ * is not written: the row's target id already says which account, and audit
+ * summaries carry no login (H15). One that names no account is kept only as a
+ * hash, because it may be a password typed in the wrong box.
  */
-function failedSignInRecord({ login, normalizedLogin, ip, student, accountLocked }: FailedSignIn): {
+function failedSignInRecord({ normalizedLogin, ip, student, accountLocked }: FailedSignIn): {
   summary: string;
   metadata: Record<string, string>;
 } {
@@ -193,8 +194,8 @@ function failedSignInRecord({ login, normalizedLogin, ip, student, accountLocked
   }
   return {
     summary: accountLocked
-      ? `Failed login attempt for "${login}" — refused, per-account attempt limit reached.`
-      : `Failed login attempt for "${login}".`,
+      ? "Failed login attempt. Refused: the account's attempt limit was reached."
+      : "Failed login attempt.",
     metadata: { ip },
   };
 }

@@ -161,13 +161,13 @@ describe("POST /api/auth/login: a failed sign-in keeps no typed text for a login
     assert.equal(audits[0]?.metadata?.loginHash, audits[1]?.metadata?.loginHash);
   });
 
-  it("still names a real account's login, which is not secret", async () => {
+  it("keeps a real account's login out of the summary: the target id already names the account (H15)", async () => {
     accountExists = true;
 
     await signIn("alice", "198.51.100.4");
 
     assert.equal(audits.length, 1);
-    assert.match(String(audits[0]?.summary), /alice/);
+    assert.doesNotMatch(String(audits[0]?.summary), /alice/);
     assert.equal(audits[0]?.metadata?.loginHash, undefined);
   });
 });
