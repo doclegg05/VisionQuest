@@ -433,12 +433,8 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
       const stopped = sendAbort.wasStopped();
       if (!stopped) console.error("Send error:", err instanceof Error ? err.name : "Unknown error");
       const after = messagesAfterSendError({
-        err,
-        stopped,
-        timedOut: sendAbort.timedOut(),
-        text,
+        err, stopped, timedOut: sendAbort.timedOut(), text, role,
         ...sent,
-        role,
         id: `${stopped ? "stop" : "err"}-${Date.now()}`,
       });
       // A new chat's first message may be saved before the failure: keep its conversation for Try again.
