@@ -1,85 +1,47 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { withTeacherAuth, badRequest, notFound } from "@/lib/api-error";
+import { withTeacherAuth, badRequest, conflict, notFound } from "@/lib/api-error";
+import { tryLogAuditEvent } from "@/lib/audit";
 import { assertStaffCanManageStudent } from "@/lib/classroom";
-import { prisma } from "@/lib/db";
 import { parseBody } from "@/lib/schemas";
-
-const alertActionSchema = z.object({
-  action: z.enum(["snooze", "resolve", "dismiss", "reopen"], {
-    message: "Invalid action. Must be: snooze, resolve, dismiss, or reopen",
-  }),
-  hours: z.number().int().min(1).max(168).optional(),
-});
+import {
+  ALERT_CHANGED_MESSAGE,
+  alertActionSchema,
+  alertAuditEvent,
+  alertIdSchema,
+  applyAlertAction,
+  findAlertTarget,
+} from "@/lib/teacher/alert-actions";
 
 /**
  * PATCH /api/teacher/alerts/:id
  *
  * Teacher actions on alerts:
- * - action: "snooze"  + hours (1-168) — hide alert until snooze expires
- * - action: "resolve" — mark as resolved manually
- * - action: "dismiss" — soft-delete (won't reappear on resync)
- * - action: "reopen"  — undo snooze/dismiss/resolve
+ * - action: "snooze"  + hours (1-168): hide the alert until the snooze expires
+ * - action: "resolve": mark it resolved
+ * - action: "dismiss": soft-delete (won't reappear on resync)
+ * - action: "reopen"  + expected { status, at }: undo the resolve or dismiss that wrote `at`
+ *
+ * Every write is conditional on the state it expects (`src/lib/teacher/alert-actions.ts`), so an older Undo or a
+ * stale queue cannot overwrite another instructor's newer decision. A mismatch answers 409 and changes nothing.
  */
 export const PATCH = withTeacherAuth(async (
   session,
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) => {
   const { id } = await params;
-  const { action, hours } = await parseBody(_req, alertActionSchema);
+  if (!alertIdSchema.safeParse(id).success) throw badRequest("Invalid alert id");
+  const input = await parseBody(req, alertActionSchema);
 
-  const alert = await prisma.studentAlert.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      studentId: true,
-    },
-  });
+  const alert = await findAlertTarget(id);
   if (!alert) throw notFound("Alert not found");
   await assertStaffCanManageStudent(session, alert.studentId);
 
-  const now = new Date();
-
-  switch (action) {
-    case "snooze": {
-      const snoozeHours = hours ?? 24; // default 24h, schema enforces 1-168 range
-      const snoozedUntil = new Date(now.getTime() + snoozeHours * 60 * 60 * 1000);
-      await prisma.studentAlert.update({
-        where: { id },
-        data: { status: "snoozed", snoozedUntil, snoozedBy: session.id },
-      });
-      return NextResponse.json({ status: "snoozed", snoozedUntil: snoozedUntil.toISOString() });
-    }
-
-    case "resolve": {
-      await prisma.studentAlert.update({
-        where: { id },
-        data: { status: "resolved", resolvedAt: now },
-      });
-      return NextResponse.json({ status: "resolved" });
-    }
-
-    case "dismiss": {
-      await prisma.studentAlert.update({
-        where: { id },
-        data: { status: "dismissed", dismissedAt: now },
-      });
-      return NextResponse.json({ status: "dismissed" });
-    }
-
-    case "reopen": {
-      await prisma.studentAlert.update({
-        where: { id },
-        data: { status: "open", snoozedUntil: null, snoozedBy: null, dismissedAt: null, resolvedAt: null },
-      });
-      return NextResponse.json({ status: "open" });
-    }
-
-    default: {
-      // Unreachable — Zod enum narrows action above. Kept as exhaustiveness guard.
-      const _exhaustive: never = action;
-      throw badRequest(`Invalid action: ${String(_exhaustive)}`);
-    }
+  const outcome = await applyAlertAction(alert, input, session.id, new Date());
+  if (outcome.kind === "conflict") throw conflict(ALERT_CHANGED_MESSAGE);
+  if (outcome.kind === "changed") {
+    // After the write, so an action that failed is never recorded; a failed audit write is logged, not a 500.
+    await tryLogAuditEvent(alertAuditEvent(alert.id, input, session));
   }
+  return NextResponse.json(outcome.response);
 });

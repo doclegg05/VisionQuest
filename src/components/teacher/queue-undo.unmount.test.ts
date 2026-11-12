@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { alertControlId, alertLineState, createQueueUndo } from "./queue-undo";
+import { alertControlId, alertLineState, createQueueUndo, type UndoExpectation } from "./queue-undo";
 import {
   CRITICAL,
   doneActions,
@@ -11,6 +11,7 @@ import {
   LOW2,
   offered,
   withOpenConfirm,
+  receiptFor,
 } from "./queue-undo.test-support";
 
 describe("createQueueUndo: unmount", () => {
@@ -22,8 +23,8 @@ describe("createQueueUndo: unmount", () => {
       ...h.deps,
       send: (alertId, action) => {
         h.sent.push([alertId, action]);
-        return new Promise<void>((resolve) => {
-          release = resolve;
+        return new Promise<UndoExpectation | null>((resolve) => {
+          release = () => resolve(receiptFor(action));
         });
       },
     });

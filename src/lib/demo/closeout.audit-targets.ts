@@ -41,6 +41,7 @@ export const AUDIT_TARGET_TYPES: Readonly<Record<string, string>> = {
   spokes_employment_follow_up: "A SpokesEmploymentFollowUp id.",
   spokes_module_progress: "A SpokesModuleProgress id.",
   spokes_record: "A SpokesRecord id.",
+  student_alert: "A StudentAlert id, from an instructor's resolve, dismiss, snooze or reopen.",
   task: "A StudentTask id.",
   StudentHiddenJob: "A StudentHiddenJob id.",
   // A class's own rows. Deleted with the demo class, kept for a real one.

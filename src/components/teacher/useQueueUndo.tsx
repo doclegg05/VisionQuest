@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { api } from "@/lib/api";
+import { api, ApiClientError } from "@/lib/api";
 import {
+  AlertChangedError,
   alertLineState,
   createQueueUndo,
   QUEUE_STATUS_ID,
@@ -14,6 +15,8 @@ import {
   type QueueUndoMessage,
   type QueueUndoQuestion,
   type QueueUndoTarget,
+  type UndoExpectation,
+  undoExpectationFrom,
 } from "./queue-undo";
 
 interface QueueUndoOptions<Rows> {
@@ -46,9 +49,28 @@ export interface QueueUndoControls<Rows> {
   status: QueueUndoMessage | null;
 }
 
-async function sendAlertRequest(alertId: string, action: QueueSendRequest): Promise<void> {
-  const body = action === "snooze" ? { action, hours: SNOOZE_HOURS } : { action };
-  await api.patch(`/api/teacher/alerts/${encodeURIComponent(alertId)}`, body);
+function alertRequestBody(action: QueueSendRequest, expected: UndoExpectation | undefined): Record<string, unknown> {
+  if (action === "snooze") return { action, hours: SNOOZE_HOURS };
+  if (action === "reopen") return { action, expected };
+  return { action };
+}
+
+/** One alert request. A 409 means another instructor changed the alert; the flow says so and reloads. */
+async function sendAlertRequest(
+  alertId: string,
+  action: QueueSendRequest,
+  expected?: UndoExpectation,
+): Promise<UndoExpectation | null> {
+  try {
+    const answer = await api.patch<unknown>(
+      `/api/teacher/alerts/${encodeURIComponent(alertId)}`,
+      alertRequestBody(action, expected),
+    );
+    return action === "reopen" ? null : undoExpectationFrom(action, answer);
+  } catch (error: unknown) {
+    if (error instanceof ApiClientError && error.status === 409) throw new AlertChangedError();
+    throw error;
+  }
 }
 
 /** Moves focus where the flow asked. If that element is gone, the status line takes it, never the page body. */

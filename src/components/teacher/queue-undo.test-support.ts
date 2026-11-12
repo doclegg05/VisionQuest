@@ -3,13 +3,25 @@
  * helpers that hold a request open so a test can act while it is out.
  */
 import {
+  AlertChangedError,
   alertLineState,
   createQueueUndo,
   type QueueSendRequest,
   type QueueUndo,
   type QueueUndoDeps,
   type QueueUndoTarget,
+  type UndoExpectation,
 } from "./queue-undo";
+
+/** The time every harness save says it wrote. */
+export const SAVED_AT = "2026-11-11T10:00:00.000Z";
+
+/** What the route answers a request with, as `send` hands it back. */
+export function receiptFor(request: QueueSendRequest): UndoExpectation | null {
+  if (request === "resolve") return { status: "resolved", at: SAVED_AT };
+  if (request === "dismiss") return { status: "dismissed", at: SAVED_AT };
+  return null;
+}
 
 export const LOW: QueueUndoTarget = { id: "a1", severity: "medium", title: "Goal review", studentName: "Sam Rivera" };
 export const LOW2: QueueUndoTarget = { id: "a2", severity: "low", title: "Missing form", studentName: "Ana Lopez" };
@@ -23,6 +35,8 @@ export const CRITICAL: QueueUndoTarget = {
 export interface Harness {
   deps: QueueUndoDeps;
   sent: Array<[string, QueueSendRequest]>;
+  /** The expected state each Undo carried, in order. */
+  expectations: UndoExpectation[];
   confirms: Array<{ title: string; message: string }>;
   refreshes: () => number;
   /** Fail the next send of this request once, then let it succeed. */
@@ -33,17 +47,25 @@ export interface HarnessOptions {
   failOn?: QueueSendRequest;
   confirmAnswer?: boolean;
   refreshResult?: boolean | "reject";
+  /** This request is answered 409: another instructor changed the alert. */
+  conflictOn?: QueueSendRequest;
+  /** Saves answer with nothing an Undo could expect. */
+  noReceipt?: boolean;
 }
 
 export function harness(options: HarnessOptions = {}): Harness {
   const sent: Harness["sent"] = [];
+  const expectations: UndoExpectation[] = [];
   const confirms: Harness["confirms"] = [];
   const failNext = new Set<QueueSendRequest>();
   let refreshCount = 0;
   const deps: QueueUndoDeps = {
-    send: async (alertId, request) => {
+    send: async (alertId, request, expected) => {
       sent.push([alertId, request]);
+      if (expected) expectations.push(expected);
       if (options.failOn === request || failNext.delete(request)) throw new Error("network down");
+      if (options.conflictOn === request) throw new AlertChangedError();
+      return options.noReceipt ? null : receiptFor(request);
     },
     confirm: async (question) => {
       confirms.push({ title: question.title, message: question.message });
@@ -62,6 +84,7 @@ export function harness(options: HarnessOptions = {}): Harness {
   return {
     deps,
     sent,
+    expectations,
     confirms,
     refreshes: () => refreshCount,
     failOnce: (request) => {
@@ -98,11 +121,12 @@ export interface Held {
 export function holding(h: Harness, request: QueueSendRequest): Held {
   let release: () => void = () => {};
   let fail: () => void = () => {};
-  const send: QueueUndoDeps["send"] = (alertId, sent) => {
-    if (sent !== request) return h.deps.send(alertId, sent);
+  const send: QueueUndoDeps["send"] = (alertId, sent, expected) => {
+    if (sent !== request) return h.deps.send(alertId, sent, expected);
     h.sent.push([alertId, sent]);
-    return new Promise<void>((resolve, reject) => {
-      release = resolve;
+    if (expected) h.expectations.push(expected);
+    return new Promise<UndoExpectation | null>((resolve, reject) => {
+      release = () => resolve(receiptFor(sent));
       fail = () => reject(new Error("network down"));
     });
   };
