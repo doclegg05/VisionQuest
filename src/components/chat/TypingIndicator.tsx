@@ -12,17 +12,18 @@ interface TypingIndicatorProps {
 }
 
 /**
- * The dots while Sage has not sent a word. This is the turn's one polite
- * status, and it says one thing at a time: hidden words at first, then,
- * after five seconds, only the visible wait words, read out once when they
- * appear.
+ * The dots while Sage has not sent a word. It says one thing at a time:
+ * hidden words at first, then, after five seconds, only the visible wait
+ * words. It has no live region of its own (E9b 4): it sits inside the chat's
+ * polite log, which is not busy while Sage says nothing (logBusy), so the
+ * log reads the words out once when they appear.
  */
 export default function TypingIndicator({ slow = false, stalled = false }: TypingIndicatorProps) {
   const reduce = useReducedMotion();
   const words = stalled ? STALLED_REPLY_WORDS : slow ? SLOW_REPLY_WORDS : null;
 
   return (
-    <div className="flex gap-3" role="status">
+    <div className="flex gap-3">
       <div
         className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--chat-sage-mark-bg)] text-xs font-bold text-[var(--chat-sage-mark)]"
         aria-hidden="true"

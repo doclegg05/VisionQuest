@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 
 import { assessReadability, PLAIN_LANGUAGE_IDEAL_GRADE } from "@/lib/sage/readability";
-import { sageFailureMessage } from "@/lib/chat/sage-failure";
+import { FIRST_EVENT_TIMEOUT_WORDS } from "@/lib/chat/send-outcome";
 import { createSendAbort } from "./send-abort";
 import { messagesAfterSendError } from "./send-turn";
 import {
@@ -16,7 +16,7 @@ import {
 } from "./wait-and-stop";
 
 // E7 (2): bounded recovery. A send whose first event never comes is ended by
-// the client with E1's "unknown" failure and Try again; a reply that has its
+// the client with its own sentence (E9b 3) and Try again; a reply that has its
 // ids but sends no word for a long time tells the student Stop works.
 
 const DASHES = /[-‐-―−]/;
@@ -76,13 +76,16 @@ describe("the first event's bound (E7 2)", () => {
     assert.equal(second.signal.aborted, false);
   });
 
-  it("what the student sees: E1's unknown sentence with Try again, and no lost message claim", () => {
+  it("what the student sees: the timeout's own sentence with Try again, and no lost message claim (E9b 3)", () => {
     const gate = createSendAbort(() => undefined);
     gate.begin();
     mock.timers.tick(FIRST_EVENT_TIMEOUT_MS);
     const after = messagesAfterSendError({
       err: Object.assign(new Error("The operation was aborted."), { name: "AbortError" }),
       stopped: gate.wasStopped(),
+      timedOut: gate.timedOut(),
+      text: "hello",
+      firstEventSeen: false,
       partial: "",
       events: [],
       crisisBlock: null,
@@ -91,10 +94,7 @@ describe("the first event's bound (E7 2)", () => {
       id: "err-1",
     });
     assert.equal(after.failedTurn?.offerRetry, true);
-    assert.equal(
-      after.messages[0].content,
-      sageFailureMessage("unknown", { audience: "student", messageSaved: false, canRetry: true }),
-    );
+    assert.equal(after.messages[0].content, FIRST_EVENT_TIMEOUT_WORDS);
   });
 });
 

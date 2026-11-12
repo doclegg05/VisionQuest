@@ -13,6 +13,8 @@ export interface SentSoFar {
   events: AgentEventItem[];
   crisisBlock: string | null;
   savedUserMessageId: string | null;
+  /** The server's first event (ids, and the crisis flag with them) arrived. */
+  firstEventSeen: boolean;
 }
 
 export interface TurnRecorderDeps {
@@ -35,13 +37,14 @@ const NOTHING_YET: SentSoFar = {
   events: [],
   crisisBlock: null,
   savedUserMessageId: null,
+  firstEventSeen: false,
 };
 
 export function createTurnRecorder(deps: TurnRecorderDeps): TurnRecorder {
   let sent = NOTHING_YET;
   const handlers: ChatStreamHandlers = {
     onIds: (ids) => {
-      sent = { ...sent, savedUserMessageId: ids.userMessageId };
+      sent = { ...sent, savedUserMessageId: ids.userMessageId, firstEventSeen: true };
       deps.noteConversation(ids.conversationId);
       // Last: a Stop kept from before the ids ends the reply here (E2c 2).
       deps.noteIds();

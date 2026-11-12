@@ -20,7 +20,7 @@ import { assertLocalDemoTarget, isDemoLocalOnlyRequired } from "./demo-local-onl
 import { retryWithBackoff } from "@/lib/sage/retry";
 import { logLlmCall } from "@/lib/llm-usage";
 import { buildLocalAiHeaders } from "./local-auth";
-import { EMBEDDING_DIMENSIONS, type EmbeddingProvider, type EmbeddingTaskType } from "./embedding-types";
+import { EMBEDDING_DIMENSIONS, type EmbedOptions, type EmbeddingProvider, type EmbeddingTaskType } from "./embedding-types";
 import type { LocalAIAuthConfig } from "./types";
 
 export const DEFAULT_LOCAL_EMBEDDING_MODEL = "nomic-embed-text";
@@ -78,7 +78,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
   async embed(
     texts: string[],
-    opts: { taskType: EmbeddingTaskType; callSite?: string; studentId?: string | null },
+    opts: EmbedOptions,
   ): Promise<number[][]> {
     if (texts.length === 0) {
       throw new Error("embed requires at least one text");
@@ -93,8 +93,9 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
       const startedAt = Date.now();
 
       const vectors = await retryWithBackoff(
-        () => this.embedBatch(this.formatInputs(batch, opts.taskType)),
+        () => this.embedBatch(this.formatInputs(batch, opts.taskType), opts.signal),
         {
+          signal: opts.signal,
           label: "Local embedding",
           alertKey: "local_embedding_request_exhausted",
           context: { taskType: opts.taskType, batchSize: batch.length, model: this.model },
@@ -128,9 +129,9 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     return texts.map((text) => prefix + text);
   }
 
-  private async embedBatch(texts: string[]): Promise<number[][]> {
+  private async embedBatch(texts: string[], signal?: AbortSignal): Promise<number[][]> {
     if (this.useNative) {
-      const nativeResult = await this.callNativeEmbed(texts);
+      const nativeResult = await this.callNativeEmbed(texts, signal);
       if (nativeResult === "not-found") {
         this.useNative = false;
       } else {
@@ -138,16 +139,18 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
       }
     }
 
-    const openAiResult = await this.callOpenAiEmbed(texts);
+    const openAiResult = await this.callOpenAiEmbed(texts, signal);
     return this.assertDimensions(openAiResult.map(l2Normalize));
   }
 
   private async callNativeEmbed(
     texts: string[],
+    signal?: AbortSignal,
   ): Promise<number[][] | "not-found"> {
     assertLocalDemoTarget(this.baseUrl, this.model);
     const response = await fetch(`${this.baseUrl}/api/embed`, {
       method: "POST",
+      signal,
       ...(isDemoLocalOnlyRequired() ? { redirect: "error" as const } : {}),
       headers: this.headers,
       body: JSON.stringify({ model: this.model, input: texts }),
@@ -174,10 +177,11 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     return embeddings;
   }
 
-  private async callOpenAiEmbed(texts: string[]): Promise<number[][]> {
+  private async callOpenAiEmbed(texts: string[], signal?: AbortSignal): Promise<number[][]> {
     assertLocalDemoTarget(this.baseUrl, this.model);
     const response = await fetch(`${this.baseUrl}/v1/embeddings`, {
       method: "POST",
+      signal,
       ...(isDemoLocalOnlyRequired() ? { redirect: "error" as const } : {}),
       headers: this.headers,
       body: JSON.stringify({ model: this.model, input: texts }),

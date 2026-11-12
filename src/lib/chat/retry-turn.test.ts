@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
 // E2c 4: the 409 query. The database is mocked, never the module under test:
 // findFirst applies the real `where` clause to these rows, so the test pins
@@ -120,5 +120,70 @@ describe("Try again after a saved reply (E2c 4)", () => {
     assert.deepEqual(where.createdAt, { gt: question().createdAt });
     const marks = where.NOT!.OR.map((part) => part.content.contains);
     assert.deepEqual(marks, ["\n\n(Sage got cut off", "\n\n(Sage stopped here.)"]);
+  });
+});
+
+// E9b 6: a Try again after the chat's own timeout knows no saved id (the
+// first event never came), so it sends retryOf null. The route may still have
+// saved the message, so it reuses that copy instead of saving it twice.
+describe("Try again with no saved id (E9b 6)", () => {
+  const SENT_AT = new Date("2026-11-10T10:00:00Z").getTime();
+
+  beforeEach(() => {
+    rows = [];
+    findFirst.mock.resetCalls();
+    mock.timers.enable({ apis: ["Date"], now: SENT_AT + 60_000 });
+  });
+  afterEach(() => {
+    mock.timers.reset();
+  });
+
+  function retryWithoutId(overrides: Partial<{ conversationId: string | null; retryOf: string | null | undefined; content: string }> = {}) {
+    return retryTurn.findRetriedUserMessage({
+      studentId: "s1",
+      conversationId: "c1",
+      retryOf: null,
+      content: QUESTION,
+      ...overrides,
+    });
+  }
+
+  it("reuses the newest identical message with no answer after it", async () => {
+    rows = [question()];
+    assert.deepEqual(await retryWithoutId(), { id: QUESTION_ID, conversationId: "c1" });
+  });
+
+  it("reuses it after a cut-off reply too", async () => {
+    rows = [question(), reply("\n\n(Sage stopped here.)\n\nIf you are in crisis, call or text 988.")];
+    assert.deepEqual(await retryWithoutId(), { id: QUESTION_ID, conversationId: "c1" });
+  });
+
+  it("saves as new when the copy is older than the window", async () => {
+    mock.timers.setTime(SENT_AT + retryTurn.UNSAVED_RETRY_WINDOW_MS + 1);
+    rows = [question()];
+    assert.equal(await retryWithoutId(), null);
+    assert.equal(retryTurn.UNSAVED_RETRY_WINDOW_MS, 5 * 60_000);
+  });
+
+  it("saves as new when the newest message says something else, or has a full answer", async () => {
+    rows = [question()];
+    assert.equal(await retryWithoutId({ content: "Something else" }), null);
+    rows = [question(), reply("Go to the OSHA office with your ID.")];
+    assert.equal(await retryWithoutId(), null);
+  });
+
+  it("cannot dedupe a new conversation, and a plain send never dedupes", async () => {
+    rows = [question()];
+    assert.equal(await retryWithoutId({ conversationId: null }), null);
+    assert.equal(await retryWithoutId({ retryOf: undefined }), null);
+    assert.equal(findFirst.mock.callCount(), 0, "neither asks the database");
+  });
+
+  it("looks only at this account's messages in this conversation", async () => {
+    rows = [{ ...question(), studentId: "someone-else" }];
+    assert.equal(await retryWithoutId(), null);
+    const where = findFirst.mock.calls[0].arguments[0].where;
+    assert.equal(where.studentId, "s1");
+    assert.equal(where.conversationId, "c1");
   });
 });

@@ -429,14 +429,12 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
    * the first event flagged it, and Try again when it applies.
    */
   const showSendFailure = useCallback(
-    (err: unknown, sent: SentSoFar, noteConversation: (nextId: string | undefined) => void) => {
+    (err: unknown, sent: SentSoFar, text: string, noteConversation: (nextId: string | undefined) => void) => {
       const stopped = sendAbort.wasStopped();
       if (!stopped) console.error("Send error:", err instanceof Error ? err.name : "Unknown error");
       const after = messagesAfterSendError({
-        err,
-        stopped,
+        err, stopped, timedOut: sendAbort.timedOut(), text, role,
         ...sent,
-        role,
         id: `${stopped ? "stop" : "err"}-${Date.now()}`,
       });
       // A new chat's first message may be saved before the failure: keep its conversation for Try again.
@@ -475,7 +473,7 @@ function ChatWindowInner({ role, defaultStage, localProvider }: ChatWindowInnerP
         pollForGoals(await prevGoalCountPromise);
         setTimeout(() => checkProgression(), 2000); // XP, achievement and level changes
       } catch (err) {
-        showSendFailure(err, turn.sent(), noteConversation);
+        showSendFailure(err, turn.sent(), text, noteConversation);
       } finally {
         sendAbort.end(controller);
         endTurnDisplay();

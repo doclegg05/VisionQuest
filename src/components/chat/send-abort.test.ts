@@ -84,7 +84,7 @@ describe("the Stop gate (E2b 1 and 2)", () => {
     assert.equal(gate.wasStopped(), true);
 
     const after = messagesAfterSendError({
-      err: abortError(), stopped: gate.wasStopped(), partial: "", events: [], crisisBlock,
+      err: abortError(), stopped: gate.wasStopped(), timedOut: false, text: "hi", firstEventSeen: true, partial: "", events: [], crisisBlock,
       role: "student", savedUserMessageId: "u1", id: "s1",
     });
     assert.deepEqual(after.messages.map((m) => m.content), [STOPPED_NOTE, crisisBlock.replace(/^\n+/, "")]);
@@ -133,6 +133,9 @@ describe("a Stop after 800 ms but before the ids (E2c 2)", () => {
     const after = messagesAfterSendError({
       err: abortError(),
       stopped: gate.wasStopped(),
+      timedOut: false,
+      text: "hi",
+      firstEventSeen: true,
       partial: "",
       events: [],
       crisisBlock,

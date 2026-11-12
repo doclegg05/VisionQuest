@@ -12,6 +12,14 @@ export const EMBEDDING_DIMENSIONS = 768;
 
 export type EmbeddingTaskType = "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY";
 
+export interface EmbedOptions {
+  taskType: EmbeddingTaskType;
+  callSite?: string;
+  studentId?: string | null;
+  /** Aborts the request and stops retries, for a chat turn's Stop (E9b 5). */
+  signal?: AbortSignal;
+}
+
 export interface EmbeddingProvider {
   readonly name: string;
   readonly model: string;
@@ -26,6 +34,6 @@ export interface EmbeddingProvider {
    */
   embed(
     texts: string[],
-    opts: { taskType: EmbeddingTaskType; callSite?: string; studentId?: string | null },
+    opts: EmbedOptions,
   ): Promise<number[][]>;
 }

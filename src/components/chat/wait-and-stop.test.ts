@@ -61,7 +61,7 @@ describe("the words under the dots (E2.1)", () => {
 
 describe("a turn the student stopped (E2.2)", () => {
   it("keeps the streamed text as Sage's reply, with the stopped note and no failure", () => {
-    const [reply, ...rest] = stoppedTurnMessages({ id: "m1", partial: "Here is the first part", events: [], crisisBlock: null });
+    const [reply, ...rest] = stoppedTurnMessages({ id: "m1", partial: "Here is the first part", events: [], crisisBlock: null, savedUserMessageId: null });
     assert.equal(rest.length, 0);
     assert.equal(reply.role, "assistant");
     assert.equal(reply.content, `Here is the first part\n\n${STOPPED_NOTE}`);
@@ -70,12 +70,12 @@ describe("a turn the student stopped (E2.2)", () => {
 
   it("keeps tool chips that streamed before the stop", () => {
     const events = [{ id: "t1", kind: "tool" as const, summary: "Checking goals..." }];
-    const [reply] = stoppedTurnMessages({ id: "m1", partial: "Part", events, crisisBlock: null });
+    const [reply] = stoppedTurnMessages({ id: "m1", partial: "Part", events, crisisBlock: null, savedUserMessageId: null });
     assert.deepEqual(reply.events, events);
   });
 
-  it("with nothing streamed, shows only the stopped note", () => {
-    const messages = stoppedTurnMessages({ id: "m1", partial: "", events: [], crisisBlock: null });
+  it("with nothing streamed and no saved message, shows only the stopped note", () => {
+    const messages = stoppedTurnMessages({ id: "m1", partial: "", events: [], crisisBlock: null, savedUserMessageId: null });
     assert.deepEqual(messages.map((m) => m.content), [STOPPED_NOTE]);
     assert.equal(messages[0].failure, undefined);
   });
@@ -83,7 +83,7 @@ describe("a turn the student stopped (E2.2)", () => {
   it("shows the 988 help on its own when the server flagged a crisis message", () => {
     for (const block of [CRISIS_RESOURCE_BLOCK, CRISIS_RESOURCE_BLOCK_ES]) {
       for (const partial of ["", "I hear you. Let's"]) {
-        const messages = stoppedTurnMessages({ id: "m1", partial, events: [], crisisBlock: block });
+        const messages = stoppedTurnMessages({ id: "m1", partial, events: [], crisisBlock: block, savedUserMessageId: null });
         const help = messages.at(-1)!;
         assert.equal(messages.length, 2);
         assert.equal(help.id, "m1-help");
@@ -99,6 +99,7 @@ describe("a turn the student stopped (E2.2)", () => {
       partial: "Please call or text 988 right now.",
       events: [],
       crisisBlock: CRISIS_RESOURCE_BLOCK,
+      savedUserMessageId: null,
     });
     assert.equal(messages.length, 1);
   });

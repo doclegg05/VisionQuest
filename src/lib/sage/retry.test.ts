@@ -9,9 +9,10 @@ mock.module("./failed-extraction", {
     recordFailedExtraction: mockRecordFailedExtraction,
   },
 });
+const loggerMock = { warn: mock.fn(), error: mock.fn(), info: mock.fn(), debug: mock.fn() };
 mock.module("@/lib/logger", {
   namedExports: {
-    logger: { warn: mock.fn(), error: mock.fn(), info: mock.fn(), debug: mock.fn() },
+    logger: loggerMock,
   },
 });
 
@@ -145,3 +146,25 @@ export function _retryContextTypeChecks(studentId: string): Parameters<typeof im
     context: { conversationId: "conv-1", studentId },
   };
 }
+
+describe("retryWithBackoff after a Stop (E9b 8)", () => {
+  it("does not retry, warn, alert or dead-letter once the signal is aborted", async () => {
+    for (const fn of Object.values(loggerMock)) fn.mock.resetCalls();
+    mockRecordFailedExtraction.mock.resetCalls();
+    const turn = new AbortController();
+    let calls = 0;
+    await assert.rejects(
+      retryWithBackoff(async () => {
+        calls++;
+        turn.abort();
+        throw Object.assign(new Error("aborted"), { name: "AbortError" });
+      }, { ...opts, studentId: "s1", signal: turn.signal }),
+      { name: "AbortError" },
+    );
+    assert.equal(calls, 1);
+    assert.equal(loggerMock.warn.mock.callCount(), 0);
+    assert.equal(loggerMock.error.mock.callCount(), 0);
+    assert.equal(mockRecordFailedExtraction.mock.callCount(), 0);
+    assert.equal(loggerMock.info.mock.callCount(), 1);
+  });
+});

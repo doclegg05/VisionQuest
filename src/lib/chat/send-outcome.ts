@@ -117,7 +117,7 @@ export interface SendErrorContext {
 export interface SendErrorOutcome {
   /** The one assistant turn shown for this failed send. */
   displayContent: string;
-  /** Null for a server sentence with no cause code, such as a rate limit. */
+  /** Null for a sentence with no cause code: a rate limit, or the chat's own timeout. */
   failure: SageFailureCode | null;
   offerRetry: boolean;
   /** Keep the bubble on Try again: it carries a partial reply. */
@@ -152,6 +152,29 @@ function splitHelpBlock(message: string, crisisBlock: string | null): { sentence
   if (!crisisBlock || !message.endsWith(crisisBlock)) return { sentence: message, helpBlock: null };
   // The block opens with the line break that joined it to the sentence.
   return { sentence: message.slice(0, -crisisBlock.length), helpBlock: crisisBlock.replace(/^\n+/, "") };
+}
+
+/**
+ * The chat ended the send itself: no first event came within its bound
+ * (FIRST_EVENT_TIMEOUT_MS in src/components/chat/wait-and-stop.ts). Nothing
+ * says the message was saved, because no answer came back to say so, and it
+ * does not send the student to the instructor for what is often a weak signal.
+ */
+export const FIRST_EVENT_TIMEOUT_WORDS = "We could not reach Sage. Check your internet, then tap Try again.";
+
+/** What the first-event timeout shows: its own sentence and Try again (E9b 3). */
+export function firstEventTimeoutOutcome(): SendErrorOutcome {
+  return {
+    displayContent: FIRST_EVENT_TIMEOUT_WORDS,
+    failure: null,
+    offerRetry: true,
+    keepOnRetry: false,
+    retryOf: null,
+    conversationId: null,
+    helpBlock: null,
+    alert: true,
+    setupLink: false,
+  };
 }
 
 export function resolveSendError(err: unknown, context: SendErrorContext): SendErrorOutcome {

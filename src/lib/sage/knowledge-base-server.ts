@@ -12,7 +12,7 @@ import { prisma } from "@/lib/db";
 import { cached } from "@/lib/cache";
 import { sanitizeForPrompt } from "./system-prompts";
 import { tokenizeForRetrieval } from "./retrieval-tokens";
-import { hybridSearchDocuments, getBestChunks } from "./hybrid-retrieval";
+import { hybridSearchDocuments, getBestChunks, type QueryEmbeddingSubject } from "./hybrid-retrieval";
 
 interface SageDocument {
   id: string;
@@ -313,7 +313,7 @@ export async function getDocumentContext(
   callerRole: CallerRole = "student",
   maxResults: number = 3,
   tokenBudgetChars: number = TOKEN_BUDGET_CHARS,
-  subject?: { studentId?: string | null },
+  subject?: QueryEmbeddingSubject,
 ): Promise<string> {
   if (!isSageRagEnabled()) return "";
 

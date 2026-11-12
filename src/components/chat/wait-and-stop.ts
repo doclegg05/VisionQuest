@@ -6,6 +6,8 @@
  */
 
 import type { ChatRole } from "@/lib/chat/commands";
+import { crisisResourceBlockFor } from "@/lib/chat/crisis-safety-net";
+import { detectCrisisSignal } from "@/lib/sage/crisis-patterns";
 import type { AgentEventItem } from "./chat-stream";
 import type { ChatMessage } from "./failed-turn";
 
@@ -47,7 +49,7 @@ export const FIRST_EVENT_TIMEOUT_MS = 20_000;
 export const REPLY_STALL_MS = 120_000;
 
 /** Shown after REPLY_STALL_MS in place of SLOW_REPLY_WORDS. */
-export const STALLED_REPLY_WORDS = "Sage is taking a long time. You can tap Stop and send it again.";
+export const STALLED_REPLY_WORDS = "Sage is taking a long time. You can tap Stop, then tap Try again.";
 
 /** Calls `onSlow` once after SLOW_REPLY_MS. Returns a cancel. */
 export function startSlowReplyTimer(onSlow: () => void): () => void {
@@ -125,6 +127,17 @@ export function withEarlyCrisisHelp(messages: ChatMessage[], crisisBlock: string
   return [...messages, helpBubble(id, crisisBlock)];
 }
 
+/**
+ * The 988 block for a message the chat cut off itself before the server's
+ * first event (E9b): the timeout, or a dropped connection. The server's crisis
+ * flag never arrived, so the chat runs the same patterns the server runs
+ * (crisis-patterns.ts) on the text it sent, and picks the block by the
+ * matched pattern's language. Null for a message with no crisis signal.
+ */
+export function localCrisisBlock(text: string): string | null {
+  return crisisResourceBlockFor(detectCrisisSignal(text), "");
+}
+
 interface StoppedTurnInput {
   id: string;
   /** Text Sage streamed before the Stop. */
@@ -132,18 +145,29 @@ interface StoppedTurnInput {
   events: AgentEventItem[];
   /** The 988 block from the stream's first event, when it sent one. */
   crisisBlock: string | null;
+  /** The student's saved message, from the first event. */
+  savedUserMessageId: string | null;
+}
+
+/** A Stop that left nothing behind can be asked again (E9b 2). */
+export function stopOffersRetry(partial: string, savedUserMessageId: string | null): boolean {
+  return !partial && savedUserMessageId !== null;
 }
 
 /**
  * What a Stop leaves on screen. It was the student's choice, so there is no
- * failure styling, no failure sentence and no Try again.
+ * failure styling and no failure sentence. A Stop before any text, with the
+ * saved message known, offers Try again on that message, so the box being
+ * empty is never a dead end. A Stop with text keeps that text and no Try again.
  */
-export function stoppedTurnMessages({ id, partial, events, crisisBlock }: StoppedTurnInput): ChatMessage[] {
+export function stoppedTurnMessages({ id, partial, events, crisisBlock, savedUserMessageId }: StoppedTurnInput): ChatMessage[] {
+  const retry = stopOffersRetry(partial, savedUserMessageId);
   const reply: ChatMessage = {
     id,
     role: "assistant",
     content: partial ? `${partial}\n\n${STOPPED_NOTE}` : STOPPED_NOTE,
     events: events.length > 0 ? events : undefined,
+    ...(retry ? { failure: { keepOnRetry: false, retryOf: savedUserMessageId, alert: false } } : {}),
   };
   return withEarlyCrisisHelp([reply], crisisBlock, id);
 }

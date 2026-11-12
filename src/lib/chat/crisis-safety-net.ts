@@ -1,4 +1,4 @@
-import { detectCrisisSignal, type CrisisDetection } from "@/lib/sage/crisis-detection";
+import { detectCrisisSignal, type CrisisDetection } from "@/lib/sage/crisis-patterns";
 import { crisisBlockForLang, type CrisisHelpLang } from "./crisis-resource-blocks";
 
 /**

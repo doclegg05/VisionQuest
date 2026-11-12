@@ -123,9 +123,10 @@ export async function* runAgentTurn(
       }
     }
   } catch (err) {
-    logger.error("agent.loop: provider stream failed", {
-      err: errorForLog(err),
-    });
+    // A Stop or a dropped connection aborts the stream on purpose: info, so
+    // monitoring does not count the student's choice as a fault (E9b 8).
+    if (signal?.aborted) logger.info("agent.loop: provider stream stopped by the client", { err: errorForLog(err) });
+    else logger.error("agent.loop: provider stream failed", { err: errorForLog(err) });
     yield* settleUnresultedCalls(pendingCalls, records);
     yield {
       type: "agent_stop",
