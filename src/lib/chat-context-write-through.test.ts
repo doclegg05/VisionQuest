@@ -204,6 +204,17 @@ test("conversation title/active updates resolve to none (per-turn writes must no
   }
 });
 
+// Deleting a conversation cascades its messages away (lowering the discovery
+// turn count) and drops a summary Sage used, though the delete names neither.
+test("deleting a conversation clears its student; a delete that names none clears everyone", () => {
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "delete", { where: { id: "conv1" } },
+    { id: "conv1", studentId: SID, stage: "discovery" }), { scope: "students", studentIds: [SID] });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "deleteMany", { where: { studentId: SID } }, { count: 3 }),
+    { scope: "students", studentIds: [SID] });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "deleteMany", { where: { active: false } }, { count: 3 }),
+    { scope: "all" });
+});
+
 test("conversation summary write resolves to the student (prior-conversation context)", () => {
   const res = resolveChatContextInvalidation("Conversation", "update", {
     where: { id: "conv1" },

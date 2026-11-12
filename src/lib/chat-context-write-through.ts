@@ -172,7 +172,8 @@ const MESSAGE_MODEL: Prisma.ModelName = "Message";
  * (prior-conversation context in chat:base-context). Stage/title/active flip
  * on nearly every turn, and invalidating on those would defeat the cache. A
  * `stage` write clears only the student's kept dashboard slow signals, whose
- * discovery turn count filters on it.
+ * discovery turn count filters on it. A delete clears the student's whole
+ * chat context: it removes a summary and, by cascade, messages.
  */
 const CONVERSATION_MODEL: Prisma.ModelName = "Conversation";
 
@@ -299,7 +300,12 @@ function forKeyed(model: string, args: unknown, result: unknown): ChatContextInv
   return classIds.size > 0 ? { scope: "classes", classIds: [...classIds] } : ALL;
 }
 
-function forConversation(args: unknown, result: unknown): ChatContextInvalidation {
+const DELETE_OPERATIONS: ReadonlySet<string> = new Set(["delete", "deleteMany"]);
+
+function forConversation(operation: string, args: unknown, result: unknown): ChatContextInvalidation {
+  // A delete names no field, but it drops a summary Sage used and cascades
+  // away the messages the discovery turn count reads.
+  if (DELETE_OPERATIONS.has(operation)) return forStudents(args, result, "students");
   if (writeTouchesField(args, "summary")) return forStudents(args, result, "students");
   if (writeTouchesField(args, "stage")) return forStudents(args, result, "dashboard");
   return NONE;
@@ -317,7 +323,7 @@ export function resolveChatContextInvalidation(
   result: unknown,
 ): ChatContextInvalidation {
   if (!model || !isChatContextWrite(model, operation)) return NONE;
-  if (model === CONVERSATION_MODEL) return forConversation(args, result);
+  if (model === CONVERSATION_MODEL) return forConversation(operation, args, result);
   if (model === MESSAGE_MODEL) return forStudents(args, result, "dashboard");
   if (GLOBAL_MODELS.has(model)) return ALL;
   if (model === CERT_REQUIREMENT_MODEL || model === CLASS_REQUIREMENT_MODEL) return forKeyed(model, args, result);
@@ -352,6 +358,16 @@ async function ownersOf(certificationIds: readonly string[], owners: Certificati
  * out of time. An empty class is an answer: nobody to clear. A student
  * enrolled in the same uncommitted transaction is cleared by that enrollment
  * write itself.
+ *
+ * That trust in an empty answer rests on the lookup running as an
+ * RLS-bypassing role. If `prismaAdmin` fell back to the `vq_app` URL, RLS
+ * would hide other students' enrollments, the lookup would come back empty
+ * rather than fail, and this would silently clear nobody. Production guards
+ * it at boot (src/lib/boot-probes.ts): `adminDatabaseUrlProbe` refuses to
+ * start with ADMIN_DATABASE_URL unset, and `startAdminClientProbe` logs
+ * `boot_probe_admin_client_unprivileged` when the URL is set but the role
+ * cannot bypass RLS. That second probe only logs, so a misconfigured role
+ * would under-clear until someone acted on the alert.
  */
 async function membersOf(classIds: readonly string[], members: ClassMembers | undefined): Promise<readonly string[] | null> {
   if (!members) return null;

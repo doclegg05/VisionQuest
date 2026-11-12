@@ -41,6 +41,7 @@ function answer(call: EngineCall): unknown {
   if (call.action === "createOne" && call.modelName === "ClassRequirement") return { id: "creq-1", classId: CLASS_ID };
   if (call.action === "updateOne" && call.modelName === "Pathway") return { id: "path-1", active: false };
   if (call.action === "updateOne" && call.modelName === "Conversation") return { id: "conv-1", studentId: A.id };
+  if (call.action === "deleteOne" && call.modelName === "Conversation") return { id: "conv-1", studentId: A.id, stage: "discovery" };
   if (call.action === "createOne" && call.modelName === "Message") return messageRow;
   // The slow signals' reads: nothing found, except the counts above (1 each),
   // which is enough for the read to count as having seen the student's rows.
@@ -296,6 +297,15 @@ describe("kept slow signals, cleared by writes to the inputs F2 left unwatched",
     assert.equal(await slowReads(A), full, "A's slow signals outlived a message that named no student");
     assert.equal(await slowReads(B), full, "B's slow signals outlived a message that named no student");
     assert.equal(await sage.kept(), true, "a message that named no student dropped Sage's cached chat layers");
+  });
+
+  it("deleting a discovery conversation clears that student's slow signals and Sage's layers, and no one else's", async () => {
+    const full = await keepBoth();
+    const sage = await sageLayer();
+    await asStudent(A, () => db.prisma.conversation.delete({ where: { id: "conv-1" } }));
+    assert.equal(await slowReads(A), full, "A's slow signals outlived deleting A's discovery conversation");
+    assert.equal(await slowReads(B), 0, "B's slow signals were cleared by A's delete");
+    assert.equal(await sage.kept(), false, "the delete left Sage's layers holding the deleted conversation's summary");
   });
 
   it("a conversation title change clears nothing", async () => {
