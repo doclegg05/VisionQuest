@@ -320,6 +320,19 @@ describe("document verifier — rate limiting", () => {
     await get("");
     assert.equal(rateLimitMock.mock.callCount(), 1);
   });
+
+  it("counts the address the platform added, so a forged first hop cannot buy a fresh limit (A6)", async () => {
+    const keys: string[] = [];
+    for (const forged of ["1.1.1.1", "2.2.2.2", "3.3.3.3"]) {
+      const req = new Request("http://localhost:3000/api/verify/document?token=x", {
+        headers: { "x-forwarded-for": `${forged}, 198.51.100.4, 172.70.1.9` },
+      });
+      await route.GET(req as unknown as NextRequest);
+      keys.push(String((rateLimitMock.mock.calls.at(-1)?.arguments as unknown[] | undefined)?.[0]));
+    }
+    assert.equal(new Set(keys).size, 1, keys.join(" | "));
+    assert.ok(!keys[0].includes("1.1.1.1"), keys[0]);
+  });
 });
 
 describe("document verifier — logging", () => {

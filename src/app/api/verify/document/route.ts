@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaAdmin } from "@/lib/db";
 import { MIN_SECRET_LENGTH, verifyDocumentToken } from "@/lib/intake/document-token";
+import { clientIpBucket } from "@/lib/client-ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
@@ -102,8 +103,7 @@ function refuse(reason: string, status: number, message: string): NextResponse {
 }
 
 export async function GET(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const limit = await rateLimit(`verify-document:${ip}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  const limit = await rateLimit(`verify-document:${clientIpBucket(req)}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
   if (!limit.success) {
     return refuse(
       "rate_limited",
