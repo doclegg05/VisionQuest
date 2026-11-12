@@ -11,7 +11,10 @@
       "src/app/api/teacher/staff-read-views.test.ts",
       "src/lib/audit.test.ts",
       "src/app/api/teacher/failed-extractions/route.test.ts",
-      "src/components/teacher/FailedExtractionDetails.test.tsx"
+      "src/components/teacher/FailedExtractionDetails.test.tsx",
+      "src/lib/staff-read-walk.test.ts",
+      "src/app/api/staff-read-views.shared-routes.test.ts",
+      "src/lib/sage/staff-student-context.test.ts"
     ]
   }
 }
