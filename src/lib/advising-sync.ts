@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 
 import { buildStudentAlertDescriptors, type AlertDescriptor } from "./advising-alerts";
 import { type DetectedAlertWriter, writeDetectedAlert } from "./alert-hold";
@@ -240,19 +241,48 @@ export function buildStudentAlertSyncPlan({
 
 type ExistingAlert = StudentAlertSyncContext["existing"][number];
 
+/** The sync's writes, plus the one lookup of resolved rows it makes in its transaction. */
+interface SyncAlertWriter extends DetectedAlertWriter {
+  studentAlert: DetectedAlertWriter["studentAlert"] & {
+    findMany(args: {
+      where: Prisma.StudentAlertWhereInput;
+      select: { alertKey: true };
+    }): PromiseLike<Array<{ alertKey: string }>>;
+  };
+}
+
+/**
+ * The keys the context read did not find that are resolved, read inside the transaction. The context read lists no
+ * resolved rows, so an unread key is resolved, missing, or open but of a type the read leaves out. One lookup for all
+ * of them keeps the sync at one statement per alert, instead of a reopen probe on every new alert.
+ */
+async function findResolvedKeys(tx: SyncAlertWriter, studentId: string, keys: string[]): Promise<Set<string>> {
+  if (keys.length === 0) return new Set();
+  const rows = await tx.studentAlert.findMany({
+    where: { studentId, alertKey: { in: keys }, status: "resolved" },
+    select: { alertKey: true },
+  });
+  return new Set(rows.map((row) => row.alertKey));
+}
+
+function belongsTo(row: unknown, studentId: string): boolean {
+  return typeof row === "object" && row !== null && "studentId" in row && row.studentId === studentId;
+}
+
 /**
  * Writes one alert the sync wants open. `prev` is what the context read found, before this transaction, so a teacher
  * can dismiss or snooze the alert in between. Every status change is therefore conditional on the state that was read
  * (`writeDetectedAlert`, the detectors' writer), and a hold that landed since is kept.
  *
- * The context read lists no resolved rows, so an alert it did not find is resolved, missing, or open but of a type the
- * read leaves out. Only a row that is still resolved is reopened, as a new spell; anything else gets its text, or is
- * created if it does not exist.
+ * An alert the read did not find is reopened, as a new spell, only while it is still resolved; a key the in-transaction
+ * lookup did not see as resolved goes straight to the upsert, which creates it, or gives text only to a row that
+ * appeared since (its state is unknown).
  */
 async function writeSyncAlert(
-  tx: DetectedAlertWriter,
+  tx: SyncAlertWriter,
   studentId: string,
   prev: ExistingAlert | undefined,
+  resolved: boolean,
   alert: AlertDescriptor,
   now: Date,
 ): Promise<void> {
@@ -263,23 +293,29 @@ async function writeSyncAlert(
     sourceType: alert.sourceType,
     sourceId: alert.sourceId,
   };
-  const detected = { studentId, alertKey: alert.alertKey, type: alert.type, ...text };
   if (prev) {
-    await writeDetectedAlert(tx, prev, detected, now);
+    await writeDetectedAlert(tx, prev, { studentId, alertKey: alert.alertKey, type: alert.type, ...text }, now);
     return;
   }
-  const { count } = await tx.studentAlert.updateMany({
-    where: { alertKey: alert.alertKey, status: "resolved" },
-    data: {
-      ...text,
-      status: "open",
-      detectedAt: now,
-      resolvedAt: null,
-      snoozedUntil: null,
-      snoozedBy: null,
-    },
+  if (resolved) {
+    const { count } = await tx.studentAlert.updateMany({
+      where: { studentId, alertKey: alert.alertKey, status: "resolved" },
+      data: { ...text, status: "open", detectedAt: now, resolvedAt: null, snoozedUntil: null, snoozedBy: null },
+    });
+    if (count > 0) return;
+  }
+  // The upsert's where stays the unique key alone: an added studentId filter makes Prisma drop the native
+  // INSERT ... ON CONFLICT for a read then a write, two statements that can also fail on a concurrent insert.
+  // The returned row is checked instead, and throwing rolls the whole sync back.
+  const row = await tx.studentAlert.upsert({
+    where: { alertKey: alert.alertKey },
+    update: text,
+    create: { studentId, alertKey: alert.alertKey, type: alert.type, ...text, status: "open", detectedAt: now },
+    select: { studentId: true },
   });
-  if (count === 0) await writeDetectedAlert(tx, undefined, detected, now);
+  if (!belongsTo(row, studentId)) {
+    throw new Error("The alert sync found an alert key that belongs to another student.");
+  }
 }
 
 export async function applyStudentAlertSyncPlan({
@@ -296,9 +332,13 @@ export async function applyStudentAlertSyncPlan({
   const desiredKeys = new Set(desiredAlerts.map((alert) => alert.alertKey));
   const existingByKey = new Map(existing.map((alert) => [alert.alertKey, alert]));
 
+  const unreadKeys = desiredAlerts.map((alert) => alert.alertKey).filter((key) => !existingByKey.has(key));
+
   await prisma.$transaction(async (tx) => {
+    const resolvedKeys = await findResolvedKeys(tx, studentId, unreadKeys);
     for (const alert of desiredAlerts) {
-      await writeSyncAlert(tx, studentId, existingByKey.get(alert.alertKey), alert, now);
+      const prev = existingByKey.get(alert.alertKey);
+      await writeSyncAlert(tx, studentId, prev, resolvedKeys.has(alert.alertKey), alert, now);
     }
 
     const staleNonDismissedIds = existing
