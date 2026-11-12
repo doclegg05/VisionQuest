@@ -12,11 +12,14 @@ for (const name of ["DATABASE_URL", "DIRECT_URL", "ADMIN_DATABASE_URL"]) {
 }
 const layout = "src/app/(student)/layout.tsx";
 const mutations = [
-  { path: "src/lib/password-change-gate.ts", from: "account.mustChangePassword === true", to: "false && account.mustChangePassword === true", gate: "/change-password", next: "/sage-notice" },
+  { path: "src/lib/password-change-gate.ts", from: "account.mustChangePassword === true", to: "false && account.mustChangePassword === true", gate: "/change-password", next: ["/sage-notice"] },
   // Remove enforcement, keeping the surrounding session narrowing valid.
   // A literal false && guard makes TypeScript treat its RHS as unreachable.
-  { path: layout, from: "redirect(SAGE_NOTICE_ACK_PATH);", to: "void SAGE_NOTICE_ACK_PATH;", gate: "/sage-notice", next: "/recovery-setup" },
-  { path: layout, from: 'redirect("/recovery-setup");', to: "void 0;", gate: "/recovery-setup", next: "/dashboard" },
+  { path: layout, from: "redirect(SAGE_NOTICE_ACK_PATH);", to: "void SAGE_NOTICE_ACK_PATH;", gate: "/sage-notice", next: ["/recovery-setup"] },
+  // Continue replaces /dashboard and refreshes. A refresh of the old password
+  // route can also redirect to /settings once its password flag is cleared.
+  // Both are protected by this layout; neither may bypass recovery normally.
+  { path: layout, from: 'redirect("/recovery-setup");', to: "void 0;", gate: "/recovery-setup", next: ["/dashboard", "/settings"] },
 ];
 const originals = new Map(mutations.map(({ path }) => [path, readFileSync(path, "utf8")]));
 const output = "reports/first-day-gate-proof";
@@ -41,11 +44,12 @@ try {
     writeFileSync(mutation.path, source.replace(mutation.from, mutation.to));
     build();
     const result = run(`missing-gate-${index}`);
-    const expected = `FIRST_DAY_GATE_MISSING:${mutation.gate}:ACTUAL:${mutation.next}`;
-    if (result.code !== 1 || result.report.stats.unexpected !== 1 || !JSON.stringify(result.report).includes(expected)) {
+    const report = JSON.stringify(result.report);
+    const actualPath = mutation.next.find((next) => report.includes(`"message":${JSON.stringify(`Error: FIRST_DAY_GATE_MISSING:${mutation.gate}:ACTUAL:${next}`)}`));
+    if (result.code !== 1 || result.report.stats.unexpected !== 1 || !actualPath) {
       throw new Error(`Missing ${mutation.gate} did not fail for its expected redirect. Inspect the report.`);
     }
-    evidence.push({ gate: mutation.gate, detected: true, actualPath: mutation.next });
+    evidence.push({ gate: mutation.gate, detected: true, actualPath });
   }
   writeFileSync(join(output, "proof.json"), JSON.stringify({ head: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), baseline: "passed", mutations: evidence }, null, 2));
   console.log("All three missing first-day gates were detected by the browser test.");
