@@ -4,9 +4,11 @@ Britt asked for a review of what VisionQuest needs before real students and inst
 
 ## Where the work is
 
-All of it is on the local branch `wave1/integration`, in the worktree `t3-f5f461cb-c3e79499a0a88764`. Nothing is pushed and nothing is merged to `main`. The decision trail is `decisions.tsv` in that worktree (one row per decision, with evidence). The scorecard is `node scripts/readiness/scorecard.mjs`.
+All of it is PR #300 (https://github.com/doclegg05/VisionQuest/pull/300), branch `wave1/integration`, worktree `t3-f5f461cb-c3e79499a0a88764`. Nothing is merged to `main`. The decision trail is `decisions.tsv` (one row per decision, with evidence). The scorecard is `node scripts/readiness/scorecard.mjs`; CI-only gates count with `--ci-green=<run URL>`.
 
-Last full unit suite on the branch (concurrency 4): 11,164 pass, 1 fail (the known sandbox failure "stages a bundled PDF"), 0 cancelled. Scorecard: launch tasks 32 of 40, launch metrics 3 of 5, owner rows 0 of 12.
+Every PR check is green at `dd61c17c` (CI run 43267766862), the Sage evals included, on Britt's topped-up OpenRouter key. Scorecard with `--ci-green` on that run: Launch tasks 39 of 40 (E0 owner-open), launch metrics 3 of 5 (M4 322.2 KB, M7 935 ms, both live and waiting on a release), owner rows 0 of 12.
+
+Later the same day (Codex/Sol session): CI's first runs found and fixed a real closeout bug (`left(text, bigint)`) plus test-only failures under CI's strict RLS mode; Sol then built B3, H3 and the T6 gate-removal proof, reconciled C9 into C11, and recorded Britt's approval of the H6 notice wording and the H8 incident runbook. Its record is `docs/audits/2026-11-12-launch-gate-reconciliation.md`.
 
 ## Ready (reviewed clean, or fixed after the last review)
 
@@ -23,9 +25,8 @@ Last full unit suite on the branch (concurrency 4): 11,164 pass, 1 fail (the kno
 
 ## Decisions waiting on Britt
 
-- The Sage notice wording (H6) and its six questions.
-- F2's 10 minute dashboard cache instead of the plan's 30 seconds.
-- A failed sign-in for a real account no longer stores the typed login (reversed a deliberate choice; one-line revert).
+- Settled 2026-11-12: the H6 notice wording and the H8 incident runbook (approved), F2's 10 minute cache and keeping the typed login out of failed sign-in summaries (accepted).
+- Merging #300 (with a merge commit) and releasing it.
 - Audit rows now hold the full client IP, and audit retention is proposed at 7 years.
 - Whether coordinators may save a personal AI key; whether the browser should show 988 on a dropped connection before the first stream event.
 - The parked tasks C1, B1, C3, which hold four more tasks.
@@ -39,4 +40,4 @@ Last full unit suite on the branch (concurrency 4): 11,164 pass, 1 fail (the kno
 
 ## Where we left off
 
-Next: push `wave1/integration`, let CI run (first runs of the closeout, alert actions and first-day tests), then Britt's decisions above. Follow-ups from the reviews are listed in the run state file in the session scratchpad and summarized in Open Items.
+Next: Britt's word to merge #300 with a merge commit (a squash re-creates the 44-file conflict #299 caused), then a release. After deploy: rerun `npm run readiness -- --only=M4,M7 --no-write`, run DEPLOY.md's sign-in client-address check, and work the owner rows (E0 host timing; O-1 to O-12 in `docs/audits/2026-11-09-ops-evidence-checklist.md`). The H6 notice and H8 runbook are approved; F2's 10-minute cache and the login kept out of failed sign-in summaries were accepted on Britt's "go with your recommendations". Still Britt's: retention numbers, staff MFA policy, the coordinator AI key, 988 on a pre-first-event drop, and the parked C1, B1 and C3.

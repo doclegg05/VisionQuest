@@ -21,7 +21,18 @@ recipient test in O-6. A Sage outage leaves the database health response at 200
 so Render does not restart an otherwise working app; the uptime workflow checks
 the separate Sage flag and fails independently.
 
-## CI evidence still required on this head
+## CI evidence
+
+Both CI-only gates passed in [CI run 43267766862](https://github.com/doclegg05/VisionQuest/actions/runs/43267766862)
+on `dd61c17c` (tested merge head `0e2d507f`), with every PR check green,
+including the three Sage evals. T6: the first-day gate proof artifact reads
+`baseline: passed`, and removing the password, notice and recovery gates was
+each detected (actual paths `/sage-notice`, `/recovery-setup`, `/settings`).
+H10 and C11: the demo closeout and alert actions Postgres tests passed. The
+scorecard run with `--ci-green` on that run reads 39 of 40 Launch tasks; the
+one left is E0, an owner measurement.
+
+The rest of this section is the plan as written before that run.
 
 T6 has a controlled removal script in the existing hermetic E2E job. It first
 builds and passes the first-day browser test. It then removes each of the
