@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { syncStudentAlerts } from "@/lib/advising";
 import { deferPerStudent } from "@/lib/after-response";
 import { withAuth, badRequest, forbidden, isStaffRole, type Session } from "@/lib/api-error";
-import { assertStaffCanManageStudent } from "@/lib/classroom";
+import { resolveTargetStudentId } from "@/lib/target-student";
 import { recordStudentView } from "@/lib/audit";
 import { applyStudentOrientationCompletion } from "@/lib/orientation-completion";
 import { isVerificationRequiredItem } from "@/lib/orientation-step-resources";
@@ -28,20 +28,6 @@ const orientationToggleSchema = z.object({
   // step back to the student.
   verify: z.enum(["confirm", "decline"]).optional(),
 });
-
-async function resolveTargetStudentId(session: Session, requestedStudentId?: string | null) {
-  const targetStudentId = requestedStudentId?.trim() || session.id;
-
-  if (targetStudentId !== session.id) {
-    if (!isStaffRole(session.role)) {
-      throw forbidden();
-    }
-
-    await assertStaffCanManageStudent(session, targetStudentId);
-  }
-
-  return targetStudentId;
-}
 
 // GET — list orientation items with student's progress
 export const GET = withAuth(async (session, req: Request) => {

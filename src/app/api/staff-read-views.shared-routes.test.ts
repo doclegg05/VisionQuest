@@ -43,14 +43,17 @@ const fileRow = {
   category: "form",
 };
 
+/** Arguments of the data reads that are scoped to one student. */
+const dataQueries: any[] = [];
+
 const fakePrisma = {
   student: { findFirst: async (args: any) => managedStudentLookup(args) },
   fileUpload: {
     // Applies the student-only scope the route hands it, as Postgres would.
     findFirst: async (args: any) => (args.where.studentId && args.where.studentId !== STUDENT.id ? null : fileRow),
   },
-  formSubmission: { findMany: async () => [] },
-  orientationItem: { findMany: async () => [] },
+  formSubmission: { findMany: async (args: any) => (dataQueries.push(args), []) },
+  orientationItem: { findMany: async (args: any) => (dataQueries.push(args), []) },
   sageInsight: { findMany: async () => [] },
   goal: {
     findFirst: async () => ({ id: GOAL_ID, studentId: STUDENT.id, level: "monthly", content: "GED", status: "active", parentId: null, createdAt: now }),
@@ -99,6 +102,7 @@ const studentSession = (): TestSession => ({ id: STUDENT.id, studentId: STUDENT.
 
 beforeEach(() => {
   auditCreates.length = 0;
+  dataQueries.length = 0;
   session = teacher(OWNER_TEACHER);
 });
 
@@ -171,3 +175,19 @@ describe("GET /api/files/download as an admin", () => {
     ]);
   });
 });
+
+// The guard also accepts a login username. The view row and the data read
+// must use the database id it returns, never the raw value the caller sent.
+for (const route of ROUTES.filter((r) => r.handler === "orientation" || r.handler === "formsStatus")) {
+  describe(`GET /api/${route.name} named by login username`, () => {
+    it("records and reads the student's database id", async () => {
+      const res = await call(route, `/x?studentId=${STUDENT.studentId}`);
+
+      assert.equal(res.status, 200);
+      assert.deepEqual(viewRows().map((row) => row.targetId), [STUDENT.id]);
+      const scoped = JSON.stringify(dataQueries);
+      assert.ok(scoped.includes(`"${STUDENT.id}"`), `data read not scoped to the id: ${scoped}`);
+      assert.ok(!scoped.includes(`"${STUDENT.studentId}"`), `data read used the username: ${scoped}`);
+    });
+  });
+}
