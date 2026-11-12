@@ -21,6 +21,8 @@ export interface SendAbort {
    */
   stop(): void;
   wasStopped(): boolean;
+  /** The chat ended the send because no first event came in time (E7, E9b 3). */
+  timedOut(): boolean;
   armed(): boolean;
   /** The send finished. An older send ending leaves a newer one alone. */
   end(controller: AbortController): void;
@@ -34,6 +36,7 @@ interface SendState {
   /** Stop was pressed after the delay but before the ids. */
   stopKept: boolean;
   idsArrived: boolean;
+  timedOut: boolean;
   sentAt: number;
 }
 
@@ -42,6 +45,7 @@ const IDLE: SendState = {
   stopped: false,
   stopKept: false,
   idsArrived: false,
+  timedOut: false,
   sentAt: 0,
 };
 
@@ -62,15 +66,15 @@ function oneTimer() {
 }
 
 /**
- * E7: no first event in time. Ends the send as a failure, not a Stop, so the
- * chat shows E1's unknown sentence with Try again and the box unlocks.
+ * E7: the state once the first-event timer fires. Overdue ends the send as a
+ * timeout, not a Stop, so the chat shows its own sentence with Try again
+ * (E9b 3) and the box unlocks. Pure: the caller does the abort.
  */
-function endIfFirstEventLate(state: SendState): SendState {
+function afterFirstEventTimer(state: SendState): SendState {
   // The timer fired, so at least the bound has passed whatever the clock reads.
   const now = Math.max(Date.now(), state.sentAt + FIRST_EVENT_TIMEOUT_MS);
   if (!firstEventOverdue({ idsArrived: state.idsArrived, sentAt: state.sentAt, now })) return state;
-  state.controller?.abort();
-  return { ...state, stopKept: false };
+  return { ...state, stopKept: false, timedOut: true };
 }
 
 export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAbort {
@@ -88,7 +92,8 @@ export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAb
     state.controller?.abort();
   };
   const onFirstEventLate = () => {
-    state = endIfFirstEventLate(state);
+    state = afterFirstEventTimer(state);
+    if (state.timedOut) state.controller?.abort();
   };
 
   return {
@@ -111,11 +116,13 @@ export function createSendAbort(onArmedChange: (armed: boolean) => void): SendAb
       else if (state.controller && !state.idsArrived && delayPassed()) state = { ...state, stopKept: true };
     },
     wasStopped: () => state.stopped,
+    timedOut: () => state.timedOut,
     armed: () => isArmed(),
     end(controller) {
       if (state.controller !== controller) return;
       clearTimers();
-      state = { ...IDLE, stopped: state.stopped };
+      // Kept for the turn's display after the send; the next begin clears them.
+      state = { ...IDLE, stopped: state.stopped, timedOut: state.timedOut };
       onArmedChange(false);
     },
     dispose: clearTimers,

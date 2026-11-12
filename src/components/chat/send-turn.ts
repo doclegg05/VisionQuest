@@ -5,10 +5,10 @@
  */
 
 import type { ChatRole } from "@/lib/chat/commands";
-import { resolveSendError, resolveStreamOutcome } from "@/lib/chat/send-outcome";
+import { SageSendError, firstEventTimeoutOutcome, resolveSendError, resolveStreamOutcome, type SendErrorOutcome } from "@/lib/chat/send-outcome";
 import type { AgentEventItem, ChatStreamResult } from "./chat-stream";
 import { failedTurnMessages, type ChatMessage, type FailedTurn } from "./failed-turn";
-import { stoppedTurnMessages, withEarlyCrisisHelp } from "./wait-and-stop";
+import { localCrisisBlock, stopOffersRetry, stoppedTurnMessages, withEarlyCrisisHelp } from "./wait-and-stop";
 
 interface TurnResultInput {
   result: ChatStreamResult;
@@ -43,8 +43,14 @@ export function turnResultMessages({ result, id, savedUserMessageId, crisisBlock
 
 interface SendErrorInput {
   err: unknown;
-  /** The student pressed Stop: no failure styling and no Try again. */
+  /** The student pressed Stop: no failure styling, Try again only with nothing streamed. */
   stopped: boolean;
+  /** The chat ended the send because no first event came in time (E9b 3). */
+  timedOut: boolean;
+  /** The message the student sent, for the chat's own crisis check (E9b 1). */
+  text: string;
+  /** The server's first event (ids and its crisis flag) arrived. */
+  firstEventSeen: boolean;
   /** Text Sage streamed before the Stop or failure. */
   partial: string;
   events: AgentEventItem[];
@@ -59,19 +65,38 @@ interface SendErrorResult extends TurnResult {
   conversationId: string | null;
 }
 
-/** The turn after a Stop or a failure, with the 988 help when nothing shows it. */
-export function messagesAfterSendError(input: SendErrorInput): SendErrorResult {
-  const { id, crisisBlock } = input;
-  if (input.stopped) {
-    const messages = stoppedTurnMessages({ id, partial: input.partial, events: input.events, crisisBlock });
-    return { messages, failedTurn: null, conversationId: null };
-  }
-  const outcome = resolveSendError(input.err, {
+/**
+ * The 988 block this turn must show. The server's flag when it sent one.
+ * When the chat cut the send off itself before the first event (the timeout
+ * or a dropped connection, not a failure the server answered), the server's
+ * flag never came, so the chat checks the text with the same patterns.
+ */
+function crisisBlockFor(input: SendErrorInput): string | null {
+  if (input.crisisBlock) return input.crisisBlock;
+  if (input.firstEventSeen || input.err instanceof SageSendError) return null;
+  return localCrisisBlock(input.text);
+}
+
+function sendErrorOutcome(input: SendErrorInput): SendErrorOutcome {
+  if (input.timedOut) return firstEventTimeoutOutcome();
+  return resolveSendError(input.err, {
     priorContent: input.partial,
     audience: input.role === "student" ? "student" : "staff",
     isAdmin: input.role === "admin",
     savedUserMessageId: input.savedUserMessageId,
   });
+}
+
+/** The turn after a Stop or a failure, with the 988 help when nothing shows it. */
+export function messagesAfterSendError(input: SendErrorInput): SendErrorResult {
+  const { id, partial, savedUserMessageId } = input;
+  const crisisBlock = crisisBlockFor(input);
+  if (input.stopped) {
+    const messages = stoppedTurnMessages({ id, partial, events: input.events, crisisBlock, savedUserMessageId });
+    const failedTurn = stopOffersRetry(partial, savedUserMessageId) ? { messageId: id, offerRetry: true, setupLink: false } : null;
+    return { messages, failedTurn, conversationId: null };
+  }
+  const outcome = sendErrorOutcome(input);
   const messages = withEarlyCrisisHelp(failedTurnMessages(outcome, id), crisisBlock, id);
   const failedTurn = outcome.offerRetry || outcome.setupLink
     ? { messageId: id, offerRetry: outcome.offerRetry, setupLink: outcome.setupLink }

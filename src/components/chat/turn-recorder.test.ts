@@ -18,7 +18,7 @@ function recorder() {
 describe("the turn recorder (E2c 6)", () => {
   it("starts with nothing received", () => {
     const { turn } = recorder();
-    assert.deepEqual(turn.sent(), { partial: "", events: [], crisisBlock: null, savedUserMessageId: null });
+    assert.deepEqual(turn.sent(), { partial: "", events: [], crisisBlock: null, savedUserMessageId: null, firstEventSeen: false });
   });
 
   it("notes the ids before telling the Stop gate, so a kept Stop sees the saved message", () => {
@@ -26,6 +26,7 @@ describe("the turn recorder (E2c 6)", () => {
     turn.handlers.onIds({ conversationId: "c1", userMessageId: "u1" });
     assert.deepEqual(calls, ["conversation:c1", "noteIds"]);
     assert.equal(turn.sent().savedUserMessageId, "u1");
+    assert.equal(turn.sent().firstEventSeen, true, "the chat's own crisis check stands down (E9b 1)");
   });
 
   it("keeps the 988 block, the text and the events a Stop or failure needs", () => {
@@ -34,7 +35,7 @@ describe("the turn recorder (E2c 6)", () => {
     turn.handlers.onText("Hi");
     turn.handlers.onText("Hi there");
     turn.handlers.onEvents([]);
-    assert.deepEqual(turn.sent(), { partial: "Hi there", events: [], crisisBlock: "988 help", savedUserMessageId: null });
+    assert.deepEqual(turn.sent(), { partial: "Hi there", events: [], crisisBlock: "988 help", savedUserMessageId: null, firstEventSeen: false });
     assert.deepEqual(calls, ["firstText", "text:Hi", "text:Hi there", "events:0"]);
   });
 

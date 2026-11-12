@@ -41,7 +41,7 @@ describe("turnResultMessages (E2b 7a)", () => {
 });
 
 describe("messagesAfterSendError (E2b 7b)", () => {
-  const base = { partial: "", events: [], crisisBlock: null, role: "student" as const, savedUserMessageId: "u1", id: "e1" };
+  const base = { timedOut: false, text: "hi", firstEventSeen: true, partial: "", events: [], crisisBlock: null, role: "student" as const, savedUserMessageId: "u1", id: "e1" };
 
   it("a Stop: the stopped note, no failure, no Try again, conversation unchanged", () => {
     const after = messagesAfterSendError({ ...base, err: new Error("aborted"), stopped: true, partial: "Half" });
