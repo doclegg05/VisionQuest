@@ -144,7 +144,7 @@ describe("Create a Class, as it was before it moved", () => {
       assert.match(html, new RegExp(`<label class="block space-y-1.5"><span [^>]*>${label}</span><(?:input|textarea) `), label);
     }
     assert.match(html, /<label for="new-class-region"[^>]*>Region<\/label>/);
-    assert.match(html, /<button type="button" class="primary-button [^"]*">Create Class<\/button>/);
+    assert.match(html, /<button type="button" aria-disabled="false" class="primary-button [^"]*">Create Class<\/button>/);
   });
 
   it("shows what was typed and ticks the picked instructors", () => {
@@ -156,7 +156,7 @@ describe("Create a Class, as it was before it moved", () => {
   });
 
   it("turns the button off while the class is being created", () => {
-    assert.match(render({ creating: true }), /<button type="button" disabled="" class="primary-button [^"]*">Creating\.\.\.<\/button>/);
+    assert.match(render({ creating: true }), /<button type="button" aria-disabled="true" class="primary-button [^"]*">Creating\.\.\.<\/button>/);
   });
 
   it("sends the same body as before, with a blank date as null", () => {

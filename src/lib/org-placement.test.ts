@@ -93,12 +93,12 @@ describe("lists", () => {
     assert.deepEqual(where.classEnrollments, { none: { status: { not: "archived" } } });
   });
 
-  it("asks only for teachers with no region and no class", async () => {
+  it("offers every teacher without a region, including teachers who already have a class", async () => {
     await mod.listUnplacedStaff(admin);
     const where = (studentFindMany.mock.calls[0].arguments[0] as any).where;
     assert.equal(where.role, "teacher");
     assert.deepEqual(where.instructorRegions, { none: {} });
-    assert.deepEqual(where.instructedClasses, { none: {} });
+    assert.equal(where.instructedClasses, undefined);
   });
 });
 

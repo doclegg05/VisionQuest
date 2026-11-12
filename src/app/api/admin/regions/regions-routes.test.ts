@@ -13,6 +13,8 @@ const regionFindUnique = mock.fn() as any;
 const regionCreate = mock.fn() as any;
 const regionUpdate = mock.fn() as any;
 const studentFindUnique = mock.fn() as any;
+const studentFindMany = mock.fn(async () => [{ id: PERSON_ID, displayName: "Pat Lee", email: null }]) as any;
+const regionFindMany = mock.fn(async () => []) as any;
 const assignmentFindUnique = mock.fn() as any;
 const assignmentCreate = mock.fn() as any;
 const assignmentDelete = mock.fn() as any;
@@ -30,8 +32,8 @@ before(async () => {
   mock.module("@/lib/db", {
     exports: {
       prisma: {
-        region: { findUnique: regionFindUnique, create: regionCreate, update: regionUpdate },
-        student: { findUnique: studentFindUnique },
+        region: { findUnique: regionFindUnique, findMany: regionFindMany, create: regionCreate, update: regionUpdate },
+        student: { findUnique: studentFindUnique, findMany: studentFindMany },
         regionCoordinator: { findUnique: assignmentFindUnique, create: assignmentCreate, delete: assignmentDelete },
       },
       prismaAdmin: {},
@@ -190,5 +192,17 @@ describe("DELETE /api/admin/regions/[id]/coordinators/[coordinatorId]", () => {
     assert.equal(row.action, "admin.region.coordinator.remove");
     assert.equal(row.targetId, REGION_ID);
     assert.deepEqual(row.metadata, { coordinatorId: PERSON_ID });
+  });
+});
+
+describe("GET /api/admin/regions", () => {
+  it("lists eligible coordinators independently of their current assignments", async () => {
+    const res = await createRoute.GET();
+    assert.equal(res.status, 200);
+    const payload = await res.json();
+    assert.deepEqual(payload.coordinatorChoices, [{ id: PERSON_ID, displayName: "Pat Lee", email: null }]);
+    const query = studentFindMany.mock.calls.at(-1).arguments[0];
+    assert.deepEqual(query.where, { role: { in: ["coordinator", "admin"] }, isActive: true });
+    assert.deepEqual(query.select, { id: true, displayName: true, email: true });
   });
 });

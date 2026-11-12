@@ -12,7 +12,8 @@
       "O-6: Render build command matches render.yaml",
       "O-6: SAGE_AGENT_MODE set in Render",
       "O-6: Mail keys set in Render",
-      "O-6: Sentry keys set in Render"
+      "O-6: Sentry keys set in Render",
+      "O-6: Alarm delivery received"
     ]
   }
 }

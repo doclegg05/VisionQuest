@@ -70,6 +70,11 @@ async function signIn(page: Page, account: string, password: string): Promise<vo
   await page.getByRole("button", { name: /sign in to see what to do today/i }).click();
 }
 
+/** A mutation proof counts only the expected missing gate and next page, never an infrastructure failure. */
+function gateMismatch(page: Page, gate: string, cause: unknown): Error {
+  return new Error(`FIRST_DAY_GATE_MISSING:${gate}:ACTUAL:${new URL(page.url()).pathname}`, { cause });
+}
+
 /** The key logout stored for this context's current session token, for afterAll to delete. */
 async function rememberRevocationKey(context: BrowserContext): Promise<void> {
   const cookie = (await context.cookies()).find((candidate) => candidate.name === SESSION_COOKIE);
@@ -167,21 +172,24 @@ async function answerRecoveryQuestions(page: Page): Promise<void> {
 }
 
 test("a new student passes the password, Sage notice and recovery gates, then reaches chat", async ({ page }) => {
+  // A deliberately missing gate must reach the URL assertion's own failure,
+  // rather than being interrupted by Playwright's default 30-second test limit.
+  test.setTimeout(120_000);
   const main = page.locator("#main-content");
 
   await test.step("first sign-in is held on the password change", async () => {
     await signIn(page, login, temporaryPassword);
-    await expect(page).toHaveURL(atPath("/change-password"), { timeout: NAV_TIMEOUT_MS });
+    await expect(page).toHaveURL(atPath("/change-password"), { timeout: NAV_TIMEOUT_MS }).catch((error) => { throw gateMismatch(page, "/change-password", error); });
     await changeTemporaryPassword(page);
   });
 
   await test.step("then the Sage notice", async () => {
-    await expect(page).toHaveURL(atPath("/sage-notice"), { timeout: NAV_TIMEOUT_MS });
+    await expect(page).toHaveURL(atPath("/sage-notice"), { timeout: NAV_TIMEOUT_MS }).catch((error) => { throw gateMismatch(page, "/sage-notice", error); });
     await main.getByRole("button", { name: SAGE_NOTICE_ACK_BUTTON }).click();
   });
 
   await test.step("then the recovery questions", async () => {
-    await expect(page).toHaveURL(atPath("/recovery-setup"), { timeout: NAV_TIMEOUT_MS });
+    await expect(page).toHaveURL(atPath("/recovery-setup"), { timeout: NAV_TIMEOUT_MS }).catch((error) => { throw gateMismatch(page, "/recovery-setup", error); });
     await answerRecoveryQuestions(page);
   });
 

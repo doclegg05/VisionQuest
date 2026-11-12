@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { CreateClassRegionSelect } from "@/components/admin/CreateClassRegionSelect";
 import type { RegionOption } from "@/components/admin/region-pick";
@@ -23,6 +23,7 @@ export interface CreateClassFormState {
   setField: (field: TextFieldName, value: string) => void;
   toggleInstructor: (instructorId: string) => void;
   reset: () => void;
+  initializeDefaults?: (instructorId: string | null, regions: readonly RegionOption[]) => void;
 }
 
 const EMPTY_VALUES: CreateClassValues = {
@@ -39,19 +40,30 @@ function toggled(ids: readonly string[], id: string): readonly string[] {
   return ids.includes(id) ? ids.filter((current) => current !== id) : [...ids, id];
 }
 
+export function initialClassValues(instructorId: string | null, regions: readonly RegionOption[]): CreateClassValues {
+  return { ...EMPTY_VALUES, regionId: regions.length === 1 ? regions[0].id : "", instructorIds: instructorId ? [instructorId] : [] };
+}
+
 /**
- * The form's state. The page calls this, not the form: the page shows
- * "Loading classes..." in place of everything while its list reloads, and what
- * was typed here has to still be there when the form comes back.
+ * The page holds this state so region-list refreshes preserve unfinished work.
+ * Defaults apply once, after the first successful class-list response.
  */
 export function useCreateClassForm(): CreateClassFormState {
   const [values, setValues] = useState(EMPTY_VALUES);
+  const defaults = useRef(EMPTY_VALUES);
+  const initialized = useRef(false);
   return {
     values,
     setField: (field, value) => setValues((current) => ({ ...current, [field]: value })),
     toggleInstructor: (instructorId) =>
       setValues((current) => ({ ...current, instructorIds: toggled(current.instructorIds, instructorId) })),
-    reset: () => setValues(EMPTY_VALUES),
+    initializeDefaults: (instructorId, regions) => {
+      if (initialized.current) return;
+      initialized.current = true;
+      defaults.current = initialClassValues(instructorId, regions);
+      setValues(defaults.current);
+    },
+    reset: () => setValues(defaults.current),
   };
 }
 
@@ -85,6 +97,7 @@ export interface CreateClassFormProps {
   instructors: readonly InstructorChoice[];
   /** The admin page has the Regions, Staff Waiting for a Region and Invite Staff cards; an instructor's page does not. */
   onAdminPage: boolean;
+  showAdminLabel?: boolean;
   creating: boolean;
   onCreate: () => void;
 }
@@ -165,12 +178,12 @@ function AssignInstructors({ instructors, pickedIds, onToggle, onAdminPage }: As
 }
 
 /** The Create a Class card. The page holds its state (`useCreateClassForm`) and sends it. */
-export function CreateClassForm({ form, regions, instructors, onAdminPage, creating, onCreate }: CreateClassFormProps) {
+export function CreateClassForm({ form, regions, instructors, onAdminPage, showAdminLabel = false, creating, onCreate }: CreateClassFormProps) {
   const { values, setField } = form;
   return (
     <div className="surface-section space-y-4 p-5">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Admin</p>
+        {showAdminLabel && <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">Admin</p>}
         <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Create a Class</h2>
         <p className="mt-2 text-sm text-[var(--ink-muted)]">Classes organize students and instructors. Create student accounts from the class roster below.</p>
       </div>
@@ -193,9 +206,9 @@ export function CreateClassForm({ form, regions, instructors, onAdminPage, creat
       <AssignInstructors instructors={instructors} pickedIds={values.instructorIds} onToggle={form.toggleInstructor} onAdminPage={onAdminPage} />
       <button
         type="button"
-        onClick={onCreate}
-        disabled={creating}
-        className="primary-button px-5 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+        onClick={() => { if (!creating) onCreate(); }}
+        aria-disabled={creating}
+        className="primary-button px-5 py-3 text-sm aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
       >
         {creating ? "Creating..." : "Create Class"}
       </button>

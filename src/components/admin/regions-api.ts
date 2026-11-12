@@ -5,6 +5,8 @@ import {
   REGION_CODE_PATTERN,
   parseRegionList,
   parseRegionReply,
+  parseCoordinatorChoices,
+  type RegionPerson,
   type AdminRegion,
 } from "./regions-model";
 
@@ -74,9 +76,11 @@ async function attempt<T>(request: () => Promise<Outcome<T>>, onError: (error: u
   }
 }
 
-export function loadRegions(http: RegionsHttp): Promise<Outcome<AdminRegion[]>> {
+export function loadRegions(http: RegionsHttp, onPeople?: (people: RegionPerson[]) => void): Promise<Outcome<AdminRegion[]>> {
   return attempt(async () => {
-    const regions = parseRegionList(await http.get(REGIONS_URL));
+    const payload = await http.get(REGIONS_URL);
+    const regions = parseRegionList(payload);
+    if (regions) onPeople?.(parseCoordinatorChoices(payload));
     return regions ? { ok: true, value: regions } : failed(MESSAGES.unreadableList);
   }, () => failed(MESSAGES.loadFailed));
 }

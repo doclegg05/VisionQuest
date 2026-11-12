@@ -85,7 +85,7 @@ describe("loading", () => {
   it("shows the empty state when there are no regions", async () => {
     const h = harness({ answer: () => ({ regions: [] }) });
     await h.controller.load();
-    assert.deepEqual(h.actions, [{ type: "load-succeeded", regions: [] }]);
+    assert.deepEqual(h.actions, [{ type: "load-succeeded", regions: [], people: [] }]);
   });
 
   it("shows the server's message when the load fails", async () => {
@@ -180,6 +180,16 @@ describe("archive and restore", () => {
 });
 
 describe("coordinators", () => {
+  it("offers a coordinator with no region after a fresh page load", async () => {
+    const h = harness({ answer: () => ({ regions: [east], coordinatorChoices: [pat] }) });
+    await h.controller.load();
+    const state = h.state();
+    assert.equal(state.kind, "ready");
+    if (state.kind !== "ready") return;
+    assert.deepEqual(state.people, [pat]);
+    assert.equal(await h.controller.onAssign(east, state.people[0]), true);
+    assert.deepEqual(regionsOf(h.state())[0].coordinators, [pat]);
+  });
   it("adds a coordinator to the region", async () => {
     const h = harness({ regions: [north, east] });
     assert.equal(await h.controller.onAssign(east, pat), true);

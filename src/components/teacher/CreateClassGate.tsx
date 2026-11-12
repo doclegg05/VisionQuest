@@ -4,6 +4,7 @@ export interface CreateClassGateInput {
   /** Regions the caller may create a class in. An instructor with no region has none. */
   regionCount: number;
   loading: boolean;
+  isAdmin?: boolean;
 }
 
 export type CreateClassVisibility = "form" | "hint" | "pending";
@@ -24,7 +25,9 @@ export function CreateClassHint(input: CreateClassGateInput) {
   return (
     <div className="surface-section space-y-2 p-5">
       <h2 className="font-display text-2xl text-[var(--ink-strong)]">Create a Class</h2>
-      <p className="text-sm text-[var(--ink-strong)]">You are not in a region yet. Ask your program admin to add you to a region.</p>
+      {input.isAdmin ? (
+        <p className="text-sm text-[var(--ink-strong)]">No regions yet. <a href="/admin#regions" className="inline-flex min-h-11 items-center font-semibold underline">Add a region in Admin</a> first.</p>
+      ) : <p className="text-sm text-[var(--ink-strong)]">You are not in a region yet. Ask your program admin to add you to a region.</p>}
     </div>
   );
 }

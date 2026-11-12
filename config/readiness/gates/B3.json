@@ -5,6 +5,16 @@
   "title": "First-day guidance",
   "doneWhen": "Tests cover the empty states and the corrected hint.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/components/teacher/TodayRoster.test.tsx",
+      "src/components/teacher/CreateClassForm.test.tsx",
+      "src/components/teacher/CreateClassGate.test.tsx",
+      "src/lib/org-placement.test.ts",
+      "src/components/admin/regions-reducer.test.ts",
+      "src/components/admin/regions-controller.test.ts",
+      "src/app/api/admin/regions/regions-routes.test.ts",
+      "src/components/teacher/first-day-guidance.test.tsx"
+    ]
   }
 }

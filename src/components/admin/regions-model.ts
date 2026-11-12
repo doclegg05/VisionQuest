@@ -55,6 +55,11 @@ function parsePeople(value: unknown): RegionPerson[] | null {
   return Array.isArray(value) ? parseAll(value, parsePerson) : null;
 }
 
+/** Include active coordinators with no region, so a reload cannot lose them. */
+export function parseCoordinatorChoices(payload: unknown): RegionPerson[] {
+  return isRecord(payload) ? parsePeople(payload.coordinatorChoices) ?? [] : [];
+}
+
 function parseRegion(value: unknown): AdminRegion | null {
   if (!isRecord(value)) return null;
   const { id, name, code, status, classCount } = value;

@@ -14,6 +14,7 @@ import ProgramBadge from "@/components/ui/ProgramBadge";
 import { normalizeProgramType } from "@/lib/program-type";
 import ClassRequirementEditor from "./ClassRequirementEditor";
 import ClassIntakeFlyerModal from "./ClassIntakeFlyerModal";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
 
 interface InstructorOption {
   id: string;
@@ -66,6 +67,8 @@ interface ClassDetail {
 }
 
 interface ClassesResponse {
+  viewerRole?: string;
+  currentInstructorId?: string | null;
   classes: ClassSummary[];
   availableInstructors: InstructorOption[];
   regions?: { id: string; name: string }[];
@@ -108,6 +111,8 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   const [selectedClassId, setSelectedClassId] = useState("");
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadedOnce = useRef(false);
+  const [viewerRole, setViewerRole] = useState("teacher");
   const [detailLoading, setDetailLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -133,7 +138,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null);
 
   async function loadClasses(preferredClassId?: string) {
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
     setError("");
     try {
       const response = await fetch(`/api/teacher/classes${adminMode ? "?includeArchived=true" : ""}`);
@@ -145,6 +150,8 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
       setClasses(payload.classes || []);
       setAvailableInstructors(payload.availableInstructors || []);
       setRegions(payload.regions || []);
+      setViewerRole(payload.viewerRole ?? "teacher");
+      newClass.initializeDefaults?.(payload.currentInstructorId ?? null, payload.regions || []);
 
       const nextClassId =
         preferredClassId && payload.classes.some((item) => item.id === preferredClassId)
@@ -160,6 +167,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
       setAvailableInstructors([]);
       setSelectedClassId("");
     } finally {
+      loadedOnce.current = true;
       setLoading(false);
     }
   }
@@ -170,7 +178,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
       return;
     }
 
-    setDetailLoading(true);
+    if (!classDetail || classDetail.id !== classId) setDetailLoading(true);
     setError("");
     try {
       const response = await fetch(`/api/teacher/classes/${classId}`);
@@ -316,6 +324,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   }
 
   async function createClass() {
+    if (creatingClass) return;
     setCreatingClass(true);
     setError("");
     setMessage("");
@@ -342,7 +351,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
   }
 
   async function saveClassSettings() {
-    if (!selectedClassId || !(await regionMove.confirmMove())) return;
+    if (saving || !selectedClassId || !(await regionMove.confirmMove())) return;
 
     setSaving(true);
     setError("");
@@ -444,16 +453,17 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
           regions={regions}
           instructors={availableInstructors}
           onAdminPage={manageRegions}
+          showAdminLabel={viewerRole === "admin"}
           creating={creatingClass}
           onCreate={() => void createClass()}
         />
-      ) : <CreateClassHint manageRegions={manageRegions} regionCount={regions.length} loading={loading} />}
+      ) : <CreateClassHint manageRegions={manageRegions} regionCount={regions.length} loading={loading} isAdmin={viewerRole === "admin"} />}
 
       <div className="surface-section space-y-4 p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-muted)]">
-              {adminMode ? "Admin settings" : "Teacher roster"}
+              {viewerRole === "admin" ? "Admin settings" : "Class settings"}
             </p>
             <h2 className="mt-2 font-display text-2xl text-[var(--ink-strong)]">Class Roster</h2>
           </div>
@@ -501,8 +511,8 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
                       <button
                         type="button"
                         onClick={() => void saveClassSettings()}
-                        disabled={saving}
-                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-disabled={saving}
+                        className="inline-flex items-center pointer-coarse:min-h-11 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink-strong)] aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
                       >
                         Save Settings
                       </button>
@@ -644,7 +654,7 @@ export default function ClassRosterManager({ manageRegions = false }: { manageRe
                     />
                   </label>
                   <p id="new-student-password-help" className="text-xs text-[var(--ink-muted)]">
-                    Use at least 8 characters.
+                    Use at least {MIN_PASSWORD_LENGTH} characters.
                   </p>
                   <button
                     type="button"

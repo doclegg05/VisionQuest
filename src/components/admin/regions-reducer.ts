@@ -32,7 +32,7 @@ export type RegionsState = { kind: "loading" } | { kind: "load-failed"; message:
 
 export type RegionsAction =
   | { type: "load-started" }
-  | { type: "load-succeeded"; regions: readonly AdminRegion[] }
+  | { type: "load-succeeded"; regions: readonly AdminRegion[]; people?: readonly RegionPerson[] }
   | { type: "load-failed"; message: string }
   | { type: "toggled" }
   | { type: "save-started"; target: SaveTarget }
@@ -69,7 +69,7 @@ export function regionsReducer(state: RegionsState, action: RegionsAction): Regi
     case "load-started":
       return { kind: "loading" };
     case "load-succeeded":
-      return loaded(action.regions);
+      return { ...loaded(action.regions), people: mergePeople(action.people ?? [], action.regions) };
     case "load-failed":
       return { kind: "load-failed", message: action.message };
     case "toggled":

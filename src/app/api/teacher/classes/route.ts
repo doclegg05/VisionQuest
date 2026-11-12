@@ -90,6 +90,8 @@ export const GET = withRegistry("classes.list", async (session, req, _ctx, _tool
   const regions = await listRegionsForClassCreation(session);
 
   return NextResponse.json({
+    viewerRole: session.role,
+    currentInstructorId: session.role === "teacher" ? session.id : null,
     regions,
     classes: classes.map((item) => ({
       ...item,

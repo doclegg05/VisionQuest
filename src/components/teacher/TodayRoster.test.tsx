@@ -23,6 +23,12 @@ function entry(overrides: Partial<TodayRosterEntry> = {}): TodayRosterEntry {
 // The badge counts critical and high alerts together (src/lib/teacher/today.ts),
 // so "high-severity" would undercount what it shows. It says "urgent".
 describe("TodayRoster alert badge", () => {
+  it("gives an empty class three linked first-day steps", () => {
+    const html = renderToString(<TodayRoster roster={[]} />);
+    assert.equal((html.match(/href="\/teacher\/classes"/g) ?? []).length, 3);
+    assert.match(html, /Add your students/);
+    assert.match(html, /QR flyer/);
+  });
   it("labels one critical-or-high alert as one urgent alert", () => {
     const html = renderToString(
       <TodayRoster roster={[entry({ openAlertCount: 1, highSeverityAlertCount: 1 })]} />,

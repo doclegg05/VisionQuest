@@ -45,7 +45,13 @@ export const GET = withAdminAuth(async () => {
     orderBy: [{ status: "asc" }, { name: "asc" }],
   });
 
+  const coordinatorChoices = await prisma.student.findMany({
+    where: { role: { in: ["coordinator", "admin"] }, isActive: true },
+    select: { id: true, displayName: true, email: true },
+    orderBy: { displayName: "asc" },
+  });
   return NextResponse.json({
+    coordinatorChoices,
     regions: regions.map((region) => ({
       id: region.id,
       name: region.name,

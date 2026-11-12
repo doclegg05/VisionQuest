@@ -5,6 +5,12 @@
   "title": "Sage's state is visible",
   "doneWhen": "Tests for both states. The workflow fails when the flag is false.",
   "check": {
-    "type": "pending"
+    "type": "test",
+    "files": [
+      "src/app/api/health/route.test.ts",
+      "src/lib/sage-availability.test.ts",
+      "src/components/teacher/SageAvailability.test.tsx",
+      "src/lib/readiness/uptime.test.ts"
+    ]
   }
 }

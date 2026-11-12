@@ -85,4 +85,17 @@ describe("first-day journey spec (T6)", () => {
   it("runs in CI's E2E gate step", () => {
     assert.ok(e2eGateFiles(read(".github/workflows/ci.yml")).includes(SPEC_PATH));
   });
+
+  it("runs a baseline and each gate removal against the hermetic database in CI", () => {
+    const proof = read("scripts/readiness/first-day-gate-proof.mjs");
+    assert.match(read(".github/workflows/ci.yml"), /run: node scripts\/readiness\/first-day-gate-proof\.mjs/);
+    assert.match(proof, /process\.env\.CI !== "true"/);
+    assert.match(proof, /url\.pathname !== "\/visionquest_e2e"/);
+    for (const gate of ["/change-password", "/sage-notice", "/recovery-setup"]) {
+      assert.ok(proof.includes(`gate: "${gate}"`));
+      assert.ok(spec.includes(`gateMismatch(page, "${gate}"`));
+    }
+    assert.match(proof, /result\.report\.stats\.unexpected !== 1/);
+    assert.match(proof, /finally \{\s*restore\(\)/);
+  });
 });

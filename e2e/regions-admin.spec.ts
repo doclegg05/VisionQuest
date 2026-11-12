@@ -157,7 +157,13 @@ test("admin on a system with no regions adds a region, places an instructor, and
     await createCard.getByLabel("Region", { exact: true }).selectOption(regionId);
     await createCard.getByLabel(INSTRUCTOR.displayName).check();
     await createCard.getByRole("button", { name: "Create Class" }).click();
+    const createButton = createCard.getByRole("button", { name: /^(Create Class|Creating\.\.\.)$/ });
+    const scrollPosition = () => page.evaluate(() => [window.scrollY, document.querySelector("#main-content")?.scrollTop ?? 0]);
+    const createScroll = await scrollPosition();
     await expect(main.getByText("Class created.")).toBeVisible({ timeout: 20_000 });
+    await expect(createButton).toBeFocused();
+    const afterCreate = await scrollPosition();
+    afterCreate.forEach((position, index) => expect(Math.abs(position - createScroll[index])).toBeLessThan(2));
 
     // The class is in the region, with the instructor on it.
     const created = await prisma.spokesClass.findUnique({
@@ -173,6 +179,13 @@ test("admin on a system with no regions adds a region, places an instructor, and
     await expect(settingsRegion).toBeVisible({ timeout: 20_000 });
     await expect(settingsRegion).toHaveValue(regionId);
     await expect(settingsRegion.locator("option")).toHaveText([REGION.name]);
+    const saveButton = main.getByRole("button", { name: "Save Settings", exact: true });
+    await saveButton.click();
+    const saveScroll = await scrollPosition();
+    await expect(main.getByText("Class settings updated.")).toBeVisible({ timeout: 20_000 });
+    await expect(saveButton).toBeFocused();
+    const afterSave = await scrollPosition();
+    afterSave.forEach((position, index) => expect(Math.abs(position - saveScroll[index])).toBeLessThan(2));
   } finally {
     await context.close();
   }

@@ -105,10 +105,11 @@ export function createRegionsController(deps: RegionsControllerDeps): RegionsCon
   const { http, dispatch } = deps;
   const save = createSave(deps);
   const load = async (): Promise<void> => {
-    const outcome = await loadRegions(http);
+    let people: RegionPerson[] = [];
+    const outcome = await loadRegions(http, (choices) => { people = choices; });
     dispatch(
       outcome.ok
-        ? { type: "load-succeeded", regions: outcome.value }
+        ? { type: "load-succeeded", regions: outcome.value, people }
         : { type: "load-failed", message: outcome.message },
     );
   };

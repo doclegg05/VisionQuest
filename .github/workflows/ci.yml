@@ -684,3 +684,14 @@ jobs:
           name: benchmark-results-e2e
           path: reports/benchmarks/latest/
           if-no-files-found: ignore
+
+      - name: Prove the first-day test detects each missing gate
+        run: node scripts/readiness/first-day-gate-proof.mjs
+
+      - name: Upload first-day gate proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-day-gate-proof
+          path: reports/first-day-gate-proof/
+          if-no-files-found: warn

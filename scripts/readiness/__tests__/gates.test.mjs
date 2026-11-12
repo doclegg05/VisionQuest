@@ -82,12 +82,13 @@ test("the owner gates are O-1 to O-12", async () => {
   assert.deepEqual(ids, Array.from({ length: 12 }, (_, index) => `O-${index + 1}`));
 });
 
-test("every owner check, task E0 included, names rows that the ops evidence checklist has", async () => {
+test("every owner check, including E0 and H8, names rows that the ops evidence checklist has", async () => {
   const { parseChecklist } = await import("../parse.mjs");
   const { loadGates } = await scorecard();
   const rows = parseChecklist(readFileSync(join(ROOT, CHECKLIST), "utf8"));
   const ownerChecked = loadGates(ROOT).filter((gate) => gate.check.type === "owner");
-  assert.equal(ownerChecked.length, 13);
+  assert.equal(ownerChecked.length, 14);
+  assert.ok(ownerChecked.some((gate) => gate.id === "H8"), "the incident runbook requires owner approval");
   for (const gate of ownerChecked) {
     assert.equal(gate.check.doc, CHECKLIST, `${gate.id} doc`);
     for (const row of gate.check.rows) assert.ok(rows.has(row), `${gate.id} names a row the checklist lacks: ${row}`);

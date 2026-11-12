@@ -74,15 +74,17 @@ Some owner steps reuse rows above. O-3 also needs "Restore drill". O-4 is the fi
 | O-6: SAGE_AGENT_MODE set in Render | Render dashboard, service `visionquest`, Environment tab, against `render.yaml`. | Britt | | not run | |
 | O-6: Mail keys set in Render | Render dashboard, service `visionquest`, Environment tab. `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` each have a value. Do not paste a value here. | Britt | | not run | |
 | O-6: Sentry keys set in Render | Render dashboard, service `visionquest`, Environment tab. `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` each have a value. Do not paste a value here. | Britt | | not run | |
+| O-6: Alarm delivery received | Use a synthetic, data-free alarm through the deployed reporter. Confirm the designated operator actually receives it and knows the incident runbook. Record time and result, not addresses or secrets. | Britt | | not run | |
 | O-7: Backup taken before the closeout | [Backup and restore runbook](../runbooks/backup-restore.md), after the five W9 steps and before the closeout kit runs. | Britt | | not run | |
 | O-7: Closeout kit preview run | The closeout script from task H10, with no flags. It prints counts only. Write the counts in Next action. | Britt | | not run | |
 | O-7: Closeout kit applied | The closeout script from task H10 with `--apply --confirm-demo-disabled`, after the backup. | Britt | | not run | |
 | O-7: Zero demo rows confirmed | Run the preview again. It must count zero demo rows before any real student account is created. | Britt | | not run | |
 | O-8: App and database in one region | Compare the two regions recorded for O-1. If they differ, recreate one piece as decision R1 in the plan describes. | Britt | | not run | |
 | O-8: Production health latency at target | `npm run readiness -- --only=M7`, which prints the number and writes no report. `latency_ms` must be 60 or less. | Britt | | not run | |
-| O-9: Notice wording approved | Decision R10 in the plan. Approve the drafted notice before task H6 merges. | Britt | | not run | |
+| O-9: Notice wording approved | Decision R10 in the plan. | Britt | 2026-11-12 | verified | Approved in this thread before the remaining launch-gate work. |
 | O-9: Retention numbers approved | [Data retention policy](../DATA_RETENTION_POLICY.md) and `config/retention-policy.json`. | Britt | | not run | |
 | O-9: Staff MFA policy approved | Decision R7 in the plan. | Britt | | not run | |
 | O-10: iPhone sign-in and orientation document | On the deployed site, on an iPhone: sign in, then open one orientation document. | Britt | | not run | |
 | O-10: Android phone sign-in and orientation document | On the deployed site, on an Android phone: sign in, then open one orientation document. | Britt | | not run | |
 | O-12: Classroom rehearsal with fictional accounts | On the deployed site, after the demo rows are gone: 15 people sign in from one network within five minutes, load the dashboard and send Sage one message each. Remove the fictional accounts afterwards. | Britt | | not run | |
+| H8: Incident basics runbook approved | Read [incident basics](../runbooks/incident-basics.md). | Britt | 2026-11-12 | verified | Britt explicitly approved the drafted runbook in this thread. |
