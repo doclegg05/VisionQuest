@@ -226,6 +226,45 @@ describe("demo closeout target lines", () => {
     assert.deepEqual(targetLines(server, supabase("Zq9%3FXw8%40Vu7%2F")).slice(0, 2), [`Target: database postgres on host ${POOLER}`, `Project ref: ${REF}`]);
   });
 
+  const DIRECT = `db.${REF}.supabase.co`;
+  const direct = (password: string) => ["postgresql://postgres:", password, "@", DIRECT, ":5432/postgres"].join("");
+
+  it("reads the project ref from a direct connection's host, as .env.example writes it", () => {
+    assert.deepEqual(targetLines(server, direct(PASSWORD)).slice(0, 2), [`Target: database postgres on host ${DIRECT}`, `Project ref: ${REF}`]);
+    assert.deepEqual(targetLines(server, direct("Zq9%3FXw8%40Vu7%2F%23Ts6%25")).slice(0, 2), [`Target: database postgres on host ${DIRECT}`, `Project ref: ${REF}`]);
+  });
+
+  it("reads no project ref from a host that only looks like a direct one", () => {
+    for (const host of [`db.${REF}.supabase.co.evil.test`, `db.${REF}x.supabase.co`, `xdb.${REF}.supabase.co`, `db.${REF.toUpperCase()}.supabase.co`]) {
+      assert.equal(targetLines(server, `postgresql://postgres:${PASSWORD}@${host}:5432/postgres`)[1], "Project ref: not in the connection string.", host);
+    }
+  });
+
+  it("reads no project ref when the pooler user and the direct host name two projects", () => {
+    const user = `postgresql://postgres.${"b".repeat(20)}:${PASSWORD}@${DIRECT}:5432/postgres`;
+
+    assert.equal(targetLines(server, user)[1], "Project ref: not in the connection string.");
+  });
+
+  it("never prints any part of a direct connection's password, whatever characters it holds", () => {
+    const passwords = ["Zq9?Xw8", "Zq9#Xw8", "Zq9/Xw8", "Zq9@Xw8", "Zq9%Xw8", "Zq9%40Xw8", "Zq9?Xw8#Vu7/Ts6@Rp5%On4", "Zq9@db.evil1.supabase.co:5432/Xw8"];
+    for (const password of passwords) {
+      const printed = targetLines(server, direct(password)).join("\n");
+      const pieces = password.split(/[^A-Za-z0-9]+/).filter((piece) => piece.length >= 3 && /\d/.test(piece));
+
+      for (const piece of pieces) assert.equal(printed.includes(piece), false, `${password}: ${piece}`);
+      assert.match(printed, new RegExp(`^Target: database postgres on host (${DIRECT.replace(/\./g, "\\.")}|unknown)$`, "m"), password);
+      assert.match(printed, new RegExp(`^Project ref: (${REF}|not in the connection string\\.)$`, "m"), password);
+    }
+  });
+
+  it("says unknown when the standard parser cannot read the string and an @ could end the password in two places", () => {
+    // The # makes the standard parser give up. Which @ ends the password is then a guess, so neither host is trusted.
+    const ambiguous = `postgresql://postgres:Zq9#Xw8@${DIRECT}:5432/postgres?application_name=a@evil.example.test`;
+
+    assert.deepEqual(targetLines(server, ambiguous).slice(0, 2), ["Target: database postgres on host unknown", "Project ref: not in the connection string."]);
+  });
+
   it("never holds the user, the password, the query string or the path", () => {
     for (const address of ["10.0.47.12", null]) {
       const printed = targetLines({ ...server, serverAddress: address }, URL).join("\n");

@@ -174,6 +174,26 @@ describe("demo closeout procedure in DEPLOY.md", () => {
     assert.doesNotMatch(preview, /The host must be the production database host shown in the Supabase dashboard, Project Settings, Database/);
   });
 
+  it("gives the direct connection its own way to find the host and the project ref", () => {
+    const preview = step(stepWith("Run the preview and read it"));
+    assert.match(preview, /`db\.<ref>\.supabase\.co`/);
+    assert.match(preview, /\*\*Connect\*\*[\s\S]*\*\*Direct connection\*\*/);
+    assert.doesNotMatch(preview, /is not a Supabase pooler connection string/);
+  });
+
+  it("has a developer compare production's applied migrations with this checkout before the owner's first run", () => {
+    assert.match(steps, /SELECT migration_name FROM visionquest\."_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL/);
+    assert.match(steps, /prisma\/migrations/);
+    assert.match(steps, /`schema_mismatch`/);
+    // Not a numbered step: the owner's steps refer to each other by number.
+    assert.ok(steps.indexOf("**Developer check") !== -1 && steps.indexOf("**Developer check") < steps.indexOf("1. **Bring the main checkout"));
+  });
+
+  it("says the audit rows about shared content stay, with the demo account's id replaced", () => {
+    assert.match(steps, /`leftBehind\.auditRowsKeptAboutSharedContent`/);
+    assert.match(steps, /`demo-closed`/);
+  });
+
   it("asks for each orphan column in the preview, says the apply refuses if one rises, and does not ask for 0 orphans afterwards", () => {
     const preview = step(stepWith("Run the preview and read it"));
     assert.match(preview, /`leftBehind\.orphans`/);

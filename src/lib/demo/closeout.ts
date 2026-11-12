@@ -35,6 +35,7 @@ import {
 } from "./closeout.guards";
 import { leftBehind, orphanCounts, type LeftBehind } from "./closeout.orphans";
 import type { LocalSchema } from "./closeout.local";
+import { closeSharedContentRows, sharedContentAuditIds } from "./closeout.shared-content";
 import { refusal, type Refusal, type RefusalCode } from "./closeout.report";
 import { jobIdsNaming, readServerFacts, refuseFilteredReads, tryCreateLock, type CloseoutTarget, type JobPayloadKey, type ServerFacts } from "./closeout.server";
 
@@ -567,14 +568,17 @@ async function prewriteRefusals(run: Run, gate: Gate, enrolledInDemoClass: numbe
 async function survey(run: Run, gate: Gate): Promise<{ preview: CloseoutPreview; refusals: Refusal[] }> {
   const { env } = gate;
   const people = await countPeople(run);
-  const rowsToDelete = await plannedRows(run);
+  const left = await leftBehind(run);
+  const planned = await plannedRows(run);
+  // The audit rows about shared content stay, with the demo actor replaced, so they are not deleted.
+  const rowsToDelete: Record<string, number> = { ...planned, AuditLog: (planned.AuditLog ?? 0) - left.auditRowsKeptAboutSharedContent };
   const preview: CloseoutPreview = {
     demoModeOn: isCohortDemoEnabled(env),
     realStudentDataDeclared: isRealStudentDataDeclared(env),
     ...people,
     rowsToDelete,
     uploadedFilesLeftInStorage: rowsToDelete.FileUpload ?? 0,
-    leftBehind: await leftBehind(run),
+    leftBehind: left,
   };
   return { preview, refusals: await prewriteRefusals(run, gate, people.unmarked.enrolledInDemoClass) };
 }
@@ -637,6 +641,8 @@ function unlistedChanges(before: Record<string, number>, after: Record<string, n
 async function applyPlan(run: Run, preview: CloseoutPreview, newestMigration: string): Promise<AppliedCounts> {
   const before = await tableCounts(run.tx);
   const unmarkedActors = await deletedAuditRowsWithUnmarkedActor(run, DELETE_STEPS.filter((step) => step.model === "AuditLog"));
+  // Before any delete, so the AuditLog steps no longer match the rows kept about shared content.
+  const closedRows = await closeSharedContentRows(run, await sharedContentAuditIds(run));
   for (const step of [...ACCOUNT_STEPS, ...JOB_STEPS, ...CLASS_STEPS]) await deleteStep(run, step);
   refuseIf(await rowsStillNaming(run, CLASS_COLUMNS, run.plan.classIds), "rows_left_pointing", preview);
   await deleteStep(run, CLASS_ROOT);
@@ -664,6 +670,7 @@ async function applyPlan(run: Run, preview: CloseoutPreview, newestMigration: st
       metadata: JSON.stringify({
         accounts: run.plan.accountIds.length, classes: run.plan.classIds.length, rows, rowsByModel: preview.rowsToDelete,
         uploadedFilesLeftInStorage: preview.uploadedFilesLeftInStorage, newestMigration, deletedAuditRowsWithUnmarkedActor: unmarkedActors,
+        auditRowsKeptAboutSharedContent: closedRows,
       }),
     },
   });

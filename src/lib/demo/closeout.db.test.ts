@@ -40,6 +40,7 @@ import path from "node:path";
 import { REFUSALS, runDemoCloseout, tableOf, type CloseoutClient, type CloseoutOptions, type CloseoutOutcome, type CloseoutTx, type RefusalCode } from "./closeout";
 import { MODELS, closeoutRowsToRemove, seedUniverse, type Row, type SeededUniverse } from "./closeout.fixtures";
 import { readLocalSchema } from "./closeout.local";
+import { CLOSED_DEMO_ACTOR } from "./closeout.shared-content";
 
 const SHOULD_RUN = process.env.DEMO_CLOSEOUT_DB_TEST_ENABLED === "true" && !!process.env.DATABASE_URL;
 const DEMO_OFF = {};
@@ -281,11 +282,28 @@ if (!SHOULD_RUN) {
         return outcome.preview.leftBehind.orphans;
       };
       const before = await counted();
-      for (const actorId of ["admin-key", "system", "system:sage-autopilot"]) {
+      for (const actorId of ["admin-key", "deterministic", "system", "system:sage-autopilot", CLOSED_DEMO_ACTOR]) {
         await insertRow("AuditLog", { id: `${real.prefix}sentinel-${actorId}`, action: "x", targetType: "x", actorId, createdAt: new Date(0) });
       }
-
       assert.deepEqual(await counted(), before);
+
+      // Only `system` itself and `system:` names are left out: an id that starts with the letters is counted.
+      await insertRow("AuditLog", { id: `${real.prefix}sentinel-lookalike`, action: "x", targetType: "x", actorId: "systematic-gone", createdAt: new Date(0) });
+      assert.equal((await counted())["AuditLog.actorId"], (before["AuditLog.actorId"] ?? 0) + 1);
+    });
+
+    it("applies when a demo student signed up for a real career event, and keeps that audit row with the demo id replaced", async () => {
+      await seed();
+      const id = `${demo.prefix}AuditLog.event`;
+      await copyRow("AuditLog", `${demo.prefix}AuditLog`, { id, actorId: demo.studentId, action: "event.registered", targetType: "event", targetId: `${real.prefix}CareerEvent`, createdAt: new Date(0) });
+
+      const outcome = await closeout(db(), { apply: true, expectAccounts: 2 });
+
+      assert.deepEqual(outcome.refusals, []);
+      assert.equal(outcome.kind, "applied");
+      const kept = await db().auditLog.findUnique({ where: { id }, select: { actorId: true, action: true, targetId: true } });
+      assert.deepEqual(kept, { actorId: CLOSED_DEMO_ACTOR, action: "event.registered", targetId: `${real.prefix}CareerEvent` });
+      assert.equal(await db().careerEvent.count({ where: { id: `${real.prefix}CareerEvent` } }), 1);
     });
 
     it("deletes the jobs that name the demo class's scrape config or a demo wager, and keeps the other universe's", async () => {
@@ -344,7 +362,7 @@ if (!SHOULD_RUN) {
         if (property !== "student") return value;
         const table = tableOf(target, property);
         return {
-          count: table.count.bind(table), findMany: table.findMany.bind(table), create: table.create.bind(table),
+          count: table.count.bind(table), findMany: table.findMany.bind(table), create: table.create.bind(table), updateMany: table.updateMany.bind(table),
           deleteMany: async (args: Parameters<typeof table.deleteMany>[0]) => {
             const result = await table.deleteMany(args);
             await tableOf(target, "auditLog").create({ data: { id: `${demo.prefix}late-audit`, action: "x", targetType: "x", actorId: `${demo.prefix}missing-account` } });
@@ -396,6 +414,11 @@ if (!SHOULD_RUN) {
       {
         name: "a marked account's audit row is about an unmarked student's appointment", code: "records_about_unmarked_people",
         arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, targetType: "appointment", targetId: `${real.prefix}Appointment`, createdAt: new Date(0) }),
+      },
+      {
+        // Staff edits of shared content keep refusing: only the student actions in closeout.shared-content.ts are kept.
+        name: "the demo instructor edited a real career event", code: "records_about_unmarked_people",
+        arrange: () => copyRow("AuditLog", `${demo.prefix}AuditLog`, { actorId: demo.staffId, action: "event.updated", targetType: "event", targetId: `${real.prefix}CareerEvent`, createdAt: new Date(0) }),
       },
       {
         name: "an unmarked student's task links to a demo appointment", code: "kept_rows_would_be_blanked",
@@ -475,7 +498,7 @@ if (!SHOULD_RUN) {
           if (typeof property !== "string" || property.startsWith("$") || typeof value !== "object" || value === null) return value;
           const table = tableOf(target, property);
           return {
-            count: table.count.bind(table), findMany: table.findMany.bind(table), create: table.create.bind(table),
+            count: table.count.bind(table), findMany: table.findMany.bind(table), create: table.create.bind(table), updateMany: table.updateMany.bind(table),
             deleteMany: async (args: Parameters<typeof table.deleteMany>[0]) => {
               if (property === "goal") throw new Error("Injected failure while deleting Goal");
               const result = await table.deleteMany(args);

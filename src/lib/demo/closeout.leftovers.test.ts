@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { REFUSALS, runDemoCloseout, type CloseoutOptions, type CloseoutOutcome, type CloseoutPreview } from "./closeout";
 import { FAKE_MIGRATION, LOCAL, copyOf, scene, type FakeDb } from "./closeout.fixtures";
+import { SENTINEL_ACTORS } from "./closeout.server";
+import { CLOSED_DEMO_ACTOR } from "./closeout.shared-content";
 
 const preview = (db: FakeDb, extra: Partial<CloseoutOptions> = {}): Promise<CloseoutOutcome> =>
   runDemoCloseout(db.client(), { apply: false, env: {}, local: LOCAL, ...extra });
@@ -66,6 +68,26 @@ describe("demo closeout orphan counts", () => {
     const { orphans } = countsOf(await preview(db)).leftBehind;
 
     assert.equal(total(orphans), 0, JSON.stringify(orphans));
+  });
+
+  it("does not count the actor the closeout writes on audit rows it keeps about shared content", async () => {
+    const { db } = await scene();
+    db.insert("AuditLog", { action: "event.registered", targetType: "event", actorId: CLOSED_DEMO_ACTOR, targetId: "rl-CareerEvent" });
+
+    const { orphans } = countsOf(await preview(db)).leftBehind;
+
+    assert.ok(SENTINEL_ACTORS.includes(CLOSED_DEMO_ACTOR));
+    assert.equal(orphans["AuditLog.actorId"], 0);
+  });
+
+  it("counts an id that only starts with the letters system as a missing account", async () => {
+    const { db } = await scene();
+    db.insert("AuditLog", { action: "x", targetType: "x", actorId: "systematic-gone-staff" });
+    db.insert("AuditLog", { action: "x", targetType: "x", actorId: "system-gone-staff" });
+
+    const { orphans } = countsOf(await preview(db)).leftBehind;
+
+    assert.equal(orphans["AuditLog.actorId"], 2);
   });
 
   it("applies over orphans that were there before, and reports each column before and after", async () => {
@@ -199,6 +221,7 @@ describe("demo closeout audit records", () => {
     assert.deepEqual(JSON.parse(String(entry.metadata)), {
       accounts: 2, classes: 1, rows: total(outcome.deleted), rowsByModel: outcome.deleted,
       uploadedFilesLeftInStorage: 1, newestMigration: FAKE_MIGRATION, deletedAuditRowsWithUnmarkedActor: 1,
+      auditRowsKeptAboutSharedContent: 0,
     });
   });
 });

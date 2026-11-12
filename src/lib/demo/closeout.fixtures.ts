@@ -110,6 +110,7 @@ function listOf(value: unknown): readonly unknown[] {
 interface Delegate {
   count(args?: { where?: unknown }): Promise<number>;
   deleteMany(args: { where?: unknown }): Promise<{ count: number }>;
+  updateMany(args: { where?: unknown; data: Row }): Promise<{ count: number }>;
   findMany(args: { where?: unknown; select?: Readonly<Record<string, true>> }): Promise<Row[]>;
   create(args: { data: Row }): Promise<Row>;
 }
@@ -302,6 +303,12 @@ export class FakeDb {
           hook.then();
         }
         return { count: doomed.length };
+      },
+      updateMany: async (args) => {
+        const changed = select(args.where);
+        if (changed.length > 0) this.writes += 1;
+        this.tables.set(model.name, this.rows(model.name).map((row) => (changed.includes(row) ? { ...row, ...args.data } : row)));
+        return { count: changed.length };
       },
       create: async (args) => {
         this.writes += 1;

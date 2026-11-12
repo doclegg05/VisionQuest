@@ -16,6 +16,7 @@
  * Each returns a count. closeout.ts turns a count above 0 into a refusal.
  */
 import { Prisma } from "@prisma/client";
+import { sharedContentAuditIds } from "./closeout.shared-content";
 import { UNMARKED, chunksOf, idsFor, idsOf, plannedValues, tableOf, valuesWhere, type DeleteStep, type Run } from "./closeout.core";
 
 /** How far back a demo account's activity still counts as the demo being live. */
@@ -65,13 +66,16 @@ async function deletedAmong(run: Run, steps: readonly DeleteStep[], candidates: 
  * is often a row id, not a person: an appointment, a certification, a goal.
  * So every target id must be a planned account, a planned class or a row a
  * step deletes. Anything else is a record of what a demo account did to data
- * that stays, and deleting it would erase that record.
+ * that stays, and deleting it would erase that record. The exception is a row
+ * about shared content (closeout.shared-content.ts): the apply keeps it.
  */
 async function auditRowsAboutKeptTargets(run: Run, steps: readonly DeleteStep[], planned: ReadonlySet<string>): Promise<number> {
+  const kept = await sharedContentAuditIds(run);
   const targets: string[] = [];
   for (const chunk of chunksOf(run.plan.accountIds, run.chunk)) {
-    const rows = await tableOf(run.tx, "AuditLog").findMany({ where: { actorId: { in: chunk }, targetId: { not: null } }, select: { targetId: true } });
-    targets.push(...idsOf(rows, "targetId").filter((id) => !planned.has(id)));
+    const rows = await tableOf(run.tx, "AuditLog").findMany({ where: { actorId: { in: chunk }, targetId: { not: null } }, select: { id: true, targetId: true } });
+    const aboutOthers = rows.filter((row) => typeof row.id !== "string" || !kept.has(row.id));
+    targets.push(...idsOf(aboutOthers, "targetId").filter((id) => !planned.has(id)));
   }
   if (targets.length === 0) return 0;
   const deleted = await deletedAmong(run, steps, [...new Set(targets)]);
