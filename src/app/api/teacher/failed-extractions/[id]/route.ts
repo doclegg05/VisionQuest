@@ -172,10 +172,14 @@ function parseRowId(id: string): string {
  */
 export const GET = withTeacherAuth(async (
   session,
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) => {
   if (isDemoInstructor(session)) throw forbidden();
+  // The stored conversation snapshot (up to 8,000 characters of chat) is sent
+  // only when asked for. The panel needs only the error text, so it never
+  // asks. Whether teachers keep chat text at all is an open owner decision.
+  const includePayload = new URL(req.url).searchParams.get("include") === "payload";
   const id = parseRowId((await params).id);
   const row = await prisma.failedExtraction.findUnique({
     where: { id },
@@ -211,7 +215,7 @@ export const GET = withTeacherAuth(async (
       attempts: row.attempts,
       status: row.status,
       createdAt: row.createdAt,
-      payload: row.payload,
+      ...(includePayload ? { payload: row.payload } : {}),
     },
   });
 });

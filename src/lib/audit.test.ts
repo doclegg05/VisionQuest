@@ -164,6 +164,48 @@ describe("recordStudentView", () => {
   });
 });
 
+describe("recordStudentView reports whether the view is on record", () => {
+  beforeEach(() => {
+    mockFindFirst.mock.resetCalls();
+    mockCreate.mock.resetCalls();
+    mockWarn.mock.resetCalls();
+    mockError.mock.resetCalls();
+    mockFindFirst.mock.mockImplementation(async () => null);
+    mockCreate.mock.mockImplementation(async () => ({ id: "audit-1" }));
+  });
+
+  it("answers recorded for a written row and for a same-day sampled row", async () => {
+    assert.deepEqual(await audit.recordStudentView(baseInput), { recorded: true });
+    mockFindFirst.mock.mockImplementation(async () => ({ id: "existing" }));
+    assert.deepEqual(await audit.recordStudentView(baseInput), { recorded: true });
+  });
+
+  it("a sampled surface whose write fails answers not recorded with a warning and no alert", async () => {
+    mockCreate.mock.mockImplementation(async () => {
+      throw new Error("insert failed");
+    });
+    assert.deepEqual(await audit.recordStudentView(baseInput), { recorded: false });
+    assert.equal(mockWarn.mock.callCount(), 1);
+    assert.equal(mockError.mock.callCount(), 0);
+  });
+
+  it("the archive surface whose write fails raises an audit_write_failed alert with no student id", async () => {
+    mockCreate.mock.mockImplementation(async () => {
+      throw new Error("insert failed");
+    });
+    const result = await audit.recordStudentView({ ...baseInput, surface: "archive" });
+
+    assert.deepEqual(result, { recorded: false });
+    assert.equal(mockWarn.mock.callCount(), 0);
+    assert.equal(mockError.mock.callCount(), 1);
+    const [message, payload] = mockError.mock.calls[0].arguments;
+    assert.equal(message, "recordStudentView failed");
+    assert.equal(payload.alert, "audit_write_failed");
+    assert.equal(payload.surface, "archive");
+    assert.ok(!JSON.stringify(payload).includes(baseInput.targetStudentId));
+  });
+});
+
 describe("logAuditEvent", () => {
   beforeEach(() => {
     mockCreate.mock.resetCalls();

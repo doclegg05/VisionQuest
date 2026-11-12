@@ -9,7 +9,7 @@ let authorizedStudent: { id: string; studentId: string; role: string } | null;
 const update = mock.fn(async (_args: unknown) => ({}));
 const deleteTokens = mock.fn(async (_args: unknown) => ({ count: 1 }));
 const audit = mock.fn(async (_args: unknown) => undefined);
-const recordView = mock.fn(async (_args: { targetStudentId: string; surface: string }) => undefined);
+const recordView = mock.fn(async (_args: { targetStudentId: string; surface: string }) => ({ recorded: true }));
 const archive = mock.fn(async (_id: string, _actor: string) => ({ storageKey: "archives/authorized-student/test.zip", fileCount: 1 }));
 const presign = mock.fn(async (_key: string, _options: unknown) => "https://storage.example.test/archive");
 const invalidate = mock.fn((_id: string) => undefined);
