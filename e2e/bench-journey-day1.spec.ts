@@ -185,9 +185,20 @@ test("Day-1 journey: sign in → welcome → first win → Sage → first goal, 
         // six-collector run, which is the frequency that makes it worth a
         // wait rather than a retry: retrying the tap would inflate
         // studentTaps, and this suite's whole point is counting taps honestly.
-        // Bounded like every other wait here: with no navigation timeout set, a
-        // page that never goes quiet would spend the whole test budget unnamed.
-        await page.waitForLoadState("networkidle", { timeout: ACTION_TIMEOUT_MS });
+        // Not "networkidle": the student layout holds the notification stream
+        // (/api/notifications/stream, an open SSE connection) for the life of
+        // the page, so the network never goes quiet. Wait for the thing that
+        // matters instead: React has attached its handlers to the button.
+        await page.waitForFunction(
+          () =>
+            [...document.querySelectorAll("button")].some(
+              (button) =>
+                /let's get started/i.test(button.textContent ?? "") &&
+                Object.keys(button).some((key) => key.startsWith("__reactProps")),
+            ),
+          undefined,
+          { timeout: ACTION_TIMEOUT_MS },
+        );
       },
     );
 
