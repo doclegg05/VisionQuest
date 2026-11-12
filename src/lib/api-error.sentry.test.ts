@@ -71,7 +71,10 @@ describe("withErrorHandler reports unexpected failures", () => {
   it("carries only the allowlisted fields", async () => {
     await failingRoute(new Error("boom"));
     const [event] = outbox.events();
-    assert.deepEqual(Object.keys(event ?? {}).sort(), [
+    // `release` and `dist` are allowlisted labels the SDK fills in only when the
+    // environment names a release (GITHUB_SHA in CI, RENDER_GIT_COMMIT on Render).
+    const ENV_LABELS = new Set(["release", "dist"]);
+    assert.deepEqual(Object.keys(event ?? {}).filter((key) => !ENV_LABELS.has(key)).sort(), [
       "contexts",
       "environment",
       "event_id",

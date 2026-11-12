@@ -50,8 +50,11 @@ function answer(call: EngineCall): unknown {
   return undefined;
 }
 
+// Prisma promises are lazy: `work()` must be awaited INSIDE the scope, or the
+// query runs after it closes, with no context (an error under CI's
+// RLS_CONTEXT_STRICT).
 const asStudent = <T>(session: { id: string }, work: () => Promise<T>) =>
-  rls.withRlsContext({ userId: session.id, role: "student", studentId: session.id }, work);
+  rls.withRlsContext({ userId: session.id, role: "student", studentId: session.id }, async () => await work());
 /** Engine reads a shell read makes; 0 means it was served from the cache. */
 async function shellReads(session: { id: string; role: string }): Promise<number> {
   const before = calls.length;
@@ -160,8 +163,8 @@ describe("dashboard globals, cleared by the real write-through", () => {
     const { globalCacheKey } = await import("./student-cache");
     const key = globalCacheKey("orientation-item-count");
     await cache.cached(key, 600, async () => 8);
-    await rls.withRlsContext({ userId: "admin-1", role: "admin", studentId: "" }, () =>
-      db.prisma.orientationItem.update({ where: { id: "item-1" }, data: { label: "Sign the attendance policy" } }));
+    await rls.withRlsContext({ userId: "admin-1", role: "admin", studentId: "" }, async () =>
+      await db.prisma.orientationItem.update({ where: { id: "item-1" }, data: { label: "Sign the attendance policy" } }));
     let reread = false;
     await cache.cached(key, 600, async () => { reread = true; return 9; });
     assert.equal(reread, true, "the orientation total outlived an OrientationItem write");
@@ -231,7 +234,7 @@ describe("kept slow signals, cleared by writes to the inputs F2 left unwatched",
     } };
   }
   const asStaff = <T>(work: () => Promise<T>) =>
-    rls.withRlsContext({ userId: "teacher-1", role: "teacher", studentId: "" }, work);
+    rls.withRlsContext({ userId: "teacher-1", role: "teacher", studentId: "" }, async () => await work());
 
   it("an enrollment write clears that student's slow signals and no one else's", async () => {
     const full = await keepBoth();
