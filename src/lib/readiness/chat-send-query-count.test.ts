@@ -471,7 +471,7 @@ before(async () => {
   warm = await sendTurn(POST, WARM_MESSAGE);
 });
 
-describe("M3: chat send query count before the response stream", () => {
+describe("M3: chat send query count before the response stream and before the provider call", () => {
   it("answers both turns with a streamed reply, so no step before the stream was skipped", () => {
     for (const turn of [cold, warm]) {
       assert.equal(turn.status, 200);
