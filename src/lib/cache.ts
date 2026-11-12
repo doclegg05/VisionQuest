@@ -13,6 +13,8 @@ interface CacheAdapter {
   set(key: string, value: unknown, ttlSeconds: number): void;
   del(key: string): void;
   delPrefix(prefix: string): void;
+  /** Keys that start with `prefix` and end with `suffix` (a Redis SCAN `prefix*suffix`). */
+  delPrefixSuffix(prefix: string, suffix: string): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +55,11 @@ class InMemoryCacheAdapter implements CacheAdapter {
     const keys = this.cache.keys().filter((k) => k.startsWith(prefix));
     if (keys.length > 0) this.cache.del(keys);
   }
+
+  delPrefixSuffix(prefix: string, suffix: string): void {
+    const keys = this.cache.keys().filter((k) => k.startsWith(prefix) && k.endsWith(suffix));
+    if (keys.length > 0) this.cache.del(keys);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +80,7 @@ class InMemoryCacheAdapter implements CacheAdapter {
 //   set(key: string, value: unknown, ttlSeconds: number): void { /* redis SET EX */ }
 //   del(key: string): void { /* redis DEL */ }
 //   delPrefix(prefix: string): void { /* redis SCAN + DEL */ }
+//   delPrefixSuffix(prefix: string, suffix: string): void { /* redis SCAN prefix*suffix + DEL */ }
 // }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +245,21 @@ export function invalidatePrefix(prefix: string): void {
     adapter.delPrefix(prefix);
   } catch (error) {
     noteCacheFailure("delPrefix", error);
+  }
+}
+
+/**
+ * Invalidate every key that starts with `prefix` and ends with `suffix`: one
+ * layer across all students (`chat:snapshot:` ... `:dashboard:slow`).
+ */
+export function invalidatePrefixSuffix(prefix: string, suffix: string): void {
+  for (const key of inFlight.keys()) {
+    if (key.startsWith(prefix) && key.endsWith(suffix)) inFlight.delete(key);
+  }
+  try {
+    adapter.delPrefixSuffix(prefix, suffix);
+  } catch (error) {
+    noteCacheFailure("delPrefixSuffix", error);
   }
 }
 

@@ -35,7 +35,7 @@ import {
   invalidateAllChatContext,
   invalidateChatContext,
 } from "@/lib/cache";
-import { invalidateKeptSlowSignals } from "@/lib/dashboard/student-cache";
+import { invalidateAllKeptSlowSignals, invalidateKeptSlowSignals } from "@/lib/dashboard/student-cache";
 import { errorForLog } from "@/lib/log-error";
 import { logger } from "@/lib/logger";
 
@@ -50,7 +50,10 @@ export type ChatContextInvalidation =
   // them (`ClassMembers`); unresolved means "all".
   | { scope: "classes"; classIds: string[] }
   // Per-turn chat writes: only these students' kept dashboard slow signals.
-  | { scope: "dashboard"; studentIds: string[] };
+  | { scope: "dashboard"; studentIds: string[] }
+  // A per-turn chat write that names no student: every student's kept slow
+  // signals, and still never Sage's chat layers.
+  | { scope: "allDashboards" };
 
 /** The students who own these certifications, as found in the database. */
 export type CertificationOwners = (certificationIds: readonly string[]) => Promise<readonly string[]>;
@@ -76,6 +79,7 @@ export const CERT_OWNER_LOOKUP_TIMEOUT_MS = 250;
 
 const NONE: ChatContextInvalidation = { scope: "none" };
 const ALL: ChatContextInvalidation = { scope: "all" };
+const ALL_DASHBOARDS: ChatContextInvalidation = { scope: "allDashboards" };
 
 /** Prisma model-level write operations (as named in query extension hooks). */
 const WRITE_OPERATIONS: ReadonlySet<string> = new Set([
@@ -274,10 +278,15 @@ function writeTouchesField(args: unknown, field: string): boolean {
   return false;
 }
 
-/** The named students, or "all" when the write names none. */
+/**
+ * The named students. A write that names none clears everyone in its own
+ * scope: all chat context for "students", only the kept slow signals for
+ * "dashboard".
+ */
 function forStudents(args: unknown, result: unknown, scope: "students" | "dashboard"): ChatContextInvalidation {
   const studentIds = collectIds(args, result, "studentId");
-  return studentIds.size > 0 ? { scope, studentIds: [...studentIds] } : ALL;
+  if (studentIds.size > 0) return { scope, studentIds: [...studentIds] };
+  return scope === "dashboard" ? ALL_DASHBOARDS : ALL;
 }
 
 /** A write keyed by another row's id, resolved to students by the shell. */
@@ -389,6 +398,7 @@ export async function applyChatContextWriteThrough(
     if (invalidation.scope === "all") return invalidateAllChatContext();
     if (invalidation.scope === "students") return invalidateStudents(invalidation.studentIds);
     if (invalidation.scope === "dashboard") return invalidateDashboards(invalidation.studentIds);
+    if (invalidation.scope === "allDashboards") return invalidateAllKeptSlowSignals();
     const studentIds = await resolveKeyed(invalidation, lookups);
     if (studentIds) invalidateStudents(studentIds);
     else invalidateAllChatContext();

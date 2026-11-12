@@ -22,6 +22,9 @@ let cache: typeof import("@/lib/cache");
 let calls: EngineCall[];
 /** What the admin client's class-member lookup answers; a throw stands for a failed lookup. */
 let classMembers: () => unknown = () => [{ studentId: A.id }];
+/** The row a Message create returns: a write whose `select` drops studentId returns one without it. */
+const FULL_MESSAGE_ROW = { id: "msg-1", studentId: A.id, conversationId: "conv-1" };
+let messageRow: Record<string, unknown> = FULL_MESSAGE_ROW;
 
 function answer(call: EngineCall): unknown {
   if (call.action === "executeRaw") return 1;
@@ -38,7 +41,7 @@ function answer(call: EngineCall): unknown {
   if (call.action === "createOne" && call.modelName === "ClassRequirement") return { id: "creq-1", classId: CLASS_ID };
   if (call.action === "updateOne" && call.modelName === "Pathway") return { id: "path-1", active: false };
   if (call.action === "updateOne" && call.modelName === "Conversation") return { id: "conv-1", studentId: A.id };
-  if (call.action === "createOne" && call.modelName === "Message") return { id: "msg-1", studentId: A.id, conversationId: "conv-1" };
+  if (call.action === "createOne" && call.modelName === "Message") return messageRow;
   // The slow signals' reads: nothing found, except the counts above (1 each),
   // which is enough for the read to count as having seen the student's rows.
   if (call.action === "findFirst" || call.action === "findUnique") return null;
@@ -72,6 +75,7 @@ before(async () => {
 beforeEach(() => {
   cache.invalidateAllChatContext();
   classMembers = () => [{ studentId: A.id }];
+  messageRow = FULL_MESSAGE_ROW;
 });
 
 describe("dashboard shell cache, cleared by the real write-through", () => {
@@ -279,6 +283,19 @@ describe("kept slow signals, cleared by writes to the inputs F2 left unwatched",
     assert.equal(await slowReads(A), full, "A's slow signals outlived A's discovery turn");
     assert.equal(await slowReads(B), 0, "B's slow signals were cleared by A's message");
     assert.equal(await sage.kept(), true, "a chat message dropped Sage's cached chat layers");
+  });
+
+  it("a chat message that names no student clears every student's slow signals, and leaves Sage's layers kept", async () => {
+    const full = await keepBoth();
+    const sage = await sageLayer();
+    messageRow = { id: "msg-2" };
+    await asStudent(A, () => db.prisma.message.create({
+      data: { student: { connect: { id: A.id } }, conversation: { connect: { id: "conv-1" } }, role: "user", content: "Hi" },
+      select: { id: true },
+    }));
+    assert.equal(await slowReads(A), full, "A's slow signals outlived a message that named no student");
+    assert.equal(await slowReads(B), full, "B's slow signals outlived a message that named no student");
+    assert.equal(await sage.kept(), true, "a message that named no student dropped Sage's cached chat layers");
   });
 
   it("a conversation title change clears nothing", async () => {

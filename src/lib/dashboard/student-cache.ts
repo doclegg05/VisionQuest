@@ -31,7 +31,7 @@
  * - A deploy or restart empties the cache, so the first request after one
  *   reads everything fresh.
  */
-import { cached, invalidate } from "@/lib/cache";
+import { cached, invalidate, invalidatePrefixSuffix } from "@/lib/cache";
 
 /** The session fields the cache rules read. */
 export interface CacheSession {
@@ -57,8 +57,14 @@ export function studentCacheKey(session: CacheSession, layer: string): string {
   return keyForStudent(ownStudentId(session), layer);
 }
 
+const STUDENT_KEY_PREFIX = "chat:snapshot:";
+
 function keyForStudent(studentId: string, layer: string): string {
-  return `chat:snapshot:${studentId}:dashboard:${layer}`;
+  return `${STUDENT_KEY_PREFIX}${studentId}${layerSuffix(layer)}`;
+}
+
+function layerSuffix(layer: string): string {
+  return `:dashboard:${layer}`;
 }
 
 /** The layer of a student's kept slow signals (./signals.ts). */
@@ -72,6 +78,15 @@ export const SLOW_SIGNALS_LAYER = "slow";
  */
 export function invalidateKeptSlowSignals(studentId: string): void {
   invalidate(keyForStudent(studentId, SLOW_SIGNALS_LAYER));
+}
+
+/**
+ * Drops every student's kept slow signals and nothing else. For a per-turn
+ * chat write that names no student: clearing all chat context instead would
+ * drop every student's Sage layers on one message.
+ */
+export function invalidateAllKeptSlowSignals(): void {
+  invalidatePrefixSuffix(STUDENT_KEY_PREFIX, layerSuffix(SLOW_SIGNALS_LAYER));
 }
 
 /**

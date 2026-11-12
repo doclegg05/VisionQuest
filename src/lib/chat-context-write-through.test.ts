@@ -380,6 +380,31 @@ test("a chat message clears only its student's dashboard slow signals", () => {
   assert.deepEqual(res, { scope: "dashboard", studentIds: [SID] });
 });
 
+// A per-turn write that names no student must not fall back to clearing
+// everyone's Sage layers: it clears only the kept slow signals, for everyone.
+test("a chat message or stage write that names no student clears every student's slow signals only", () => {
+  assert.deepEqual(resolveChatContextInvalidation("Message", "create",
+    { data: { student: { connect: { id: SID } }, conversation: { connect: { id: "conv1" } }, role: "user", content: "Hi" }, select: { id: true } },
+    { id: "m2" }), { scope: "allDashboards" });
+  assert.deepEqual(resolveChatContextInvalidation("Conversation", "updateMany",
+    { where: { id: { in: ["conv1"] } }, data: { stage: "discovery" } }, { count: 1 }), { scope: "allDashboards" });
+});
+
+test("the every-dashboard fallback drops every student's slow signals and keeps Sage's layers", async () => {
+  const slow = (id: string) => `chat:snapshot:${id}:dashboard:slow`;
+  const sage = `chat:pathway:${SID}`;
+  for (const key of [slow(SID), slow(OTHER_SID), sage]) await cached(key, 60, async () => "warm");
+  await applyChatContextWriteThrough("Message", "create", { data: { student: { connect: { id: SID } } } }, { id: "m2" });
+  const reread = async (key: string) => {
+    let again = false;
+    await cached(key, 60, async () => { again = true; return "fresh"; });
+    return again;
+  };
+  assert.equal(await reread(slow(SID)), true, "a student's slow signals outlived the fallback");
+  assert.equal(await reread(slow(OTHER_SID)), true, "another student's slow signals outlived the fallback");
+  assert.equal(await reread(sage), false, "the fallback dropped Sage's chat layers");
+});
+
 test("an enrollment write clears its student, and a pathway write clears everyone", () => {
   assert.deepEqual(resolveChatContextInvalidation("StudentClassEnrollment", "update",
     { where: { id: "e1" }, data: { status: "archived" } }, { id: "e1", studentId: SID, classId: "k1" }),
