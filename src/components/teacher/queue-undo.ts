@@ -14,6 +14,10 @@
  * before its request leaves, and `reloaded(token)` clears only what was saved at or before that token. The rule never
  * looks at which alerts the load listed.
  *
+ * Undo sends back the status and timestamp its save wrote (`UndoExpectation`), so the route reopens the alert only if
+ * nobody has changed it since. If somebody has, the route answers 409, `send` throws `AlertChangedError`, and the flow
+ * says so and reloads the queue. Resolved, Dismiss and Snooze get the same answer when the alert is no longer open.
+ *
  * A critical alert asks first for all three. Declining leaves any earlier Undo offer as it was.
  *
  * No DOM here, so the whole flow is unit tested; `useQueueUndo` wires it to React and moves focus where `focus` says.
@@ -28,6 +32,32 @@ export const SNOOZE_HOURS = 24;
 
 /** The status line that takes focus when an alert line leaves the screen. The panel renders it. */
 export const QUEUE_STATUS_ID = "intervention-queue-status";
+
+/** What a Resolved or Dismiss save wrote. Undo sends it, and the route reopens only an alert that still holds it. */
+export interface UndoExpectation {
+  status: "resolved" | "dismissed";
+  at: string;
+}
+
+/** Thrown by `send` when the route answers 409: another instructor changed the alert since this queue loaded. */
+export class AlertChangedError extends Error {
+  constructor() {
+    super("The alert changed since the queue loaded.");
+    this.name = "AlertChangedError";
+  }
+}
+
+export const ALERT_CHANGED_TEXT = "Someone else changed this alert. The list now shows the latest.";
+
+/** The expected state in the route's answer to a Resolved or Dismiss, or null if it holds none. */
+export function undoExpectationFrom(action: QueueAlertRequest, body: unknown): UndoExpectation | null {
+  if (action === "snooze" || typeof body !== "object" || body === null) return null;
+  const answer = body as Record<string, unknown>;
+  const status = action === "resolve" ? "resolved" : "dismissed";
+  const at = action === "resolve" ? answer.resolvedAt : answer.dismissedAt;
+  if (answer.status !== status || typeof at !== "string") return null;
+  return { status, at };
+}
 
 /** The parts of a queue alert the flow needs. The title and name are shown in a confirm, never logged. */
 export interface QueueUndoTarget {
@@ -50,6 +80,7 @@ export interface UndoOffer {
   alertId: string;
   action: UndoableAlertAction;
   seq: number;
+  expected: UndoExpectation;
 }
 
 export type QueueUndoState =
@@ -99,7 +130,11 @@ export interface QueueReloadHooks {
 }
 
 export interface QueueUndoDeps {
-  send: (alertId: string, request: QueueSendRequest) => Promise<void>;
+  /**
+   * Sends one request. For Resolved and Dismiss it returns what the save wrote; Undo passes that back as `expected`.
+   * Throws `AlertChangedError` on a 409, anything else on another failure.
+   */
+  send: (alertId: string, request: QueueSendRequest, expected?: UndoExpectation) => Promise<UndoExpectation | null>;
   confirm: (question: QueueUndoQuestion) => Promise<boolean>;
   /** Reloads the queue. The load reports back through `reload`, so nothing here reads what it returns. */
   refresh: (reload: QueueReloadHooks) => Promise<unknown>;
@@ -322,7 +357,7 @@ function startingOffer(core: FlowCore): { previous: UndoOffer | null } | null {
   if (core.disposed) return null;
   if (state.kind === "idle") return { previous: null };
   if (state.kind === "undoable") {
-    return { previous: { alertId: state.alertId, action: state.action, seq: state.seq } };
+    return { previous: { alertId: state.alertId, action: state.action, seq: state.seq, expected: state.expected } };
   }
   return null;
 }
@@ -336,18 +371,36 @@ async function act(core: FlowCore, alert: QueueUndoTarget, action: QueueAlertReq
   const before = core.snapshot.state;
   const previous = before.kind === "confirming" ? before.previous : start.previous;
   update(core, { state: { kind: "sending", alertId: alert.id, action, previous }, message: null });
+  let expected: UndoExpectation | null;
   try {
-    await core.deps.send(alert.id, action);
-  } catch {
-    if (mounted()) actionFailed(core, alert.id, action);
+    expected = await core.deps.send(alert.id, action);
+  } catch (error: unknown) {
+    if (!mounted()) return;
+    if (error instanceof AlertChangedError) await changedElsewhere(core);
+    else actionFailed(core, alert.id, action);
     return;
   }
   if (!mounted()) return;
-  await saved(core, alert.id, action);
+  await saved(core, alert.id, action, expected);
+}
+
+/** The route refused because another instructor changed the alert. Only a reload shows what it is now. */
+async function changedElsewhere(core: FlowCore): Promise<void> {
+  update(core, {
+    state: IDLE,
+    message: note(core, "alert", ALERT_CHANGED_TEXT),
+    focus: focusOn(core, QUEUE_STATUS_ID),
+  });
+  await reload(core);
 }
 
 /** The send worked. The line turns into a done line, stamped so a reload that began earlier cannot clear it. */
-async function saved(core: FlowCore, alertId: string, action: QueueAlertRequest): Promise<void> {
+async function saved(
+  core: FlowCore,
+  alertId: string,
+  action: QueueAlertRequest,
+  expected: UndoExpectation | null,
+): Promise<void> {
   core.seq += 1;
   const seq = core.seq;
   const done = { ...core.snapshot.done, [alertId]: { action, seq } };
@@ -355,8 +408,13 @@ async function saved(core: FlowCore, alertId: string, action: QueueAlertRequest)
     await snoozed(core, done);
     return;
   }
+  if (!expected) {
+    // Saved, but the answer holds nothing an Undo could check against, so no Undo is offered.
+    update(core, { state: IDLE, done, focus: focusOn(core, QUEUE_STATUS_ID) });
+    return;
+  }
   update(core, {
-    state: { kind: "undoable", alertId, action, seq },
+    state: { kind: "undoable", alertId, action, seq, expected },
     done,
     focus: focusOn(core, alertControlId(alertId, "undo")),
   });
@@ -393,8 +451,12 @@ async function undo(core: FlowCore): Promise<void> {
   update(core, { state: { ...offer, kind: "undoing", rowGone: false }, message: null });
   let reopened = true;
   try {
-    await core.deps.send(offer.alertId, "reopen");
-  } catch {
+    await core.deps.send(offer.alertId, "reopen", offer.expected);
+  } catch (error: unknown) {
+    if (error instanceof AlertChangedError) {
+      if (mounted()) await changedElsewhere(core);
+      return;
+    }
     reopened = false;
   }
   if (!mounted()) return;

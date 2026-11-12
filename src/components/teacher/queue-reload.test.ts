@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { runQueueLoad, type QueueLoadSteps } from "./queue-reload";
 import { alertLineState, createQueueUndo, type QueueUndo, type QueueUndoTarget } from "./queue-undo";
+import { receiptFor } from "./queue-undo.test-support";
 
 const ROWS = ["row"];
 
@@ -107,7 +108,7 @@ function panelLike(): { flow: QueueUndo; answers: Array<() => void>; shown: () =
   let requests = 0;
   let shown = 0;
   const flow = createQueueUndo({
-    send: async () => {},
+    send: async (_alertId, request) => receiptFor(request),
     confirm: async () => true,
     refresh: (reload) => {
       requests += 1;

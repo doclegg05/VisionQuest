@@ -9,6 +9,7 @@ import {
   doneLabel,
   QUEUE_STATUS_ID,
   SNOOZE_HOURS,
+  type UndoExpectation,
 } from "./queue-undo";
 import {
   CRITICAL,
@@ -19,6 +20,7 @@ import {
   LOW2,
   offered,
   withOpenConfirm,
+  receiptFor,
 } from "./queue-undo.test-support";
 
 describe("createQueueUndo: Resolved and Dismiss", () => {
@@ -133,8 +135,8 @@ describe("createQueueUndo: Resolved and Dismiss", () => {
       ...h.deps,
       send: (alertId, action) => {
         h.sent.push([alertId, action]);
-        return new Promise<void>((resolve) => {
-          release = resolve;
+        return new Promise<UndoExpectation | null>((resolve) => {
+          release = () => resolve(receiptFor(action));
         });
       },
     });
@@ -150,9 +152,9 @@ describe("createQueueUndo: Resolved and Dismiss", () => {
     let release: () => void = () => {};
     const flow = createQueueUndo({
       ...h.deps,
-      send: () =>
-        new Promise<void>((resolve) => {
-          release = resolve;
+      send: (_alertId, action) =>
+        new Promise<UndoExpectation | null>((resolve) => {
+          release = () => resolve(receiptFor(action));
         }),
     });
     const pending = flow.act(LOW, "resolve");

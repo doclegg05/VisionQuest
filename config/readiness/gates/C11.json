@@ -1,0 +1,14 @@
+{
+  "id": "C11",
+  "kind": "task",
+  "set": "launch",
+  "title": "Alert Undo never overwrites a newer action",
+  "doneWhen": "Route test: an Undo whose expected state no longer matches is refused and changes nothing; every transition writes an audit row.",
+  "check": {
+    "type": "test",
+    "files": [
+      "src/app/api/teacher/alerts/[id]/route.test.ts",
+      "src/components/teacher/queue-undo.conflict.test.ts"
+    ]
+  }
+}
